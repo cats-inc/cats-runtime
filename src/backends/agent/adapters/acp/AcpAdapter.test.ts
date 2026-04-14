@@ -831,6 +831,235 @@ describe('AcpAdapter', () => {
     ]);
   });
 
+  it('persists ACP session info, commands, and config-option updates into runtime progress/state', async () => {
+    const process = new FakeAcpProcess();
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: false,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'acp-session-stateful',
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/prompt') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-session-stateful',
+            update: {
+              sessionUpdate: 'session_info_update',
+              sessionInfoUpdate: {
+                title: 'Repo Refactor',
+              },
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-session-stateful',
+            update: {
+              sessionUpdate: 'available_commands_update',
+              availableCommandsUpdate: {
+                availableCommands: [
+                  { name: '/plan', description: 'Create a plan' },
+                  { name: '/review', description: 'Review the patch' },
+                ],
+              },
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-session-stateful',
+            update: {
+              sessionUpdate: 'config_option_update',
+              configOptionUpdate: {
+                configOptions: [
+                  {
+                    configId: 'model',
+                    name: 'Model',
+                    payload: {
+                      currentValue: 'gpt-5.4-mini',
+                    },
+                  },
+                  {
+                    configId: 'mode',
+                    name: 'Mode',
+                    payload: {
+                      currentValue: 'plan',
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            stopReason: 'end_turn',
+          },
+        }) + '\n');
+      }
+    });
+
+    const hostBridge = createHostBridge();
+    const adapter = new AcpAdapter({
+      acpHostBridge: hostBridge,
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    const events = await collectEvents(adapter.invoke(
+      createInvokeInput(createStdioInstance(), hostBridge),
+    ));
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'init',
+        providerSessionId: 'acp-session-stateful',
+      }),
+      {
+        type: 'progress',
+        providerSessionId: 'acp-session-stateful',
+        text: 'Codex session title updated to Repo Refactor.',
+        providerState: expect.objectContaining({
+          agentSession: expect.objectContaining({
+            adapterState: expect.objectContaining({
+              sessionTitle: 'Repo Refactor',
+            }),
+          }),
+        }),
+        metadata: {
+          kind: 'session',
+          status: 'updated',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'agent',
+          instance: 'acp-local',
+          native: {
+            sourceEvent: 'session/update:session_info_update',
+            title: 'Repo Refactor',
+          },
+        },
+      },
+      {
+        type: 'progress',
+        providerSessionId: 'acp-session-stateful',
+        text: 'Codex updated available commands (2 commands).',
+        providerState: expect.objectContaining({
+          agentSession: expect.objectContaining({
+            adapterState: expect.objectContaining({
+              availableCommands: ['/plan', '/review'],
+            }),
+          }),
+        }),
+        metadata: {
+          kind: 'command',
+          status: 'updated',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'agent',
+          instance: 'acp-local',
+          native: {
+            sourceEvent: 'session/update:available_commands_update',
+            commandCount: 2,
+            commandNames: ['/plan', '/review'],
+          },
+        },
+      },
+      {
+        type: 'progress',
+        providerSessionId: 'acp-session-stateful',
+        text: 'Codex model state updated to gpt-5.4-mini.',
+        providerState: expect.objectContaining({
+          agentSession: expect.objectContaining({
+            adapterState: expect.objectContaining({
+              configOptions: [
+                {
+                  id: 'model',
+                  label: 'Model',
+                  value: 'gpt-5.4-mini',
+                },
+                {
+                  id: 'mode',
+                  label: 'Mode',
+                  value: 'plan',
+                },
+              ],
+            }),
+          }),
+        }),
+        metadata: {
+          kind: 'model_state',
+          status: 'updated',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'agent',
+          instance: 'acp-local',
+          native: {
+            sourceEvent: 'session/update:config_option_update',
+            configId: 'model',
+            value: 'gpt-5.4-mini',
+          },
+        },
+      },
+      {
+        type: 'result',
+        providerSessionId: 'acp-session-stateful',
+        summary: 'ACP stop reason: end_turn',
+        providerState: expect.objectContaining({
+          agentSession: expect.objectContaining({
+            status: 'idle',
+            adapterState: expect.objectContaining({
+              sessionTitle: 'Repo Refactor',
+              availableCommands: ['/plan', '/review'],
+              configOptions: [
+                {
+                  id: 'model',
+                  label: 'Model',
+                  value: 'gpt-5.4-mini',
+                },
+                {
+                  id: 'mode',
+                  label: 'Mode',
+                  value: 'plan',
+                },
+              ],
+              stopReason: 'end_turn',
+            }),
+          }),
+        }),
+        metadata: {
+          stopReason: 'end_turn',
+        },
+      },
+    ]);
+  });
+
   it('uses session/load for continuity and suppresses replay updates during bootstrap', async () => {
     const process = new FakeAcpProcess();
     startFakeServer(process, async (message) => {

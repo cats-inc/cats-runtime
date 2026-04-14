@@ -26,6 +26,12 @@ interface AcpObservedToolCall {
   name?: string;
 }
 
+interface AcpConfigOptionSnapshot {
+  id: string;
+  label?: string;
+  value?: string;
+}
+
 function resolveEndpoint(
   instance: RemoteProviderInstanceConfig,
   env: NodeJS.ProcessEnv,
@@ -467,6 +473,101 @@ function summarizePlanUpdate(input: AgentInvokeInput, update: Record<string, unk
       };
 }
 
+function normalizeConfigOption(entry: unknown): AcpConfigOptionSnapshot | null {
+  const record = parseRecord(entry);
+  if (!record) {
+    return null;
+  }
+
+  const payload = parseRecord(record.payload) || record;
+  const id = readString(record.configId)
+    || readString(record.id)
+    || readString(record.name);
+  if (!id) {
+    return null;
+  }
+
+  const label = readString(record.name) || readString(record.label);
+  const currentValue = readString(payload.currentValue)
+    || readString(record.currentValue)
+    || readString(record.value);
+
+  return {
+    id,
+    ...(label ? { label } : {}),
+    ...(currentValue ? { value: currentValue } : {}),
+  };
+}
+
+function parseConfigOptions(value: unknown): AcpConfigOptionSnapshot[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry) => {
+    const normalized = normalizeConfigOption(entry);
+    return normalized ? [normalized] : [];
+  });
+}
+
+function summarizeAvailableCommandsUpdate(
+  input: AgentInvokeInput,
+  commands: Array<{ name: string }>,
+): { text: string; count?: number } {
+  const label = formatProviderLabel(input.providerName);
+  const count = commands.length;
+  if (count === 0) {
+    return { text: `${label} cleared available commands.` };
+  }
+
+  return {
+    text: `${label} updated available commands (${count} command${count === 1 ? '' : 's'}).`,
+    count,
+  };
+}
+
+function summarizeConfigOptionUpdate(
+  input: AgentInvokeInput,
+  options: AcpConfigOptionSnapshot[],
+): {
+  text: string;
+  kind: 'session' | 'model_state';
+  details: Record<string, unknown>;
+} {
+  const label = formatProviderLabel(input.providerName);
+  const model = options.find((option) => option.id === 'model');
+  if (model?.value) {
+    return {
+      text: `${label} model state updated to ${model.value}.`,
+      kind: 'model_state',
+      details: {
+        configId: 'model',
+        value: model.value,
+      },
+    };
+  }
+
+  const mode = options.find((option) => option.id === 'mode');
+  if (mode?.value) {
+    return {
+      text: `${label} session mode updated to ${mode.value}.`,
+      kind: 'session',
+      details: {
+        configId: 'mode',
+        value: mode.value,
+      },
+    };
+  }
+
+  return {
+    text: `${label} updated session configuration (${options.length} option${options.length === 1 ? '' : 's'}).`,
+    kind: 'session',
+    details: {
+      optionCount: options.length,
+    },
+  };
+}
+
 function buildToolMetadata(
   sourceEvent: string,
   toolCall: Record<string, unknown>,
@@ -495,6 +596,7 @@ function parseSessionUpdateEvents(
   providerSessionId: string,
   notification: AcpJsonRpcNotification,
   observedTools: Map<string, AcpObservedToolCall>,
+  adapterState: Record<string, unknown>,
 ): StreamEvent[] {
   const params = parseRecord(notification.params);
   const update = parseRecord(params?.update);
@@ -507,7 +609,7 @@ function parseSessionUpdateEvents(
     return [];
   }
 
-  const providerState = buildProviderState(input, providerSessionId, 'active');
+  const buildActiveState = () => buildProviderState(input, providerSessionId, 'active', adapterState);
   if (updateType === 'agent_message_chunk') {
     const text = readString(update.content)
       || readString(parseRecord(update.chunk)?.text)
@@ -536,7 +638,7 @@ function parseSessionUpdateEvents(
             sourceEvent: 'session/update:agent_thought_chunk',
             hasReasoningDelta: true,
           },
-          providerState,
+          buildActiveState(),
         )]
       : [];
   }
@@ -553,7 +655,82 @@ function parseSessionUpdateEvents(
         sourceEvent: 'session/update:plan',
         ...(summary.stepCount === undefined ? {} : { stepCount: summary.stepCount }),
       },
-      providerState,
+      buildActiveState(),
+    )];
+  }
+
+  if (updateType === 'session_info_update') {
+    const sessionInfo = parseRecord(update.sessionInfoUpdate) || update;
+    const title = readString(sessionInfo.title);
+    if (!title) {
+      return [];
+    }
+
+    adapterState.sessionTitle = title;
+    return [buildProgressEvent(
+      input,
+      providerSessionId,
+      `${formatProviderLabel(input.providerName)} session title updated to ${title}.`,
+      'session',
+      'updated',
+      {
+        sourceEvent: 'session/update:session_info_update',
+        title,
+      },
+      buildActiveState(),
+    )];
+  }
+
+  if (updateType === 'available_commands_update') {
+    const availableCommandsUpdate = parseRecord(update.availableCommandsUpdate) || update;
+    const commands = Array.isArray(availableCommandsUpdate.availableCommands)
+      ? availableCommandsUpdate.availableCommands.flatMap((entry) => {
+          const record = parseRecord(entry);
+          const name = readString(record?.name);
+          return name ? [{ name }] : [];
+        })
+      : [];
+    adapterState.availableCommands = commands.map((command) => command.name);
+    const summary = summarizeAvailableCommandsUpdate(input, commands);
+    return [buildProgressEvent(
+      input,
+      providerSessionId,
+      summary.text,
+      'command',
+      'updated',
+      {
+        sourceEvent: 'session/update:available_commands_update',
+        ...(summary.count === undefined ? {} : { commandCount: summary.count }),
+        commandNames: commands.map((command) => command.name),
+      },
+      buildActiveState(),
+    )];
+  }
+
+  if (updateType === 'config_option_update') {
+    const configOptionUpdate = parseRecord(update.configOptionUpdate) || update;
+    const options = parseConfigOptions(configOptionUpdate.configOptions);
+    if (options.length === 0) {
+      return [];
+    }
+
+    adapterState.configOptions = options.map((option) => ({
+      id: option.id,
+      ...(option.label ? { label: option.label } : {}),
+      ...(option.value ? { value: option.value } : {}),
+    }));
+    const summary = summarizeConfigOptionUpdate(input, options);
+    return [buildProgressEvent(
+      input,
+      providerSessionId,
+      summary.text,
+      summary.kind,
+      'updated',
+      {
+        sourceEvent: 'session/update:config_option_update',
+        ...summary.details,
+      },
+      buildActiveState(),
     )];
   }
 
@@ -563,6 +740,9 @@ function parseSessionUpdateEvents(
       || readString(toolCall.kind)
       || readString(toolCall.name);
     const toolId = readString(toolCall.toolCallId) || readString(toolCall.id);
+    const toolText = extractToolText(toolCall.content);
+    const toolMetadata = buildToolMetadata('session/update:tool_call', toolCall);
+    const rawInput = parseRecord(toolCall.rawInput) || parseRecord(toolCall.raw_input);
     if (toolId) {
       observedTools.set(toolId, {
         ...(toolName ? { name: toolName } : {}),
@@ -571,16 +751,12 @@ function parseSessionUpdateEvents(
     return [{
       type: 'tool_use',
       providerSessionId,
-      ...(extractToolText(toolCall.content) ? { text: extractToolText(toolCall.content) } : {}),
+      ...(toolText ? { text: toolText } : {}),
       ...(toolName ? { toolName } : {}),
       ...(toolId ? { toolId } : {}),
-      ...(buildToolMetadata('session/update:tool_call', toolCall)
-        ? { metadata: buildToolMetadata('session/update:tool_call', toolCall) }
-        : {}),
-      providerState,
-      ...(parseRecord(toolCall.rawInput) || parseRecord(toolCall.raw_input)
-        ? { toolArgs: (parseRecord(toolCall.rawInput) || parseRecord(toolCall.raw_input))! }
-        : {}),
+      ...(toolMetadata ? { metadata: toolMetadata } : {}),
+      providerState: buildActiveState(),
+      ...(rawInput ? { toolArgs: rawInput } : {}),
     }];
   }
 
@@ -613,7 +789,7 @@ function parseSessionUpdateEvents(
             sourceEvent: 'session/update:tool_call_update:terminal_output',
             terminalId: readString(terminalOutput.terminal_id) || toolId,
           },
-          providerState,
+          buildActiveState(),
           {
             ...(toolId ? { toolId } : {}),
             ...(toolName ? { toolName } : {}),
@@ -636,17 +812,17 @@ function parseSessionUpdateEvents(
         summary,
         'command',
         'updated',
-        {
-          sourceEvent: 'session/update:tool_call_update:terminal_exit',
-          terminalId: readString(terminalExit.terminal_id) || toolId,
-          ...(exitCode === undefined ? {} : { exitCode }),
-          ...(signal ? { signal } : {}),
-        },
-        providerState,
-        {
-          ...(toolId ? { toolId } : {}),
-          ...(toolName ? { toolName } : {}),
-        },
+          {
+            sourceEvent: 'session/update:tool_call_update:terminal_exit',
+            terminalId: readString(terminalExit.terminal_id) || toolId,
+            ...(exitCode === undefined ? {} : { exitCode }),
+            ...(signal ? { signal } : {}),
+          },
+          buildActiveState(),
+          {
+            ...(toolId ? { toolId } : {}),
+            ...(toolName ? { toolName } : {}),
+          },
       ));
     }
 
@@ -658,7 +834,7 @@ function parseSessionUpdateEvents(
         ...(toolName ? { toolName } : {}),
         ...(text ? { text } : {}),
         ...(status === 'failed' ? { isError: true } : {}),
-        providerState,
+        providerState: buildActiveState(),
         ...(meta && Object.keys(meta).length > 0
           ? {
               metadata: {
@@ -827,6 +1003,9 @@ export class AcpAdapter implements AgentAdapter {
     let providerSessionId = input.providerSessionId;
     let phase: AcpInvokePhase = 'bootstrap';
     const observedTools = new Map<string, AcpObservedToolCall>();
+    const adapterStateSnapshot = {
+      ...(parseRecord(input.sessionState?.agentSession?.adapterState) || {}),
+    };
 
     const push = (item: StreamEvent | Error | null) => {
       queue.push(item);
@@ -852,6 +1031,7 @@ export class AcpAdapter implements AgentAdapter {
           providerSessionId,
           notification,
           observedTools,
+          adapterStateSnapshot,
         )) {
           push(event);
         }
@@ -903,6 +1083,7 @@ export class AcpAdapter implements AgentAdapter {
         type: 'init',
         providerSessionId,
         providerState: buildProviderState(input, providerSessionId, 'active', {
+          ...adapterStateSnapshot,
           protocolVersion,
           loadSessionSupported,
           sessionCwd: bootstrapParams.cwd,
@@ -930,6 +1111,7 @@ export class AcpAdapter implements AgentAdapter {
           providerSessionId,
           ...(stopReason ? { summary: `ACP stop reason: ${stopReason}` } : {}),
           providerState: buildProviderState(input, providerSessionId, 'idle', {
+            ...adapterStateSnapshot,
             protocolVersion,
             loadSessionSupported,
             sessionCwd: bootstrapParams.cwd,
