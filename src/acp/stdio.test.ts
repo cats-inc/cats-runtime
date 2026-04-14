@@ -1,0 +1,292 @@
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { PassThrough } from 'node:stream';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
+import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
+import type { CliRuntimeConfig } from '../backends/cli/config.js';
+import type { CursorNativeSessionService } from '../backends/cli/cursor/CursorNativeSessionService.js';
+import type { GooseNativeSessionService } from '../backends/cli/goose/GooseNativeSessionService.js';
+import type { KiroNativeSessionService } from '../backends/cli/kiro/KiroNativeSessionService.js';
+import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionService.js';
+import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
+import type { AppContext } from '../http/app.js';
+import { createRuntimeStartupState } from '../startup.js';
+import { startAcpStdioServer } from './stdio.js';
+
+function encodeMessage(message: unknown): Buffer {
+  const payload = Buffer.from(JSON.stringify(message), 'utf8');
+  return Buffer.from(`Content-Length: ${payload.length}\r\n\r\n${payload.toString('utf8')}`, 'utf8');
+}
+
+function decodeMessages(buffer: Buffer): unknown[] {
+  const messages: unknown[] = [];
+  let remaining = buffer;
+  while (remaining.length > 0) {
+    const separator = remaining.indexOf('\r\n\r\n');
+    if (separator < 0) {
+      break;
+    }
+    const header = remaining.subarray(0, separator).toString('utf8');
+    const lengthLine = header.split('\r\n').find((line) => line.toLowerCase().startsWith('content-length:'));
+    if (!lengthLine) {
+      throw new Error('Missing Content-Length');
+    }
+    const length = Number.parseInt(lengthLine.split(':')[1].trim(), 10);
+    const start = separator + 4;
+    const end = start + length;
+    messages.push(JSON.parse(remaining.subarray(start, end).toString('utf8')) as unknown);
+    remaining = remaining.subarray(end);
+  }
+  return messages;
+}
+
+function makeConfig(rootDir: string): CliRuntimeConfig {
+  return {
+    host: '127.0.0.1',
+    port: 3110,
+    apiKey: '',
+    dataDir: join(rootDir, 'data'),
+    sessionBaseDir: join(rootDir, 'sessions'),
+    auggiePath: 'auggie',
+    claudePath: 'claude',
+    codexPath: 'codex',
+    copilotPath: 'copilot',
+    cursorPath: 'cursor-agent',
+    geminiPath: 'gemini',
+    goosePath: 'goose',
+    juniePath: 'junie',
+    kiroPath: 'kiro-cli',
+    kiloPath: 'kilo',
+    opencodePath: 'opencode',
+    piPath: 'pi',
+    opencodeServerHost: '127.0.0.1',
+    opencodeServerPort: 4097,
+    opencodeServerStartupTimeoutMs: 10000,
+    kiloServerHost: '127.0.0.1',
+    kiloServerPort: 4313,
+    kiloServerStartupTimeoutMs: 10000,
+    auggieSessionsDir: '',
+    claudeProjectsDir: '',
+    codexSessionsDir: '',
+    copilotSessionsDir: '',
+    cursorChatsDir: '',
+    cursorRuntime: { mode: 'native' },
+    geminiSessionsDir: '',
+    kiroDbPath: '',
+    kiroRuntime: { mode: 'native' },
+    providerCommands: {
+      auggie: { path: 'auggie', runner: 'auto', runtime: { mode: 'native' } },
+      claude: { path: 'claude', runner: 'auto', runtime: { mode: 'native' } },
+      codex: { path: 'codex', runner: 'auto', runtime: { mode: 'native' } },
+      copilot: { path: 'copilot', runner: 'auto', runtime: { mode: 'native' } },
+      cursor: { path: 'cursor-agent', runner: 'auto', runtime: { mode: 'native' } },
+      gemini: { path: 'gemini', runner: 'auto', runtime: { mode: 'native' } },
+      goose: { path: 'goose', runner: 'auto', runtime: { mode: 'native' } },
+      junie: { path: 'junie', runner: 'auto', runtime: { mode: 'native' } },
+      kiro: { path: 'kiro-cli', runner: 'auto', runtime: { mode: 'native' } },
+      kilo: { path: 'kilo', runner: 'auto', runtime: { mode: 'native' } },
+      opencode: { path: 'opencode', runner: 'auto', runtime: { mode: 'native' } },
+      pi: { path: 'pi', runner: 'auto', runtime: { mode: 'native' } },
+    },
+    externalSessionLiveWindowMs: 0,
+    maxSessions: 10,
+  } as unknown as CliRuntimeConfig;
+}
+
+describe('ACP stdio transport', () => {
+  let rootDir = '';
+
+  afterEach(() => {
+    if (rootDir) {
+      rmSync(rootDir, { recursive: true, force: true });
+      rootDir = '';
+    }
+  });
+
+  it('handles initialize, session creation, listing, loading, and cancel notifications over stdio frames', async () => {
+    rootDir = mkdtempSync(join(tmpdir(), 'cats-runtime-acp-stdio-'));
+    mkdirSync(join(rootDir, 'sessions'), { recursive: true });
+    mkdirSync(join(rootDir, 'data'), { recursive: true });
+
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const registry = new SessionRegistry();
+    const pool = {
+      getCapabilities: vi.fn(() => ({ resume: true, fork: true, permissions: true })),
+      get: vi.fn(() => undefined),
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      cancel: vi.fn(),
+      status: vi.fn(() => ({ active: 0 })),
+    } as unknown as WorkerPool;
+
+    const ctx: AppContext = {
+      config: makeConfig(rootDir),
+      startup: createRuntimeStartupState(),
+      registry,
+      pool,
+      cursorNative: {} as CursorNativeSessionService,
+      gooseNative: {} as GooseNativeSessionService,
+      kiroNative: {} as KiroNativeSessionService,
+      auggieSessions: {} as AuggieSessionService,
+      opencodeNative: {} as OpencodeNativeSessionService,
+      providerModelCatalog: {} as never,
+    };
+
+    const server = startAcpStdioServer({ ctx, input, output });
+    const chunks: Buffer[] = [];
+    output.on('data', (chunk) => {
+      chunks.push(Buffer.from(chunk));
+    });
+
+    const cwd = join(rootDir, 'workspace');
+    mkdirSync(cwd, { recursive: true });
+
+    input.write(Buffer.concat([
+      encodeMessage({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: 1,
+        },
+      }),
+      encodeMessage({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'session/new',
+        params: {
+          cwd,
+          mcpServers: [],
+        },
+      }),
+    ]));
+
+    await vi.waitFor(() => {
+      expect(decodeMessages(Buffer.concat(chunks))).toHaveLength(2);
+    });
+
+    const firstMessages = decodeMessages(Buffer.concat(chunks)) as Array<Record<string, unknown>>;
+    expect(firstMessages[0]).toMatchObject({
+      jsonrpc: '2.0',
+      id: 1,
+      result: {
+        protocolVersion: 1,
+        agentInfo: {
+          name: 'cats-runtime',
+        },
+      },
+    });
+    expect(firstMessages[1]).toMatchObject({
+      jsonrpc: '2.0',
+      id: 2,
+      result: {
+        sessionId: expect.any(String),
+        _meta: {
+          catsRuntime: {
+            source: 'runtime_http_bridge',
+          },
+        },
+      },
+    });
+
+    const sessionId = (firstMessages[1].result as { sessionId: string }).sessionId;
+
+    input.write(Buffer.concat([
+      encodeMessage({
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'session/list',
+        params: {
+          cwd,
+        },
+      }),
+      encodeMessage({
+        jsonrpc: '2.0',
+        id: 4,
+        method: 'session/load',
+        params: {
+          sessionId,
+          cwd,
+          mcpServers: [],
+        },
+      }),
+      encodeMessage({
+        jsonrpc: '2.0',
+        method: 'session/cancel',
+        params: {
+          sessionId,
+        },
+      }),
+    ]));
+
+    await vi.waitFor(() => {
+      expect(decodeMessages(Buffer.concat(chunks))).toHaveLength(4);
+    });
+
+    const messages = decodeMessages(Buffer.concat(chunks)) as Array<Record<string, unknown>>;
+    expect(messages[2]).toMatchObject({
+      jsonrpc: '2.0',
+      id: 3,
+      result: {
+        sessions: [
+          expect.objectContaining({
+            sessionId,
+            cwd,
+          }),
+        ],
+      },
+    });
+    expect(messages[3]).toMatchObject({
+      jsonrpc: '2.0',
+      id: 4,
+      result: {
+        _meta: {
+          catsRuntime: {
+            resumedFromRuntimeRegistry: true,
+          },
+        },
+      },
+    });
+
+    await server.close();
+  });
+
+  it('returns parse errors for malformed stdio frames', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const server = startAcpStdioServer({
+      handleJsonRpc: vi.fn(async () => ({
+        jsonrpc: '2.0',
+        id: 1,
+        result: {},
+      })),
+      input,
+      output,
+    });
+
+    const chunks: Buffer[] = [];
+    output.on('data', (chunk) => {
+      chunks.push(Buffer.from(chunk));
+    });
+
+    input.write(Buffer.from('Content-Length: nope\r\n\r\n{}', 'utf8'));
+
+    await vi.waitFor(() => {
+      expect(decodeMessages(Buffer.concat(chunks))).toEqual([
+        {
+          jsonrpc: '2.0',
+          id: null,
+          error: {
+            code: -32700,
+            message: 'Missing or invalid Content-Length header',
+          },
+        },
+      ]);
+    });
+
+    await server.close();
+  });
+});
