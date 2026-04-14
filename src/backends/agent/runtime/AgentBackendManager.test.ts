@@ -463,4 +463,98 @@ describe('AgentBackendManager', () => {
       }),
     }));
   });
+
+  it('best-effort closes ACP provider sessions during runtime close when the agent supports session close', async () => {
+    const registry = new SessionRegistry();
+    const session = registry.create({
+      id: 'agent-acp-close',
+      providerName: 'codex',
+      providerBackend: 'agent',
+      providerInstanceId: 'acp-local',
+      cwd: '/repo',
+    });
+    registry.setProviderState(session.id, {
+      agentSession: {
+        providerSessionId: 'acp-close-session',
+      },
+    });
+
+    const process = new FakeAcpProcess();
+    const seenMessages: Array<Record<string, unknown>> = [];
+    startFakeServer(process, async (message) => {
+      seenMessages.push(message);
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              session: {
+                close: {},
+              },
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/close') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            closed: true,
+          },
+        }) + '\n');
+      }
+    });
+
+    vi.mocked(buildAgentAdapter).mockReturnValue(new AcpAdapter({
+      acpProcessSpawner: createSpawner(process),
+    }));
+
+    const manager = new AgentBackendManager(
+      { sessionBaseDir: '/tmp/cats-runtime-tests' },
+      registry,
+    );
+
+    const target: ProviderTargetDescriptor = {
+      providerName: 'codex',
+      backend: 'agent',
+      instanceId: 'acp-local',
+      defaultTarget: true,
+      remoteInstance: {
+        id: 'acp-local',
+        providerName: 'codex',
+        backend: 'agent',
+        transport: 'acp_stdio',
+        command: 'codex-acp',
+        args: ['serve'],
+        cwd: '/repo',
+        model: 'gpt-5.4',
+      },
+    };
+
+    manager.spawn(session.id, target);
+    await manager.close(session.id, 'close');
+
+    expect(seenMessages).toEqual([
+      {
+        jsonrpc: '2.0',
+        id: 0,
+        method: 'initialize',
+        params: expect.any(Object),
+      },
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'session/close',
+        params: {
+          sessionId: 'acp-close-session',
+        },
+      },
+    ]);
+    expect(manager.get(session.id)).toBeUndefined();
+  });
 });

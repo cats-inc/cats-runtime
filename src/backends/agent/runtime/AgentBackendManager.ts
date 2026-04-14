@@ -103,9 +103,13 @@ export class AgentBackendManager {
       onCancel: async (input) => {
         await this.cancelRemoteSession(sessionId, target, input.busy);
       },
-      onClose: async () => {
-        this.handles.delete(sessionId);
-        this.targets.delete(sessionId);
+      onClose: async (input) => {
+        try {
+          await this.closeRemoteSession(sessionId, target, input.reason);
+        } finally {
+          this.handles.delete(sessionId);
+          this.targets.delete(sessionId);
+        }
       },
     });
 
@@ -372,5 +376,24 @@ export class AgentBackendManager {
     }
 
     await adapter.cancel(sessionId, instance, session?.providerState);
+  }
+
+  private async closeRemoteSession(
+    sessionId: string,
+    target: ProviderTargetDescriptor,
+    reason: ManagedExecutionLifecycleReason,
+  ): Promise<void> {
+    const session = this.registry.get(sessionId);
+    if (!session) {
+      return;
+    }
+
+    const instance = ensureAgentTarget(target);
+    const adapter = this.buildAdapter(instance);
+    if (!adapter.close) {
+      return;
+    }
+
+    await adapter.close(sessionId, instance, session.providerState, reason);
   }
 }

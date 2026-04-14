@@ -12,6 +12,7 @@ import type {
 } from '../../types.js';
 import type { PermissionMode, SessionProviderState, StreamEvent } from '../../../../core/types.js';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
+import type { ManagedExecutionLifecycleReason } from '../../../../core/runtime/ManagedExecutionHandle.js';
 import { runCliCommand } from '../../../../core/management/cli.js';
 import { hiddenWindowsSpawnOptions } from '../../../../core/process/windowsSpawn.js';
 import { createRuntimeProgressEvent } from '../../../../core/progress.js';
@@ -356,6 +357,20 @@ function resolveBootstrapMcpServers(input: AgentInvokeInput): AgentAcpHostMcpSer
 
 function resolveBootstrapTimeoutMs(instance: RemoteProviderInstanceConfig): number {
   return instance.startupTimeoutMs ?? DEFAULT_ACP_STDIN_PROBE_TIMEOUT_MS;
+}
+
+function supportsCloseSession(agentCapabilities: Record<string, unknown> | undefined): boolean {
+  if (!agentCapabilities) {
+    return false;
+  }
+
+  if (agentCapabilities.closeSession === true) {
+    return true;
+  }
+
+  const sessionCapabilities = parseRecord(agentCapabilities.session);
+  const close = sessionCapabilities?.close;
+  return close === true || Boolean(parseRecord(close));
 }
 
 function resolveBootstrapCwd(...candidates: Array<string | undefined>): string | undefined {
@@ -1891,8 +1906,9 @@ export class AcpAdapter implements AgentAdapter {
         }), { timeoutMs: bootstrapTimeoutMs }),
       );
       const protocolVersion = initializeResult?.protocolVersion;
-      const agentCapabilities = parseRecord(initializeResult?.agentCapabilities);
+      const agentCapabilities = parseRecord(initializeResult?.agentCapabilities) || undefined;
       const loadSessionSupported = agentCapabilities?.loadSession === true;
+      const closeSessionSupported = supportsCloseSession(agentCapabilities);
 
       const bootstrapParams = buildSessionBootstrapParams(input);
       if (providerSessionId) {
@@ -1924,6 +1940,7 @@ export class AcpAdapter implements AgentAdapter {
           ...adapterStateSnapshot,
           protocolVersion,
           loadSessionSupported,
+          closeSessionSupported,
           sessionCwd: bootstrapParams.cwd,
           sessionMcpServers: bootstrapParams.mcpServers,
         }),
@@ -1953,6 +1970,7 @@ export class AcpAdapter implements AgentAdapter {
             ...adapterStateSnapshot,
             protocolVersion,
             loadSessionSupported,
+            closeSessionSupported,
             sessionCwd: bootstrapParams.cwd,
             sessionMcpServers: bootstrapParams.mcpServers,
             ...(stopReason ? { stopReason } : {}),
@@ -2039,7 +2057,7 @@ export class AcpAdapter implements AgentAdapter {
           timeoutMs: bootstrapTimeoutMs,
         }),
       );
-      const agentCapabilities = parseRecord(initializeResult?.agentCapabilities);
+      const agentCapabilities = parseRecord(initializeResult?.agentCapabilities) || undefined;
       if (agentCapabilities?.loadSession !== true) {
         return;
       }
@@ -2051,6 +2069,52 @@ export class AcpAdapter implements AgentAdapter {
       }, { timeoutMs: bootstrapTimeoutMs });
       client.notify('session/cancel', {
         sessionId: providerSessionId,
+      });
+    } finally {
+      await client.close();
+    }
+  }
+
+  async close(
+    _sessionId: string,
+    instance: RemoteProviderInstanceConfig,
+    state?: SessionProviderState,
+    reason: ManagedExecutionLifecycleReason = 'close',
+  ): Promise<void> {
+    if (reason === 'cancel') {
+      return;
+    }
+
+    const command = instance.command?.trim();
+    const providerSessionId = state?.agentSession?.providerSessionId;
+    if (!command || !providerSessionId) {
+      return;
+    }
+
+    const env = sanitizeEnv(this.options.env || process.env);
+    const bootstrapTimeoutMs = resolveBootstrapTimeoutMs(instance);
+    const client = new AcpStdioClient({
+      command,
+      args: instance.args,
+      cwd: instance.cwd || process.cwd(),
+      env,
+      spawnProcess: this.options.acpProcessSpawner,
+    });
+    try {
+      const initializeResult = parseRecord(
+        await client.request('initialize', buildInitializeParams(instance), {
+          timeoutMs: bootstrapTimeoutMs,
+        }),
+      );
+      const agentCapabilities = parseRecord(initializeResult?.agentCapabilities) || undefined;
+      if (!supportsCloseSession(agentCapabilities)) {
+        return;
+      }
+
+      await client.request('session/close', {
+        sessionId: providerSessionId,
+      }, {
+        timeoutMs: bootstrapTimeoutMs,
       });
     } finally {
       await client.close();

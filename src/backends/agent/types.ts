@@ -12,6 +12,7 @@ import type {
 } from '../../core/types.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../core/compatibility/providerEvolution.js';
 import type { RemoteProviderInstanceConfig } from '../cli/config.js';
+import type { ManagedExecutionLifecycleReason } from '../../core/runtime/ManagedExecutionHandle.js';
 
 export interface AgentAcpHostContext {
   sessionId: string;
@@ -260,6 +261,12 @@ export interface AgentAdapter {
     sessionId: string,
     instance: RemoteProviderInstanceConfig,
     state?: SessionProviderState,
+  ): Promise<void>;
+  close?(
+    sessionId: string,
+    instance: RemoteProviderInstanceConfig,
+    state?: SessionProviderState,
+    reason?: ManagedExecutionLifecycleReason,
   ): Promise<void>;
 }
 

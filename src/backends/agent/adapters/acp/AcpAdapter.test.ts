@@ -2617,4 +2617,64 @@ describe('AcpAdapter', () => {
       },
     ]);
   });
+
+  it('closes provider-managed ACP sessions when the agent advertises close-session support', async () => {
+    const process = new FakeAcpProcess();
+    const seenMessages: Array<Record<string, unknown>> = [];
+    startFakeServer(process, (message) => {
+      seenMessages.push(message);
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              session: {
+                close: {},
+              },
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/close') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            closed: true,
+          },
+        }) + '\n');
+      }
+    });
+
+    const adapter = new AcpAdapter({
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    await adapter.close('session-1', createStdioInstance(), {
+      agentSession: {
+        providerSessionId: 'acp-session-close',
+      },
+    }, 'close');
+
+    expect(seenMessages).toEqual([
+      {
+        jsonrpc: '2.0',
+        id: 0,
+        method: 'initialize',
+        params: expect.any(Object),
+      },
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'session/close',
+        params: {
+          sessionId: 'acp-session-close',
+        },
+      },
+    ]);
+  });
 });
