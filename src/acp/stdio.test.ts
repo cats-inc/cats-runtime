@@ -862,4 +862,210 @@ describe('ACP stdio transport', () => {
 
     await server.close();
   });
+
+  it('projects runtime session mode and usage state into ACP-native updates without duplicates', async () => {
+    rootDir = mkdtempSync(join(tmpdir(), 'cats-runtime-acp-stdio-'));
+    mkdirSync(join(rootDir, 'sessions'), { recursive: true });
+    mkdirSync(join(rootDir, 'data'), { recursive: true });
+
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const registry = new SessionRegistry();
+    const worker = {
+      alive: true,
+      busy: false,
+      on: vi.fn(),
+      off: vi.fn(),
+      async *streamMessage(turnInput: string | TurnInput): AsyncGenerator<StreamEvent> {
+        const resolvedInput = typeof turnInput === 'string' ? { message: turnInput } : turnInput;
+        expect(resolvedInput.message).toBe('Show session-state projections.');
+        yield {
+          type: 'progress',
+          text: 'Runtime entered code mode.',
+          providerState: {
+            agentSession: {
+              adapterState: {
+                currentModeId: 'code',
+              },
+            },
+          },
+        };
+        yield {
+          type: 'progress',
+          text: 'Runtime usage snapshot updated.',
+          providerState: {
+            agentSession: {
+              adapterState: {
+                currentModeId: 'code',
+                contextWindowUsage: {
+                  used: 53000,
+                  size: 200000,
+                  costAmount: 0.045,
+                  costCurrency: 'USD',
+                },
+              },
+            },
+          },
+        };
+        yield {
+          type: 'result',
+          text: 'Session-state projection complete.',
+          providerState: {
+            agentSession: {
+              adapterState: {
+                currentModeId: 'code',
+                contextWindowUsage: {
+                  used: 53000,
+                  size: 200000,
+                  costAmount: 0.045,
+                  costCurrency: 'USD',
+                },
+              },
+            },
+          },
+        };
+      },
+    };
+    const pool = {
+      getCapabilities: vi.fn(() => ({ resume: true, fork: true, permissions: true })),
+      get: vi.fn(() => worker),
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      cancel: vi.fn(),
+      status: vi.fn(() => ({ active: 1 })),
+    } as unknown as WorkerPool;
+
+    const ctx: AppContext = {
+      config: makeConfig(rootDir),
+      startup: createRuntimeStartupState(),
+      registry,
+      pool,
+      cursorNative: {} as CursorNativeSessionService,
+      gooseNative: {} as GooseNativeSessionService,
+      kiroNative: {} as KiroNativeSessionService,
+      auggieSessions: {} as AuggieSessionService,
+      opencodeNative: {} as OpencodeNativeSessionService,
+      providerModelCatalog: {} as never,
+    };
+
+    const server = startAcpStdioServer({ ctx, input, output });
+    const chunks: Buffer[] = [];
+    output.on('data', (chunk) => {
+      chunks.push(Buffer.from(chunk));
+    });
+
+    const cwd = join(rootDir, 'workspace-session-state');
+    mkdirSync(cwd, { recursive: true });
+
+    input.write(Buffer.concat([
+      encodeMessage({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: 1,
+        },
+      }),
+      encodeMessage({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'session/new',
+        params: {
+          cwd,
+          mcpServers: [],
+        },
+      }),
+    ]));
+
+    await vi.waitFor(() => {
+      expect(decodeMessages(Buffer.concat(chunks))).toHaveLength(2);
+    });
+
+    const initialMessages = decodeMessages(Buffer.concat(chunks)) as Array<Record<string, unknown>>;
+    const sessionId = (initialMessages[1].result as { sessionId: string }).sessionId;
+
+    input.write(encodeMessage({
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'session/prompt',
+      params: {
+        sessionId,
+        prompt: [
+          {
+            type: 'text',
+            text: 'Show session-state projections.',
+          },
+        ],
+      },
+    }));
+
+    await vi.waitFor(() => {
+      expect(decodeMessages(Buffer.concat(chunks))).toHaveLength(6);
+    });
+
+    const promptMessages = decodeMessages(Buffer.concat(chunks)).slice(2) as Array<Record<string, unknown>>;
+    expect(promptMessages).toEqual([
+      {
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: 'current_mode_update',
+            currentModeUpdate: {
+              modeId: 'code',
+            },
+          },
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: 'usage_update',
+            usageUpdate: {
+              used: 53000,
+              size: 200000,
+              cost: {
+                amount: 0.045,
+                currency: 'USD',
+              },
+            },
+          },
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: 'agent_message_chunk',
+            content: {
+              type: 'text',
+              text: 'Session-state projection complete.',
+            },
+          },
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        id: 3,
+        result: {
+          stopReason: 'end_turn',
+          _meta: {
+            catsRuntime: {
+              source: 'runtime_http_bridge',
+              transport: 'stdio',
+              turnStream: 'application/x-ndjson',
+            },
+          },
+        },
+      },
+    ]);
+
+    await server.close();
+  });
 });

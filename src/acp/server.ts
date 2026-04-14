@@ -27,6 +27,15 @@ interface RuntimeAcpPromptProjectionState {
   lastToolId: string | null;
   toolIdsByName: Map<string, string>;
   publishedToolIds: Set<string>;
+  projectedCurrentModeId: string | null;
+  projectedUsageSignature: string | null;
+}
+
+interface RuntimeAcpUsageSnapshot {
+  used: number;
+  size: number;
+  costAmount?: number;
+  costCurrency?: string;
 }
 
 class AcpFacadeError extends Error {
@@ -94,6 +103,21 @@ function readOptionalString(
 ): string | undefined {
   const value = record[key];
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function parseRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 function readCatsRuntimeMeta(record: Record<string, unknown>): Record<string, unknown> | undefined {
@@ -435,6 +459,8 @@ function createPromptProjectionState(): RuntimeAcpPromptProjectionState {
     lastToolId: null,
     toolIdsByName: new Map(),
     publishedToolIds: new Set(),
+    projectedCurrentModeId: null,
+    projectedUsageSignature: null,
   };
 }
 
@@ -505,6 +531,112 @@ function buildToolResultContent(text: string): Array<Record<string, unknown>> {
     type: 'content',
     content: buildTextContent(text),
   }];
+}
+
+function resolveModeIdFromStreamEvent(
+  streamEvent: StreamEvent,
+): string | undefined {
+  const metadata = parseRecord(streamEvent.metadata);
+  const nativeMetadata = parseRecord(metadata?.native);
+  const providerState = parseRecord(streamEvent.providerState);
+  const agentSession = parseRecord(providerState?.agentSession);
+  const adapterState = parseRecord(agentSession?.adapterState);
+
+  return readString(adapterState?.currentModeId)
+    || (metadata?.kind === 'session'
+      ? readString(metadata.currentModeId) || readString(metadata.modeId)
+      : undefined)
+    || (metadata?.kind === 'session'
+      ? readString(nativeMetadata?.currentModeId) || readString(nativeMetadata?.modeId)
+      : undefined);
+}
+
+function resolveUsageFromStreamEvent(
+  streamEvent: StreamEvent,
+): RuntimeAcpUsageSnapshot | undefined {
+  const metadata = parseRecord(streamEvent.metadata);
+  const nativeMetadata = parseRecord(metadata?.native);
+  const providerState = parseRecord(streamEvent.providerState);
+  const agentSession = parseRecord(providerState?.agentSession);
+  const adapterState = parseRecord(agentSession?.adapterState);
+  const providerUsage = parseRecord(adapterState?.contextWindowUsage);
+  const usageSource = providerUsage
+    || (metadata?.kind === 'session' ? metadata : undefined)
+    || (metadata?.kind === 'session' ? nativeMetadata : undefined);
+
+  const used = readNumber(usageSource?.used);
+  const size = readNumber(usageSource?.size);
+  if (used === undefined || size === undefined) {
+    return undefined;
+  }
+
+  const cost = parseRecord(usageSource?.cost);
+  const costAmount = readNumber(usageSource?.costAmount) ?? readNumber(cost?.amount);
+  const costCurrency = readString(usageSource?.costCurrency) || readString(cost?.currency);
+  return {
+    used,
+    size,
+    ...(costAmount === undefined ? {} : { costAmount }),
+    ...(costCurrency ? { costCurrency } : {}),
+  };
+}
+
+function buildUsageSignature(usage: RuntimeAcpUsageSnapshot): string {
+  return [
+    usage.used,
+    usage.size,
+    usage.costAmount ?? '',
+    usage.costCurrency ?? '',
+  ].join(':');
+}
+
+function buildSessionStateUpdates(
+  streamEvent: StreamEvent,
+  state: RuntimeAcpPromptProjectionState,
+): Array<Record<string, unknown>> {
+  const updates: Array<Record<string, unknown>> = [];
+
+  const modeId = resolveModeIdFromStreamEvent(streamEvent);
+  if (modeId && modeId !== state.projectedCurrentModeId) {
+    state.projectedCurrentModeId = modeId;
+    updates.push({
+      sessionId: '',
+      update: {
+        sessionUpdate: 'current_mode_update',
+        currentModeUpdate: {
+          modeId,
+        },
+      },
+    });
+  }
+
+  const usage = resolveUsageFromStreamEvent(streamEvent);
+  if (usage) {
+    const signature = buildUsageSignature(usage);
+    if (signature !== state.projectedUsageSignature) {
+      state.projectedUsageSignature = signature;
+      updates.push({
+        sessionId: '',
+        update: {
+          sessionUpdate: 'usage_update',
+          usageUpdate: {
+            used: usage.used,
+            size: usage.size,
+            ...(usage.costAmount === undefined && !usage.costCurrency
+              ? {}
+              : {
+                  cost: {
+                    ...(usage.costAmount === undefined ? {} : { amount: usage.costAmount }),
+                    ...(usage.costCurrency ? { currency: usage.costCurrency } : {}),
+                  },
+                }),
+          },
+        },
+      });
+    }
+  }
+
+  return updates;
 }
 
 function buildPlanUpdateFromProgress(
@@ -658,42 +790,55 @@ function mapRuntimeEventToAcpUpdates(
     return [];
   }
   const streamEvent = eventRecord as unknown as StreamEvent;
+  const sessionStateUpdates = buildSessionStateUpdates(streamEvent, state);
 
   if (eventType === 'text' && typeof streamEvent.text === 'string' && streamEvent.text.length > 0) {
-    return [{
-      sessionId: '',
-      update: {
-        sessionUpdate: 'agent_message_chunk',
-        content: buildTextContent(streamEvent.text),
+    return [
+      ...sessionStateUpdates,
+      {
+        sessionId: '',
+        update: {
+          sessionUpdate: 'agent_message_chunk',
+          content: buildTextContent(streamEvent.text),
+        },
       },
-    }];
+    ];
   }
 
   if (eventType === 'result' && typeof streamEvent.text === 'string' && streamEvent.text.length > 0) {
-    return [{
-      sessionId: '',
-      update: {
-        sessionUpdate: 'agent_message_chunk',
-        content: buildTextContent(streamEvent.text),
+    return [
+      ...sessionStateUpdates,
+      {
+        sessionId: '',
+        update: {
+          sessionUpdate: 'agent_message_chunk',
+          content: buildTextContent(streamEvent.text),
+        },
       },
-    }];
+    ];
   }
 
   if (eventType === 'progress') {
     const planUpdate = buildPlanUpdateFromProgress(streamEvent);
     if (planUpdate) {
-      return [{
-        sessionId: '',
-        update: planUpdate,
-      }];
+      return [
+        ...sessionStateUpdates,
+        {
+          sessionId: '',
+          update: planUpdate,
+        },
+      ];
     }
 
     const configOptionUpdate = buildConfigOptionUpdateFromProgress(streamEvent);
     if (configOptionUpdate) {
-      return [{
-        sessionId: '',
-        update: configOptionUpdate,
-      }];
+      return [
+        ...sessionStateUpdates,
+        {
+          sessionId: '',
+          update: configOptionUpdate,
+        },
+      ];
     }
   }
 
@@ -705,13 +850,16 @@ function mapRuntimeEventToAcpUpdates(
     && !Array.isArray(streamEvent.metadata)
     && (streamEvent.metadata as Record<string, unknown>).kind === 'reasoning'
   ) {
-    return [{
-      sessionId: '',
-      update: {
-        sessionUpdate: 'agent_thought_chunk',
-        content: buildTextContent(streamEvent.text),
+    return [
+      ...sessionStateUpdates,
+      {
+        sessionId: '',
+        update: {
+          sessionUpdate: 'agent_thought_chunk',
+          content: buildTextContent(streamEvent.text),
+        },
       },
-    }];
+    ];
   }
 
   if (
@@ -723,6 +871,7 @@ function mapRuntimeEventToAcpUpdates(
     const toolId = resolveProjectedToolId(streamEvent, state);
     const toolName = streamEvent.toolName?.trim();
     return [
+      ...sessionStateUpdates,
       ...buildToolCallAnnouncement(toolId, toolName, state),
       {
         sessionId: '',
@@ -739,16 +888,20 @@ function mapRuntimeEventToAcpUpdates(
   if (eventType === 'tool_use') {
     const toolUseEvent = streamEvent as Extract<StreamEvent, { type: 'tool_use' }>;
     const toolId = resolveProjectedToolId(toolUseEvent, state);
-    return buildToolCallAnnouncement(toolId, toolUseEvent.toolName, state, {
-      ...(toolUseEvent.toolArgs ? { rawInput: toolUseEvent.toolArgs } : {}),
-      ...(toolUseEvent.text ? { text: toolUseEvent.text } : {}),
-    });
+    return [
+      ...sessionStateUpdates,
+      ...buildToolCallAnnouncement(toolId, toolUseEvent.toolName, state, {
+        ...(toolUseEvent.toolArgs ? { rawInput: toolUseEvent.toolArgs } : {}),
+        ...(toolUseEvent.text ? { text: toolUseEvent.text } : {}),
+      }),
+    ];
   }
 
   if (eventType === 'tool_result') {
     const toolResultEvent = streamEvent as Extract<StreamEvent, { type: 'tool_result' }>;
     const toolId = resolveProjectedToolId(toolResultEvent, state);
     return [
+      ...sessionStateUpdates,
       ...buildToolCallAnnouncement(toolId, toolResultEvent.toolName, state),
       {
         sessionId: '',
@@ -762,7 +915,7 @@ function mapRuntimeEventToAcpUpdates(
     ];
   }
 
-  return [];
+  return sessionStateUpdates;
 }
 
 function looksLikeCancelledStop(text: string): boolean {
