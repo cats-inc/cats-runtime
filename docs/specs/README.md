@@ -48,6 +48,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 | Spec | Title | Status | Related Plan |
 |------|-------|--------|--------------|
+| [SPEC-025](./SPEC-025-acp-agent-adapters-and-runtime-facade.md) | ACP Agent Adapters and Runtime ACP Facade | Draft | [PLAN-032](../plans/PLAN-032-acp-agent-adapters-and-runtime-facade.md) |
 | [SPEC-024](./SPEC-024-curated-cli-catalog-pack-and-evidence-overlay.md) | Curated CLI Catalog Input and Runtime Evidence Overlay | Draft | TBD |
 | [SPEC-023](./SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md) | Verified Advanced Provider Catalogs and Manual-Refresh Discovery | In Progress (Safety, Cache-First Reads, and Entry-Scoped Controls Landed) | [PLAN-026](../plans/PLAN-026-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md) |
 | [SPEC-022](./SPEC-022-stdio-mcp-proxy-to-primary-runtime.md) | Stdio MCP Proxy to the Primary Runtime | Completed | [PLAN-022](../plans/PLAN-022-stdio-mcp-proxy-to-primary-runtime.md) |
@@ -96,4 +97,4 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 ---
 
 *See also: [plans/](../plans/) for implementation plans*
-*Last updated: 2026-04-08*
+*Last updated: 2026-04-15*

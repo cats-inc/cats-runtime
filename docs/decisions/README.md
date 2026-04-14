@@ -38,6 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [031-keep-acp-inside-agent-backend-and-model-runtime-acp-as-a-separate-facade](./031-keep-acp-inside-agent-backend-and-model-runtime-acp-as-a-separate-facade.md) | Keep ACP inside the `agent` backend family and model runtime ACP as a separate facade | Proposed | 2026-04-15 |
 | [030-use-structured-cats-home-runtime-storage](./030-use-structured-cats-home-runtime-storage.md) | Use structured `~/.cats` runtime storage with a config subtree | Accepted | 2026-04-05 |
 | [029-keep-advanced-provider-catalogs-verified-and-manual-refresh](./029-keep-advanced-provider-catalogs-verified-and-manual-refresh.md) | Keep advanced provider catalogs verified and manual-refresh | Accepted | 2026-03-30 |
 | [028-proxy-stdio-mcp-to-the-primary-runtime-http-surface](./028-proxy-stdio-mcp-to-the-primary-runtime-http-surface.md) | Proxy stdio MCP to the primary runtime HTTP surface | Accepted | 2026-03-29 |
@@ -79,6 +80,6 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 ---
 
-*Last updated: 2026-04-07*
+*Last updated: 2026-04-15*
 
 *See also: [AGENTS.md](../../../AGENTS.md) for decision-making protocols*
