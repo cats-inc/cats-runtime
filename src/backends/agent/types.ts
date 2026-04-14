@@ -34,11 +34,11 @@ export interface AgentAcpHostDescription {
   };
   toolPolicy: RuntimeToolPolicyInspection;
   capabilities: {
-    permissionPolicy: true;
-    filesystem: true;
-    terminal: true;
-    toolExecution: true;
-    clientMcpServers: false;
+    permissionPolicy: boolean;
+    filesystem: boolean;
+    terminal: boolean;
+    toolExecution: boolean;
+    clientMcpServers: boolean;
   };
 }
 

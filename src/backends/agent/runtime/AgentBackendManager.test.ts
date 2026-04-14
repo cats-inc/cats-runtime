@@ -35,10 +35,12 @@ describe('AgentBackendManager', () => {
     });
 
     let capturedInstructions: string | undefined;
+    let capturedAcpHost: Parameters<AgentAdapter['invoke']>[0]['acpHost'];
     const adapter: AgentAdapter = {
       kind: 'test-adapter',
       async *invoke(input) {
         capturedInstructions = input.turn.instructions;
+        capturedAcpHost = input.acpHost;
         yield { type: 'result', sessionId: input.providerSessionId ?? input.sessionId };
       },
     };
@@ -75,6 +77,7 @@ describe('AgentBackendManager', () => {
     expect(capturedInstructions).toMatch(
       /Session-level instructions\.\s+Turn-level instructions\./,
     );
+    expect(capturedAcpHost).toBeUndefined();
     expect(events).toEqual([
       { type: 'result', sessionId: 'agent-session' },
     ]);

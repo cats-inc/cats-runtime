@@ -33,6 +33,10 @@ function ensureAgentTarget(target: ProviderTargetDescriptor): RemoteProviderInst
   return target.remoteInstance;
 }
 
+function isAcpTransport(instance: RemoteProviderInstanceConfig): boolean {
+  return instance.transport === 'acp' || instance.transport === 'acp_stdio';
+}
+
 async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number | undefined,
@@ -323,6 +327,10 @@ export class AgentBackendManager {
     instance: RemoteProviderInstanceConfig,
     turn: TurnInput,
   ): AgentAcpHostBinding | undefined {
+    if (!isAcpTransport(instance)) {
+      return undefined;
+    }
+
     const bridge = this.options.acpHostBridge;
     if (!bridge) {
       return undefined;

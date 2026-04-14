@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Phase 2 ACP Host Bridge Slice Landed) |
+| **Status** | In Progress (Phase 2 Host Bridge Contract Landed) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -82,12 +82,12 @@ This plan stages both directions deliberately so the runtime can:
 
 ### Phase 1: Reserve the `agent/acp` Transport Slot
 
-- [ ] Extend `buildAgentAdapter(...)` to recognize an ACP transport family
-- [ ] Extend `AgentAdapterInspection` so ACP can describe its transport,
+- [x] Extend `buildAgentAdapter(...)` to recognize an ACP transport family
+- [x] Extend `AgentAdapterInspection` so ACP can describe its transport,
       capability, and auth posture truthfully
-- [ ] Extend config parsing so agent transports can carry ACP-specific launch or
+- [x] Extend config parsing so agent transports can carry ACP-specific launch or
       connection settings without forcing those fields into CLI-only config
-- [ ] Keep provider routing unchanged so ACP targets can coexist with CLI/API
+- [x] Keep provider routing unchanged so ACP targets can coexist with CLI/API
       targets for the same provider family
 
 **Deliverables**:
@@ -210,4 +210,4 @@ Current rationale for preferring `codex-acp` first:
 |------|--------|
 | 2026-04-15 | Draft plan created to stage ACP under `agent` while reserving a separate runtime-owned ACP facade and documenting ACP + A2A complementarity |
 | 2026-04-15 | Phase 1 skeleton landed with `agent/acp` transport recognition, ACP launch config fields, truthful inspection, and focused coverage; execution remains a Phase 2 follow-up |
-| 2026-04-15 | Phase 2 host-bridge slice landed with a runtime-owned ACP host bridge contract backed by runtime tool policy, `LocalToolRuntime`, and session workspace/permission context; ACP transport lifecycle execution remains Phase 3 work |
+| 2026-04-15 | Phase 2 host-bridge contract landed with a runtime-owned ACP host bridge backed by runtime tool policy, `LocalToolRuntime`, and session workspace/permission context; ACP transport lifecycle execution remains Phase 3 work |
