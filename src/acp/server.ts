@@ -348,7 +348,6 @@ export async function handleAcpJsonRpc(
       case 'session/load':
         return successResponse(id, handleLoadSession(ctx, request.params));
       case 'authenticate':
-      case 'session/prompt':
       case 'session/set_mode':
       case 'session/set_config_option':
         ensureRuntimeReadyForAcp(ctx);
@@ -359,6 +358,28 @@ export async function handleAcpJsonRpc(
           {
             facade: 'runtime_acp_http',
             phase: 'phase_4',
+            supportedMethods: [
+              'initialize',
+              'ping',
+              'session/new',
+              'session/list',
+              'session/load',
+              'session/cancel',
+            ],
+          },
+        );
+      case 'session/prompt':
+        ensureRuntimeReadyForAcp(ctx);
+        return errorResponse(
+          id,
+          -32601,
+          "ACP method 'session/prompt' is not yet enabled by the cats-runtime ACP facade.",
+          {
+            facade: 'runtime_acp_http',
+            phase: 'phase_4',
+            reason: 'prompt_turn_requires_bidirectional_transport',
+            currentTransport: 'http',
+            requiredNotifications: ['session/update'],
             supportedMethods: [
               'initialize',
               'ping',

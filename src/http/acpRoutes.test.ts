@@ -451,6 +451,9 @@ describe('runtime ACP facade routes', () => {
         data: {
           facade: 'runtime_acp_http',
           phase: 'phase_4',
+          reason: 'prompt_turn_requires_bidirectional_transport',
+          currentTransport: 'http',
+          requiredNotifications: ['session/update'],
           supportedMethods: [
             'initialize',
             'ping',
