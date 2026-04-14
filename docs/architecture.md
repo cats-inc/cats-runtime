@@ -107,6 +107,37 @@ product shells or ad-hoc prompt helpers. The runtime:
 └───────────────────────────────────────────┘
 ```
 
+## Protocol Layering
+
+`cats-runtime` now has three distinct integration directions that should not be
+collapsed into one transport story:
+
+1. **Client-to-runtime**
+   External products or IDEs consume `cats-runtime` through runtime-owned
+   transports such as the primary HTTP API and the bounded ACP facade under
+   `src/acp/` plus `src/http/routes/acp.ts`.
+   Today, the ACP facade has two carrier shapes:
+   - HTTP `/acp` for conservative control-plane/session lifecycle methods
+   - direct stdio ACP for bidirectional `session/prompt` plus `session/update`
+2. **Runtime-to-provider**
+   `cats-runtime` consumes provider runtimes through `backends/cli`,
+   `backends/api`, `backends/local`, and `backends/agent`, including the new
+   `agent/acp` path for ACP-compatible external agent runtimes.
+3. **Runtime-to-peer**
+   `cats-runtime` can route work to peer runtimes over the peer-execution / A2A
+   direction. This remains conceptually separate from ACP. ACP is the client
+   layer; A2A is the peer/runtime layer.
+
+Current truth:
+
+- ACP is live inside the runtime in both directions:
+  - provider-side under `backends/agent/adapters/acp`
+  - runtime-facing under `src/acp/`
+- the runtime-facing ACP facade is intentionally bounded rather than feature
+  complete
+- the current repo still documents A2A as a pilot/example layer rather than a
+  released public Agent Card surface
+
 ## Internal Layout
 
 ```text

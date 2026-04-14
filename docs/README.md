@@ -16,7 +16,7 @@ These important documents live in the project root:
 | Document | Status | Description |
 |----------|--------|-------------|
 | [requirements.md](./requirements.md) | Template | Requirements specification |
-| [architecture.md](./architecture.md) | Complete | Embedded runtime architecture, backend layering, and runtime-owned skill / compatibility / metering / session-maintenance / browser-preview seams |
+| [architecture.md](./architecture.md) | Complete | Embedded runtime architecture, backend layering, runtime-owned skill / compatibility / metering / session-maintenance / browser-preview seams, and the ACP vs A2A protocol stack |
 | [api.md](./api.md) | Complete | Supported public HTTP contract, including skills, diagnostics, progress, guardrails, browser sessions/pages, preview surfaces, compatibility summaries, and session maintenance metadata |
 
 ## Development Guides
@@ -49,7 +49,7 @@ Add your project-specific automation scripts here.
 | Document | Status | Description |
 |----------|--------|-------------|
 | [AGENT-GUIDE.md](./AGENT-GUIDE.md) | Complete | Project-specific agent notes |
-| [terminology.md](./terminology.md) | Complete | AAIF, A2A, skills, compatibility, evidence, control-plane adapter, and runtime-project-memory terminology |
+| [terminology.md](./terminology.md) | Complete | AAIF, ACP, A2A, skills, compatibility, evidence, control-plane adapter, and runtime/project/protocol layering terminology |
 | [a2a/](./a2a/) | Complete | Pilot-owned A2A v1.0 example set for future adapter work; standards-aligned docs, not a claim of a live A2A endpoint today |
 | [specs/](./specs/) | Complete | Feature specifications for runtime capabilities and future delivery tracks, including advanced provider-catalog truthfulness, human-curated CLI catalog inputs, manual-refresh discovery follow-through, and the new ACP agent-adapter/runtime-facade direction; see `specs/README.md` for the full list |
 | [plans/](./plans/) | Complete | Implementation plans for WSL discovery, API/backend expansion, startup contract, runtime-managed skills, browser-preview substrate, provider compatibility/evidence, metering/progress/guardrails, truthful provider-refusal surfacing, provider advanced-catalog hardening, independent Kilo CLI provider support, the setup workflow-rail / workspace-split follow-through, and ACP staging |
