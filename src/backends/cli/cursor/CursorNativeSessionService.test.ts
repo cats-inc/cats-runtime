@@ -1,4 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CursorNativeSessionService,
@@ -236,6 +239,73 @@ describe('CursorNativeSessionService', () => {
         ...(process.platform === 'win32' ? { shell: true } : {}),
       }),
     );
+  });
+
+  it('resolves Windows Cursor shim commands before creating a native session', async () => {
+    if (process.platform !== 'win32') {
+      return;
+    }
+
+    const originalPath = process.env.PATH;
+    const tempDir = mkdtempSync(join(tmpdir(), 'cursor-native-shim-'));
+    const shimPath = join(tempDir, 'cursor-agent.cmd');
+    writeFileSync(shimPath, '@echo off\r\n', 'utf8');
+    process.env.PATH = `${tempDir};${originalPath || ''}`;
+
+    const runner = vi.fn(async (command) => {
+      if (command === shimPath) {
+        return {
+          code: 0,
+          stdout: 'cursor-session-456\n',
+          stderr: '',
+        };
+      }
+
+      return {
+        code: 0,
+        stdout: JSON.stringify([
+          {
+            sessionId: 'cursor-session-456',
+            workspacePath: 'C:/repo',
+            summary: 'Resolved Cursor Session',
+            messageCount: 0,
+          },
+        ]),
+        stderr: '',
+      };
+    });
+    const service = new CursorNativeSessionService({
+      command: 'cursor-agent',
+      chatsDir: '~/.cursor/chats',
+      runtime: createRuntimeAdapter({
+        mode: 'native',
+      }),
+      runner,
+    });
+
+    try {
+      const session = await service.createSession('C:/repo');
+
+      expect(session).toEqual({
+        providerSessionId: 'cursor-session-456',
+        cwd: 'C:/repo',
+        summary: 'Resolved Cursor Session',
+        messageCount: 0,
+        lastActivity: undefined,
+        model: undefined,
+      });
+      expect(runner).toHaveBeenNthCalledWith(
+        1,
+        shimPath,
+        ['create-chat'],
+        expect.objectContaining({
+          cwd: 'C:/repo',
+          shell: true,
+        }),
+      );
+    } finally {
+      process.env.PATH = originalPath;
+    }
   });
 
   it('skips WSL discovery when startIfNeeded is false and the distro is stopped', async () => {

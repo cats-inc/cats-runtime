@@ -1,4 +1,6 @@
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { delimiter, extname, isAbsolute, join } from 'node:path';
 import { isWslDistroRunning, type WslDistroInspector } from '../discovery/wslDiscovery.js';
 import type { CommandRunnerOptions } from '../pythonScripts.js';
 import { runPythonJsonScript, type CommandRunner } from '../pythonScripts.js';
@@ -194,8 +196,9 @@ export class CursorNativeSessionService {
   }
 
   private async runCommand(args: string[], cwd?: string): Promise<string> {
-    return this.run(this.command, args, {
-      ...(shouldUseNativeCommandShell(this.command) ? { shell: true } : {}),
+    const command = resolveNativeCommandForExecution(this.command);
+    return this.run(command, args, {
+      ...(shouldUseNativeCommandShell(command) ? { shell: true } : {}),
       ...(cwd ? { cwd } : {}),
     });
   }
@@ -272,6 +275,37 @@ function shouldUseNativeCommandShell(command: string): boolean {
   }
 
   return /\.(cmd|bat)$/i.test(command.trim());
+}
+
+function resolveNativeCommandForExecution(command: string): string {
+  if (process.platform !== 'win32') {
+    return command;
+  }
+
+  const trimmed = command.trim();
+  if (!trimmed || isExplicitCommandPath(trimmed) || extname(trimmed)) {
+    return command;
+  }
+
+  const pathDirs = (process.env.PATH || '')
+    .split(delimiter)
+    .map((dir) => dir.trim())
+    .filter(Boolean);
+
+  for (const dir of pathDirs) {
+    for (const extension of ['.cmd', '.bat', '.exe', '.com', '']) {
+      const candidate = join(dir, `${trimmed}${extension}`);
+      if (existsSync(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  return command;
+}
+
+function isExplicitCommandPath(command: string): boolean {
+  return isAbsolute(command) || command.includes('/') || command.includes('\\');
 }
 
 function shellQuote(value: string): string {
