@@ -1,4 +1,5 @@
 import type { AppContext } from '../http/app.js';
+import type { SessionInfo } from '../core/types.js';
 import {
   RUNTIME_READINESS_PATH,
   RUNTIME_SERVICE_NAME,
@@ -64,6 +65,21 @@ function ensureMethod(request: AcpJsonRpcRequest): string {
   return request.method.trim();
 }
 
+function ensureRecord(value: unknown, label: string): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new AcpFacadeError(-32602, `${label} must be an object`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function readOptionalString(
+  record: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = record[key];
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
 function resolveRequestId(value: unknown): string | number | null {
   if (typeof value === 'string' || typeof value === 'number') {
     return value;
@@ -81,7 +97,7 @@ function buildInitializeResult(ctx: AppContext) {
     },
     authMethods: [],
     agentCapabilities: {
-      loadSession: false,
+      loadSession: true,
       promptCapabilities: {
         audio: false,
         embeddedContext: false,
@@ -91,7 +107,9 @@ function buildInitializeResult(ctx: AppContext) {
         http: false,
         sse: false,
       },
-      sessionCapabilities: {},
+      sessionCapabilities: {
+        list: {},
+      },
     },
     _meta: {
       catsRuntime: {
@@ -103,6 +121,8 @@ function buildInitializeResult(ctx: AppContext) {
         supportedMethods: [
           'initialize',
           'ping',
+          'session/list',
+          'session/load',
         ],
       },
     },
@@ -122,6 +142,84 @@ function ensureRuntimeReadyForAcp(ctx: AppContext): void {
   }
 }
 
+function buildSessionInfo(session: SessionInfo) {
+  return {
+    sessionId: session.id,
+    cwd: session.cwd,
+    ...(session.summary ? { title: session.summary } : {}),
+    ...(session.lastActivity ? { updatedAt: session.lastActivity } : {}),
+    _meta: {
+      catsRuntime: {
+        providerName: session.providerName,
+        providerBackend: session.providerBackend || 'cli',
+        providerInstanceId: session.providerInstanceId || 'default',
+        status: session.status,
+        workspaceMode: session.workspaceMode,
+      },
+    },
+  };
+}
+
+function handleListSessions(ctx: AppContext, params: unknown) {
+  const request = params === undefined ? {} : ensureRecord(params, 'session/list params');
+  const cwd = readOptionalString(request, 'cwd');
+  const sessions = ctx.registry
+    .list()
+    .filter((session) => (cwd ? session.cwd === cwd : true))
+    .map((session) => buildSessionInfo(session));
+
+  return {
+    sessions,
+    nextCursor: null,
+    _meta: {
+      catsRuntime: {
+        source: 'runtime_registry',
+        returnedCount: sessions.length,
+      },
+    },
+  };
+}
+
+function handleLoadSession(ctx: AppContext, params: unknown) {
+  const request = ensureRecord(params ?? {}, 'session/load params');
+  const sessionId = readOptionalString(request, 'sessionId');
+  const cwd = readOptionalString(request, 'cwd');
+  const mcpServers = request.mcpServers;
+
+  if (!sessionId) {
+    throw new AcpFacadeError(-32602, 'session/load requires params.sessionId');
+  }
+  if (!cwd) {
+    throw new AcpFacadeError(-32602, 'session/load requires params.cwd');
+  }
+  if (!Array.isArray(mcpServers)) {
+    throw new AcpFacadeError(-32602, 'session/load requires params.mcpServers');
+  }
+
+  const session = ctx.registry.get(sessionId);
+  if (!session) {
+    throw new AcpFacadeError(-32602, `Runtime session '${sessionId}' was not found`, {
+      reason: 'session_not_found',
+    });
+  }
+  if (session.cwd !== cwd) {
+    throw new AcpFacadeError(-32602, `Runtime session '${sessionId}' is not bound to cwd '${cwd}'`, {
+      reason: 'cwd_mismatch',
+      actualCwd: session.cwd,
+    });
+  }
+
+  return {
+    _meta: {
+      catsRuntime: {
+        session: buildSessionInfo(session),
+        resumedFromRuntimeRegistry: true,
+        clientMcpServers: mcpServers.length,
+      },
+    },
+  };
+}
+
 export async function handleAcpJsonRpc(
   ctx: AppContext,
   rawBody: unknown,
@@ -139,12 +237,14 @@ export async function handleAcpJsonRpc(
         return successResponse(id, {});
       case 'initialize':
         return successResponse(id, buildInitializeResult(ctx));
+      case 'session/list':
+        return successResponse(id, handleListSessions(ctx, request.params));
+      case 'session/load':
+        return successResponse(id, handleLoadSession(ctx, request.params));
       case 'authenticate':
       case 'session/new':
-      case 'session/load':
       case 'session/prompt':
       case 'session/cancel':
-      case 'session/list':
       case 'session/set_mode':
       case 'session/set_config_option':
         ensureRuntimeReadyForAcp(ctx);
@@ -158,6 +258,8 @@ export async function handleAcpJsonRpc(
             supportedMethods: [
               'initialize',
               'ping',
+              'session/list',
+              'session/load',
             ],
           },
         );

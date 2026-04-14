@@ -85,13 +85,14 @@ function makeApp(options: { bootstrapRequired?: boolean } = {}) {
     status: vi.fn(() => ({ active: 0 })),
   } as unknown as WorkerPool;
 
+  const registry = new SessionRegistry();
   const app = createApp({
     config: makeConfig(sessionBaseDir, dataDir),
     startup: createRuntimeStartupState({
       ready: true,
       bootstrapRequired: options.bootstrapRequired ?? false,
     }),
-    registry: new SessionRegistry(),
+    registry,
     pool,
     cursorNative: {} as CursorNativeSessionService,
     gooseNative: {} as GooseNativeSessionService,
@@ -100,7 +101,7 @@ function makeApp(options: { bootstrapRequired?: boolean } = {}) {
     opencodeNative: {} as OpencodeNativeSessionService,
   });
 
-  return { app, rootDir };
+  return { app, rootDir, registry };
 }
 
 describe('runtime ACP facade routes', () => {
@@ -147,7 +148,7 @@ describe('runtime ACP facade routes', () => {
         },
         authMethods: [],
         agentCapabilities: {
-          loadSession: false,
+          loadSession: true,
           promptCapabilities: {
             audio: false,
             embeddedContext: false,
@@ -157,7 +158,9 @@ describe('runtime ACP facade routes', () => {
             http: false,
             sse: false,
           },
-          sessionCapabilities: {},
+          sessionCapabilities: {
+            list: {},
+          },
         },
         _meta: {
           catsRuntime: {
@@ -166,7 +169,126 @@ describe('runtime ACP facade routes', () => {
             bootstrapRequired: false,
             readinessPath: '/health',
             sessionLifecycle: 'pending',
-            supportedMethods: ['initialize', 'ping'],
+            supportedMethods: ['initialize', 'ping', 'session/list', 'session/load'],
+          },
+        },
+      },
+    });
+  });
+
+  it('lists runtime-owned sessions through ACP session/list', async () => {
+    const { app, rootDir, registry } = makeApp();
+    cleanupRoots.push(rootDir);
+
+    const session = registry.create({
+      id: 'runtime-session-list',
+      providerName: 'claude',
+      cwd: join(rootDir, 'workspace'),
+    });
+    session.summary = 'ACP listed session';
+    session.lastActivity = '2026-04-15T04:30:00.000Z';
+    registry.updateStatus(session.id, 'ready');
+
+    const response = await app.request('/acp', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'list',
+        method: 'session/list',
+        params: {
+          cwd: join(rootDir, 'workspace'),
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 'list',
+      result: {
+        sessions: [{
+          sessionId: 'runtime-session-list',
+          cwd: join(rootDir, 'workspace'),
+          title: 'ACP listed session',
+          updatedAt: '2026-04-15T04:30:00.000Z',
+          _meta: {
+            catsRuntime: {
+              providerName: 'claude',
+              providerBackend: 'cli',
+              providerInstanceId: 'default',
+              status: 'ready',
+              workspaceMode: 'shared',
+            },
+          },
+        }],
+        nextCursor: null,
+        _meta: {
+          catsRuntime: {
+            source: 'runtime_registry',
+            returnedCount: 1,
+          },
+        },
+      },
+    });
+  });
+
+  it('loads an existing runtime-owned session through ACP session/load', async () => {
+    const { app, rootDir, registry } = makeApp();
+    cleanupRoots.push(rootDir);
+
+    const session = registry.create({
+      id: 'runtime-session-load',
+      providerName: 'codex',
+      providerBackend: 'agent',
+      providerInstanceId: 'acp-local',
+      cwd: join(rootDir, 'workspace-load'),
+    });
+    session.summary = 'ACP loaded session';
+    registry.updateStatus(session.id, 'ready');
+
+    const response = await app.request('/acp', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'load',
+        method: 'session/load',
+        params: {
+          sessionId: session.id,
+          cwd: join(rootDir, 'workspace-load'),
+          mcpServers: [],
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 'load',
+      result: {
+        _meta: {
+          catsRuntime: {
+            session: {
+              sessionId: 'runtime-session-load',
+              cwd: join(rootDir, 'workspace-load'),
+              title: 'ACP loaded session',
+              _meta: {
+                catsRuntime: {
+                  providerName: 'codex',
+                  providerBackend: 'agent',
+                  providerInstanceId: 'acp-local',
+                  status: 'ready',
+                  workspaceMode: 'shared',
+                },
+              },
+            },
+            resumedFromRuntimeRegistry: true,
+            clientMcpServers: 0,
           },
         },
       },
@@ -225,7 +347,7 @@ describe('runtime ACP facade routes', () => {
         data: {
           facade: 'runtime_acp_http',
           phase: 'phase_4',
-          supportedMethods: ['initialize', 'ping'],
+          supportedMethods: ['initialize', 'ping', 'session/list', 'session/load'],
         },
       },
     });
