@@ -4556,6 +4556,74 @@ providers:
     });
   });
 
+  it('GET /providers/kilo/models and /advanced honor curated Kilo YAML', async () => {
+    await withCuratedCatalogRuntime([
+      'schema_version: 1',
+      'catalogs:',
+      '  - cli: Kilo',
+      '    version: v7.2.0',
+      '    last_updated: 2026-04-14',
+      '    models:',
+      '      - name: Kilo Auto Frontier',
+      '      - name: Elephant (new)',
+      '      - name: "OpenAI: GPT-5.4"',
+      '        default: true',
+      '      - name: "MoonshotAI: Kimi K2.5"',
+    ], {}, {}, async (runtime) => {
+      const modelsResponse = await runtime.app.request('/providers/kilo/models');
+      expect(modelsResponse.status).toBe(200);
+      expect(await modelsResponse.json()).toEqual({
+        provider: 'kilo',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'kilo/openai/gpt-5.4',
+        source: 'static',
+        cache: null,
+        models: [
+          { id: 'kilo/kilo-auto/frontier', label: 'Kilo Auto Frontier', default: false },
+          { id: 'kilo/openrouter/elephant-alpha', label: 'Elephant (new)', default: false },
+          { id: 'kilo/openai/gpt-5.4', label: 'OpenAI: GPT-5.4', default: true },
+          { id: 'kilo/moonshotai/kimi-k2.5', label: 'MoonshotAI: Kimi K2.5', default: false },
+        ],
+        warnings: [],
+      });
+
+      const advancedResponse = await runtime.app.request('/providers/kilo/models/advanced');
+      expect(advancedResponse.status).toBe(200);
+      expect(await advancedResponse.json()).toEqual({
+        provider: 'kilo',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'kilo/openai/gpt-5.4',
+        source: 'static',
+        cache: null,
+        entries: [
+          { id: 'kilo/kilo-auto/frontier', label: 'Kilo Auto Frontier', default: false },
+          { id: 'kilo/openrouter/elephant-alpha', label: 'Elephant (new)', default: false },
+          {
+            id: 'kilo/openai/gpt-5.4',
+            label: 'OpenAI: GPT-5.4',
+            default: true,
+            capabilityTags: ['reasoning'],
+          },
+          { id: 'kilo/moonshotai/kimi-k2.5', label: 'MoonshotAI: Kimi K2.5', default: false },
+        ],
+        presets: [],
+        controls: [],
+        defaultSelection: null,
+        support: {
+          tier: 'entry_only',
+          advancedMetadataStatus: 'unverified_omitted',
+          discoveryMode: 'manual_refresh',
+          provenance: {
+            status: 'unverified_omitted',
+          },
+        },
+        warnings: [],
+      });
+    });
+  });
+
   it('GET /providers/:provider/models/advanced only probes verified providers on explicit refresh', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       data: [

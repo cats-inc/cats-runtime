@@ -481,6 +481,88 @@ describe('buildProviderAdvancedKnowledge', () => {
     }
   });
 
+  it('normalizes curated Kilo raw labels into advanced catalog entries', () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-curated-kilo-'));
+    const curatedPath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');
+    mkdirSync(join(runtimeRoot, 'config'), { recursive: true });
+    writeFileSync(curatedPath, [
+      'schema_version: 1',
+      'catalogs:',
+      '  - cli: Kilo',
+      '    last_updated: 2026-04-14',
+      '    models:',
+      '      - name: Kilo Auto Frontier',
+      '      - name: Elephant (new)',
+      '      - name: "OpenAI: GPT-5.4"',
+      '        default: true',
+      '      - name: "MoonshotAI: Kimi K2.5"',
+      '',
+    ].join('\n'), 'utf8');
+
+    try {
+      const target: ProviderTargetDescriptor = {
+        providerName: 'kilo',
+        backend: 'cli',
+        instanceId: 'default',
+        defaultTarget: true,
+        cliInstance: {
+          id: 'default',
+          providerName: 'kilo',
+          backend: 'cli',
+          command: 'kilo',
+        },
+      };
+
+      const knowledge = buildProviderAdvancedKnowledge(target, createCatalog({
+        provider: 'kilo',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'kilo/openai/gpt-5.4',
+        models: [
+          { id: 'kilo/kilo-auto/frontier', label: 'kilo/kilo-auto/frontier' },
+          { id: 'kilo/openrouter/elephant-alpha', label: 'kilo/openrouter/elephant-alpha' },
+          { id: 'kilo/openai/gpt-5.4', label: 'kilo/openai/gpt-5.4', default: true },
+          { id: 'kilo/moonshotai/kimi-k2.5', label: 'kilo/moonshotai/kimi-k2.5' },
+        ],
+      }), {
+        env: {
+          ...process.env,
+          CATS_RUNTIME_DIR: runtimeRoot,
+        },
+      });
+
+      expect(knowledge.supportTier).toBe('entry_only');
+      expect(knowledge.catalog.entries).toEqual([
+        {
+          id: 'kilo/kilo-auto/frontier',
+          label: 'Kilo Auto Frontier',
+          default: false,
+        },
+        {
+          id: 'kilo/openrouter/elephant-alpha',
+          label: 'Elephant (new)',
+          default: false,
+        },
+        {
+          id: 'kilo/openai/gpt-5.4',
+          label: 'OpenAI: GPT-5.4',
+          default: true,
+          capabilityTags: ['reasoning'],
+        },
+        {
+          id: 'kilo/moonshotai/kimi-k2.5',
+          label: 'MoonshotAI: Kimi K2.5',
+          default: false,
+        },
+      ]);
+      expect(knowledge.catalog.controls).toEqual([]);
+      expect(knowledge.catalog.defaultSelection).toBeNull();
+      expect(knowledge.catalog.warnings).toEqual([]);
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
   it('publishes curated native Claude CLI aliases and effort controls', () => {
     const target: ProviderTargetDescriptor = {
       providerName: 'claude',

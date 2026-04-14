@@ -58,7 +58,7 @@ This spec defines that split explicitly:
 
 ## User Stories
 
-- As a user, I want to paste what I can read from Claude/Codex/Gemini/Copilot/Cursor
+- As a user, I want to paste what I can read from Claude/Codex/Gemini/Kilo/Copilot/Cursor
   without needing to know internal keys like `reasoning_effort` or `xhigh`.
 - As a forum or marketplace maintainer, I want to publish one YAML file that
   other users can adjust locally.
@@ -389,6 +389,8 @@ Current importer status in runtime:
   the CLI static-fallback catalog and the advanced catalog
 - Gemini CLI: curated entry metadata on both the CLI static-fallback catalog
   and the advanced catalog
+- Kilo CLI: curated entry metadata on both the CLI static-fallback catalog
+  and the advanced catalog
 - Copilot CLI: curated entry metadata on both the CLI static-fallback catalog
   and the advanced catalog
 - Cursor CLI: curated entry metadata, including `providers[]` flattening, on
@@ -423,6 +425,7 @@ current local/runtime-observed baseline for:
 - Claude
 - Codex
 - Gemini
+- Kilo
 - Cursor (as a `providers[]` example)
 
 Those seeds are expected to be corrected by the user after review.

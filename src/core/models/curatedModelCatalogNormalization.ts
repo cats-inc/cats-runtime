@@ -267,6 +267,70 @@ export function normalizeCopilotModelName(
   }
 }
 
+export function normalizeKiloModelName(
+  value: string | undefined,
+): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = normalizeWhitespace(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const knownIds = new Set([
+    'kilo/kilo-auto/frontier',
+    'kilo/kilo-auto/balanced',
+    'kilo/kilo-auto/free',
+    'kilo/bytedance-seed/dola-seed-2.0-pro:free',
+    'kilo/x-ai/grok-code-fast-1:optimized:free',
+    'kilo/openrouter/elephant-alpha',
+    'kilo/anthropic/claude-opus-4.6',
+    'kilo/anthropic/claude-sonnet-4.6',
+    'kilo/openai/gpt-5.4',
+    'kilo/google/gemini-3.1-pro-preview',
+    'kilo/minimax/minimax-m2.7',
+    'kilo/moonshotai/kimi-k2.5',
+    'kilo/z-ai/glm-5.1',
+  ]);
+  if (knownIds.has(normalized)) {
+    return normalized;
+  }
+
+  switch (normalized) {
+    case 'kilo auto frontier':
+      return 'kilo/kilo-auto/frontier';
+    case 'kilo auto balanced':
+      return 'kilo/kilo-auto/balanced';
+    case 'kilo auto free':
+      return 'kilo/kilo-auto/free';
+    case 'bytedance seed: dola seed 2.0 pro (free)':
+      return 'kilo/bytedance-seed/dola-seed-2.0-pro:free';
+    case 'xai: grok code fast 1 optimized (free)':
+      return 'kilo/x-ai/grok-code-fast-1:optimized:free';
+    case 'elephant (new)':
+      return 'kilo/openrouter/elephant-alpha';
+    case 'anthropic: claude opus 4.6':
+      return 'kilo/anthropic/claude-opus-4.6';
+    case 'anthropic: claude sonnet 4.6':
+      return 'kilo/anthropic/claude-sonnet-4.6';
+    case 'openai: gpt-5.4':
+    case 'gpt-5.4':
+      return 'kilo/openai/gpt-5.4';
+    case 'google: gemini 3.1 pro preview':
+      return 'kilo/google/gemini-3.1-pro-preview';
+    case 'minimax: minimax m2.7':
+      return 'kilo/minimax/minimax-m2.7';
+    case 'moonshotai: kimi k2.5':
+      return 'kilo/moonshotai/kimi-k2.5';
+    case 'z.ai: glm 5.1 (new)':
+      return 'kilo/z-ai/glm-5.1';
+    default:
+      return null;
+  }
+}
+
 export function normalizeClaudeCuratedModelId(model: CuratedModelCatalogModel): string | null {
   const candidates = [model.name, model.label].filter((value): value is string => Boolean(value));
   for (const candidate of candidates) {
@@ -348,6 +412,18 @@ export function normalizeCopilotCuratedModelId(model: CuratedModelCatalogModel):
   return null;
 }
 
+export function normalizeKiloCuratedModelId(model: CuratedModelCatalogModel): string | null {
+  const candidates = [model.name, model.label].filter((value): value is string => Boolean(value));
+  for (const candidate of candidates) {
+    const normalized = normalizeKiloModelName(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
 export function normalizeCuratedModelId(
   providerName: string,
   model: CuratedModelCatalogModel,
@@ -359,6 +435,8 @@ export function normalizeCuratedModelId(
       return normalizeCodexCuratedModelId(model);
     case 'gemini':
       return normalizeLiteralCuratedModelId(model);
+    case 'kilo':
+      return normalizeKiloCuratedModelId(model);
     case 'copilot':
       return normalizeCopilotCuratedModelId(model);
     case 'cursor':

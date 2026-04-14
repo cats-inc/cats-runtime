@@ -57,6 +57,7 @@ import {
   normalizeCopilotModelName,
   normalizeCuratedModelId,
   normalizeCursorModelName,
+  normalizeKiloModelName,
 } from './curatedModelCatalogNormalization.js';
 
 export interface ProviderModelCatalogEntry {
@@ -302,6 +303,10 @@ export function normalizeProviderCatalogModelId(
 
   if (target.providerName === 'copilot' && target.backend === 'cli') {
     return normalizeCopilotModelName(normalized) || normalized;
+  }
+
+  if (target.providerName === 'kilo' && target.backend === 'cli') {
+    return normalizeKiloModelName(normalized) || normalized;
   }
 
   return normalized;
@@ -597,6 +602,7 @@ function supportsCuratedStaticCliCatalog(providerName: string): boolean {
   return providerName === 'claude'
     || providerName === 'codex'
     || providerName === 'gemini'
+    || providerName === 'kilo'
     || providerName === 'copilot'
     || providerName === 'cursor';
 }

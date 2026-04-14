@@ -298,3 +298,37 @@ catalogs:
 
       - name: Claude Sonnet 4
         options: []
+
+  - cli: Kilo
+    version: v7.2.0
+    last_updated: 2026-04-14
+    notes:
+      - "Source: Kilo model picker output supplied by user."
+      - "Entries below preserve picker-visible labels only; runtime maps them to Kilo gateway ids."
+    models:
+      - name: Kilo Auto Frontier
+
+      - name: Kilo Auto Balanced
+
+      - name: Kilo Auto Free
+
+      - name: "ByteDance Seed: Dola Seed 2.0 Pro (free)"
+
+      - name: "xAI: Grok Code Fast 1 Optimized (free)"
+
+      - name: Elephant (new)
+
+      - name: "Anthropic: Claude Opus 4.6"
+
+      - name: "Anthropic: Claude Sonnet 4.6"
+
+      - name: "OpenAI: GPT-5.4"
+        default: true
+
+      - name: "Google: Gemini 3.1 Pro Preview"
+
+      - name: "MiniMax: MiniMax M2.7"
+
+      - name: "MoonshotAI: Kimi K2.5"
+
+      - name: "Z.ai: GLM 5.1 (new)"

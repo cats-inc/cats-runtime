@@ -116,6 +116,17 @@ describe('normalizeProviderCatalogModelId', () => {
       backend: 'cli',
     }, 'claude-opus-4-6')).toBe('opus');
   });
+
+  it('normalizes Kilo picker labels to canonical gateway ids', () => {
+    expect(normalizeProviderCatalogModelId({
+      providerName: 'kilo',
+      backend: 'cli',
+    }, 'OpenAI: GPT-5.4')).toBe('kilo/openai/gpt-5.4');
+    expect(normalizeProviderCatalogModelId({
+      providerName: 'kilo',
+      backend: 'cli',
+    }, 'Elephant (new)')).toBe('kilo/openrouter/elephant-alpha');
+  });
 });
 
 function jsonResponse(body: Record<string, unknown>, status = 200): Response {
@@ -2143,6 +2154,144 @@ describe('ProviderModelCatalogService', () => {
           {
             id: 'claude-sonnet-4',
             label: 'Claude Sonnet 4',
+            default: false,
+          },
+        ],
+        presets: [],
+        controls: [],
+        defaultSelection: null,
+        support: {
+          tier: 'entry_only',
+          advancedMetadataStatus: 'unverified_omitted',
+          discoveryMode: 'manual_refresh',
+          provenance: {
+            status: 'unverified_omitted',
+          },
+        },
+        warnings: [],
+      });
+    } finally {
+      runtime.cleanup();
+    }
+  });
+
+  it('applies curated Kilo CLI entry metadata from curated-model-catalogs.yaml', () => {
+    const runtime = createRuntimeRoot();
+
+    try {
+      writeFileSync(runtime.paths.curatedModelCatalogPath, [
+        'schema_version: 1',
+        'catalogs:',
+        '  - cli: Kilo',
+        '    version: v7.2.0',
+        '    last_updated: 2026-04-14',
+        '    models:',
+        '      - name: Kilo Auto Frontier',
+        '      - name: "xAI: Grok Code Fast 1 Optimized (free)"',
+        '      - name: Elephant (new)',
+        '      - name: "OpenAI: GPT-5.4"',
+        '        default: true',
+        '      - name: "MiniMax: MiniMax M2.7"',
+        '      - name: "Z.ai: GLM 5.1 (new)"',
+        '',
+      ].join('\n'), 'utf8');
+
+      const base = createCatalogConfig();
+      const config = {
+        ...base,
+        configPath: runtime.paths.configPath,
+        sessionBaseDir: runtime.paths.sessionBaseDir,
+        providerDefaultTargets: {
+          ...base.providerDefaultTargets,
+          kilo: { backend: 'cli', instance: 'default' },
+        },
+        providerInstances: {
+          ...base.providerInstances,
+          kilo: {
+            default: {
+              id: 'default',
+              providerName: 'kilo',
+              commandConfig: {
+                path: 'kilo',
+                runner: 'auto',
+                runtime: { mode: 'native' },
+              },
+            },
+          },
+        },
+        providerCommands: {
+          ...base.providerCommands,
+          kilo: {
+            path: 'kilo',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
+        },
+      } as const;
+
+      const service = new ProviderModelCatalogService(config as never, {
+        env: runtime.env,
+      });
+
+      expect(service.getImmediateCatalog('kilo')).toEqual({
+        provider: 'kilo',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'kilo/openai/gpt-5.4',
+        source: 'static',
+        cache: null,
+        models: [
+          { id: 'kilo/kilo-auto/frontier', label: 'Kilo Auto Frontier', default: false },
+          {
+            id: 'kilo/x-ai/grok-code-fast-1:optimized:free',
+            label: 'xAI: Grok Code Fast 1 Optimized (free)',
+            default: false,
+          },
+          { id: 'kilo/openrouter/elephant-alpha', label: 'Elephant (new)', default: false },
+          { id: 'kilo/openai/gpt-5.4', label: 'OpenAI: GPT-5.4', default: true },
+          { id: 'kilo/minimax/minimax-m2.7', label: 'MiniMax: MiniMax M2.7', default: false },
+          { id: 'kilo/z-ai/glm-5.1', label: 'Z.ai: GLM 5.1 (new)', default: false },
+        ],
+        warnings: [],
+      });
+      expect(service.getImmediateAdvancedCatalog('kilo')).toEqual({
+        provider: 'kilo',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'kilo/openai/gpt-5.4',
+        source: 'static',
+        cache: null,
+        entries: [
+          {
+            id: 'kilo/kilo-auto/frontier',
+            label: 'Kilo Auto Frontier',
+            default: false,
+          },
+          {
+            id: 'kilo/x-ai/grok-code-fast-1:optimized:free',
+            label: 'xAI: Grok Code Fast 1 Optimized (free)',
+            default: false,
+          },
+          {
+            id: 'kilo/openrouter/elephant-alpha',
+            label: 'Elephant (new)',
+            default: false,
+          },
+          {
+            id: 'kilo/openai/gpt-5.4',
+            label: 'OpenAI: GPT-5.4',
+            default: true,
+            capabilityTags: ['reasoning'],
+          },
+          {
+            id: 'kilo/minimax/minimax-m2.7',
+            label: 'MiniMax: MiniMax M2.7',
+            default: false,
+            capabilityTags: ['latency_optimized'],
+          },
+          {
+            id: 'kilo/z-ai/glm-5.1',
+            label: 'Z.ai: GLM 5.1 (new)',
             default: false,
           },
         ],
