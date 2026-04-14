@@ -243,4 +243,61 @@ describe('agentDiagnosticsEvidence', () => {
       },
     ]);
   });
+
+  it('surfaces persisted ACP adapter state in agent evidence summaries', () => {
+    const session = createSession();
+    session.providerState = {
+      agentSession: {
+        providerSessionId: 'acp-session-1',
+        status: 'idle',
+        adapterState: {
+          sessionTitle: 'Repo Refactor',
+          currentModeId: 'code',
+          availableCommands: ['/plan', '/review'],
+          configOptions: [
+            { id: 'model', label: 'Model', value: 'gpt-5.4' },
+          ],
+          contextWindowUsage: {
+            used: 1200,
+            size: 200000,
+            costAmount: 0.12,
+            costCurrency: 'USD',
+          },
+          stopReason: 'end_turn',
+          sessionMcpServers: [
+            { type: 'stdio', name: 'cats-runtime', command: 'node', args: ['build/runtime/bin/mcp.js'], env: [] },
+          ],
+        },
+      },
+    };
+
+    const evidence = buildAgentDiagnosticSessionEvidence(
+      session,
+      createInspection(),
+      'runtime_session_inspection',
+    );
+
+    expect(evidence).toEqual(expect.objectContaining({
+      providerSessionId: 'acp-session-1',
+      status: 'idle',
+      agentState: {
+        sessionTitle: 'Repo Refactor',
+        currentModeId: 'code',
+        availableCommands: ['/plan', '/review'],
+        configOptions: [
+          { id: 'model', label: 'Model', value: 'gpt-5.4' },
+        ],
+        contextWindowUsage: {
+          used: 1200,
+          size: 200000,
+          costAmount: 0.12,
+          costCurrency: 'USD',
+        },
+        stopReason: 'end_turn',
+        mcpServers: [
+          { type: 'stdio', name: 'cats-runtime' },
+        ],
+      },
+    }));
+  });
 });

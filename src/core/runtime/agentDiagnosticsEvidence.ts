@@ -3,6 +3,11 @@ import type {
   SessionInfo,
 } from '../types.js';
 
+type AgentDiagnosticMcpServerSummary = {
+  name: string;
+  type: 'stdio' | 'http' | 'sse';
+};
+
 export interface AgentDiagnosticSessionEvidenceSummary {
   source:
     | 'runtime_session_inspection'
@@ -18,6 +23,24 @@ export interface AgentDiagnosticSessionEvidenceSummary {
     cwd: string;
     outputDir?: string;
     workspaceMode?: string;
+  };
+  agentState?: {
+    sessionTitle?: string;
+    currentModeId?: string;
+    availableCommands?: string[];
+    configOptions?: Array<{
+      id: string;
+      label?: string;
+      value?: string;
+    }>;
+    contextWindowUsage?: {
+      used: number;
+      size: number;
+      costAmount?: number;
+      costCurrency?: string;
+    };
+    stopReason?: string;
+    mcpServers?: AgentDiagnosticMcpServerSummary[];
   };
   latestRun?: {
     id: string;
@@ -189,19 +212,25 @@ export function buildAgentDiagnosticSessionEvidence(
   }
 
   const latestRun = inspection.currentRun || inspection.lastRun;
+  const agentState = buildAgentDiagnosticStateSummary(session);
+  const inspectionAgentSession = inspection.agentSession;
+  const providerAgentSession = session.providerState?.agentSession;
 
   return {
     source,
     sessionId: session.id,
     ...(session.sessionKey ? { sessionKey: session.sessionKey } : {}),
-    ...(inspection.agentSession?.providerSessionId
-      ? { providerSessionId: inspection.agentSession.providerSessionId }
+    ...((inspectionAgentSession?.providerSessionId || providerAgentSession?.providerSessionId)
+      ? { providerSessionId: inspectionAgentSession?.providerSessionId || providerAgentSession?.providerSessionId }
       : {}),
-    ...(inspection.agentSession?.status ? { status: inspection.agentSession.status } : {}),
+    ...((inspectionAgentSession?.status || providerAgentSession?.status)
+      ? { status: inspectionAgentSession?.status || providerAgentSession?.status }
+      : {}),
     ...(resolveAgentDiagnosticObservedAt(session)
       ? { observedAt: resolveAgentDiagnosticObservedAt(session) }
       : {}),
     workspace: buildAgentDiagnosticWorkspace(session),
+    ...(agentState ? { agentState } : {}),
     ...(latestRun ? {
       latestRun: {
         id: latestRun.id,
@@ -263,6 +292,69 @@ function resolveAgentDiagnosticObservedAt(
   return session.lastActivity || session.updatedAt || session.createdAt || undefined;
 }
 
+function buildAgentDiagnosticStateSummary(
+  session: SessionInfo,
+): AgentDiagnosticSessionEvidenceSummary['agentState'] | undefined {
+  const record = parseRecord(session.providerState?.agentSession?.adapterState);
+  if (!record) {
+    return undefined;
+  }
+
+  const configOptions = Array.isArray(record.configOptions)
+    ? record.configOptions.flatMap((entry) => {
+      const option = parseRecord(entry);
+      const id = readString(option?.id);
+      if (!id) {
+        return [];
+      }
+      return [{
+        id,
+        ...(readString(option?.label) ? { label: readString(option?.label) } : {}),
+        ...(readString(option?.value) ? { value: readString(option?.value) } : {}),
+      }];
+    })
+    : [];
+  const availableCommands = Array.isArray(record.availableCommands)
+    ? record.availableCommands.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+    : [];
+  const sessionMcpServers: AgentDiagnosticMcpServerSummary[] = Array.isArray(record.sessionMcpServers)
+    ? record.sessionMcpServers.flatMap((entry) => {
+      const server = parseRecord(entry);
+      const type = readString(server?.type);
+      const name = readString(server?.name);
+      return (name && (type === 'stdio' || type === 'http' || type === 'sse'))
+        ? [{ name, type }]
+        : [];
+    })
+    : [];
+  const contextWindowUsageRecord = parseRecord(record.contextWindowUsage);
+  const contextWindowUsage = contextWindowUsageRecord
+    && typeof contextWindowUsageRecord.used === 'number'
+    && typeof contextWindowUsageRecord.size === 'number'
+    ? {
+        used: contextWindowUsageRecord.used,
+        size: contextWindowUsageRecord.size,
+        ...(typeof contextWindowUsageRecord.costAmount === 'number'
+          ? { costAmount: contextWindowUsageRecord.costAmount }
+          : {}),
+        ...(readString(contextWindowUsageRecord.costCurrency)
+          ? { costCurrency: readString(contextWindowUsageRecord.costCurrency) }
+          : {}),
+      }
+    : undefined;
+  const summary = {
+    ...(readString(record.sessionTitle) ? { sessionTitle: readString(record.sessionTitle) } : {}),
+    ...(readString(record.currentModeId) ? { currentModeId: readString(record.currentModeId) } : {}),
+    ...(availableCommands.length ? { availableCommands: [...availableCommands] } : {}),
+    ...(configOptions.length ? { configOptions } : {}),
+    ...(contextWindowUsage ? { contextWindowUsage } : {}),
+    ...(readString(record.stopReason) ? { stopReason: readString(record.stopReason) } : {}),
+    ...(sessionMcpServers.length ? { mcpServers: sessionMcpServers } : {}),
+  };
+
+  return Object.keys(summary).length > 0 ? summary : undefined;
+}
+
 function buildAgentDiagnosticWorkspace(
   session: SessionInfo,
 ): {
@@ -275,4 +367,14 @@ function buildAgentDiagnosticWorkspace(
     ...(session.outputDir ? { outputDir: session.outputDir } : {}),
     ...(session.workspaceMode ? { workspaceMode: session.workspaceMode } : {}),
   };
+}
+
+function parseRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
