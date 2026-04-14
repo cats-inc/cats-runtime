@@ -6,6 +6,7 @@ export interface AcpProviderProfile {
   label: string;
   family: string;
   summary: string;
+  clientCapabilityMeta?: Record<string, unknown>;
   probe: {
     helpArgs: string[];
   };
@@ -16,6 +17,9 @@ const CODEX_ACP_PROFILE: AcpProviderProfile = {
   label: 'Codex ACP',
   family: 'codex',
   summary: 'Tier 1 Codex ACP pilot target with runtime overlap on JSON-RPC lifecycle semantics.',
+  clientCapabilityMeta: {
+    terminal_output: true,
+  },
   probe: {
     helpArgs: ['--help'],
   },

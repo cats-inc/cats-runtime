@@ -172,10 +172,14 @@ function buildProviderState(
   };
 }
 
-function buildInitializeParams() {
+function buildInitializeParams(instance?: RemoteProviderInstanceConfig) {
+  const profile = instance ? resolveAcpProviderProfile(instance) : undefined;
   return {
     protocolVersion: DEFAULT_ACP_PROTOCOL_VERSION,
     clientCapabilities: {
+      ...(profile?.clientCapabilityMeta
+        ? { _meta: { ...profile.clientCapabilityMeta } }
+        : {}),
       fs: {
         readTextFile: false,
         writeTextFile: false,
@@ -970,7 +974,7 @@ export class AcpAdapter implements AgentAdapter {
       spawnProcess: this.options.acpProcessSpawner,
     });
     try {
-      await client.request('initialize', buildInitializeParams());
+      await client.request('initialize', buildInitializeParams(instance));
       const sessionResult = parseRecord(await client.request('session/new', {
         cwd,
         mcpServers: [],
@@ -1053,7 +1057,9 @@ export class AcpAdapter implements AgentAdapter {
     });
 
     const run = (async () => {
-      const initializeResult = parseRecord(await client.request('initialize', buildInitializeParams()));
+      const initializeResult = parseRecord(
+        await client.request('initialize', buildInitializeParams(input.instance)),
+      );
       const protocolVersion = initializeResult?.protocolVersion;
       const agentCapabilities = parseRecord(initializeResult?.agentCapabilities);
       const loadSessionSupported = agentCapabilities?.loadSession === true;
@@ -1183,7 +1189,9 @@ export class AcpAdapter implements AgentAdapter {
       spawnProcess: this.options.acpProcessSpawner,
     });
     try {
-      const initializeResult = parseRecord(await client.request('initialize', buildInitializeParams()));
+      const initializeResult = parseRecord(
+        await client.request('initialize', buildInitializeParams(instance)),
+      );
       const agentCapabilities = parseRecord(initializeResult?.agentCapabilities);
       if (agentCapabilities?.loadSession !== true) {
         return;

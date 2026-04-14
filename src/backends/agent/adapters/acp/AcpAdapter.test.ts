@@ -76,6 +76,20 @@ function createStdioInstance(): RemoteProviderInstanceConfig {
   };
 }
 
+function createGenericStdioInstance(): RemoteProviderInstanceConfig {
+  return {
+    id: 'acp-generic',
+    providerName: 'generic',
+    backend: 'agent',
+    transport: 'acp_stdio',
+    command: 'generic-acp',
+    args: ['serve'],
+    cwd: '/tmp/acp',
+    startupTimeoutMs: 15000,
+    model: 'generic-model',
+  };
+}
+
 function createHostBridge(permissionMode: 'skip' | 'default' | 'whitelist' = 'skip'): AgentAcpHostBridge {
   return {
     describe(_context: AgentAcpHostContext) {
@@ -552,6 +566,123 @@ describe('AcpAdapter', () => {
         },
       },
     ]);
+  });
+
+  it('advertises the codex terminal-output capability hint during ACP initialize', async () => {
+    const process = new FakeAcpProcess();
+    let initializeParams: Record<string, unknown> | undefined;
+
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        initializeParams = message.params as Record<string, unknown>;
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: false,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'acp-session-init-codex',
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/prompt') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            stopReason: 'end_turn',
+          },
+        }) + '\n');
+      }
+    });
+
+    const hostBridge = createHostBridge();
+    const adapter = new AcpAdapter({
+      acpHostBridge: hostBridge,
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    await collectEvents(adapter.invoke(
+      createInvokeInput(createStdioInstance(), hostBridge),
+    ));
+
+    expect(initializeParams).toEqual(expect.objectContaining({
+      clientCapabilities: expect.objectContaining({
+        _meta: {
+          terminal_output: true,
+        },
+      }),
+    }));
+  });
+
+  it('keeps generic ACP stdio initialize payloads free of codex-specific capability hints', async () => {
+    const process = new FakeAcpProcess();
+    let initializeParams: Record<string, unknown> | undefined;
+
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        initializeParams = message.params as Record<string, unknown>;
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: false,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'acp-session-init-generic',
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/prompt') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            stopReason: 'end_turn',
+          },
+        }) + '\n');
+      }
+    });
+
+    const hostBridge = createHostBridge();
+    const adapter = new AcpAdapter({
+      acpHostBridge: hostBridge,
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    await collectEvents(adapter.invoke(
+      createInvokeInput(createGenericStdioInstance(), hostBridge),
+    ));
+
+    const capabilities = initializeParams?.clientCapabilities as Record<string, unknown> | undefined;
+    expect(capabilities?._meta).toBeUndefined();
   });
 
   it('normalizes ACP reasoning, plan, and terminal-output updates into runtime progress events', async () => {
