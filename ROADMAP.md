@@ -751,6 +751,13 @@ longer needed, revisit the public contract in a coordinated cleanup slice.
   selection
 - evaluate whether request-scoped public advanced overrides should be added
   after product/API consumers are ready
+- collapse curated CLI model-label normalization onto a shared runtime-owned,
+  table-driven helper before more provider families are added, so future
+  provider breadth does not keep growing one hardcoded `Set`/`switch` block per
+  provider
+- keep that normalization cleanup in runtime code rather than pushing
+  canonical-id responsibility back into `curated-model-catalogs.yaml`; the
+  curator file should remain human-facing and provider-visible
 - keep backend support truthful; expand support only where runtime can map
   controls honestly
 
@@ -1665,4 +1672,4 @@ to make partial cleanup outcomes explicit for hosts.
 - `public/index.html`
 
 ---
-*Last updated: 2026-04-07*
+*Last updated: 2026-04-14*
