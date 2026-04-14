@@ -499,4 +499,150 @@ describe('ACP stdio transport', () => {
 
     await server.close();
   });
+
+  it('processes session/cancel notifications while a direct stdio prompt turn is still running', async () => {
+    rootDir = mkdtempSync(join(tmpdir(), 'cats-runtime-acp-stdio-'));
+    mkdirSync(join(rootDir, 'sessions'), { recursive: true });
+    mkdirSync(join(rootDir, 'data'), { recursive: true });
+
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const registry = new SessionRegistry();
+    let cancelRequested = false;
+    const worker = {
+      alive: true,
+      busy: false,
+      on: vi.fn(),
+      off: vi.fn(),
+      async *streamMessage(turnInput: string | TurnInput): AsyncGenerator<StreamEvent> {
+        const resolvedInput = typeof turnInput === 'string' ? { message: turnInput } : turnInput;
+        expect(resolvedInput.message).toBe('Cancel this prompt once it starts.');
+        worker.busy = true;
+        yield { type: 'text', text: 'Prompt started.' };
+
+        let remainingPolls = 60;
+        while (!cancelRequested && remainingPolls > 0) {
+          remainingPolls -= 1;
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+
+        worker.busy = false;
+        if (cancelRequested) {
+          yield { type: 'error', text: 'Turn cancelled by runtime abort.' };
+          return;
+        }
+
+        yield { type: 'error', text: 'Prompt timed out waiting for cancellation.' };
+      },
+    };
+    const pool = {
+      getCapabilities: vi.fn(() => ({ resume: true, fork: true, permissions: true })),
+      get: vi.fn(() => worker),
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      cancel: vi.fn(() => {
+        cancelRequested = true;
+        worker.busy = false;
+      }),
+      status: vi.fn(() => ({ active: 1 })),
+    } as unknown as WorkerPool;
+
+    const ctx: AppContext = {
+      config: makeConfig(rootDir),
+      startup: createRuntimeStartupState(),
+      registry,
+      pool,
+      cursorNative: {} as CursorNativeSessionService,
+      gooseNative: {} as GooseNativeSessionService,
+      kiroNative: {} as KiroNativeSessionService,
+      auggieSessions: {} as AuggieSessionService,
+      opencodeNative: {} as OpencodeNativeSessionService,
+      providerModelCatalog: {} as never,
+    };
+
+    const server = startAcpStdioServer({ ctx, input, output });
+    const chunks: Buffer[] = [];
+    output.on('data', (chunk) => {
+      chunks.push(Buffer.from(chunk));
+    });
+
+    const cwd = join(rootDir, 'workspace-cancel');
+    mkdirSync(cwd, { recursive: true });
+
+    input.write(Buffer.concat([
+      encodeMessage({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: 1,
+        },
+      }),
+      encodeMessage({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'session/new',
+        params: {
+          cwd,
+          mcpServers: [],
+        },
+      }),
+    ]));
+
+    await vi.waitFor(() => {
+      expect(decodeMessages(Buffer.concat(chunks))).toHaveLength(2);
+    });
+
+    const initialMessages = decodeMessages(Buffer.concat(chunks)) as Array<Record<string, unknown>>;
+    const sessionId = (initialMessages[1].result as { sessionId: string }).sessionId;
+
+    input.write(encodeMessage({
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'session/prompt',
+      params: {
+        sessionId,
+        prompt: [
+          {
+            type: 'text',
+            text: 'Cancel this prompt once it starts.',
+          },
+        ],
+      },
+    }));
+
+    await vi.waitFor(() => {
+      const messages = decodeMessages(Buffer.concat(chunks)) as Array<Record<string, unknown>>;
+      expect(messages.some((message) => message.method === 'session/update')).toBe(true);
+    });
+
+    input.write(encodeMessage({
+      jsonrpc: '2.0',
+      method: 'session/cancel',
+      params: {
+        sessionId,
+      },
+    }));
+
+    await vi.waitFor(() => {
+      expect(pool.cancel).toHaveBeenCalledTimes(1);
+      const messages = decodeMessages(Buffer.concat(chunks)) as Array<Record<string, unknown>>;
+      expect(messages).toContainEqual({
+        jsonrpc: '2.0',
+        id: 3,
+        result: {
+          stopReason: 'cancelled',
+          _meta: {
+            catsRuntime: {
+              source: 'runtime_http_bridge',
+              transport: 'stdio',
+              turnStream: 'application/x-ndjson',
+            },
+          },
+        },
+      });
+    });
+
+    await server.close();
+  });
 });

@@ -106,6 +106,14 @@ function parseErrorResponse(message: string) {
   };
 }
 
+function isNotificationMessage(message: unknown): boolean {
+  if (!message || typeof message !== 'object' || Array.isArray(message)) {
+    return false;
+  }
+
+  return !('id' in (message as Record<string, unknown>));
+}
+
 function resolveJsonRpcHandler(options: AcpStdioServerOptions): AcpJsonRpcHandler {
   if (options.handleJsonRpc) {
     return options.handleJsonRpc;
@@ -128,6 +136,7 @@ export function startAcpStdioServer(options: AcpStdioServerOptions): AcpStdioSer
   let buffer: Buffer = Buffer.alloc(0);
   let closed = false;
   let processing = Promise.resolve();
+  const inflightNotifications = new Set<Promise<void>>();
 
   const writeResponse = (message: unknown) => {
     output.write(encodeMessage(message));
@@ -160,12 +169,26 @@ export function startAcpStdioServer(options: AcpStdioServerOptions): AcpStdioSer
 
       buffer = parsed.remainder;
       for (const message of parsed.messages) {
-        processing = processing.then(async () => {
+        const executeMessage = async () => {
           const response = await handleJsonRpc(message, responder);
           if (response !== null) {
             writeResponse(response);
           }
-        }).catch((error) => {
+        };
+
+        if (isNotificationMessage(message)) {
+          const task = executeMessage()
+            .catch((error) => {
+              errorOutput.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
+            })
+            .finally(() => {
+              inflightNotifications.delete(task);
+            });
+          inflightNotifications.add(task);
+          continue;
+        }
+
+        processing = processing.then(executeMessage).catch((error) => {
           errorOutput.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
         });
       }
@@ -181,6 +204,7 @@ export function startAcpStdioServer(options: AcpStdioServerOptions): AcpStdioSer
     input.off('end', handleEnd);
     input.off('error', handleError);
     await processing.catch(() => undefined);
+    await Promise.allSettled(Array.from(inflightNotifications));
     await options.onClose?.();
   };
 

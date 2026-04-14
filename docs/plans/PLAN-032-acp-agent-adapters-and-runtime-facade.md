@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Phase 4 Direct Runtime ACP CLI Landed) |
+| **Status** | In Progress (Phase 4 Direct Runtime Prompt + Cancel Landed) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -257,3 +257,4 @@ Current rationale for preferring `codex-acp` first:
 | 2026-04-15 | Added a repo-local ACP proxy CLI alongside the new stdio carrier: `cats-runtime acp` now forwards stdio ACP traffic into the runtime's primary HTTP `/acp` endpoint using the same host/port/API-key conventions as the MCP proxy mode, so external ACP clients can target the runtime through either direct HTTP JSON-RPC or a CLI-friendly stdio command without waiting for prompt-turn support to land |
 | 2026-04-15 | Enabled the first real prompt-turn path on the runtime ACP facade, but only on direct stdio transport: the shared ACP handler can now reuse `/sessions/:id/messages` over NDJSON, project runtime text/tool events into outbound `session/update` notifications, and return ACP `stopReason` results, while HTTP `/acp` still truthfully refuses `session/prompt` until it grows a comparable bidirectional carrier |
 | 2026-04-15 | Exposed the direct stdio prompt-turn carrier as an actual operator-facing CLI mode: `cats-runtime acp --serve-runtime` now starts an in-process runtime-backed ACP stdio server, while the default `cats-runtime acp` command remains the HTTP proxy variant, so ACP clients can choose between a lightweight proxy to an already-running runtime or a standalone subprocess entrypoint that supports `session/prompt` over stdio immediately |
+| 2026-04-15 | Closed the first ACP cancellation gap on the direct stdio carrier: `startAcpStdioServer` now lets JSON-RPC notifications such as `session/cancel` run concurrently with the single in-flight request chain, so a long-running `session/prompt` can be interrupted mid-turn and return ACP's required `cancelled` stop reason instead of forcing cancel notifications to wait behind the prompt response |
