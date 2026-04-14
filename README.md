@@ -42,6 +42,10 @@ Current capabilities:
 - runtime-owned provider event capability truth on `/providers/config`, so
   hosts can inspect normalized text/tool/progress/block posture without
   hard-coding provider behavior
+- provider-side ACP support under the existing `agent` backend family,
+  including a working `codex-acp` pilot path
+- a bounded runtime-owned ACP facade on `POST /acp` plus a direct stdio ACP
+  carrier for prompt-turn capable IDE/client integration
 
 ## Current Status
 
@@ -69,6 +73,8 @@ Current capabilities:
       for provider selection and future rendering contracts
 - [x] Publish a runtime-owned streamed `content_block` contract for live host
       transcript rendering
+- [x] Land provider-side ACP support under the existing `agent` backend family
+- [x] Land the first bounded runtime-owned ACP facade for IDE/client consumption
 
 ## Design Rules
 
