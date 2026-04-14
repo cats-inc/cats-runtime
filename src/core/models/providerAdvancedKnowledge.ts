@@ -23,6 +23,7 @@ import {
   type CuratedModelCatalogDocument,
   type CuratedModelCatalogModel,
   type CuratedModelCatalogOption,
+  type CuratedModelCatalogProvider,
 } from './curatedModelCatalog.js';
 import {
   describeCuratedModelLabel,
@@ -242,6 +243,43 @@ function fallbackCodexEffortDescription(
   }
 }
 
+function normalizeCopilotEffortValue(
+  value: string | undefined,
+): ProviderAdvancedControlValue | null {
+  const normalized = value?.trim().toLowerCase();
+  switch (normalized) {
+    case 'low':
+      return 'low';
+    case 'medium':
+      return 'medium';
+    case 'high':
+      return 'high';
+    case 'extra high':
+    case 'extra-high':
+    case 'xhigh':
+      return 'xhigh';
+    default:
+      return null;
+  }
+}
+
+function fallbackCopilotEffortDescription(
+  value: ProviderAdvancedControlValue,
+): string | undefined {
+  switch (value) {
+    case 'low':
+      return 'Faster responses, less detailed reasoning.';
+    case 'medium':
+      return 'Balanced speed and reasoning depth.';
+    case 'high':
+      return 'More thorough reasoning, slower responses.';
+    case 'xhigh':
+      return 'Maximum reasoning depth, slowest responses.';
+    default:
+      return undefined;
+  }
+}
+
 function matchesCuratedOptionName(
   option: CuratedModelCatalogOption,
   aliases: string[],
@@ -404,6 +442,21 @@ function buildCuratedCodexCliControls(
   });
 }
 
+function buildCuratedCopilotCliControls(
+  optionsByEntryId: Map<string, CuratedModelCatalogOption>,
+): {
+  controls?: ProviderAdvancedCatalogControl[];
+  entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
+} {
+  return buildCuratedEnumControl(optionsByEntryId, {
+    key: 'copilot.reasoning_effort',
+    label: 'Reasoning effort',
+    description: 'Controls GitHub Copilot CLI reasoning effort for supported models.',
+    normalizeValue: normalizeCopilotEffortValue,
+    fallbackDescription: fallbackCopilotEffortDescription,
+  });
+}
+
 function buildCuratedClaudeCliOverlay(
   document: CuratedModelCatalogDocument | undefined,
 ): CuratedCatalogOverlay | null {
@@ -542,6 +595,46 @@ function flattenCuratedCatalogProviderModels(
   return (catalog.providers || []).flatMap((provider) => provider.models);
 }
 
+function resolveCuratedProviderSharedOptions(
+  catalog: CuratedModelCatalogEntry,
+  provider: CuratedModelCatalogProvider,
+): CuratedModelCatalogOption[] {
+  return resolveEffectiveCuratedModelOptions(catalog.sharedOptions, {
+    name: `provider:${provider.name}`,
+    ...(provider.sharedOptions !== undefined ? { options: provider.sharedOptions } : {}),
+  });
+}
+
+function collectCuratedCopilotModel(
+  cliLabel: string,
+  model: CuratedModelCatalogModel,
+  sharedOptions: CuratedModelCatalogOption[],
+  entriesById: Record<string, CuratedEntryMetadata>,
+  effortOptions: Map<string, CuratedModelCatalogOption>,
+  warnings: string[],
+): void {
+  const entryId = normalizeCopilotCuratedModelId(model);
+  if (!entryId) {
+    warnings.push(
+      `Curated model '${describeCuratedModelLabel(model)}' for ${cliLabel} could not be normalized and was ignored.`,
+    );
+    return;
+  }
+
+  entriesById[entryId] = buildCuratedEntryMetadata(model);
+
+  const effectiveOptions = resolveEffectiveCuratedModelOptions(sharedOptions, model);
+  const effortOption = effectiveOptions.find((option) => matchesCuratedOptionName(option, [
+    'reasoning effort',
+    'reasoning level',
+    'effort level',
+    'effort',
+  ]));
+  if (effortOption) {
+    effortOptions.set(entryId, effortOption);
+  }
+}
+
 function buildCuratedKiloCliOverlay(
   document: CuratedModelCatalogDocument | undefined,
 ): CuratedCatalogOverlay | null {
@@ -566,8 +659,49 @@ function buildCuratedCopilotCliOverlay(
     return null;
   }
 
-  const models = catalog.models ?? flattenCuratedCatalogProviderModels(catalog);
-  return buildCuratedEntryOnlyOverlay(catalog.cli, models, normalizeCopilotCuratedModelId);
+  const entriesById: Record<string, CuratedEntryMetadata> = {};
+  const effortOptions = new Map<string, CuratedModelCatalogOption>();
+  const warnings: string[] = [];
+
+  if (catalog.models) {
+    const sharedOptions = catalog.sharedOptions || [];
+    for (const model of catalog.models) {
+      collectCuratedCopilotModel(
+        catalog.cli,
+        model,
+        sharedOptions,
+        entriesById,
+        effortOptions,
+        warnings,
+      );
+    }
+  } else {
+    for (const provider of catalog.providers || []) {
+      const sharedOptions = resolveCuratedProviderSharedOptions(catalog, provider);
+      for (const model of provider.models) {
+        collectCuratedCopilotModel(
+          catalog.cli,
+          model,
+          sharedOptions,
+          entriesById,
+          effortOptions,
+          warnings,
+        );
+      }
+    }
+  }
+
+  if (Object.keys(entriesById).length === 0) {
+    return null;
+  }
+
+  const controlResult = buildCuratedCopilotCliControls(effortOptions);
+  return {
+    entriesById,
+    ...(controlResult.controls ? { controls: controlResult.controls } : {}),
+    entryDefaults: controlResult.entryDefaults,
+    warnings,
+  };
 }
 
 function buildCuratedCursorCliOverlay(
@@ -1176,7 +1310,8 @@ export function buildProviderAdvancedKnowledge(
     curatedOverlay?.entriesById,
   );
   const manifest = resolveVerifiedAdvancedManifest(target);
-  const supportTier = manifest?.supportTier ?? 'entry_only';
+  const supportTier = manifest?.supportTier
+    ?? (curatedOverlay?.controls?.length ? 'full' : 'entry_only');
   let manifestCatalog = manifest
     ? manifest.build(target, entries)
     : {

@@ -51,6 +51,17 @@ describe('CopilotProvider', () => {
       expect(args).toContain('gpt-5.1');
     });
 
+    it('adds --effort when modelControls specify Copilot reasoning effort', () => {
+      const args = provider.buildSpawnArgs({
+        cwd: '/tmp',
+        modelControls: {
+          'copilot.reasoning_effort': 'high',
+        },
+      });
+      expect(args).toContain('--effort');
+      expect(args).toContain('high');
+    });
+
     it('adds --resume when resumeSessionId specified', () => {
       const args = provider.buildSpawnArgs({ cwd: '/tmp', resumeSessionId: 'sess-abc' });
       expect(args).toContain('--resume');

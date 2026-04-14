@@ -391,8 +391,9 @@ Current importer status in runtime:
   and the advanced catalog
 - Kilo CLI: curated entry metadata on both the CLI static-fallback catalog
   and the advanced catalog
-- Copilot CLI: curated entry metadata, including `providers[]` flattening, on
-  both the CLI static-fallback catalog and the advanced catalog
+- Copilot CLI: curated entry metadata, `providers[]` flattening, and
+  reasoning-control normalization on both the CLI static-fallback catalog and
+  the advanced catalog
 - Cursor CLI: curated entry metadata, including `providers[]` flattening, on
   both the CLI static-fallback catalog and the advanced catalog
 

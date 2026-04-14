@@ -73,6 +73,9 @@ export class CopilotProvider implements Provider {
     if (opts.model) {
       args.push('--model', opts.model);
     }
+    if (typeof opts.modelControls?.['copilot.reasoning_effort'] === 'string') {
+      args.push('--effort', opts.modelControls['copilot.reasoning_effort']);
+    }
 
     if (opts.resumeSessionId) {
       args.push('--resume', opts.resumeSessionId);

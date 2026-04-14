@@ -220,14 +220,14 @@ catalogs:
       - name: Kimi K2.5
 
   - cli: Copilot
-    version: v1.0.25
-    last_updated: 2026-04-14
+    version: v1.0.26
+    last_updated: 2026-04-15
     notes:
       - "Source: Copilot model picker output supplied by user"
     providers:
       - name: OpenAI
         shared_options:
-          - name: Reasoning Level
+          - name: Reasoning Effort
             values:
               - name: Low
                 notes:
@@ -238,9 +238,6 @@ catalogs:
               - name: High
                 notes:
                   - "More thorough reasoning, slower responses"
-              - name: Extra High
-                notes:
-                  - "Maximum reasoning depth, slowest responses"
             default: Medium
         models:
           - name: GPT-5.4
@@ -250,35 +247,23 @@ catalogs:
 
           - name: GPT-5.2-Codex
             options:
-              - name: Reasoning Level
+              - name: Reasoning Effort
                 default: High
 
           - name: GPT-5.2
-            options:
-              - name: Reasoning Level
-                values: [Low, Medium, High]
-                default: Medium
 
           - name: GPT-5.1
-            options:
-              - name: Reasoning Level
-                values: [Low, Medium, High]
-                default: Medium
 
           - name: GPT-5.4 mini
 
           - name: GPT-5 mini
-            options:
-              - name: Reasoning Level
-                values: [Low, Medium, High]
-                default: Medium
 
           - name: GPT-4.1
             options: []
 
       - name: Anthropic
         shared_options:
-          - name: Reasoning Level
+          - name: Effort Level
             values:
               - name: Low
                 notes:
@@ -301,7 +286,7 @@ catalogs:
 
           - name: Claude Opus 4.6
             options:
-              - name: Reasoning Level
+              - name: Effort Level
                 default: High
 
           - name: Claude Opus 4.5

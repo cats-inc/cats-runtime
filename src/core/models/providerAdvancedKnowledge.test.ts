@@ -489,16 +489,51 @@ describe('buildProviderAdvancedKnowledge', () => {
       'schema_version: 1',
       'catalogs:',
       '  - cli: Copilot',
+      '    version: v1.0.26',
       '    last_updated: 2026-04-15',
       '    providers:',
       '      - name: OpenAI',
+      '        shared_options:',
+      '          - name: Reasoning Effort',
+      '            values:',
+      '              - name: Low',
+      '                notes:',
+      '                  - "Faster responses, less detailed reasoning"',
+      '              - name: Medium',
+      '                notes:',
+      '                  - "Balanced speed and reasoning depth"',
+      '              - name: High',
+      '                notes:',
+      '                  - "More thorough reasoning, slower responses"',
+      '            default: Medium',
       '        models:',
       '          - name: GPT-5.4',
       '            default: true',
       '          - name: GPT-5.4 mini',
+      '          - name: GPT-5.2-Codex',
+      '            options:',
+      '              - name: Reasoning Effort',
+      '                default: High',
       '      - name: Anthropic',
+      '        shared_options:',
+      '          - name: Effort Level',
+      '            values:',
+      '              - name: Low',
+      '                notes:',
+      '                  - "Minimal thinking, prioritizes speed"',
+      '              - name: Medium',
+      '                notes:',
+      '                  - "Balanced, thinks on harder problems"',
+      '              - name: High',
+      '                notes:',
+      '                  - "Optimal performance, thorough thinking"',
+      '            default: Medium',
       '        models:',
       '          - name: Claude Opus 4.6',
+      '            options:',
+      '              - name: Effort Level',
+      '                default: High',
+      '          - name: Claude Sonnet 4',
       '',
     ].join('\n'), 'utf8');
 
@@ -524,7 +559,9 @@ describe('buildProviderAdvancedKnowledge', () => {
         models: [
           { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
           { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini' },
+          { id: 'gpt-5.2-codex', label: 'gpt-5.2-codex' },
           { id: 'claude-opus-4.6', label: 'claude-opus-4.6' },
+          { id: 'claude-sonnet-4', label: 'claude-sonnet-4' },
         ],
       }), {
         env: {
@@ -533,7 +570,15 @@ describe('buildProviderAdvancedKnowledge', () => {
         },
       });
 
-      expect(knowledge.supportTier).toBe('entry_only');
+      expect(knowledge.supportTier).toBe('full');
+      expect(knowledge.catalog.support).toEqual({
+        tier: 'full',
+        advancedMetadataStatus: 'unverified_omitted',
+        discoveryMode: 'manual_refresh',
+        provenance: {
+          status: 'unverified_omitted',
+        },
+      });
       expect(knowledge.catalog.entries).toEqual([
         {
           id: 'gpt-5.4',
@@ -548,14 +593,100 @@ describe('buildProviderAdvancedKnowledge', () => {
           capabilityTags: ['reasoning', 'latency_optimized'],
         },
         {
+          id: 'gpt-5.2-codex',
+          label: 'GPT-5.2-Codex',
+          default: false,
+        },
+        {
           id: 'claude-opus-4.6',
           label: 'Claude Opus 4.6',
           default: false,
           capabilityTags: ['reasoning'],
         },
+        {
+          id: 'claude-sonnet-4',
+          label: 'Claude Sonnet 4',
+          default: false,
+        },
       ]);
-      expect(knowledge.catalog.controls).toEqual([]);
-      expect(knowledge.catalog.defaultSelection).toBeNull();
+      expect(knowledge.catalog.controls).toEqual([
+        {
+          key: 'copilot.reasoning_effort',
+          label: 'Reasoning effort',
+          description: 'Controls GitHub Copilot CLI reasoning effort for supported models.',
+          kind: 'enum',
+          scope: 'both',
+          values: expect.arrayContaining([
+            {
+              value: 'low',
+              label: 'Low',
+              description: 'Faster responses, less detailed reasoning',
+              applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.2-codex'],
+            },
+            {
+              value: 'medium',
+              label: 'Medium (default)',
+              description: 'Balanced speed and reasoning depth',
+              applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini'],
+            },
+            {
+              value: 'high',
+              label: 'High',
+              description: 'More thorough reasoning, slower responses',
+              applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini'],
+            },
+            {
+              value: 'high',
+              label: 'High (default)',
+              description: 'More thorough reasoning, slower responses',
+              applicableEntryIds: ['gpt-5.2-codex'],
+            },
+            {
+              value: 'low',
+              label: 'Low',
+              description: 'Minimal thinking, prioritizes speed',
+              applicableEntryIds: ['claude-opus-4.6', 'claude-sonnet-4'],
+            },
+            {
+              value: 'medium',
+              label: 'Medium (default)',
+              description: 'Balanced, thinks on harder problems',
+              applicableEntryIds: ['claude-sonnet-4'],
+            },
+            {
+              value: 'high',
+              label: 'High (default)',
+              description: 'Optimal performance, thorough thinking',
+              applicableEntryIds: ['claude-opus-4.6'],
+            },
+            {
+              value: 'high',
+              label: 'High',
+              description: 'Optimal performance, thorough thinking',
+              applicableEntryIds: ['claude-sonnet-4'],
+            },
+          ]),
+          applicableEntryIds: [
+            'gpt-5.4',
+            'gpt-5.4-mini',
+            'gpt-5.2-codex',
+            'claude-opus-4.6',
+            'claude-sonnet-4',
+          ],
+          semanticTags: ['reasoning_intensity'],
+        },
+      ]);
+      expect(knowledge.catalog.defaultSelection).toEqual({
+        entryId: 'gpt-5.4',
+        entryMode: 'explicit',
+        controls: {
+          'copilot.reasoning_effort': 'medium',
+        },
+      });
+      expect(knowledge.entryDefaults['gpt-5.2-codex']).toEqual({
+        'copilot.reasoning_effort': 'high',
+      });
+      expect(knowledge.controlsByKey['copilot.reasoning_effort']).toBeDefined();
       expect(knowledge.catalog.warnings).toEqual([]);
     } finally {
       rmSync(runtimeRoot, { recursive: true, force: true });
