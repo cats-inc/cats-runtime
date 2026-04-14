@@ -213,6 +213,8 @@ function extractSessionIdFromBootstrapResult(
 function selectPermissionOption(
   options: unknown,
   permissionMode: PermissionMode | undefined,
+  allowedTools: string[] | undefined,
+  request: AcpJsonRpcRequest,
 ): string | undefined {
   if (!Array.isArray(options)) {
     return undefined;
@@ -230,6 +232,11 @@ function selectPermissionOption(
       || readString(records[0]?.optionId);
   }
 
+  if (permissionMode === 'whitelist' && matchesPermissionRequestToAllowedTools(request, allowedTools)) {
+    return readString(findByKind('allow_always', 'allow_once')?.optionId)
+      || undefined;
+  }
+
   return readString(findByKind('reject_once', 'reject_always')?.optionId)
     || undefined;
 }
@@ -237,9 +244,15 @@ function selectPermissionOption(
 function buildPermissionResponse(
   request: AcpJsonRpcRequest,
   permissionMode: PermissionMode | undefined,
+  allowedTools: string[] | undefined,
 ): Record<string, unknown> {
   const params = parseRecord(request.params);
-  const selectedOptionId = selectPermissionOption(params?.options, permissionMode);
+  const selectedOptionId = selectPermissionOption(
+    params?.options,
+    permissionMode,
+    allowedTools,
+    request,
+  );
   if (selectedOptionId) {
     return {
       outcome: {
@@ -254,6 +267,57 @@ function buildPermissionResponse(
       outcome: 'cancelled',
     },
   };
+}
+
+function normalizeAllowedToken(value: string | null | undefined): string {
+  return (value || '').trim().toLowerCase().replace(/[^a-z0-9*]+/g, '');
+}
+
+function kindCandidates(kind: string | undefined): string[] {
+  switch ((kind || '').trim().toLowerCase()) {
+    case 'read':
+      return ['read_file', 'read', 'view_image'];
+    case 'edit':
+      return ['apply_patch', 'write_file', 'edit_file', 'write'];
+    case 'execute':
+      return ['run_shell', 'command_execution', 'exec'];
+    case 'fetch':
+      return ['web_fetch', 'web_search', 'fetch'];
+    default:
+      return [];
+  }
+}
+
+function matchesPermissionRequestToAllowedTools(
+  request: AcpJsonRpcRequest,
+  allowedTools: string[] | undefined,
+): boolean {
+  const normalizedAllowed = new Set((allowedTools || [])
+    .map(normalizeAllowedToken)
+    .filter(Boolean));
+  if (normalizedAllowed.size === 0) {
+    return false;
+  }
+  if (normalizedAllowed.has('*')) {
+    return true;
+  }
+
+  const params = parseRecord(request.params);
+  const toolCall = parseRecord(params?.toolCall) || parseRecord(params?.tool_call);
+  const title = readString(toolCall?.title);
+  const kind = readString(toolCall?.kind);
+  const name = readString(toolCall?.name);
+  const candidates = [
+    title,
+    name,
+    kind,
+    ...(title ? [title.split(/\s+/, 1)[0] || ''] : []),
+    ...kindCandidates(kind),
+  ]
+    .map(normalizeAllowedToken)
+    .filter(Boolean);
+
+  return candidates.some((candidate) => normalizedAllowed.has(candidate));
 }
 
 function extractToolText(content: unknown): string | undefined {
@@ -496,7 +560,11 @@ export class AcpAdapter implements AgentAdapter {
       },
       onServerRequest: async (request) => {
         if (request.method === 'session/request_permission') {
-          return buildPermissionResponse(request, input.acpHost?.context.permissionMode);
+          return buildPermissionResponse(
+            request,
+            input.acpHost?.context.permissionMode,
+            input.acpHost?.context.allowedTools,
+          );
         }
 
         throw new AcpJsonRpcClientError(

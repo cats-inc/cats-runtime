@@ -158,6 +158,7 @@ function createInvokeInput(
   instance: RemoteProviderInstanceConfig,
   hostBridge: AgentAcpHostBridge,
   permissionMode: 'skip' | 'default' | 'whitelist' = 'skip',
+  allowedTools?: string[],
 ) {
   return {
     sessionId: 'session-1',
@@ -181,6 +182,7 @@ function createInvokeInput(
           runtimeCwd: '/tmp/acp',
         },
         permissionMode,
+        ...(allowedTools ? { allowedTools } : {}),
       },
     },
     signal: new AbortController().signal,
@@ -742,6 +744,101 @@ describe('AcpAdapter', () => {
       expect.objectContaining({
         type: 'result',
         providerSessionId: 'acp-session-2',
+      }),
+    ]);
+  });
+
+  it('rejects ACP permission requests when whitelist policy does not match the requested tool', async () => {
+    const process = new FakeAcpProcess();
+    let permissionReply: Record<string, unknown> | undefined;
+
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: false,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'acp-session-3',
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/prompt') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 77,
+          method: 'session/request_permission',
+          params: {
+            sessionId: 'acp-session-3',
+            toolCall: {
+              toolCallId: 'tool-2',
+              title: 'Run Shell',
+              kind: 'execute',
+            },
+            options: [
+              { optionId: 'allow-once', kind: 'allow_once' },
+              { optionId: 'reject-once', kind: 'reject_once' },
+            ],
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.id === 77) {
+        permissionReply = message;
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 2,
+          result: {
+            stopReason: 'end_turn',
+          },
+        }) + '\n');
+      }
+    });
+
+    const hostBridge = createHostBridge('whitelist');
+    const adapter = new AcpAdapter({
+      acpHostBridge: hostBridge,
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    const events = await collectEvents(adapter.invoke(
+      createInvokeInput(createStdioInstance(), hostBridge, 'whitelist', ['read_file']),
+    ));
+
+    expect(permissionReply).toEqual({
+      jsonrpc: '2.0',
+      id: 77,
+      result: {
+        outcome: {
+          outcome: 'selected',
+          optionId: 'reject-once',
+        },
+      },
+    });
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'init',
+        providerSessionId: 'acp-session-3',
+      }),
+      expect.objectContaining({
+        type: 'result',
+        providerSessionId: 'acp-session-3',
       }),
     ]);
   });
