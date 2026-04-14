@@ -8,6 +8,7 @@ import type {
 import type { PermissionMode, SessionProviderState, StreamEvent } from '../../../../core/types.js';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
 import { runCliCommand } from '../../../../core/management/cli.js';
+import { createRuntimeProgressEvent } from '../../../../core/progress.js';
 import { parseRecord, prependInstructions, readString } from '../../utils.js';
 import {
   AcpJsonRpcClientError,
@@ -21,6 +22,9 @@ const DEFAULT_ACP_PROTOCOL_VERSION = 1;
 const DEFAULT_ACP_STDIN_PROBE_TIMEOUT_MS = 5_000;
 
 type AcpInvokePhase = 'bootstrap' | 'prompt';
+interface AcpObservedToolCall {
+  name?: string;
+}
 
 function resolveEndpoint(
   instance: RemoteProviderInstanceConfig,
@@ -383,10 +387,114 @@ function extractToolText(content: unknown): string | undefined {
   return lines.length > 0 ? lines.join('\n') : undefined;
 }
 
+function readNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function formatProviderLabel(providerName: string): string {
+  if (!providerName.trim()) {
+    return 'ACP agent';
+  }
+
+  return providerName
+    .split(/[_\s-]+/u)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function buildProgressEvent(
+  input: AgentInvokeInput,
+  providerSessionId: string,
+  text: string,
+  kind: 'plan' | 'reasoning' | 'command' | 'session' | 'model_state',
+  status: 'running' | 'updated',
+  native: Record<string, unknown>,
+  providerState: SessionProviderState,
+  tool?: { toolId?: string; toolName?: string },
+): StreamEvent {
+  const progress = createRuntimeProgressEvent({
+    text,
+    providerSessionId,
+    provider: input.providerName,
+    backend: 'agent',
+    instance: input.instance.id,
+    source: 'provider',
+    kind,
+    status,
+    native,
+  });
+  return {
+    ...progress,
+    providerState,
+    ...(tool?.toolId ? { toolId: tool.toolId } : {}),
+    ...(tool?.toolName ? { toolName: tool.toolName } : {}),
+  };
+}
+
+function countPlanEntries(value: unknown): number | undefined {
+  const plan = parseRecord(value);
+  const entries = Array.isArray(plan?.entries)
+    ? plan.entries
+    : Array.isArray(plan?.steps)
+      ? plan.steps
+      : Array.isArray(value)
+        ? value
+        : [];
+  return entries.length > 0 ? entries.length : undefined;
+}
+
+function summarizePlanUpdate(input: AgentInvokeInput, update: Record<string, unknown>): {
+  text: string;
+  stepCount?: number;
+} {
+  const plan = parseRecord(update.plan) || update;
+  const summary = readString(plan.summary) || readString(update.summary);
+  const stepCount = countPlanEntries(plan);
+  if (summary) {
+    return {
+      text: summary,
+      ...(stepCount === undefined ? {} : { stepCount }),
+    };
+  }
+
+  const label = formatProviderLabel(input.providerName);
+  return stepCount === undefined
+    ? { text: `${label} updated the plan.` }
+    : {
+        text: `${label} updated the plan (${stepCount} steps).`,
+        stepCount,
+      };
+}
+
+function buildToolMetadata(
+  sourceEvent: string,
+  toolCall: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  const kind = readString(toolCall.kind);
+  const meta = parseRecord(toolCall.meta);
+  const details: Record<string, unknown> = {
+    native: {
+      sourceEvent,
+      ...(kind ? { toolKind: kind } : {}),
+    },
+  };
+
+  if (meta && Object.keys(meta).length > 0) {
+    details.native = {
+      ...(details.native as Record<string, unknown>),
+      meta,
+    };
+  }
+
+  return Object.keys(details).length > 0 ? details : undefined;
+}
+
 function parseSessionUpdateEvents(
   input: AgentInvokeInput,
   providerSessionId: string,
   notification: AcpJsonRpcNotification,
+  observedTools: Map<string, AcpObservedToolCall>,
 ): StreamEvent[] {
   const params = parseRecord(notification.params);
   const update = parseRecord(params?.update);
@@ -413,37 +521,159 @@ function parseSessionUpdateEvents(
       : [];
   }
 
+  if (updateType === 'agent_thought_chunk') {
+    const text = readString(update.content)
+      || readString(parseRecord(update.chunk)?.text)
+      || readString(parseRecord(update.delta)?.text);
+    return text
+      ? [buildProgressEvent(
+          input,
+          providerSessionId,
+          text,
+          'reasoning',
+          'running',
+          {
+            sourceEvent: 'session/update:agent_thought_chunk',
+            hasReasoningDelta: true,
+          },
+          providerState,
+        )]
+      : [];
+  }
+
+  if (updateType === 'plan') {
+    const summary = summarizePlanUpdate(input, update);
+    return [buildProgressEvent(
+      input,
+      providerSessionId,
+      summary.text,
+      'plan',
+      'updated',
+      {
+        sourceEvent: 'session/update:plan',
+        ...(summary.stepCount === undefined ? {} : { stepCount: summary.stepCount }),
+      },
+      providerState,
+    )];
+  }
+
   if (updateType === 'tool_call') {
     const toolCall = parseRecord(update.toolCall) || update;
     const toolName = readString(toolCall.title)
       || readString(toolCall.kind)
       || readString(toolCall.name);
     const toolId = readString(toolCall.toolCallId) || readString(toolCall.id);
+    if (toolId) {
+      observedTools.set(toolId, {
+        ...(toolName ? { name: toolName } : {}),
+      });
+    }
     return [{
       type: 'tool_use',
       providerSessionId,
+      ...(extractToolText(toolCall.content) ? { text: extractToolText(toolCall.content) } : {}),
       ...(toolName ? { toolName } : {}),
       ...(toolId ? { toolId } : {}),
+      ...(buildToolMetadata('session/update:tool_call', toolCall)
+        ? { metadata: buildToolMetadata('session/update:tool_call', toolCall) }
+        : {}),
       providerState,
+      ...(parseRecord(toolCall.rawInput) || parseRecord(toolCall.raw_input)
+        ? { toolArgs: (parseRecord(toolCall.rawInput) || parseRecord(toolCall.raw_input))! }
+        : {}),
     }];
   }
 
   if (updateType === 'tool_call_update') {
     const toolCallUpdate = parseRecord(update.toolCallUpdate) || update;
     const toolId = readString(toolCallUpdate.toolCallId) || readString(toolCallUpdate.id);
+    const observed = toolId ? observedTools.get(toolId) : undefined;
+    const toolName = readString(toolCallUpdate.title)
+      || readString(toolCallUpdate.kind)
+      || readString(toolCallUpdate.name)
+      || observed?.name;
     const fields = parseRecord(toolCallUpdate.fields);
     const status = readString(fields?.status) || readString(toolCallUpdate.status);
     const text = extractToolText(fields?.content ?? toolCallUpdate.content);
+    const meta = parseRecord(toolCallUpdate.meta);
+    const events: StreamEvent[] = [];
+    const terminalOutput = parseRecord(meta?.terminal_output);
+    const terminalExit = parseRecord(meta?.terminal_exit);
+
+    if (terminalOutput) {
+      const output = readString(terminalOutput.data);
+      if (output) {
+        events.push(buildProgressEvent(
+          input,
+          providerSessionId,
+          output,
+          'command',
+          'running',
+          {
+            sourceEvent: 'session/update:tool_call_update:terminal_output',
+            terminalId: readString(terminalOutput.terminal_id) || toolId,
+          },
+          providerState,
+          {
+            ...(toolId ? { toolId } : {}),
+            ...(toolName ? { toolName } : {}),
+          },
+        ));
+      }
+    }
+
+    if (terminalExit) {
+      const exitCode = readNumber(terminalExit.exit_code);
+      const signal = readString(terminalExit.signal);
+      const summary = exitCode !== undefined
+        ? `Command exited with code ${exitCode}.`
+        : signal
+          ? `Command exited with signal ${signal}.`
+          : 'Command exited.';
+      events.push(buildProgressEvent(
+        input,
+        providerSessionId,
+        summary,
+        'command',
+        'updated',
+        {
+          sourceEvent: 'session/update:tool_call_update:terminal_exit',
+          terminalId: readString(terminalExit.terminal_id) || toolId,
+          ...(exitCode === undefined ? {} : { exitCode }),
+          ...(signal ? { signal } : {}),
+        },
+        providerState,
+        {
+          ...(toolId ? { toolId } : {}),
+          ...(toolName ? { toolName } : {}),
+        },
+      ));
+    }
+
     if (status === 'completed' || status === 'failed') {
-      return [{
+      events.push({
         type: 'tool_result',
         providerSessionId,
         ...(toolId ? { toolId } : {}),
+        ...(toolName ? { toolName } : {}),
         ...(text ? { text } : {}),
         ...(status === 'failed' ? { isError: true } : {}),
         providerState,
-      }];
+        ...(meta && Object.keys(meta).length > 0
+          ? {
+              metadata: {
+                native: {
+                  sourceEvent: 'session/update:tool_call_update',
+                  status,
+                  meta,
+                },
+              },
+            }
+          : {}),
+      });
     }
+
+    return events;
   }
 
   return [];
@@ -596,6 +826,7 @@ export class AcpAdapter implements AgentAdapter {
     let resolve: (() => void) | null = null;
     let providerSessionId = input.providerSessionId;
     let phase: AcpInvokePhase = 'bootstrap';
+    const observedTools = new Map<string, AcpObservedToolCall>();
 
     const push = (item: StreamEvent | Error | null) => {
       queue.push(item);
@@ -616,7 +847,12 @@ export class AcpAdapter implements AgentAdapter {
           return;
         }
 
-        for (const event of parseSessionUpdateEvents(input, providerSessionId, notification)) {
+        for (const event of parseSessionUpdateEvents(
+          input,
+          providerSessionId,
+          notification,
+          observedTools,
+        )) {
           push(event);
         }
       },

@@ -554,6 +554,283 @@ describe('AcpAdapter', () => {
     ]);
   });
 
+  it('normalizes ACP reasoning, plan, and terminal-output updates into runtime progress events', async () => {
+    const process = new FakeAcpProcess();
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: false,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'acp-session-progress',
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/prompt') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-session-progress',
+            update: {
+              sessionUpdate: 'agent_thought_chunk',
+              content: 'Need to inspect the repository first.',
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-session-progress',
+            update: {
+              sessionUpdate: 'plan',
+              plan: {
+                entries: [
+                  { step: 'Inspect repository', status: 'in_progress' },
+                  { step: 'Apply changes', status: 'pending' },
+                ],
+              },
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-session-progress',
+            update: {
+              sessionUpdate: 'tool_call',
+              toolCall: {
+                toolCallId: 'cmd-1',
+                title: 'Run Shell',
+                kind: 'execute',
+                rawInput: {
+                  command: 'ls',
+                },
+                meta: {
+                  terminal_info: {
+                    terminal_id: 'cmd-1',
+                    cwd: '/tmp/acp',
+                  },
+                },
+              },
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-session-progress',
+            update: {
+              sessionUpdate: 'tool_call_update',
+              toolCallUpdate: {
+                toolCallId: 'cmd-1',
+                meta: {
+                  terminal_output: {
+                    terminal_id: 'cmd-1',
+                    data: 'README.md\nsrc\n',
+                  },
+                },
+              },
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-session-progress',
+            update: {
+              sessionUpdate: 'tool_call_update',
+              toolCallUpdate: {
+                toolCallId: 'cmd-1',
+                fields: {
+                  status: 'completed',
+                  content: [
+                    { text: 'shell finished' },
+                  ],
+                },
+                meta: {
+                  terminal_exit: {
+                    terminal_id: 'cmd-1',
+                    exit_code: 0,
+                    signal: null,
+                  },
+                },
+              },
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            stopReason: 'end_turn',
+          },
+        }) + '\n');
+      }
+    });
+
+    const hostBridge = createHostBridge();
+    const adapter = new AcpAdapter({
+      acpHostBridge: hostBridge,
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    const events = await collectEvents(adapter.invoke(
+      createInvokeInput(createStdioInstance(), hostBridge),
+    ));
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'init',
+        providerSessionId: 'acp-session-progress',
+      }),
+      {
+        type: 'progress',
+        providerSessionId: 'acp-session-progress',
+        text: 'Need to inspect the repository first.',
+        providerState: expect.any(Object),
+        metadata: {
+          kind: 'reasoning',
+          status: 'running',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'agent',
+          instance: 'acp-local',
+          native: {
+            sourceEvent: 'session/update:agent_thought_chunk',
+            hasReasoningDelta: true,
+          },
+        },
+      },
+      {
+        type: 'progress',
+        providerSessionId: 'acp-session-progress',
+        text: 'Codex updated the plan (2 steps).',
+        providerState: expect.any(Object),
+        metadata: {
+          kind: 'plan',
+          status: 'updated',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'agent',
+          instance: 'acp-local',
+          native: {
+            sourceEvent: 'session/update:plan',
+            stepCount: 2,
+          },
+        },
+      },
+      {
+        type: 'tool_use',
+        providerSessionId: 'acp-session-progress',
+        toolName: 'Run Shell',
+        toolId: 'cmd-1',
+        toolArgs: {
+          command: 'ls',
+        },
+        providerState: expect.any(Object),
+        metadata: {
+          native: {
+            sourceEvent: 'session/update:tool_call',
+            toolKind: 'execute',
+            meta: {
+              terminal_info: {
+                terminal_id: 'cmd-1',
+                cwd: '/tmp/acp',
+              },
+            },
+          },
+        },
+      },
+      {
+        type: 'progress',
+        providerSessionId: 'acp-session-progress',
+        toolId: 'cmd-1',
+        toolName: 'Run Shell',
+        text: 'README.md\nsrc\n',
+        providerState: expect.any(Object),
+        metadata: {
+          kind: 'command',
+          status: 'running',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'agent',
+          instance: 'acp-local',
+          native: {
+            sourceEvent: 'session/update:tool_call_update:terminal_output',
+            terminalId: 'cmd-1',
+          },
+        },
+      },
+      {
+        type: 'progress',
+        providerSessionId: 'acp-session-progress',
+        toolId: 'cmd-1',
+        toolName: 'Run Shell',
+        text: 'Command exited with code 0.',
+        providerState: expect.any(Object),
+        metadata: {
+          kind: 'command',
+          status: 'updated',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'agent',
+          instance: 'acp-local',
+          native: {
+            sourceEvent: 'session/update:tool_call_update:terminal_exit',
+            terminalId: 'cmd-1',
+            exitCode: 0,
+          },
+        },
+      },
+      {
+        type: 'tool_result',
+        providerSessionId: 'acp-session-progress',
+        toolName: 'Run Shell',
+        toolId: 'cmd-1',
+        text: 'shell finished',
+        providerState: expect.any(Object),
+        metadata: {
+          native: {
+            sourceEvent: 'session/update:tool_call_update',
+            status: 'completed',
+            meta: {
+              terminal_exit: {
+                terminal_id: 'cmd-1',
+                exit_code: 0,
+                signal: null,
+              },
+            },
+          },
+        },
+      },
+      expect.objectContaining({
+        type: 'result',
+        providerSessionId: 'acp-session-progress',
+      }),
+    ]);
+  });
+
   it('uses session/load for continuity and suppresses replay updates during bootstrap', async () => {
     const process = new FakeAcpProcess();
     startFakeServer(process, async (message) => {
@@ -773,10 +1050,16 @@ describe('AcpAdapter', () => {
         toolName: 'Run Shell',
         toolId: 'tool-1',
         providerState: expect.any(Object),
+        metadata: {
+          native: {
+            sourceEvent: 'session/update:tool_call',
+          },
+        },
       },
       {
         type: 'tool_result',
         providerSessionId: 'acp-session-2',
+        toolName: 'Run Shell',
         toolId: 'tool-1',
         text: 'shell finished',
         providerState: expect.any(Object),
