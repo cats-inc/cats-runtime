@@ -169,7 +169,14 @@ describe('runtime ACP facade routes', () => {
             bootstrapRequired: false,
             readinessPath: '/health',
             sessionLifecycle: 'pending',
-            supportedMethods: ['initialize', 'ping', 'session/new', 'session/list', 'session/load'],
+            supportedMethods: [
+              'initialize',
+              'ping',
+              'session/new',
+              'session/list',
+              'session/load',
+              'session/cancel',
+            ],
           },
         },
       },
@@ -361,6 +368,36 @@ describe('runtime ACP facade routes', () => {
     });
   });
 
+  it('accepts ACP session/cancel as a notification and bridges it to the runtime session route', async () => {
+    const { app, rootDir, registry } = makeApp();
+    cleanupRoots.push(rootDir);
+
+    const session = registry.create({
+      id: 'runtime-session-cancel',
+      providerName: 'claude',
+      cwd: join(rootDir, 'workspace-cancel'),
+    });
+    registry.updateStatus(session.id, 'busy');
+
+    const response = await app.request('/acp', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'session/cancel',
+        params: {
+          sessionId: session.id,
+        },
+      }),
+    });
+
+    expect(response.status).toBe(204);
+    expect(await response.text()).toBe('');
+    expect(registry.get(session.id)?.status).toBe('ready');
+  });
+
   it('returns JSON-RPC parse errors for invalid ACP HTTP bodies', async () => {
     const { app, rootDir } = makeApp();
     cleanupRoots.push(rootDir);
@@ -414,7 +451,14 @@ describe('runtime ACP facade routes', () => {
         data: {
           facade: 'runtime_acp_http',
           phase: 'phase_4',
-          supportedMethods: ['initialize', 'ping', 'session/new', 'session/list', 'session/load'],
+          supportedMethods: [
+            'initialize',
+            'ping',
+            'session/new',
+            'session/list',
+            'session/load',
+            'session/cancel',
+          ],
         },
       },
     });

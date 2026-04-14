@@ -137,6 +137,7 @@ function buildInitializeResult(ctx: AppContext) {
           'session/new',
           'session/list',
           'session/load',
+          'session/cancel',
         ],
       },
     },
@@ -291,6 +292,35 @@ async function handleNewSession(ctx: AppContext, params: unknown) {
   };
 }
 
+async function handleCancelSession(ctx: AppContext, params: unknown) {
+  const request = ensureRecord(params ?? {}, 'session/cancel params');
+  const sessionId = readOptionalString(request, 'sessionId');
+  if (!sessionId) {
+    throw new AcpFacadeError(-32602, 'session/cancel requires params.sessionId');
+  }
+
+  const response = await requestRuntimeSessionRoute(
+    ctx,
+    `/sessions/${encodeURIComponent(sessionId)}/cancel`,
+    {
+      method: 'POST',
+    },
+  );
+  const payload = await response.json().catch(() => undefined) as Record<string, unknown> | undefined;
+  if (!response.ok) {
+    throw new AcpFacadeError(
+      -32603,
+      typeof payload?.error === 'string'
+        ? payload.error
+        : `Failed to cancel runtime session '${sessionId}'.`,
+      {
+        route: `/sessions/${sessionId}/cancel`,
+        httpStatus: response.status,
+      },
+    );
+  }
+}
+
 export async function handleAcpJsonRpc(
   ctx: AppContext,
   rawBody: unknown,
@@ -310,13 +340,15 @@ export async function handleAcpJsonRpc(
         return successResponse(id, buildInitializeResult(ctx));
       case 'session/new':
         return successResponse(id, await handleNewSession(ctx, request.params));
+      case 'session/cancel':
+        await handleCancelSession(ctx, request.params);
+        return id === null ? null : successResponse(id, {});
       case 'session/list':
         return successResponse(id, handleListSessions(ctx, request.params));
       case 'session/load':
         return successResponse(id, handleLoadSession(ctx, request.params));
       case 'authenticate':
       case 'session/prompt':
-      case 'session/cancel':
       case 'session/set_mode':
       case 'session/set_config_option':
         ensureRuntimeReadyForAcp(ctx);
@@ -333,6 +365,7 @@ export async function handleAcpJsonRpc(
               'session/new',
               'session/list',
               'session/load',
+              'session/cancel',
             ],
           },
         );
