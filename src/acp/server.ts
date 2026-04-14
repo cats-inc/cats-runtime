@@ -865,6 +865,10 @@ function buildToolCallAnnouncement(
   }];
 }
 
+function looksLikeCancelledStop(text: string): boolean {
+  return /cancelled|canceled|abort|aborted/i.test(text);
+}
+
 function mapRuntimeEventToAcpUpdates(
   event: unknown,
   state: RuntimeAcpPromptProjectionState,
@@ -895,6 +899,24 @@ function mapRuntimeEventToAcpUpdates(
   }
 
   if (eventType === 'result' && typeof streamEvent.text === 'string' && streamEvent.text.length > 0) {
+    return [
+      ...sessionStateUpdates,
+      {
+        sessionId: '',
+        update: {
+          sessionUpdate: 'agent_message_chunk',
+          content: buildTextContent(streamEvent.text),
+        },
+      },
+    ];
+  }
+
+  if (
+    eventType === 'error'
+    && typeof streamEvent.text === 'string'
+    && streamEvent.text.length > 0
+    && !looksLikeCancelledStop(streamEvent.text)
+  ) {
     return [
       ...sessionStateUpdates,
       {
@@ -1005,10 +1027,6 @@ function mapRuntimeEventToAcpUpdates(
   }
 
   return sessionStateUpdates;
-}
-
-function looksLikeCancelledStop(text: string): boolean {
-  return /cancelled|canceled|abort|aborted/i.test(text);
 }
 
 async function handlePromptSession(
