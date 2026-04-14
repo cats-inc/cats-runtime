@@ -5,6 +5,7 @@ import {
   RUNTIME_SERVICE_NAME,
   RUNTIME_VERSION,
 } from '../startup.js';
+import { requestRuntimeSessionRoute } from './runtimeHttpBridge.js';
 import type {
   AcpJsonRpcError,
   AcpJsonRpcRequest,
@@ -80,6 +81,18 @@ function readOptionalString(
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
 }
 
+function readCatsRuntimeMeta(record: Record<string, unknown>): Record<string, unknown> | undefined {
+  const meta = record._meta;
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) {
+    return undefined;
+  }
+  const catsRuntime = (meta as Record<string, unknown>).catsRuntime;
+  if (!catsRuntime || typeof catsRuntime !== 'object' || Array.isArray(catsRuntime)) {
+    return undefined;
+  }
+  return catsRuntime as Record<string, unknown>;
+}
+
 function resolveRequestId(value: unknown): string | number | null {
   if (typeof value === 'string' || typeof value === 'number') {
     return value;
@@ -121,6 +134,7 @@ function buildInitializeResult(ctx: AppContext) {
         supportedMethods: [
           'initialize',
           'ping',
+          'session/new',
           'session/list',
           'session/load',
         ],
@@ -220,6 +234,63 @@ function handleLoadSession(ctx: AppContext, params: unknown) {
   };
 }
 
+async function handleNewSession(ctx: AppContext, params: unknown) {
+  ensureRuntimeReadyForAcp(ctx);
+
+  const request = ensureRecord(params ?? {}, 'session/new params');
+  const cwd = readOptionalString(request, 'cwd');
+  const mcpServers = request.mcpServers;
+  if (!cwd) {
+    throw new AcpFacadeError(-32602, 'session/new requires params.cwd');
+  }
+  if (!Array.isArray(mcpServers)) {
+    throw new AcpFacadeError(-32602, 'session/new requires params.mcpServers');
+  }
+
+  const catsRuntime = readCatsRuntimeMeta(request);
+  const response = await requestRuntimeSessionRoute(ctx, '/sessions', {
+    method: 'POST',
+    body: {
+      provider: readOptionalString(catsRuntime ?? {}, 'provider') ?? 'claude',
+      instance: readOptionalString(catsRuntime ?? {}, 'instance'),
+      model: readOptionalString(catsRuntime ?? {}, 'model'),
+      permissionMode: readOptionalString(catsRuntime ?? {}, 'permissionMode'),
+      group: readOptionalString(catsRuntime ?? {}, 'group') ?? 'acp-facade',
+      cwd,
+    },
+  });
+
+  const payload = await response.json().catch(() => undefined) as Record<string, unknown> | undefined;
+  if (!response.ok) {
+    throw new AcpFacadeError(
+      -32603,
+      typeof payload?.error === 'string'
+        ? payload.error
+        : 'Failed to create a runtime-owned ACP session.',
+      {
+        route: '/sessions',
+        httpStatus: response.status,
+      },
+    );
+  }
+
+  const sessionId = typeof payload?.id === 'string' ? payload.id : undefined;
+  if (!sessionId) {
+    throw new AcpFacadeError(-32603, 'Runtime session create response did not include a session id');
+  }
+
+  return {
+    sessionId,
+    _meta: {
+      catsRuntime: {
+        source: 'runtime_http_bridge',
+        clientMcpServers: mcpServers.length,
+        session: payload,
+      },
+    },
+  };
+}
+
 export async function handleAcpJsonRpc(
   ctx: AppContext,
   rawBody: unknown,
@@ -237,12 +308,13 @@ export async function handleAcpJsonRpc(
         return successResponse(id, {});
       case 'initialize':
         return successResponse(id, buildInitializeResult(ctx));
+      case 'session/new':
+        return successResponse(id, await handleNewSession(ctx, request.params));
       case 'session/list':
         return successResponse(id, handleListSessions(ctx, request.params));
       case 'session/load':
         return successResponse(id, handleLoadSession(ctx, request.params));
       case 'authenticate':
-      case 'session/new':
       case 'session/prompt':
       case 'session/cancel':
       case 'session/set_mode':
@@ -258,6 +330,7 @@ export async function handleAcpJsonRpc(
             supportedMethods: [
               'initialize',
               'ping',
+              'session/new',
               'session/list',
               'session/load',
             ],

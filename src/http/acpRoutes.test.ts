@@ -169,10 +169,76 @@ describe('runtime ACP facade routes', () => {
             bootstrapRequired: false,
             readinessPath: '/health',
             sessionLifecycle: 'pending',
-            supportedMethods: ['initialize', 'ping', 'session/list', 'session/load'],
+            supportedMethods: ['initialize', 'ping', 'session/new', 'session/list', 'session/load'],
           },
         },
       },
+    });
+  });
+
+  it('creates a runtime-owned session through ACP session/new via the shared session route', async () => {
+    const { app, rootDir, registry } = makeApp();
+    cleanupRoots.push(rootDir);
+
+    const cwd = join(rootDir, 'workspace-new');
+    mkdirSync(cwd, { recursive: true });
+
+    const response = await app.request('/acp', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'new',
+        method: 'session/new',
+        params: {
+          cwd,
+          mcpServers: [],
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      jsonrpc: string;
+      id: string;
+      result: {
+        sessionId: string;
+        _meta: {
+          catsRuntime: {
+            source: string;
+            clientMcpServers: number;
+            session: {
+              id: string;
+              cwd: string;
+              providerName: string;
+              status: string;
+            };
+          };
+        };
+      };
+    };
+
+    expect(body.jsonrpc).toBe('2.0');
+    expect(body.id).toBe('new');
+    expect(body.result.sessionId).toBeTruthy();
+    expect(body.result._meta.catsRuntime).toMatchObject({
+      source: 'runtime_http_bridge',
+      clientMcpServers: 0,
+      session: {
+        id: body.result.sessionId,
+        cwd,
+        providerName: 'claude',
+        status: 'initializing',
+      },
+    });
+
+    expect(registry.get(body.result.sessionId)).toMatchObject({
+      id: body.result.sessionId,
+      cwd,
+      providerName: 'claude',
+      status: 'initializing',
     });
   });
 
@@ -318,7 +384,7 @@ describe('runtime ACP facade routes', () => {
     });
   });
 
-  it('returns a truthful not-yet-enabled error for ACP session methods', async () => {
+  it('returns a truthful not-yet-enabled error for ACP prompt-turn methods', async () => {
     const { app, rootDir } = makeApp();
     cleanupRoots.push(rootDir);
 
@@ -329,10 +395,11 @@ describe('runtime ACP facade routes', () => {
       },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 'session-new',
-        method: 'session/new',
+        id: 'session-prompt',
+        method: 'session/prompt',
         params: {
-          cwd: '/tmp/repo',
+          sessionId: 'runtime-session',
+          prompt: [{ type: 'text', text: 'hello' }],
         },
       }),
     });
@@ -340,14 +407,14 @@ describe('runtime ACP facade routes', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       jsonrpc: '2.0',
-      id: 'session-new',
+      id: 'session-prompt',
       error: {
         code: -32601,
-        message: "ACP method 'session/new' is not yet enabled by the cats-runtime ACP facade.",
+        message: "ACP method 'session/prompt' is not yet enabled by the cats-runtime ACP facade.",
         data: {
           facade: 'runtime_acp_http',
           phase: 'phase_4',
-          supportedMethods: ['initialize', 'ping', 'session/list', 'session/load'],
+          supportedMethods: ['initialize', 'ping', 'session/new', 'session/list', 'session/load'],
         },
       },
     });
