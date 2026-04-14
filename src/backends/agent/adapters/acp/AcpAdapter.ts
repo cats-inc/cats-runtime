@@ -1,3 +1,4 @@
+import { spawn, type ChildProcess } from 'node:child_process';
 import type {
   AgentAdapter,
   AgentAdapterInspection,
@@ -8,7 +9,9 @@ import type {
 import type { PermissionMode, SessionProviderState, StreamEvent } from '../../../../core/types.js';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
 import { runCliCommand } from '../../../../core/management/cli.js';
+import { hiddenWindowsSpawnOptions } from '../../../../core/process/windowsSpawn.js';
 import { createRuntimeProgressEvent } from '../../../../core/progress.js';
+import { resolveSafeWorkspacePath } from '../../../../core/tools/pathSafety.js';
 import { parseRecord, prependInstructions, readString } from '../../utils.js';
 import {
   AcpJsonRpcClientError,
@@ -20,6 +23,7 @@ import { buildAcpHelpProbeArgs, resolveAcpProviderProfile } from './profiles.js'
 
 const DEFAULT_ACP_PROTOCOL_VERSION = 1;
 const DEFAULT_ACP_STDIN_PROBE_TIMEOUT_MS = 5_000;
+const DEFAULT_ACP_TERMINAL_OUTPUT_BYTE_LIMIT = 128 * 1024;
 
 type AcpInvokePhase = 'bootstrap' | 'prompt';
 interface AcpObservedToolCall {
@@ -30,6 +34,19 @@ interface AcpConfigOptionSnapshot {
   id: string;
   label?: string;
   value?: string;
+}
+
+interface AcpManagedTerminal {
+  id: string;
+  process: ChildProcess;
+  output: string;
+  truncated: boolean;
+  byteLimit: number;
+  exitCode: number | null;
+  signal: string | null;
+  released: boolean;
+  exitPromise: Promise<void>;
+  resolveExit: () => void;
 }
 
 function resolveEndpoint(
@@ -381,6 +398,214 @@ async function handleWriteTextFileRequest(
     },
   });
 
+  return {};
+}
+
+function normalizePermissionModeForShell(
+  binding: NonNullable<AgentInvokeInput['acpHost']>,
+): PermissionMode {
+  return binding.context.permissionMode
+    || (binding.context.workspaceMode === 'read_only' ? 'default' : 'skip');
+}
+
+function ensureTerminalExecutionAllowed(
+  binding: NonNullable<AgentInvokeInput['acpHost']>,
+): void {
+  const listedTools = new Set(binding.bridge.listTools(binding.context).map((tool) => tool.name));
+  if (!listedTools.has('run_shell')) {
+    throw new AcpJsonRpcClientError(
+      `ACP terminal execution is disabled by toolProfile '${binding.context.toolProfile || 'standard'}'.`,
+      -32000,
+    );
+  }
+
+  if (binding.context.workspaceMode === 'read_only') {
+    throw new AcpJsonRpcClientError('ACP terminal execution is not allowed in read_only workspace mode.', -32000);
+  }
+
+  const permissionMode = normalizePermissionModeForShell(binding);
+  if (permissionMode === 'default') {
+    throw new AcpJsonRpcClientError('ACP terminal execution requires permissionMode=skip or whitelist.', -32000);
+  }
+
+  if (permissionMode === 'whitelist') {
+    const allowedTools = new Set((binding.context.allowedTools || []).map(normalizeAllowedToken));
+    if (!allowedTools.has('runshell') && !allowedTools.has('*')) {
+      throw new AcpJsonRpcClientError(
+        "ACP terminal execution requires 'run_shell' in allowedTools when permissionMode=whitelist.",
+        -32000,
+      );
+    }
+  }
+}
+
+function appendTerminalOutput(
+  terminal: AcpManagedTerminal,
+  chunk: string,
+): void {
+  if (!chunk) {
+    return;
+  }
+
+  terminal.output += chunk;
+  while (Buffer.byteLength(terminal.output, 'utf8') > terminal.byteLimit && terminal.output.length > 0) {
+    terminal.output = terminal.output.slice(1);
+    terminal.truncated = true;
+  }
+}
+
+function buildTerminalExitStatus(terminal: AcpManagedTerminal): Record<string, unknown> | null {
+  return terminal.exitCode !== null || terminal.signal !== null
+    ? {
+        exitCode: terminal.exitCode,
+        signal: terminal.signal,
+      }
+    : null;
+}
+
+async function handleCreateTerminalRequest(
+  binding: NonNullable<AgentInvokeInput['acpHost']>,
+  request: AcpJsonRpcRequest,
+  terminals: Map<string, AcpManagedTerminal>,
+  nextTerminalId: () => string,
+): Promise<Record<string, unknown>> {
+  ensureTerminalExecutionAllowed(binding);
+
+  const params = parseRecord(request.params);
+  const command = readString(params?.command);
+  if (!command) {
+    throw new AcpJsonRpcClientError('ACP terminal/create requires a command.', -32602);
+  }
+
+  const args = Array.isArray(params?.args)
+    ? params.args.filter((entry): entry is string => typeof entry === 'string')
+    : [];
+  const requestedCwd = readString(params?.cwd) || binding.context.cwd;
+  const cwd = (await resolveSafeWorkspacePath(binding.context.cwd, requestedCwd)).fullPath;
+  const envEntries = Array.isArray(params?.env)
+    ? params.env.flatMap((entry) => {
+        const record = parseRecord(entry);
+        const name = readString(record?.name);
+        const value = readString(record?.value);
+        return name && value !== undefined ? [[name, value] as const] : [];
+      })
+    : [];
+  const childEnv: NodeJS.ProcessEnv = envEntries.length > 0
+    ? { ...globalThis.process.env, ...Object.fromEntries(envEntries) }
+    : { ...globalThis.process.env };
+  const outputByteLimit = readNumber(params?.outputByteLimit) || DEFAULT_ACP_TERMINAL_OUTPUT_BYTE_LIMIT;
+  const terminalId = nextTerminalId();
+  let resolveExit: () => void = () => {};
+  const exitPromise = new Promise<void>((resolve) => {
+    resolveExit = resolve;
+  });
+
+  const child = spawn(command, args, {
+    cwd,
+    env: childEnv,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: false,
+    ...hiddenWindowsSpawnOptions(),
+  });
+  const terminal: AcpManagedTerminal = {
+    id: terminalId,
+    process: child,
+    output: '',
+    truncated: false,
+    byteLimit: outputByteLimit,
+    exitCode: null,
+    signal: null,
+    released: false,
+    exitPromise,
+    resolveExit,
+  };
+  terminals.set(terminalId, terminal);
+
+  child.stdout?.on('data', (chunk: Buffer | string) => {
+    appendTerminalOutput(terminal, chunk.toString());
+  });
+  child.stderr?.on('data', (chunk: Buffer | string) => {
+    appendTerminalOutput(terminal, chunk.toString());
+  });
+  child.on('error', (error: Error) => {
+    appendTerminalOutput(terminal, error.message);
+    terminal.signal = 'spawn_error';
+    terminal.resolveExit();
+  });
+  child.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
+    terminal.exitCode = code;
+    terminal.signal = signal;
+    terminal.resolveExit();
+  });
+
+  return { terminalId };
+}
+
+function requireManagedTerminal(
+  terminals: Map<string, AcpManagedTerminal>,
+  request: AcpJsonRpcRequest,
+): AcpManagedTerminal {
+  const params = parseRecord(request.params);
+  const terminalId = readString(params?.terminalId);
+  if (!terminalId) {
+    throw new AcpJsonRpcClientError(`ACP ${request.method} requires a terminalId.`, -32602);
+  }
+
+  const terminal = terminals.get(terminalId);
+  if (!terminal || terminal.released) {
+    throw new AcpJsonRpcClientError(`ACP terminal '${terminalId}' is not available.`, -32000);
+  }
+
+  return terminal;
+}
+
+async function handleTerminalOutputRequest(
+  terminals: Map<string, AcpManagedTerminal>,
+  request: AcpJsonRpcRequest,
+): Promise<Record<string, unknown>> {
+  const terminal = requireManagedTerminal(terminals, request);
+  return {
+    output: terminal.output,
+    truncated: terminal.truncated,
+    exitStatus: buildTerminalExitStatus(terminal),
+  };
+}
+
+async function handleWaitForTerminalExitRequest(
+  terminals: Map<string, AcpManagedTerminal>,
+  request: AcpJsonRpcRequest,
+): Promise<Record<string, unknown>> {
+  const terminal = requireManagedTerminal(terminals, request);
+  await terminal.exitPromise;
+  return {
+    exitCode: terminal.exitCode,
+    signal: terminal.signal,
+  };
+}
+
+async function handleKillTerminalRequest(
+  terminals: Map<string, AcpManagedTerminal>,
+  request: AcpJsonRpcRequest,
+): Promise<Record<string, never>> {
+  const terminal = requireManagedTerminal(terminals, request);
+  if (terminal.exitCode === null && terminal.signal === null) {
+    terminal.process.kill('SIGTERM');
+    await terminal.exitPromise;
+  }
+  return {};
+}
+
+async function handleReleaseTerminalRequest(
+  terminals: Map<string, AcpManagedTerminal>,
+  request: AcpJsonRpcRequest,
+): Promise<Record<string, never>> {
+  const terminal = requireManagedTerminal(terminals, request);
+  if (terminal.exitCode === null && terminal.signal === null) {
+    terminal.process.kill('SIGTERM');
+    await terminal.exitPromise;
+  }
+  terminal.released = true;
+  terminals.delete(terminal.id);
   return {};
 }
 
@@ -1082,6 +1307,8 @@ export class AcpAdapter implements AgentAdapter {
     const adapterStateSnapshot = {
       ...(parseRecord(input.sessionState?.agentSession?.adapterState) || {}),
     };
+    const terminals = new Map<string, AcpManagedTerminal>();
+    let nextTerminalCounter = 0;
 
     const push = (item: StreamEvent | Error | null) => {
       queue.push(item);
@@ -1121,6 +1348,31 @@ export class AcpAdapter implements AgentAdapter {
           return handleWriteTextFileRequest(input.acpHost, request);
         }
 
+        if (request.method === 'terminal/create' && input.acpHost) {
+          return handleCreateTerminalRequest(
+            input.acpHost,
+            request,
+            terminals,
+            () => `acp-terminal-${++nextTerminalCounter}`,
+          );
+        }
+
+        if (request.method === 'terminal/output') {
+          return handleTerminalOutputRequest(terminals, request);
+        }
+
+        if (request.method === 'terminal/wait_for_exit') {
+          return handleWaitForTerminalExitRequest(terminals, request);
+        }
+
+        if (request.method === 'terminal/kill') {
+          return handleKillTerminalRequest(terminals, request);
+        }
+
+        if (request.method === 'terminal/release') {
+          return handleReleaseTerminalRequest(terminals, request);
+        }
+
         if (request.method === 'session/request_permission') {
           return buildPermissionResponse(
             request,
@@ -1140,6 +1392,7 @@ export class AcpAdapter implements AgentAdapter {
       const initializeResult = parseRecord(
         await client.request('initialize', buildInitializeParams(input.instance, {
           filesystem: true,
+          terminal: true,
         })),
       );
       const protocolVersion = initializeResult?.protocolVersion;
@@ -1245,6 +1498,15 @@ export class AcpAdapter implements AgentAdapter {
       }
       await run;
     } finally {
+      await Promise.all(Array.from(terminals.values()).map(async (terminal) => {
+        if (terminal.released) {
+          return;
+        }
+        if (terminal.exitCode === null && terminal.signal === null) {
+          terminal.process.kill('SIGTERM');
+          await terminal.exitPromise;
+        }
+      }));
       await client.close();
     }
   }

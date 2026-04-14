@@ -106,7 +106,7 @@ integration track for only two vendors.
       can call into
 - [ ] Map ACP permission requests onto runtime approval/guardrail policy
 - [x] Map ACP file access onto runtime workspace/worktree rules
-- [ ] Map ACP terminal requests onto runtime execution controls
+- [x] Map ACP terminal requests onto runtime execution controls
 - [ ] Decide how ACP-facing client MCP server access should relate to the
       runtime's existing MCP and local-tool policies
 
@@ -240,3 +240,4 @@ Current rationale for preferring `codex-acp` first:
 | 2026-04-15 | Added provider-managed ACP session-state normalization for the `codex-acp` pilot: session title, available commands, and config-option updates now become runtime progress events and are persisted into `providerState.agentSession.adapterState`, so later inspection/resume flows can see the same state the ACP agent advertised mid-turn |
 | 2026-04-15 | Enabled the `codex-acp` pilot's custom terminal-output capability negotiation: runtime ACP initialize payloads now advertise the profile-specific `_meta.terminal_output` hint only for the Codex profile, so the richer terminal-output stream landed in earlier slices can actually be requested from the upstream ACP agent without leaking Codex-specific hints into generic ACP targets |
 | 2026-04-15 | Landed the first official ACP filesystem bridge slice: `agent/acp` now advertises `fs.readTextFile`/`fs.writeTextFile` when a runtime ACP host bridge is attached, and incoming `fs/read_text_file` plus `fs/write_text_file` requests are mediated through the runtime's existing `read_file`/`write_file` guardrails so absolute ACP paths still obey workspace isolation and tool policy |
+| 2026-04-15 | Landed the first official ACP terminal bridge slice: `agent/acp` now advertises `terminal` support when a runtime ACP host bridge is attached, and incoming `terminal/create`, `terminal/output`, `terminal/wait_for_exit`, `terminal/kill`, plus `terminal/release` requests are mediated through runtime-owned shell policy and a bounded terminal registry, so ACP agents can open short-lived execution terminals without bypassing `run_shell`-level workspace and whitelist controls |

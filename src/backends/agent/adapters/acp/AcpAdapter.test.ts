@@ -826,6 +826,173 @@ describe('AcpAdapter', () => {
     expect(readFileSync(join(root, 'generated.txt'), 'utf8')).toBe('written through ACP');
   });
 
+  it('handles ACP terminal create/output/wait/release through a managed terminal bridge', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-acp-terminal-'));
+    tempRoots.push(root);
+
+    const nodeBinary = globalThis.process.execPath;
+    const process = new FakeAcpProcess();
+    let initializeParams: Record<string, unknown> | undefined;
+    let promptRequestId = 0;
+    let createdTerminalId = '';
+    let waitReply: Record<string, unknown> | undefined;
+    let outputReply: Record<string, unknown> | undefined;
+    let releaseReply: Record<string, unknown> | undefined;
+
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        initializeParams = message.params as Record<string, unknown>;
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: false,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'acp-session-terminal',
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/prompt') {
+        promptRequestId = message.id as number;
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 90,
+          method: 'terminal/create',
+          params: {
+            sessionId: 'acp-session-terminal',
+            command: nodeBinary,
+            args: ['-e', "process.stdout.write('hello from terminal')"],
+            cwd: root,
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.id === 90) {
+        createdTerminalId = ((message.result as Record<string, unknown>).terminalId as string);
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 91,
+          method: 'terminal/wait_for_exit',
+          params: {
+            sessionId: 'acp-session-terminal',
+            terminalId: createdTerminalId,
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.id === 91) {
+        waitReply = message;
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 92,
+          method: 'terminal/output',
+          params: {
+            sessionId: 'acp-session-terminal',
+            terminalId: createdTerminalId,
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.id === 92) {
+        outputReply = message;
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 93,
+          method: 'terminal/release',
+          params: {
+            sessionId: 'acp-session-terminal',
+            terminalId: createdTerminalId,
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.id === 93) {
+        releaseReply = message;
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: promptRequestId,
+          result: {
+            stopReason: 'end_turn',
+          },
+        }) + '\n');
+      }
+    });
+
+    const hostBridge = new RuntimeAcpHostBridge();
+    const adapter = new AcpAdapter({
+      acpHostBridge: hostBridge,
+      acpProcessSpawner: createSpawner(process),
+    });
+    const instance = {
+      ...createStdioInstance(),
+      cwd: root,
+    };
+
+    const events = await collectEvents(adapter.invoke(
+      createInvokeInput(instance, hostBridge, 'skip'),
+    ));
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'init',
+        providerSessionId: 'acp-session-terminal',
+      }),
+      expect.objectContaining({
+        type: 'result',
+        providerSessionId: 'acp-session-terminal',
+      }),
+    ]);
+    expect(initializeParams).toEqual(expect.objectContaining({
+      clientCapabilities: expect.objectContaining({
+        terminal: true,
+      }),
+    }));
+    expect(createdTerminalId).toBe('acp-terminal-1');
+    expect(waitReply).toEqual({
+      jsonrpc: '2.0',
+      id: 91,
+      result: {
+        exitCode: 0,
+        signal: null,
+      },
+    });
+    expect(outputReply).toEqual({
+      jsonrpc: '2.0',
+      id: 92,
+      result: {
+        output: 'hello from terminal',
+        truncated: false,
+        exitStatus: {
+          exitCode: 0,
+          signal: null,
+        },
+      },
+    });
+    expect(releaseReply).toEqual({
+      jsonrpc: '2.0',
+      id: 93,
+      result: {},
+    });
+  });
+
   it('normalizes ACP reasoning, plan, and terminal-output updates into runtime progress events', async () => {
     const process = new FakeAcpProcess();
     startFakeServer(process, async (message) => {
