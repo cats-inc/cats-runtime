@@ -1193,7 +1193,8 @@ async function diagnoseAgentTarget(
 
   try {
     const shouldProbeLive = probeMode === 'live'
-      || agentRuntime.transport.liveProbe === 'rpc_health';
+      || agentRuntime.transport.liveProbe === 'rpc_health'
+      || agentRuntime.transport.liveProbe === 'command_help';
     const probe = ctx.agentBackend
       ? await ctx.agentBackend.probe(
           target,

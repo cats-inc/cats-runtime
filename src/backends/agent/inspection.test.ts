@@ -133,7 +133,7 @@ describe('inspectAgentTarget', () => {
     expect(inspection).toEqual({
       adapter: 'acp',
       family: 'protocol',
-      summary: expect.stringContaining('stdio agent command'),
+      summary: expect.stringContaining('Codex ACP is the current ACP pilot target'),
       launch: {
         kind: 'stdio',
         command: 'codex-acp',
@@ -144,7 +144,7 @@ describe('inspectAgentTarget', () => {
       transport: {
         kind: 'stdio',
         protocol: 'acp_v1',
-        liveProbe: 'none',
+        liveProbe: 'command_help',
         modelDiscovery: 'none',
         toolDiscovery: 'none',
         streaming: 'generic',
@@ -163,7 +163,7 @@ describe('inspectAgentTarget', () => {
         cancel: false,
       },
       capabilities: {
-        probe: false,
+        probe: true,
         modelDiscovery: false,
         toolCatalog: false,
         effectiveToolCatalog: false,

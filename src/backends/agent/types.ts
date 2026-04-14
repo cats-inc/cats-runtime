@@ -102,6 +102,26 @@ export interface AgentAdapterInspectionLaunch {
   startupTimeoutMs?: number;
 }
 
+export interface AgentCliCommandRunnerOptions {
+  cwd?: string;
+  timeoutMs?: number;
+  env?: Record<string, string>;
+}
+
+export interface AgentCliCommandRunnerResult {
+  code: number | null;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+  durationMs: number;
+}
+
+export type AgentCliCommandRunner = (
+  command: string,
+  args: string[],
+  options?: AgentCliCommandRunnerOptions,
+) => Promise<AgentCliCommandRunnerResult>;
+
 export interface AgentAdapterProbeCheck {
   code: string;
   status: HealthStatus['status'];
@@ -153,7 +173,7 @@ export interface AgentAdapterInspection {
   transport: {
     kind: 'websocket' | 'http' | 'stdio';
     protocol: 'openclaw_gateway_v3' | 'agent_sdk_http_v1' | 'acp_v1' | 'generic';
-    liveProbe: 'rpc_health' | 'providers_get' | 'none';
+    liveProbe: 'rpc_health' | 'providers_get' | 'command_help' | 'none';
     modelDiscovery: 'models_list' | 'providers_get' | 'none';
     toolDiscovery: 'tools_catalog' | 'tools_effective' | 'providers_get' | 'none';
     streaming: 'agent_event_frames' | 'sse' | 'generic';
@@ -204,6 +224,7 @@ export interface AgentBackendOptions {
   fetch?: typeof fetch;
   webSocketFactory?: (url: string | URL, init?: WebSocketInit) => WebSocket;
   acpHostBridge?: AgentAcpHostBridge;
+  cliCommandRunner?: AgentCliCommandRunner;
 }
 
 export interface AgentBackendStatus {

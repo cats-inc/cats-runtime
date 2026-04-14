@@ -117,7 +117,7 @@ integration track for only two vendors.
 
 ### Phase 3: First `agent/acp` Provider Pilot
 
-- [ ] Choose the first ACP target to pilot
+- [x] Choose the first ACP target to pilot
 - [ ] Implement the provider-side ACP adapter against the shared `AgentAdapter`
       seam
 - [ ] Normalize lifecycle and stream events into runtime `StreamEvent`s
@@ -230,3 +230,4 @@ Current rationale for preferring `codex-acp` first:
 | 2026-04-15 | Phase 1 skeleton landed with `agent/acp` transport recognition, ACP launch config fields, truthful inspection, and focused coverage; execution remains a Phase 2 follow-up |
 | 2026-04-15 | Phase 2 host-bridge contract landed with a runtime-owned ACP host bridge backed by runtime tool policy, `LocalToolRuntime`, and session workspace/permission context; ACP transport lifecycle execution remains Phase 3 work |
 | 2026-04-15 | Expanded the ACP adoption plan from a `claude`/`codex` framing to a provider-overlap support matrix with SPEC-owned tiers, so Phase 3 can treat `codex-acp` as the first Tier 1 pilot rather than a special-case two-provider branch |
+| 2026-04-15 | Phase 3 bootstrap diagnostics landed for `codex-acp`: the runtime now resolves Codex as the first concrete ACP pilot target and can run a stdio help probe for ACP command launches before lifecycle execution is enabled |

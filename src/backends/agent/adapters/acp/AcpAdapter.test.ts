@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
-import type { AgentAcpHostBridge, AgentAcpHostContext } from '../../types.js';
+import type {
+  AgentAcpHostBridge,
+  AgentAcpHostContext,
+  AgentCliCommandRunner,
+} from '../../types.js';
 import { AcpAdapter } from './AcpAdapter.js';
 
 function createHttpInstance(): RemoteProviderInstanceConfig {
@@ -86,6 +90,26 @@ function createHostBridge(): AgentAcpHostBridge {
   };
 }
 
+function createSuccessfulProbeRunner(): AgentCliCommandRunner {
+  return async () => ({
+    code: 0,
+    stdout: 'codex-acp help output',
+    stderr: '',
+    timedOut: false,
+    durationMs: 42,
+  });
+}
+
+function createFailedProbeRunner(): AgentCliCommandRunner {
+  return async () => ({
+    code: 1,
+    stdout: '',
+    stderr: 'boom',
+    timedOut: false,
+    durationMs: 17,
+  });
+}
+
 describe('AcpAdapter', () => {
   it('describes HTTP ACP targets with bearer-header auth when endpoint credentials exist', () => {
     const adapter = new AcpAdapter({
@@ -145,7 +169,7 @@ describe('AcpAdapter', () => {
     expect(inspection).toEqual({
       adapter: 'acp',
       family: 'protocol',
-      summary: expect.stringContaining('stdio agent command'),
+      summary: expect.stringContaining('Codex ACP is the current ACP pilot target'),
       launch: {
         kind: 'stdio',
         command: 'codex-acp',
@@ -156,7 +180,7 @@ describe('AcpAdapter', () => {
       transport: {
         kind: 'stdio',
         protocol: 'acp_v1',
-        liveProbe: 'none',
+        liveProbe: 'command_help',
         modelDiscovery: 'none',
         toolDiscovery: 'none',
         streaming: 'generic',
@@ -175,7 +199,7 @@ describe('AcpAdapter', () => {
         cancel: false,
       },
       capabilities: {
-        probe: false,
+        probe: true,
         modelDiscovery: false,
         toolCatalog: false,
         effectiveToolCatalog: false,
@@ -183,6 +207,102 @@ describe('AcpAdapter', () => {
         runtimeServices: false,
         toolCallEvents: false,
       },
+    });
+  });
+
+  it('runs a stdio help probe for codex ACP pilot targets', async () => {
+    const adapter = new AcpAdapter({
+      cliCommandRunner: createSuccessfulProbeRunner(),
+    });
+
+    await expect(adapter.probe(createStdioInstance())).resolves.toEqual({
+      health: {
+        status: 'ok',
+        checkedAt: expect.any(String),
+        details: "ACP stdio help probe succeeded for 'codex-acp serve --help'.",
+      },
+      liveProbe: {
+        transport: 'stdio',
+        command: 'codex-acp',
+        args: ['serve', '--help'],
+        profile: 'codex-acp',
+        profileLabel: 'Codex ACP',
+        exitCode: 0,
+        timedOut: false,
+        durationMs: 42,
+        hasOutput: true,
+      },
+      checks: [
+        {
+          code: 'acp_help_probe_exit',
+          status: 'ok',
+          message: 'ACP stdio command accepted the help probe.',
+          details: {
+            command: 'codex-acp serve --help',
+            exitCode: 0,
+            timedOut: false,
+            durationMs: 42,
+          },
+        },
+        {
+          code: 'acp_target_profile',
+          status: 'ok',
+          message: "Resolved ACP target profile 'Codex ACP'.",
+          details: {
+            profile: 'codex-acp',
+            label: 'Codex ACP',
+            family: 'codex',
+          },
+        },
+      ],
+    });
+  });
+
+  it('reports failed stdio help probes as unavailable', async () => {
+    const adapter = new AcpAdapter({
+      cliCommandRunner: createFailedProbeRunner(),
+    });
+
+    await expect(adapter.probe(createStdioInstance())).resolves.toEqual({
+      health: {
+        status: 'unavailable',
+        checkedAt: expect.any(String),
+        details: "ACP stdio help probe failed for 'codex-acp serve --help'.",
+      },
+      liveProbe: {
+        transport: 'stdio',
+        command: 'codex-acp',
+        args: ['serve', '--help'],
+        profile: 'codex-acp',
+        profileLabel: 'Codex ACP',
+        exitCode: 1,
+        timedOut: false,
+        durationMs: 17,
+        hasOutput: true,
+      },
+      checks: [
+        {
+          code: 'acp_help_probe_exit',
+          status: 'unavailable',
+          message: 'ACP stdio command did not complete the help probe successfully.',
+          details: {
+            command: 'codex-acp serve --help',
+            exitCode: 1,
+            timedOut: false,
+            durationMs: 17,
+          },
+        },
+        {
+          code: 'acp_target_profile',
+          status: 'ok',
+          message: "Resolved ACP target profile 'Codex ACP'.",
+          details: {
+            profile: 'codex-acp',
+            label: 'Codex ACP',
+            family: 'codex',
+          },
+        },
+      ],
     });
   });
 
