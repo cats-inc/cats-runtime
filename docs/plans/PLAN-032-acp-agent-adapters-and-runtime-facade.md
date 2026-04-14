@@ -36,6 +36,11 @@ This plan stages both directions deliberately so the runtime can:
   is better understood
 - document where A2A and ACP complement each other in the final stack
 
+ACP also matters across more provider families than `claude` and `codex`.
+The runtime should therefore keep an explicit ACP adoption matrix for the
+provider families it already supports, rather than treating ACP as a one-off
+integration track for only two vendors.
+
 ## Scope
 
 ### In Scope
@@ -123,6 +128,29 @@ This plan stages both directions deliberately so the runtime can:
 
 The default recommendation for the first pilot is `codex-acp`.
 
+**ACP provider families to track because they overlap with the current runtime
+inventory**:
+
+- `claude`
+- `codex`
+- `gemini`
+- `cursor`
+- `copilot`
+- `opencode`
+- `kilo`
+- `goose`
+- `pi`
+- `auggie`
+- `junie`
+- `kiro`
+
+**Adoption tiers**:
+
+- **Tier 1**: `codex`, `gemini`, `opencode`, `goose`, `kilo`, `pi`, `auggie`
+- **Tier 2**: `cursor`, `copilot`, `junie`
+- **Conditional**: `claude`
+- **Observe only**: `kiro`
+
 **Candidate first targets**:
 
 - `codex-acp`
@@ -148,6 +176,10 @@ Current rationale for preferring `codex-acp` first:
 - `claude-agent-acp` remains a strong second target once the ACP host
   capability bridge and diagnostics shape have been proven on one concrete
   target first
+- after `codex-acp`, the next most promising runtime-owned follow-ons are the
+  Tier 1 families whose existing runtime seams are already CLI- or
+  protocol-oriented enough to benefit from the same ACP host bridge with
+  limited extra taxonomy work
 
 **Deliverables**:
 
@@ -211,3 +243,4 @@ Current rationale for preferring `codex-acp` first:
 | 2026-04-15 | Draft plan created to stage ACP under `agent` while reserving a separate runtime-owned ACP facade and documenting ACP + A2A complementarity |
 | 2026-04-15 | Phase 1 skeleton landed with `agent/acp` transport recognition, ACP launch config fields, truthful inspection, and focused coverage; execution remains a Phase 2 follow-up |
 | 2026-04-15 | Phase 2 host-bridge contract landed with a runtime-owned ACP host bridge backed by runtime tool policy, `LocalToolRuntime`, and session workspace/permission context; ACP transport lifecycle execution remains Phase 3 work |
+| 2026-04-15 | Expanded the ACP adoption plan from a `claude`/`codex` framing to a provider-overlap support matrix covering all current runtime families that also appear in the public ACP ecosystem, with Tier 1, Tier 2, conditional, and observation-only buckets |

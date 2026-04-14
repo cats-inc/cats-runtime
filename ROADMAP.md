@@ -1722,6 +1722,12 @@ remaining work is execution and capability follow-through:
 - implement the provider-side ACP host capability bridge so ACP permission,
   filesystem, terminal, and client-MCP-style requests flow through
   runtime-owned guardrails instead of bypassing them
+- maintain an ACP support matrix anchored to the runtime's existing provider
+  families rather than to the full public ACP ecosystem:
+  - Tier 1: `codex`, `gemini`, `opencode`, `goose`, `kilo`, `pi`, `auggie`
+  - Tier 2: `cursor`, `copilot`, `junie`
+  - conditional: `claude`
+  - observe only: `kiro`
 - make `AcpAdapter.invoke()` real by mapping ACP session lifecycle and stream
   events onto the existing runtime `StreamEvent` contract
 - pilot `codex-acp` first through `agent/acp`, because its protocol semantics

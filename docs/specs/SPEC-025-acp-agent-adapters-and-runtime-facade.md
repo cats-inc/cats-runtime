@@ -39,6 +39,9 @@ It also records how ACP complements the runtime's A2A direction:
   family
 - Allow ACP and existing CLI/API/agent targets to coexist for the same provider
   family
+- Define which ACP ecosystem agents are in-scope for `cats-runtime` based on
+  overlap with the runtime's existing provider inventory rather than attempting
+  to ingest the entire ACP ecosystem at once
 - Define the capability and lifecycle requirements for a provider-side ACP
   adapter
 - Reserve a separate runtime-owned ACP facade for future IDE consumption of
@@ -205,6 +208,68 @@ The long-term stack should remain explicit:
 - `cats-runtime` -> `agent/acp` -> external ACP-compatible provider agent
 
 Those layers are compatible because they solve different boundaries.
+
+## ACP Ecosystem Scope
+
+ACP is larger than `claude-agent-acp` and `codex-acp`.
+
+As of 2026-04-15:
+
+- the ACP **Agents** page lists 31 ACP-compatible agents
+- the ACP **Registry** page lists 27 curated agents with authentication support
+
+`cats-runtime` should not treat those public lists as an automatic import queue.
+The runtime should only add provider-side ACP support where there is a clear
+fit with the runtime's existing provider taxonomy and product direction.
+
+### Runtime Adoption Rule
+
+The ACP support matrix should start with provider families that already exist in
+the runtime's provider inventory.
+
+That currently means these overlapping families are in scope for ACP tracking:
+
+- `claude`
+- `codex`
+- `gemini`
+- `cursor`
+- `copilot`
+- `opencode`
+- `kilo`
+- `goose`
+- `pi`
+- `auggie`
+- `junie`
+- `kiro`
+
+Families that are ACP-compatible but do not map onto an existing runtime
+provider family today should remain out of scope unless the runtime explicitly
+adds them as first-class providers for other reasons.
+
+### Initial Adoption Tiers
+
+The provider-side ACP adoption matrix should begin with these tiers:
+
+- **Tier 1**: `codex`, `gemini`, `opencode`, `goose`, `kilo`, `pi`, `auggie`
+- **Tier 2**: `cursor`, `copilot`, `junie`
+- **Conditional**: `claude`
+- **Observe only**: `kiro`
+
+Rationale:
+
+- `codex` remains the default first pilot because its current runtime seam is
+  already highly protocol-shaped
+- `gemini`, `opencode`, `goose`, `kilo`, `pi`, and `auggie` are all meaningful
+  runtime families whose ACP track does not currently carry the same policy
+  ambiguity as `claude`
+- `cursor`, `copilot`, and `junie` are in-scope but should come after the first
+  provider-side ACP bridge and evidence shape are proven on simpler targets
+- `claude` remains strategically important but should stay conditional while the
+  runtime intentionally avoids assuming that Anthropic's Agent SDK-based ACP
+  path is the preferred product seam for this repo
+- `kiro` is worth tracking because it appears on ACP's compatible-agents list,
+  but it does not appear in the current curated registry and should therefore
+  remain observation-only until registry/auth/maturity posture is clearer
 
 ## Capability Model
 
