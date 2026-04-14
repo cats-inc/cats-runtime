@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { EventEmitter } from 'node:events';
+import { createInterface } from 'node:readline';
+import { PassThrough } from 'node:stream';
 import { AgentBackendManager } from './AgentBackendManager.js';
 import { SessionRegistry } from '../../cli/pool/SessionRegistry.js';
 import type { ProviderTargetDescriptor } from '../../../core/providerCatalog.js';
 import type { StreamEvent } from '../../../core/types.js';
-import type { AgentAdapter } from '../types.js';
+import type { AgentAdapter, AgentProcessSpawner, AgentSpawnedProcess } from '../types.js';
 import { buildAgentAdapter } from '../adapters/registry.js';
+import { AcpAdapter } from '../adapters/acp/AcpAdapter.js';
 
 vi.mock('../adapters/registry.js', () => ({
   buildAgentAdapter: vi.fn(),
@@ -16,6 +20,35 @@ async function collectEvents(stream: AsyncGenerator<StreamEvent>): Promise<Strea
     events.push(event);
   }
   return events;
+}
+
+class FakeAcpProcess extends EventEmitter implements AgentSpawnedProcess {
+  readonly stdin = new PassThrough();
+  readonly stdout = new PassThrough();
+  readonly stderr = new PassThrough();
+  exitCode: number | null = null;
+  killed = false;
+
+  kill(): boolean {
+    this.killed = true;
+    this.exitCode = 0;
+    this.emit('close', 0, null);
+    return true;
+  }
+}
+
+function createSpawner(process: FakeAcpProcess): AgentProcessSpawner {
+  return () => process;
+}
+
+function startFakeServer(
+  process: FakeAcpProcess,
+  onMessage: (message: Record<string, unknown>) => void | Promise<void>,
+): void {
+  const rl = createInterface({ input: process.stdin });
+  rl.on('line', (line) => {
+    void onMessage(JSON.parse(line) as Record<string, unknown>);
+  });
 }
 
 describe('AgentBackendManager', () => {
@@ -311,5 +344,123 @@ describe('AgentBackendManager', () => {
         }),
       }),
     );
+  });
+
+  it('persists ACP provider session continuity state through the session registry', async () => {
+    const registry = new SessionRegistry();
+    const session = registry.create({
+      id: 'agent-acp-runtime',
+      providerName: 'codex',
+      providerBackend: 'agent',
+      providerInstanceId: 'acp-local',
+      cwd: '/repo',
+      workspaceMode: 'shared',
+      permissionMode: 'skip',
+    });
+
+    const process = new FakeAcpProcess();
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: true,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'acp-runtime-session',
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/prompt') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-runtime-session',
+            update: {
+              sessionUpdate: 'agent_message_chunk',
+              content: 'runtime-facing output',
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            stopReason: 'end_turn',
+          },
+        }) + '\n');
+      }
+    });
+
+    vi.mocked(buildAgentAdapter).mockReturnValue(new AcpAdapter({
+      acpProcessSpawner: createSpawner(process),
+    }));
+
+    const manager = new AgentBackendManager(
+      { sessionBaseDir: '/tmp/cats-runtime-tests' },
+      registry,
+    );
+
+    const target: ProviderTargetDescriptor = {
+      providerName: 'codex',
+      backend: 'agent',
+      instanceId: 'acp-local',
+      defaultTarget: true,
+      remoteInstance: {
+        id: 'acp-local',
+        providerName: 'codex',
+        backend: 'agent',
+        transport: 'acp_stdio',
+        command: 'codex-acp',
+        args: ['serve'],
+        cwd: '/repo',
+        model: 'gpt-5.4',
+      },
+    };
+
+    const handle = manager.spawn(session.id, target);
+    const events = await collectEvents(handle.streamMessage({
+      message: 'hello',
+    }));
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'init',
+        providerSessionId: 'acp-runtime-session',
+      }),
+      {
+        type: 'text',
+        providerSessionId: 'acp-runtime-session',
+        text: 'runtime-facing output',
+      },
+      expect.objectContaining({
+        type: 'result',
+        providerSessionId: 'acp-runtime-session',
+      }),
+    ]);
+    expect(registry.get(session.id)).toEqual(expect.objectContaining({
+      providerSessionId: 'acp-runtime-session',
+      providerState: expect.objectContaining({
+        agentSession: expect.objectContaining({
+          providerSessionId: 'acp-runtime-session',
+          status: 'idle',
+        }),
+      }),
+    }));
   });
 });
