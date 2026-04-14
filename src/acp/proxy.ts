@@ -1,5 +1,9 @@
-import type { AcpJsonRpcError, AcpJsonRpcSuccess } from './types.js';
-import type { AcpJsonRpcHandler } from './stdio.js';
+import type {
+  AcpJsonRpcError,
+  AcpJsonRpcNotification,
+  AcpJsonRpcSuccess,
+} from './types.js';
+import type { AcpJsonRpcHandler, AcpJsonRpcResponder } from './stdio.js';
 
 const DEFAULT_RUNTIME_HOST = '127.0.0.1';
 const DEFAULT_RUNTIME_PORT = 3110;
@@ -29,6 +33,13 @@ interface JsonRpcResponseRecord {
     message?: unknown;
     data?: unknown;
   };
+}
+
+function isPromptRequest(message: unknown): boolean {
+  if (!message || typeof message !== 'object' || Array.isArray(message)) {
+    return false;
+  }
+  return (message as { method?: unknown }).method === 'session/prompt';
 }
 
 function normalizeHost(rawHost: string | undefined): string {
@@ -105,6 +116,19 @@ function isJsonRpcResponse(value: unknown): value is JsonRpcResponseRecord {
   return 'result' in record || 'error' in record;
 }
 
+function isJsonRpcNotification(value: unknown): value is AcpJsonRpcNotification {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  return record.jsonrpc === '2.0'
+    && typeof record.method === 'string'
+    && !('id' in record)
+    && !('result' in record)
+    && !('error' in record);
+}
+
 function createProxyError(
   id: string | number | null,
   message: string,
@@ -136,6 +160,108 @@ async function parseResponseBody(response: Response): Promise<unknown> {
   } catch {
     return text;
   }
+}
+
+async function* parseNdjsonMessages(
+  body: ReadableStream<Uint8Array>,
+): AsyncGenerator<unknown> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      let newlineIndex = buffer.indexOf('\n');
+      while (newlineIndex >= 0) {
+        const line = buffer.slice(0, newlineIndex).trim();
+        buffer = buffer.slice(newlineIndex + 1);
+        if (line.length > 0) {
+          yield JSON.parse(line) as unknown;
+        }
+        newlineIndex = buffer.indexOf('\n');
+      }
+    }
+
+    const trailing = `${buffer}${decoder.decode()}`.trim();
+    if (trailing.length > 0) {
+      yield JSON.parse(trailing) as unknown;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function forwardPromptStream(
+  response: Response,
+  responder: AcpJsonRpcResponder,
+  requestId: string | number | null,
+  targetUrl: string,
+): Promise<AcpJsonRpcSuccess | AcpJsonRpcError> {
+  if (!response.body) {
+    return createProxyError(
+      requestId,
+      `Primary cats-runtime ACP endpoint returned no stream body at ${targetUrl}.`,
+      'invalid_upstream_response',
+      {
+        targetUrl,
+        httpStatus: response.status,
+      },
+    );
+  }
+
+  try {
+    let finalResponse: AcpJsonRpcSuccess | AcpJsonRpcError | null = null;
+    for await (const entry of parseNdjsonMessages(response.body)) {
+      if (isJsonRpcNotification(entry)) {
+        await responder.notify(entry);
+        continue;
+      }
+      if (isJsonRpcResponse(entry)) {
+        finalResponse = entry as AcpJsonRpcSuccess | AcpJsonRpcError;
+        continue;
+      }
+      return createProxyError(
+        requestId,
+        `Primary cats-runtime ACP endpoint returned a non-JSON-RPC NDJSON entry at ${targetUrl}.`,
+        'invalid_upstream_response',
+        {
+          targetUrl,
+          httpStatus: response.status,
+        },
+      );
+    }
+
+    if (finalResponse) {
+      return finalResponse;
+    }
+  } catch (error) {
+    return createProxyError(
+      requestId,
+      `Primary cats-runtime ACP endpoint returned an invalid NDJSON prompt stream at ${targetUrl}.`,
+      'invalid_upstream_response',
+      {
+        targetUrl,
+        httpStatus: response.status,
+        detail: error instanceof Error ? error.message : String(error),
+      },
+    );
+  }
+
+  return createProxyError(
+    requestId,
+    `Primary cats-runtime ACP endpoint ended the prompt stream without a terminal JSON-RPC response at ${targetUrl}.`,
+    'invalid_upstream_response',
+    {
+      targetUrl,
+      httpStatus: response.status,
+    },
+  );
 }
 
 export function resolveAcpProxyTarget(
@@ -182,7 +308,7 @@ export function createHttpAcpProxyHandler(
   const env = options.env ?? process.env;
   const fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
 
-  return async (message) => {
+  return async (message, responder) => {
     const requestId = resolveRequestId(message);
     let target: AcpProxyTarget;
     let timeoutMs: number;
@@ -201,7 +327,8 @@ export function createHttpAcpProxyHandler(
 
     const headers = new Headers();
     headers.set('content-type', 'application/json');
-    headers.set('accept', 'application/json');
+    const promptProxyRequested = isPromptRequest(message) && Boolean(responder);
+    headers.set('accept', promptProxyRequested ? 'application/x-ndjson' : 'application/json');
     if (target.authorizationHeader) {
       headers.set('authorization', target.authorizationHeader);
     }
@@ -237,6 +364,13 @@ export function createHttpAcpProxyHandler(
           detail: error instanceof Error ? error.message : String(error),
         },
       );
+    }
+
+    if (promptProxyRequested && response.ok) {
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/x-ndjson')) {
+        return forwardPromptStream(response, responder as AcpJsonRpcResponder, requestId, target.url);
+      }
     }
 
     const body = await parseResponseBody(response);

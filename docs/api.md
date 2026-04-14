@@ -100,7 +100,8 @@ supports ACP prompt turns over HTTP when the client negotiates
 direct stdio carrier via `node build/runtime/bin/acp.js`. By default that helper
 proxies to the existing HTTP `/acp` surface; when started with `--serve-runtime`,
 it runs an in-process runtime-backed ACP stdio server that supports the same
-`session/update` prompt flow over stdio frames.
+`session/update` prompt flow over stdio frames. Proxy mode now forwards the same
+HTTP NDJSON prompt stream instead of downgrading prompt turns back to plain JSON.
 
 Supported JSON-RPC methods:
 

@@ -100,4 +100,86 @@ describe('ACP HTTP proxy', () => {
       },
     });
   });
+
+  it('forwards HTTP NDJSON prompt streams through the ACP proxy responder', async () => {
+    const encoder = new TextEncoder();
+    const fetchImpl = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      expect(headers.get('accept')).toBe('application/x-ndjson');
+
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(`${JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'session/update',
+            params: {
+              sessionId: 'runtime-session',
+              update: {
+                sessionUpdate: 'agent_message_chunk',
+                content: {
+                  type: 'text',
+                  text: 'Inspecting workspace. ',
+                },
+              },
+            },
+          })}\n`));
+          controller.enqueue(encoder.encode(`${JSON.stringify({
+            jsonrpc: '2.0',
+            id: 'prompt-1',
+            result: {
+              stopReason: 'end_turn',
+            },
+          })}\n`));
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        status: 200,
+        headers: {
+          'content-type': 'application/x-ndjson',
+        },
+      });
+    }) as typeof fetch;
+
+    const handler = createHttpAcpProxyHandler({
+      env: {},
+      fetchImpl,
+    });
+    const notify = vi.fn(async () => undefined);
+
+    await expect(handler({
+      jsonrpc: '2.0',
+      id: 'prompt-1',
+      method: 'session/prompt',
+      params: {
+        sessionId: 'runtime-session',
+        prompt: [{ type: 'text', text: 'Inspect the workspace.' }],
+      },
+    }, {
+      notify,
+    })).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 'prompt-1',
+      result: {
+        stopReason: 'end_turn',
+      },
+    });
+
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledWith({
+      jsonrpc: '2.0',
+      method: 'session/update',
+      params: {
+        sessionId: 'runtime-session',
+        update: {
+          sessionUpdate: 'agent_message_chunk',
+          content: {
+            type: 'text',
+            text: 'Inspecting workspace. ',
+          },
+        },
+      },
+    });
+  });
 });
