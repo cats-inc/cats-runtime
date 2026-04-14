@@ -223,9 +223,9 @@ installed package.
 
 Current runtime behavior:
 
-- Claude, Codex, Gemini, and Cursor can all consume curated YAML on the CLI
+- Claude, Codex, Gemini, Copilot, and Cursor can all consume curated YAML on the CLI
   static-fallback path
-- Claude, Codex, Gemini, and Cursor advanced catalogs also consume the same
+- Claude, Codex, Gemini, Copilot, and Cursor advanced catalogs also consume the same
   curated input
 - packaged desktop hosts seed `management.yaml` and
   `curated-model-catalogs.yaml` into `~/.cats/runtime/config/` on first launch
@@ -258,7 +258,7 @@ Current stabilization status:
 - `config/providers.yaml.example` - reference topology for manual/preseeded config
 - `config/management.yaml.example` - default management adapter template used as
   the packaged fallback when `~/.cats/runtime/config/management.yaml` is absent
-- `config/curated-model-catalogs.yaml.example` - human-curated CLI model catalog input example consumed by the current Claude/Codex/Gemini/Cursor importer slices
+- `config/curated-model-catalogs.yaml.example` - human-curated CLI model catalog input example consumed by the current Claude/Codex/Gemini/Copilot/Cursor importer slices
 - `docs/api.md` - public HTTP surface
 - `docs/architecture.md` - internal layout and data flow
 

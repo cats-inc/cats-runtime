@@ -2036,6 +2036,134 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
+  it('applies curated Copilot CLI entry metadata from curated-model-catalogs.yaml', () => {
+    const runtime = createRuntimeRoot();
+
+    try {
+      writeFileSync(runtime.paths.curatedModelCatalogPath, [
+        'schema_version: 1',
+        'catalogs:',
+        '  - cli: Copilot',
+        '    version: v1.0.25',
+        '    last_updated: 2026-04-14',
+        '    models:',
+        '      - name: GPT-5.4',
+        '        default: true',
+        '      - name: GPT-5.4 mini',
+        '      - name: GPT-5.2-Codex',
+        '      - name: Claude Opus 4.6',
+        '      - name: Claude Sonnet 4',
+        '',
+      ].join('\n'), 'utf8');
+
+      const base = createCatalogConfig();
+      const config = {
+        ...base,
+        configPath: runtime.paths.configPath,
+        sessionBaseDir: runtime.paths.sessionBaseDir,
+        providerDefaultTargets: {
+          ...base.providerDefaultTargets,
+          copilot: { backend: 'cli', instance: 'default' },
+        },
+        providerInstances: {
+          ...base.providerInstances,
+          copilot: {
+            default: {
+              id: 'default',
+              providerName: 'copilot',
+              commandConfig: {
+                path: 'copilot',
+                runner: 'auto',
+                runtime: { mode: 'native' },
+              },
+            },
+          },
+        },
+        providerCommands: {
+          ...base.providerCommands,
+          copilot: {
+            path: 'copilot',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
+        },
+      } as const;
+
+      const service = new ProviderModelCatalogService(config as never, {
+        env: runtime.env,
+      });
+
+      expect(service.getImmediateCatalog('copilot')).toEqual({
+        provider: 'copilot',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt-5.4',
+        source: 'static',
+        cache: null,
+        models: [
+          { id: 'gpt-5.4', label: 'GPT-5.4', default: true },
+          { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini', default: false },
+          { id: 'gpt-5.2-codex', label: 'GPT-5.2-Codex', default: false },
+          { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', default: false },
+          { id: 'claude-sonnet-4', label: 'Claude Sonnet 4', default: false },
+        ],
+        warnings: [],
+      });
+      expect(service.getImmediateAdvancedCatalog('copilot')).toEqual({
+        provider: 'copilot',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt-5.4',
+        source: 'static',
+        cache: null,
+        entries: [
+          {
+            id: 'gpt-5.4',
+            label: 'GPT-5.4',
+            default: true,
+            capabilityTags: ['reasoning'],
+          },
+          {
+            id: 'gpt-5.4-mini',
+            label: 'GPT-5.4 mini',
+            default: false,
+            capabilityTags: ['reasoning', 'latency_optimized'],
+          },
+          {
+            id: 'gpt-5.2-codex',
+            label: 'GPT-5.2-Codex',
+            default: false,
+          },
+          {
+            id: 'claude-opus-4-6',
+            label: 'Claude Opus 4.6',
+            default: false,
+            capabilityTags: ['reasoning'],
+          },
+          {
+            id: 'claude-sonnet-4',
+            label: 'Claude Sonnet 4',
+            default: false,
+          },
+        ],
+        presets: [],
+        controls: [],
+        defaultSelection: null,
+        support: {
+          tier: 'entry_only',
+          advancedMetadataStatus: 'unverified_omitted',
+          discoveryMode: 'manual_refresh',
+          provenance: {
+            status: 'unverified_omitted',
+          },
+        },
+        warnings: [],
+      });
+    } finally {
+      runtime.cleanup();
+    }
+  });
+
   it('warns when curated CLI models cannot be normalized', () => {
     const runtime = createRuntimeRoot();
 

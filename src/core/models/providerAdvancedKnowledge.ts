@@ -26,6 +26,7 @@ import {
 import {
   describeCuratedModelLabel,
   normalizeClaudeCuratedModelId,
+  normalizeCopilotCuratedModelId,
   normalizeCodexCuratedModelId,
   normalizeCursorCuratedModelId,
   normalizeLiteralCuratedModelId,
@@ -531,6 +532,22 @@ function buildCuratedGeminiCliOverlay(
   }
 
   return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeLiteralCuratedModelId);
+}
+
+function buildCuratedCopilotCliOverlay(
+  document: CuratedModelCatalogDocument | undefined,
+): CuratedCatalogOverlay | null {
+  const catalog = findCuratedCliCatalog(document, 'copilot');
+  if (!catalog) {
+    return null;
+  }
+
+  const scope = resolveCuratedCatalogScope(catalog, 'copilot');
+  if (!scope) {
+    return null;
+  }
+
+  return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeCopilotCuratedModelId);
 }
 
 function buildCuratedCursorCliOverlay(
@@ -1080,6 +1097,7 @@ function loadCuratedOverlay(
       target.providerName !== 'claude'
       && target.providerName !== 'codex'
       && target.providerName !== 'gemini'
+      && target.providerName !== 'copilot'
       && target.providerName !== 'cursor'
     )
     || (!options.runtimeConfig && !options.env)
@@ -1099,6 +1117,8 @@ function loadCuratedOverlay(
         return buildCuratedCodexCliOverlay(result.document);
       case 'gemini':
         return buildCuratedGeminiCliOverlay(result.document);
+      case 'copilot':
+        return buildCuratedCopilotCliOverlay(result.document);
       case 'cursor':
         return buildCuratedCursorCliOverlay(result.document);
       default:

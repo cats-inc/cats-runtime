@@ -4467,6 +4467,95 @@ providers:
     });
   });
 
+  it('GET /providers/copilot/models and /advanced honor curated Copilot YAML', async () => {
+    await withCuratedCatalogRuntime([
+      'schema_version: 1',
+      'catalogs:',
+      '  - cli: Copilot',
+      '    version: v1.0.25',
+      '    last_updated: 2026-04-14',
+      '    models:',
+      '      - name: GPT-5.4',
+      '        default: true',
+      '      - name: GPT-5.4 mini',
+      '      - name: GPT-5.2-Codex',
+      '      - name: Claude Opus 4.6',
+      '      - name: Claude Sonnet 4',
+    ], {}, {}, async (runtime) => {
+      const modelsResponse = await runtime.app.request('/providers/copilot/models');
+      expect(modelsResponse.status).toBe(200);
+      expect(await modelsResponse.json()).toEqual({
+        provider: 'copilot',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt-5.4',
+        source: 'static',
+        cache: null,
+        models: [
+          { id: 'gpt-5.4', label: 'GPT-5.4', default: true },
+          { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini', default: false },
+          { id: 'gpt-5.2-codex', label: 'GPT-5.2-Codex', default: false },
+          { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', default: false },
+          { id: 'claude-sonnet-4', label: 'Claude Sonnet 4', default: false },
+        ],
+        warnings: [],
+      });
+
+      const advancedResponse = await runtime.app.request('/providers/copilot/models/advanced');
+      expect(advancedResponse.status).toBe(200);
+      expect(await advancedResponse.json()).toEqual({
+        provider: 'copilot',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt-5.4',
+        source: 'static',
+        cache: null,
+        entries: [
+          {
+            id: 'gpt-5.4',
+            label: 'GPT-5.4',
+            default: true,
+            capabilityTags: ['reasoning'],
+          },
+          {
+            id: 'gpt-5.4-mini',
+            label: 'GPT-5.4 mini',
+            default: false,
+            capabilityTags: ['reasoning', 'latency_optimized'],
+          },
+          {
+            id: 'gpt-5.2-codex',
+            label: 'GPT-5.2-Codex',
+            default: false,
+          },
+          {
+            id: 'claude-opus-4-6',
+            label: 'Claude Opus 4.6',
+            default: false,
+            capabilityTags: ['reasoning'],
+          },
+          {
+            id: 'claude-sonnet-4',
+            label: 'Claude Sonnet 4',
+            default: false,
+          },
+        ],
+        presets: [],
+        controls: [],
+        defaultSelection: null,
+        support: {
+          tier: 'entry_only',
+          advancedMetadataStatus: 'unverified_omitted',
+          discoveryMode: 'manual_refresh',
+          provenance: {
+            status: 'unverified_omitted',
+          },
+        },
+        warnings: [],
+      });
+    });
+  });
+
   it('GET /providers/:provider/models/advanced only probes verified providers on explicit refresh', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       data: [

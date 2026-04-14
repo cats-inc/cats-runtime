@@ -213,6 +213,60 @@ export function normalizeCursorModelName(
   }
 }
 
+export function normalizeCopilotModelName(
+  value: string | undefined,
+): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = normalizeWhitespace(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const knownIds = new Set([
+    'gpt-5.4',
+    'gpt-5.3-codex',
+    'gpt-5.2-codex',
+    'gpt-5.2',
+    'gpt-5.1',
+    'gpt-5.4-mini',
+    'gpt-5-mini',
+    'gpt-4.1',
+    'claude-sonnet-4-6',
+    'claude-sonnet-4-5',
+    'claude-haiku-4-5',
+    'claude-opus-4-6',
+    'claude-opus-4-5',
+    'claude-sonnet-4',
+  ]);
+  if (knownIds.has(normalized)) {
+    return normalized;
+  }
+
+  switch (normalized) {
+    case 'gpt-5.4 mini':
+      return 'gpt-5.4-mini';
+    case 'gpt-5 mini':
+      return 'gpt-5-mini';
+    case 'claude sonnet 4.6':
+      return 'claude-sonnet-4-6';
+    case 'claude sonnet 4.5':
+      return 'claude-sonnet-4-5';
+    case 'claude haiku 4.5':
+      return 'claude-haiku-4-5';
+    case 'claude opus 4.6':
+      return 'claude-opus-4-6';
+    case 'claude opus 4.5':
+      return 'claude-opus-4-5';
+    case 'claude sonnet 4':
+      return 'claude-sonnet-4';
+    default:
+      return null;
+  }
+}
+
 export function normalizeClaudeCuratedModelId(model: CuratedModelCatalogModel): string | null {
   const candidates = [model.name, model.label].filter((value): value is string => Boolean(value));
   for (const candidate of candidates) {
@@ -282,6 +336,18 @@ export function normalizeCursorCuratedModelId(model: CuratedModelCatalogModel): 
   return null;
 }
 
+export function normalizeCopilotCuratedModelId(model: CuratedModelCatalogModel): string | null {
+  const candidates = [model.name, model.label].filter((value): value is string => Boolean(value));
+  for (const candidate of candidates) {
+    const normalized = normalizeCopilotModelName(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
 export function normalizeCuratedModelId(
   providerName: string,
   model: CuratedModelCatalogModel,
@@ -293,6 +359,8 @@ export function normalizeCuratedModelId(
       return normalizeCodexCuratedModelId(model);
     case 'gemini':
       return normalizeLiteralCuratedModelId(model);
+    case 'copilot':
+      return normalizeCopilotCuratedModelId(model);
     case 'cursor':
       return normalizeCursorCuratedModelId(model);
     default:
