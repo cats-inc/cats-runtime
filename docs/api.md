@@ -127,6 +127,9 @@ Current ACP HTTP limitations:
   request receives a negotiation error instead of a prompt-turn stream
 - prompt-turn notifications and the final JSON-RPC result are emitted as NDJSON
   lines on the same HTTP response body
+- ACP-created sessions are still ordinary runtime sessions, so downstream
+  peer-routing/A2A rules continue to apply through the shared
+  `/sessions/{id}/messages` execution path
 - the ACP facade is additive and bounded; it does not replace the primary
   runtime HTTP session API
 

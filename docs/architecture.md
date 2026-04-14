@@ -120,6 +120,10 @@ collapsed into one transport story:
    - HTTP `/acp` for control-plane/session lifecycle methods plus
      `session/prompt` over `Accept: application/x-ndjson`
    - direct stdio ACP for bidirectional `session/prompt` plus `session/update`
+   ACP-created sessions still map onto the runtime's own session registry and
+   `/sessions/:id/messages` execution path, so any later peer-routing decision
+   remains a runtime-to-peer / A2A concern below the ACP layer rather than a
+   second client-facing transport.
 2. **Runtime-to-provider**
    `cats-runtime` consumes provider runtimes through `backends/cli`,
    `backends/api`, `backends/local`, and `backends/agent`, including the new

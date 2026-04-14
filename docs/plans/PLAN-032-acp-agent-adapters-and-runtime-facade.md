@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Phase 4 Runtime Stdio Facade Landed; HTTP Prompt Carrier Pending) |
+| **Status** | In Progress (Phase 4 Runtime HTTP/Stdio Facades Landed; Phase 5 Follow-Through Pending) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -185,12 +185,12 @@ Current rationale for preferring `codex-acp` first:
 **Deliverables**:
 
 - a bounded `cats-runtime` ACP facade suitable for at least one external client,
-  currently via direct stdio carrier
+  now via HTTP NDJSON prompt streaming plus both proxy and direct stdio carriers
 - documented capability matrix and known limitations
 
 ### Phase 5: A2A + ACP Layering Follow-Through
 
-- [ ] Update architecture and terminology docs so ACP and A2A are shown as
+- [x] Update architecture and terminology docs so ACP and A2A are shown as
       complementary layers
 - [ ] Confirm how runtime-owned ACP sessions can coexist with A2A peer routing
 - [ ] Keep diagnostics truthful about which flows are:
@@ -266,3 +266,4 @@ Current rationale for preferring `codex-acp` first:
 | 2026-04-15 | Closed the first direct-stdio refusal UX gap: terminal runtime `error` events that are not cancellations now emit one final ACP `agent_message_chunk` before the prompt result returns `stopReason: refusal`, so IDE clients can show the actual refusal reason instead of only an abstract stop code |
 | 2026-04-15 | Landed the first HTTP prompt carrier for the runtime ACP facade: `/acp` now advertises `session/prompt` on HTTP, requires `Accept: application/x-ndjson` for prompt turns, and streams `session/update` notifications plus the final JSON-RPC result as NDJSON lines on the same response body so browser/IDE clients no longer need direct stdio just to drive runtime-owned prompt turns |
 | 2026-04-15 | Closed the first ACP proxy-mode follow-through gap: the default `cats-runtime acp` HTTP-proxy path now upgrades proxied `session/prompt` calls to `Accept: application/x-ndjson`, forwards upstream `session/update` notifications as they arrive, and waits for the terminal JSON-RPC result line instead of buffering the entire upstream prompt stream into a plain JSON response |
+| 2026-04-15 | Updated the plan/docs baseline after the HTTP prompt slices: Phase 4 is now treated as landed across HTTP, proxy stdio, and direct stdio carriers, while architecture/API notes now state explicitly that ACP-created runtime sessions still flow into the shared `/sessions/:id/messages` path where later A2A peer-routing decisions remain a runtime-to-peer concern |
