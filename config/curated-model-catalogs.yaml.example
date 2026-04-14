@@ -140,6 +140,84 @@ catalogs:
       - name: gemini-2.5-flash-lite
         label: gemini-2.5-flash-lite
 
+  - cli: Cursor
+    version: 2026.04.13-a9d7fb5
+    last_updated: 2026-04-14
+    notes:
+      - "Source: Cursor Agent /model picker output supplied by user"
+      - "Entries below are raw visible /model names only; provider grouping and canonical ids are intentionally omitted."
+    models:
+      - name: Auto
+      - name: Composer 2 Fast
+      - name: Composer 2
+      - name: Composer 1.5
+      - name: Codex 5.3 Low
+      - name: Codex 5.3 Low Fast
+      - name: Codex 5.3
+      - name: Codex 5.3 Fast
+      - name: Codex 5.3 High
+      - name: Codex 5.3 High Fast
+      - name: Codex 5.3 Extra High
+      - name: Codex 5.3 Extra High Fast
+      - name: GPT-5.2
+      - name: Codex 5.3 Spark Low
+      - name: Codex 5.3 Spark
+      - name: Codex 5.3 Spark High
+      - name: Codex 5.3 Spark Extra High
+      - name: Codex 5.2 Low
+      - name: Codex 5.2 Low Fast
+      - name: Codex 5.2
+      - name: Codex 5.2 Fast
+      - name: Codex 5.2 High
+      - name: Codex 5.2 High Fast
+      - name: Codex 5.2 Extra High
+      - name: Codex 5.2 Extra High Fast
+      - name: Codex 5.1 Max Low
+      - name: Codex 5.1 Max Low Fast
+      - name: Codex 5.1 Max
+      - name: Codex 5.1 Max Medium Fast
+      - name: Codex 5.1 Max High
+      - name: Codex 5.1 Max High Fast
+      - name: Codex 5.1 Max Extra High
+      - name: Codex 5.1 Max Extra High Fast
+      - name: GPT-5.4 1M High
+      - name: GPT-5.4 High Fast
+      - name: GPT-5.4 Extra High Fast
+      - name: GPT-5.4 1M Low
+      - name: GPT-5.4 1M
+      - name: GPT-5.4 Fast
+      - name: GPT-5.4 1M Extra High
+      - name: Opus 4.5
+      - name: Opus 4.5 Thinking
+      - name: GPT-5.2 Low
+      - name: GPT-5.2 Low Fast
+      - name: GPT-5.2 Fast
+      - name: GPT-5.2 High
+      - name: GPT-5.2 High Fast
+      - name: GPT-5.2 Extra High
+      - name: GPT-5.2 Extra High Fast
+      - name: Gemini 3.1 Pro
+      - name: GPT-5.4 Mini None
+      - name: GPT-5.4 Mini Low
+      - name: GPT-5.4 Mini
+      - name: GPT-5.4 Mini High
+      - name: GPT-5.4 Mini Extra High
+      - name: GPT-5.4 Nano None
+      - name: GPT-5.4 Nano Low
+      - name: GPT-5.4 Nano
+      - name: GPT-5.4 Nano High
+      - name: GPT-5.4 Nano Extra High
+      - name: Grok 4.20
+      - name: Grok 4.20 Thinking
+      - name: Sonnet 4.5 1M
+      - name: Sonnet 4.5 1M Thinking
+      - name: Gemini 3 Flash
+      - name: Codex 5.1 Mini Low
+      - name: Codex 5.1 Mini
+      - name: Codex 5.1 Mini High
+      - name: GPT-5 Mini
+      - name: Kimi K2.5
+
   - cli: Copilot
     version: v1.0.25
     last_updated: 2026-04-14
@@ -220,81 +298,3 @@ catalogs:
 
       - name: Claude Sonnet 4
         options: []
-
-  - cli: Cursor
-    version: 2026.04.13-a9d7fb5
-    last_updated: 2026-04-14
-    notes:
-      - "Source: Cursor Agent /model picker output supplied by user"
-      - "Entries below are raw visible /model names only; provider grouping and canonical ids are intentionally omitted."
-    models:
-      - name: Auto
-      - name: Composer 2 Fast
-      - name: Composer 2
-      - name: Composer 1.5
-      - name: Codex 5.3 Low
-      - name: Codex 5.3 Low Fast
-      - name: Codex 5.3
-      - name: Codex 5.3 Fast
-      - name: Codex 5.3 High
-      - name: Codex 5.3 High Fast
-      - name: Codex 5.3 Extra High
-      - name: Codex 5.3 Extra High Fast
-      - name: GPT-5.2
-      - name: Codex 5.3 Spark Low
-      - name: Codex 5.3 Spark
-      - name: Codex 5.3 Spark High
-      - name: Codex 5.3 Spark Extra High
-      - name: Codex 5.2 Low
-      - name: Codex 5.2 Low Fast
-      - name: Codex 5.2
-      - name: Codex 5.2 Fast
-      - name: Codex 5.2 High
-      - name: Codex 5.2 High Fast
-      - name: Codex 5.2 Extra High
-      - name: Codex 5.2 Extra High Fast
-      - name: Codex 5.1 Max Low
-      - name: Codex 5.1 Max Low Fast
-      - name: Codex 5.1 Max
-      - name: Codex 5.1 Max Medium Fast
-      - name: Codex 5.1 Max High
-      - name: Codex 5.1 Max High Fast
-      - name: Codex 5.1 Max Extra High
-      - name: Codex 5.1 Max Extra High Fast
-      - name: GPT-5.4 1M High
-      - name: GPT-5.4 High Fast
-      - name: GPT-5.4 Extra High Fast
-      - name: GPT-5.4 1M Low
-      - name: GPT-5.4 1M
-      - name: GPT-5.4 Fast
-      - name: GPT-5.4 1M Extra High
-      - name: Opus 4.5
-      - name: Opus 4.5 Thinking
-      - name: GPT-5.2 Low
-      - name: GPT-5.2 Low Fast
-      - name: GPT-5.2 Fast
-      - name: GPT-5.2 High
-      - name: GPT-5.2 High Fast
-      - name: GPT-5.2 Extra High
-      - name: GPT-5.2 Extra High Fast
-      - name: Gemini 3.1 Pro
-      - name: GPT-5.4 Mini None
-      - name: GPT-5.4 Mini Low
-      - name: GPT-5.4 Mini
-      - name: GPT-5.4 Mini High
-      - name: GPT-5.4 Mini Extra High
-      - name: GPT-5.4 Nano None
-      - name: GPT-5.4 Nano Low
-      - name: GPT-5.4 Nano
-      - name: GPT-5.4 Nano High
-      - name: GPT-5.4 Nano Extra High
-      - name: Grok 4.20
-      - name: Grok 4.20 Thinking
-      - name: Sonnet 4.5 1M
-      - name: Sonnet 4.5 1M Thinking
-      - name: Gemini 3 Flash
-      - name: Codex 5.1 Mini Low
-      - name: Codex 5.1 Mini
-      - name: Codex 5.1 Mini High
-      - name: GPT-5 Mini
-      - name: Kimi K2.5
