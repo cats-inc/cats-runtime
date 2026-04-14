@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Phase 4 Direct Runtime Prompt + Cancel Landed) |
+| **Status** | In Progress (Phase 4 Runtime Stdio Facade Landed; HTTP Prompt Carrier Pending) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -175,16 +175,17 @@ Current rationale for preferring `codex-acp` first:
 
 ### Phase 4: Runtime-owned ACP Facade for IDE Consumption
 
-- [ ] Define the ACP session lifecycle mapping onto runtime session routes
+- [x] Define the ACP session lifecycle mapping onto runtime session routes
 - [x] Decide the first transport shape for the runtime ACP facade
 - [x] Implement a conservative capability profile for IDE/client consumption
-- [ ] Ensure facade sessions reuse the same runtime session ownership,
+- [x] Ensure facade sessions reuse the same runtime session ownership,
       diagnostics, and worktree truth
-- [ ] Add readiness/debug guidance for ACP-capable clients
+- [x] Add readiness/debug guidance for ACP-capable clients
 
 **Deliverables**:
 
-- a bounded `cats-runtime` ACP facade suitable for at least one external client
+- a bounded `cats-runtime` ACP facade suitable for at least one external client,
+  currently via direct stdio carrier
 - documented capability matrix and known limitations
 
 ### Phase 5: A2A + ACP Layering Follow-Through
