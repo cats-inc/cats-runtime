@@ -672,4 +672,194 @@ describe('ACP stdio transport', () => {
 
     await server.close();
   });
+
+  it('projects runtime plan and model-state progress into ACP-native updates', async () => {
+    rootDir = mkdtempSync(join(tmpdir(), 'cats-runtime-acp-stdio-'));
+    mkdirSync(join(rootDir, 'sessions'), { recursive: true });
+    mkdirSync(join(rootDir, 'data'), { recursive: true });
+
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const registry = new SessionRegistry();
+    const worker = {
+      alive: true,
+      busy: false,
+      on: vi.fn(),
+      off: vi.fn(),
+      async *streamMessage(turnInput: string | TurnInput): AsyncGenerator<StreamEvent> {
+        const resolvedInput = typeof turnInput === 'string' ? { message: turnInput } : turnInput;
+        expect(resolvedInput.message).toBe('Show plan and model transitions.');
+        yield {
+          type: 'progress',
+          text: 'Runtime updated the plan (2 steps).',
+          metadata: {
+            kind: 'plan',
+            status: 'updated',
+            stepCount: 2,
+          },
+        };
+        yield {
+          type: 'progress',
+          text: 'Runtime rerouted from gpt-5.4 to gpt-5.4-mini.',
+          metadata: {
+            kind: 'model_state',
+            status: 'updated',
+            native: {
+              fromModel: 'gpt-5.4',
+              toModel: 'gpt-5.4-mini',
+            },
+          },
+        };
+        yield { type: 'result', text: 'Projection complete.' };
+      },
+    };
+    const pool = {
+      getCapabilities: vi.fn(() => ({ resume: true, fork: true, permissions: true })),
+      get: vi.fn(() => worker),
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      cancel: vi.fn(),
+      status: vi.fn(() => ({ active: 1 })),
+    } as unknown as WorkerPool;
+
+    const ctx: AppContext = {
+      config: makeConfig(rootDir),
+      startup: createRuntimeStartupState(),
+      registry,
+      pool,
+      cursorNative: {} as CursorNativeSessionService,
+      gooseNative: {} as GooseNativeSessionService,
+      kiroNative: {} as KiroNativeSessionService,
+      auggieSessions: {} as AuggieSessionService,
+      opencodeNative: {} as OpencodeNativeSessionService,
+      providerModelCatalog: {} as never,
+    };
+
+    const server = startAcpStdioServer({ ctx, input, output });
+    const chunks: Buffer[] = [];
+    output.on('data', (chunk) => {
+      chunks.push(Buffer.from(chunk));
+    });
+
+    const cwd = join(rootDir, 'workspace-projection');
+    mkdirSync(cwd, { recursive: true });
+
+    input.write(Buffer.concat([
+      encodeMessage({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: 1,
+        },
+      }),
+      encodeMessage({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'session/new',
+        params: {
+          cwd,
+          mcpServers: [],
+        },
+      }),
+    ]));
+
+    await vi.waitFor(() => {
+      expect(decodeMessages(Buffer.concat(chunks))).toHaveLength(2);
+    });
+
+    const initialMessages = decodeMessages(Buffer.concat(chunks)) as Array<Record<string, unknown>>;
+    const sessionId = (initialMessages[1].result as { sessionId: string }).sessionId;
+
+    input.write(encodeMessage({
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'session/prompt',
+      params: {
+        sessionId,
+        prompt: [
+          {
+            type: 'text',
+            text: 'Show plan and model transitions.',
+          },
+        ],
+      },
+    }));
+
+    await vi.waitFor(() => {
+      expect(decodeMessages(Buffer.concat(chunks))).toHaveLength(6);
+    });
+
+    const promptMessages = decodeMessages(Buffer.concat(chunks)).slice(2) as Array<Record<string, unknown>>;
+    expect(promptMessages).toEqual([
+      {
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: 'plan',
+            entries: [
+              {
+                content: 'Runtime updated the plan (2 steps).',
+                status: 'pending',
+                step: 2,
+              },
+            ],
+          },
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: 'config_option_update',
+            configOptionUpdate: {
+              configOptions: [
+                {
+                  configId: 'model',
+                  name: 'Model',
+                  payload: {
+                    currentValue: 'gpt-5.4-mini',
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: 'agent_message_chunk',
+            content: {
+              type: 'text',
+              text: 'Projection complete.',
+            },
+          },
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        id: 3,
+        result: {
+          stopReason: 'end_turn',
+          _meta: {
+            catsRuntime: {
+              source: 'runtime_http_bridge',
+              transport: 'stdio',
+              turnStream: 'application/x-ndjson',
+            },
+          },
+        },
+      },
+    ]);
+
+    await server.close();
+  });
 });

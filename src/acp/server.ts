@@ -480,11 +480,106 @@ function buildTextContent(text: string): Record<string, string> {
   };
 }
 
+function buildPlanEntryStatus(
+  status: unknown,
+): 'pending' | 'in_progress' | 'completed' {
+  if (status === 'started' || status === 'running' || status === 'created') {
+    return 'in_progress';
+  }
+  if (status === 'completed') {
+    return 'completed';
+  }
+  return 'pending';
+}
+
+function titleCaseConfigLabel(id: string): string {
+  return id
+    .split(/[_\s-]+/u)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 function buildToolResultContent(text: string): Array<Record<string, unknown>> {
   return [{
     type: 'content',
     content: buildTextContent(text),
   }];
+}
+
+function buildPlanUpdateFromProgress(
+  streamEvent: StreamEvent,
+): Record<string, unknown> | null {
+  if (typeof streamEvent.text !== 'string' || streamEvent.text.length === 0) {
+    return null;
+  }
+
+  const metadata = streamEvent.metadata;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    return null;
+  }
+
+  const metadataRecord = metadata as Record<string, unknown>;
+  if (metadataRecord.kind !== 'plan') {
+    return null;
+  }
+
+  return {
+    sessionUpdate: 'plan',
+    entries: [
+      {
+        content: streamEvent.text,
+        status: buildPlanEntryStatus(metadataRecord.status),
+        ...(typeof metadataRecord.stepCount === 'number' ? { step: metadataRecord.stepCount } : {}),
+      },
+    ],
+  };
+}
+
+function buildConfigOptionUpdateFromProgress(
+  streamEvent: StreamEvent,
+): Record<string, unknown> | null {
+  const metadata = streamEvent.metadata;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    return null;
+  }
+
+  const metadataRecord = metadata as Record<string, unknown>;
+  if (metadataRecord.kind !== 'model_state') {
+    return null;
+  }
+
+  const native = metadataRecord.native && typeof metadataRecord.native === 'object' && !Array.isArray(metadataRecord.native)
+    ? metadataRecord.native as Record<string, unknown>
+    : undefined;
+
+  const configId = typeof metadataRecord.configId === 'string' && metadataRecord.configId.trim().length > 0
+    ? metadataRecord.configId.trim()
+    : 'model';
+  const value = typeof metadataRecord.value === 'string' && metadataRecord.value.trim().length > 0
+    ? metadataRecord.value.trim()
+    : typeof native?.toModel === 'string' && native.toModel.trim().length > 0
+      ? native.toModel.trim()
+      : undefined;
+
+  if (!value) {
+    return null;
+  }
+
+  return {
+    sessionUpdate: 'config_option_update',
+    configOptionUpdate: {
+      configOptions: [
+        {
+          configId,
+          name: titleCaseConfigLabel(configId),
+          payload: {
+            currentValue: value,
+          },
+        },
+      ],
+    },
+  };
 }
 
 function resolveProjectedToolId(
@@ -582,6 +677,24 @@ function mapRuntimeEventToAcpUpdates(
         content: buildTextContent(streamEvent.text),
       },
     }];
+  }
+
+  if (eventType === 'progress') {
+    const planUpdate = buildPlanUpdateFromProgress(streamEvent);
+    if (planUpdate) {
+      return [{
+        sessionId: '',
+        update: planUpdate,
+      }];
+    }
+
+    const configOptionUpdate = buildConfigOptionUpdateFromProgress(streamEvent);
+    if (configOptionUpdate) {
+      return [{
+        sessionId: '',
+        update: configOptionUpdate,
+      }];
+    }
   }
 
   if (eventType === 'progress'
