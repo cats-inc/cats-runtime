@@ -28,6 +28,7 @@ import type { RuntimeConfig } from '../config.js';
 import { asRecord, readNumber, readString } from '../usage/utils.js';
 import type { WorkerPool } from '../../backends/cli/pool/WorkerPool.js';
 import type { WorkerProcess } from '../../backends/cli/pool/WorkerProcess.js';
+import { normalizeProviderCatalogModelId } from '../models/providerModelCatalog.js';
 import { resolveProviderTarget } from '../providerCatalog.js';
 import type { BackendKind } from '../../backends/cli/config.js';
 import { ApiBackendManager } from '../../backends/api/runtime/ApiBackendManager.js';
@@ -181,6 +182,12 @@ export class RuntimeSessionManager {
         ? `${providerBackend}/${providerInstanceId}`
         : providerInstanceId,
     );
+    const normalizedModel = opts.model
+      ? (normalizeProviderCatalogModelId(target, opts.model) || opts.model)
+      : undefined;
+    const normalizedOpts = normalizedModel && normalizedModel !== opts.model
+      ? { ...opts, model: normalizedModel }
+      : opts;
 
     if (target.backend === 'cli') {
       const cliInstanceId = !providerInstanceId || providerInstanceId === 'default'
@@ -189,7 +196,7 @@ export class RuntimeSessionManager {
       const worker = this.pool.spawn(
         sessionId,
         providerName,
-        opts,
+        normalizedOpts,
         cliInstanceId,
       ) as WorkerProcess | undefined;
       return worker ? new CliExecutionHandle(worker, () => this.pool.kill(sessionId)) : undefined;

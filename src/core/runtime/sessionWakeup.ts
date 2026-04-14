@@ -3,6 +3,8 @@ import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js
 import type { RuntimeSessionManager } from './RuntimeSessionManager.js';
 import type { KiroNativeSessionService } from '../../backends/cli/kiro/KiroNativeSessionService.js';
 import { toSessionView } from '../../backends/cli/pool/sessionView.js';
+import { normalizeProviderCatalogModelId } from '../models/providerModelCatalog.js';
+import { resolveProviderTarget } from '../providerCatalog.js';
 import { resolvePiResumeTarget } from '../../backends/cli/pi/resume.js';
 import type { RuntimeWakeupTriggerOutcome } from '../types.js';
 
@@ -20,10 +22,43 @@ export interface EnsureSessionAwakeOptions {
   getKiroNative?: (instanceId?: string) => KiroNativeSessionService;
 }
 
+function normalizeStoredSessionModel(
+  options: EnsureSessionAwakeOptions,
+  session: ReturnType<SessionRegistry['get']>,
+): ReturnType<SessionRegistry['get']> {
+  if (!session?.model) {
+    return session;
+  }
+
+  try {
+    const target = resolveProviderTarget(
+      options.config,
+      session.providerName,
+      session.providerBackend && session.providerInstanceId
+        ? `${session.providerBackend}/${session.providerInstanceId}`
+        : session.providerInstanceId,
+    );
+    const normalizedModel = normalizeProviderCatalogModelId(target, session.model);
+    if (!normalizedModel || normalizedModel === session.model) {
+      return session;
+    }
+
+    options.registry.updateSessionMetadata(session.id, {
+      model: normalizedModel,
+    });
+    return options.registry.get(session.id) ?? {
+      ...session,
+      model: normalizedModel,
+    };
+  } catch {
+    return session;
+  }
+}
+
 export async function ensureSessionAwake(
   options: EnsureSessionAwakeOptions,
 ): Promise<EnsureSessionAwakeResult> {
-  const session = options.registry.get(options.sessionId);
+  let session = options.registry.get(options.sessionId);
   if (!session) {
     throw new Error(`Session '${options.sessionId}' not found.`);
   }
@@ -48,6 +83,8 @@ export async function ensureSessionAwake(
       outcome: 'already_awake',
     };
   }
+
+  session = normalizeStoredSessionModel(options, session) ?? session;
 
   if (session.providerBackend !== 'cli') {
     options.runtime.spawn(session.id, session.providerName, {

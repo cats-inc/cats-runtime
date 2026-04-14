@@ -63,6 +63,11 @@ function makeConfig() {
     externalSessionLiveWindowMs: 60_000,
     piSessionsDir: '/home/tester/.pi/agent/sessions',
     providerCommands: {
+      copilot: {
+        path: 'copilot',
+        runner: 'auto',
+        runtime: { mode: 'native' as const },
+      },
       pi: {
         path: 'pi',
         runner: 'auto',
@@ -70,9 +75,22 @@ function makeConfig() {
       },
     },
     providerDefaultInstances: {
+      copilot: 'default',
       pi: 'default',
     },
     providerInstances: {
+      copilot: {
+        default: {
+          id: 'default',
+          providerName: 'copilot',
+          commandConfig: {
+            path: 'copilot',
+            runner: 'auto',
+            runtime: { mode: 'native' as const },
+          },
+          copilotSessionsDir: '/home/tester/.copilot/session-state',
+        },
+      },
       pi: {
         default: {
           id: 'default',
@@ -270,6 +288,44 @@ describe('ensureSessionAwake', () => {
       'default',
       'cli',
     );
+  });
+
+  it('normalizes stored Copilot legacy model ids before resuming a session', async () => {
+    const registry = new SessionRegistry();
+    const session = registry.create(makeSession({
+      id: 'copilot-legacy-session',
+      providerName: 'copilot',
+      providerBackend: 'cli',
+      providerInstanceId: 'default',
+      model: 'claude-opus-4-6',
+    }));
+    registry.setProviderSessionId(session.id, 'copilot-provider-session');
+    const runtime = makeRuntime();
+
+    const result = await ensureSessionAwake({
+      config: makeConfig() as never,
+      registry,
+      runtime: runtime as never,
+      sessionId: session.id,
+    });
+
+    expect(result).toEqual({
+      sessionId: session.id,
+      providerSessionId: 'copilot-provider-session',
+      outcome: 'resumed',
+    });
+    expect(runtime.spawn).toHaveBeenCalledWith(
+      session.id,
+      'copilot',
+      expect.objectContaining({
+        cwd: '/repo',
+        model: 'claude-opus-4.6',
+        resumeSessionId: 'copilot-provider-session',
+      }),
+      'default',
+      'cli',
+    );
+    expect(registry.get(session.id)?.model).toBe('claude-opus-4.6');
   });
 
   it('rejects generic CLI resume when no provider session id is available', async () => {

@@ -601,8 +601,26 @@ async function refreshSessionModelStateForTarget(
   target: ProviderTargetDescriptor,
   session: SessionInfo,
 ): Promise<SessionInfo> {
+  const normalizedLegacyModel = normalizeLegacyModelForTarget(target, session.model);
   if (!session.modelSelection) {
-    return session;
+    if (!normalizedLegacyModel || normalizedLegacyModel === session.model) {
+      return session;
+    }
+
+    ctx.registry.updateSessionMetadata(session.id, {
+      model: normalizedLegacyModel,
+    });
+    return ctx.registry.get(session.id) ?? session;
+  }
+
+  if (
+    normalizedLegacyModel
+    && normalizedLegacyModel !== session.model
+  ) {
+    ctx.registry.updateSessionMetadata(session.id, {
+      model: normalizedLegacyModel,
+    });
+    session = ctx.registry.get(session.id) ?? session;
   }
 
   const refreshed = await resolveRequestedSessionModelState(ctx, target, {

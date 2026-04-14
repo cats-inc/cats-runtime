@@ -5325,6 +5325,39 @@ providers:
     });
   });
 
+  it('POST /sessions/:id/resume normalizes legacy Copilot model ids without requiring modelSelection', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const spawnSpy = vi.spyOn(runtime.context.pool, 'spawn');
+      const session = runtime.context.registry.create({
+        id: 'legacy-copilot-model-session',
+        providerName: 'copilot',
+        providerBackend: 'cli',
+        providerInstanceId: 'default',
+        cwd: '/tmp/cats-runtime-copilot-legacy',
+        model: 'claude-opus-4-6',
+      });
+      runtime.context.registry.setProviderSessionId(session.id, 'copilot-legacy-provider-session');
+      runtime.context.registry.updateStatus(session.id, 'closed');
+
+      const response = await runtime.app.request(`/sessions/${session.id}/resume`, {
+        method: 'POST',
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({
+        id: session.id,
+        model: 'claude-opus-4.6',
+        providerSessionId: 'copilot-legacy-provider-session',
+      }));
+      expect(runtime.context.registry.get(session.id)?.model).toBe('claude-opus-4.6');
+      expect(spawnSpy).toHaveBeenCalled();
+      expect(spawnSpy.mock.calls.at(-1)?.[2]).toEqual(expect.objectContaining({
+        model: 'claude-opus-4.6',
+        resumeSessionId: 'copilot-legacy-provider-session',
+      }));
+    });
+  });
+
   it('POST /sessions rejects conflicting legacy model and structured selection payloads', async () => {
     await withRuntime({
       providerDefaultTargets: {
