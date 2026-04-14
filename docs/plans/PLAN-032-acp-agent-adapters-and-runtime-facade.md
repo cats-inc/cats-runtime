@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Phase 3 Codex ACP Pilot Landed; Phase 4 Runtime ACP Facade Pending) |
+| **Status** | In Progress (Phase 4 HTTP ACP Facade Slice Started) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -176,8 +176,8 @@ Current rationale for preferring `codex-acp` first:
 ### Phase 4: Runtime-owned ACP Facade for IDE Consumption
 
 - [ ] Define the ACP session lifecycle mapping onto runtime session routes
-- [ ] Decide the first transport shape for the runtime ACP facade
-- [ ] Implement a conservative capability profile for IDE/client consumption
+- [x] Decide the first transport shape for the runtime ACP facade
+- [x] Implement a conservative capability profile for IDE/client consumption
 - [ ] Ensure facade sessions reuse the same runtime session ownership,
       diagnostics, and worktree truth
 - [ ] Add readiness/debug guidance for ACP-capable clients
@@ -217,8 +217,8 @@ Current rationale for preferring `codex-acp` first:
    `acp_stdio`, or another additive name?
 2. Which ACP client capabilities should be mandatory versus optional in the
    first provider-side slice?
-3. Should the first runtime-owned ACP facade target stdio only, or should it
-   also consider another transport in the initial design?
+3. After the initial HTTP ACP facade slice, should the runtime add a stdio
+   entrypoint for hosts that prefer subprocess integration over HTTP?
 4. Which first ACP provider target gives the cleanest validation path:
    `codex-acp`, `claude-agent-acp`, or another ACP-compatible agent?
 
@@ -248,3 +248,4 @@ Current rationale for preferring `codex-acp` first:
 | 2026-04-15 | Surfaced persisted ACP adapter state in runtime diagnostics evidence: retained and live agent evidence summaries can now show Codex ACP session title, current mode, available commands, config options, context-window usage, stop reason, and MCP declaration summaries instead of leaving that ACP-specific state trapped inside raw `providerState.agentSession.adapterState` |
 | 2026-04-15 | Promoted Codex ACP command discovery into a first-class remote tool catalog path: ACP inspection now truthfully reports `session_bootstrap` tool discovery for the profiled pilot target, `listTools()` can bootstrap a transient ACP session to capture `available_commands_update`, and provider-tooling read models map that bootstrap-backed catalog onto the existing `tools_effective` vocabulary instead of leaving command discovery buried inside progress events only |
 | 2026-04-15 | Closed the active-worker runtime close gap for the Codex ACP pilot: the shared `AgentAdapter` seam now exposes an optional provider-side `close()` hook, `AgentBackendManager` calls it during runtime close/reset/delete detachment, and `AcpAdapter` now sends draft ACP `session/close` only when the upstream agent explicitly advertises close-session capability instead of assuming it exists for every ACP target |
+| 2026-04-15 | Started Phase 4 with the first runtime-owned ACP facade slice: `cats-runtime` now exposes an HTTP `/acp` JSON-RPC endpoint that answers `initialize` with a conservative, truthful capability profile, advertises bootstrap/readiness state through `_meta`, and rejects ACP session methods explicitly until runtime-owned session mapping lands |

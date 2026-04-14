@@ -56,6 +56,7 @@ import { healthRoutes } from './routes/health.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { setupRoutes } from './routes/setup.js';
 import { messageRoutes } from './routes/messages.js';
+import { acpRoutes } from './routes/acp.js';
 import { mcpRoutes } from './routes/mcp.js';
 import { poolRoutes } from './routes/pool.js';
 import { historyRoutes } from './routes/history.js';
@@ -395,6 +396,7 @@ export function createRuntimeApp(ctx: AppContext) {
   app.route('/', deliveryRoutes);
   app.route('/', sessionRoutes);
   app.route('/', messageRoutes);
+  app.route('/', acpRoutes);
   app.route('/', mcpRoutes);
   app.route('/', historyRoutes);
   app.route('/', poolRoutes);
