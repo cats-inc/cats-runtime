@@ -409,7 +409,7 @@ describe('buildProviderAdvancedKnowledge', () => {
       'schema_version: 1',
       'catalogs:',
       '  - cli: Cursor',
-      '    last_updated: 2026-04-09',
+      '    last_updated: 2026-04-14',
       '    models:',
       '      - name: Composer 2 Fast',
       '      - name: GPT-5.4 1M',

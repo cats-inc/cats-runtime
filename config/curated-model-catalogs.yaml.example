@@ -141,8 +141,8 @@ catalogs:
         label: gemini-2.5-flash-lite
 
   - cli: Cursor
-    version: 2026.04.08-a41fba1
-    last_updated: 2026-04-09
+    version: 2026.04.13-a9d7fb5
+    last_updated: 2026-04-14
     notes:
       - "Source: Cursor Agent /model picker output supplied by user"
       - "Entries below are raw visible /model names only; provider grouping and canonical ids are intentionally omitted."
