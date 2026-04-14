@@ -71,7 +71,9 @@ Peer auth/trust notes:
 GET /
 GET /playground
 POST /mcp
+POST /acp
 stdio: node build/runtime/bin/mcp.js (repo-local helper)
+stdio: node build/runtime/bin/acp.js (repo-local helper)
 ```
 
 `GET /` returns the embedded `cats-runtime` dashboard HTML.
@@ -91,6 +93,14 @@ surface instead of creating a second independent runtime core. This slice is
 additive: direct runtime APIs remain the primary app boundary, while MCP is
 the curated tool surface for orchestrator-style agents.
 
+`POST /acp` exposes the bounded runtime-owned ACP facade over HTTP JSON-RPC.
+It is intentionally narrower than the primary HTTP session API and currently
+focuses on ACP control-plane/session lifecycle calls. The same repo-local ACP
+entrypoint also has a direct stdio carrier via `node build/runtime/bin/acp.js`.
+By default that helper proxies to the existing HTTP `/acp` surface; when started
+with `--serve-runtime`, it runs an in-process runtime-backed ACP stdio server
+that supports bidirectional prompt turns.
+
 Supported JSON-RPC methods:
 
 - `initialize`
@@ -98,6 +108,24 @@ Supported JSON-RPC methods:
 - `tools/list`
 - `tools/call`
 - `notifications/initialized`
+
+Supported ACP HTTP JSON-RPC methods:
+
+- `initialize`
+- `ping`
+- `session/new`
+- `session/list`
+- `session/load`
+- `session/cancel`
+
+Current ACP HTTP limitations:
+
+- `session/prompt` is still refused on HTTP because the current HTTP carrier
+  does not yet provide ACP's required bidirectional `session/update` path
+- direct ACP prompt turns are currently available only on the direct stdio
+  carrier (`node build/runtime/bin/acp.js --serve-runtime`)
+- the ACP facade is additive and bounded; it does not replace the primary
+  runtime HTTP session API
 
 Current curated tools:
 
@@ -4210,4 +4238,4 @@ Errors use this format:
 
 ---
 
-*Last updated: 2026-04-12*
+*Last updated: 2026-04-15*

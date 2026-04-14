@@ -61,6 +61,7 @@ Update indexes when adding or changing tracked artifacts:
 
 - `GET /`
 - `GET /playground`
+- `POST /acp`
 - `GET /health`
 - `GET /diagnostics/health`
 - `GET /diagnostics/peers`

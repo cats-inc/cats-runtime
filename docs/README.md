@@ -17,7 +17,7 @@ These important documents live in the project root:
 |----------|--------|-------------|
 | [requirements.md](./requirements.md) | Template | Requirements specification |
 | [architecture.md](./architecture.md) | Complete | Embedded runtime architecture, backend layering, runtime-owned skill / compatibility / metering / session-maintenance / browser-preview seams, and the ACP vs A2A protocol stack |
-| [api.md](./api.md) | Complete | Supported public HTTP contract, including skills, diagnostics, progress, guardrails, browser sessions/pages, preview surfaces, compatibility summaries, and session maintenance metadata |
+| [api.md](./api.md) | Complete | Supported public HTTP contract, including skills, diagnostics, progress, guardrails, browser sessions/pages, preview surfaces, compatibility summaries, session maintenance metadata, and the bounded ACP facade |
 
 ## Development Guides
 
