@@ -3897,17 +3897,17 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   let worktreeMergedPaths: number | undefined;
   let resolvedCleanupPolicy: WorktreeCleanupPolicy | undefined;
 
-  if (session.workspaceIsolation?.mode === 'worktree') {
-    const worker = runtime.get(id);
-    if (worker?.active) {
-      try {
-        await runtime.close(session, 'delete');
-        ctx.registry.updateStatus(id, 'closed');
-      } catch (err) {
-        return c.json({ error: `Failed to close session before delete: ${err}` }, 500);
-      }
+  const attachedExecution = runtime.get(id);
+  if (attachedExecution?.active) {
+    try {
+      await runtime.close(session, 'delete');
+      ctx.registry.updateStatus(id, 'closed');
+    } catch (err) {
+      return c.json({ error: `Failed to close session before delete: ${err}` }, 500);
     }
+  }
 
+  if (session.workspaceIsolation?.mode === 'worktree') {
     const cleanup = await prepareWorkspaceCleanupState(session, worktreeCleanupPolicy, ctx);
     workspaceCleaned = cleanup.workspaceCleaned;
     worktreeDetached = cleanup.worktreeDetached;

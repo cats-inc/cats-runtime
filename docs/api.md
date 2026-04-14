@@ -3342,6 +3342,11 @@ then either detaches the worktree and removes the session or returns
 cannot be completed or when `preserve` intentionally keeps the worktree for
 manual handling.
 
+For attached native-provider sessions outside the worktree path, the runtime
+also detaches the live worker before it verifies provider-owned cleanup so the
+delete path does not re-check Cursor or similar native session state while the
+session is still attached locally.
+
 For delete responses, top-level `cleanup` is a flat alias of
 `maintenance.cleanup` so transport-facing consumers can read terminal cleanup
 results without having to unwrap the full lifecycle object after the session

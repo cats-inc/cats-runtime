@@ -69,10 +69,22 @@ export class CursorNativeSessionService {
   }
 
   normalizeWorkspace(cwd: string): string {
-    if (!cwd.trim()) {
+    const trimmed = cwd.trim();
+    if (!trimmed) {
       throw new Error('cwd is required');
     }
-    return this.runtime.toRuntimePath(cwd);
+    if (
+      this.runtime.mode === 'native'
+      && process.platform === 'win32'
+      && (
+        /^[A-Za-z]:[\\/]/.test(trimmed)
+        || trimmed.startsWith('\\\\')
+        || trimmed.startsWith('//')
+      )
+    ) {
+      return trimmed.replace(/\//g, '\\');
+    }
+    return this.runtime.toRuntimePath(trimmed);
   }
 
   async listSessions(
@@ -518,6 +530,75 @@ def get_projects_dir(base_dir):
     return os.path.join(os.path.dirname(os.path.normpath(base_dir)), "projects")
 
 
+def workspace_variants(workspace):
+    candidates = []
+    seen = set()
+
+    def add(value):
+        if value is None:
+            return
+        text = str(value).strip()
+        if not text or text in seen:
+            return
+        seen.add(text)
+        candidates.append(text)
+
+    add(workspace)
+    add(os.path.normpath(str(workspace)))
+    add(str(workspace).replace("\\", "/"))
+    add(str(workspace).replace("/", "\\"))
+    return candidates
+
+
+def iter_workspace_session_dirs(base_dir, workspace, session_id):
+    seen = set()
+    for candidate in workspace_variants(workspace):
+        workspace_hash = hashlib.md5(candidate.encode("utf-8")).hexdigest()
+        session_dir = os.path.join(base_dir, workspace_hash, session_id)
+        if session_dir in seen:
+            continue
+        seen.add(session_dir)
+        yield session_dir
+
+
+def normalize_workspace_match(value):
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    normalized = text.replace("\\", "/").rstrip("/")
+    if re.match(r"^[A-Za-z]:/", normalized):
+        normalized = normalized[0].lower() + normalized[1:]
+    return normalized
+
+
+def workspace_matches(left, right):
+    left_normalized = normalize_workspace_match(left)
+    right_normalized = normalize_workspace_match(right)
+    return left_normalized == right_normalized
+
+
+def resolve_transcript_path(transcripts_dir, session_id):
+    direct_path = os.path.join(transcripts_dir, f"{session_id}.jsonl")
+    if os.path.isfile(direct_path):
+        return direct_path
+
+    nested_dir = os.path.join(transcripts_dir, session_id)
+    if not os.path.isdir(nested_dir):
+        return None
+
+    canonical_path = os.path.join(nested_dir, f"{session_id}.jsonl")
+    if os.path.isfile(canonical_path):
+        return canonical_path
+
+    for entry in sorted(os.listdir(nested_dir)):
+        if entry.endswith(".jsonl"):
+            return os.path.join(nested_dir, entry)
+
+    return None
+
+
 def extract_workspace_path_from_worker_log(project_dir):
     worker_log = os.path.join(project_dir, "worker.log")
     workspace_path = None
@@ -586,12 +667,15 @@ def find_transcript_paths(base_dir, session_id, workspace=None):
         if not os.path.isdir(project_dir):
             continue
 
-        transcript_path = os.path.join(project_dir, "agent-transcripts", f"{session_id}.jsonl")
-        if not os.path.isfile(transcript_path):
+        transcript_path = resolve_transcript_path(
+            os.path.join(project_dir, "agent-transcripts"),
+            session_id,
+        )
+        if not transcript_path:
             continue
 
         workspace_path = extract_workspace_path_from_worker_log(project_dir)
-        if workspace and workspace_path and workspace_path != workspace:
+        if workspace and workspace_path and not workspace_matches(workspace_path, workspace):
             continue
 
         matches.append((transcript_path, workspace_path))
@@ -698,11 +782,20 @@ def collect_transcript_sessions(base_dir):
             continue
 
         for entry in sorted(os.listdir(transcripts_dir)):
-            if not entry.endswith(".jsonl"):
+            entry_path = os.path.join(transcripts_dir, entry)
+            transcript_path = None
+            session_id = None
+
+            if os.path.isfile(entry_path) and entry.endswith(".jsonl"):
+                transcript_path = entry_path
+                session_id = os.path.splitext(entry)[0]
+            elif os.path.isdir(entry_path):
+                session_id = entry
+                transcript_path = resolve_transcript_path(transcripts_dir, session_id)
+
+            if not transcript_path or not session_id:
                 continue
 
-            transcript_path = os.path.join(transcripts_dir, entry)
-            session_id = os.path.splitext(entry)[0]
             summary = summarize_transcript(transcript_path)
 
             result.append({
@@ -761,11 +854,16 @@ ${CURSOR_PY_SHARED}
 workspace = sys.argv[1]
 session_id = sys.argv[2]
 base_dir = os.path.expanduser(sys.argv[3])
-workspace_hash = hashlib.md5(workspace.encode("utf-8")).hexdigest()
-store_db = os.path.join(base_dir, workspace_hash, session_id, "store.db")
+store_db = None
+for session_dir in iter_workspace_session_dirs(base_dir, workspace, session_id):
+    candidate_store_db = os.path.join(session_dir, "store.db")
+    if os.path.isfile(candidate_store_db):
+        store_db = candidate_store_db
+        break
+
 messages = []
 
-if os.path.isfile(store_db):
+if store_db and os.path.isfile(store_db):
     db = open_store_db(store_db)
     rows = db.execute(
         "SELECT rowid, data FROM blobs WHERE substr(data, 1, 1) = X'7B' ORDER BY rowid ASC"
@@ -801,21 +899,22 @@ ${CURSOR_PY_SHARED}
 workspace = sys.argv[1]
 session_id = sys.argv[2]
 base_dir = os.path.expanduser(sys.argv[3])
-workspace_hash = hashlib.md5(workspace.encode("utf-8")).hexdigest()
-session_dir = os.path.join(base_dir, workspace_hash, session_id)
 deleted = False
 
-if os.path.isdir(session_dir):
-    shutil.rmtree(session_dir, ignore_errors=True)
-    deleted = deleted or not os.path.exists(session_dir)
+workspace_dirs = set()
+for session_dir in iter_workspace_session_dirs(base_dir, workspace, session_id):
+    workspace_dirs.add(os.path.dirname(session_dir))
+    if os.path.isdir(session_dir):
+        shutil.rmtree(session_dir, ignore_errors=True)
+        deleted = deleted or not os.path.exists(session_dir)
 
-workspace_dir = os.path.join(base_dir, workspace_hash)
-if os.path.isdir(workspace_dir):
-    try:
-        if not os.listdir(workspace_dir):
-            os.rmdir(workspace_dir)
-    except Exception:
-        pass
+for workspace_dir in workspace_dirs:
+    if os.path.isdir(workspace_dir):
+        try:
+            if not os.listdir(workspace_dir):
+                os.rmdir(workspace_dir)
+        except Exception:
+            pass
 
 transcript_paths = find_transcript_paths(base_dir, session_id, workspace)
 if not transcript_paths:

@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -7,6 +8,23 @@ import {
   CursorNativeSessionService,
 } from './CursorNativeSessionService.js';
 import { createRuntimeAdapter } from '../runtime/runtime.js';
+
+const realPythonRunner = async (
+  command: string,
+  args: string[],
+  options?: { cwd?: string; shell?: boolean },
+): Promise<{ code: number; stdout: string; stderr: string }> => {
+  const result = spawnSync(command, args, {
+    cwd: options?.cwd,
+    shell: options?.shell,
+    encoding: 'utf8',
+  });
+  return {
+    code: result.status ?? -1,
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+  };
+};
 
 describe('CursorNativeSessionService', () => {
   it('normalizes Windows workspaces to WSL mount paths when using WSL runtime', () => {
@@ -35,6 +53,24 @@ describe('CursorNativeSessionService', () => {
     });
 
     expect(service.normalizeWorkspace('/Users/test/project')).toBe('/Users/test/project');
+  });
+
+  it('normalizes Windows native workspaces back to backslash paths for Cursor storage lookups', () => {
+    if (process.platform !== 'win32') {
+      return;
+    }
+
+    const service = new CursorNativeSessionService({
+      command: 'cursor-agent',
+      chatsDir: '~/.cursor/chats',
+      runtime: createRuntimeAdapter({
+        mode: 'native',
+      }),
+      runner: async () => ({ code: 0, stdout: '', stderr: '' }),
+    });
+
+    expect(service.normalizeWorkspace('C:/Users/kenne/Source/repo'))
+      .toBe('C:\\Users\\kenne\\Source\\repo');
   });
 
   it('lists globally discovered Cursor sessions without rewriting native macOS/Linux paths', async () => {
@@ -235,7 +271,7 @@ describe('CursorNativeSessionService', () => {
       process.platform === 'win32' ? 'cursor-agent.cmd' : 'cursor-agent',
       ['create-chat'],
       expect.objectContaining({
-        cwd: 'C:/repo',
+        cwd: process.platform === 'win32' ? 'C:\\repo' : 'C:/repo',
         ...(process.platform === 'win32' ? { shell: true } : {}),
       }),
     );
@@ -299,7 +335,7 @@ describe('CursorNativeSessionService', () => {
         shimPath,
         ['create-chat'],
         expect.objectContaining({
-          cwd: 'C:/repo',
+          cwd: 'C:\\repo',
           shell: true,
         }),
       );
@@ -335,4 +371,126 @@ describe('CursorNativeSessionService', () => {
     await expect(service.listAllSessions({ startIfNeeded: false })).resolves.toEqual([]);
     expect(runner).not.toHaveBeenCalled();
   });
+
+  it('discovers nested transcript sessions from newer Cursor project layouts', async () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), 'cursor-native-transcripts-'));
+    const chatsDir = join(runtimeRoot, 'chats');
+    const projectDir = join(runtimeRoot, 'projects', 'project-a');
+    const transcriptDir = join(projectDir, 'agent-transcripts', 'cursor-nested');
+    const workspace = process.platform === 'win32' ? 'C:\\repo' : '/tmp/repo';
+    const expectedCwd = process.platform === 'win32' ? 'C:/repo' : workspace;
+
+    mkdirSync(transcriptDir, { recursive: true });
+    writeFileSync(
+      join(projectDir, 'worker.log'),
+      `[info] Getting tree structure for workspacePath=${workspace}\n`,
+      'utf8',
+    );
+    writeFileSync(
+      join(transcriptDir, 'cursor-nested.jsonl'),
+      `${JSON.stringify({ message: { role: 'user', content: 'hello nested transcript' } })}\n`,
+      'utf8',
+    );
+
+    const service = new CursorNativeSessionService({
+      command: 'cursor-agent',
+      chatsDir,
+      runtime: createRuntimeAdapter({
+        mode: 'native',
+      }),
+      runner: realPythonRunner,
+    });
+
+    try {
+      await expect(service.listAllSessions()).resolves.toEqual([
+        {
+          providerSessionId: 'cursor-nested',
+          cwd: expectedCwd,
+          summary: 'hello nested transcript',
+          messageCount: 1,
+          lastActivity: expect.any(String),
+          model: null,
+        },
+      ]);
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('deletes Windows-native Cursor store directories even when the caller passes a slash-normalized cwd', async () => {
+    if (process.platform !== 'win32') {
+      return;
+    }
+
+    const runtimeRoot = mkdtempSync(join(tmpdir(), 'cursor-native-delete-store-'));
+    const chatsDir = join(runtimeRoot, 'chats');
+    const workspace = 'C:\\repo';
+    const sessionId = 'cursor-store-delete';
+    const hash = createWindowsWorkspaceHash(workspace);
+    const sessionDir = join(chatsDir, hash, sessionId);
+
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(join(sessionDir, 'store.db'), '', 'utf8');
+
+    const service = new CursorNativeSessionService({
+      command: 'cursor-agent',
+      chatsDir,
+      runtime: createRuntimeAdapter({
+        mode: 'native',
+      }),
+      runner: realPythonRunner,
+    });
+
+    try {
+      await expect(service.deleteSession('C:/repo', sessionId)).resolves.toBe(true);
+      expect(existsSync(sessionDir)).toBe(false);
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('deletes nested transcript files when no Cursor store directory remains', async () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), 'cursor-native-delete-transcript-'));
+    const chatsDir = join(runtimeRoot, 'chats');
+    const projectDir = join(runtimeRoot, 'projects', 'project-a');
+    const sessionId = 'cursor-transcript-delete';
+    const transcriptDir = join(projectDir, 'agent-transcripts', sessionId);
+    const workspace = process.platform === 'win32' ? 'C:\\repo' : '/tmp/repo';
+    const deleteCwd = process.platform === 'win32' ? 'C:/repo' : workspace;
+    const transcriptPath = join(transcriptDir, `${sessionId}.jsonl`);
+
+    mkdirSync(transcriptDir, { recursive: true });
+    writeFileSync(
+      join(projectDir, 'worker.log'),
+      `[info] Getting tree structure for workspacePath=${workspace}\n`,
+      'utf8',
+    );
+    writeFileSync(
+      transcriptPath,
+      `${JSON.stringify({ message: { role: 'user', content: 'delete transcript fallback' } })}\n`,
+      'utf8',
+    );
+
+    const service = new CursorNativeSessionService({
+      command: 'cursor-agent',
+      chatsDir,
+      runtime: createRuntimeAdapter({
+        mode: 'native',
+      }),
+      runner: realPythonRunner,
+    });
+
+    try {
+      await expect(service.deleteSession(deleteCwd, sessionId)).resolves.toBe(true);
+      expect(existsSync(transcriptPath)).toBe(false);
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
 });
+
+function createWindowsWorkspaceHash(workspace: string): string {
+  return createHash('md5')
+    .update(workspace, 'utf8')
+    .digest('hex');
+}

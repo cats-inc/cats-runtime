@@ -307,7 +307,7 @@ describe('Cursor native session management', () => {
     expect(registry.get(session!.id)).toBeDefined();
   });
 
-  it('does not kill an attached worker when delete is retained', async () => {
+  it('closes an attached worker before delete verification and retains the session when native cleanup still fails', async () => {
     const session = registry.create({
       providerName: 'cursor',
       cwd: 'C:/repo',
@@ -335,8 +335,34 @@ describe('Cursor native session management', () => {
     const body = await res.json() as Record<string, unknown>;
     expect(body.status).toBe('retained');
     expect(registry.get(session.id)).toBeDefined();
-    expect(attachedWorkers.get(session.id)?.alive).toBe(true);
-    expect(vi.mocked(pool.kill)).not.toHaveBeenCalledWith(session.id);
+    expect(registry.get(session.id)?.status).toBe('closed');
+    expect(attachedWorkers.has(session.id)).toBe(false);
+    expect(vi.mocked(pool.kill)).toHaveBeenCalledWith(session.id);
+  });
+
+  it('closes an attached worker before deleting a Cursor session successfully', async () => {
+    const session = registry.create({
+      providerName: 'cursor',
+      cwd: 'C:/repo',
+      workspaceMode: 'shared',
+    });
+    registry.setProviderSessionId(session.id, 'cursor-attached-success');
+    registry.updateStatus(session.id, 'ready');
+    attachedWorkers.set(session.id, { alive: true });
+
+    vi.mocked(cursorNative.deleteSession).mockResolvedValue(true);
+    vi.mocked(cursorNative.listSessions).mockResolvedValue([]);
+
+    const res = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('deleted');
+    expect(registry.get(session.id)).toBeUndefined();
+    expect(attachedWorkers.has(session.id)).toBe(false);
+    expect(vi.mocked(pool.kill)).toHaveBeenCalledWith(session.id);
   });
 
   it('deletes transcript-only discovered Cursor sessions without staging away native-owned files first', async () => {
