@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Phase 2 Capability Bridge Complete; Phase 3 Codex ACP Pilot In Progress) |
+| **Status** | In Progress (Phase 3 Codex ACP Pilot Landed; Phase 4 Runtime ACP Facade Pending) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -118,12 +118,12 @@ integration track for only two vendors.
 ### Phase 3: First `agent/acp` Provider Pilot
 
 - [x] Choose the first ACP target to pilot
-- [ ] Implement the provider-side ACP adapter against the shared `AgentAdapter`
+- [x] Implement the provider-side ACP adapter against the shared `AgentAdapter`
       seam
-- [ ] Normalize lifecycle and stream events into runtime `StreamEvent`s
-- [ ] Persist provider-managed ACP continuity state in the existing session
+- [x] Normalize lifecycle and stream events into runtime `StreamEvent`s
+- [x] Persist provider-managed ACP continuity state in the existing session
       registry
-- [ ] Add targeted diagnostics, probe behavior, and model/tool discovery where
+- [x] Add targeted diagnostics, probe behavior, and model/tool discovery where
       the ACP target makes them available
 
 The default recommendation for the first pilot is `codex-acp`.
