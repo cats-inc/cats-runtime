@@ -693,6 +693,162 @@ describe('buildProviderAdvancedKnowledge', () => {
     }
   });
 
+  it('normalizes curated Copilot flat models into the same advanced controls and default selection', () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-curated-copilot-flat-'));
+    const curatedPath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');
+    mkdirSync(join(runtimeRoot, 'config'), { recursive: true });
+    writeFileSync(curatedPath, [
+      'schema_version: 1',
+      'catalogs:',
+      '  - cli: Copilot',
+      '    version: v1.0.26',
+      '    last_updated: 2026-04-15',
+      '    shared_options:',
+      '      - name: Reasoning Effort',
+      '        values:',
+      '          - name: Low',
+      '            notes:',
+      '              - "Faster responses, less detailed reasoning"',
+      '          - name: Medium',
+      '            notes:',
+      '              - "Balanced speed and reasoning depth"',
+      '          - name: High',
+      '            notes:',
+      '              - "More thorough reasoning, slower responses"',
+      '        default: Medium',
+      '    models:',
+      '      - name: GPT-5.4',
+      '        default: true',
+      '      - name: GPT-5.4 mini',
+      '      - name: GPT-5.2-Codex',
+      '        options:',
+      '          - name: Reasoning Effort',
+      '            default: High',
+      '      - name: Claude Opus 4.6',
+      '        options:',
+      '          - name: Reasoning Effort',
+      '            values:',
+      '              - name: Low',
+      '                notes:',
+      '                  - "Minimal thinking, prioritizes speed"',
+      '              - name: Medium',
+      '                notes:',
+      '                  - "Balanced, thinks on harder problems"',
+      '              - name: High',
+      '                notes:',
+      '                  - "Optimal performance, thorough thinking"',
+      '            default: High',
+      '      - name: Claude Sonnet 4',
+      '        options:',
+      '          - name: Reasoning Effort',
+      '            values:',
+      '              - name: Low',
+      '                notes:',
+      '                  - "Minimal thinking, prioritizes speed"',
+      '              - name: Medium',
+      '                notes:',
+      '                  - "Balanced, thinks on harder problems"',
+      '              - name: High',
+      '                notes:',
+      '                  - "Optimal performance, thorough thinking"',
+      '            default: Medium',
+      '',
+    ].join('\n'), 'utf8');
+
+    try {
+      const target: ProviderTargetDescriptor = {
+        providerName: 'copilot',
+        backend: 'cli',
+        instanceId: 'default',
+        defaultTarget: true,
+        cliInstance: {
+          id: 'default',
+          providerName: 'copilot',
+          backend: 'cli',
+          command: 'copilot',
+        },
+      };
+
+      const knowledge = buildProviderAdvancedKnowledge(target, createCatalog({
+        provider: 'copilot',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt-5.4',
+        models: [
+          { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
+          { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini' },
+          { id: 'gpt-5.2-codex', label: 'gpt-5.2-codex' },
+          { id: 'claude-opus-4.6', label: 'claude-opus-4.6' },
+          { id: 'claude-sonnet-4', label: 'claude-sonnet-4' },
+        ],
+      }), {
+        env: {
+          ...process.env,
+          CATS_RUNTIME_DIR: runtimeRoot,
+        },
+      });
+
+      expect(knowledge.supportTier).toBe('full');
+      expect(knowledge.catalog.defaultSelection).toEqual({
+        entryId: 'gpt-5.4',
+        entryMode: 'explicit',
+        controls: {
+          'copilot.reasoning_effort': 'medium',
+        },
+      });
+      expect(knowledge.controlsByKey['copilot.reasoning_effort']).toEqual(
+        expect.objectContaining({
+          key: 'copilot.reasoning_effort',
+          label: 'Reasoning effort',
+          kind: 'enum',
+          scope: 'both',
+          applicableEntryIds: [
+            'gpt-5.4',
+            'gpt-5.4-mini',
+            'gpt-5.2-codex',
+            'claude-opus-4.6',
+            'claude-sonnet-4',
+          ],
+        }),
+      );
+      expect(knowledge.catalog.controls[0]?.values).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          value: 'low',
+          label: 'Low',
+          applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.2-codex'],
+        }),
+        expect.objectContaining({
+          value: 'medium',
+          label: 'Medium (default)',
+          applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini'],
+        }),
+        expect.objectContaining({
+          value: 'high',
+          label: 'High (default)',
+          applicableEntryIds: ['gpt-5.2-codex'],
+        }),
+        expect.objectContaining({
+          value: 'low',
+          label: 'Low',
+          applicableEntryIds: ['claude-opus-4.6', 'claude-sonnet-4'],
+        }),
+        expect.objectContaining({
+          value: 'medium',
+          label: 'Medium (default)',
+          applicableEntryIds: ['claude-sonnet-4'],
+        }),
+        expect.objectContaining({
+          value: 'high',
+          label: 'High (default)',
+          applicableEntryIds: ['claude-opus-4.6'],
+        }),
+      ]));
+      expect(knowledge.catalog.warnings).toEqual([]);
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
   it('normalizes curated Kilo raw labels into advanced catalog entries', () => {
     const runtimeRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-curated-kilo-'));
     const curatedPath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');
