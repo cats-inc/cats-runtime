@@ -1,12 +1,79 @@
 import type {
   HealthStatus,
+  PermissionMode,
   ProviderCapabilities,
+  RuntimeToolPolicyInspection,
+  SessionInvocationContext,
   SessionProviderState,
+  SessionWorkspaceState,
   StreamEvent,
   TurnInput,
+  WorkspaceMode,
 } from '../../core/types.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../core/compatibility/providerEvolution.js';
 import type { RemoteProviderInstanceConfig } from '../cli/config.js';
+
+export interface AgentAcpHostContext {
+  sessionId: string;
+  providerName: string;
+  providerInstanceId?: string;
+  cwd: string;
+  workspace: SessionWorkspaceState;
+  workspaceMode?: WorkspaceMode;
+  permissionMode?: PermissionMode;
+  allowedTools?: string[];
+  toolProfile?: string;
+  outputDir?: string;
+  context?: SessionInvocationContext;
+}
+
+export interface AgentAcpHostDescription {
+  summary: string;
+  workspace: Pick<SessionWorkspaceState, 'kind' | 'access' | 'runtimeCwd' | 'sourceCwd'> & {
+    worktreePath?: string;
+  };
+  toolPolicy: RuntimeToolPolicyInspection;
+  capabilities: {
+    permissionPolicy: true;
+    filesystem: true;
+    terminal: true;
+    toolExecution: true;
+    clientMcpServers: false;
+  };
+}
+
+export interface AgentAcpHostToolDefinition {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
+export interface AgentAcpHostToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface AgentAcpHostToolResult {
+  callId: string;
+  name: string;
+  output: string;
+  isError?: boolean;
+}
+
+export interface AgentAcpHostBridge {
+  describe(context: AgentAcpHostContext): AgentAcpHostDescription;
+  listTools(context: AgentAcpHostContext): AgentAcpHostToolDefinition[];
+  executeTool(
+    context: AgentAcpHostContext,
+    call: AgentAcpHostToolCall,
+  ): Promise<AgentAcpHostToolResult>;
+}
+
+export interface AgentAcpHostBinding {
+  bridge: AgentAcpHostBridge;
+  context: AgentAcpHostContext;
+}
 
 export interface AgentInvokeInput {
   sessionId: string;
@@ -18,6 +85,7 @@ export interface AgentInvokeInput {
   providerSessionId?: string;
   sessionState?: SessionProviderState;
   evolutionObserver?: ProviderEvolutionEvidenceObserver;
+  acpHost?: AgentAcpHostBinding;
   signal: AbortSignal;
 }
 
@@ -135,6 +203,7 @@ export interface AgentBackendOptions {
   env?: NodeJS.ProcessEnv;
   fetch?: typeof fetch;
   webSocketFactory?: (url: string | URL, init?: WebSocketInit) => WebSocket;
+  acpHostBridge?: AgentAcpHostBridge;
 }
 
 export interface AgentBackendStatus {

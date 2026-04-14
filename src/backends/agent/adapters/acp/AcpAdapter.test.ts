@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
+import type { AgentAcpHostBridge, AgentAcpHostContext } from '../../types.js';
 import { AcpAdapter } from './AcpAdapter.js';
 
 function createHttpInstance(): RemoteProviderInstanceConfig {
@@ -29,6 +30,59 @@ function createStdioInstance(): RemoteProviderInstanceConfig {
     cwd: '/tmp/acp',
     startupTimeoutMs: 15000,
     model: 'gpt-5.4',
+  };
+}
+
+function createHostBridge(): AgentAcpHostBridge {
+  return {
+    describe(_context: AgentAcpHostContext) {
+      return {
+        summary: 'host bridge ready',
+        workspace: {
+          kind: 'source',
+          access: 'read_write',
+          runtimeCwd: '/tmp/acp',
+        },
+        toolPolicy: {
+          profile: 'standard',
+          permissionMode: 'skip',
+          whitelistActive: false,
+          fullAccessTools: ['read_file'],
+          previewOnlyTools: [],
+          blockedTools: [],
+          counts: {
+            total: 1,
+            fullAccess: 1,
+            previewOnly: 0,
+            blocked: 0,
+          },
+          capabilities: [{
+            name: 'read_file',
+            domain: 'filesystem',
+            access: 'full_access',
+            readOnlyCompatible: true,
+            mutating: false,
+          }],
+        },
+        capabilities: {
+          permissionPolicy: true,
+          filesystem: true,
+          terminal: true,
+          toolExecution: true,
+          clientMcpServers: false,
+        },
+      };
+    },
+    listTools() {
+      return [];
+    },
+    async executeTool() {
+      return {
+        callId: 'noop',
+        name: 'noop',
+        output: '',
+      };
+    },
   };
 }
 
@@ -132,6 +186,17 @@ describe('AcpAdapter', () => {
     });
   });
 
+  it('reports runtime host services when an ACP host bridge is configured', () => {
+    const adapter = new AcpAdapter({
+      acpHostBridge: createHostBridge(),
+    });
+
+    const inspection = adapter.inspect(createHttpInstance());
+
+    expect(inspection.summary).toContain('host-capability bridge is configured');
+    expect(inspection.capabilities.runtimeServices).toBe(true);
+  });
+
   it('throws an explicit Phase 2 follow-up error when invoke is used before execution exists', async () => {
     const adapter = new AcpAdapter();
 
@@ -147,7 +212,42 @@ describe('AcpAdapter', () => {
     });
 
     await expect(iterator.next()).rejects.toThrow(
-      /PLAN-032 Phase 2 to add the ACP host-capability bridge/,
+      /no runtime ACP host-capability bridge is attached/,
+    );
+  });
+
+  it('throws a Phase 3 follow-up error once the ACP host bridge is attached', async () => {
+    const adapter = new AcpAdapter({
+      acpHostBridge: createHostBridge(),
+    });
+
+    const iterator = adapter.invoke({
+      sessionId: 'session-1',
+      providerName: 'codex',
+      instance: createStdioInstance(),
+      turn: {
+        messages: [],
+      },
+      sessionKey: 'session-key-1',
+      acpHost: {
+        bridge: createHostBridge(),
+        context: {
+          sessionId: 'session-1',
+          providerName: 'codex',
+          providerInstanceId: 'acp-local',
+          cwd: '/tmp/acp',
+          workspace: {
+            kind: 'source',
+            access: 'read_write',
+            runtimeCwd: '/tmp/acp',
+          },
+        },
+      },
+      signal: new AbortController().signal,
+    });
+
+    await expect(iterator.next()).rejects.toThrow(
+      /PLAN-032 Phase 3/,
     );
   });
 });

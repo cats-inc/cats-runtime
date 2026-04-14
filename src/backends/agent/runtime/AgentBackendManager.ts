@@ -7,9 +7,11 @@ import {
   ManagedExecutionHandle,
   type ManagedExecutionLifecycleReason,
 } from '../../../core/runtime/ManagedExecutionHandle.js';
+import { RuntimeAcpHostBridge } from '../acp/RuntimeAcpHostBridge.js';
 import { buildAgentAdapter } from '../adapters/registry.js';
 import { inspectAgentTarget } from '../inspection.js';
 import type {
+  AgentAcpHostBinding,
   AgentBackendOptions,
   AgentAdapterProbeResult,
   AgentAdapterToolCatalog,
@@ -58,12 +60,18 @@ async function withTimeout<T>(
 export class AgentBackendManager {
   private readonly handles = new Map<string, ManagedExecutionHandle>();
   private readonly targets = new Map<string, ProviderTargetDescriptor>();
+  private readonly options: AgentBackendOptions;
 
   constructor(
     private readonly config: Pick<CliRuntimeConfig, 'sessionBaseDir'>,
     private readonly registry: SessionRegistry,
-    private readonly options: AgentBackendOptions = {},
-  ) {}
+    options: AgentBackendOptions = {},
+  ) {
+    this.options = {
+      ...options,
+      acpHostBridge: options.acpHostBridge ?? new RuntimeAcpHostBridge(),
+    };
+  }
 
   get(sessionId: string): ExecutionHandle | undefined {
     return this.handles.get(sessionId);
@@ -270,6 +278,7 @@ export class AgentBackendManager {
       turn.sessionInstructions ?? session.instructions,
       turn.instructions,
     );
+    const acpHost = this.buildAcpHostBinding(sessionId, session, instance, turn);
 
     for await (const event of adapter.invoke({
       sessionId,
@@ -285,6 +294,7 @@ export class AgentBackendManager {
       sessionKey,
       providerSessionId: session.providerSessionId,
       sessionState: session.providerState,
+      ...(acpHost ? { acpHost } : {}),
       signal,
     })) {
       if (event.providerSessionId || event.sessionId) {
@@ -305,6 +315,35 @@ export class AgentBackendManager {
 
   private buildAdapter(instance: RemoteProviderInstanceConfig): AgentAdapter {
     return buildAgentAdapter(instance, this.options);
+  }
+
+  private buildAcpHostBinding(
+    sessionId: string,
+    session: NonNullable<ReturnType<SessionRegistry['get']>>,
+    instance: RemoteProviderInstanceConfig,
+    turn: TurnInput,
+  ): AgentAcpHostBinding | undefined {
+    const bridge = this.options.acpHostBridge;
+    if (!bridge) {
+      return undefined;
+    }
+
+    return {
+      bridge,
+      context: {
+        sessionId,
+        providerName: session.providerName,
+        providerInstanceId: session.providerInstanceId || instance.id,
+        cwd: session.workspace.runtimeCwd || session.cwd,
+        workspace: session.workspace,
+        workspaceMode: session.workspaceMode,
+        permissionMode: session.permissionMode,
+        allowedTools: session.allowedTools ? [...session.allowedTools] : undefined,
+        toolProfile: instance.toolProfile,
+        outputDir: turn.outputDir || session.outputDir,
+        context: turn.context || session.context,
+      },
+    };
   }
 
   private async cancelRemoteSession(

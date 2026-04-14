@@ -21,6 +21,7 @@ function resolveEndpoint(
 function buildInspection(
   instance: RemoteProviderInstanceConfig,
   env: NodeJS.ProcessEnv,
+  hostBridgeConfigured: boolean,
 ): AgentAdapterInspection {
   const endpoint = resolveEndpoint(instance, env);
   const command = instance.command?.trim() || undefined;
@@ -39,9 +40,12 @@ function buildInspection(
     || (instance.headers && Object.keys(instance.headers).some((key) =>
       key.toLowerCase() === 'authorization')),
   );
+  const hostBridgeSummary = hostBridgeConfigured
+    ? 'A runtime ACP host-capability bridge is configured for filesystem, terminal, and tool-policy mediation, but ACP session execution is not enabled yet.'
+    : 'It will require a runtime ACP host-capability bridge before turn execution is enabled.';
   const summary = command
-    ? `ACP target '${instance.providerName}/${instance.id}' is configured as a provider-managed stdio agent command and will require a runtime ACP host-capability bridge before turn execution is enabled.`
-    : `ACP target '${instance.providerName}/${instance.id}' is configured as a provider-managed ACP transport and will require a runtime ACP host-capability bridge before turn execution is enabled.`;
+    ? `ACP target '${instance.providerName}/${instance.id}' is configured as a provider-managed stdio agent command. ${hostBridgeSummary}`
+    : `ACP target '${instance.providerName}/${instance.id}' is configured as a provider-managed ACP transport. ${hostBridgeSummary}`;
 
   return {
     adapter: 'acp',
@@ -91,7 +95,7 @@ function buildInspection(
       toolCatalog: false,
       effectiveToolCatalog: false,
       cancel: false,
-      runtimeServices: false,
+      runtimeServices: hostBridgeConfigured,
       toolCallEvents: false,
     },
   };
@@ -103,13 +107,25 @@ export class AcpAdapter implements AgentAdapter {
   constructor(private readonly options: AgentBackendOptions = {}) {}
 
   async *invoke(_input: AgentInvokeInput): AsyncGenerator<StreamEvent> {
+    if (!_input.acpHost) {
+      throw new Error(
+        'ACP agent transport is configured but no runtime ACP host-capability bridge '
+        + 'is attached. Continue with PLAN-032 Phase 2 before enabling turn execution.',
+      );
+    }
+
     throw new Error(
-      'ACP agent transport is configured but turn execution is not implemented yet. '
-      + 'Start with PLAN-032 Phase 2 to add the ACP host-capability bridge.',
+      'ACP agent transport is configured and the runtime ACP host-capability bridge is available, '
+      + 'but session lifecycle execution is not implemented yet. Continue with PLAN-032 Phase 3 '
+      + 'to pilot a concrete ACP provider target.',
     );
   }
 
   inspect(instance: RemoteProviderInstanceConfig): AgentAdapterInspection {
-    return buildInspection(instance, this.options.env || process.env);
+    return buildInspection(
+      instance,
+      this.options.env || process.env,
+      Boolean(this.options.acpHostBridge),
+    );
   }
 }

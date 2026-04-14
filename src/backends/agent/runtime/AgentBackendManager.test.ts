@@ -231,4 +231,82 @@ describe('AgentBackendManager', () => {
       ],
     });
   });
+
+  it('passes runtime ACP host context into adapter invocation when the bridge is available', async () => {
+    const registry = new SessionRegistry();
+    const session = registry.create({
+      id: 'agent-acp-session',
+      providerName: 'codex',
+      providerBackend: 'agent',
+      providerInstanceId: 'acp-local',
+      cwd: '/repo',
+      workspaceMode: 'shared',
+      permissionMode: 'whitelist',
+      allowedTools: ['read_file'],
+    });
+
+    let capturedAcpHost: NonNullable<Parameters<AgentAdapter['invoke']>[0]['acpHost']> | undefined;
+    const adapter: AgentAdapter = {
+      kind: 'acp',
+      async *invoke(input) {
+        capturedAcpHost = input.acpHost;
+        yield { type: 'result', sessionId: input.providerSessionId ?? input.sessionId };
+      },
+    };
+    vi.mocked(buildAgentAdapter).mockReturnValue(adapter);
+
+    const manager = new AgentBackendManager(
+      { sessionBaseDir: '/tmp/cats-runtime-tests' },
+      registry,
+    );
+
+    const target: ProviderTargetDescriptor = {
+      providerName: 'codex',
+      backend: 'agent',
+      instanceId: 'acp-local',
+      defaultTarget: true,
+      remoteInstance: {
+        id: 'acp-local',
+        providerName: 'codex',
+        backend: 'agent',
+        transport: 'acp_stdio',
+        toolProfile: 'extended',
+        model: 'gpt-5.4',
+      },
+    };
+
+    const handle = manager.spawn(session.id, target);
+    const events = await collectEvents(handle.streamMessage({
+      message: 'hello',
+    }));
+
+    expect(events).toEqual([
+      { type: 'result', sessionId: 'agent-acp-session' },
+    ]);
+    expect(capturedAcpHost).toBeDefined();
+    expect(capturedAcpHost?.context).toEqual(expect.objectContaining({
+      sessionId: 'agent-acp-session',
+      providerName: 'codex',
+      providerInstanceId: 'acp-local',
+      cwd: '/repo',
+      workspaceMode: 'shared',
+      permissionMode: 'whitelist',
+      allowedTools: ['read_file'],
+      toolProfile: 'extended',
+      workspace: expect.objectContaining({
+        kind: 'source',
+        access: 'read_write',
+        runtimeCwd: '/repo',
+      }),
+    }));
+    expect(capturedAcpHost?.bridge.describe(capturedAcpHost.context)).toEqual(
+      expect.objectContaining({
+        toolPolicy: expect.objectContaining({
+          permissionMode: 'whitelist',
+          whitelistActive: true,
+          allowedTools: ['read_file'],
+        }),
+      }),
+    );
+  });
 });

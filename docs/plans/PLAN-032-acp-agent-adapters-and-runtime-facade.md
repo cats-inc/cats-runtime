@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Phase 1 ACP Transport Slot Skeleton Landed) |
+| **Status** | In Progress (Phase 2 ACP Host Bridge Slice Landed) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -97,7 +97,7 @@ This plan stages both directions deliberately so the runtime can:
 
 ### Phase 2: Provider-side ACP Capability Bridge
 
-- [ ] Define the minimal runtime-owned host capability surface the ACP adapter
+- [x] Define the minimal runtime-owned host capability surface the ACP adapter
       can call into
 - [ ] Map ACP permission requests onto runtime approval/guardrail policy
 - [ ] Map ACP file access onto runtime workspace/worktree rules
@@ -210,3 +210,4 @@ Current rationale for preferring `codex-acp` first:
 |------|--------|
 | 2026-04-15 | Draft plan created to stage ACP under `agent` while reserving a separate runtime-owned ACP facade and documenting ACP + A2A complementarity |
 | 2026-04-15 | Phase 1 skeleton landed with `agent/acp` transport recognition, ACP launch config fields, truthful inspection, and focused coverage; execution remains a Phase 2 follow-up |
+| 2026-04-15 | Phase 2 host-bridge slice landed with a runtime-owned ACP host bridge contract backed by runtime tool policy, `LocalToolRuntime`, and session workspace/permission context; ACP transport lifecycle execution remains Phase 3 work |
