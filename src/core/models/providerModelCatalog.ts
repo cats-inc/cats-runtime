@@ -51,6 +51,8 @@ import {
   findCuratedCliCatalog,
   loadCuratedModelCatalog,
   resolveCuratedCatalogScope,
+  type CuratedModelCatalogEntry,
+  type CuratedModelCatalogModel,
 } from './curatedModelCatalog.js';
 import {
   describeCuratedModelLabel,
@@ -607,6 +609,27 @@ function supportsCuratedStaticCliCatalog(providerName: string): boolean {
     || providerName === 'cursor';
 }
 
+function flattenCuratedCatalogProviderModels(
+  catalog: CuratedModelCatalogEntry,
+): CuratedModelCatalogModel[] {
+  return (catalog.providers || []).flatMap((provider) => provider.models);
+}
+
+function resolveCuratedStaticCliModels(
+  catalog: CuratedModelCatalogEntry,
+  providerName: string,
+): CuratedModelCatalogModel[] {
+  if (catalog.models) {
+    return catalog.models;
+  }
+
+  if (providerName === 'cursor' || providerName === 'copilot') {
+    return flattenCuratedCatalogProviderModels(catalog);
+  }
+
+  return resolveCuratedCatalogScope(catalog, providerName)?.models ?? [];
+}
+
 function buildCuratedStaticCliModels(
   target: ProviderTargetDescriptor,
   config: Pick<CliRuntimeConfig, 'configPath'>,
@@ -631,11 +654,7 @@ function buildCuratedStaticCliModels(
     return null;
   }
 
-  const models = (
-    target.providerName === 'cursor'
-      ? (catalog.models ?? catalog.providers?.flatMap((provider) => provider.models) ?? [])
-      : (resolveCuratedCatalogScope(catalog, target.providerName)?.models ?? [])
-  ).flatMap((model) => {
+  const models = resolveCuratedStaticCliModels(catalog, target.providerName).flatMap((model) => {
     const id = normalizeCuratedModelId(target.providerName, model);
     if (!id) {
       warnings.push(

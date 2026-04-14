@@ -224,81 +224,91 @@ catalogs:
     last_updated: 2026-04-14
     notes:
       - "Source: Copilot model picker output supplied by user"
-      - "Reasoning options below preserve the picker-visible labels only."
-    shared_options:
-      - name: Reasoning Level
-        values:
-          - name: Low
-            notes:
-              - "Faster responses, less detailed reasoning"
-          - name: Medium
-            notes:
-              - "Balanced speed and reasoning depth"
-          - name: High
-            notes:
-              - "More thorough reasoning, slower responses"
-          - name: Extra High
-            notes:
-              - "Maximum reasoning depth, slowest responses"
-        default: Medium
-    models:
-      - name: GPT-5.4
-        default: true
-
-      - name: GPT-5.3-Codex
-
-      - name: GPT-5.2-Codex
-        options:
+    providers:
+      - name: OpenAI
+        shared_options:
           - name: Reasoning Level
-            values: [Low, Medium, High, Extra High]
-            default: High
-
-      - name: GPT-5.2
-        options:
-          - name: Reasoning Level
-            values: [Low, Medium, High]
+            values:
+              - name: Low
+                notes:
+                  - "Faster responses, less detailed reasoning"
+              - name: Medium
+                notes:
+                  - "Balanced speed and reasoning depth"
+              - name: High
+                notes:
+                  - "More thorough reasoning, slower responses"
+              - name: Extra High
+                notes:
+                  - "Maximum reasoning depth, slowest responses"
             default: Medium
+        models:
+          - name: GPT-5.4
+            default: true
 
-      - name: GPT-5.1
-        options:
+          - name: GPT-5.3-Codex
+
+          - name: GPT-5.2-Codex
+            options:
+              - name: Reasoning Level
+                default: High
+
+          - name: GPT-5.2
+            options:
+              - name: Reasoning Level
+                values: [Low, Medium, High]
+                default: Medium
+
+          - name: GPT-5.1
+            options:
+              - name: Reasoning Level
+                values: [Low, Medium, High]
+                default: Medium
+
+          - name: GPT-5.4 mini
+
+          - name: GPT-5 mini
+            options:
+              - name: Reasoning Level
+                values: [Low, Medium, High]
+                default: Medium
+
+          - name: GPT-4.1
+            options: []
+
+      - name: Anthropic
+        shared_options:
           - name: Reasoning Level
-            values: [Low, Medium, High]
+            values:
+              - name: Low
+                notes:
+                  - "Minimal thinking, prioritizes speed"
+              - name: Medium
+                notes:
+                  - "Balanced, thinks on harder problems"
+              - name: High
+                notes:
+                  - "Optimal performance, thorough thinking"
             default: Medium
+        models:
+          - name: Claude Sonnet 4.6
 
-      - name: GPT-5.4 mini
+          - name: Claude Sonnet 4.5
+            options: []
 
-      - name: GPT-5 mini
-        options:
-          - name: Reasoning Level
-            values: [Low, Medium, High]
-            default: Medium
+          - name: Claude Haiku 4.5
+            options: []
 
-      - name: GPT-4.1
-        options: []
+          - name: Claude Opus 4.6
+            options:
+              - name: Reasoning Level
+                default: High
 
-      - name: Claude Sonnet 4.6
-        options:
-          - name: Reasoning Level
-            values: [Low, Medium, High]
-            default: Medium
+          - name: Claude Opus 4.5
+            options: []
 
-      - name: Claude Sonnet 4.5
-        options: []
-
-      - name: Claude Haiku 4.5
-        options: []
-
-      - name: Claude Opus 4.6
-        options:
-          - name: Reasoning Level
-            values: [Low, Medium, High]
-            default: High
-
-      - name: Claude Opus 4.5
-        options: []
-
-      - name: Claude Sonnet 4
-        options: []
+          - name: Claude Sonnet 4
+            options: []
 
   - cli: Kilo
     version: v7.2.0

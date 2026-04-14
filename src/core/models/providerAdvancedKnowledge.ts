@@ -19,6 +19,7 @@ import {
   loadCuratedModelCatalog,
   resolveCuratedCatalogScope,
   resolveEffectiveCuratedModelOptions,
+  type CuratedModelCatalogEntry,
   type CuratedModelCatalogDocument,
   type CuratedModelCatalogModel,
   type CuratedModelCatalogOption,
@@ -535,6 +536,12 @@ function buildCuratedGeminiCliOverlay(
   return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeLiteralCuratedModelId);
 }
 
+function flattenCuratedCatalogProviderModels(
+  catalog: CuratedModelCatalogEntry,
+): CuratedModelCatalogModel[] {
+  return (catalog.providers || []).flatMap((provider) => provider.models);
+}
+
 function buildCuratedKiloCliOverlay(
   document: CuratedModelCatalogDocument | undefined,
 ): CuratedCatalogOverlay | null {
@@ -559,12 +566,8 @@ function buildCuratedCopilotCliOverlay(
     return null;
   }
 
-  const scope = resolveCuratedCatalogScope(catalog, 'copilot');
-  if (!scope) {
-    return null;
-  }
-
-  return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeCopilotCuratedModelId);
+  const models = catalog.models ?? flattenCuratedCatalogProviderModels(catalog);
+  return buildCuratedEntryOnlyOverlay(catalog.cli, models, normalizeCopilotCuratedModelId);
 }
 
 function buildCuratedCursorCliOverlay(
@@ -579,7 +582,7 @@ function buildCuratedCursorCliOverlay(
     return buildCuratedEntryOnlyOverlay(catalog.cli, catalog.models, normalizeCursorCuratedModelId);
   }
 
-  const providerModels = (catalog.providers || []).flatMap((provider) => provider.models);
+  const providerModels = flattenCuratedCatalogProviderModels(catalog);
   return buildCuratedEntryOnlyOverlay(catalog.cli, providerModels, normalizeCursorCuratedModelId);
 }
 

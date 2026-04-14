@@ -481,6 +481,87 @@ describe('buildProviderAdvancedKnowledge', () => {
     }
   });
 
+  it('normalizes curated Copilot grouped providers into advanced catalog entries', () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-curated-copilot-'));
+    const curatedPath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');
+    mkdirSync(join(runtimeRoot, 'config'), { recursive: true });
+    writeFileSync(curatedPath, [
+      'schema_version: 1',
+      'catalogs:',
+      '  - cli: Copilot',
+      '    last_updated: 2026-04-15',
+      '    providers:',
+      '      - name: OpenAI',
+      '        models:',
+      '          - name: GPT-5.4',
+      '            default: true',
+      '          - name: GPT-5.4 mini',
+      '      - name: Anthropic',
+      '        models:',
+      '          - name: Claude Opus 4.6',
+      '',
+    ].join('\n'), 'utf8');
+
+    try {
+      const target: ProviderTargetDescriptor = {
+        providerName: 'copilot',
+        backend: 'cli',
+        instanceId: 'default',
+        defaultTarget: true,
+        cliInstance: {
+          id: 'default',
+          providerName: 'copilot',
+          backend: 'cli',
+          command: 'copilot',
+        },
+      };
+
+      const knowledge = buildProviderAdvancedKnowledge(target, createCatalog({
+        provider: 'copilot',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt-5.4',
+        models: [
+          { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
+          { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini' },
+          { id: 'claude-opus-4.6', label: 'claude-opus-4.6' },
+        ],
+      }), {
+        env: {
+          ...process.env,
+          CATS_RUNTIME_DIR: runtimeRoot,
+        },
+      });
+
+      expect(knowledge.supportTier).toBe('entry_only');
+      expect(knowledge.catalog.entries).toEqual([
+        {
+          id: 'gpt-5.4',
+          label: 'GPT-5.4',
+          default: true,
+          capabilityTags: ['reasoning'],
+        },
+        {
+          id: 'gpt-5.4-mini',
+          label: 'GPT-5.4 mini',
+          default: false,
+          capabilityTags: ['reasoning', 'latency_optimized'],
+        },
+        {
+          id: 'claude-opus-4.6',
+          label: 'Claude Opus 4.6',
+          default: false,
+          capabilityTags: ['reasoning'],
+        },
+      ]);
+      expect(knowledge.catalog.controls).toEqual([]);
+      expect(knowledge.catalog.defaultSelection).toBeNull();
+      expect(knowledge.catalog.warnings).toEqual([]);
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
   it('normalizes curated Kilo raw labels into advanced catalog entries', () => {
     const runtimeRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-curated-kilo-'));
     const curatedPath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');
