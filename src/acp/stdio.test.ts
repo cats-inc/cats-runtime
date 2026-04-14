@@ -315,6 +315,12 @@ describe('ACP stdio transport', () => {
           toolArgs: { command: 'pwd' },
         };
         yield {
+          type: 'progress',
+          text: 'pwd is still running...',
+          toolId: 'shell-1',
+          toolName: 'run_shell',
+        };
+        yield {
           type: 'tool_result',
           toolId: 'shell-1',
           toolName: 'run_shell',
@@ -410,7 +416,7 @@ describe('ACP stdio transport', () => {
     }));
 
     await vi.waitFor(() => {
-      expect(decodeMessages(Buffer.concat(chunks))).toHaveLength(7);
+      expect(decodeMessages(Buffer.concat(chunks))).toHaveLength(8);
     });
 
     const promptMessages = decodeMessages(Buffer.concat(chunks)).slice(2) as Array<Record<string, unknown>>;
@@ -443,6 +449,27 @@ describe('ACP stdio transport', () => {
             rawInput: {
               command: 'pwd',
             },
+          },
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: 'tool_call_update',
+            toolCallId: 'shell-1',
+            status: 'in_progress',
+            content: [
+              {
+                type: 'content',
+                content: {
+                  type: 'text',
+                  text: 'pwd is still running...',
+                },
+              },
+            ],
           },
         },
       },

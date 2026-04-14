@@ -26,6 +26,7 @@ interface RuntimeAcpPromptProjectionState {
   nextSyntheticToolId: number;
   lastToolId: string | null;
   toolIdsByName: Map<string, string>;
+  publishedToolIds: Set<string>;
 }
 
 class AcpFacadeError extends Error {
@@ -433,6 +434,7 @@ function createPromptProjectionState(): RuntimeAcpPromptProjectionState {
     nextSyntheticToolId: 1,
     lastToolId: null,
     toolIdsByName: new Map(),
+    publishedToolIds: new Set(),
   };
 }
 
@@ -519,6 +521,34 @@ function resolveProjectedToolId(
   return state.lastToolId ?? undefined;
 }
 
+function buildToolCallAnnouncement(
+  toolId: string | undefined,
+  toolName: string | undefined,
+  state: RuntimeAcpPromptProjectionState,
+  options: {
+    rawInput?: Record<string, unknown>;
+    text?: string;
+  } = {},
+): Array<Record<string, unknown>> {
+  if (!toolId || state.publishedToolIds.has(toolId)) {
+    return [];
+  }
+
+  state.publishedToolIds.add(toolId);
+  return [{
+    sessionId: '',
+    update: {
+      sessionUpdate: 'tool_call',
+      toolCallId: toolId,
+      title: toolName?.trim() || 'Tool',
+      kind: toolName?.trim() || 'other',
+      status: 'pending',
+      ...(options.rawInput ? { rawInput: options.rawInput } : {}),
+      ...(options.text ? { content: buildToolResultContent(options.text) } : {}),
+    },
+  }];
+}
+
 function mapRuntimeEventToAcpUpdates(
   event: unknown,
   state: RuntimeAcpPromptProjectionState,
@@ -571,35 +601,52 @@ function mapRuntimeEventToAcpUpdates(
     }];
   }
 
+  if (
+    eventType === 'progress'
+    && typeof streamEvent.text === 'string'
+    && streamEvent.text.length > 0
+    && (streamEvent.toolId?.trim() || streamEvent.toolName?.trim())
+  ) {
+    const toolId = resolveProjectedToolId(streamEvent, state);
+    const toolName = streamEvent.toolName?.trim();
+    return [
+      ...buildToolCallAnnouncement(toolId, toolName, state),
+      {
+        sessionId: '',
+        update: {
+          sessionUpdate: 'tool_call_update',
+          ...(toolId ? { toolCallId: toolId } : {}),
+          status: 'in_progress',
+          content: buildToolResultContent(streamEvent.text),
+        },
+      },
+    ];
+  }
+
   if (eventType === 'tool_use') {
     const toolUseEvent = streamEvent as Extract<StreamEvent, { type: 'tool_use' }>;
     const toolId = resolveProjectedToolId(toolUseEvent, state);
-    return [{
-      sessionId: '',
-      update: {
-        sessionUpdate: 'tool_call',
-        ...(toolId ? { toolCallId: toolId } : {}),
-        title: toolUseEvent.toolName?.trim() || 'Tool',
-        kind: toolUseEvent.toolName?.trim() || 'other',
-        status: 'pending',
-        ...(toolUseEvent.toolArgs ? { rawInput: toolUseEvent.toolArgs } : {}),
-        ...(toolUseEvent.text ? { content: buildToolResultContent(toolUseEvent.text) } : {}),
-      },
-    }];
+    return buildToolCallAnnouncement(toolId, toolUseEvent.toolName, state, {
+      ...(toolUseEvent.toolArgs ? { rawInput: toolUseEvent.toolArgs } : {}),
+      ...(toolUseEvent.text ? { text: toolUseEvent.text } : {}),
+    });
   }
 
   if (eventType === 'tool_result') {
     const toolResultEvent = streamEvent as Extract<StreamEvent, { type: 'tool_result' }>;
     const toolId = resolveProjectedToolId(toolResultEvent, state);
-    return [{
-      sessionId: '',
-      update: {
-        sessionUpdate: 'tool_call_update',
-        ...(toolId ? { toolCallId: toolId } : {}),
-        status: toolResultEvent.isError ? 'failed' : 'completed',
-        ...(toolResultEvent.text ? { content: buildToolResultContent(toolResultEvent.text) } : {}),
+    return [
+      ...buildToolCallAnnouncement(toolId, toolResultEvent.toolName, state),
+      {
+        sessionId: '',
+        update: {
+          sessionUpdate: 'tool_call_update',
+          ...(toolId ? { toolCallId: toolId } : {}),
+          status: toolResultEvent.isError ? 'failed' : 'completed',
+          ...(toolResultEvent.text ? { content: buildToolResultContent(toolResultEvent.text) } : {}),
+        },
       },
-    }];
+    ];
   }
 
   return [];
