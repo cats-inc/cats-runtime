@@ -1,11 +1,50 @@
+import { EventEmitter } from 'node:events';
+import { createInterface } from 'node:readline';
+import { PassThrough } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
 import type {
   AgentAcpHostBridge,
   AgentAcpHostContext,
   AgentCliCommandRunner,
+  AgentProcessSpawner,
+  AgentSpawnedProcess,
 } from '../../types.js';
+import type { StreamEvent } from '../../../../core/types.js';
 import { AcpAdapter } from './AcpAdapter.js';
+
+class FakeAcpProcess extends EventEmitter implements AgentSpawnedProcess {
+  readonly stdin = new PassThrough();
+  readonly stdout = new PassThrough();
+  readonly stderr = new PassThrough();
+  exitCode: number | null = null;
+  killed = false;
+
+  kill(): boolean {
+    this.killed = true;
+    this.exitCode = 0;
+    this.emit('close', 0, null);
+    return true;
+  }
+}
+
+async function collectEvents(stream: AsyncGenerator<StreamEvent>): Promise<StreamEvent[]> {
+  const events: StreamEvent[] = [];
+  for await (const event of stream) {
+    events.push(event);
+  }
+  return events;
+}
+
+function startFakeServer(
+  process: FakeAcpProcess,
+  onMessage: (message: Record<string, unknown>) => void | Promise<void>,
+): void {
+  const rl = createInterface({ input: process.stdin });
+  rl.on('line', (line) => {
+    void onMessage(JSON.parse(line) as Record<string, unknown>);
+  });
+}
 
 function createHttpInstance(): RemoteProviderInstanceConfig {
   return {
@@ -37,7 +76,7 @@ function createStdioInstance(): RemoteProviderInstanceConfig {
   };
 }
 
-function createHostBridge(): AgentAcpHostBridge {
+function createHostBridge(permissionMode: 'skip' | 'default' | 'whitelist' = 'skip'): AgentAcpHostBridge {
   return {
     describe(_context: AgentAcpHostContext) {
       return {
@@ -49,8 +88,8 @@ function createHostBridge(): AgentAcpHostBridge {
         },
         toolPolicy: {
           profile: 'standard',
-          permissionMode: 'skip',
-          whitelistActive: false,
+          permissionMode,
+          whitelistActive: permissionMode === 'whitelist',
           fullAccessTools: ['read_file'],
           previewOnlyTools: [],
           blockedTools: [],
@@ -67,6 +106,7 @@ function createHostBridge(): AgentAcpHostBridge {
             readOnlyCompatible: true,
             mutating: false,
           }],
+          ...(permissionMode === 'whitelist' ? { allowedTools: ['read_file'] } : {}),
         },
         capabilities: {
           permissionPolicy: true,
@@ -108,6 +148,43 @@ function createFailedProbeRunner(): AgentCliCommandRunner {
     timedOut: false,
     durationMs: 17,
   });
+}
+
+function createSpawner(process: FakeAcpProcess): AgentProcessSpawner {
+  return () => process;
+}
+
+function createInvokeInput(
+  instance: RemoteProviderInstanceConfig,
+  hostBridge: AgentAcpHostBridge,
+  permissionMode: 'skip' | 'default' | 'whitelist' = 'skip',
+) {
+  return {
+    sessionId: 'session-1',
+    providerName: 'codex',
+    instance,
+    turn: {
+      message: 'hello from cats-runtime',
+      instructions: 'Follow runtime instructions.',
+    },
+    sessionKey: 'session-key-1',
+    acpHost: {
+      bridge: hostBridge,
+      context: {
+        sessionId: 'session-1',
+        providerName: 'codex',
+        providerInstanceId: instance.id,
+        cwd: '/tmp/acp',
+        workspace: {
+          kind: 'source' as const,
+          access: 'read_write' as const,
+          runtimeCwd: '/tmp/acp',
+        },
+        permissionMode,
+      },
+    },
+    signal: new AbortController().signal,
+  };
 }
 
 describe('AcpAdapter', () => {
@@ -161,7 +238,7 @@ describe('AcpAdapter', () => {
     });
   });
 
-  it('describes stdio ACP targets with launch metadata and no transport auth mechanism', () => {
+  it('describes stdio ACP targets with launch metadata and tool-call event support', () => {
     const adapter = new AcpAdapter();
 
     const inspection = adapter.inspect(createStdioInstance());
@@ -205,7 +282,7 @@ describe('AcpAdapter', () => {
         effectiveToolCatalog: false,
         cancel: false,
         runtimeServices: false,
-        toolCallEvents: false,
+        toolCallEvents: true,
       },
     });
   });
@@ -313,19 +390,18 @@ describe('AcpAdapter', () => {
 
     const inspection = adapter.inspect(createHttpInstance());
 
-    expect(inspection.summary).toContain('host-capability bridge is configured');
+    expect(inspection.summary).toContain('provider-managed ACP transport');
     expect(inspection.capabilities.runtimeServices).toBe(true);
   });
 
-  it('throws an explicit Phase 2 follow-up error when invoke is used before execution exists', async () => {
+  it('throws when invoke is used without a runtime ACP host bridge binding', async () => {
     const adapter = new AcpAdapter();
-
     const iterator = adapter.invoke({
       sessionId: 'session-1',
       providerName: 'codex',
       instance: createStdioInstance(),
       turn: {
-        messages: [],
+        message: 'hello',
       },
       sessionKey: 'session-key-1',
       signal: new AbortController().signal,
@@ -336,38 +412,337 @@ describe('AcpAdapter', () => {
     );
   });
 
-  it('throws a Phase 3 follow-up error once the ACP host bridge is attached', async () => {
-    const adapter = new AcpAdapter({
-      acpHostBridge: createHostBridge(),
+  it('boots a new ACP session and emits prompt-turn text plus a final result', async () => {
+    const process = new FakeAcpProcess();
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: true,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'acp-session-1',
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/prompt') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-session-1',
+            update: {
+              sessionUpdate: 'agent_message_chunk',
+              content: 'hello from codex-acp',
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            stopReason: 'end_turn',
+          },
+        }) + '\n');
+      }
     });
 
-    const iterator = adapter.invoke({
-      sessionId: 'session-1',
-      providerName: 'codex',
-      instance: createStdioInstance(),
-      turn: {
-        messages: [],
+    const adapter = new AcpAdapter({
+      acpHostBridge: createHostBridge(),
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    const events = await collectEvents(adapter.invoke(
+      createInvokeInput(createStdioInstance(), createHostBridge()),
+    ));
+
+    expect(events).toEqual([
+      {
+        type: 'init',
+        providerSessionId: 'acp-session-1',
+        providerState: expect.objectContaining({
+          agentSession: expect.objectContaining({
+            providerSessionId: 'acp-session-1',
+            status: 'active',
+            adapterState: expect.objectContaining({
+              acpProfile: 'codex-acp',
+              loadSessionSupported: true,
+              protocolVersion: 1,
+            }),
+          }),
+        }),
       },
-      sessionKey: 'session-key-1',
-      acpHost: {
-        bridge: createHostBridge(),
-        context: {
-          sessionId: 'session-1',
-          providerName: 'codex',
-          providerInstanceId: 'acp-local',
-          cwd: '/tmp/acp',
-          workspace: {
-            kind: 'source',
-            access: 'read_write',
-            runtimeCwd: '/tmp/acp',
+      {
+        type: 'text',
+        providerSessionId: 'acp-session-1',
+        text: 'hello from codex-acp',
+      },
+      {
+        type: 'result',
+        providerSessionId: 'acp-session-1',
+        summary: 'ACP stop reason: end_turn',
+        providerState: expect.objectContaining({
+          agentSession: expect.objectContaining({
+            providerSessionId: 'acp-session-1',
+            status: 'idle',
+            adapterState: expect.objectContaining({
+              stopReason: 'end_turn',
+            }),
+          }),
+        }),
+        metadata: {
+          stopReason: 'end_turn',
+        },
+      },
+    ]);
+  });
+
+  it('uses session/load for continuity and suppresses replay updates during bootstrap', async () => {
+    const process = new FakeAcpProcess();
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: true,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/load') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-session-restore',
+            update: {
+              sessionUpdate: 'agent_message_chunk',
+              content: 'old replay that should stay internal',
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            restored: true,
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/prompt') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-session-restore',
+            update: {
+              sessionUpdate: 'agent_message_chunk',
+              content: 'fresh prompt output',
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            stopReason: 'end_turn',
+          },
+        }) + '\n');
+      }
+    });
+
+    const adapter = new AcpAdapter({
+      acpHostBridge: createHostBridge(),
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    const input = createInvokeInput(createStdioInstance(), createHostBridge());
+    const events = await collectEvents(adapter.invoke({
+      ...input,
+      providerSessionId: 'acp-session-restore',
+      sessionState: {
+        agentSession: {
+          providerSessionId: 'acp-session-restore',
+          adapterState: {
+            acpProfile: 'codex-acp',
           },
         },
       },
-      signal: new AbortController().signal,
+    }));
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'init',
+        providerSessionId: 'acp-session-restore',
+      }),
+      {
+        type: 'text',
+        providerSessionId: 'acp-session-restore',
+        text: 'fresh prompt output',
+      },
+      expect.objectContaining({
+        type: 'result',
+        providerSessionId: 'acp-session-restore',
+      }),
+    ]);
+  });
+
+  it('answers ACP permission requests using the runtime permission mode mapping', async () => {
+    const process = new FakeAcpProcess();
+    let permissionReply: Record<string, unknown> | undefined;
+
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: false,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'acp-session-2',
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/prompt') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 77,
+          method: 'session/request_permission',
+          params: {
+            sessionId: 'acp-session-2',
+            options: [
+              { optionId: 'allow-once', kind: 'allow_once' },
+              { optionId: 'reject-once', kind: 'reject_once' },
+            ],
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.id === 77) {
+        permissionReply = message;
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-session-2',
+            update: {
+              sessionUpdate: 'tool_call',
+              toolCall: {
+                toolCallId: 'tool-1',
+                title: 'Run Shell',
+              },
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-session-2',
+            update: {
+              sessionUpdate: 'tool_call_update',
+              toolCallUpdate: {
+                toolCallId: 'tool-1',
+                fields: {
+                  status: 'completed',
+                  content: [
+                    { text: 'shell finished' },
+                  ],
+                },
+              },
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 2,
+          result: {
+            stopReason: 'end_turn',
+          },
+        }) + '\n');
+      }
     });
 
-    await expect(iterator.next()).rejects.toThrow(
-      /PLAN-032 Phase 3/,
-    );
+    const hostBridge = createHostBridge('skip');
+    const adapter = new AcpAdapter({
+      acpHostBridge: hostBridge,
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    const events = await collectEvents(adapter.invoke(
+      createInvokeInput(createStdioInstance(), hostBridge, 'skip'),
+    ));
+
+    expect(permissionReply).toEqual({
+      jsonrpc: '2.0',
+      id: 77,
+      result: {
+        outcome: {
+          outcome: 'selected',
+          optionId: 'allow-once',
+        },
+      },
+    });
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'init',
+        providerSessionId: 'acp-session-2',
+      }),
+      {
+        type: 'tool_use',
+        providerSessionId: 'acp-session-2',
+        toolName: 'Run Shell',
+        toolId: 'tool-1',
+        providerState: expect.any(Object),
+      },
+      {
+        type: 'tool_result',
+        providerSessionId: 'acp-session-2',
+        toolId: 'tool-1',
+        text: 'shell finished',
+        providerState: expect.any(Object),
+      },
+      expect.objectContaining({
+        type: 'result',
+        providerSessionId: 'acp-session-2',
+      }),
+    ]);
   });
 });

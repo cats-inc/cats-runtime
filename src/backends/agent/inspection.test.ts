@@ -169,7 +169,7 @@ describe('inspectAgentTarget', () => {
         effectiveToolCatalog: false,
         cancel: false,
         runtimeServices: false,
-        toolCallEvents: false,
+        toolCallEvents: true,
       },
     });
   });

@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createInterface, type Interface as ReadLineInterface } from 'node:readline';
-import type { Readable, Writable } from 'node:stream';
 import { hiddenWindowsSpawnOptions } from '../../../../core/process/windowsSpawn.js';
+import type { AgentProcessSpawner, AgentSpawnedProcess } from '../../types.js';
 
 export interface AcpJsonRpcErrorPayload {
   code: number;
@@ -39,32 +39,12 @@ export interface AcpSpawnProcessOptions {
   env?: Record<string, string>;
 }
 
-export interface AcpSpawnedProcess {
-  stdin?: Writable | null;
-  stdout?: Readable | null;
-  stderr?: Readable | null;
-  exitCode?: number | null;
-  killed?: boolean;
-  kill(signal?: NodeJS.Signals | number): boolean;
-  on(event: 'error', listener: (error: Error) => void): this;
-  on(
-    event: 'close',
-    listener: (code: number | null, signal: NodeJS.Signals | null) => void,
-  ): this;
-}
-
-export type AcpProcessSpawner = (
-  command: string,
-  args: string[],
-  options: AcpSpawnProcessOptions,
-) => AcpSpawnedProcess;
-
 export interface AcpStdioClientOptions {
   command: string;
   args?: string[];
   cwd?: string;
   env?: Record<string, string>;
-  spawnProcess?: AcpProcessSpawner;
+  spawnProcess?: AgentProcessSpawner;
   onNotification?: (message: AcpJsonRpcNotification) => void | Promise<void>;
   onServerRequest?: (
     message: AcpJsonRpcRequest,
@@ -82,7 +62,7 @@ function defaultSpawnProcess(
   command: string,
   args: string[],
   options: AcpSpawnProcessOptions,
-): AcpSpawnedProcess {
+): AgentSpawnedProcess {
   return spawn(command, args, {
     cwd: options.cwd,
     env: options.env ? { ...process.env, ...options.env } : undefined,
@@ -142,7 +122,7 @@ export class AcpJsonRpcClientError extends Error {
 
 export class AcpStdioClient {
   private readonly pending = new Map<number, PendingRequest>();
-  private readonly process: AcpSpawnedProcess;
+  private readonly process: AgentSpawnedProcess;
   private readonly spawnOptions: AcpSpawnProcessOptions;
   private readonly rl: ReadLineInterface;
   private nextId = 0;
@@ -165,7 +145,9 @@ export class AcpStdioClient {
 
     this.rl = createInterface({ input: this.process.stdout });
     this.rl.on('line', (line) => {
-      void this.handleLine(line);
+      void this.handleLine(line).catch((error) => {
+        this.failAll(error instanceof Error ? error : new Error(String(error)));
+      });
     });
     this.process.stderr?.on('data', (chunk: Buffer | string) => {
       const text = chunk.toString().trim();
@@ -173,10 +155,10 @@ export class AcpStdioClient {
         this.options.onStderr?.(text);
       }
     });
-    this.process.on('error', (error) => {
+    this.process.on('error', (error: Error) => {
       this.failAll(error);
     });
-    this.process.on('close', (code, signal) => {
+    this.process.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
       if (this.closed) {
         return;
       }

@@ -5,9 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   AcpJsonRpcClientError,
   AcpStdioClient,
-  type AcpProcessSpawner,
-  type AcpSpawnedProcess,
 } from './AcpStdioClient.js';
+import type { AgentProcessSpawner, AgentSpawnedProcess } from '../../types.js';
 
 class FakeAcpProcess extends EventEmitter implements AcpSpawnedProcess {
   readonly stdin = new PassThrough();
@@ -35,7 +34,7 @@ async function readNextLine(stream: PassThrough): Promise<string> {
   }
 }
 
-function createSpawner(process: FakeAcpProcess): AcpProcessSpawner {
+function createSpawner(process: FakeAcpProcess): AgentProcessSpawner {
   return () => process;
 }
 

@@ -5,12 +5,22 @@ import type {
   AgentBackendOptions,
   AgentInvokeInput,
 } from '../../types.js';
-import type { StreamEvent } from '../../../../core/types.js';
+import type { PermissionMode, SessionProviderState, StreamEvent } from '../../../../core/types.js';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
 import { runCliCommand } from '../../../../core/management/cli.js';
+import { parseRecord, prependInstructions, readString } from '../../utils.js';
+import {
+  AcpJsonRpcClientError,
+  AcpStdioClient,
+  type AcpJsonRpcNotification,
+  type AcpJsonRpcRequest,
+} from './AcpStdioClient.js';
 import { buildAcpHelpProbeArgs, resolveAcpProviderProfile } from './profiles.js';
 
+const DEFAULT_ACP_PROTOCOL_VERSION = 1;
 const DEFAULT_ACP_STDIN_PROBE_TIMEOUT_MS = 5_000;
+
+type AcpInvokePhase = 'bootstrap' | 'prompt';
 
 function resolveEndpoint(
   instance: RemoteProviderInstanceConfig,
@@ -57,7 +67,7 @@ function buildInspection(
       key.toLowerCase() === 'authorization')),
   );
   const hostBridgeSummary = hostBridgeConfigured
-    ? 'A runtime ACP host-capability bridge is configured for filesystem, terminal, and tool-policy mediation, but ACP session execution is not enabled yet.'
+    ? 'A runtime ACP host-capability bridge is configured; the current execution slice uses runtime permission-policy mediation while fuller filesystem and terminal client capabilities remain follow-up work.'
     : 'It will require a runtime ACP host-capability bridge before turn execution is enabled.';
   const profileSummary = profile
     ? ` ${profile.label} is the current ACP pilot target because its lifecycle overlaps with an existing runtime seam.`
@@ -115,9 +125,235 @@ function buildInspection(
       effectiveToolCatalog: false,
       cancel: false,
       runtimeServices: hostBridgeConfigured,
-      toolCallEvents: false,
+      toolCallEvents: Boolean(command),
     },
   };
+}
+
+function buildProviderState(
+  input: AgentInvokeInput,
+  providerSessionId: string,
+  status: string,
+  extra: Record<string, unknown> = {},
+): SessionProviderState {
+  const existingAgentSession = input.sessionState?.agentSession;
+  const existingAdapterState = parseRecord(existingAgentSession?.adapterState) || {};
+  const profile = resolveAcpProviderProfile(input.instance);
+
+  return {
+    ...(input.sessionState || {}),
+    agentSession: {
+      providerSessionId,
+      sessionKey: input.sessionKey,
+      status,
+      summary: status === 'active'
+        ? 'ACP stdio session is actively processing a prompt.'
+        : 'ACP stdio session is idle.',
+      ...(existingAgentSession?.activity ? { activity: existingAgentSession.activity } : {}),
+      adapterState: {
+        ...existingAdapterState,
+        transport: input.instance.transport || 'acp',
+        ...(profile ? { acpProfile: profile.id } : {}),
+        ...extra,
+      },
+    },
+  };
+}
+
+function buildInitializeParams() {
+  return {
+    protocolVersion: DEFAULT_ACP_PROTOCOL_VERSION,
+    clientCapabilities: {
+      fs: {
+        readTextFile: false,
+        writeTextFile: false,
+      },
+      terminal: false,
+    },
+    clientInfo: {
+      name: 'cats-runtime',
+      title: 'cats-runtime',
+      version: '0.1.0',
+    },
+  };
+}
+
+function buildSessionBootstrapParams(input: AgentInvokeInput) {
+  const cwd = input.turn.context?.workspace?.cwd
+    || input.instance.cwd
+    || input.acpHost?.context.cwd;
+  if (!cwd) {
+    throw new Error('ACP session bootstrap requires a working directory.');
+  }
+
+  return {
+    cwd,
+    mcpServers: [],
+  };
+}
+
+function buildPromptParams(input: AgentInvokeInput, sessionId: string) {
+  return {
+    sessionId,
+    prompt: [{
+      type: 'text',
+      text: prependInstructions(input.turn.message, input.turn.instructions),
+    }],
+  };
+}
+
+function extractSessionIdFromBootstrapResult(
+  value: unknown,
+  fallback?: string,
+): string {
+  const record = parseRecord(value);
+  return readString(record?.sessionId) || fallback || '';
+}
+
+function selectPermissionOption(
+  options: unknown,
+  permissionMode: PermissionMode | undefined,
+): string | undefined {
+  if (!Array.isArray(options)) {
+    return undefined;
+  }
+
+  const records = options
+    .map((entry) => parseRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const findByKind = (...kinds: string[]) => records.find((option) =>
+    kinds.includes(readString(option.kind) || ''))
+    ;
+
+  if (permissionMode === 'skip') {
+    return readString(findByKind('allow_always', 'allow_once')?.optionId)
+      || readString(records[0]?.optionId);
+  }
+
+  return readString(findByKind('reject_once', 'reject_always')?.optionId)
+    || undefined;
+}
+
+function buildPermissionResponse(
+  request: AcpJsonRpcRequest,
+  permissionMode: PermissionMode | undefined,
+): Record<string, unknown> {
+  const params = parseRecord(request.params);
+  const selectedOptionId = selectPermissionOption(params?.options, permissionMode);
+  if (selectedOptionId) {
+    return {
+      outcome: {
+        outcome: 'selected',
+        optionId: selectedOptionId,
+      },
+    };
+  }
+
+  return {
+    outcome: {
+      outcome: 'cancelled',
+    },
+  };
+}
+
+function extractToolText(content: unknown): string | undefined {
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+
+  const lines = content.flatMap((entry) => {
+    const record = parseRecord(entry);
+    if (!record) {
+      return [];
+    }
+
+    const directText = readString(record.text);
+    if (directText) {
+      return [directText];
+    }
+
+    const nestedContent = parseRecord(record.content);
+    const nestedText = readString(nestedContent?.text);
+    if (nestedText) {
+      return [nestedText];
+    }
+
+    const resource = parseRecord(record.resource);
+    const resourceText = readString(resource?.text);
+    if (resourceText) {
+      return [resourceText];
+    }
+
+    return [];
+  });
+
+  return lines.length > 0 ? lines.join('\n') : undefined;
+}
+
+function parseSessionUpdateEvents(
+  input: AgentInvokeInput,
+  providerSessionId: string,
+  notification: AcpJsonRpcNotification,
+): StreamEvent[] {
+  const params = parseRecord(notification.params);
+  const update = parseRecord(params?.update);
+  if (!update) {
+    return [];
+  }
+
+  const updateType = readString(update.sessionUpdate);
+  if (!updateType) {
+    return [];
+  }
+
+  const providerState = buildProviderState(input, providerSessionId, 'active');
+  if (updateType === 'agent_message_chunk') {
+    const text = readString(update.content)
+      || readString(parseRecord(update.chunk)?.text)
+      || readString(parseRecord(update.delta)?.text);
+    return text
+      ? [{
+          type: 'text',
+          providerSessionId,
+          text,
+        }]
+      : [];
+  }
+
+  if (updateType === 'tool_call') {
+    const toolCall = parseRecord(update.toolCall) || update;
+    const toolName = readString(toolCall.title)
+      || readString(toolCall.kind)
+      || readString(toolCall.name);
+    const toolId = readString(toolCall.toolCallId) || readString(toolCall.id);
+    return [{
+      type: 'tool_use',
+      providerSessionId,
+      ...(toolName ? { toolName } : {}),
+      ...(toolId ? { toolId } : {}),
+      providerState,
+    }];
+  }
+
+  if (updateType === 'tool_call_update') {
+    const toolCallUpdate = parseRecord(update.toolCallUpdate) || update;
+    const toolId = readString(toolCallUpdate.toolCallId) || readString(toolCallUpdate.id);
+    const fields = parseRecord(toolCallUpdate.fields);
+    const status = readString(fields?.status) || readString(toolCallUpdate.status);
+    const text = extractToolText(fields?.content ?? toolCallUpdate.content);
+    if (status === 'completed' || status === 'failed') {
+      return [{
+        type: 'tool_result',
+        providerSessionId,
+        ...(toolId ? { toolId } : {}),
+        ...(text ? { text } : {}),
+        ...(status === 'failed' ? { isError: true } : {}),
+        providerState,
+      }];
+    }
+  }
+
+  return [];
 }
 
 export class AcpAdapter implements AgentAdapter {
@@ -213,19 +449,166 @@ export class AcpAdapter implements AgentAdapter {
     };
   }
 
-  async *invoke(_input: AgentInvokeInput): AsyncGenerator<StreamEvent> {
-    if (!_input.acpHost) {
+  async *invoke(input: AgentInvokeInput): AsyncGenerator<StreamEvent> {
+    if (!input.acpHost) {
       throw new Error(
         'ACP agent transport is configured but no runtime ACP host-capability bridge '
         + 'is attached. Continue with PLAN-032 Phase 2 before enabling turn execution.',
       );
     }
 
-    throw new Error(
-      'ACP agent transport is configured and the runtime ACP host-capability bridge is available, '
-      + 'but session lifecycle execution is not implemented yet. Continue with PLAN-032 Phase 3 '
-      + 'to pilot a concrete ACP provider target.',
-    );
+    const command = input.instance.command?.trim();
+    if (!command) {
+      throw new Error(
+        'ACP turn execution currently supports stdio agent commands only. '
+        + 'HTTP ACP targets remain a future follow-up.',
+      );
+    }
+
+    const env = sanitizeEnv(this.options.env || process.env);
+    const queue: Array<StreamEvent | Error | null> = [];
+    let resolve: (() => void) | null = null;
+    let providerSessionId = input.providerSessionId;
+    let phase: AcpInvokePhase = 'bootstrap';
+
+    const push = (item: StreamEvent | Error | null) => {
+      queue.push(item);
+      if (resolve) {
+        resolve();
+        resolve = null;
+      }
+    };
+
+    const client = new AcpStdioClient({
+      command,
+      args: input.instance.args,
+      cwd: input.instance.cwd || input.acpHost.context.cwd,
+      env,
+      spawnProcess: this.options.acpProcessSpawner,
+      onNotification: async (notification) => {
+        if (phase !== 'prompt' || notification.method !== 'session/update' || !providerSessionId) {
+          return;
+        }
+
+        for (const event of parseSessionUpdateEvents(input, providerSessionId, notification)) {
+          push(event);
+        }
+      },
+      onServerRequest: async (request) => {
+        if (request.method === 'session/request_permission') {
+          return buildPermissionResponse(request, input.acpHost?.context.permissionMode);
+        }
+
+        throw new AcpJsonRpcClientError(
+          `Unsupported ACP server request '${request.method}' in the current runtime slice.`,
+          -32601,
+        );
+      },
+    });
+
+    const run = (async () => {
+      const initializeResult = parseRecord(await client.request('initialize', buildInitializeParams()));
+      const protocolVersion = initializeResult?.protocolVersion;
+      const agentCapabilities = parseRecord(initializeResult?.agentCapabilities);
+      const loadSessionSupported = agentCapabilities?.loadSession === true;
+
+      const bootstrapParams = buildSessionBootstrapParams(input);
+      if (providerSessionId) {
+        if (!loadSessionSupported) {
+          throw new Error(
+            `ACP target '${input.providerName}/${input.instance.id}' returned no load-session `
+            + 'capability, so the runtime cannot restore provider-managed continuity yet.',
+          );
+        }
+
+        await client.request('session/load', {
+          sessionId: providerSessionId,
+          ...bootstrapParams,
+        });
+      } else {
+        const sessionResult = await client.request('session/new', bootstrapParams);
+        providerSessionId = extractSessionIdFromBootstrapResult(sessionResult);
+        if (!providerSessionId) {
+          throw new Error('ACP session bootstrap returned no session id.');
+        }
+      }
+
+      push({
+        type: 'init',
+        providerSessionId,
+        providerState: buildProviderState(input, providerSessionId, 'active', {
+          protocolVersion,
+          loadSessionSupported,
+        }),
+      });
+
+      phase = 'prompt';
+      const onAbort = () => {
+        if (providerSessionId) {
+          try {
+            client.notify('session/cancel', { sessionId: providerSessionId });
+          } catch {
+            // best-effort only
+          }
+        }
+      };
+      input.signal.addEventListener('abort', onAbort, { once: true });
+      try {
+        const promptResult = parseRecord(
+          await client.request('session/prompt', buildPromptParams(input, providerSessionId)),
+        );
+        const stopReason = readString(promptResult?.stopReason);
+        push({
+          type: 'result',
+          providerSessionId,
+          ...(stopReason ? { summary: `ACP stop reason: ${stopReason}` } : {}),
+          providerState: buildProviderState(input, providerSessionId, 'idle', {
+            protocolVersion,
+            loadSessionSupported,
+            ...(stopReason ? { stopReason } : {}),
+          }),
+          metadata: {
+            ...(stopReason ? { stopReason } : {}),
+          },
+        });
+      } finally {
+        input.signal.removeEventListener('abort', onAbort);
+      }
+    })();
+
+    try {
+      while (true) {
+        if (queue.length === 0) {
+          await Promise.race([
+            run.then(() => undefined).catch((error) => {
+              push(error instanceof Error ? error : new Error(String(error)));
+            }),
+            new Promise<void>((resolveQueue) => {
+              resolve = resolveQueue;
+            }),
+          ]);
+        }
+
+        const item = queue.shift();
+        if (item === undefined) {
+          if (queue.length === 0) {
+            await run;
+            break;
+          }
+          continue;
+        }
+        if (item === null) {
+          break;
+        }
+        if (item instanceof Error) {
+          throw item;
+        }
+        yield item;
+      }
+      await run;
+    } finally {
+      await client.close();
+    }
   }
 
   inspect(instance: RemoteProviderInstanceConfig): AgentAdapterInspection {

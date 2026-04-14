@@ -122,6 +122,29 @@ export type AgentCliCommandRunner = (
   options?: AgentCliCommandRunnerOptions,
 ) => Promise<AgentCliCommandRunnerResult>;
 
+export interface AgentSpawnedProcess {
+  stdin?: NodeJS.WritableStream | null;
+  stdout?: NodeJS.ReadableStream | null;
+  stderr?: NodeJS.ReadableStream | null;
+  exitCode?: number | null;
+  killed?: boolean;
+  kill(signal?: NodeJS.Signals | number): boolean;
+  on(event: 'error', listener: (error: Error) => void): this;
+  on(
+    event: 'close',
+    listener: (code: number | null, signal: NodeJS.Signals | null) => void,
+  ): this;
+}
+
+export type AgentProcessSpawner = (
+  command: string,
+  args: string[],
+  options: {
+    cwd?: string;
+    env?: Record<string, string>;
+  },
+) => AgentSpawnedProcess;
+
 export interface AgentAdapterProbeCheck {
   code: string;
   status: HealthStatus['status'];
@@ -225,6 +248,7 @@ export interface AgentBackendOptions {
   webSocketFactory?: (url: string | URL, init?: WebSocketInit) => WebSocket;
   acpHostBridge?: AgentAcpHostBridge;
   cliCommandRunner?: AgentCliCommandRunner;
+  acpProcessSpawner?: AgentProcessSpawner;
 }
 
 export interface AgentBackendStatus {
