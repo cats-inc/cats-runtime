@@ -2893,7 +2893,7 @@ backends:
                 metering: expectIdleMeteringSummary(),
                 modelCatalog: expect.objectContaining({
                   source: 'static',
-                  defaultModel: 'auto',
+                  defaultModel: 'composer-2-fast',
                   modelCount: 5,
                   warnings: [
                     'Live model discovery is available for cursor/cli/ubuntu via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
@@ -2957,7 +2957,7 @@ backends:
                 metering: expectIdleMeteringSummary(),
                 modelCatalog: expect.objectContaining({
                   source: 'static',
-                  defaultModel: 'auto',
+                  defaultModel: 'composer-2-fast',
                   modelCount: 5,
                   warnings: [
                     'Live model discovery is available for cursor/cli/debian via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
@@ -4392,8 +4392,8 @@ providers:
       '    last_updated: 2026-04-14',
       '    models:',
       '      - name: Auto',
-      '        default: true',
       '      - name: Composer 2 Fast',
+      '        default: true',
       '      - name: Codex 5.3 Extra High',
       '      - name: GPT-5.4 1M',
       '      - name: Opus 4.5 Thinking',
@@ -4405,12 +4405,12 @@ providers:
         provider: 'cursor',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'auto',
+        defaultModel: 'composer-2-fast',
         source: 'static',
         cache: null,
         models: [
-          { id: 'auto', label: 'Auto', default: true },
-          { id: 'composer-2-fast', label: 'Composer 2 Fast' },
+          { id: 'auto', label: 'Auto' },
+          { id: 'composer-2-fast', label: 'Composer 2 Fast', default: true },
           { id: 'gpt-5.3-codex-xhigh', label: 'Codex 5.3 Extra High' },
           { id: 'gpt-5.4-medium', label: 'GPT-5.4 1M' },
           { id: 'claude-4.5-opus-thinking', label: 'Opus 4.5 Thinking' },
@@ -4427,12 +4427,12 @@ providers:
         provider: 'cursor',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'auto',
+        defaultModel: 'composer-2-fast',
         source: 'static',
         cache: null,
         entries: [
-          { id: 'auto', label: 'Auto', default: true },
-          { id: 'composer-2-fast', label: 'Composer 2 Fast', default: false },
+          { id: 'auto', label: 'Auto', default: false },
+          { id: 'composer-2-fast', label: 'Composer 2 Fast', default: true },
           { id: 'gpt-5.3-codex-xhigh', label: 'Codex 5.3 Extra High', default: false },
           {
             id: 'gpt-5.4-medium',

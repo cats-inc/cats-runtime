@@ -172,7 +172,7 @@ describe('curatedModelCatalog', () => {
     }
   });
 
-  it('bundled Cursor example marks Auto as the default entry', () => {
+  it('bundled Cursor example marks Composer 2 Fast as the default entry', () => {
     const runtime = createRuntimeRoot();
 
     try {
@@ -186,8 +186,8 @@ describe('curatedModelCatalog', () => {
       expect(result.path).toBe(join(PACKAGE_ROOT, 'config', 'curated-model-catalogs.yaml.example'));
       expect(result.warnings).toEqual([]);
       expect(findCuratedCliCatalog(result.document, 'cursor')?.models?.slice(0, 2)).toEqual([
-        { name: 'Auto', default: true },
-        { name: 'Composer 2 Fast' },
+        { name: 'Auto' },
+        { name: 'Composer 2 Fast', default: true },
       ]);
     } finally {
       runtime.cleanup();
