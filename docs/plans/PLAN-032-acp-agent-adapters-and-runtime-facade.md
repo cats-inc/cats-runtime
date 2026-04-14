@@ -128,28 +128,14 @@ integration track for only two vendors.
 
 The default recommendation for the first pilot is `codex-acp`.
 
-**ACP provider families to track because they overlap with the current runtime
-inventory**:
+The canonical ACP adoption matrix lives in
+[SPEC-025](../specs/SPEC-025-acp-agent-adapters-and-runtime-facade.md#acp-ecosystem-scope).
+Phase 3 should interpret that matrix this way:
 
-- `claude`
-- `codex`
-- `gemini`
-- `cursor`
-- `copilot`
-- `opencode`
-- `kilo`
-- `goose`
-- `pi`
-- `auggie`
-- `junie`
-- `kiro`
-
-**Adoption tiers**:
-
-- **Tier 1**: `codex`, `gemini`, `opencode`, `goose`, `kilo`, `pi`, `auggie`
-- **Tier 2**: `cursor`, `copilot`, `junie`
-- **Conditional**: `claude`
-- **Observe only**: `kiro`
+- `codex-acp` is the first executable Tier 1 pilot
+- once the first pilot proves lifecycle, continuity, and diagnostics, the rest
+  of Tier 1 becomes the next rollout bucket
+- Tier 2, conditional, and observation-only families remain follow-on work
 
 **Candidate first targets**:
 
@@ -243,4 +229,4 @@ Current rationale for preferring `codex-acp` first:
 | 2026-04-15 | Draft plan created to stage ACP under `agent` while reserving a separate runtime-owned ACP facade and documenting ACP + A2A complementarity |
 | 2026-04-15 | Phase 1 skeleton landed with `agent/acp` transport recognition, ACP launch config fields, truthful inspection, and focused coverage; execution remains a Phase 2 follow-up |
 | 2026-04-15 | Phase 2 host-bridge contract landed with a runtime-owned ACP host bridge backed by runtime tool policy, `LocalToolRuntime`, and session workspace/permission context; ACP transport lifecycle execution remains Phase 3 work |
-| 2026-04-15 | Expanded the ACP adoption plan from a `claude`/`codex` framing to a provider-overlap support matrix covering all current runtime families that also appear in the public ACP ecosystem, with Tier 1, Tier 2, conditional, and observation-only buckets |
+| 2026-04-15 | Expanded the ACP adoption plan from a `claude`/`codex` framing to a provider-overlap support matrix with SPEC-owned tiers, so Phase 3 can treat `codex-acp` as the first Tier 1 pilot rather than a special-case two-provider branch |

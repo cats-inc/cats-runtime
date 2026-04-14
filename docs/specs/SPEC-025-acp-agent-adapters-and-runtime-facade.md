@@ -227,6 +227,10 @@ fit with the runtime's existing provider taxonomy and product direction.
 The ACP support matrix should start with provider families that already exist in
 the runtime's provider inventory.
 
+This section is the canonical ACP adoption matrix for overlapping provider
+families. `PLAN-032`, `ROADMAP.md`, and related research notes should reference
+this matrix rather than restating tier lists independently.
+
 That currently means these overlapping families are in scope for ACP tracking:
 
 - `claude`
@@ -255,6 +259,22 @@ The provider-side ACP adoption matrix should begin with these tiers:
 - **Conditional**: `claude`
 - **Observe only**: `kiro`
 
+### Tier Criteria
+
+- **Tier 1**: public ACP evidence exists today for the overlapping provider
+  family, the runtime already has a meaningful provider seam for that family,
+  and there is no current repo-level policy or product reason to avoid an ACP
+  pilot after the host bridge is proven
+- **Tier 2**: public ACP evidence exists today and the family overlaps with the
+  runtime inventory, but the runtime should wait until the first ACP pilot
+  proves lifecycle, diagnostics, and capability truth on simpler targets
+- **Conditional**: public ACP evidence exists today, but the runtime has a
+  repo-specific product/policy reason not to assume that ACP is the preferred
+  seam for that family
+- **Observe only**: the family has some public ACP evidence, but registry
+  coverage, auth posture, maturity, naming, or runtime fit is still weak enough
+  that the runtime should track it without planning implementation
+
 Rationale:
 
 - `codex` remains the default first pilot because its current runtime seam is
@@ -270,6 +290,10 @@ Rationale:
 - `kiro` is worth tracking because it appears on ACP's compatible-agents list,
   but it does not appear in the current curated registry and should therefore
   remain observation-only until registry/auth/maturity posture is clearer
+
+`codex` is both the default Phase 3 pilot and a Tier 1 family.
+That is intentional: the first executable ACP provider slice should validate
+one Tier 1 target before the runtime rolls out the rest of Tier 1.
 
 ## Capability Model
 

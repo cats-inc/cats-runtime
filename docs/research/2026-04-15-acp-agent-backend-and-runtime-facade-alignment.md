@@ -93,15 +93,31 @@ Those are the ACP families that should be tracked in the runtime's adoption
 matrix first, because they already have config, routing, session, and product
 meaning inside `cats-runtime`.
 
-The practical prioritization is:
+The tiering itself is a runtime policy decision and now lives canonically in
+`SPEC-025`. This note should instead anchor the public evidence that a given
+runtime family actually overlaps with the public ACP ecosystem.
 
-- **Tier 1**: `codex`, `gemini`, `opencode`, `goose`, `kilo`, `pi`, `auggie`
-- **Tier 2**: `cursor`, `copilot`, `junie`
-- **Conditional**: `claude`
-- **Observe only**: `kiro`
+#### Overlap Evidence Table
 
-This is an inference from the public ACP ecosystem plus the runtime's existing
-provider seams. It is not claimed as an ACP standard.
+Checked on 2026-04-15 against the ACP public Agents and Registry pages.
+
+| Runtime family | ACP public name | Agents page | Registry page | Notes |
+|---------------|-----------------|-------------|---------------|-------|
+| `claude` | `Claude Agent` | Yes | Yes | Registry entry is the Claude ACP wrapper |
+| `codex` | `Codex CLI` | Yes | Yes | Registry entry is the Codex ACP adapter |
+| `gemini` | `Gemini CLI` | Yes | Yes | Public and curated overlap is explicit |
+| `cursor` | `Cursor` | Yes | Yes | Public and curated overlap is explicit |
+| `copilot` | `GitHub Copilot` | Yes | Yes | Agents page notes public preview |
+| `opencode` | `OpenCode` | Yes | Yes | Public and curated overlap is explicit |
+| `kilo` | `Kilo` | No | Yes | Curated registry evidence exists even though the broad agents page does not list it |
+| `goose` | `Goose` / `goose` | Yes | Yes | Name casing differs between pages |
+| `pi` | `Pi` / `pi ACP` | Yes | Yes | Agents page references `Pi` via `pi-acp adapter`; registry lists `pi ACP` |
+| `auggie` | `Augment Code` / `Auggie CLI` | Yes | Yes | Runtime family name differs from public product/registry labels |
+| `junie` | `Junie by JetBrains` / `Junie` | Yes | Yes | Public and curated overlap is explicit |
+| `kiro` | `Kiro CLI` | Yes | No | Public ACP-compatible evidence exists, but not in the curated registry today |
+
+This table is the evidence anchor for the overlap claim. It is not itself the
+canonical tier matrix.
 
 ### 6. A2A remains a different layer
 
@@ -140,6 +156,7 @@ be used to describe IDE-facing runtime ACP exposure.
 The runtime should keep an explicit ACP support matrix for overlapping provider
 families. It should not treat the public ACP registry as a promise that every
 listed agent will become a first-class `cats-runtime` provider target.
+`SPEC-025` should own that support matrix.
 
 ### Runtime Surface Taxonomy
 
