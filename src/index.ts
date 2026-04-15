@@ -36,6 +36,7 @@ import {
 } from './core/diagnostics/setupDiagnosticEntry.js';
 import { inspectRuntimeConfig, shouldEnterBootstrapMode } from './core/configInspection.js';
 import { createRuntimeServer } from './server.js';
+import { createRuntimeStartupTrace } from './core/startupTrace.js';
 import {
   applyRuntimeCliEnvOverrides,
   createRuntimeStartupState,
@@ -102,7 +103,15 @@ async function main(): Promise<void> {
   }
 
   loadDotEnv();
+  const startupTrace = createRuntimeStartupTrace();
+  startupTrace.trace('main.entered', {
+    argv,
+  });
   applyRuntimeCliEnvOverrides(cliOptions, process.env);
+  startupTrace.trace('env.overrides.applied', {
+    host: process.env.CATS_RUNTIME_HOST ?? null,
+    port: process.env.CATS_RUNTIME_PORT ?? null,
+  });
 
   if (cliOptions.diagnoseSetup) {
     const result = await generateSetupDiagnosticEntryArtifact(cliOptions, process.env);
@@ -209,16 +218,29 @@ async function main(): Promise<void> {
   }
 
   startup = resolveRuntimeStartupState(cliOptions, process.env);
+  startupTrace.trace('startup.resolved', {
+    mode: startup.mode,
+    managedBy: startup.managedBy ?? null,
+    readyOutput: startup.readyOutput,
+  });
   validateRuntimeServerStartupState(cliOptions, process.env, startup);
 
   const inspection = inspectRuntimeConfig(process.env);
   if (shouldEnterBootstrapMode(inspection, cliOptions.bootstrap === true)) {
     startup.bootstrapRequired = true;
   }
+  startupTrace.trace('config.inspected', {
+    bootstrapRequired: startup.bootstrapRequired,
+  });
 
   let config: ReturnType<typeof loadConfig>;
   try {
     config = loadConfig();
+    startupTrace.trace('config.loaded', {
+      host: config.host,
+      port: config.port,
+      bootstrapRequired: startup.bootstrapRequired,
+    });
   } catch (error) {
     // Semantically invalid config (e.g. provider in multiple backends without
     // disambiguation) — enter bootstrap mode instead of crashing.
@@ -232,8 +254,16 @@ async function main(): Promise<void> {
     // Retry in an explicit env-derived mode that ignores any providers.yaml,
     // including the default config path in the current working directory.
     config = loadConfig(process.env, { skipProviderFile: true });
+    startupTrace.trace('config.loaded_from_env_fallback', {
+      host: config.host,
+      port: config.port,
+      bootstrapRequired: startup.bootstrapRequired,
+    });
   }
-  const runtime = createRuntimeServer(config, { startup });
+  const runtime = createRuntimeServer(config, { startup, startupTrace });
+  startupTrace.trace('server.created', {
+    bootstrapRequired: startup.bootstrapRequired,
+  });
   let shutdownPromise: Promise<void> | null = null;
 
   const writeLifecycle = (line: string | null) => {
@@ -285,7 +315,12 @@ async function main(): Promise<void> {
     });
   }
 
+  startupTrace.trace('server.start.await');
   const address = await runtime.start();
+  startupTrace.trace('server.start.resolved', {
+    host: address.host,
+    port: address.port,
+  });
   if (shutdownPromise) {
     await shutdownPromise;
     return;
@@ -295,6 +330,11 @@ async function main(): Promise<void> {
     host: address.host,
     port: address.port,
     healthUrl: `http://${address.host}:${address.port}/health`,
+  });
+  startupTrace.trace('ready.message.emitted', {
+    host: address.host,
+    port: address.port,
+    bootstrapRequired: startup.bootstrapRequired,
   });
   writeLifecycle(readyMessage);
 
@@ -307,6 +347,9 @@ async function main(): Promise<void> {
 
 if (isDirectCliEntrypoint(import.meta.url, process.argv[1])) {
   main().catch((error) => {
+    createRuntimeStartupTrace().trace('main.error', {
+      message: error instanceof Error ? error.message : String(error),
+    });
     process.stderr.write(formatRuntimeStartupError(startup, error));
     process.exitCode = 1;
     process.exit(1);

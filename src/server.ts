@@ -83,6 +83,7 @@ import {
   supportsHostFileBackedProviderDiscovery,
 } from './backends/cli/providerPaths.js';
 import { createRuntimeBrowserDrivers } from './backends/browser/createDrivers.js';
+import type { RuntimeStartupTrace } from './core/startupTrace.js';
 
 interface DiscoveryController {
   start(): void;
@@ -95,6 +96,7 @@ interface RuntimeServerOptions {
   agentBackend?: AgentBackendOptions;
   startup?: RuntimeStartupState;
   compatibility?: ProviderCompatibilityService;
+  startupTrace?: RuntimeStartupTrace;
 }
 
 interface WatcherSpec {
@@ -686,6 +688,7 @@ export function createRuntimeServer(
   options: RuntimeServerOptions = {},
 ): RuntimeServer {
   const startup = options.startup ?? createRuntimeStartupState();
+  const startupTrace = options.startupTrace;
   const peerConfig = loadPeerRuntimeConfig(config);
   const dataDir = config.dataDir || join(config.sessionBaseDir, '..', 'data');
   const registry = new SessionRegistry(
@@ -1041,14 +1044,23 @@ export function createRuntimeServer(
       }
 
       startPromise = (async () => {
+        startupTrace?.trace('server.start.begin', {
+          bootstrapRequired: startup.bootstrapRequired,
+          host: config.host,
+          port: config.port,
+        });
         if (activeDiscovery) {
           activeDiscovery.start();
+          startupTrace?.trace('server.discovery.started', {
+            bootstrapRequired: startup.bootstrapRequired,
+          });
         }
         if (!startup.bootstrapRequired) {
           peerDiscovery.start();
           wakeup.start();
           browserMaintenance.start();
           worktreeMaintenance.start();
+          startupTrace?.trace('server.runtime_services.started');
         }
 
         try {
@@ -1057,11 +1069,21 @@ export function createRuntimeServer(
           }
 
           if (!server.listening) {
+            startupTrace?.trace('server.listen.begin', {
+              host: config.host,
+              port: config.port,
+            });
             await listenServer(server, config.host, config.port);
+            startupTrace?.trace('server.listen.ready', {
+              host: config.host,
+              port: config.port,
+            });
           }
 
           if (!startup.bootstrapRequired) {
+            startupTrace?.trace('server.provider_diagnostics_prime.begin');
             primeProviderAvailabilityDiagnosticsCache(context);
+            startupTrace?.trace('server.provider_diagnostics_prime.scheduled');
           }
 
           if (startup.phase !== 'starting') {
@@ -1075,6 +1097,11 @@ export function createRuntimeServer(
               ...fallback,
               healthUrl: `http://${fallback.host}:${fallback.port}/health`,
             });
+            startupTrace?.trace('server.mark_ready', {
+              host: fallback.host,
+              port: fallback.port,
+              fallbackAddress: true,
+            });
             peerDiscovery.refreshSelf();
             return fallback;
           }
@@ -1084,10 +1111,18 @@ export function createRuntimeServer(
             port: address.port,
             healthUrl: `http://${address.address}:${address.port}/health`,
           });
+          startupTrace?.trace('server.mark_ready', {
+            host: address.address,
+            port: address.port,
+            fallbackAddress: false,
+          });
           peerDiscovery.refreshSelf();
 
           return { host: address.address, port: address.port };
         } catch (error) {
+          startupTrace?.trace('server.start.error', {
+            message: error instanceof Error ? error.message : String(error),
+          });
           worktreeMaintenance.close();
           browserMaintenance.close();
           wakeup.close();
