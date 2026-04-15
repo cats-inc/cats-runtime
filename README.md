@@ -236,9 +236,14 @@ Current runtime behavior:
 - Claude, Codex, Gemini, Kilo, Copilot, and Cursor advanced catalogs also consume the same
   curated input
 - packaged desktop hosts seed `management.yaml` and
-  `curated-model-catalogs.yaml` into `~/.cats/runtime/config/` on first launch
-  when those files do not already exist, so users get editable runtime-owned
-  copies outside the app bundle
+  `curated-model-catalogs.yaml` into `~/.cats/runtime/config/` when those
+  files do not already exist, so users get editable runtime-owned copies
+  outside the app bundle
+- packaged desktop hosts may refresh `curated-model-catalogs.yaml` when the
+  existing file still matches a known previously auto-seeded template or the
+  recorded seed hash, but they do not force-overwrite user-edited copies
+- packaged desktop hosts do not force-overwrite existing `management.yaml`
+  copies; that file remains operator-owned once present
 - for those advanced catalogs, the curated `models[]` or flattened
   `providers[]` entry list is authoritative for entry filtering and ordering
 - dynamic discovery or config-backed catalogs still take precedence when those
