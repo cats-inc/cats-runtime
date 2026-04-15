@@ -272,8 +272,7 @@ export function resolveAcpProviderProfile(
   }
 
   if (
-    providerName === 'opencode'
-    || commandName === 'opencode-acp'
+    commandName === 'opencode-acp'
     || (commandName === 'opencode' && hasAcpSubcommand)
     || argNames.has('opencode-acp')
   ) {
@@ -281,8 +280,7 @@ export function resolveAcpProviderProfile(
   }
 
   if (
-    providerName === 'kilo'
-    || commandName === 'kilo-acp'
+    commandName === 'kilo-acp'
     || (commandName === 'kilo' && hasAcpSubcommand)
     || argNames.has('kilo-acp')
     || (argNames.has('@kilocode/cli') && hasAcpSubcommand)
@@ -291,8 +289,7 @@ export function resolveAcpProviderProfile(
   }
 
   if (
-    providerName === 'goose'
-    || commandName === 'goose-acp'
+    commandName === 'goose-acp'
     || (commandName === 'goose' && hasAcpSubcommand)
     || argNames.has('goose-acp')
   ) {
@@ -300,16 +297,14 @@ export function resolveAcpProviderProfile(
   }
 
   if (
-    providerName === 'pi'
-    || commandName === 'pi-acp'
+    commandName === 'pi-acp'
     || argNames.has('pi-acp')
   ) {
     return PI_ACP_PROFILE;
   }
 
   if (
-    providerName === 'auggie'
-    || commandName === 'auggie-acp'
+    commandName === 'auggie-acp'
     || commandName === 'augment-code-acp'
     || (commandName === 'auggie' && hasAcpFlag)
     || argNames.has('auggie-acp')
@@ -320,8 +315,7 @@ export function resolveAcpProviderProfile(
   }
 
   if (
-    providerName === 'junie'
-    || commandName === 'junie-acp'
+    commandName === 'junie-acp'
     || (commandName === 'junie' && hasAcpFlag)
     || argNames.has('junie-acp')
   ) {
@@ -329,8 +323,7 @@ export function resolveAcpProviderProfile(
   }
 
   if (
-    providerName === 'kiro'
-    || commandName === 'kiro-acp'
+    commandName === 'kiro-acp'
     || commandName === 'kiro-cli-acp'
     || (commandName === 'kiro-cli' && hasAcpSubcommand)
     || argNames.has('kiro-acp')

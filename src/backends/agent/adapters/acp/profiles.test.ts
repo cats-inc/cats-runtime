@@ -105,4 +105,58 @@ describe('resolveAcpProviderProfile', () => {
       expect.objectContaining(expected),
     );
   });
+
+  it.each([
+    {
+      label: 'OpenCode bare binary',
+      instance: {
+        ...createInstance('opencode', []),
+        providerName: 'opencode',
+      } satisfies RemoteProviderInstanceConfig,
+    },
+    {
+      label: 'Kilo bare binary',
+      instance: {
+        ...createInstance('kilo', []),
+        providerName: 'kilo',
+      } satisfies RemoteProviderInstanceConfig,
+    },
+    {
+      label: 'Goose bare binary',
+      instance: {
+        ...createInstance('goose', []),
+        providerName: 'goose',
+      } satisfies RemoteProviderInstanceConfig,
+    },
+    {
+      label: 'Pi provider name only',
+      instance: {
+        ...createInstance('npx', []),
+        providerName: 'pi',
+      } satisfies RemoteProviderInstanceConfig,
+    },
+    {
+      label: 'Auggie without --acp',
+      instance: {
+        ...createInstance('auggie', []),
+        providerName: 'auggie',
+      } satisfies RemoteProviderInstanceConfig,
+    },
+    {
+      label: 'Junie without --acp flag',
+      instance: {
+        ...createInstance('/Applications/junie.app/Contents/MacOS/junie', []),
+        providerName: 'junie',
+      } satisfies RemoteProviderInstanceConfig,
+    },
+    {
+      label: 'Kiro CLI without acp subcommand',
+      instance: {
+        ...createInstance('kiro-cli', []),
+        providerName: 'kiro',
+      } satisfies RemoteProviderInstanceConfig,
+    },
+  ])('does not resolve $label without an ACP-specific launch signal', ({ instance }) => {
+    expect(resolveAcpProviderProfile(instance)).toBeUndefined();
+  });
 });

@@ -498,4 +498,37 @@ describe('inspectAgentTarget', () => {
       launch: expect.objectContaining({ command: 'kiro-cli', args: ['acp'] }),
     }));
   });
+
+  it('does not promote a bare Tier 2 CLI binary into an ACP profile', () => {
+    const inspection = inspectAgentTarget({
+      id: 'acp-opencode-bare',
+      providerName: 'opencode',
+      backend: 'agent',
+      transport: 'acp_stdio',
+      command: 'opencode',
+      args: [],
+      cwd: '/tmp/acp',
+      startupTimeoutMs: 15000,
+    });
+
+    expect(inspection).toEqual(expect.objectContaining({
+      adapter: 'acp',
+      family: 'protocol',
+      launch: expect.objectContaining({ command: 'opencode' }),
+      summary: expect.not.stringContaining('supported Tier 2 ACP target'),
+      transport: expect.objectContaining({
+        liveProbe: 'command_help',
+        modelDiscovery: 'none',
+        toolDiscovery: 'none',
+      }),
+      capabilities: expect.objectContaining({
+        probe: true,
+        modelDiscovery: false,
+        toolCatalog: false,
+        effectiveToolCatalog: false,
+        cancel: false,
+      }),
+    }));
+    expect(inspection.profile).toBeUndefined();
+  });
 });
