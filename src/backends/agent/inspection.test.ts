@@ -230,4 +230,67 @@ describe('inspectAgentTarget', () => {
       },
     });
   });
+
+  it('describes ACP stdio transport semantics for gemini profile', () => {
+    const inspection = inspectAgentTarget({
+      id: 'acp-gemini-local',
+      providerName: 'gemini',
+      backend: 'agent',
+      transport: 'acp_stdio',
+      command: 'gemini-acp',
+      args: ['serve'],
+      cwd: '/tmp/acp',
+      startupTimeoutMs: 15000,
+      model: 'gemini-2.5-pro',
+    });
+
+    expect(inspection).toEqual(expect.objectContaining({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('Gemini ACP is the current ACP pilot target'),
+      launch: expect.objectContaining({ command: 'gemini-acp' }),
+    }));
+  });
+
+  it('describes ACP stdio transport semantics for cursor profile', () => {
+    const inspection = inspectAgentTarget({
+      id: 'acp-cursor-local',
+      providerName: 'cursor',
+      backend: 'agent',
+      transport: 'acp_stdio',
+      command: 'cursor-acp',
+      args: ['serve'],
+      cwd: '/tmp/acp',
+      startupTimeoutMs: 15000,
+      model: 'cursor-fast',
+    });
+
+    expect(inspection).toEqual(expect.objectContaining({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('Cursor ACP is the current ACP pilot target'),
+      launch: expect.objectContaining({ command: 'cursor-acp' }),
+    }));
+  });
+
+  it('describes ACP stdio transport semantics for copilot profile', () => {
+    const inspection = inspectAgentTarget({
+      id: 'acp-copilot-local',
+      providerName: 'copilot',
+      backend: 'agent',
+      transport: 'acp_stdio',
+      command: 'copilot-acp',
+      args: ['serve'],
+      cwd: '/tmp/acp',
+      startupTimeoutMs: 15000,
+      model: 'copilot-chat',
+    });
+
+    expect(inspection).toEqual(expect.objectContaining({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('Copilot ACP is the current ACP pilot target'),
+      launch: expect.objectContaining({ command: 'copilot-acp' }),
+    }));
+  });
 });

@@ -132,6 +132,96 @@ function createClaudeStdioInstance(): RemoteProviderInstanceConfig {
   };
 }
 
+function createGeminiHttpInstance(): RemoteProviderInstanceConfig {
+  return {
+    id: 'acp-gemini-remote',
+    providerName: 'gemini',
+    backend: 'agent',
+    transport: 'acp',
+    baseUrl: 'http://gemini-acp.test',
+    authTokenEnv: 'GEMINI_ACP_TOKEN',
+    headers: {
+      'x-client-id': 'cats-runtime',
+      accept: 'application/json',
+    },
+    model: 'gemini-2.5-pro',
+  };
+}
+
+function createGeminiStdioInstance(): RemoteProviderInstanceConfig {
+  return {
+    id: 'acp-gemini-local',
+    providerName: 'gemini',
+    backend: 'agent',
+    transport: 'acp_stdio',
+    command: 'gemini-acp',
+    args: ['serve'],
+    cwd: '/tmp/acp',
+    startupTimeoutMs: 15000,
+    model: 'gemini-2.5-pro',
+  };
+}
+
+function createCursorHttpInstance(): RemoteProviderInstanceConfig {
+  return {
+    id: 'acp-cursor-remote',
+    providerName: 'cursor',
+    backend: 'agent',
+    transport: 'acp',
+    baseUrl: 'http://cursor-acp.test',
+    authTokenEnv: 'CURSOR_ACP_TOKEN',
+    headers: {
+      'x-client-id': 'cats-runtime',
+      accept: 'application/json',
+    },
+    model: 'cursor-fast',
+  };
+}
+
+function createCursorStdioInstance(): RemoteProviderInstanceConfig {
+  return {
+    id: 'acp-cursor-local',
+    providerName: 'cursor',
+    backend: 'agent',
+    transport: 'acp_stdio',
+    command: 'cursor-acp',
+    args: ['serve'],
+    cwd: '/tmp/acp',
+    startupTimeoutMs: 15000,
+    model: 'cursor-fast',
+  };
+}
+
+function createCopilotHttpInstance(): RemoteProviderInstanceConfig {
+  return {
+    id: 'acp-copilot-remote',
+    providerName: 'copilot',
+    backend: 'agent',
+    transport: 'acp',
+    baseUrl: 'http://copilot-acp.test',
+    authTokenEnv: 'COPILOT_ACP_TOKEN',
+    headers: {
+      'x-client-id': 'cats-runtime',
+      accept: 'application/json',
+    },
+    model: 'copilot-chat',
+  };
+}
+
+function createCopilotStdioInstance(): RemoteProviderInstanceConfig {
+  return {
+    id: 'acp-copilot-local',
+    providerName: 'copilot',
+    backend: 'agent',
+    transport: 'acp_stdio',
+    command: 'copilot-acp',
+    args: ['serve'],
+    cwd: '/tmp/acp',
+    startupTimeoutMs: 15000,
+    model: 'copilot-chat',
+  };
+}
+
 function createHostBridge(permissionMode: 'skip' | 'default' | 'whitelist' = 'skip'): AgentAcpHostBridge {
   return {
     describe(_context: AgentAcpHostContext) {
@@ -446,6 +536,273 @@ describe('AcpAdapter', () => {
     });
   });
 
+  it('describes HTTP ACP targets with gemini profile when provider name is gemini', () => {
+    const adapter = new AcpAdapter({
+      env: { GEMINI_ACP_TOKEN: 'secret-token' },
+    });
+
+    const inspection = adapter.inspect(createGeminiHttpInstance());
+
+    expect(inspection).toEqual({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('provider-managed ACP transport'),
+      endpoint: 'http://gemini-acp.test',
+      transport: {
+        kind: 'http',
+        protocol: 'acp_v1',
+        liveProbe: 'none',
+        modelDiscovery: 'none',
+        toolDiscovery: 'none',
+        streaming: 'generic',
+      },
+      request: { headerNames: ['x-client-id'] },
+      auth: {
+        mechanisms: ['bearer_header'],
+        credentials: [
+          { kind: 'base_url', configured: true },
+          { kind: 'auth_token', configured: true },
+        ],
+      },
+      continuity: {
+        providerManagedSessions: true,
+        sessionKey: true,
+        providerSessionState: true,
+        cancel: false,
+      },
+      capabilities: {
+        probe: false,
+        modelDiscovery: false,
+        toolCatalog: false,
+        effectiveToolCatalog: false,
+        cancel: false,
+        runtimeServices: false,
+        toolCallEvents: false,
+      },
+    });
+  });
+
+  it('describes stdio ACP targets with Gemini ACP profile label', () => {
+    const adapter = new AcpAdapter();
+    const inspection = adapter.inspect(createGeminiStdioInstance());
+
+    expect(inspection).toEqual({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('Gemini ACP is the current ACP pilot target'),
+      launch: {
+        kind: 'stdio',
+        command: 'gemini-acp',
+        args: ['serve'],
+        cwd: '/tmp/acp',
+        startupTimeoutMs: 15000,
+      },
+      transport: {
+        kind: 'stdio',
+        protocol: 'acp_v1',
+        liveProbe: 'command_help',
+        modelDiscovery: 'session_bootstrap',
+        toolDiscovery: 'session_bootstrap',
+        streaming: 'generic',
+      },
+      request: { headerNames: [] },
+      auth: { mechanisms: [], credentials: [] },
+      continuity: {
+        providerManagedSessions: true,
+        sessionKey: true,
+        providerSessionState: true,
+        cancel: true,
+      },
+      capabilities: {
+        probe: true,
+        modelDiscovery: true,
+        toolCatalog: true,
+        effectiveToolCatalog: true,
+        cancel: true,
+        runtimeServices: false,
+        toolCallEvents: true,
+      },
+    });
+  });
+
+  it('describes HTTP ACP targets with cursor profile when provider name is cursor', () => {
+    const adapter = new AcpAdapter({
+      env: { CURSOR_ACP_TOKEN: 'secret-token' },
+    });
+
+    const inspection = adapter.inspect(createCursorHttpInstance());
+
+    expect(inspection).toEqual({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('provider-managed ACP transport'),
+      endpoint: 'http://cursor-acp.test',
+      transport: {
+        kind: 'http',
+        protocol: 'acp_v1',
+        liveProbe: 'none',
+        modelDiscovery: 'none',
+        toolDiscovery: 'none',
+        streaming: 'generic',
+      },
+      request: { headerNames: ['x-client-id'] },
+      auth: {
+        mechanisms: ['bearer_header'],
+        credentials: [
+          { kind: 'base_url', configured: true },
+          { kind: 'auth_token', configured: true },
+        ],
+      },
+      continuity: {
+        providerManagedSessions: true,
+        sessionKey: true,
+        providerSessionState: true,
+        cancel: false,
+      },
+      capabilities: {
+        probe: false,
+        modelDiscovery: false,
+        toolCatalog: false,
+        effectiveToolCatalog: false,
+        cancel: false,
+        runtimeServices: false,
+        toolCallEvents: false,
+      },
+    });
+  });
+
+  it('describes stdio ACP targets with Cursor ACP profile label', () => {
+    const adapter = new AcpAdapter();
+    const inspection = adapter.inspect(createCursorStdioInstance());
+
+    expect(inspection).toEqual({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('Cursor ACP is the current ACP pilot target'),
+      launch: {
+        kind: 'stdio',
+        command: 'cursor-acp',
+        args: ['serve'],
+        cwd: '/tmp/acp',
+        startupTimeoutMs: 15000,
+      },
+      transport: {
+        kind: 'stdio',
+        protocol: 'acp_v1',
+        liveProbe: 'command_help',
+        modelDiscovery: 'session_bootstrap',
+        toolDiscovery: 'session_bootstrap',
+        streaming: 'generic',
+      },
+      request: { headerNames: [] },
+      auth: { mechanisms: [], credentials: [] },
+      continuity: {
+        providerManagedSessions: true,
+        sessionKey: true,
+        providerSessionState: true,
+        cancel: true,
+      },
+      capabilities: {
+        probe: true,
+        modelDiscovery: true,
+        toolCatalog: true,
+        effectiveToolCatalog: true,
+        cancel: true,
+        runtimeServices: false,
+        toolCallEvents: true,
+      },
+    });
+  });
+
+  it('describes HTTP ACP targets with copilot profile when provider name is copilot', () => {
+    const adapter = new AcpAdapter({
+      env: { COPILOT_ACP_TOKEN: 'secret-token' },
+    });
+
+    const inspection = adapter.inspect(createCopilotHttpInstance());
+
+    expect(inspection).toEqual({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('provider-managed ACP transport'),
+      endpoint: 'http://copilot-acp.test',
+      transport: {
+        kind: 'http',
+        protocol: 'acp_v1',
+        liveProbe: 'none',
+        modelDiscovery: 'none',
+        toolDiscovery: 'none',
+        streaming: 'generic',
+      },
+      request: { headerNames: ['x-client-id'] },
+      auth: {
+        mechanisms: ['bearer_header'],
+        credentials: [
+          { kind: 'base_url', configured: true },
+          { kind: 'auth_token', configured: true },
+        ],
+      },
+      continuity: {
+        providerManagedSessions: true,
+        sessionKey: true,
+        providerSessionState: true,
+        cancel: false,
+      },
+      capabilities: {
+        probe: false,
+        modelDiscovery: false,
+        toolCatalog: false,
+        effectiveToolCatalog: false,
+        cancel: false,
+        runtimeServices: false,
+        toolCallEvents: false,
+      },
+    });
+  });
+
+  it('describes stdio ACP targets with Copilot ACP profile label', () => {
+    const adapter = new AcpAdapter();
+    const inspection = adapter.inspect(createCopilotStdioInstance());
+
+    expect(inspection).toEqual({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('Copilot ACP is the current ACP pilot target'),
+      launch: {
+        kind: 'stdio',
+        command: 'copilot-acp',
+        args: ['serve'],
+        cwd: '/tmp/acp',
+        startupTimeoutMs: 15000,
+      },
+      transport: {
+        kind: 'stdio',
+        protocol: 'acp_v1',
+        liveProbe: 'command_help',
+        modelDiscovery: 'session_bootstrap',
+        toolDiscovery: 'session_bootstrap',
+        streaming: 'generic',
+      },
+      request: { headerNames: [] },
+      auth: { mechanisms: [], credentials: [] },
+      continuity: {
+        providerManagedSessions: true,
+        sessionKey: true,
+        providerSessionState: true,
+        cancel: true,
+      },
+      capabilities: {
+        probe: true,
+        modelDiscovery: true,
+        toolCatalog: true,
+        effectiveToolCatalog: true,
+        cancel: true,
+        runtimeServices: false,
+        toolCallEvents: true,
+      },
+    });
+  });
+
   it('discovers effective ACP command tools through transient session bootstrap', async () => {
     const process = new FakeAcpProcess();
     startFakeServer(process, async (message) => {
@@ -742,6 +1099,120 @@ describe('AcpAdapter', () => {
         },
       ],
     });
+  });
+
+  it('runs a stdio help probe for gemini ACP pilot targets', async () => {
+    const process = new FakeAcpProcess();
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0', id: message.id,
+          result: { protocolVersion: 1, agentCapabilities: { loadSession: true } },
+        }) + '\n');
+        return;
+      }
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0', id: message.id,
+          result: { sessionId: 'probe-session-gemini', models: [{ modelId: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' }] },
+        }) + '\n');
+      }
+    });
+
+    const adapter = new AcpAdapter({
+      cliCommandRunner: createSuccessfulProbeRunner(),
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    const result = await adapter.probe!(createGeminiStdioInstance());
+    expect(result.health.status).toBe('ok');
+    expect(result.liveProbe).toEqual(expect.objectContaining({
+      profile: 'gemini-acp',
+      profileLabel: 'Gemini ACP',
+      command: 'gemini-acp',
+    }));
+    expect(result.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'acp_target_profile',
+        details: expect.objectContaining({ profile: 'gemini-acp', label: 'Gemini ACP', family: 'gemini' }),
+      }),
+    ]));
+  });
+
+  it('runs a stdio help probe for cursor ACP pilot targets', async () => {
+    const process = new FakeAcpProcess();
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0', id: message.id,
+          result: { protocolVersion: 1, agentCapabilities: { loadSession: true } },
+        }) + '\n');
+        return;
+      }
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0', id: message.id,
+          result: { sessionId: 'probe-session-cursor', models: [{ modelId: 'cursor-fast', name: 'Cursor Fast' }] },
+        }) + '\n');
+      }
+    });
+
+    const adapter = new AcpAdapter({
+      cliCommandRunner: createSuccessfulProbeRunner(),
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    const result = await adapter.probe!(createCursorStdioInstance());
+    expect(result.health.status).toBe('ok');
+    expect(result.liveProbe).toEqual(expect.objectContaining({
+      profile: 'cursor-acp',
+      profileLabel: 'Cursor ACP',
+      command: 'cursor-acp',
+    }));
+    expect(result.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'acp_target_profile',
+        details: expect.objectContaining({ profile: 'cursor-acp', label: 'Cursor ACP', family: 'cursor' }),
+      }),
+    ]));
+  });
+
+  it('runs a stdio help probe for copilot ACP pilot targets', async () => {
+    const process = new FakeAcpProcess();
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0', id: message.id,
+          result: { protocolVersion: 1, agentCapabilities: { loadSession: true } },
+        }) + '\n');
+        return;
+      }
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0', id: message.id,
+          result: { sessionId: 'probe-session-copilot', models: [{ modelId: 'copilot-chat', name: 'Copilot Chat' }] },
+        }) + '\n');
+      }
+    });
+
+    const adapter = new AcpAdapter({
+      cliCommandRunner: createSuccessfulProbeRunner(),
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    const result = await adapter.probe!(createCopilotStdioInstance());
+    expect(result.health.status).toBe('ok');
+    expect(result.liveProbe).toEqual(expect.objectContaining({
+      profile: 'copilot-acp',
+      profileLabel: 'Copilot ACP',
+      command: 'copilot-acp',
+    }));
+    expect(result.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'acp_target_profile',
+        details: expect.objectContaining({ profile: 'copilot-acp', label: 'Copilot ACP', family: 'copilot' }),
+      }),
+    ]));
   });
 
   it('reports failed stdio help probes as unavailable', async () => {
@@ -1271,6 +1742,87 @@ describe('AcpAdapter', () => {
     await collectEvents(adapter.invoke(
       createInvokeInput(createClaudeStdioInstance(), hostBridge),
     ));
+
+    const capabilities = initializeParams?.clientCapabilities as Record<string, unknown> | undefined;
+    expect(capabilities?._meta).toBeUndefined();
+  });
+
+  it('keeps gemini ACP stdio initialize payloads free of provider-specific capability hints', async () => {
+    const process = new FakeAcpProcess();
+    let initializeParams: Record<string, unknown> | undefined;
+
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        initializeParams = message.params as Record<string, unknown>;
+        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { protocolVersion: 1, agentCapabilities: { loadSession: false } } }) + '\n');
+        return;
+      }
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { sessionId: 'acp-session-init-gemini' } }) + '\n');
+        return;
+      }
+      if (message.method === 'session/prompt') {
+        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { stopReason: 'end_turn' } }) + '\n');
+      }
+    });
+
+    const hostBridge = createHostBridge();
+    const adapter = new AcpAdapter({ acpHostBridge: hostBridge, acpProcessSpawner: createSpawner(process) });
+    await collectEvents(adapter.invoke(createInvokeInput(createGeminiStdioInstance(), hostBridge)));
+
+    const capabilities = initializeParams?.clientCapabilities as Record<string, unknown> | undefined;
+    expect(capabilities?._meta).toBeUndefined();
+  });
+
+  it('keeps cursor ACP stdio initialize payloads free of provider-specific capability hints', async () => {
+    const process = new FakeAcpProcess();
+    let initializeParams: Record<string, unknown> | undefined;
+
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        initializeParams = message.params as Record<string, unknown>;
+        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { protocolVersion: 1, agentCapabilities: { loadSession: false } } }) + '\n');
+        return;
+      }
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { sessionId: 'acp-session-init-cursor' } }) + '\n');
+        return;
+      }
+      if (message.method === 'session/prompt') {
+        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { stopReason: 'end_turn' } }) + '\n');
+      }
+    });
+
+    const hostBridge = createHostBridge();
+    const adapter = new AcpAdapter({ acpHostBridge: hostBridge, acpProcessSpawner: createSpawner(process) });
+    await collectEvents(adapter.invoke(createInvokeInput(createCursorStdioInstance(), hostBridge)));
+
+    const capabilities = initializeParams?.clientCapabilities as Record<string, unknown> | undefined;
+    expect(capabilities?._meta).toBeUndefined();
+  });
+
+  it('keeps copilot ACP stdio initialize payloads free of provider-specific capability hints', async () => {
+    const process = new FakeAcpProcess();
+    let initializeParams: Record<string, unknown> | undefined;
+
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        initializeParams = message.params as Record<string, unknown>;
+        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { protocolVersion: 1, agentCapabilities: { loadSession: false } } }) + '\n');
+        return;
+      }
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { sessionId: 'acp-session-init-copilot' } }) + '\n');
+        return;
+      }
+      if (message.method === 'session/prompt') {
+        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { stopReason: 'end_turn' } }) + '\n');
+      }
+    });
+
+    const hostBridge = createHostBridge();
+    const adapter = new AcpAdapter({ acpHostBridge: hostBridge, acpProcessSpawner: createSpawner(process) });
+    await collectEvents(adapter.invoke(createInvokeInput(createCopilotStdioInstance(), hostBridge)));
 
     const capabilities = initializeParams?.clientCapabilities as Record<string, unknown> | undefined;
     expect(capabilities?._meta).toBeUndefined();
