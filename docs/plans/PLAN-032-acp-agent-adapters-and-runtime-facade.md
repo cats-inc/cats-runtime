@@ -116,10 +116,10 @@ integration track for only two vendors.
 - ACP host capability bridge contract
 - explicit capability profile for the first provider-side ACP slice
 
-### Phase 3: Tier 1 `agent/acp` Provider Support
+### Phase 3: Full CLI `agent/acp` Provider Support
 
-- [x] Land the Tier 1 ACP target matrix for `claude`, `codex`, `gemini`,
-      `cursor`, and `copilot`
+- [x] Land the full 12-family CLI ACP target matrix across Tier 1 and Tier 2
+      provider families
 - [x] Implement the provider-side ACP adapter against the shared `AgentAdapter`
       seam
 - [x] Normalize lifecycle and stream events into runtime `StreamEvent`s
@@ -134,19 +134,22 @@ Phase 3 should interpret that matrix this way:
 
 - Tier 1 is the simultaneous provider-family support set:
   `claude`, `codex`, `gemini`, `cursor`, `copilot`
-- runtime docs, diagnostics, and inspection summaries should treat those five
-  families as the same rollout bucket rather than singling out one provider as
-  the exclusive ACP path
-- Tier 2 families remain follow-on work
+- Tier 2 is the lower-priority-but-supported set:
+  `opencode`, `kilo`, `goose`, `pi`, `auggie`, `junie`, `kiro`
+- runtime docs, diagnostics, and inspection summaries should treat all 12
+  families as the current CLI ACP support matrix rather than singling out one
+  provider as the exclusive ACP path or describing Tier 2 as future-only work
+- Tier labels remain prioritization metadata for provider-specific refinements,
+  not rollout gates for the shared ACP adapter path
 
-Tier 1 implementation still needs to stay grounded in:
+Phase 3 implementation still needs to stay grounded in:
 
 - protocol overlap with an existing runtime seam
 - capability truthfulness
 - auth and launch stability
 - testability in local repo workflows
 
-Current rationale for the Tier 1 split:
+Current rationale for the tier split:
 
 - `claude`, `codex`, `gemini`, `cursor`, and `copilot` are the primary runtime
   families with the strongest ACP ecosystem overlap and product relevance
@@ -154,14 +157,15 @@ Current rationale for the Tier 1 split:
   Codex-specific transport details may land earlier than the rest of Tier 1
   without changing the matrix itself
 - the runtime should keep shared ACP capability/diagnostics machinery generic
-  across the full Tier 1 set, while only adding provider-specific hints when
+  across the full 12-family matrix, while only adding provider-specific hints when
   they are validated for that provider family
 - `opencode`, `kilo`, `goose`, `pi`, `auggie`, `junie`, and `kiro` remain
-  deliberate Tier 2 follow-on work rather than silent additions
+  lower-priority families for provider-specific refinements rather than
+  future-only follow-on additions
 
 **Deliverables**:
 
-- working `agent/acp` provider targets for the Tier 1 families
+- working `agent/acp` provider targets for all 12 current CLI ACP families
 - session creation/message/cancel/close flows through the existing runtime
   session API
 
@@ -200,7 +204,7 @@ Current rationale for the Tier 1 split:
 |------|--------|------------|
 | Provider-side ACP and runtime-facing ACP get conflated | High | Keep separate file/module boundaries and separate docs from the first slice |
 | ACP capability requests bypass runtime guardrails | High | Route permission/fs/terminal requests through runtime-owned policy seams only |
-| Early ACP target coverage overfits the transport taxonomy | Medium | Reserve `agent/acp` conceptually and keep concrete transport names additive while validating the full Tier 1 matrix |
+| Early ACP target coverage overfits the transport taxonomy | Medium | Reserve `agent/acp` conceptually and keep concrete transport names additive while validating the full 12-family CLI ACP matrix |
 | IDE-facing ACP facade promises too much too early | Medium | Start with a bounded capability profile and document unsupported features explicitly |
 | A2A and ACP are treated as competing protocols | Medium | Keep layering docs explicit and update architecture/terminology together |
 
@@ -212,8 +216,9 @@ Current rationale for the Tier 1 split:
    first provider-side slice?
 3. After the initial HTTP ACP facade slice, should the runtime add a stdio
    entrypoint for hosts that prefer subprocess integration over HTTP?
-4. Which Tier 2 ACP family should be promoted first after the Tier 1 matrix is
-   fully hardened: `opencode`, `kilo`, `goose`, `pi`, `auggie`, `junie`, or
+4. Which lower-priority CLI ACP family should receive the next
+   provider-specific launch/auth/capability refinement after the shared
+   12-family matrix: `opencode`, `kilo`, `goose`, `pi`, `auggie`, `junie`, or
    `kiro`?
 
 ## Progress Log
@@ -243,6 +248,7 @@ Current rationale for the Tier 1 split:
 | 2026-04-15 | Promoted Codex ACP command discovery into a first-class remote tool catalog path: ACP inspection now truthfully reports `session_bootstrap` tool discovery for the resolved ACP profile, `listTools()` can bootstrap a transient ACP session to capture `available_commands_update`, and provider-tooling read models map that bootstrap-backed catalog onto the existing `tools_effective` vocabulary instead of leaving command discovery buried inside progress events only |
 | 2026-04-15 | Closed the active-worker runtime close gap for the Codex ACP slice: the shared `AgentAdapter` seam now exposes an optional provider-side `close()` hook, `AgentBackendManager` calls it during runtime close/reset/delete detachment, and `AcpAdapter` now sends draft ACP `session/close` only when the upstream agent explicitly advertises close-session capability instead of assuming it exists for every ACP target |
 | 2026-04-15 | Aligned provider-side ACP docs and inspection language to the canonical simultaneous Tier 1 matrix, and extended profile resolution so versioned npm package launch forms like `@scope/pkg@latest` still map onto the correct ACP provider profile |
+| 2026-04-15 | Expanded provider-side ACP support from the Tier 1-only framing to the full 12-family CLI matrix, and corrected Tier 2 launch-token resolution to match official ACP registry / provider entrypoints such as `binary acp`, `pi-acp`, `@kilocode/cli acp`, `@augmentcode/auggie --acp`, `junie --acp=true`, and `kiro-cli acp` |
 | 2026-04-15 | Started Phase 4 with the first runtime-owned ACP facade slice: `cats-runtime` now exposes an HTTP `/acp` JSON-RPC endpoint that answers `initialize` with a conservative, truthful capability profile, advertises bootstrap/readiness state through `_meta`, and rejects ACP session methods explicitly until runtime-owned session mapping lands |
 | 2026-04-15 | Extended the runtime ACP facade's truthful read surface before prompt-turn work: `initialize` now advertises `session/load` and `session/list`, `session/list` reflects the runtime registry as the ACP session source of truth, and `session/load` can reattach to an existing runtime-owned session without inventing a second session catalog |
 | 2026-04-15 | Landed the first runtime-owned ACP write-path bridge without duplicating session-creation logic: `session/new` now forwards into the existing `/sessions` route through an in-process ACP-to-HTTP bridge, so ACP session creation reuses the runtime's real workspace/session registry path instead of growing a parallel create contract |

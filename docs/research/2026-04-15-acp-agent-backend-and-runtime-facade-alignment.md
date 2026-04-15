@@ -6,10 +6,12 @@ Source:
 - ACP Overview: https://agentclientprotocol.com/protocol/overview
 - ACP Agents page: https://agentclientprotocol.com/get-started/agents
 - ACP Registry page: https://agentclientprotocol.com/get-started/registry
+- ACP Registry JSON feed: https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json
 - A2A latest docs: https://a2a-protocol.org/latest/
 - Zed external agents docs: https://zed.dev/docs/ai/external-agents
 - Codex ACP repository: https://github.com/zed-industries/codex-acp
 - Claude Agent ACP repository: https://github.com/agentclientprotocol/claude-agent-acp
+- Kiro CLI launch post: https://kiro.dev/blog/introducing-kiro-cli/
 Summary: ACP should not become a new top-level backend family in `cats-runtime`. When the runtime consumes an ACP-compatible external agent, ACP behaves like another `agent` transport. When IDEs consume `cats-runtime` itself over ACP, that is a separate runtime-owned facade because the control direction and capability ownership are inverted. The public ACP ecosystem is also much larger than `claude-agent-acp` and `codex-acp`, so the runtime needs an explicit adoption matrix based on overlap with its existing provider families rather than a two-provider mental model. A2A remains complementary because it solves agent-to-agent/runtime-to-runtime communication instead of client-to-agent communication.
 Relevance: This clarifies why `agent/acp` and a future runtime ACP facade can both exist without sharing one config surface or one implementation class, and why the runtime should track a broader ACP provider matrix without promising to ingest every public ACP agent.
 Action Items:
@@ -118,6 +120,22 @@ Checked on 2026-04-15 against the ACP public Agents and Registry pages.
 
 This table is the evidence anchor for the overlap claim. It is not itself the
 canonical tier matrix.
+
+#### Launch Distribution Notes
+
+Checked on 2026-04-15 against the ACP registry JSON feed and current provider
+docs. These are the runtime-facing launch shapes that should anchor common
+CLI ACP detection before inventing synthetic `*-acp` package names:
+
+| Runtime family | Distribution evidence | Common launch shape |
+|---------------|-----------------------|---------------------|
+| `opencode` | ACP registry JSON `binary.*.cmd=./opencode`, `args=["acp"]` | `opencode acp` |
+| `kilo` | ACP registry JSON `binary.*.cmd=./kilo`, `args=["acp"]`; `npx.package=@kilocode/cli` | `kilo acp` or `npx @kilocode/cli acp` |
+| `goose` | ACP registry JSON `binary.*.cmd=./goose`, `args=["acp"]` | `goose acp` |
+| `pi` | ACP registry JSON `npx.package=pi-acp` | `npx pi-acp` |
+| `auggie` | ACP registry JSON `npx.package=@augmentcode/auggie`, `args=["--acp"]` | `npx @augmentcode/auggie --acp` |
+| `junie` | ACP registry JSON `binary.*.cmd=.../junie`, `args=["--acp=true"]` | `junie --acp=true` |
+| `kiro` | Kiro CLI docs plus ACP agents-page overlap on `Kiro CLI` | `kiro-cli acp` |
 
 ### 6. A2A remains a different layer
 

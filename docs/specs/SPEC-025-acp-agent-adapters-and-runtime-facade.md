@@ -250,9 +250,10 @@ Families that are ACP-compatible but do not map onto an existing runtime
 provider family today should remain out of scope unless the runtime explicitly
 adds them as first-class providers for other reasons.
 
-### Initial Adoption Tiers
+### Current CLI ACP Support Tiers
 
-The provider-side ACP adoption matrix should begin with these tiers:
+The provider-side ACP adoption matrix currently uses these runtime-owned
+support tiers:
 
 - **Tier 1**: `claude`, `codex`, `gemini`, `cursor`, `copilot`
 - **Tier 2**: `opencode`, `kilo`, `goose`, `pi`, `auggie`, `junie`, `kiro`
@@ -263,8 +264,9 @@ The provider-side ACP adoption matrix should begin with these tiers:
   ecosystem evidence, meaningful runtime seam overlap, and clear product value
   for early ACP adoption
 - **Tier 2**: the provider family has public ACP evidence and overlaps with the
-  runtime inventory, but should follow after Tier 1 proves lifecycle,
-  diagnostics, and capability truth on the primary targets
+  runtime inventory, and is part of the same current CLI ACP support matrix,
+  but remains lower priority for provider-specific launch/auth/capability
+  refinements than Tier 1
 
 Rationale:
 
@@ -279,8 +281,9 @@ Rationale:
   families in the runtime's product direction and all have strong public ACP
   ecosystem presence alongside `codex`
 - `opencode`, `kilo`, `goose`, `pi`, `auggie`, `junie`, and `kiro` are all
-  meaningful runtime families with ACP evidence, but should follow after the
-  primary Tier 1 targets prove the ACP host bridge and diagnostics shape
+  meaningful runtime families with ACP evidence and are now included in the
+  current 12-family CLI ACP matrix, while still remaining lower priority for
+  provider-specific refinements than the Tier 1 set
 
 ## Capability Model
 

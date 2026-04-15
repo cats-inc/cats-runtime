@@ -1493,6 +1493,12 @@ function setupCapabilityGridRows({ providerName, instance, agentRuntime, tooling
     rows.push(['Protocol', `${agentRuntime.transport.kind} · ${humanizeToken(agentRuntime.transport.protocol)}`]);
     rows.push(['Continuity', agentRuntime.continuity?.providerManagedSessions ? 'provider-managed' : 'runtime-managed']);
   }
+  if (agentRuntime?.profile?.label) {
+    rows.push(['ACP Profile', agentRuntime.profile.label]);
+    if (agentRuntime.profile.tier) {
+      rows.push(['ACP Tier', `Tier ${agentRuntime.profile.tier}`]);
+    }
+  }
   if (tooling?.observability?.catalog) {
     rows.push(['Tooling', humanizeToken(tooling.observability.catalog)]);
   }

@@ -219,6 +219,8 @@ export function resolveAcpProviderProfile(
   const providerName = normalizeToken(instance.providerName);
   const commandName = normalizeCommandName(instance.command);
   const argNames = collectArgTokens(instance.args);
+  const hasAcpSubcommand = argNames.has('acp');
+  const hasAcpFlag = argNames.has('--acp') || argNames.has('--acp=true');
 
   if (
     providerName === 'codex'
@@ -272,8 +274,8 @@ export function resolveAcpProviderProfile(
   if (
     providerName === 'opencode'
     || commandName === 'opencode-acp'
+    || (commandName === 'opencode' && hasAcpSubcommand)
     || argNames.has('opencode-acp')
-    || argNames.has('@opencode/opencode-acp')
   ) {
     return OPENCODE_ACP_PROFILE;
   }
@@ -281,8 +283,9 @@ export function resolveAcpProviderProfile(
   if (
     providerName === 'kilo'
     || commandName === 'kilo-acp'
+    || (commandName === 'kilo' && hasAcpSubcommand)
     || argNames.has('kilo-acp')
-    || argNames.has('@kilocode/kilo-acp')
+    || (argNames.has('@kilocode/cli') && hasAcpSubcommand)
   ) {
     return KILO_ACP_PROFILE;
   }
@@ -290,8 +293,8 @@ export function resolveAcpProviderProfile(
   if (
     providerName === 'goose'
     || commandName === 'goose-acp'
+    || (commandName === 'goose' && hasAcpSubcommand)
     || argNames.has('goose-acp')
-    || argNames.has('@block/goose-acp')
   ) {
     return GOOSE_ACP_PROFILE;
   }
@@ -300,7 +303,6 @@ export function resolveAcpProviderProfile(
     providerName === 'pi'
     || commandName === 'pi-acp'
     || argNames.has('pi-acp')
-    || argNames.has('@anthropic/pi-acp')
   ) {
     return PI_ACP_PROFILE;
   }
@@ -309,9 +311,10 @@ export function resolveAcpProviderProfile(
     providerName === 'auggie'
     || commandName === 'auggie-acp'
     || commandName === 'augment-code-acp'
+    || (commandName === 'auggie' && hasAcpFlag)
     || argNames.has('auggie-acp')
     || argNames.has('augment-code-acp')
-    || argNames.has('@augmentcode/auggie-acp')
+    || (argNames.has('@augmentcode/auggie') && hasAcpFlag)
   ) {
     return AUGGIE_ACP_PROFILE;
   }
@@ -319,8 +322,8 @@ export function resolveAcpProviderProfile(
   if (
     providerName === 'junie'
     || commandName === 'junie-acp'
+    || (commandName === 'junie' && hasAcpFlag)
     || argNames.has('junie-acp')
-    || argNames.has('@jetbrains/junie-acp')
   ) {
     return JUNIE_ACP_PROFILE;
   }
@@ -329,9 +332,9 @@ export function resolveAcpProviderProfile(
     providerName === 'kiro'
     || commandName === 'kiro-acp'
     || commandName === 'kiro-cli-acp'
+    || (commandName === 'kiro-cli' && hasAcpSubcommand)
     || argNames.has('kiro-acp')
     || argNames.has('kiro-cli-acp')
-    || argNames.has('@amazon/kiro-acp')
   ) {
     return KIRO_ACP_PROFILE;
   }

@@ -1688,8 +1688,9 @@ bounded form:
   launch metadata
 - provider-side ACP execution is real through the shared `AgentAdapter` seam,
   with runtime-owned host capability mediation, persisted provider-managed
-  continuity, cancel/close support, and Tier 1 ACP profile coverage for
-  `claude`, `codex`, `gemini`, `cursor`, and `copilot`
+  continuity, cancel/close support, and full 12-family CLI ACP profile
+  coverage for `claude`, `codex`, `gemini`, `cursor`, `copilot`, `opencode`,
+  `kilo`, `goose`, `pi`, `auggie`, `junie`, and `kiro`
 - `cats-runtime` can now be consumed directly by ACP-capable clients through a
   runtime-owned ACP facade:
   - `POST /acp` for bounded HTTP control-plane/session lifecycle
@@ -1698,13 +1699,14 @@ bounded form:
   rather than substitutes
 
 That means the remaining work is no longer "make ACP real at all". It is
-follow-through on contract hardening, Tier 2 rollout, and cross-surface
-truthfulness:
+follow-through on contract hardening, launch-truth hardening across the full
+12-family CLI matrix, and cross-surface truthfulness:
 
 - the HTTP ACP carrier now supports prompt turns, but its coexistence and
   diagnostics posture still need continued hardening
-- provider-side ACP still needs deliberate Tier 2 rollout after the Tier 1
-  matrix is hardened across docs, diagnostics, and launch guidance
+- provider-side ACP now covers the full 12-family CLI matrix, but docs,
+  diagnostics, and launch guidance still need to stay truthful about each
+  family's real entrypoint and provider-specific refinements
 - the temporary ACP stdio launch fields currently live on the shared remote
   provider config shape and should be narrowed before ACP config is treated as a
   stable multi-provider contract
@@ -1733,9 +1735,11 @@ truthfulness:
   `docs/specs/SPEC-025-acp-agent-adapters-and-runtime-facade.md`, anchored to
   the runtime's existing provider families rather than to the full public ACP
   ecosystem
-- keep the simultaneous Tier 1 matrix (`claude`, `codex`, `gemini`, `cursor`,
-  `copilot`) aligned across runtime docs, diagnostics, inspection, and launch
-  guidance before promoting Tier 2 families
+- keep the full 12-family CLI ACP matrix (`claude`, `codex`, `gemini`,
+  `cursor`, `copilot`, `opencode`, `kilo`, `goose`, `pi`, `auggie`, `junie`,
+  `kiro`) aligned across runtime docs, diagnostics, inspection, and launch
+  guidance, while still treating Tier labels as prioritization metadata rather
+  than rollout gates
 - extend truthful diagnostics as more ACP targets expose probe, model
   discovery, tool discovery, auth, or launch capabilities in practice
 - add a bidirectional HTTP-capable carrier or equivalent session-update path if
