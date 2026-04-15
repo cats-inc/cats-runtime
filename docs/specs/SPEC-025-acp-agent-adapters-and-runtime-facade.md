@@ -254,42 +254,28 @@ adds them as first-class providers for other reasons.
 
 The provider-side ACP adoption matrix should begin with these tiers:
 
-- **Tier 1**: `codex`, `gemini`, `opencode`, `goose`, `kilo`, `pi`, `auggie`
-- **Tier 2**: `cursor`, `copilot`, `junie`
-- **Conditional**: `claude`
-- **Observe only**: `kiro`
+- **Tier 1**: `claude`, `codex`, `gemini`, `cursor`, `copilot`
+- **Tier 2**: `opencode`, `kilo`, `goose`, `pi`, `auggie`, `junie`, `kiro`
 
 ### Tier Criteria
 
-- **Tier 1**: public ACP evidence exists today for the overlapping provider
-  family, the runtime already has a meaningful provider seam for that family,
-  and there is no current repo-level policy or product reason to avoid an ACP
-  pilot after the host bridge is proven
-- **Tier 2**: public ACP evidence exists today and the family overlaps with the
-  runtime inventory, but the runtime should wait until the first ACP pilot
-  proves lifecycle, diagnostics, and capability truth on simpler targets
-- **Conditional**: public ACP evidence exists today, but the runtime has a
-  repo-specific product/policy reason not to assume that ACP is the preferred
-  seam for that family
-- **Observe only**: the family has some public ACP evidence, but registry
-  coverage, auth posture, maturity, naming, or runtime fit is still weak enough
-  that the runtime should track it without planning implementation
+- **Tier 1**: the provider family is a primary runtime target with strong ACP
+  ecosystem evidence, meaningful runtime seam overlap, and clear product value
+  for early ACP adoption
+- **Tier 2**: the provider family has public ACP evidence and overlaps with the
+  runtime inventory, but should follow after Tier 1 proves lifecycle,
+  diagnostics, and capability truth on the primary targets
 
 Rationale:
 
 - `codex` remains the default first pilot because its current runtime seam is
   already highly protocol-shaped
-- `gemini`, `opencode`, `goose`, `kilo`, `pi`, and `auggie` are all meaningful
-  runtime families whose ACP track does not currently carry the same policy
-  ambiguity as `claude`
-- `cursor`, `copilot`, and `junie` are in-scope but should come after the first
-  provider-side ACP bridge and evidence shape are proven on simpler targets
-- `claude` remains strategically important but should stay conditional while the
-  runtime intentionally avoids assuming that Anthropic's Agent SDK-based ACP
-  path is the preferred product seam for this repo
-- `kiro` is worth tracking because it appears on ACP's compatible-agents list,
-  but it does not appear in the current curated registry and should therefore
-  remain observation-only until registry/auth/maturity posture is clearer
+- `claude`, `gemini`, `cursor`, and `copilot` are the highest-value provider
+  families in the runtime's product direction and all have strong public ACP
+  ecosystem presence
+- `opencode`, `kilo`, `goose`, `pi`, `auggie`, `junie`, and `kiro` are all
+  meaningful runtime families with ACP evidence, but should follow after the
+  primary Tier 1 targets prove the ACP host bridge and diagnostics shape
 
 `codex` is both the default Phase 3 pilot and a Tier 1 family.
 That is intentional: the first executable ACP provider slice should validate

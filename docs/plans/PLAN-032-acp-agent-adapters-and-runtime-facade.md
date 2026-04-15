@@ -134,8 +134,9 @@ Phase 3 should interpret that matrix this way:
 
 - `codex-acp` is the first executable Tier 1 pilot
 - once the first pilot proves lifecycle, continuity, and diagnostics, the rest
-  of Tier 1 becomes the next rollout bucket
-- Tier 2, conditional, and observation-only families remain follow-on work
+  of Tier 1 (`claude`, `gemini`, `cursor`, `copilot`) becomes the next rollout
+  bucket
+- Tier 2 families remain follow-on work
 
 **Candidate first targets**:
 
@@ -159,13 +160,11 @@ Current rationale for preferring `codex-acp` first:
 - the first ACP-specific work can therefore focus more on ACP client capability
   bridging and less on relearning provider-native turn semantics at the same
   time
-- `claude-agent-acp` remains a strong second target once the ACP host
-  capability bridge and diagnostics shape have been proven on one concrete
-  target first
-- after `codex-acp`, the next most promising runtime-owned follow-ons are the
-  Tier 1 families whose existing runtime seams are already CLI- or
-  protocol-oriented enough to benefit from the same ACP host bridge with
-  limited extra taxonomy work
+- `claude-agent-acp` is a Tier 1 family and a strong second target once the
+  ACP host capability bridge and diagnostics shape have been proven on
+  `codex-acp` first
+- the remaining Tier 1 families (`gemini`, `cursor`, `copilot`) should follow
+  once the ACP host bridge is validated on at least two concrete targets
 
 **Deliverables**:
 
