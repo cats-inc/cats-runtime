@@ -54,6 +54,9 @@ If assigned as Conductor in Project Roles table:
 - **MUST** respect `.editorconfig` settings (LF line endings, final newline, trim rules)
 - **MUST NOT** use `git add -f` to commit files ignored by `.gitignore` when they are local machine config, runtime state, or other environment-specific data
 - **MUST NOT** use interactive rebase; always use non-interactive rebase commands only
+- **MUST NOT** run `git commit` and `git push` simultaneously or in one
+  parallelized step; finish and verify the commit first, then run a separate
+  push
 - **MUST NOT** run plain `git rebase --continue` in this Windows/PowerShell
   workspace, because Git may open an editor and block the session
 - **MUST** continue rebases with an explicit no-editor command after conflicts
@@ -114,4 +117,4 @@ To sync skills after changes:
 
 This file is maintained by Codex only. Other agents should not modify this file.
 
-Last updated: 2026-04-06
+Last updated: 2026-04-15
