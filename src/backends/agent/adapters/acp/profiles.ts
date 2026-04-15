@@ -25,6 +25,16 @@ const CODEX_ACP_PROFILE: AcpProviderProfile = {
   },
 };
 
+const CLAUDE_ACP_PROFILE: AcpProviderProfile = {
+  id: 'claude-acp',
+  label: 'Claude ACP',
+  family: 'claude',
+  summary: 'Tier 1 Claude ACP target with auth-capable registry profile.',
+  probe: {
+    helpArgs: ['--help'],
+  },
+};
+
 function normalizeCommandName(command: string | undefined): string {
   if (!command) {
     return '';
@@ -52,6 +62,17 @@ export function resolveAcpProviderProfile(
     || argNames.has('@zed-industries/codex-acp')
   ) {
     return CODEX_ACP_PROFILE;
+  }
+
+  if (
+    providerName === 'claude'
+    || commandName === 'claude-acp'
+    || commandName === 'claude-agent-acp'
+    || argNames.has('claude-acp')
+    || argNames.has('claude-agent-acp')
+    || argNames.has('@agentclientprotocol/claude-agent-acp')
+  ) {
+    return CLAUDE_ACP_PROFILE;
   }
 
   return undefined;

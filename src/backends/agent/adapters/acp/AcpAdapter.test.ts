@@ -102,6 +102,36 @@ function createGenericStdioInstance(): RemoteProviderInstanceConfig {
   };
 }
 
+function createClaudeHttpInstance(): RemoteProviderInstanceConfig {
+  return {
+    id: 'acp-claude-remote',
+    providerName: 'claude',
+    backend: 'agent',
+    transport: 'acp',
+    baseUrl: 'http://claude-acp.test',
+    authTokenEnv: 'CLAUDE_ACP_TOKEN',
+    headers: {
+      'x-client-id': 'cats-runtime',
+      accept: 'application/json',
+    },
+    model: 'sonnet',
+  };
+}
+
+function createClaudeStdioInstance(): RemoteProviderInstanceConfig {
+  return {
+    id: 'acp-claude-local',
+    providerName: 'claude',
+    backend: 'agent',
+    transport: 'acp_stdio',
+    command: 'claude-agent-acp',
+    args: ['serve'],
+    cwd: '/tmp/acp',
+    startupTimeoutMs: 15000,
+    model: 'sonnet',
+  };
+}
+
 function createHostBridge(permissionMode: 'skip' | 'default' | 'whitelist' = 'skip'): AgentAcpHostBridge {
   return {
     describe(_context: AgentAcpHostContext) {
@@ -282,6 +312,103 @@ describe('AcpAdapter', () => {
       launch: {
         kind: 'stdio',
         command: 'codex-acp',
+        args: ['serve'],
+        cwd: '/tmp/acp',
+        startupTimeoutMs: 15000,
+      },
+      transport: {
+        kind: 'stdio',
+        protocol: 'acp_v1',
+        liveProbe: 'command_help',
+        modelDiscovery: 'session_bootstrap',
+        toolDiscovery: 'session_bootstrap',
+        streaming: 'generic',
+      },
+      request: {
+        headerNames: [],
+      },
+      auth: {
+        mechanisms: [],
+        credentials: [],
+      },
+      continuity: {
+        providerManagedSessions: true,
+        sessionKey: true,
+        providerSessionState: true,
+        cancel: true,
+      },
+      capabilities: {
+        probe: true,
+        modelDiscovery: true,
+        toolCatalog: true,
+        effectiveToolCatalog: true,
+        cancel: true,
+        runtimeServices: false,
+        toolCallEvents: true,
+      },
+    });
+  });
+
+  it('describes HTTP ACP targets with claude profile when provider name is claude', () => {
+    const adapter = new AcpAdapter({
+      env: { CLAUDE_ACP_TOKEN: 'secret-token' },
+    });
+
+    const inspection = adapter.inspect(createClaudeHttpInstance());
+
+    expect(inspection).toEqual({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('provider-managed ACP transport'),
+      endpoint: 'http://claude-acp.test',
+      transport: {
+        kind: 'http',
+        protocol: 'acp_v1',
+        liveProbe: 'none',
+        modelDiscovery: 'none',
+        toolDiscovery: 'none',
+        streaming: 'generic',
+      },
+      request: {
+        headerNames: ['x-client-id'],
+      },
+      auth: {
+        mechanisms: ['bearer_header'],
+        credentials: [
+          { kind: 'base_url', configured: true },
+          { kind: 'auth_token', configured: true },
+        ],
+      },
+      continuity: {
+        providerManagedSessions: true,
+        sessionKey: true,
+        providerSessionState: true,
+        cancel: false,
+      },
+      capabilities: {
+        probe: false,
+        modelDiscovery: false,
+        toolCatalog: false,
+        effectiveToolCatalog: false,
+        cancel: false,
+        runtimeServices: false,
+        toolCallEvents: false,
+      },
+    });
+  });
+
+  it('describes stdio ACP targets with Claude ACP profile label', () => {
+    const adapter = new AcpAdapter();
+
+    const inspection = adapter.inspect(createClaudeStdioInstance());
+
+    expect(inspection).toEqual({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('Claude ACP is the current ACP pilot target'),
+      launch: {
+        kind: 'stdio',
+        command: 'claude-agent-acp',
         args: ['serve'],
         cwd: '/tmp/acp',
         startupTimeoutMs: 15000,
@@ -508,6 +635,98 @@ describe('AcpAdapter', () => {
             profile: 'codex-acp',
             label: 'Codex ACP',
             family: 'codex',
+          },
+        },
+        {
+          code: 'acp_session_bootstrap',
+          status: 'ok',
+          message: 'ACP stdio target completed initialize plus session bootstrap.',
+          details: {
+            cwd: '/tmp/acp',
+            sessionIdPresent: true,
+            modelCount: 1,
+            loadSessionSupported: true,
+          },
+        },
+      ],
+    });
+  });
+
+  it('runs a stdio help probe for claude ACP pilot targets', async () => {
+    const process = new FakeAcpProcess();
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: true,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'probe-session-claude',
+            models: [{ modelId: 'sonnet', name: 'Sonnet' }],
+          },
+        }) + '\n');
+      }
+    });
+
+    const adapter = new AcpAdapter({
+      cliCommandRunner: createSuccessfulProbeRunner(),
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    await expect(adapter.probe!(createClaudeStdioInstance())).resolves.toEqual({
+      health: {
+        status: 'ok',
+        checkedAt: expect.any(String),
+        details: "ACP stdio help probe succeeded for 'claude-agent-acp serve --help'.",
+      },
+      liveProbe: {
+        transport: 'stdio',
+        command: 'claude-agent-acp',
+        args: ['serve', '--help'],
+        profile: 'claude-acp',
+        profileLabel: 'Claude ACP',
+        exitCode: 0,
+        timedOut: false,
+        durationMs: 42,
+        hasOutput: true,
+        bootstrapSession: true,
+        bootstrapCwd: '/tmp/acp',
+        bootstrapSessionIdPresent: true,
+        bootstrapModelCount: 1,
+        loadSessionSupported: true,
+      },
+      checks: [
+        {
+          code: 'acp_help_probe_exit',
+          status: 'ok',
+          message: 'ACP stdio command accepted the help probe.',
+          details: {
+            command: 'claude-agent-acp serve --help',
+            exitCode: 0,
+            timedOut: false,
+            durationMs: 42,
+          },
+        },
+        {
+          code: 'acp_target_profile',
+          status: 'ok',
+          message: "Resolved ACP target profile 'Claude ACP'.",
+          details: {
+            profile: 'claude-acp',
+            label: 'Claude ACP',
+            family: 'claude',
           },
         },
         {
@@ -995,6 +1214,62 @@ describe('AcpAdapter', () => {
 
     await collectEvents(adapter.invoke(
       createInvokeInput(createGenericStdioInstance(), hostBridge),
+    ));
+
+    const capabilities = initializeParams?.clientCapabilities as Record<string, unknown> | undefined;
+    expect(capabilities?._meta).toBeUndefined();
+  });
+
+  it('keeps claude ACP stdio initialize payloads free of provider-specific capability hints', async () => {
+    const process = new FakeAcpProcess();
+    let initializeParams: Record<string, unknown> | undefined;
+
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        initializeParams = message.params as Record<string, unknown>;
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: false,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'acp-session-init-claude',
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/prompt') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            stopReason: 'end_turn',
+          },
+        }) + '\n');
+      }
+    });
+
+    const hostBridge = createHostBridge();
+    const adapter = new AcpAdapter({
+      acpHostBridge: hostBridge,
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    await collectEvents(adapter.invoke(
+      createInvokeInput(createClaudeStdioInstance(), hostBridge),
     ));
 
     const capabilities = initializeParams?.clientCapabilities as Record<string, unknown> | undefined;

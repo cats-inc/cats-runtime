@@ -173,4 +173,61 @@ describe('inspectAgentTarget', () => {
       },
     });
   });
+
+  it('describes ACP stdio transport semantics for claude profile', () => {
+    const inspection = inspectAgentTarget({
+      id: 'acp-claude-local',
+      providerName: 'claude',
+      backend: 'agent',
+      transport: 'acp_stdio',
+      command: 'claude-agent-acp',
+      args: ['serve'],
+      cwd: '/tmp/acp',
+      startupTimeoutMs: 15000,
+      model: 'sonnet',
+    });
+
+    expect(inspection).toEqual({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('Claude ACP is the current ACP pilot target'),
+      launch: {
+        kind: 'stdio',
+        command: 'claude-agent-acp',
+        args: ['serve'],
+        cwd: '/tmp/acp',
+        startupTimeoutMs: 15000,
+      },
+      transport: {
+        kind: 'stdio',
+        protocol: 'acp_v1',
+        liveProbe: 'command_help',
+        modelDiscovery: 'session_bootstrap',
+        toolDiscovery: 'session_bootstrap',
+        streaming: 'generic',
+      },
+      request: {
+        headerNames: [],
+      },
+      auth: {
+        mechanisms: [],
+        credentials: [],
+      },
+      continuity: {
+        providerManagedSessions: true,
+        sessionKey: true,
+        providerSessionState: true,
+        cancel: true,
+      },
+      capabilities: {
+        probe: true,
+        modelDiscovery: true,
+        toolCatalog: true,
+        effectiveToolCatalog: true,
+        cancel: true,
+        runtimeServices: false,
+        toolCallEvents: true,
+      },
+    });
+  });
 });
