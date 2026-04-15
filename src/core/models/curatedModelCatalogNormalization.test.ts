@@ -3,6 +3,7 @@ import {
   normalizeCopilotModelName,
   normalizeCursorModelName,
   normalizeKiloModelName,
+  normalizeKiroCuratedModelId,
 } from './curatedModelCatalogNormalization.js';
 
 describe('curatedModelCatalogNormalization', () => {
@@ -42,5 +43,17 @@ describe('curatedModelCatalogNormalization', () => {
     expect(normalizeKiloModelName('MoonshotAI: Kimi K2.5')).toBe('kilo/moonshotai/kimi-k2.5');
     expect(normalizeKiloModelName('Z.ai: GLM 5.1 (new)')).toBe('kilo/z-ai/glm-5.1');
     expect(normalizeKiloModelName('Unknown Kilo Model')).toBeNull();
+  });
+
+  it('normalizes Kiro model names into runtime-owned catalog ids', () => {
+    expect(normalizeKiroCuratedModelId({ name: 'auto' })).toBe('auto');
+    expect(normalizeKiroCuratedModelId({ name: 'claude-opus-4.6' })).toBe('claude-opus-4.6');
+    expect(normalizeKiroCuratedModelId({ name: 'claude-sonnet-4.6' })).toBe('claude-sonnet-4.6');
+    expect(normalizeKiroCuratedModelId({ name: 'claude-haiku-4.5' })).toBe('claude-haiku-4.5');
+    expect(normalizeKiroCuratedModelId({ name: 'deepseek-3.2' })).toBe('deepseek-3.2');
+    expect(normalizeKiroCuratedModelId({ name: 'minimax-m2.5' })).toBe('minimax-m2.5');
+    expect(normalizeKiroCuratedModelId({ name: 'glm-5' })).toBe('glm-5');
+    expect(normalizeKiroCuratedModelId({ name: 'qwen3-coder-next' })).toBe('qwen3-coder-next');
+    expect(normalizeKiroCuratedModelId({ name: 'Unknown Kiro Model' })).toBeNull();
   });
 });

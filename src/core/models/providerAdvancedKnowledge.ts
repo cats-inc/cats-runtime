@@ -32,6 +32,7 @@ import {
   normalizeCodexCuratedModelId,
   normalizeCursorCuratedModelId,
   normalizeKiloCuratedModelId,
+  normalizeKiroCuratedModelId,
   normalizeLiteralCuratedModelId,
 } from './curatedModelCatalogNormalization.js';
 
@@ -651,6 +652,22 @@ function buildCuratedKiloCliOverlay(
   return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeKiloCuratedModelId);
 }
 
+function buildCuratedKiroCliOverlay(
+  document: CuratedModelCatalogDocument | undefined,
+): CuratedCatalogOverlay | null {
+  const catalog = findCuratedCliCatalog(document, 'kiro');
+  if (!catalog) {
+    return null;
+  }
+
+  const scope = resolveCuratedCatalogScope(catalog, 'kiro');
+  if (!scope) {
+    return null;
+  }
+
+  return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeKiroCuratedModelId);
+}
+
 function buildCuratedCopilotCliOverlay(
   document: CuratedModelCatalogDocument | undefined,
 ): CuratedCatalogOverlay | null {
@@ -1252,6 +1269,7 @@ function loadCuratedOverlay(
       && target.providerName !== 'codex'
       && target.providerName !== 'gemini'
       && target.providerName !== 'kilo'
+      && target.providerName !== 'kiro'
       && target.providerName !== 'copilot'
       && target.providerName !== 'cursor'
     )
@@ -1274,6 +1292,8 @@ function loadCuratedOverlay(
         return buildCuratedGeminiCliOverlay(result.document);
       case 'kilo':
         return buildCuratedKiloCliOverlay(result.document);
+      case 'kiro':
+        return buildCuratedKiroCliOverlay(result.document);
       case 'copilot':
         return buildCuratedCopilotCliOverlay(result.document);
       case 'cursor':

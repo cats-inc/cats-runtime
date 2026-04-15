@@ -15,6 +15,7 @@ const CURATED_CLI_ALIASES: Record<string, string[]> = {
   codex: ['codex'],
   gemini: ['gemini'],
   kilo: ['kilo'],
+  kiro: ['kiro'],
   copilot: ['copilot', 'github copilot'],
   cursor: ['cursor'],
 };
@@ -24,6 +25,7 @@ const CURATED_PROVIDER_ALIASES: Record<string, string[]> = {
   codex: ['openai', 'codex'],
   gemini: ['google', 'gemini'],
   kilo: ['kilo'],
+  kiro: ['kiro'],
   copilot: ['copilot', 'github copilot'],
   cursor: ['cursor'],
 };
