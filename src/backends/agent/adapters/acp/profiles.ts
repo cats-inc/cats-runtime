@@ -1,10 +1,11 @@
-import { basename } from 'node:path';
+import { basename, win32 } from 'node:path';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
 
 export interface AcpProviderProfile {
   id: string;
   label: string;
   family: string;
+  tier: 1 | 2;
   summary: string;
   clientCapabilityMeta?: Record<string, unknown>;
   probe: {
@@ -16,7 +17,8 @@ const CODEX_ACP_PROFILE: AcpProviderProfile = {
   id: 'codex-acp',
   label: 'Codex ACP',
   family: 'codex',
-  summary: 'Tier 1 Codex ACP pilot target with runtime overlap on JSON-RPC lifecycle semantics.',
+  tier: 1,
+  summary: 'Tier 1 Codex ACP target with runtime overlap on JSON-RPC lifecycle semantics.',
   clientCapabilityMeta: {
     terminal_output: true,
   },
@@ -29,6 +31,7 @@ const CLAUDE_ACP_PROFILE: AcpProviderProfile = {
   id: 'claude-acp',
   label: 'Claude ACP',
   family: 'claude',
+  tier: 1,
   summary: 'Tier 1 Claude ACP target with auth-capable registry profile.',
   probe: {
     helpArgs: ['--help'],
@@ -39,6 +42,7 @@ const GEMINI_ACP_PROFILE: AcpProviderProfile = {
   id: 'gemini-acp',
   label: 'Gemini ACP',
   family: 'gemini',
+  tier: 1,
   summary: 'Tier 1 Gemini ACP target with public and curated registry overlap.',
   probe: {
     helpArgs: ['--help'],
@@ -49,6 +53,7 @@ const CURSOR_ACP_PROFILE: AcpProviderProfile = {
   id: 'cursor-acp',
   label: 'Cursor ACP',
   family: 'cursor',
+  tier: 1,
   summary: 'Tier 1 Cursor ACP target with public and curated registry overlap.',
   probe: {
     helpArgs: ['--help'],
@@ -59,18 +64,72 @@ const COPILOT_ACP_PROFILE: AcpProviderProfile = {
   id: 'copilot-acp',
   label: 'Copilot ACP',
   family: 'copilot',
+  tier: 1,
   summary: 'Tier 1 Copilot ACP target with public preview registry evidence.',
   probe: {
     helpArgs: ['--help'],
   },
 };
 
+function stripPackageVersion(token: string): string {
+  if (!token) {
+    return '';
+  }
+
+  if (token.startsWith('@')) {
+    const slashIndex = token.indexOf('/');
+    if (slashIndex === -1) {
+      return token;
+    }
+
+    const versionIndex = token.indexOf('@', slashIndex + 1);
+    return versionIndex === -1 ? token : token.slice(0, versionIndex);
+  }
+
+  const versionIndex = token.indexOf('@');
+  return versionIndex === -1 ? token : token.slice(0, versionIndex);
+}
+
+function stripExecutableExtension(token: string): string {
+  return token.replace(/\.(cmd|exe|bat|ps1|sh|js|mjs|cjs)$/u, '');
+}
+
+function normalizeToken(token: string | undefined): string {
+  if (!token) {
+    return '';
+  }
+
+  return stripExecutableExtension(stripPackageVersion(token.trim().toLowerCase()));
+}
+
 function normalizeCommandName(command: string | undefined): string {
   if (!command) {
     return '';
   }
 
-  return basename(command).trim().toLowerCase();
+  return normalizeToken(win32.basename(command)) || normalizeToken(basename(command));
+}
+
+function collectArgTokens(args: readonly string[] | undefined): Set<string> {
+  const tokens = new Set<string>();
+
+  for (const arg of args || []) {
+    const normalizedArg = normalizeToken(arg);
+    const normalizedBase = normalizeToken(basename(arg));
+    const normalizedWindowsBase = normalizeToken(win32.basename(arg));
+
+    if (normalizedArg) {
+      tokens.add(normalizedArg);
+    }
+    if (normalizedBase) {
+      tokens.add(normalizedBase);
+    }
+    if (normalizedWindowsBase) {
+      tokens.add(normalizedWindowsBase);
+    }
+  }
+
+  return tokens;
 }
 
 function hasHelpFlag(args: readonly string[] | undefined): boolean {
@@ -80,10 +139,9 @@ function hasHelpFlag(args: readonly string[] | undefined): boolean {
 export function resolveAcpProviderProfile(
   instance: RemoteProviderInstanceConfig,
 ): AcpProviderProfile | undefined {
-  const providerName = instance.providerName.trim().toLowerCase();
+  const providerName = normalizeToken(instance.providerName);
   const commandName = normalizeCommandName(instance.command);
-  const argNames = new Set((instance.args || [])
-    .map((arg) => basename(arg).trim().toLowerCase()));
+  const argNames = collectArgTokens(instance.args);
 
   if (
     providerName === 'codex'

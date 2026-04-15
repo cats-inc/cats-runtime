@@ -268,18 +268,19 @@ The provider-side ACP adoption matrix should begin with these tiers:
 
 Rationale:
 
-- `codex` remains the default first pilot because its current runtime seam is
-  already highly protocol-shaped
+- Tier 1 is a simultaneous support matrix, not a single-provider pilot track:
+  runtime docs, diagnostics, and inspection summaries should treat
+  `claude`, `codex`, `gemini`, `cursor`, and `copilot` as the same rollout
+  bucket unless a later decision explicitly narrows that policy
+- `codex` has the most protocol-shaped runtime seam today, so some
+  Codex-specific transport details may land earlier than other Tier 1 families
+  without changing the matrix itself
 - `claude`, `gemini`, `cursor`, and `copilot` are the highest-value provider
   families in the runtime's product direction and all have strong public ACP
-  ecosystem presence
+  ecosystem presence alongside `codex`
 - `opencode`, `kilo`, `goose`, `pi`, `auggie`, `junie`, and `kiro` are all
   meaningful runtime families with ACP evidence, but should follow after the
   primary Tier 1 targets prove the ACP host bridge and diagnostics shape
-
-`codex` is both the default Phase 3 pilot and a Tier 1 family.
-That is intentional: the first executable ACP provider slice should validate
-one Tier 1 target before the runtime rolls out the rest of Tier 1.
 
 ## Capability Model
 

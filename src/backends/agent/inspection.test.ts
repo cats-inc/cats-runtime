@@ -133,7 +133,7 @@ describe('inspectAgentTarget', () => {
     expect(inspection).toEqual({
       adapter: 'acp',
       family: 'protocol',
-      summary: expect.stringContaining('Codex ACP is the current ACP pilot target'),
+      summary: expect.stringContaining('Codex ACP is a supported Tier 1 ACP target'),
       launch: {
         kind: 'stdio',
         command: 'codex-acp',
@@ -190,7 +190,7 @@ describe('inspectAgentTarget', () => {
     expect(inspection).toEqual({
       adapter: 'acp',
       family: 'protocol',
-      summary: expect.stringContaining('Claude ACP is the current ACP pilot target'),
+      summary: expect.stringContaining('Claude ACP is a supported Tier 1 ACP target'),
       launch: {
         kind: 'stdio',
         command: 'claude-agent-acp',
@@ -247,7 +247,7 @@ describe('inspectAgentTarget', () => {
     expect(inspection).toEqual(expect.objectContaining({
       adapter: 'acp',
       family: 'protocol',
-      summary: expect.stringContaining('Gemini ACP is the current ACP pilot target'),
+      summary: expect.stringContaining('Gemini ACP is a supported Tier 1 ACP target'),
       launch: expect.objectContaining({ command: 'gemini-acp' }),
     }));
   });
@@ -268,7 +268,7 @@ describe('inspectAgentTarget', () => {
     expect(inspection).toEqual(expect.objectContaining({
       adapter: 'acp',
       family: 'protocol',
-      summary: expect.stringContaining('Cursor ACP is the current ACP pilot target'),
+      summary: expect.stringContaining('Cursor ACP is a supported Tier 1 ACP target'),
       launch: expect.objectContaining({ command: 'cursor-acp' }),
     }));
   });
@@ -289,7 +289,7 @@ describe('inspectAgentTarget', () => {
     expect(inspection).toEqual(expect.objectContaining({
       adapter: 'acp',
       family: 'protocol',
-      summary: expect.stringContaining('Copilot ACP is the current ACP pilot target'),
+      summary: expect.stringContaining('Copilot ACP is a supported Tier 1 ACP target'),
       launch: expect.objectContaining({ command: 'copilot-acp' }),
     }));
   });

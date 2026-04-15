@@ -398,7 +398,7 @@ describe('AcpAdapter', () => {
     expect(inspection).toEqual({
       adapter: 'acp',
       family: 'protocol',
-      summary: expect.stringContaining('Codex ACP is the current ACP pilot target'),
+      summary: expect.stringContaining('Codex ACP is a supported Tier 1 ACP target'),
       launch: {
         kind: 'stdio',
         command: 'codex-acp',
@@ -495,7 +495,7 @@ describe('AcpAdapter', () => {
     expect(inspection).toEqual({
       adapter: 'acp',
       family: 'protocol',
-      summary: expect.stringContaining('Claude ACP is the current ACP pilot target'),
+      summary: expect.stringContaining('Claude ACP is a supported Tier 1 ACP target'),
       launch: {
         kind: 'stdio',
         command: 'claude-agent-acp',
@@ -589,7 +589,7 @@ describe('AcpAdapter', () => {
     expect(inspection).toEqual({
       adapter: 'acp',
       family: 'protocol',
-      summary: expect.stringContaining('Gemini ACP is the current ACP pilot target'),
+      summary: expect.stringContaining('Gemini ACP is a supported Tier 1 ACP target'),
       launch: {
         kind: 'stdio',
         command: 'gemini-acp',
@@ -678,7 +678,7 @@ describe('AcpAdapter', () => {
     expect(inspection).toEqual({
       adapter: 'acp',
       family: 'protocol',
-      summary: expect.stringContaining('Cursor ACP is the current ACP pilot target'),
+      summary: expect.stringContaining('Cursor ACP is a supported Tier 1 ACP target'),
       launch: {
         kind: 'stdio',
         command: 'cursor-acp',
@@ -767,7 +767,7 @@ describe('AcpAdapter', () => {
     expect(inspection).toEqual({
       adapter: 'acp',
       family: 'protocol',
-      summary: expect.stringContaining('Copilot ACP is the current ACP pilot target'),
+      summary: expect.stringContaining('Copilot ACP is a supported Tier 1 ACP target'),
       launch: {
         kind: 'stdio',
         command: 'copilot-acp',
@@ -914,7 +914,7 @@ describe('AcpAdapter', () => {
     ]);
   });
 
-  it('runs a stdio help probe for codex ACP pilot targets', async () => {
+  it('runs a stdio help probe for codex ACP Tier 1 targets', async () => {
     const process = new FakeAcpProcess();
     startFakeServer(process, async (message) => {
       if (message.method === 'initialize') {
@@ -1009,7 +1009,7 @@ describe('AcpAdapter', () => {
     });
   });
 
-  it('runs a stdio help probe for claude ACP pilot targets', async () => {
+  it('runs a stdio help probe for claude ACP Tier 1 targets', async () => {
     const process = new FakeAcpProcess();
     startFakeServer(process, async (message) => {
       if (message.method === 'initialize') {
@@ -1101,7 +1101,7 @@ describe('AcpAdapter', () => {
     });
   });
 
-  it('runs a stdio help probe for gemini ACP pilot targets', async () => {
+  it('runs a stdio help probe for gemini ACP Tier 1 targets', async () => {
     const process = new FakeAcpProcess();
     startFakeServer(process, async (message) => {
       if (message.method === 'initialize') {
@@ -1139,7 +1139,7 @@ describe('AcpAdapter', () => {
     ]));
   });
 
-  it('runs a stdio help probe for cursor ACP pilot targets', async () => {
+  it('runs a stdio help probe for cursor ACP Tier 1 targets', async () => {
     const process = new FakeAcpProcess();
     startFakeServer(process, async (message) => {
       if (message.method === 'initialize') {
@@ -1177,7 +1177,7 @@ describe('AcpAdapter', () => {
     ]));
   });
 
-  it('runs a stdio help probe for copilot ACP pilot targets', async () => {
+  it('runs a stdio help probe for copilot ACP Tier 1 targets', async () => {
     const process = new FakeAcpProcess();
     startFakeServer(process, async (message) => {
       if (message.method === 'initialize') {

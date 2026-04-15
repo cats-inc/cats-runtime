@@ -121,7 +121,7 @@ function buildInspection(
     ? 'A runtime ACP host-capability bridge is configured; the current execution slice mediates ACP permission, filesystem, and terminal requests through runtime policy, while client MCP server exposure remains disabled unless the host bridge explicitly supplies MCP declarations.'
     : 'It will require a runtime ACP host-capability bridge before turn execution is enabled.';
   const profileSummary = profile
-    ? ` ${profile.label} is the current ACP pilot target because its lifecycle overlaps with an existing runtime seam.`
+    ? ` ${profile.label} is a supported Tier ${profile.tier} ACP target in the runtime adoption matrix.`
     : '';
   const summary = command
     ? `ACP target '${instance.providerName}/${instance.id}' is configured as a provider-managed stdio agent command.${profileSummary} ${hostBridgeSummary}`
@@ -1578,7 +1578,7 @@ export class AcpAdapter implements AgentAdapter {
         status: profile ? 'ok' : 'degraded',
         message: profile
           ? `Resolved ACP target profile '${profile.label}'.`
-          : 'ACP target is using the generic stdio profile with no runtime-owned pilot hints.',
+          : 'ACP target is using the generic stdio profile with no runtime-owned tier mapping.',
         details: profile
           ? {
               profile: profile.id,
