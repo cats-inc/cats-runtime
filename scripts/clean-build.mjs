@@ -7,12 +7,14 @@ const runtimeRoot = join(scriptsDir, '..');
 const runtimeBuildDir = join(runtimeRoot, 'build', 'runtime');
 const legacyDistDir = join(runtimeRoot, 'dist');
 
-rmSync(runtimeBuildDir, {
-  recursive: true,
-  force: true,
-});
+function removeBuildDir(targetPath) {
+  rmSync(targetPath, {
+    recursive: true,
+    force: true,
+    maxRetries: 10,
+    retryDelay: 100,
+  });
+}
 
-rmSync(legacyDistDir, {
-  recursive: true,
-  force: true,
-});
+removeBuildDir(runtimeBuildDir);
+removeBuildDir(legacyDistDir);
