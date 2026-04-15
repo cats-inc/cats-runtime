@@ -2401,6 +2401,181 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
+  it('applies curated Kiro CLI entry metadata from curated-model-catalogs.yaml', () => {
+    const runtime = createRuntimeRoot();
+
+    try {
+      writeFileSync(runtime.paths.curatedModelCatalogPath, [
+        'schema_version: 1',
+        'catalogs:',
+        '  - cli: Kiro',
+        '    version: 2.0.0',
+        '    last_updated: 2026-04-15',
+        '    models:',
+        '      - name: auto',
+        '        default: true',
+        '      - name: claude-opus-4.6',
+        '      - name: claude-sonnet-4.6',
+        '      - name: claude-opus-4.5',
+        '      - name: claude-sonnet-4.5',
+        '      - name: claude-sonnet-4',
+        '      - name: claude-haiku-4.5',
+        '      - name: deepseek-3.2',
+        '      - name: minimax-m2.5',
+        '      - name: minimax-m2.1',
+        '      - name: glm-5',
+        '      - name: qwen3-coder-next',
+        '',
+      ].join('\n'), 'utf8');
+
+      const base = createCatalogConfig();
+      const config = {
+        ...base,
+        configPath: runtime.paths.configPath,
+        sessionBaseDir: runtime.paths.sessionBaseDir,
+        providerDefaultTargets: {
+          ...base.providerDefaultTargets,
+          kiro: { backend: 'cli', instance: 'default' },
+        },
+        providerInstances: {
+          ...base.providerInstances,
+          kiro: {
+            default: {
+              id: 'default',
+              providerName: 'kiro',
+              commandConfig: {
+                path: 'kiro-cli',
+                runner: 'auto',
+                runtime: { mode: 'native' },
+              },
+            },
+          },
+        },
+        providerCommands: {
+          ...base.providerCommands,
+          kiro: {
+            path: 'kiro-cli',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
+        },
+      } as const;
+
+      const service = new ProviderModelCatalogService(config as never, {
+        env: runtime.env,
+      });
+
+      expect(service.getImmediateCatalog('kiro')).toEqual({
+        provider: 'kiro',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'claude-opus-4.6',
+        source: 'static',
+        cache: null,
+        models: [
+          { id: 'auto', label: 'auto', default: false },
+          { id: 'claude-opus-4.6', label: 'claude-opus-4.6', default: true },
+          { id: 'claude-sonnet-4.6', label: 'claude-sonnet-4.6', default: false },
+          { id: 'claude-opus-4.5', label: 'claude-opus-4.5', default: false },
+          { id: 'claude-sonnet-4.5', label: 'claude-sonnet-4.5', default: false },
+          { id: 'claude-sonnet-4', label: 'claude-sonnet-4', default: false },
+          { id: 'claude-haiku-4.5', label: 'claude-haiku-4.5', default: false },
+          { id: 'deepseek-3.2', label: 'deepseek-3.2', default: false },
+          { id: 'minimax-m2.5', label: 'minimax-m2.5', default: false },
+          { id: 'minimax-m2.1', label: 'minimax-m2.1', default: false },
+          { id: 'glm-5', label: 'glm-5', default: false },
+          { id: 'qwen3-coder-next', label: 'qwen3-coder-next', default: false },
+        ],
+        warnings: [],
+      });
+      expect(service.getImmediateAdvancedCatalog('kiro')).toEqual({
+        provider: 'kiro',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'claude-opus-4.6',
+        source: 'static',
+        cache: null,
+        entries: [
+          { id: 'auto', label: 'auto', default: true },
+          {
+            id: 'claude-opus-4.6',
+            label: 'claude-opus-4.6',
+            default: false,
+            capabilityTags: ['reasoning'],
+          },
+          {
+            id: 'claude-sonnet-4.6',
+            label: 'claude-sonnet-4.6',
+            default: false,
+          },
+          {
+            id: 'claude-opus-4.5',
+            label: 'claude-opus-4.5',
+            default: false,
+            capabilityTags: ['reasoning'],
+          },
+          {
+            id: 'claude-sonnet-4.5',
+            label: 'claude-sonnet-4.5',
+            default: false,
+          },
+          {
+            id: 'claude-sonnet-4',
+            label: 'claude-sonnet-4',
+            default: false,
+          },
+          {
+            id: 'claude-haiku-4.5',
+            label: 'claude-haiku-4.5',
+            default: false,
+            capabilityTags: ['latency_optimized'],
+          },
+          {
+            id: 'deepseek-3.2',
+            label: 'deepseek-3.2',
+            default: false,
+          },
+          {
+            id: 'minimax-m2.5',
+            label: 'minimax-m2.5',
+            default: false,
+            capabilityTags: ['latency_optimized'],
+          },
+          {
+            id: 'minimax-m2.1',
+            label: 'minimax-m2.1',
+            default: false,
+            capabilityTags: ['latency_optimized'],
+          },
+          {
+            id: 'glm-5',
+            label: 'glm-5',
+            default: false,
+          },
+          {
+            id: 'qwen3-coder-next',
+            label: 'qwen3-coder-next',
+            default: false,
+          },
+        ],
+        presets: [],
+        controls: [],
+        defaultSelection: null,
+        support: {
+          tier: 'entry_only',
+          advancedMetadataStatus: 'unverified_omitted',
+          discoveryMode: 'manual_refresh',
+          provenance: {
+            status: 'unverified_omitted',
+          },
+        },
+        warnings: [],
+      });
+    } finally {
+      runtime.cleanup();
+    }
+  });
+
   it('warns when curated CLI models cannot be normalized', () => {
     const runtime = createRuntimeRoot();
 

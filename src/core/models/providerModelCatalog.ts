@@ -605,6 +605,7 @@ function supportsCuratedStaticCliCatalog(providerName: string): boolean {
     || providerName === 'codex'
     || providerName === 'gemini'
     || providerName === 'kilo'
+    || providerName === 'kiro'
     || providerName === 'copilot'
     || providerName === 'cursor';
 }
