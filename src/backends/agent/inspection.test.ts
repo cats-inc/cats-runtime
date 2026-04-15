@@ -134,6 +134,12 @@ describe('inspectAgentTarget', () => {
       adapter: 'acp',
       family: 'protocol',
       summary: expect.stringContaining('Codex ACP is a supported Tier 1 ACP target'),
+      profile: {
+        id: 'codex-acp',
+        label: 'Codex ACP',
+        family: 'codex',
+        tier: 1,
+      },
       launch: {
         kind: 'stdio',
         command: 'codex-acp',
@@ -191,6 +197,12 @@ describe('inspectAgentTarget', () => {
       adapter: 'acp',
       family: 'protocol',
       summary: expect.stringContaining('Claude ACP is a supported Tier 1 ACP target'),
+      profile: {
+        id: 'claude-acp',
+        label: 'Claude ACP',
+        family: 'claude',
+        tier: 1,
+      },
       launch: {
         kind: 'stdio',
         command: 'claude-agent-acp',
@@ -248,6 +260,11 @@ describe('inspectAgentTarget', () => {
       adapter: 'acp',
       family: 'protocol',
       summary: expect.stringContaining('Gemini ACP is a supported Tier 1 ACP target'),
+      profile: expect.objectContaining({
+        id: 'gemini-acp',
+        family: 'gemini',
+        tier: 1,
+      }),
       launch: expect.objectContaining({ command: 'gemini-acp' }),
     }));
   });
@@ -269,6 +286,11 @@ describe('inspectAgentTarget', () => {
       adapter: 'acp',
       family: 'protocol',
       summary: expect.stringContaining('Cursor ACP is a supported Tier 1 ACP target'),
+      profile: expect.objectContaining({
+        id: 'cursor-acp',
+        family: 'cursor',
+        tier: 1,
+      }),
       launch: expect.objectContaining({ command: 'cursor-acp' }),
     }));
   });
@@ -290,6 +312,11 @@ describe('inspectAgentTarget', () => {
       adapter: 'acp',
       family: 'protocol',
       summary: expect.stringContaining('Copilot ACP is a supported Tier 1 ACP target'),
+      profile: expect.objectContaining({
+        id: 'copilot-acp',
+        family: 'copilot',
+        tier: 1,
+      }),
       launch: expect.objectContaining({ command: 'copilot-acp' }),
     }));
   });

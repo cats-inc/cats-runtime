@@ -215,6 +215,12 @@ export interface AgentAdapterInspection {
   summary: string;
   endpoint?: string;
   launch?: AgentAdapterInspectionLaunch;
+  profile?: {
+    id: string;
+    label: string;
+    family: string;
+    tier?: 1 | 2;
+  };
   transport: {
     kind: 'websocket' | 'http' | 'stdio';
     protocol: 'openclaw_gateway_v3' | 'agent_sdk_http_v1' | 'acp_v1' | 'generic';

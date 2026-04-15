@@ -267,10 +267,11 @@ src/
   names or research notes
 - Exposes additive agent-target inspection read models on `/providers/config`
   and `/diagnostics/providers` so operators can read adapter family, transport
-  semantics, auth surface, provider-managed continuity, and bounded capability
-  truth without inferring them from provider names; live agent diagnostics also
-  project adapter-specific `config.liveProbe` summaries instead of only generic
-  probe status text
+  semantics, resolved ACP profile/tier identity when applicable, auth surface,
+  provider-managed continuity, and bounded capability truth without inferring
+  them from provider names; live agent diagnostics also project
+  adapter-specific `config.liveProbe` summaries instead of only generic probe
+  status text
 - Exposes runtime-owned browser session/page routes with pluggable driver
   metadata, normalized `browser_page` preview surfaces, aggregate browser
   summary reads, explicit in-place page navigation/update, and explicit

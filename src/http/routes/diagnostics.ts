@@ -871,6 +871,7 @@ async function diagnoseAgentTarget(
       {
         adapter: agentRuntime.adapter,
         family: agentRuntime.family,
+        ...(agentRuntime.profile ? { profile: agentRuntime.profile } : {}),
         transport: agentRuntime.transport,
         request: agentRuntime.request,
         auth: agentRuntime.auth,

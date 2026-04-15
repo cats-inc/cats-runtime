@@ -133,6 +133,14 @@ function buildInspection(
     summary,
     ...(endpoint ? { endpoint } : {}),
     ...(launch ? { launch } : {}),
+    ...(profile ? {
+      profile: {
+        id: profile.id,
+        label: profile.label,
+        family: profile.family,
+        tier: profile.tier,
+      },
+    } : {}),
     transport: {
       kind: transportKind,
       protocol: 'acp_v1',
@@ -1584,6 +1592,7 @@ export class AcpAdapter implements AgentAdapter {
               profile: profile.id,
               label: profile.label,
               family: profile.family,
+              tier: profile.tier,
             }
           : {
               provider: instance.providerName,
@@ -1594,7 +1603,11 @@ export class AcpAdapter implements AgentAdapter {
       transport: 'stdio',
       command,
       args,
-      ...(profile ? { profile: profile.id, profileLabel: profile.label } : {}),
+      ...(profile ? {
+        profile: profile.id,
+        profileLabel: profile.label,
+        profileTier: profile.tier,
+      } : {}),
       exitCode: result.code,
       timedOut: result.timedOut,
       durationMs: result.durationMs,

@@ -354,6 +354,12 @@ describe('AcpAdapter', () => {
       family: 'protocol',
       summary: expect.stringContaining('provider-managed ACP transport'),
       endpoint: 'http://acp.test',
+      profile: {
+        id: 'codex-acp',
+        label: 'Codex ACP',
+        family: 'codex',
+        tier: 1,
+      },
       transport: {
         kind: 'http',
         protocol: 'acp_v1',
@@ -399,6 +405,12 @@ describe('AcpAdapter', () => {
       adapter: 'acp',
       family: 'protocol',
       summary: expect.stringContaining('Codex ACP is a supported Tier 1 ACP target'),
+      profile: {
+        id: 'codex-acp',
+        label: 'Codex ACP',
+        family: 'codex',
+        tier: 1,
+      },
       launch: {
         kind: 'stdio',
         command: 'codex-acp',
@@ -451,6 +463,12 @@ describe('AcpAdapter', () => {
       family: 'protocol',
       summary: expect.stringContaining('provider-managed ACP transport'),
       endpoint: 'http://claude-acp.test',
+      profile: {
+        id: 'claude-acp',
+        label: 'Claude ACP',
+        family: 'claude',
+        tier: 1,
+      },
       transport: {
         kind: 'http',
         protocol: 'acp_v1',
@@ -496,6 +514,12 @@ describe('AcpAdapter', () => {
       adapter: 'acp',
       family: 'protocol',
       summary: expect.stringContaining('Claude ACP is a supported Tier 1 ACP target'),
+      profile: {
+        id: 'claude-acp',
+        label: 'Claude ACP',
+        family: 'claude',
+        tier: 1,
+      },
       launch: {
         kind: 'stdio',
         command: 'claude-agent-acp',
@@ -548,6 +572,12 @@ describe('AcpAdapter', () => {
       family: 'protocol',
       summary: expect.stringContaining('provider-managed ACP transport'),
       endpoint: 'http://gemini-acp.test',
+      profile: {
+        id: 'gemini-acp',
+        label: 'Gemini ACP',
+        family: 'gemini',
+        tier: 1,
+      },
       transport: {
         kind: 'http',
         protocol: 'acp_v1',
@@ -590,6 +620,12 @@ describe('AcpAdapter', () => {
       adapter: 'acp',
       family: 'protocol',
       summary: expect.stringContaining('Gemini ACP is a supported Tier 1 ACP target'),
+      profile: {
+        id: 'gemini-acp',
+        label: 'Gemini ACP',
+        family: 'gemini',
+        tier: 1,
+      },
       launch: {
         kind: 'stdio',
         command: 'gemini-acp',
@@ -637,6 +673,12 @@ describe('AcpAdapter', () => {
       family: 'protocol',
       summary: expect.stringContaining('provider-managed ACP transport'),
       endpoint: 'http://cursor-acp.test',
+      profile: {
+        id: 'cursor-acp',
+        label: 'Cursor ACP',
+        family: 'cursor',
+        tier: 1,
+      },
       transport: {
         kind: 'http',
         protocol: 'acp_v1',
@@ -679,6 +721,12 @@ describe('AcpAdapter', () => {
       adapter: 'acp',
       family: 'protocol',
       summary: expect.stringContaining('Cursor ACP is a supported Tier 1 ACP target'),
+      profile: {
+        id: 'cursor-acp',
+        label: 'Cursor ACP',
+        family: 'cursor',
+        tier: 1,
+      },
       launch: {
         kind: 'stdio',
         command: 'cursor-acp',
@@ -726,6 +774,12 @@ describe('AcpAdapter', () => {
       family: 'protocol',
       summary: expect.stringContaining('provider-managed ACP transport'),
       endpoint: 'http://copilot-acp.test',
+      profile: {
+        id: 'copilot-acp',
+        label: 'Copilot ACP',
+        family: 'copilot',
+        tier: 1,
+      },
       transport: {
         kind: 'http',
         protocol: 'acp_v1',
@@ -768,6 +822,12 @@ describe('AcpAdapter', () => {
       adapter: 'acp',
       family: 'protocol',
       summary: expect.stringContaining('Copilot ACP is a supported Tier 1 ACP target'),
+      profile: {
+        id: 'copilot-acp',
+        label: 'Copilot ACP',
+        family: 'copilot',
+        tier: 1,
+      },
       launch: {
         kind: 'stdio',
         command: 'copilot-acp',
@@ -962,6 +1022,7 @@ describe('AcpAdapter', () => {
         args: ['serve', '--help'],
         profile: 'codex-acp',
         profileLabel: 'Codex ACP',
+        profileTier: 1,
         exitCode: 0,
         timedOut: false,
         durationMs: 42,
@@ -992,6 +1053,7 @@ describe('AcpAdapter', () => {
             profile: 'codex-acp',
             label: 'Codex ACP',
             family: 'codex',
+            tier: 1,
           },
         },
         {
@@ -1054,6 +1116,7 @@ describe('AcpAdapter', () => {
         args: ['serve', '--help'],
         profile: 'claude-acp',
         profileLabel: 'Claude ACP',
+        profileTier: 1,
         exitCode: 0,
         timedOut: false,
         durationMs: 42,
@@ -1084,6 +1147,7 @@ describe('AcpAdapter', () => {
             profile: 'claude-acp',
             label: 'Claude ACP',
             family: 'claude',
+            tier: 1,
           },
         },
         {
@@ -1129,12 +1193,13 @@ describe('AcpAdapter', () => {
     expect(result.liveProbe).toEqual(expect.objectContaining({
       profile: 'gemini-acp',
       profileLabel: 'Gemini ACP',
+      profileTier: 1,
       command: 'gemini-acp',
     }));
     expect(result.checks).toEqual(expect.arrayContaining([
       expect.objectContaining({
         code: 'acp_target_profile',
-        details: expect.objectContaining({ profile: 'gemini-acp', label: 'Gemini ACP', family: 'gemini' }),
+        details: expect.objectContaining({ profile: 'gemini-acp', label: 'Gemini ACP', family: 'gemini', tier: 1 }),
       }),
     ]));
   });
@@ -1167,12 +1232,13 @@ describe('AcpAdapter', () => {
     expect(result.liveProbe).toEqual(expect.objectContaining({
       profile: 'cursor-acp',
       profileLabel: 'Cursor ACP',
+      profileTier: 1,
       command: 'cursor-acp',
     }));
     expect(result.checks).toEqual(expect.arrayContaining([
       expect.objectContaining({
         code: 'acp_target_profile',
-        details: expect.objectContaining({ profile: 'cursor-acp', label: 'Cursor ACP', family: 'cursor' }),
+        details: expect.objectContaining({ profile: 'cursor-acp', label: 'Cursor ACP', family: 'cursor', tier: 1 }),
       }),
     ]));
   });
@@ -1205,12 +1271,13 @@ describe('AcpAdapter', () => {
     expect(result.liveProbe).toEqual(expect.objectContaining({
       profile: 'copilot-acp',
       profileLabel: 'Copilot ACP',
+      profileTier: 1,
       command: 'copilot-acp',
     }));
     expect(result.checks).toEqual(expect.arrayContaining([
       expect.objectContaining({
         code: 'acp_target_profile',
-        details: expect.objectContaining({ profile: 'copilot-acp', label: 'Copilot ACP', family: 'copilot' }),
+        details: expect.objectContaining({ profile: 'copilot-acp', label: 'Copilot ACP', family: 'copilot', tier: 1 }),
       }),
     ]));
   });
@@ -1232,6 +1299,7 @@ describe('AcpAdapter', () => {
         args: ['serve', '--help'],
         profile: 'codex-acp',
         profileLabel: 'Codex ACP',
+        profileTier: 1,
         exitCode: 1,
         timedOut: false,
         durationMs: 17,
@@ -1257,6 +1325,7 @@ describe('AcpAdapter', () => {
             profile: 'codex-acp',
             label: 'Codex ACP',
             family: 'codex',
+            tier: 1,
           },
         },
       ],
@@ -1298,6 +1367,7 @@ describe('AcpAdapter', () => {
         args: ['serve', '--help'],
         profile: 'codex-acp',
         profileLabel: 'Codex ACP',
+        profileTier: 1,
         exitCode: 0,
         timedOut: false,
         durationMs: 42,
@@ -1325,6 +1395,7 @@ describe('AcpAdapter', () => {
             profile: 'codex-acp',
             label: 'Codex ACP',
             family: 'codex',
+            tier: 1,
           },
         },
         {

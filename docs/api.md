@@ -851,7 +851,8 @@ surface for hosts and dashboards. The response includes:
   bounded resume/fork/permission and remote-session affordance truth
 - additive `config.agentRuntime` inspection metadata for agent targets,
   including adapter family, probe/model-discovery transport shape, bounded auth
-  surface, provider-managed continuity, and runtime-visible capability flags
+  surface, resolved ACP profile identity/tier when applicable,
+  provider-managed continuity, and runtime-visible capability flags
 - additive `config.modelCatalog` summaries (`source`, `defaultModel`,
   `modelCount`, `statusCounts`, cache metadata when applicable, and warnings)
 - additive `config.liveProbe` request/semantic metadata for API/local and
@@ -873,7 +874,8 @@ surface for hosts and dashboards. The response includes:
 Agent targets now also include an additive `agent_runtime_contract` check. It
 does not replace live health probes; it summarizes the static/runtime-owned
 semantic contract that the current adapter exposes so dashboards and operators
-can distinguish gateway-vs-bridge behavior even before a session is running.
+can distinguish gateway-vs-bridge behavior, plus resolved ACP profile/tier
+identity when applicable, even before a session is running.
 
 `GET /diagnostics/providers?probe=live` enables live probes where the current
 runtime backend supports them. For CLI targets this now validates the runtime
@@ -3593,6 +3595,8 @@ metadata. This is a bounded operator read model, not a new session contract.
 The object includes:
 
 - adapter identity (`adapter`, `family`)
+- resolved ACP profile metadata when applicable (`profile.id`, `profile.label`,
+  `profile.family`, `profile.tier`)
 - operator-facing `summary`
 - resolved `endpoint`
 - `transport` semantics (`kind`, `protocol`, `liveProbe`, `modelDiscovery`,
