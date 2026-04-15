@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { loadDotEnv } from '../core/dotenv.js';
+import { loadRuntimeEnvFiles } from '../core/dotenv.js';
 import { isDirectCliEntrypoint } from '../core/cliEntrypoint.js';
 import {
   formatSetupDiagnosticEntrySummary,
@@ -66,7 +66,7 @@ export async function runMcpCli(argv: string[] = process.argv.slice(2)): Promise
     return;
   }
 
-  loadDotEnv();
+  loadRuntimeEnvFiles();
   applyRuntimeCliEnvOverrides(cliOptions, process.env);
   if (cliOptions.diagnoseSetup) {
     const result = await generateSetupDiagnosticEntryArtifact(cliOptions, process.env);

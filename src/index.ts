@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { isDirectCliEntrypoint } from './core/cliEntrypoint.js';
-import { loadDotEnv } from './core/dotenv.js';
+import { loadRuntimeEnvFiles } from './core/dotenv.js';
 import { runAcpCli } from './bin/acp.js';
 import { runMcpCli } from './bin/mcp.js';
 import { loadConfig } from './core/config.js';
@@ -102,7 +102,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  loadDotEnv();
+  loadRuntimeEnvFiles();
   const startupTrace = createRuntimeStartupTrace();
   startupTrace.trace('main.entered', {
     argv,
