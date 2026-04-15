@@ -71,6 +71,83 @@ const COPILOT_ACP_PROFILE: AcpProviderProfile = {
   },
 };
 
+const OPENCODE_ACP_PROFILE: AcpProviderProfile = {
+  id: 'opencode-acp',
+  label: 'OpenCode ACP',
+  family: 'opencode',
+  tier: 2,
+  summary: 'Tier 2 OpenCode ACP target with public and curated registry overlap.',
+  probe: {
+    helpArgs: ['--help'],
+  },
+};
+
+const KILO_ACP_PROFILE: AcpProviderProfile = {
+  id: 'kilo-acp',
+  label: 'Kilo ACP',
+  family: 'kilo',
+  tier: 2,
+  summary: 'Tier 2 Kilo ACP target with curated registry evidence.',
+  probe: {
+    helpArgs: ['--help'],
+  },
+};
+
+const GOOSE_ACP_PROFILE: AcpProviderProfile = {
+  id: 'goose-acp',
+  label: 'Goose ACP',
+  family: 'goose',
+  tier: 2,
+  summary: 'Tier 2 Goose ACP target with public and curated registry overlap.',
+  probe: {
+    helpArgs: ['--help'],
+  },
+};
+
+const PI_ACP_PROFILE: AcpProviderProfile = {
+  id: 'pi-acp',
+  label: 'Pi ACP',
+  family: 'pi',
+  tier: 2,
+  summary: 'Tier 2 Pi ACP target with public and curated registry overlap.',
+  probe: {
+    helpArgs: ['--help'],
+  },
+};
+
+const AUGGIE_ACP_PROFILE: AcpProviderProfile = {
+  id: 'auggie-acp',
+  label: 'Auggie ACP',
+  family: 'auggie',
+  tier: 2,
+  summary: 'Tier 2 Auggie ACP target with public and curated registry overlap.',
+  probe: {
+    helpArgs: ['--help'],
+  },
+};
+
+const JUNIE_ACP_PROFILE: AcpProviderProfile = {
+  id: 'junie-acp',
+  label: 'Junie ACP',
+  family: 'junie',
+  tier: 2,
+  summary: 'Tier 2 Junie ACP target with public and curated registry overlap.',
+  probe: {
+    helpArgs: ['--help'],
+  },
+};
+
+const KIRO_ACP_PROFILE: AcpProviderProfile = {
+  id: 'kiro-acp',
+  label: 'Kiro ACP',
+  family: 'kiro',
+  tier: 2,
+  summary: 'Tier 2 Kiro ACP target with public ACP-compatible evidence.',
+  probe: {
+    helpArgs: ['--help'],
+  },
+};
+
 function stripPackageVersion(token: string): string {
   if (!token) {
     return '';
@@ -190,6 +267,73 @@ export function resolveAcpProviderProfile(
     || argNames.has('@github/copilot-acp')
   ) {
     return COPILOT_ACP_PROFILE;
+  }
+
+  if (
+    providerName === 'opencode'
+    || commandName === 'opencode-acp'
+    || argNames.has('opencode-acp')
+    || argNames.has('@opencode/opencode-acp')
+  ) {
+    return OPENCODE_ACP_PROFILE;
+  }
+
+  if (
+    providerName === 'kilo'
+    || commandName === 'kilo-acp'
+    || argNames.has('kilo-acp')
+    || argNames.has('@kilocode/kilo-acp')
+  ) {
+    return KILO_ACP_PROFILE;
+  }
+
+  if (
+    providerName === 'goose'
+    || commandName === 'goose-acp'
+    || argNames.has('goose-acp')
+    || argNames.has('@block/goose-acp')
+  ) {
+    return GOOSE_ACP_PROFILE;
+  }
+
+  if (
+    providerName === 'pi'
+    || commandName === 'pi-acp'
+    || argNames.has('pi-acp')
+    || argNames.has('@anthropic/pi-acp')
+  ) {
+    return PI_ACP_PROFILE;
+  }
+
+  if (
+    providerName === 'auggie'
+    || commandName === 'auggie-acp'
+    || commandName === 'augment-code-acp'
+    || argNames.has('auggie-acp')
+    || argNames.has('augment-code-acp')
+    || argNames.has('@augmentcode/auggie-acp')
+  ) {
+    return AUGGIE_ACP_PROFILE;
+  }
+
+  if (
+    providerName === 'junie'
+    || commandName === 'junie-acp'
+    || argNames.has('junie-acp')
+    || argNames.has('@jetbrains/junie-acp')
+  ) {
+    return JUNIE_ACP_PROFILE;
+  }
+
+  if (
+    providerName === 'kiro'
+    || commandName === 'kiro-acp'
+    || commandName === 'kiro-cli-acp'
+    || argNames.has('kiro-acp')
+    || argNames.has('kiro-cli-acp')
+    || argNames.has('@amazon/kiro-acp')
+  ) {
+    return KIRO_ACP_PROFILE;
   }
 
   return undefined;

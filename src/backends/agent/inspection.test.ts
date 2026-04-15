@@ -320,4 +320,144 @@ describe('inspectAgentTarget', () => {
       launch: expect.objectContaining({ command: 'copilot-acp' }),
     }));
   });
+
+  it('describes ACP stdio transport semantics for opencode profile', () => {
+    const inspection = inspectAgentTarget({
+      id: 'acp-opencode-local',
+      providerName: 'opencode',
+      backend: 'agent',
+      transport: 'acp_stdio',
+      command: 'opencode-acp',
+      args: ['serve'],
+      cwd: '/tmp/acp',
+      startupTimeoutMs: 15000,
+    });
+
+    expect(inspection).toEqual(expect.objectContaining({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('OpenCode ACP is a supported Tier 2 ACP target'),
+      launch: expect.objectContaining({ command: 'opencode-acp' }),
+    }));
+  });
+
+  it('describes ACP stdio transport semantics for kilo profile', () => {
+    const inspection = inspectAgentTarget({
+      id: 'acp-kilo-local',
+      providerName: 'kilo',
+      backend: 'agent',
+      transport: 'acp_stdio',
+      command: 'kilo-acp',
+      args: ['serve'],
+      cwd: '/tmp/acp',
+      startupTimeoutMs: 15000,
+    });
+
+    expect(inspection).toEqual(expect.objectContaining({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('Kilo ACP is a supported Tier 2 ACP target'),
+      launch: expect.objectContaining({ command: 'kilo-acp' }),
+    }));
+  });
+
+  it('describes ACP stdio transport semantics for goose profile', () => {
+    const inspection = inspectAgentTarget({
+      id: 'acp-goose-local',
+      providerName: 'goose',
+      backend: 'agent',
+      transport: 'acp_stdio',
+      command: 'goose-acp',
+      args: ['serve'],
+      cwd: '/tmp/acp',
+      startupTimeoutMs: 15000,
+    });
+
+    expect(inspection).toEqual(expect.objectContaining({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('Goose ACP is a supported Tier 2 ACP target'),
+      launch: expect.objectContaining({ command: 'goose-acp' }),
+    }));
+  });
+
+  it('describes ACP stdio transport semantics for pi profile', () => {
+    const inspection = inspectAgentTarget({
+      id: 'acp-pi-local',
+      providerName: 'pi',
+      backend: 'agent',
+      transport: 'acp_stdio',
+      command: 'pi-acp',
+      args: ['serve'],
+      cwd: '/tmp/acp',
+      startupTimeoutMs: 15000,
+    });
+
+    expect(inspection).toEqual(expect.objectContaining({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('Pi ACP is a supported Tier 2 ACP target'),
+      launch: expect.objectContaining({ command: 'pi-acp' }),
+    }));
+  });
+
+  it('describes ACP stdio transport semantics for auggie profile', () => {
+    const inspection = inspectAgentTarget({
+      id: 'acp-auggie-local',
+      providerName: 'auggie',
+      backend: 'agent',
+      transport: 'acp_stdio',
+      command: 'auggie-acp',
+      args: ['serve'],
+      cwd: '/tmp/acp',
+      startupTimeoutMs: 15000,
+    });
+
+    expect(inspection).toEqual(expect.objectContaining({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('Auggie ACP is a supported Tier 2 ACP target'),
+      launch: expect.objectContaining({ command: 'auggie-acp' }),
+    }));
+  });
+
+  it('describes ACP stdio transport semantics for junie profile', () => {
+    const inspection = inspectAgentTarget({
+      id: 'acp-junie-local',
+      providerName: 'junie',
+      backend: 'agent',
+      transport: 'acp_stdio',
+      command: 'junie-acp',
+      args: ['serve'],
+      cwd: '/tmp/acp',
+      startupTimeoutMs: 15000,
+    });
+
+    expect(inspection).toEqual(expect.objectContaining({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('Junie ACP is a supported Tier 2 ACP target'),
+      launch: expect.objectContaining({ command: 'junie-acp' }),
+    }));
+  });
+
+  it('describes ACP stdio transport semantics for kiro profile', () => {
+    const inspection = inspectAgentTarget({
+      id: 'acp-kiro-local',
+      providerName: 'kiro',
+      backend: 'agent',
+      transport: 'acp_stdio',
+      command: 'kiro-acp',
+      args: ['serve'],
+      cwd: '/tmp/acp',
+      startupTimeoutMs: 15000,
+    });
+
+    expect(inspection).toEqual(expect.objectContaining({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('Kiro ACP is a supported Tier 2 ACP target'),
+      launch: expect.objectContaining({ command: 'kiro-acp' }),
+    }));
+  });
 });
