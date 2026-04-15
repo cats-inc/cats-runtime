@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,7 +37,13 @@ export function resolveRuntimePackageRoot(
       : resolve(process.cwd(), trimmedRoot);
   }
 
-  return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  const candidatePaths = [
+    resolve(moduleDir, '..', '..', 'package.json'),
+    resolve(moduleDir, '..', '..', '..', 'package.json'),
+  ];
+  const packageJsonPath = candidatePaths.find((candidate) => existsSync(candidate));
+  return packageJsonPath ? dirname(packageJsonPath) : resolve(moduleDir, '..', '..', '..');
 }
 
 export function resolveRuntimeDataDir(runtimeRoot: string): string {

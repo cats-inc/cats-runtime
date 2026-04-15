@@ -14,6 +14,7 @@ interface PackageManifest {
     };
   };
   files?: string[];
+  scripts?: Record<string, string>;
 }
 
 interface NpmPackDryRunEntry {
@@ -154,6 +155,9 @@ describe('package contract', () => {
       'README.md',
       'LICENSE',
     ]);
+    expect(manifest.scripts?.build).toBe('npm run clean:build && npm run build:ui && node scripts/build-runtime-artifacts.mjs');
+    expect(manifest.scripts?.['build:runtime']).toBe('tsc -p tsconfig.json');
+    expect(manifest.scripts?.['build:runtime-bundle']).toBe('node scripts/bundle-runtime.mjs');
 
     expect(packed.name).toBe('cats-runtime');
     expect(packed.version).toBeTruthy();

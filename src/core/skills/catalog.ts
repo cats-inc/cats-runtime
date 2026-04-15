@@ -34,6 +34,7 @@ const SOURCE_SKILLS_ROOT_CANDIDATES = [
   ['..', '..', '..', '..', 'skills'],
 ] as const;
 const BUILT_SKILLS_ROOT_CANDIDATES = [
+  ['..', '..', 'skills'],
   ['..', '..', '..', '..', 'skills'],
   ['..', '..', '..', 'skills'],
 ] as const;
@@ -226,8 +227,19 @@ export interface RuntimeSkillCatalogVerification {
 }
 
 export function resolveRuntimeSkillsRoot(moduleUrl: string = import.meta.url): string {
+  const packageRootOverride = process.env.CATS_RUNTIME_PACKAGE_ROOT?.trim();
+  if (packageRootOverride) {
+    const resolvedOverride = path.isAbsolute(packageRootOverride)
+      ? packageRootOverride
+      : path.resolve(process.cwd(), packageRootOverride);
+    const overrideSkillsRoot = path.join(resolvedOverride, 'skills');
+    if (existsSync(overrideSkillsRoot)) {
+      return overrideSkillsRoot;
+    }
+  }
+
   const moduleDir = path.dirname(fileURLToPath(moduleUrl));
-  const candidates = moduleDir.includes(BUILT_RUNTIME_SEGMENT)
+  const candidates = moduleDirIncludesBuiltRuntime(moduleDir)
     ? BUILT_SKILLS_ROOT_CANDIDATES
     : SOURCE_SKILLS_ROOT_CANDIDATES;
 
@@ -239,6 +251,19 @@ export function resolveRuntimeSkillsRoot(moduleUrl: string = import.meta.url): s
   }
 
   return path.resolve(moduleDir, ...candidates[0]);
+}
+
+function moduleDirIncludesBuiltRuntime(moduleDir: string): boolean {
+  if (moduleDir.includes(BUILT_RUNTIME_SEGMENT)) {
+    return true;
+  }
+  const segments = path.resolve(moduleDir).split(path.sep).filter(Boolean);
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    if (segments[index] === 'build' && segments[index + 1] === 'runtime') {
+      return true;
+    }
+  }
+  return false;
 }
 
 const SKILLS_ROOT = resolveRuntimeSkillsRoot();

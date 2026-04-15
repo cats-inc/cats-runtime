@@ -37,7 +37,9 @@
   "scripts": {
     "clean:build": "node scripts/clean-build.mjs",
     "build:ui": "node scripts/build-runtime-ui-css.mjs",
-    "build": "npm run clean:build && npm run build:ui && tsc -p tsconfig.json",
+    "build:runtime": "tsc -p tsconfig.json",
+    "build:runtime-bundle": "node scripts/bundle-runtime.mjs",
+    "build": "npm run clean:build && npm run build:ui && node scripts/build-runtime-artifacts.mjs",
     "dev": "tsx watch src/index.ts",
     "start": "node build/runtime/index.js",
     "prepack": "npm run build",
@@ -65,6 +67,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "esbuild": "^0.27.0",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.0",
     "typescript": "^5.0.0",

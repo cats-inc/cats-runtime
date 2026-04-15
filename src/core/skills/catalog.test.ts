@@ -121,6 +121,17 @@ describe('runtime skill catalog', () => {
     expect(resolveRuntimeSkillsRoot(builtModuleUrl)).toBe(expectedSkillsRoot);
   });
 
+  it('resolves bundled runtime skills from a build/runtime entrypoint path', () => {
+    const packageRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-bundled-skills-'));
+    cleanupPaths.push(packageRoot);
+    mkdirSync(join(packageRoot, 'skills'), { recursive: true });
+    const bundledModuleUrl = pathToFileURL(
+      join(packageRoot, 'build', 'runtime', 'index.js'),
+    ).href;
+
+    expect(resolveRuntimeSkillsRoot(bundledModuleUrl)).toBe(join(packageRoot, 'skills'));
+  });
+
   it('materializes filesystem skills for Codex isolated workspaces', () => {
     const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
     cleanupPaths.push(sessionBaseDir);
