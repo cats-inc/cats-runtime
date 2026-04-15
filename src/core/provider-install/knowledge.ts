@@ -201,18 +201,6 @@ function createNpmInstall(
   };
 }
 
-function createUnsupportedInstall(
-  installerId: string,
-  notes: string[],
-): ProviderPlatformInstallMetadata {
-  return {
-    supported: false,
-    installerId,
-    method: 'native_installer',
-    notes,
-  };
-}
-
 function createGenericNpmKnowledge(
   provider: ProviderName,
   familyLabel: string,
@@ -421,10 +409,18 @@ const INSTALL_KNOWLEDGE: Record<ProviderName, ProviderInstallKnowledge> = {
       helpArgs: ['--help'],
       prerequisites: createNativeInstallerPrerequisites('Kiro CLI'),
       expectedPaths: {
+        windows: '%LOCALAPPDATA%\\Kiro-Cli\\kiro-cli.exe',
         macos: '~/.local/bin/kiro-cli',
         linux: '~/.local/bin/kiro-cli',
       },
-      pathHints: createLocalBinPathHints('kiro-cli', { alias: 'kc' }),
+      pathHints: {
+        ...createLocalBinPathHints('kiro-cli', { alias: 'kc' }),
+        windows: {
+          expectedPath: '%LOCALAPPDATA%\\Kiro-Cli\\kiro-cli.exe',
+          directoryHint: '%LOCALAPPDATA%\\Kiro-Cli',
+          reloadHint: 'Open a new terminal window after installing Kiro CLI on Windows.',
+        },
+      },
     },
     auth: {
       requiredAfterInstall: true,
@@ -435,10 +431,17 @@ const INSTALL_KNOWLEDGE: Record<ProviderName, ProviderInstallKnowledge> = {
       errorPatterns: GENERIC_AUTH_ERROR_PATTERNS,
     },
     platforms: {
-      windows: createUnsupportedInstall(
-        'kiro-cli',
-        ['Kiro CLI should run in a Linux or WSL execution environment on Windows hosts.'],
-      ),
+      windows: {
+        supported: true,
+        installerId: 'kiro-cli',
+        method: 'native_installer',
+        command: "iex (irm 'https://cli.kiro.dev/install.ps1')",
+        docsUrl: 'https://cli.kiro.dev',
+        requiresShellRestart: true,
+        notes: [
+          'Kiro installs into %LOCALAPPDATA%\\Kiro-Cli and may add kiro-cli to PATH.',
+        ],
+      },
       macos: {
         supported: true,
         installerId: 'kiro-cli',
