@@ -42,10 +42,9 @@ describe('Kiro native session management', () => {
       distro: 'Ubuntu',
     },
     geminiSessionsDir: '',
-    kiroDbPath: '~/.local/share/kiro-cli/data.sqlite3',
+    kiroDbPath: '~/AppData/Local/kiro-cli/data.sqlite3',
     kiroRuntime: {
-      mode: 'wsl',
-      distro: 'Ubuntu',
+      mode: 'native',
     },
     nativeDiscoveryIntervalMs: 5000,
     externalSessionLiveWindowMs: 15000,
@@ -299,12 +298,11 @@ describe('Kiro native session management', () => {
     };
     expect(body.instance).toBe('default');
     expect(body.runtime).toEqual({
-      mode: 'wsl',
-      distro: 'Ubuntu',
+      mode: 'native',
     });
     expect(body.source).toBe('static');
     expect(body.models).toEqual([
-      'claude-sonnet-4.5',
+      'claude-opus-4.6',
       'deepseek-3.2',
       'minimax-m2.1',
     ]);

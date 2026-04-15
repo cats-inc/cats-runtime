@@ -57,7 +57,7 @@ function loadConfigWithoutProviderFile(env: NodeJS.ProcessEnv = {}) {
 }
 
 describe('config platform defaults', () => {
-  it('defaults Cursor to native on every platform and Kiro to WSL only on Windows', () => {
+  it('defaults Cursor and Kiro to native on every platform', () => {
     expect(defaultCursorRuntimeMode('win32')).toBe('native');
     expect(defaultCursorRuntimeMode('darwin')).toBe('native');
     expect(defaultCursorRuntimeMode('linux')).toBe('native');
@@ -75,7 +75,7 @@ describe('config platform defaults', () => {
     expect(defaultProviderRuntimeMode('auggie', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('pi', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('cursor', 'win32')).toBe('native');
-    expect(defaultProviderRuntimeMode('kiro', 'win32')).toBe('wsl');
+    expect(defaultProviderRuntimeMode('kiro', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('cursor', 'darwin')).toBe('native');
     expect(defaultProviderRuntimeMode('kiro', 'linux')).toBe('native');
   });
@@ -486,8 +486,13 @@ providers:
         runner: auto
         chats_dir: /wsl/cursor/chats
   kiro:
-    default_instance: ubuntu
+    default_instance: native
     instances:
+      native:
+        environment: native
+        command: kiro-cli
+        runner: auto
+        db_path: /native/kiro/data.sqlite3
       ubuntu:
         environment: ubuntu
         command: kiro-cli
@@ -515,7 +520,7 @@ providers:
       expect(config.configPath).toBe(configPath);
       expect(config.providerDefaultInstances?.codex).toBe('native');
       expect(config.providerDefaultInstances?.cursor).toBe('native');
-      expect(config.providerDefaultInstances?.kiro).toBe('ubuntu');
+      expect(config.providerDefaultInstances?.kiro).toBe('native');
 
       expect(config.codexSessionsDir).toBe('/native/codex/sessions');
       expect(resolveProviderInstance(config, 'codex', 'ubuntu')).toMatchObject({
@@ -567,14 +572,25 @@ providers:
         'ubuntu',
       ]);
 
-      expect(config.kiroDbPath).toBe('/wsl/kiro/data.sqlite3');
+      expect(config.kiroDbPath).toBe('/native/kiro/data.sqlite3');
       expect(config.kiroRuntime).toEqual({
-        mode: 'wsl',
-        distro: 'Ubuntu',
-        environmentId: 'ubuntu',
+        mode: 'native',
+        distro: undefined,
+        environmentId: 'native',
       });
       expect(resolveProviderInstance(config, 'kiro', 'default')).toMatchObject({
+        id: 'native',
+        commandConfig: {
+          runtime: {
+            mode: 'native',
+            distro: undefined,
+            environmentId: 'native',
+          },
+        },
+      });
+      expect(resolveProviderInstance(config, 'kiro', 'ubuntu')).toMatchObject({
         id: 'ubuntu',
+        kiroDbPath: '/wsl/kiro/data.sqlite3',
         commandConfig: {
           runtime: {
             mode: 'wsl',

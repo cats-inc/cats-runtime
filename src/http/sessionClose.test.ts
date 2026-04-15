@@ -50,10 +50,9 @@ describe('session close route', () => {
       distro: 'Ubuntu',
     },
     geminiSessionsDir: '',
-    kiroDbPath: '~/.local/share/kiro-cli/data.sqlite3',
+    kiroDbPath: '~/AppData/Local/kiro-cli/data.sqlite3',
     kiroRuntime: {
-      mode: 'wsl',
-      distro: 'Ubuntu',
+      mode: 'native',
     },
     nativeDiscoveryIntervalMs: 5000,
     externalSessionLiveWindowMs: 15000,
