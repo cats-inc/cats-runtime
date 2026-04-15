@@ -328,3 +328,58 @@ catalogs:
       - name: "MoonshotAI: Kimi K2.5"
 
       - name: "Z.ai: GLM 5.1 (new)"
+
+  - cli: Kiro
+    version: 2.0.0
+    last_updated: 2026-04-15
+    notes:
+      - "Source: kiro-cli model list output supplied by user"
+    models:
+      - name: auto
+        notes:
+          - "Models chosen by task for optimal usage and consistent quality"
+        default: true
+
+      - name: claude-opus-4.6
+        notes:
+          - "The latest Claude Opus model with 1M context window"
+
+      - name: claude-sonnet-4.6
+        notes:
+          - "The latest Claude Sonnet model with 1M context window"
+
+      - name: claude-opus-4.5
+        notes:
+          - "The Claude Opus 4.5 model"
+
+      - name: claude-sonnet-4.5
+        notes:
+          - "The Claude Sonnet 4.5 model"
+
+      - name: claude-sonnet-4
+        notes:
+          - "Hybrid reasoning and coding for regular use"
+
+      - name: claude-haiku-4.5
+        notes:
+          - "The latest Claude Haiku model"
+
+      - name: deepseek-3.2
+        notes:
+          - "Experimental preview of DeepSeek V3.2"
+
+      - name: minimax-m2.5
+        notes:
+          - "The MiniMax M2.5 model"
+
+      - name: minimax-m2.1
+        notes:
+          - "Experimental preview of MiniMax M2.1"
+
+      - name: glm-5
+        notes:
+          - "The GLM-5 model"
+
+      - name: qwen3-coder-next
+        notes:
+          - "Experimental preview of Qwen3 Coder Next"
