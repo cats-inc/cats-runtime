@@ -45,6 +45,7 @@ Only Claude should read and maintain this file.
 - **MUST** follow the Development Workflow defined in AGENTS.md
 - **MUST NOT** skip testing when code changes are made
 - **MUST NOT** modify other agents' files (GEMINI.md, CODEX.md)
+- **MUST NOT** use compound commands with `cd` and `git`（例如 `cd submodule && git log`）。對 submodule 操作時，使用 `-C` 參數或指定完整路徑
 - **SHOULD** ask for clarification when requirements are ambiguous
 - **SHOULD** propose approach before implementing major changes
 
