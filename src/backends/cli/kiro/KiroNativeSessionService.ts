@@ -6,6 +6,7 @@ import type { RuntimeAdapter } from '../runtime/runtime.js';
 import {
   createRuntimeAdapter,
 } from '../runtime/runtime.js';
+import { defaultKiroDbPath } from '../config.js';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 
 export interface KiroNativeSessionSummary {
@@ -179,10 +180,9 @@ export class KiroNativeSessionService {
 export function normalizeKiroWorkspacePath(cwd: string): string {
   return new KiroNativeSessionService({
     command: 'kiro-cli',
-    dbPath: '~/.local/share/kiro-cli/data.sqlite3',
+    dbPath: defaultKiroDbPath(),
     runtime: createRuntimeAdapter({
-      mode: process.platform === 'win32' ? 'wsl' : 'native',
-      distro: 'Ubuntu',
+      mode: 'native',
     }),
     runner: async () => ({ code: 0, stdout: '', stderr: '' }),
   }).normalizeWorkspace(cwd);

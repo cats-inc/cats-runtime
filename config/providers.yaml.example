@@ -77,7 +77,7 @@ routing:
     kiro:
       default_target:
         backend: cli
-        instance: ubuntu
+        instance: native
     ollama:
       default_target:
         backend: local
@@ -208,14 +208,14 @@ backends:
 
       kiro:
         instances:
-          ubuntu:
-            environment: ubuntu
+          native:
+            environment: native
             command: kiro-cli
             runner: auto
             # db_path defaults:
-            #   macOS:       ~/Library/Application Support/kiro-cli/data.sqlite3
-            #   Linux / WSL: ~/.local/share/kiro-cli/data.sqlite3
-            db_path: ~/.local/share/kiro-cli/data.sqlite3
+            #   Windows: ~/AppData/Local/kiro-cli/data.sqlite3
+            #   macOS:   ~/Library/Application Support/kiro-cli/data.sqlite3
+            #   Linux:   ~/.local/share/kiro-cli/data.sqlite3
 
   api:
     providers:

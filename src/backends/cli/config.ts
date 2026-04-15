@@ -261,7 +261,8 @@ export function defaultCursorRuntimeMode(
 export function defaultKiroRuntimeMode(
   platform: NodeJS.Platform = process.platform,
 ): RuntimeMode {
-  return platform === 'win32' ? 'wsl' : 'native';
+  void platform;
+  return 'native';
 }
 
 export function defaultProviderRuntimeMode(
@@ -301,6 +302,10 @@ export function defaultKiroDbPath(
 
   if (platform === 'darwin') {
     return '~/Library/Application Support/kiro-cli/data.sqlite3';
+  }
+
+  if (platform === 'win32') {
+    return '~/AppData/Local/kiro-cli/data.sqlite3';
   }
 
   return '~/.local/share/kiro-cli/data.sqlite3';

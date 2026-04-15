@@ -61,7 +61,7 @@ describe('config platform defaults', () => {
     expect(defaultCursorRuntimeMode('win32')).toBe('native');
     expect(defaultCursorRuntimeMode('darwin')).toBe('native');
     expect(defaultCursorRuntimeMode('linux')).toBe('native');
-    expect(defaultKiroRuntimeMode('win32')).toBe('wsl');
+    expect(defaultKiroRuntimeMode('win32')).toBe('native');
     expect(defaultKiroRuntimeMode('darwin')).toBe('native');
     expect(defaultKiroRuntimeMode('linux')).toBe('native');
   });
@@ -97,9 +97,12 @@ describe('config platform defaults', () => {
       .toBe('~/Library/Application Support/kiro-cli/data.sqlite3');
   });
 
-  it('uses the Linux/WSL Kiro database path elsewhere', () => {
+  it('uses the Windows-native Kiro database path on win32', () => {
+    expect(defaultKiroDbPath('win32')).toBe('~/AppData/Local/kiro-cli/data.sqlite3');
+  });
+
+  it('uses the Linux Kiro database path on Linux', () => {
     expect(defaultKiroDbPath('linux')).toBe('~/.local/share/kiro-cli/data.sqlite3');
-    expect(defaultKiroDbPath('win32')).toBe('~/.local/share/kiro-cli/data.sqlite3');
   });
 
   it('uses the Linux Kiro database path for WSL and Docker runtimes on every host', () => {

@@ -124,7 +124,7 @@ describe('session worktree routes', () => {
       copilot: { path: 'copilot', runner: 'auto', runtime: { mode: 'native' } },
       cursor: { path: 'cursor-agent', runner: 'auto', runtime: { mode: 'wsl', distro: 'Ubuntu' } },
       gemini: { path: 'gemini', runner: 'auto', runtime: { mode: 'native' } },
-      kiro: { path: 'kiro-cli', runner: 'auto', runtime: { mode: 'wsl', distro: 'Ubuntu' } },
+      kiro: { path: 'kiro-cli', runner: 'auto', runtime: { mode: 'native' } },
       opencode: { path: 'opencode', runner: 'auto', runtime: { mode: 'native' } },
     },
   });
