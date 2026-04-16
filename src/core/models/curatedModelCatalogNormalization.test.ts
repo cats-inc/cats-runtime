@@ -31,6 +31,10 @@ describe('curatedModelCatalogNormalization', () => {
   });
 
   it('normalizes Codex curated catalog ids from the curated YAML allowlist', () => {
+    expect(normalizeCodexCuratedModelId({ name: 'gpt-5.2-codex' }))
+      .toBe('gpt-5.2-codex');
+    expect(normalizeCodexCuratedModelId({ label: 'gpt-5.1-codex-max' }))
+      .toBe('gpt-5.1-codex-max');
     expect(normalizeCodexCuratedModelId({ name: 'gpt-5.1-codex-mini' }))
       .toBe('gpt-5.1-codex-mini');
     expect(normalizeCodexCuratedModelId({ label: 'gpt-5.4-mini' }))

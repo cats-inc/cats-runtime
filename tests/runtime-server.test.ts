@@ -4254,6 +4254,8 @@ providers:
       '    models:',
       '      - name: gpt-5.4',
       '        default: true',
+      '      - name: gpt-5.2-codex',
+      '      - name: gpt-5.1-codex-max',
       '      - name: gpt-5.4-mini',
       '      - name: gpt-5.3-codex',
       '      - name: gpt-5.3-codex-spark',
@@ -4278,6 +4280,8 @@ providers:
         cache: null,
         models: [
           { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
+          { id: 'gpt-5.2-codex', label: 'gpt-5.2-codex', default: false },
+          { id: 'gpt-5.1-codex-max', label: 'gpt-5.1-codex-max', default: false },
           { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini', default: false },
           { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex', default: false },
           { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark', default: false },
@@ -4292,6 +4296,8 @@ providers:
       const advancedPayload = await advancedResponse.json();
       expect(advancedPayload.entries.map((entry: { id: string }) => entry.id)).toEqual([
         'gpt-5.4',
+        'gpt-5.2-codex',
+        'gpt-5.1-codex-max',
         'gpt-5.4-mini',
         'gpt-5.3-codex',
         'gpt-5.3-codex-spark',
@@ -4310,6 +4316,8 @@ providers:
           key: 'codex.reasoning_effort',
           applicableEntryIds: [
             'gpt-5.4',
+            'gpt-5.2-codex',
+            'gpt-5.1-codex-max',
             'gpt-5.4-mini',
             'gpt-5.3-codex',
             'gpt-5.3-codex-spark',
@@ -4324,6 +4332,8 @@ providers:
           label: 'Medium (default)',
           applicableEntryIds: [
             'gpt-5.4',
+            'gpt-5.2-codex',
+            'gpt-5.1-codex-max',
             'gpt-5.4-mini',
             'gpt-5.3-codex',
             'gpt-5.2',
@@ -4335,6 +4345,8 @@ providers:
           label: 'High',
           applicableEntryIds: [
             'gpt-5.4',
+            'gpt-5.2-codex',
+            'gpt-5.1-codex-max',
             'gpt-5.4-mini',
             'gpt-5.3-codex',
             'gpt-5.2',
@@ -4345,6 +4357,8 @@ providers:
           value: 'low',
           applicableEntryIds: [
             'gpt-5.4',
+            'gpt-5.2-codex',
+            'gpt-5.1-codex-max',
             'gpt-5.4-mini',
             'gpt-5.3-codex',
             'gpt-5.3-codex-spark',
@@ -4355,6 +4369,8 @@ providers:
           value: 'xhigh',
           applicableEntryIds: [
             'gpt-5.4',
+            'gpt-5.2-codex',
+            'gpt-5.1-codex-max',
             'gpt-5.4-mini',
             'gpt-5.3-codex',
             'gpt-5.3-codex-spark',

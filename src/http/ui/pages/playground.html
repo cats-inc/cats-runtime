@@ -1515,11 +1515,13 @@ function renderAgentModelControls(div,catalog,entryId,presetId){
     const safeKey=escapeHtml(control.key);
     const label=escapeHtml(control.label||control.key);
     if(control.kind==='enum'){
-      const valueOptions=(Array.isArray(control.values)?control.values:[])
-        .filter(v=>{
-          if(!entryId||!Array.isArray(v.applicableEntryIds)||v.applicableEntryIds.length===0)return true;
-          return v.applicableEntryIds.includes(entryId);
-        });
+      const valueOptions=window.CatsUI?.listApplicableEnumControlOptions
+        ? window.CatsUI.listApplicableEnumControlOptions(control,entryId)
+        : (Array.isArray(control.values)?control.values:[])
+          .filter(v=>{
+            if(!entryId||!Array.isArray(v.applicableEntryIds)||v.applicableEntryIds.length===0)return true;
+            return v.applicableEntryIds.includes(entryId);
+          });
       const curVal=defaults[control.key]!==undefined?String(defaults[control.key]):'';
       const opts=valueOptions.map(v=>`<option value="${escapeHtml(v.value)}" ${String(v.value)===curVal?'selected':''}>${escapeHtml(v.label||v.value)}</option>`).join('');
       return `<div><label class="block text-xs text-slate-400">${label}</label><select class="agent-model-control w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" data-model-control-kind="enum" data-model-control-key="${safeKey}">${opts}</select></div>`;

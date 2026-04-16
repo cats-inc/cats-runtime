@@ -160,4 +160,77 @@ describe('shared playground selection helpers', () => {
       },
     });
   });
+
+  it('derives per-entry control defaults from explicit enum default labels', () => {
+    const catsUI = createCatsUI();
+    const catalog = {
+      provider: 'claude',
+      backend: 'cli',
+      instance: 'default',
+      defaultModel: 'opus',
+      entries: [
+        { id: 'opus', label: 'Opus 4.7 with 1M context', default: true },
+        { id: 'sonnet', label: 'Sonnet 4.6' },
+      ],
+      presets: [],
+      controls: [
+        {
+          key: 'claude.reasoning_effort',
+          label: 'Reasoning effort',
+          kind: 'enum',
+          scope: 'both',
+          values: [
+            { value: 'low', label: 'Low', applicableEntryIds: ['opus', 'sonnet'] },
+            { value: 'medium', label: 'Medium (default)', applicableEntryIds: ['sonnet'] },
+            { value: 'high', label: 'High', applicableEntryIds: ['opus', 'sonnet'] },
+            { value: 'xhigh', label: 'xHigh (default)', applicableEntryIds: ['opus'] },
+            { value: 'max', label: 'Max', applicableEntryIds: ['opus'] },
+          ],
+          applicableEntryIds: ['opus', 'sonnet'],
+        },
+      ],
+      defaultSelection: {
+        entryMode: 'explicit',
+        entryId: 'opus',
+        controls: {
+          'claude.reasoning_effort': 'xhigh',
+        },
+      },
+      support: { tier: 'full' },
+      warnings: [],
+    };
+
+    expect(catsUI.getAdvancedEntryControlDefaults(catalog, 'sonnet', '')).toEqual({
+      'claude.reasoning_effort': 'medium',
+    });
+    expect(catsUI.getAdvancedEntryControlDefaults(catalog, 'opus', '')).toEqual({
+      'claude.reasoning_effort': 'xhigh',
+    });
+  });
+
+  it('merges entry-specific enum overrides without disturbing shared value order', () => {
+    const catsUI = createCatsUI();
+    const control = {
+      key: 'codex.reasoning_effort',
+      label: 'Reasoning effort',
+      kind: 'enum',
+      scope: 'both',
+      values: [
+        { value: 'low', label: 'Low', applicableEntryIds: ['gpt-5.4', 'gpt-5.3-codex-spark'] },
+        { value: 'medium', label: 'Medium (default)', applicableEntryIds: ['gpt-5.4'] },
+        { value: 'high', label: 'High', applicableEntryIds: ['gpt-5.4'] },
+        { value: 'xhigh', label: 'Extra High', applicableEntryIds: ['gpt-5.4', 'gpt-5.3-codex-spark'] },
+        { value: 'medium', label: 'Medium', applicableEntryIds: ['gpt-5.3-codex-spark'] },
+        { value: 'high', label: 'High (default)', applicableEntryIds: ['gpt-5.3-codex-spark'] },
+      ],
+      applicableEntryIds: ['gpt-5.4', 'gpt-5.3-codex-spark'],
+    };
+
+    expect(catsUI.listApplicableEnumControlOptions(control, 'gpt-5.3-codex-spark')).toEqual([
+      { value: 'low', label: 'Low', applicableEntryIds: ['gpt-5.4', 'gpt-5.3-codex-spark'] },
+      { value: 'medium', label: 'Medium', applicableEntryIds: ['gpt-5.3-codex-spark'] },
+      { value: 'high', label: 'High (default)', applicableEntryIds: ['gpt-5.3-codex-spark'] },
+      { value: 'xhigh', label: 'Extra High', applicableEntryIds: ['gpt-5.4', 'gpt-5.3-codex-spark'] },
+    ]);
+  });
 });

@@ -1860,6 +1860,10 @@ describe('ProviderModelCatalogService', () => {
         '      - name: gpt-5.4',
         '        label: gpt-5.4',
         '        default: true',
+        '      - name: gpt-5.2-codex',
+        '        label: gpt-5.2-codex',
+        '      - name: gpt-5.1-codex-max',
+        '        label: gpt-5.1-codex-max',
         '      - name: gpt-5.4-mini',
         '        label: gpt-5.4-mini',
         '      - name: gpt-5.3-codex',
@@ -1926,6 +1930,8 @@ describe('ProviderModelCatalogService', () => {
         cache: null,
         models: [
           { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
+          { id: 'gpt-5.2-codex', label: 'gpt-5.2-codex', default: false },
+          { id: 'gpt-5.1-codex-max', label: 'gpt-5.1-codex-max', default: false },
           { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini', default: false },
           { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex', default: false },
           { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark', default: false },
@@ -1938,12 +1944,20 @@ describe('ProviderModelCatalogService', () => {
       expect(catalog.provider).toBe('codex');
       expect(catalog.backend).toBe('cli');
       expect(catalog.defaultModel).toBe('gpt-5.4');
-      expect(catalog.entries).toHaveLength(6);
+      expect(catalog.entries).toHaveLength(8);
       expect(catalog.entries).toEqual(expect.arrayContaining([
         expect.objectContaining({
           id: 'gpt-5.4',
           label: 'gpt-5.4',
           default: true,
+        }),
+        expect.objectContaining({
+          id: 'gpt-5.2-codex',
+          label: 'gpt-5.2-codex',
+        }),
+        expect.objectContaining({
+          id: 'gpt-5.1-codex-max',
+          label: 'gpt-5.1-codex-max',
         }),
         expect.objectContaining({
           id: 'gpt-5.3-codex-spark',
@@ -1968,6 +1982,8 @@ describe('ProviderModelCatalogService', () => {
             description: 'Fast responses with lighter reasoning.',
             applicableEntryIds: [
               'gpt-5.4',
+              'gpt-5.2-codex',
+              'gpt-5.1-codex-max',
               'gpt-5.4-mini',
               'gpt-5.3-codex',
               'gpt-5.3-codex-spark',
@@ -1980,6 +1996,8 @@ describe('ProviderModelCatalogService', () => {
             description: 'Balances speed and reasoning depth for everyday tasks.',
             applicableEntryIds: [
               'gpt-5.4',
+              'gpt-5.2-codex',
+              'gpt-5.1-codex-max',
               'gpt-5.4-mini',
               'gpt-5.3-codex',
               'gpt-5.2',
@@ -2000,6 +2018,8 @@ describe('ProviderModelCatalogService', () => {
             description: 'Greater reasoning depth for complex problems.',
             applicableEntryIds: [
               'gpt-5.4',
+              'gpt-5.2-codex',
+              'gpt-5.1-codex-max',
               'gpt-5.4-mini',
               'gpt-5.3-codex',
               'gpt-5.2',
@@ -2020,6 +2040,8 @@ describe('ProviderModelCatalogService', () => {
             description: 'Extra high reasoning depth for complex problems.',
             applicableEntryIds: [
               'gpt-5.4',
+              'gpt-5.2-codex',
+              'gpt-5.1-codex-max',
               'gpt-5.4-mini',
               'gpt-5.3-codex',
               'gpt-5.3-codex-spark',
@@ -2029,6 +2051,8 @@ describe('ProviderModelCatalogService', () => {
         ]),
         applicableEntryIds: [
           'gpt-5.4',
+          'gpt-5.2-codex',
+          'gpt-5.1-codex-max',
           'gpt-5.4-mini',
           'gpt-5.3-codex',
           'gpt-5.3-codex-spark',

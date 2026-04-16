@@ -507,6 +507,72 @@ export const SHARED_UI_SCRIPT = `
       || control.applicableEntryIds.indexOf(entryId) >= 0;
   }
 
+  function advancedControlValueAppliesToEntry(option, entryId) {
+    return !Array.isArray(option && option.applicableEntryIds)
+      || option.applicableEntryIds.length === 0
+      || option.applicableEntryIds.indexOf(entryId) >= 0;
+  }
+
+  function normalizeEnumControlOption(option) {
+    if (
+      option
+      && typeof option === 'object'
+      && !Array.isArray(option)
+      && Object.prototype.hasOwnProperty.call(option, 'value')
+    ) {
+      return option;
+    }
+    return {
+      value: option,
+      label: String(option),
+    };
+  }
+
+  function enumControlValueKey(value) {
+    return typeof value + ':' + String(value);
+  }
+
+  function listApplicableEnumControlOptions(control, entryId) {
+    if (!control || control.kind !== 'enum') return [];
+    var values = Array.isArray(control.values) ? control.values : [];
+    var orderedKeys = [];
+    var applicableOptionsByKey = {};
+    for (var i = 0; i < values.length; i++) {
+      var option = normalizeEnumControlOption(values[i]);
+      var optionKey = enumControlValueKey(option.value);
+      if (orderedKeys.indexOf(optionKey) < 0) {
+        orderedKeys.push(optionKey);
+      }
+      if (!advancedControlValueAppliesToEntry(option, entryId)) {
+        continue;
+      }
+      applicableOptionsByKey[optionKey] = option;
+    }
+    var merged = [];
+    for (var j = 0; j < orderedKeys.length; j++) {
+      var orderedKey = orderedKeys[j];
+      if (Object.prototype.hasOwnProperty.call(applicableOptionsByKey, orderedKey)) {
+        merged.push(applicableOptionsByKey[orderedKey]);
+      }
+    }
+    return merged;
+  }
+
+  function findExplicitDefaultEnumOption(control, entryId) {
+    var options = listApplicableEnumControlOptions(control, entryId);
+    for (var i = 0; i < options.length; i++) {
+      var option = options[i];
+      if (
+        option
+        && typeof option.label === 'string'
+        && /\(default\)/iu.test(option.label)
+      ) {
+        return option;
+      }
+    }
+    return null;
+  }
+
   function getAdvancedCatalogDefaultSelection(catalog) {
     return resolveAdvancedCatalogChoice(catalog, 'default');
   }
@@ -811,22 +877,10 @@ export const SHARED_UI_SCRIPT = `
   }
 
   function listApplicableEnumControlValues(control, entryId) {
-    if (!control || control.kind !== 'enum') return [];
-    var values = Array.isArray(control.values) ? control.values : [];
+    var options = listApplicableEnumControlOptions(control, entryId);
     var allowed = [];
-    for (var i = 0; i < values.length; i++) {
-      var option = values[i];
-      if (
-        typeof option === 'object'
-        && option !== null
-        && Array.isArray(option.applicableEntryIds)
-        && option.applicableEntryIds.length > 0
-        && entryId
-        && option.applicableEntryIds.indexOf(entryId) < 0
-      ) {
-        continue;
-      }
-      var value = typeof option === 'object' && option !== null ? option.value : option;
+    for (var i = 0; i < options.length; i++) {
+      var value = options[i] && options[i].value;
       if (typeof value === 'string' && allowed.indexOf(value) < 0) {
         allowed.push(value);
       }
@@ -1093,6 +1147,11 @@ export const SHARED_UI_SCRIPT = `
       }
       if (Object.prototype.hasOwnProperty.call(defaults, control.key)) {
         filtered[control.key] = defaults[control.key];
+        continue;
+      }
+      var explicitDefault = findExplicitDefaultEnumOption(control, entryId);
+      if (explicitDefault) {
+        filtered[control.key] = explicitDefault.value;
       }
     }
     return filtered;
@@ -1378,6 +1437,7 @@ export const SHARED_UI_SCRIPT = `
     resolveAdvancedCatalogChoice: resolveAdvancedCatalogChoice,
     getAdvancedChoiceControlDefaults: getAdvancedChoiceControlDefaults,
     getAdvancedEntryControlDefaults: getAdvancedEntryControlDefaults,
+    listApplicableEnumControlOptions: listApplicableEnumControlOptions,
     listStoredAdvancedControls: listStoredAdvancedControls,
     setRuntimeTooltip: setRuntimeTooltip,
     hideRuntimeTooltip: hideRuntimeTooltip,

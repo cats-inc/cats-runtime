@@ -1866,6 +1866,10 @@ function createControlValueOptionAppliesToEntry(option, entryId) {
 }
 
 function listCreateControlValueOptions(control, entryId) {
+  if (window.CatsUI?.listApplicableEnumControlOptions) {
+    return window.CatsUI.listApplicableEnumControlOptions(control, entryId);
+  }
+
   const options = Array.isArray(control?.values) ? control.values : [];
   return options
     .map((option) => {

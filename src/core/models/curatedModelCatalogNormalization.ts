@@ -370,6 +370,8 @@ export function normalizeCodexCuratedModelId(model: CuratedModelCatalogModel): s
   const candidates = [model.name, model.label].filter((value): value is string => Boolean(value));
   const knownIds = new Set([
     'gpt-5.4',
+    'gpt-5.2-codex',
+    'gpt-5.1-codex-max',
     'gpt-5.4-mini',
     'gpt-5.3-codex',
     'gpt-5.3-codex-spark',
