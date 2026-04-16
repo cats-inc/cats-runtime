@@ -690,11 +690,17 @@ describe('ProviderModelCatalogService', () => {
       const service = new ProviderModelCatalogService(config as never, {
         env: runtime.env,
       });
+      const cursorCatalog = service.getImmediateCatalog('cursor');
+      expect(cursorCatalog).not.toBeNull();
+      if (!cursorCatalog) {
+        throw new Error('Expected Cursor static catalog to be available.');
+      }
+      const cursorStaticModelCount = cursorCatalog.models.length;
 
       expect(service.inspectSummary('cursor')).toEqual({
         source: 'static',
         defaultModel: 'composer-2-fast',
-        modelCount: 5,
+        modelCount: cursorStaticModelCount,
         warnings: [
           'Live model discovery is available for cursor/cli/default via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
         ],
@@ -702,7 +708,7 @@ describe('ProviderModelCatalogService', () => {
           configured: 0,
           available: 0,
           running: 0,
-          unknown: 5,
+          unknown: cursorStaticModelCount,
         },
       });
     } finally {
@@ -1711,6 +1717,125 @@ describe('ProviderModelCatalogService', () => {
           },
         },
         warnings: [],
+      });
+    } finally {
+      runtime.cleanup();
+    }
+  });
+
+  it('applies curated Claude CLI xHigh effort defaults from curated-model-catalogs.yaml', () => {
+    const runtime = createRuntimeRoot();
+
+    try {
+      writeFileSync(runtime.paths.curatedModelCatalogPath, [
+        'schema_version: 1',
+        'catalogs:',
+        '  - cli: Claude',
+        '    version: 2.1.111',
+        '    last_updated: 2026-04-17',
+        '    models:',
+        '      - name: Opus',
+        '        label: Opus 4.7 with 1M context',
+        '        default: true',
+        '        options:',
+        '          - name: Effort',
+        '            values:',
+        '              - name: Low',
+        '              - name: High',
+        '              - name: xHigh',
+        '                notes:',
+        '                  - Deeper reasoning than high, just below maximum.',
+        '              - name: Max',
+        '            default: xHigh',
+        '',
+      ].join('\n'), 'utf8');
+
+      const base = createCatalogConfig();
+      const config = {
+        ...base,
+        configPath: runtime.paths.configPath,
+        sessionBaseDir: runtime.paths.sessionBaseDir,
+        providerDefaultTargets: {
+          ...base.providerDefaultTargets,
+          claude: { backend: 'cli', instance: 'default' },
+        },
+        providerInstances: {
+          ...base.providerInstances,
+          claude: {
+            default: {
+              id: 'default',
+              providerName: 'claude',
+              commandConfig: {
+                path: 'claude',
+                runner: 'auto',
+                runtime: { mode: 'native' },
+              },
+            },
+          },
+        },
+        providerCommands: {
+          ...base.providerCommands,
+          claude: {
+            path: 'claude',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
+        },
+      } as const;
+
+      const service = new ProviderModelCatalogService(config as never, {
+        env: runtime.env,
+      });
+
+      const advanced = service.getImmediateAdvancedCatalog('claude');
+      expect(advanced).not.toBeNull();
+      if (!advanced) {
+        throw new Error('Expected Claude advanced catalog to be available.');
+      }
+
+      expect(advanced.controls).toEqual([
+        {
+          key: 'claude.reasoning_effort',
+          label: 'Reasoning effort',
+          description: 'Controls Claude Code effort for supported models.',
+          kind: 'enum',
+          scope: 'both',
+          values: [
+            {
+              value: 'low',
+              label: 'Low',
+              description: 'Lighter reasoning for faster responses.',
+              applicableEntryIds: ['opus'],
+            },
+            {
+              value: 'high',
+              label: 'High',
+              description: 'Greater depth for complex tasks.',
+              applicableEntryIds: ['opus'],
+            },
+            {
+              value: 'xhigh',
+              label: 'xHigh (default)',
+              description: 'Deeper reasoning than high, just below maximum.',
+              applicableEntryIds: ['opus'],
+            },
+            {
+              value: 'max',
+              label: 'Max',
+              description: 'Maximum effort for the most complex work.',
+              applicableEntryIds: ['opus'],
+            },
+          ],
+          applicableEntryIds: ['opus'],
+          semanticTags: ['reasoning_intensity'],
+        },
+      ]);
+      expect(advanced.defaultSelection).toEqual({
+        entryId: 'opus',
+        entryMode: 'explicit',
+        controls: {
+          'claude.reasoning_effort': 'xhigh',
+        },
       });
     } finally {
       runtime.cleanup();

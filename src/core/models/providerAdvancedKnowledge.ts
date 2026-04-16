@@ -183,6 +183,10 @@ function normalizeClaudeEffortValue(
       return 'medium';
     case 'high':
       return 'high';
+    case 'extra high':
+    case 'extra-high':
+    case 'xhigh':
+      return 'xhigh';
     case 'max':
       return 'max';
     default:
@@ -200,6 +204,8 @@ function fallbackClaudeEffortDescription(
       return 'Balanced effort for most work.';
     case 'high':
       return 'Greater depth for complex tasks.';
+    case 'xhigh':
+      return 'Deeper reasoning than high, just below maximum.';
     case 'max':
       return 'Maximum effort for the most complex work.';
     default:

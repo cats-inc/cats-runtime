@@ -22,13 +22,13 @@ schema_version: 1
 
 catalogs:
   - cli: Claude
-    version: 2.1.104
-    last_updated: 2026-04-14
+    version: 2.1.111
+    last_updated: 2026-04-17
     notes:
       - "Source: claude /model picker and /effort output"
     models:
       - name: Opus
-        label: Opus 4.6 with 1M context
+        label: Opus 4.7 with 1M context
         notes:
           - Most capable for complex work
         default: true
@@ -45,10 +45,13 @@ catalogs:
               - name: High
                 notes:
                   - "Comprehensive implementation with extensive testing and documentation"
+              - name: xHigh
+                notes:
+                  - "Deeper reasoning than high, just below maximum"
               - name: Max
                 notes:
                   - "Maximum capability with deepest reasoning"
-            default: Medium
+            default: xHigh
 
       - name: Sonnet
         label: Sonnet 4.6

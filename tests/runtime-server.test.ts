@@ -26,6 +26,11 @@ import {
   RUNTIME_VERSION,
   createRuntimeStartupState,
 } from '../src/startup.js';
+import {
+  findCuratedCliCatalog,
+  loadCuratedModelCatalog,
+  resolveCuratedCatalogScope,
+} from '../src/core/models/curatedModelCatalog.js';
 
 function alignDefaultProviderRuntime(
   config: ReturnType<typeof loadConfig>,
@@ -104,6 +109,24 @@ function createGitWorkspace(root: string, repoName: string): string {
 
 function resolveEnvRuntimePaths(env: NodeJS.ProcessEnv) {
   return createRuntimeTestPaths(env.HOME || env.USERPROFILE || '');
+}
+
+function getBundledCursorStaticModelCount(): number {
+  const curated = loadCuratedModelCatalog({
+    runtimeConfig: {
+      configPath: join(tmpdir(), 'cats-runtime-bundled-curated-example', 'providers.yaml'),
+    },
+    env: {
+      ...process.env,
+      CATS_RUNTIME_DIR: join(tmpdir(), 'cats-runtime-bundled-curated-example'),
+    },
+  });
+  const catalog = findCuratedCliCatalog(curated.document, 'cursor');
+  const scope = catalog ? resolveCuratedCatalogScope(catalog, 'cursor') : undefined;
+  if (!scope) {
+    throw new Error('Expected bundled curated cursor catalog to be available.');
+  }
+  return scope.models.length;
 }
 
 function createTestConfig(overrides = {}) {
@@ -2825,6 +2848,7 @@ backends:
   });
 
   it('GET /providers/config returns configured provider instances for the dashboard', async () => {
+    const cursorStaticModelCount = getBundledCursorStaticModelCount();
     await withRuntime({
       providerDefaultInstances: {
         cursor: 'ubuntu',
@@ -2894,7 +2918,7 @@ backends:
                 modelCatalog: expect.objectContaining({
                   source: 'static',
                   defaultModel: 'composer-2-fast',
-                  modelCount: 5,
+                  modelCount: cursorStaticModelCount,
                   warnings: [
                     'Live model discovery is available for cursor/cli/ubuntu via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
                   ],
@@ -2902,7 +2926,7 @@ backends:
                     configured: 0,
                     available: 0,
                     running: 0,
-                    unknown: 5,
+                    unknown: cursorStaticModelCount,
                   },
                 }),
                 tooling: {
@@ -2958,7 +2982,7 @@ backends:
                 modelCatalog: expect.objectContaining({
                   source: 'static',
                   defaultModel: 'composer-2-fast',
-                  modelCount: 5,
+                  modelCount: cursorStaticModelCount,
                   warnings: [
                     'Live model discovery is available for cursor/cli/debian via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
                   ],
@@ -2966,7 +2990,7 @@ backends:
                     configured: 0,
                     available: 0,
                     running: 0,
-                    unknown: 5,
+                    unknown: cursorStaticModelCount,
                   },
                 }),
                 tooling: {
