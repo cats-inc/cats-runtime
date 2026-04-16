@@ -405,3 +405,33 @@ catalogs:
       - name: qwen3-coder-next
         notes:
           - "Experimental preview of Qwen3 Coder Next"
+
+  - cli: Junie
+    version: 1362.47
+    last_updated: 2026-04-17
+    notes:
+      - "Source: Junie model picker output supplied by user"
+      - "All models routed through JetBrains AI"
+    models:
+      - name: Gemini 3 Flash
+        default: true
+
+      - name: Claude Opus 4.6
+
+      - name: Claude Opus 4.7
+
+      - name: Claude Sonnet 4.6
+
+      - name: Gemini 3.1 Flash Lite
+
+      - name: Gemini 3.1 Pro Preview
+
+      - name: GPT-5
+
+      - name: GPT-5.2
+
+      - name: GPT-5.3-codex
+
+      - name: GPT-5.4
+
+      - name: Grok 4.1 Fast Reasoning
