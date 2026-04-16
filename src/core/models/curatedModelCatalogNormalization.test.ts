@@ -71,14 +71,14 @@ describe('curatedModelCatalogNormalization', () => {
     expect(normalizeKiroCuratedModelId({ name: 'Unknown Kiro Model' })).toBeNull();
   });
 
-  it('normalizes Junie picker labels into runtime-owned alias ids', () => {
-    expect(normalizeJunieCuratedModelId({ name: 'Gemini 3 Flash' })).toBe('gemini-flash');
-    expect(normalizeJunieCuratedModelId({ name: 'Claude Opus 4.7' })).toBe('opus');
-    expect(normalizeJunieCuratedModelId({ name: 'Claude Sonnet 4.6' })).toBe('sonnet');
-    expect(normalizeJunieCuratedModelId({ name: 'Gemini 3.1 Pro Preview' })).toBe('gemini-pro');
-    expect(normalizeJunieCuratedModelId({ name: 'GPT-5.3-codex' })).toBe('gpt-codex');
-    expect(normalizeJunieCuratedModelId({ name: 'GPT-5.4' })).toBe('gpt');
-    expect(normalizeJunieCuratedModelId({ name: 'Grok 4.1 Fast Reasoning' })).toBe('grok');
-    expect(normalizeJunieCuratedModelId({ name: 'Unknown Junie Model' })).toBeNull();
+  it('preserves Junie picker labels as literal curated ids', () => {
+    expect(normalizeJunieCuratedModelId({ name: 'Gemini 3 Flash' })).toBe('Gemini 3 Flash');
+    expect(normalizeJunieCuratedModelId({ name: 'Claude Opus 4.7' })).toBe('Claude Opus 4.7');
+    expect(normalizeJunieCuratedModelId({ name: 'Claude Sonnet 4.6' })).toBe('Claude Sonnet 4.6');
+    expect(normalizeJunieCuratedModelId({ name: 'Gemini 3.1 Pro Preview' })).toBe('Gemini 3.1 Pro Preview');
+    expect(normalizeJunieCuratedModelId({ name: 'GPT-5.3-codex' })).toBe('GPT-5.3-codex');
+    expect(normalizeJunieCuratedModelId({ name: 'GPT-5.4' })).toBe('GPT-5.4');
+    expect(normalizeJunieCuratedModelId({ name: 'Grok 4.1 Fast Reasoning' })).toBe('Grok 4.1 Fast Reasoning');
+    expect(normalizeJunieCuratedModelId({ name: 'Unknown Junie Model' })).toBe('Unknown Junie Model');
   });
 });

@@ -128,19 +128,19 @@ describe('normalizeProviderCatalogModelId', () => {
     }, 'Elephant (new)')).toBe('kilo/openrouter/elephant-alpha');
   });
 
-  it('normalizes Junie picker labels to runtime-owned alias ids', () => {
+  it('preserves Junie picker labels as literal model ids', () => {
     expect(normalizeProviderCatalogModelId({
       providerName: 'junie',
       backend: 'cli',
-    }, 'Claude Opus 4.7')).toBe('opus');
+    }, ' Claude Opus 4.7 ')).toBe('Claude Opus 4.7');
     expect(normalizeProviderCatalogModelId({
       providerName: 'junie',
       backend: 'cli',
-    }, 'Gemini 3.1 Flash Lite')).toBe('gemini-flash');
+    }, 'Gemini 3.1 Flash Lite')).toBe('Gemini 3.1 Flash Lite');
     expect(normalizeProviderCatalogModelId({
       providerName: 'junie',
       backend: 'cli',
-    }, 'GPT-5.3-codex')).toBe('gpt-codex');
+    }, 'GPT-5.3-codex')).toBe('GPT-5.3-codex');
   });
 });
 
@@ -195,6 +195,89 @@ function createRuntimeRoot() {
     cleanup: () => rmSync(root, { recursive: true, force: true }),
   };
 }
+
+const junieStaticWarning =
+  'Junie CLI does not expose a live model list; serving the curated picker snapshot as a static fallback. '
+  + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.";
+
+const junieCuratedModels = [
+  { id: 'Gemini 3 Flash', label: 'Gemini 3 Flash', default: true },
+  { id: 'Claude Opus 4.6', label: 'Claude Opus 4.6' },
+  { id: 'Claude Opus 4.7', label: 'Claude Opus 4.7' },
+  { id: 'Claude Sonnet 4.6', label: 'Claude Sonnet 4.6' },
+  { id: 'Gemini 3.1 Flash Lite', label: 'Gemini 3.1 Flash Lite' },
+  { id: 'Gemini 3.1 Pro Preview', label: 'Gemini 3.1 Pro Preview' },
+  { id: 'GPT-5', label: 'GPT-5' },
+  { id: 'GPT-5.2', label: 'GPT-5.2' },
+  { id: 'GPT-5.3-codex', label: 'GPT-5.3-codex' },
+  { id: 'GPT-5.4', label: 'GPT-5.4' },
+  { id: 'Grok 4.1 Fast Reasoning', label: 'Grok 4.1 Fast Reasoning' },
+];
+
+const junieCuratedAdvancedEntries = [
+  {
+    id: 'Gemini 3 Flash',
+    label: 'Gemini 3 Flash',
+    default: true,
+    capabilityTags: ['latency_optimized'],
+  },
+  {
+    id: 'Claude Opus 4.6',
+    label: 'Claude Opus 4.6',
+    default: false,
+    capabilityTags: ['reasoning'],
+  },
+  {
+    id: 'Claude Opus 4.7',
+    label: 'Claude Opus 4.7',
+    default: false,
+    capabilityTags: ['reasoning'],
+  },
+  {
+    id: 'Claude Sonnet 4.6',
+    label: 'Claude Sonnet 4.6',
+    default: false,
+  },
+  {
+    id: 'Gemini 3.1 Flash Lite',
+    label: 'Gemini 3.1 Flash Lite',
+    default: false,
+    capabilityTags: ['latency_optimized'],
+  },
+  {
+    id: 'Gemini 3.1 Pro Preview',
+    label: 'Gemini 3.1 Pro Preview',
+    default: false,
+    capabilityTags: ['reasoning'],
+  },
+  {
+    id: 'GPT-5',
+    label: 'GPT-5',
+    default: false,
+  },
+  {
+    id: 'GPT-5.2',
+    label: 'GPT-5.2',
+    default: false,
+  },
+  {
+    id: 'GPT-5.3-codex',
+    label: 'GPT-5.3-codex',
+    default: false,
+  },
+  {
+    id: 'GPT-5.4',
+    label: 'GPT-5.4',
+    default: false,
+    capabilityTags: ['reasoning'],
+  },
+  {
+    id: 'Grok 4.1 Fast Reasoning',
+    label: 'Grok 4.1 Fast Reasoning',
+    default: false,
+    capabilityTags: ['reasoning'],
+  },
+];
 
 describe('ProviderModelCatalogService', () => {
   it('marks running Ollama models, injects missing configured defaults, and caches warnings', async () => {
@@ -610,7 +693,7 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
-  it('normalizes curated Junie picker labels into alias-backed model and advanced catalogs', () => {
+  it('preserves curated Junie picker labels in model and advanced catalogs', () => {
     const runtime = createRuntimeRoot();
 
     try {
@@ -680,71 +763,21 @@ describe('ProviderModelCatalogService', () => {
         provider: 'junie',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'gemini-flash',
+        defaultModel: 'Gemini 3 Flash',
         source: 'static',
         cache: null,
-        models: [
-          { id: 'gemini-flash', label: 'gemini-flash', default: true },
-          { id: 'opus', label: 'opus', default: false },
-          { id: 'sonnet', label: 'sonnet' },
-          { id: 'gemini-pro', label: 'gemini-pro' },
-          { id: 'gpt', label: 'gpt', default: false },
-          { id: 'gpt-codex', label: 'gpt-codex' },
-          { id: 'grok', label: 'grok' },
-        ],
-        warnings: [
-          'Junie CLI does not expose a live model list; serving a curated alias fallback only. '
-          + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.",
-        ],
+        models: junieCuratedModels,
+        warnings: [junieStaticWarning],
       });
 
       expect(service.getImmediateAdvancedCatalog('junie')).toEqual({
         provider: 'junie',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'gemini-flash',
+        defaultModel: 'Gemini 3 Flash',
         source: 'static',
         cache: null,
-        entries: [
-          {
-            id: 'gemini-flash',
-            label: 'gemini-flash',
-            default: true,
-            capabilityTags: ['latency_optimized'],
-          },
-          {
-            id: 'opus',
-            label: 'opus',
-            default: false,
-            capabilityTags: ['reasoning'],
-          },
-          {
-            id: 'sonnet',
-            label: 'sonnet',
-            default: false,
-          },
-          {
-            id: 'gemini-pro',
-            label: 'gemini-pro',
-            default: false,
-            capabilityTags: ['reasoning'],
-          },
-          {
-            id: 'gpt',
-            label: 'gpt',
-            default: false,
-          },
-          {
-            id: 'gpt-codex',
-            label: 'gpt-codex',
-            default: false,
-          },
-          {
-            id: 'grok',
-            label: 'grok',
-            default: false,
-          },
-        ],
+        entries: junieCuratedAdvancedEntries,
         presets: [],
         controls: [],
         defaultSelection: null,
@@ -756,10 +789,7 @@ describe('ProviderModelCatalogService', () => {
             status: 'unverified_omitted',
           },
         },
-        warnings: [
-          'Junie CLI does not expose a live model list; serving a curated alias fallback only. '
-          + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.",
-        ],
+        warnings: [junieStaticWarning],
       });
     } finally {
       runtime.cleanup();
@@ -811,28 +841,17 @@ describe('ProviderModelCatalogService', () => {
         provider: 'junie',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'gemini-flash',
+        defaultModel: 'Gemini 3 Flash',
         source: 'static',
-        models: [
-          { id: 'gemini-flash', label: 'gemini-flash', default: true },
-          { id: 'opus', label: 'opus', default: false },
-          { id: 'sonnet', label: 'sonnet' },
-          { id: 'gemini-pro', label: 'gemini-pro' },
-          { id: 'gpt', label: 'gpt', default: false },
-          { id: 'gpt-codex', label: 'gpt-codex' },
-          { id: 'grok', label: 'grok' },
-        ],
-        warnings: [
-          'Junie CLI does not expose a live model list; serving a curated alias fallback only. '
-          + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.",
-        ],
+        models: junieCuratedModels,
+        warnings: [junieStaticWarning],
       });
     } finally {
       runtime.cleanup();
     }
   });
 
-  it('keeps the first Junie default when multiple normalized aliases are marked default', () => {
+  it('keeps the first Junie default when multiple curated models are marked default', () => {
     const runtime = createRuntimeRoot();
 
     try {
@@ -891,18 +910,17 @@ describe('ProviderModelCatalogService', () => {
         provider: 'junie',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'gemini-flash',
+        defaultModel: 'Gemini 3 Flash',
         source: 'static',
         cache: null,
         models: [
-          { id: 'gemini-flash', label: 'gemini-flash', default: true },
-          { id: 'gpt', label: 'gpt', default: false },
-          { id: 'opus', label: 'opus' },
+          { id: 'Gemini 3 Flash', label: 'Gemini 3 Flash', default: true },
+          { id: 'GPT-5', label: 'GPT-5', default: false },
+          { id: 'Claude Opus 4.7', label: 'Claude Opus 4.7' },
         ],
         warnings: [
-          'Junie CLI does not expose a live model list; serving a curated alias fallback only. '
-          + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.",
-          "Curated catalog for Junie resolved multiple defaults after normalization; keeping 'gemini-flash' as the default.",
+          junieStaticWarning,
+          "Curated catalog for Junie marked multiple defaults; keeping 'Gemini 3 Flash' as the default.",
         ],
       });
 
@@ -910,24 +928,24 @@ describe('ProviderModelCatalogService', () => {
         provider: 'junie',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'gemini-flash',
+        defaultModel: 'Gemini 3 Flash',
         source: 'static',
         cache: null,
         entries: [
           {
-            id: 'gemini-flash',
-            label: 'gemini-flash',
+            id: 'Gemini 3 Flash',
+            label: 'Gemini 3 Flash',
             default: true,
             capabilityTags: ['latency_optimized'],
           },
           {
-            id: 'gpt',
-            label: 'gpt',
+            id: 'GPT-5',
+            label: 'GPT-5',
             default: false,
           },
           {
-            id: 'opus',
-            label: 'opus',
+            id: 'Claude Opus 4.7',
+            label: 'Claude Opus 4.7',
             default: false,
             capabilityTags: ['reasoning'],
           },
@@ -944,9 +962,8 @@ describe('ProviderModelCatalogService', () => {
           },
         },
         warnings: [
-          'Junie CLI does not expose a live model list; serving a curated alias fallback only. '
-          + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.",
-          "Curated catalog for Junie resolved multiple defaults after normalization; keeping 'gemini-flash' as the default.",
+          junieStaticWarning,
+          "Curated catalog for Junie marked multiple defaults; keeping 'Gemini 3 Flash' as the default.",
         ],
       });
     } finally {

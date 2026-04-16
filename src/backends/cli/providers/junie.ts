@@ -9,7 +9,6 @@ import {
   parseJunieStreamLine,
   type JunieUsageTotals,
 } from '../junie/parser.js';
-import { normalizeJunieModelName } from '../junie/models.js';
 import { buildProcessSpawnConfig } from '../runtime/runtime.js';
 import type {
   Provider,
@@ -448,7 +447,7 @@ function normalizeJunieModelId(model?: string): string | undefined {
   const trimmed = model.trim();
   if (!trimmed) return undefined;
 
-  return normalizeJunieModelName(trimmed) || trimmed;
+  return trimmed;
 }
 
 interface LiveJunieTurnState {

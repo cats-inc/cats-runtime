@@ -482,7 +482,7 @@ describe('runtime server', () => {
       expect(html).toContain('Runtime Health');
       expect(html).toContain('validateRuntimeApiKey');
       expect(html).toContain('getRuntimeAuthHeaders');
-      expect(html).toContain("junie:[{value:'gemini-flash',label:'gemini-flash (default)'},{value:'opus',label:'opus'},{value:'sonnet',label:'sonnet'},{value:'gemini-pro',label:'gemini-pro'},{value:'gpt',label:'gpt'},{value:'gpt-codex',label:'gpt-codex'},{value:'grok',label:'grok'}],");
+      expect(html).toContain("junie:[{value:'Gemini 3 Flash',label:'Gemini 3 Flash (default)'},{value:'Claude Opus 4.6',label:'Claude Opus 4.6'},{value:'Claude Opus 4.7',label:'Claude Opus 4.7'},{value:'Claude Sonnet 4.6',label:'Claude Sonnet 4.6'},{value:'Gemini 3.1 Flash Lite',label:'Gemini 3.1 Flash Lite'},{value:'Gemini 3.1 Pro Preview',label:'Gemini 3.1 Pro Preview'},{value:'GPT-5',label:'GPT-5'},{value:'GPT-5.2',label:'GPT-5.2'},{value:'GPT-5.3-codex',label:'GPT-5.3-codex'},{value:'GPT-5.4',label:'GPT-5.4'},{value:'Grok 4.1 Fast Reasoning',label:'Grok 4.1 Fast Reasoning'}],");
       expect(html).not.toContain("junie:[{value:'gpt-5.4',label:'gpt-5.4 (default)'}],");
       expect(html).toContain('/providers/${name}/models/advanced');
       expect(html).toContain('normalizeModelCatalog');
@@ -3991,7 +3991,7 @@ providers:
     });
   });
 
-  it('GET /providers/junie/models returns curated aliases with an honesty warning', async () => {
+  it('GET /providers/junie/models returns the curated picker snapshot with an honesty warning', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/junie/models');
       expect(response.status).toBe(200);
@@ -3999,27 +3999,31 @@ providers:
         provider: 'junie',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'gemini-flash',
+        defaultModel: 'Gemini 3 Flash',
         source: 'static',
         cache: null,
         models: [
-          { id: 'gemini-flash', label: 'gemini-flash', default: true },
-          { id: 'opus', label: 'opus', default: false },
-          { id: 'sonnet', label: 'sonnet' },
-          { id: 'gemini-pro', label: 'gemini-pro' },
-          { id: 'gpt', label: 'gpt', default: false },
-          { id: 'gpt-codex', label: 'gpt-codex' },
-          { id: 'grok', label: 'grok' },
+          { id: 'Gemini 3 Flash', label: 'Gemini 3 Flash', default: true },
+          { id: 'Claude Opus 4.6', label: 'Claude Opus 4.6' },
+          { id: 'Claude Opus 4.7', label: 'Claude Opus 4.7' },
+          { id: 'Claude Sonnet 4.6', label: 'Claude Sonnet 4.6' },
+          { id: 'Gemini 3.1 Flash Lite', label: 'Gemini 3.1 Flash Lite' },
+          { id: 'Gemini 3.1 Pro Preview', label: 'Gemini 3.1 Pro Preview' },
+          { id: 'GPT-5', label: 'GPT-5' },
+          { id: 'GPT-5.2', label: 'GPT-5.2' },
+          { id: 'GPT-5.3-codex', label: 'GPT-5.3-codex' },
+          { id: 'GPT-5.4', label: 'GPT-5.4' },
+          { id: 'Grok 4.1 Fast Reasoning', label: 'Grok 4.1 Fast Reasoning' },
         ],
         warnings: [
-          'Junie CLI does not expose a live model list; serving a curated alias fallback only. '
+          'Junie CLI does not expose a live model list; serving the curated picker snapshot as a static fallback. '
           + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.",
         ],
       });
     });
   });
 
-  it('GET /providers/junie/models/advanced returns curated alias-backed advanced metadata with an honesty warning', async () => {
+  it('GET /providers/junie/models/advanced returns curated advanced metadata with an honesty warning', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/junie/models/advanced');
       expect(response.status).toBe(200);
@@ -4027,47 +4031,71 @@ providers:
         provider: 'junie',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'gemini-flash',
+        defaultModel: 'Gemini 3 Flash',
         source: 'static',
         cache: null,
         entries: [
           {
-            id: 'gemini-flash',
-            label: 'gemini-flash',
+            id: 'Gemini 3 Flash',
+            label: 'Gemini 3 Flash',
             default: true,
             capabilityTags: ['latency_optimized'],
           },
           {
-            id: 'opus',
-            label: 'opus',
+            id: 'Claude Opus 4.6',
+            label: 'Claude Opus 4.6',
             default: false,
             capabilityTags: ['reasoning'],
           },
           {
-            id: 'sonnet',
-            label: 'sonnet',
-            default: false,
-          },
-          {
-            id: 'gemini-pro',
-            label: 'gemini-pro',
+            id: 'Claude Opus 4.7',
+            label: 'Claude Opus 4.7',
             default: false,
             capabilityTags: ['reasoning'],
           },
           {
-            id: 'gpt',
-            label: 'gpt',
+            id: 'Claude Sonnet 4.6',
+            label: 'Claude Sonnet 4.6',
             default: false,
           },
           {
-            id: 'gpt-codex',
-            label: 'gpt-codex',
+            id: 'Gemini 3.1 Flash Lite',
+            label: 'Gemini 3.1 Flash Lite',
+            default: false,
+            capabilityTags: ['latency_optimized'],
+          },
+          {
+            id: 'Gemini 3.1 Pro Preview',
+            label: 'Gemini 3.1 Pro Preview',
+            default: false,
+            capabilityTags: ['reasoning'],
+          },
+          {
+            id: 'GPT-5',
+            label: 'GPT-5',
             default: false,
           },
           {
-            id: 'grok',
-            label: 'grok',
+            id: 'GPT-5.2',
+            label: 'GPT-5.2',
             default: false,
+          },
+          {
+            id: 'GPT-5.3-codex',
+            label: 'GPT-5.3-codex',
+            default: false,
+          },
+          {
+            id: 'GPT-5.4',
+            label: 'GPT-5.4',
+            default: false,
+            capabilityTags: ['reasoning'],
+          },
+          {
+            id: 'Grok 4.1 Fast Reasoning',
+            label: 'Grok 4.1 Fast Reasoning',
+            default: false,
+            capabilityTags: ['reasoning'],
           },
         ],
         presets: [],
@@ -4082,7 +4110,7 @@ providers:
           },
         },
         warnings: [
-          'Junie CLI does not expose a live model list; serving a curated alias fallback only. '
+          'Junie CLI does not expose a live model list; serving the curated picker snapshot as a static fallback. '
           + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.",
         ],
       });

@@ -1,5 +1,4 @@
 import type { CuratedModelCatalogModel } from './curatedModelCatalog.js';
-import { normalizeJunieModelName } from '../../backends/cli/junie/models.js';
 
 function normalizeWhitespace(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -397,6 +396,18 @@ export function normalizeLiteralCuratedModelId(
   return normalized.length > 0 ? normalized : null;
 }
 
+export function normalizeVerbatimCuratedModelId(
+  model: CuratedModelCatalogModel,
+): string | null {
+  const name = model.name.trim();
+  if (name.length > 0) {
+    return name;
+  }
+
+  const label = model.label?.trim();
+  return label && label.length > 0 ? label : null;
+}
+
 export function normalizeCursorCuratedModelId(model: CuratedModelCatalogModel): string | null {
   const candidates = [model.name, model.label].filter((value): value is string => Boolean(value));
   for (const candidate of candidates) {
@@ -461,15 +472,7 @@ export function normalizeKiroCuratedModelId(model: CuratedModelCatalogModel): st
 }
 
 export function normalizeJunieCuratedModelId(model: CuratedModelCatalogModel): string | null {
-  const candidates = [model.name, model.label].filter((value): value is string => Boolean(value));
-  for (const candidate of candidates) {
-    const normalized = normalizeJunieModelName(candidate);
-    if (normalized) {
-      return normalized;
-    }
-  }
-
-  return null;
+  return normalizeVerbatimCuratedModelId(model);
 }
 
 export function normalizeCuratedModelId(

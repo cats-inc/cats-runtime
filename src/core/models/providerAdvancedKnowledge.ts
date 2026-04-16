@@ -743,34 +743,7 @@ function buildCuratedJunieCliOverlay(
     return null;
   }
 
-  const entriesById: Record<string, CuratedEntryMetadata> = {};
-  const warnings: string[] = [];
-
-  for (const model of scope.models) {
-    const entryId = normalizeJunieCuratedModelId(model);
-    if (!entryId) {
-      warnings.push(
-        `Curated model '${describeCuratedModelLabel(model)}' for ${catalog.cli} could not be normalized and was ignored.`,
-      );
-      continue;
-    }
-
-    const nextEntry = buildCuratedEntryMetadata({
-      ...model,
-      label: entryId,
-    });
-    entriesById[entryId] = mergeCuratedEntryMetadata(entriesById[entryId], nextEntry);
-  }
-
-  const normalizedEntriesById = coerceSingleCuratedDefaultEntryMetadata(entriesById);
-
-  return Object.keys(normalizedEntriesById).length > 0
-    ? {
-        entriesById: normalizedEntriesById,
-        entryDefaults: {},
-        warnings,
-      }
-    : null;
+  return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeJunieCuratedModelId);
 }
 
 function buildCuratedCopilotCliOverlay(

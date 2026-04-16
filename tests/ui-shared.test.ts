@@ -232,10 +232,10 @@ describe('shared UI script', () => {
     const basicCatalog = catsUi.normalizeModelCatalog({
       catalog: {
         provider: 'junie',
-        defaultModel: 'gemini-flash',
+        defaultModel: 'Gemini 3 Flash',
         models: [
-          { id: 'gemini-flash', label: 'gemini-flash', default: true },
-          { id: 'opus', label: 'opus' },
+          { id: 'Gemini 3 Flash', label: 'Gemini 3 Flash', default: true },
+          { id: 'Claude Opus 4.7', label: 'Claude Opus 4.7' },
         ],
       },
     });
@@ -244,12 +244,12 @@ describe('shared UI script', () => {
       provider: 'junie',
       backend: '',
       instance: '',
-      defaultModel: 'gemini-flash',
+      defaultModel: 'Gemini 3 Flash',
       source: 'static',
       cache: null,
       models: [
-        { id: 'gemini-flash', label: 'gemini-flash', default: true },
-        { id: 'opus', label: 'opus' },
+        { id: 'Gemini 3 Flash', label: 'Gemini 3 Flash', default: true },
+        { id: 'Claude Opus 4.7', label: 'Claude Opus 4.7' },
       ],
       warnings: [],
     });
@@ -257,10 +257,10 @@ describe('shared UI script', () => {
     const advancedCatalog = catsUi.normalizeAdvancedCatalog({
       catalog: {
         provider: 'junie',
-        defaultModel: 'gemini-flash',
+        defaultModel: 'Gemini 3 Flash',
         entries: [
-          { id: 'gemini-flash', label: 'gemini-flash', default: true },
-          { id: 'opus', label: 'opus', capabilityTags: ['reasoning'] },
+          { id: 'Gemini 3 Flash', label: 'Gemini 3 Flash', default: true },
+          { id: 'Claude Opus 4.7', label: 'Claude Opus 4.7', capabilityTags: ['reasoning'] },
         ],
         support: { tier: 'entry_only', notes: [] },
       },
@@ -270,12 +270,12 @@ describe('shared UI script', () => {
       provider: 'junie',
       backend: '',
       instance: '',
-      defaultModel: 'gemini-flash',
+      defaultModel: 'Gemini 3 Flash',
       source: 'static',
       cache: null,
       entries: [
-        { id: 'gemini-flash', label: 'gemini-flash', default: true },
-        { id: 'opus', label: 'opus', capabilityTags: ['reasoning'] },
+        { id: 'Gemini 3 Flash', label: 'Gemini 3 Flash', default: true },
+        { id: 'Claude Opus 4.7', label: 'Claude Opus 4.7', capabilityTags: ['reasoning'] },
       ],
       presets: [],
       controls: [],

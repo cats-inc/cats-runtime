@@ -45,34 +45,34 @@ describe('JunieProvider', () => {
       }
     });
 
-    it('normalizes Claude Sonnet variants to the Junie sonnet alias', () => {
+    it('passes through Claude model names as-is', () => {
       const provider = new JunieProvider();
       const args = provider.buildSpawnArgs({
         cwd: '/tmp',
-        model: 'claude-sonnet-4',
+        model: 'Claude Sonnet 4.6',
       });
       expect(args).toContain('--model');
-      expect(args).toContain('sonnet');
+      expect(args).toContain('Claude Sonnet 4.6');
     });
 
-    it('normalizes generic GPT-family models to Junie aliases', () => {
+    it('passes through GPT-family model names as-is', () => {
       const provider = new JunieProvider();
       const args = provider.buildSpawnArgs({
         cwd: '/tmp',
-        model: 'gpt-5.4',
+        model: 'GPT-5.4',
       });
       expect(args).toContain('--model');
-      expect(args).toContain('gpt');
+      expect(args).toContain('GPT-5.4');
     });
 
-    it('normalizes Codex-family models to gpt-codex', () => {
+    it('passes through Codex-family model names as-is', () => {
       const provider = new JunieProvider();
       const args = provider.buildSpawnArgs({
         cwd: '/tmp',
-        model: 'gpt-5.2-codex',
+        model: 'GPT-5.3-codex',
       });
       expect(args).toContain('--model');
-      expect(args).toContain('gpt-codex');
+      expect(args).toContain('GPT-5.3-codex');
     });
 
     it('includes session-id for resume', () => {

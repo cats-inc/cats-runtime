@@ -61,7 +61,6 @@ import {
   normalizeCursorModelName,
   normalizeKiloModelName,
 } from './curatedModelCatalogNormalization.js';
-import { normalizeJunieModelName } from '../../backends/cli/junie/models.js';
 
 export interface ProviderModelCatalogEntry {
   id: string;
@@ -242,13 +241,17 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'openai-codex/gpt-5.4', label: 'openai-codex/gpt-5.4', default: true },
   ],
   junie: [
-    { id: 'gpt', label: 'gpt', default: true },
-    { id: 'gpt-codex', label: 'gpt-codex' },
-    { id: 'sonnet', label: 'sonnet' },
-    { id: 'opus', label: 'opus' },
-    { id: 'gemini-pro', label: 'gemini-pro' },
-    { id: 'gemini-flash', label: 'gemini-flash' },
-    { id: 'grok', label: 'grok' },
+    { id: 'Gemini 3 Flash', label: 'Gemini 3 Flash', default: true },
+    { id: 'Claude Opus 4.6', label: 'Claude Opus 4.6' },
+    { id: 'Claude Opus 4.7', label: 'Claude Opus 4.7' },
+    { id: 'Claude Sonnet 4.6', label: 'Claude Sonnet 4.6' },
+    { id: 'Gemini 3.1 Flash Lite', label: 'Gemini 3.1 Flash Lite' },
+    { id: 'Gemini 3.1 Pro Preview', label: 'Gemini 3.1 Pro Preview' },
+    { id: 'GPT-5', label: 'GPT-5' },
+    { id: 'GPT-5.2', label: 'GPT-5.2' },
+    { id: 'GPT-5.3-codex', label: 'GPT-5.3-codex' },
+    { id: 'GPT-5.4', label: 'GPT-5.4' },
+    { id: 'Grok 4.1 Fast Reasoning', label: 'Grok 4.1 Fast Reasoning' },
   ],
   cursor: [
     { id: 'auto', label: 'Auto' },
@@ -310,10 +313,6 @@ export function normalizeProviderCatalogModelId(
 
   if (target.providerName === 'kilo' && target.backend === 'cli') {
     return normalizeKiloModelName(normalized) || normalized;
-  }
-
-  if (target.providerName === 'junie' && target.backend === 'cli') {
-    return normalizeJunieModelName(normalized) || normalized;
   }
 
   return normalized;
@@ -575,7 +574,7 @@ function appendKnownStaticCatalogWarnings(
   }
   if (target.backend === 'cli' && target.providerName === 'junie') {
     warnings.push(
-      'Junie CLI does not expose a live model list; serving a curated alias fallback only. '
+      'Junie CLI does not expose a live model list; serving the curated picker snapshot as a static fallback. '
       + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.",
     );
   }
@@ -654,7 +653,7 @@ function coerceSingleCuratedDefaultModel(
 
   const keptDefault = defaultEntries[0];
   warnings.push(
-    `Curated catalog for ${cliLabel} resolved multiple defaults after normalization; `
+    `Curated catalog for ${cliLabel} marked multiple defaults; `
     + `keeping '${keptDefault?.label || keptDefault?.id || 'unknown'}' as the default.`,
   );
 
@@ -702,11 +701,7 @@ function buildCuratedStaticCliModels(
 
     return [{
       id,
-      // Junie's visible picker labels are routed vendor variants that churn
-      // frequently (for example "Claude Opus 4.6" vs "Claude Opus 4.7").
-      // Publish the stable runtime alias as the label too so hosts see a
-      // consistent catalog contract instead of JetBrains-version-specific text.
-      label: target.providerName === 'junie' ? id : (model.label || model.name),
+      label: model.label || model.name,
       ...(model.default !== undefined ? { default: model.default } : {}),
     }];
   });
