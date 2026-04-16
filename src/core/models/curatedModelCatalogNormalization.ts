@@ -374,6 +374,7 @@ export function normalizeCodexCuratedModelId(model: CuratedModelCatalogModel): s
     'gpt-5.3-codex',
     'gpt-5.3-codex-spark',
     'gpt-5.2',
+    'gpt-5.1-codex-mini',
   ]);
 
   for (const candidate of candidates) {

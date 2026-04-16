@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  normalizeCodexCuratedModelId,
   normalizeCopilotModelName,
   normalizeCursorModelName,
   normalizeKiloModelName,
@@ -27,6 +28,14 @@ describe('curatedModelCatalogNormalization', () => {
     expect(normalizeCopilotModelName('Claude Opus 4.6')).toBe('claude-opus-4.6');
     expect(normalizeCopilotModelName('Claude Sonnet 4')).toBe('claude-sonnet-4');
     expect(normalizeCopilotModelName('Unknown Copilot Model')).toBeNull();
+  });
+
+  it('normalizes Codex curated catalog ids from the curated YAML allowlist', () => {
+    expect(normalizeCodexCuratedModelId({ name: 'gpt-5.1-codex-mini' }))
+      .toBe('gpt-5.1-codex-mini');
+    expect(normalizeCodexCuratedModelId({ label: 'gpt-5.4-mini' }))
+      .toBe('gpt-5.4-mini');
+    expect(normalizeCodexCuratedModelId({ name: 'unknown-codex-model' })).toBeNull();
   });
 
   it('normalizes Kilo picker labels into runtime-owned gateway ids', () => {

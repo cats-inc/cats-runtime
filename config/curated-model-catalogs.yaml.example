@@ -69,8 +69,8 @@ catalogs:
         options: []
 
   - cli: Codex
-    version: 0.120.0
-    last_updated: 2026-04-14
+    version: 0.121.0
+    last_updated: 2026-04-17
     notes:
       - "Source: codex model picker and reasoning level selector"
       - "Context window reported ~258K total"
@@ -86,7 +86,7 @@ catalogs:
           - name: High
             notes:
               - "Greater reasoning depth for complex problems"
-          - name: Extra High
+          - name: Extra high
             notes:
               - "Extra high reasoning depth for complex problems"
         default: Medium
@@ -96,6 +96,16 @@ catalogs:
         notes:
           - "Latest frontier agentic coding model."
         default: true
+
+      - name: gpt-5.2-codex
+        label: gpt-5.2-codex
+        notes:
+          - "Frontier agentic coding model."
+
+      - name: gpt-5.1-codex-max
+        label: gpt-5.1-codex-max
+        notes:
+          - "Codex-optimized flagship for deep and fast reasoning."
 
       - name: gpt-5.4-mini
         label: gpt-5.4-mini
@@ -120,9 +130,18 @@ catalogs:
         notes:
           - "Optimized for professional work and long-running agents."
 
+      - name: gpt-5.1-codex-mini
+        label: gpt-5.1-codex-mini
+        notes:
+          - "Optimized for codex. Cheaper, faster, but less capable."
+        options:
+          - name: Reasoning Level
+            values: [Medium, High]
+            default: Medium
+
   - cli: Gemini
-    version: 0.37.1
-    last_updated: 2026-04-14
+    version: 0.38.1
+    last_updated: 2026-04-17
     models:
       - name: gemini-3.1-pro-preview
         label: gemini-3.1-pro-preview

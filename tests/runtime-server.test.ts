@@ -4261,6 +4261,11 @@ providers:
       '          - name: Reasoning Level',
       '            default: High',
       '      - name: gpt-5.2',
+      '      - name: gpt-5.1-codex-mini',
+      '        options:',
+      '          - name: Reasoning Level',
+      '            values: [Medium, High]',
+      '            default: Medium',
     ], {}, {}, async (runtime) => {
       const modelsResponse = await runtime.app.request('/providers/codex/models');
       expect(modelsResponse.status).toBe(200);
@@ -4277,6 +4282,7 @@ providers:
           { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex', default: false },
           { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark', default: false },
           { id: 'gpt-5.2', label: 'gpt-5.2', default: false },
+          { id: 'gpt-5.1-codex-mini', label: 'gpt-5.1-codex-mini', default: false },
         ],
         warnings: [],
       });
@@ -4290,6 +4296,7 @@ providers:
         'gpt-5.3-codex',
         'gpt-5.3-codex-spark',
         'gpt-5.2',
+        'gpt-5.1-codex-mini',
       ]);
       expect(advancedPayload.defaultSelection).toEqual({
         entryId: 'gpt-5.4',
@@ -4307,9 +4314,54 @@ providers:
             'gpt-5.3-codex',
             'gpt-5.3-codex-spark',
             'gpt-5.2',
+            'gpt-5.1-codex-mini',
           ],
         },
       ]);
+      expect(advancedPayload.controls[0]?.values).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          value: 'medium',
+          label: 'Medium (default)',
+          applicableEntryIds: [
+            'gpt-5.4',
+            'gpt-5.4-mini',
+            'gpt-5.3-codex',
+            'gpt-5.2',
+            'gpt-5.1-codex-mini',
+          ],
+        }),
+        expect.objectContaining({
+          value: 'high',
+          label: 'High',
+          applicableEntryIds: [
+            'gpt-5.4',
+            'gpt-5.4-mini',
+            'gpt-5.3-codex',
+            'gpt-5.2',
+            'gpt-5.1-codex-mini',
+          ],
+        }),
+        expect.objectContaining({
+          value: 'low',
+          applicableEntryIds: [
+            'gpt-5.4',
+            'gpt-5.4-mini',
+            'gpt-5.3-codex',
+            'gpt-5.3-codex-spark',
+            'gpt-5.2',
+          ],
+        }),
+        expect.objectContaining({
+          value: 'xhigh',
+          applicableEntryIds: [
+            'gpt-5.4',
+            'gpt-5.4-mini',
+            'gpt-5.3-codex',
+            'gpt-5.3-codex-spark',
+            'gpt-5.2',
+          ],
+        }),
+      ]));
       expect(advancedPayload.warnings).toEqual([]);
     });
   });

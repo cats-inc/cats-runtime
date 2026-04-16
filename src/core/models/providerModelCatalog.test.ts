@@ -1871,6 +1871,12 @@ describe('ProviderModelCatalogService', () => {
         '            default: High',
         '      - name: gpt-5.2',
         '        label: gpt-5.2',
+        '      - name: gpt-5.1-codex-mini',
+        '        label: gpt-5.1-codex-mini',
+        '        options:',
+        '          - name: Reasoning Level',
+        '            values: [Medium, High]',
+        '            default: Medium',
         '',
       ].join('\n'), 'utf8');
 
@@ -1924,6 +1930,7 @@ describe('ProviderModelCatalogService', () => {
           { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex', default: false },
           { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark', default: false },
           { id: 'gpt-5.2', label: 'gpt-5.2', default: false },
+          { id: 'gpt-5.1-codex-mini', label: 'gpt-5.1-codex-mini', default: false },
         ],
         warnings: [],
       });
@@ -1931,7 +1938,7 @@ describe('ProviderModelCatalogService', () => {
       expect(catalog.provider).toBe('codex');
       expect(catalog.backend).toBe('cli');
       expect(catalog.defaultModel).toBe('gpt-5.4');
-      expect(catalog.entries).toHaveLength(5);
+      expect(catalog.entries).toHaveLength(6);
       expect(catalog.entries).toEqual(expect.arrayContaining([
         expect.objectContaining({
           id: 'gpt-5.4',
@@ -1941,6 +1948,10 @@ describe('ProviderModelCatalogService', () => {
         expect.objectContaining({
           id: 'gpt-5.3-codex-spark',
           label: 'gpt-5.3-codex-spark',
+        }),
+        expect.objectContaining({
+          id: 'gpt-5.1-codex-mini',
+          label: 'gpt-5.1-codex-mini',
         }),
       ]));
       expect(catalog.controls).toHaveLength(1);
@@ -1972,6 +1983,7 @@ describe('ProviderModelCatalogService', () => {
               'gpt-5.4-mini',
               'gpt-5.3-codex',
               'gpt-5.2',
+              'gpt-5.1-codex-mini',
             ],
           },
           {
@@ -1991,6 +2003,7 @@ describe('ProviderModelCatalogService', () => {
               'gpt-5.4-mini',
               'gpt-5.3-codex',
               'gpt-5.2',
+              'gpt-5.1-codex-mini',
             ],
           },
           {
@@ -2020,6 +2033,7 @@ describe('ProviderModelCatalogService', () => {
           'gpt-5.3-codex',
           'gpt-5.3-codex-spark',
           'gpt-5.2',
+          'gpt-5.1-codex-mini',
         ],
         semanticTags: ['reasoning_intensity'],
       });
