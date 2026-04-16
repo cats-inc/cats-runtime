@@ -212,27 +212,61 @@ export const SHARED_UI_SCRIPT = `
     return JSON.parse(JSON.stringify(value));
   }
 
-  function normalizeAdvancedCatalog(catalog) {
-    if (!catalog || typeof catalog !== 'object' || Array.isArray(catalog)) {
+  function unwrapCatalogEnvelope(catalog) {
+    if (
+      catalog
+      && typeof catalog === 'object'
+      && !Array.isArray(catalog)
+      && catalog.catalog
+      && typeof catalog.catalog === 'object'
+      && !Array.isArray(catalog.catalog)
+    ) {
+      return catalog.catalog;
+    }
+    return catalog;
+  }
+
+  function normalizeModelCatalog(catalog) {
+    var rawCatalog = unwrapCatalogEnvelope(catalog);
+    if (!rawCatalog || typeof rawCatalog !== 'object' || Array.isArray(rawCatalog)) {
       return null;
     }
     return {
-      provider: typeof catalog.provider === 'string' ? catalog.provider : '',
-      backend: typeof catalog.backend === 'string' ? catalog.backend : '',
-      instance: typeof catalog.instance === 'string' ? catalog.instance : '',
-      defaultModel: typeof catalog.defaultModel === 'string' ? catalog.defaultModel : null,
-      source: typeof catalog.source === 'string' ? catalog.source : 'static',
-      cache: catalog.cache && typeof catalog.cache === 'object' ? cloneJson(catalog.cache) : null,
-      entries: Array.isArray(catalog.entries) ? cloneJson(catalog.entries) : [],
-      presets: Array.isArray(catalog.presets) ? cloneJson(catalog.presets) : [],
-      controls: Array.isArray(catalog.controls) ? cloneJson(catalog.controls) : [],
-      defaultSelection: catalog.defaultSelection && typeof catalog.defaultSelection === 'object'
-        ? cloneJson(catalog.defaultSelection)
+      provider: typeof rawCatalog.provider === 'string' ? rawCatalog.provider : '',
+      backend: typeof rawCatalog.backend === 'string' ? rawCatalog.backend : '',
+      instance: typeof rawCatalog.instance === 'string' ? rawCatalog.instance : '',
+      defaultModel: typeof rawCatalog.defaultModel === 'string' ? rawCatalog.defaultModel : null,
+      source: typeof rawCatalog.source === 'string' ? rawCatalog.source : 'static',
+      cache: rawCatalog.cache && typeof rawCatalog.cache === 'object'
+        ? cloneJson(rawCatalog.cache)
         : null,
-      support: catalog.support && typeof catalog.support === 'object'
-        ? cloneJson(catalog.support)
+      models: Array.isArray(rawCatalog.models) ? cloneJson(rawCatalog.models) : [],
+      warnings: Array.isArray(rawCatalog.warnings) ? cloneJson(rawCatalog.warnings) : [],
+    };
+  }
+
+  function normalizeAdvancedCatalog(catalog) {
+    var rawCatalog = unwrapCatalogEnvelope(catalog);
+    if (!rawCatalog || typeof rawCatalog !== 'object' || Array.isArray(rawCatalog)) {
+      return null;
+    }
+    return {
+      provider: typeof rawCatalog.provider === 'string' ? rawCatalog.provider : '',
+      backend: typeof rawCatalog.backend === 'string' ? rawCatalog.backend : '',
+      instance: typeof rawCatalog.instance === 'string' ? rawCatalog.instance : '',
+      defaultModel: typeof rawCatalog.defaultModel === 'string' ? rawCatalog.defaultModel : null,
+      source: typeof rawCatalog.source === 'string' ? rawCatalog.source : 'static',
+      cache: rawCatalog.cache && typeof rawCatalog.cache === 'object' ? cloneJson(rawCatalog.cache) : null,
+      entries: Array.isArray(rawCatalog.entries) ? cloneJson(rawCatalog.entries) : [],
+      presets: Array.isArray(rawCatalog.presets) ? cloneJson(rawCatalog.presets) : [],
+      controls: Array.isArray(rawCatalog.controls) ? cloneJson(rawCatalog.controls) : [],
+      defaultSelection: rawCatalog.defaultSelection && typeof rawCatalog.defaultSelection === 'object'
+        ? cloneJson(rawCatalog.defaultSelection)
+        : null,
+      support: rawCatalog.support && typeof rawCatalog.support === 'object'
+        ? cloneJson(rawCatalog.support)
         : { tier: 'read_only' },
-      warnings: Array.isArray(catalog.warnings) ? cloneJson(catalog.warnings) : [],
+      warnings: Array.isArray(rawCatalog.warnings) ? cloneJson(rawCatalog.warnings) : [],
     };
   }
 
@@ -1420,6 +1454,7 @@ export const SHARED_UI_SCRIPT = `
     apiFetch: apiFetch,
     renderProviderBadge: renderProviderBadge,
     renderStatusBadge: renderStatusBadge,
+    normalizeModelCatalog: normalizeModelCatalog,
     normalizeAdvancedCatalog: normalizeAdvancedCatalog,
     getAdvancedCatalogChoices: getAdvancedCatalogChoices,
     getAdvancedCatalogDefaultChoice: getAdvancedCatalogDefaultChoice,

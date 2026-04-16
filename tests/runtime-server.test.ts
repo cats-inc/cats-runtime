@@ -482,9 +482,10 @@ describe('runtime server', () => {
       expect(html).toContain('Runtime Health');
       expect(html).toContain('validateRuntimeApiKey');
       expect(html).toContain('getRuntimeAuthHeaders');
-      expect(html).toContain("junie:[{value:'gpt',label:'gpt'},{value:'gpt-codex',label:'gpt-codex'},{value:'sonnet',label:'sonnet'},{value:'opus',label:'opus'},{value:'gemini-pro',label:'gemini-pro'},{value:'gemini-flash',label:'gemini-flash'},{value:'grok',label:'grok'}],");
+      expect(html).toContain("junie:[{value:'gemini-flash',label:'gemini-flash (default)'},{value:'opus',label:'opus'},{value:'sonnet',label:'sonnet'},{value:'gemini-pro',label:'gemini-pro'},{value:'gpt',label:'gpt'},{value:'gpt-codex',label:'gpt-codex'},{value:'grok',label:'grok'}],");
       expect(html).not.toContain("junie:[{value:'gpt-5.4',label:'gpt-5.4 (default)'}],");
       expect(html).toContain('/providers/${name}/models/advanced');
+      expect(html).toContain('normalizeModelCatalog');
       expect(html).toContain('modelSelection');
       expect(html).toContain('Provider returned no assistant output.');
       expect(html).toContain('function extractResultEventFallbackText(event) {');

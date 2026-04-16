@@ -148,6 +148,7 @@ describe('shared UI script', () => {
     expect(SHARED_UI_SCRIPT).toContain('apiFetch');
     expect(SHARED_UI_SCRIPT).toContain('renderProviderBadge');
     expect(SHARED_UI_SCRIPT).toContain('renderStatusBadge');
+    expect(SHARED_UI_SCRIPT).toContain('normalizeModelCatalog');
     expect(SHARED_UI_SCRIPT).toContain('normalizeAdvancedCatalog');
     expect(SHARED_UI_SCRIPT).toContain('getAdvancedCatalogChoices');
     expect(SHARED_UI_SCRIPT).toContain('resolveAdvancedCatalogChoice');
@@ -223,6 +224,64 @@ describe('shared UI script', () => {
       provider: 'codex',
       model: 'gpt-custom-preview',
       modelSelection: null,
+    });
+  });
+
+  it('unwraps runtime model catalog envelopes before normalizing shared helpers', () => {
+    const catsUi = loadCatsUiHelpers();
+    const basicCatalog = catsUi.normalizeModelCatalog({
+      catalog: {
+        provider: 'junie',
+        defaultModel: 'gemini-flash',
+        models: [
+          { id: 'gemini-flash', label: 'gemini-flash', default: true },
+          { id: 'opus', label: 'opus' },
+        ],
+      },
+    });
+
+    expect(basicCatalog).toEqual({
+      provider: 'junie',
+      backend: '',
+      instance: '',
+      defaultModel: 'gemini-flash',
+      source: 'static',
+      cache: null,
+      models: [
+        { id: 'gemini-flash', label: 'gemini-flash', default: true },
+        { id: 'opus', label: 'opus' },
+      ],
+      warnings: [],
+    });
+
+    const advancedCatalog = catsUi.normalizeAdvancedCatalog({
+      catalog: {
+        provider: 'junie',
+        defaultModel: 'gemini-flash',
+        entries: [
+          { id: 'gemini-flash', label: 'gemini-flash', default: true },
+          { id: 'opus', label: 'opus', capabilityTags: ['reasoning'] },
+        ],
+        support: { tier: 'entry_only', notes: [] },
+      },
+    });
+
+    expect(advancedCatalog).toEqual({
+      provider: 'junie',
+      backend: '',
+      instance: '',
+      defaultModel: 'gemini-flash',
+      source: 'static',
+      cache: null,
+      entries: [
+        { id: 'gemini-flash', label: 'gemini-flash', default: true },
+        { id: 'opus', label: 'opus', capabilityTags: ['reasoning'] },
+      ],
+      presets: [],
+      controls: [],
+      defaultSelection: null,
+      support: { tier: 'entry_only', notes: [] },
+      warnings: [],
     });
   });
 
