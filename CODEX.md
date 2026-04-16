@@ -34,6 +34,11 @@ Only Codex should read and maintain this file.
 - **MUST** follow the Development Workflow defined in AGENTS.md
 - **MUST** run validation proportional to the change risk
 - **MUST NOT** modify other agents' files (CLAUDE.md, GEMINI.md)
+- **MUST NOT** include source code paths, filenames, or line numbers in normal
+  user-facing answers about the codebase unless the user explicitly asks for
+  source references, locations, or line-level detail
+- **SHOULD** answer codebase questions in plain language first, and only add
+  code references when they are necessary to complete the request
 - **SHOULD** ask for clarification when requirements are ambiguous
 - **SHOULD** make minimal, focused edits
 
@@ -117,4 +122,4 @@ To sync skills after changes:
 
 This file is maintained by Codex only. Other agents should not modify this file.
 
-Last updated: 2026-04-15
+Last updated: 2026-04-17
