@@ -641,6 +641,32 @@ function resolveCuratedStaticCliModels(
   return resolveCuratedCatalogScope(catalog, providerName)?.models ?? [];
 }
 
+function coerceSingleCuratedDefaultModel(
+  models: ProviderModelCatalogEntry[],
+  cliLabel: string,
+  warnings: string[],
+): ProviderModelCatalogEntry[] {
+  const deduped = dedupeModels(models);
+  const defaultEntries = deduped.filter((entry) => entry.default === true);
+  if (defaultEntries.length <= 1) {
+    return deduped;
+  }
+
+  const keptDefault = defaultEntries[0];
+  warnings.push(
+    `Curated catalog for ${cliLabel} resolved multiple defaults after normalization; `
+    + `keeping '${keptDefault?.label || keptDefault?.id || 'unknown'}' as the default.`,
+  );
+
+  const keptDefaultId = keptDefault.id;
+  return deduped.map((entry) => ({
+    ...entry,
+    ...(entry.default === true || entry.id === keptDefaultId
+      ? { default: entry.id === keptDefaultId }
+      : {}),
+  }));
+}
+
 function buildCuratedStaticCliModels(
   target: ProviderTargetDescriptor,
   config: Pick<CliRuntimeConfig, 'configPath'>,
@@ -676,12 +702,16 @@ function buildCuratedStaticCliModels(
 
     return [{
       id,
+      // Junie's visible picker labels are routed vendor variants that churn
+      // frequently (for example "Claude Opus 4.6" vs "Claude Opus 4.7").
+      // Publish the stable runtime alias as the label too so hosts see a
+      // consistent catalog contract instead of JetBrains-version-specific text.
       label: target.providerName === 'junie' ? id : (model.label || model.name),
       ...(model.default !== undefined ? { default: model.default } : {}),
     }];
   });
 
-  return models.length > 0 ? models : null;
+  return models.length > 0 ? coerceSingleCuratedDefaultModel(models, catalog.cli, warnings) : null;
 }
 
 function resolveProviderModelCatalogStorageFile(

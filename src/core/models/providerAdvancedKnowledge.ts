@@ -362,6 +362,30 @@ function mergeCuratedEntryMetadata(
   };
 }
 
+function coerceSingleCuratedDefaultEntryMetadata(
+  entriesById: Record<string, CuratedEntryMetadata>,
+): Record<string, CuratedEntryMetadata> {
+  const entryPairs = Object.entries(entriesById);
+  const defaultEntries = entryPairs.filter(([, entry]) => entry.default === true);
+  if (defaultEntries.length <= 1) {
+    return entriesById;
+  }
+
+  const keptDefaultId = defaultEntries[0]?.[0];
+  if (!keptDefaultId) {
+    return entriesById;
+  }
+
+  return Object.fromEntries(
+    entryPairs.map(([entryId, entry]) => [
+      entryId,
+      entry.default === true || entryId === keptDefaultId
+        ? { ...entry, default: entryId === keptDefaultId }
+        : entry,
+    ]),
+  );
+}
+
 function buildCuratedEnumControl(
   optionsByEntryId: Map<string, CuratedModelCatalogOption>,
   control: {
@@ -601,9 +625,11 @@ function buildCuratedEntryOnlyOverlay(
     entriesById[entryId] = buildCuratedEntryMetadata(model);
   }
 
-  return Object.keys(entriesById).length > 0
+  const normalizedEntriesById = coerceSingleCuratedDefaultEntryMetadata(entriesById);
+
+  return Object.keys(normalizedEntriesById).length > 0
     ? {
-        entriesById,
+        entriesById: normalizedEntriesById,
         entryDefaults: {},
         warnings,
       }
@@ -736,9 +762,11 @@ function buildCuratedJunieCliOverlay(
     entriesById[entryId] = mergeCuratedEntryMetadata(entriesById[entryId], nextEntry);
   }
 
-  return Object.keys(entriesById).length > 0
+  const normalizedEntriesById = coerceSingleCuratedDefaultEntryMetadata(entriesById);
+
+  return Object.keys(normalizedEntriesById).length > 0
     ? {
-        entriesById,
+        entriesById: normalizedEntriesById,
         entryDefaults: {},
         warnings,
       }

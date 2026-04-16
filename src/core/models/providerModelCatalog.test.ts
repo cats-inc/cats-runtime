@@ -766,6 +766,194 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
+  it('falls back to the bundled Junie curated catalog when the runtime YAML is absent', () => {
+    const runtime = createRuntimeRoot();
+
+    try {
+      const base = createCatalogConfig();
+      const config = {
+        ...base,
+        configPath: runtime.paths.configPath,
+        sessionBaseDir: runtime.paths.sessionBaseDir,
+        providerDefaultTargets: {
+          ...base.providerDefaultTargets,
+          junie: { backend: 'cli', instance: 'default' },
+        },
+        providerInstances: {
+          ...base.providerInstances,
+          junie: {
+            default: {
+              id: 'default',
+              providerName: 'junie',
+              commandConfig: {
+                path: 'junie',
+                runner: 'auto',
+                runtime: { mode: 'native' },
+              },
+            },
+          },
+        },
+        providerCommands: {
+          ...base.providerCommands,
+          junie: {
+            path: 'junie',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
+        },
+      } as const;
+
+      const service = new ProviderModelCatalogService(config as never, {
+        env: runtime.env,
+      });
+
+      expect(service.getImmediateCatalog('junie')).toMatchObject({
+        provider: 'junie',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gemini-flash',
+        source: 'static',
+        models: [
+          { id: 'gemini-flash', label: 'gemini-flash', default: true },
+          { id: 'opus', label: 'opus', default: false },
+          { id: 'sonnet', label: 'sonnet' },
+          { id: 'gemini-pro', label: 'gemini-pro' },
+          { id: 'gpt', label: 'gpt', default: false },
+          { id: 'gpt-codex', label: 'gpt-codex' },
+          { id: 'grok', label: 'grok' },
+        ],
+        warnings: [
+          'Junie CLI does not expose a live model list; serving a curated alias fallback only. '
+          + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.",
+        ],
+      });
+    } finally {
+      runtime.cleanup();
+    }
+  });
+
+  it('keeps the first Junie default when multiple normalized aliases are marked default', () => {
+    const runtime = createRuntimeRoot();
+
+    try {
+      writeFileSync(runtime.paths.curatedModelCatalogPath, [
+        'schema_version: 1',
+        'catalogs:',
+        '  - cli: Junie',
+        '    version: 1362.47',
+        '    models:',
+        '      - name: Gemini 3 Flash',
+        '        default: true',
+        '      - name: GPT-5',
+        '        default: true',
+        '      - name: Claude Opus 4.7',
+        '',
+      ].join('\n'), 'utf8');
+
+      const base = createCatalogConfig();
+      const config = {
+        ...base,
+        configPath: runtime.paths.configPath,
+        sessionBaseDir: runtime.paths.sessionBaseDir,
+        providerDefaultTargets: {
+          ...base.providerDefaultTargets,
+          junie: { backend: 'cli', instance: 'default' },
+        },
+        providerInstances: {
+          ...base.providerInstances,
+          junie: {
+            default: {
+              id: 'default',
+              providerName: 'junie',
+              commandConfig: {
+                path: 'junie',
+                runner: 'auto',
+                runtime: { mode: 'native' },
+              },
+            },
+          },
+        },
+        providerCommands: {
+          ...base.providerCommands,
+          junie: {
+            path: 'junie',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
+        },
+      } as const;
+
+      const service = new ProviderModelCatalogService(config as never, {
+        env: runtime.env,
+      });
+
+      expect(service.getImmediateCatalog('junie')).toEqual({
+        provider: 'junie',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gemini-flash',
+        source: 'static',
+        cache: null,
+        models: [
+          { id: 'gemini-flash', label: 'gemini-flash', default: true },
+          { id: 'gpt', label: 'gpt', default: false },
+          { id: 'opus', label: 'opus' },
+        ],
+        warnings: [
+          'Junie CLI does not expose a live model list; serving a curated alias fallback only. '
+          + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.",
+          "Curated catalog for Junie resolved multiple defaults after normalization; keeping 'gemini-flash' as the default.",
+        ],
+      });
+
+      expect(service.getImmediateAdvancedCatalog('junie')).toEqual({
+        provider: 'junie',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gemini-flash',
+        source: 'static',
+        cache: null,
+        entries: [
+          {
+            id: 'gemini-flash',
+            label: 'gemini-flash',
+            default: true,
+            capabilityTags: ['latency_optimized'],
+          },
+          {
+            id: 'gpt',
+            label: 'gpt',
+            default: false,
+          },
+          {
+            id: 'opus',
+            label: 'opus',
+            default: false,
+            capabilityTags: ['reasoning'],
+          },
+        ],
+        presets: [],
+        controls: [],
+        defaultSelection: null,
+        support: {
+          tier: 'entry_only',
+          advancedMetadataStatus: 'unverified_omitted',
+          discoveryMode: 'manual_refresh',
+          provenance: {
+            status: 'unverified_omitted',
+          },
+        },
+        warnings: [
+          'Junie CLI does not expose a live model list; serving a curated alias fallback only. '
+          + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.",
+          "Curated catalog for Junie resolved multiple defaults after normalization; keeping 'gemini-flash' as the default.",
+        ],
+      });
+    } finally {
+      runtime.cleanup();
+    }
+  });
+
   it('adds an honest warning when Cursor is still serving the curated static fallback', async () => {
     const runtime = createRuntimeRoot();
 
