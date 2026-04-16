@@ -16,6 +16,7 @@ const CURATED_CLI_ALIASES: Record<string, string[]> = {
   gemini: ['gemini'],
   kilo: ['kilo'],
   kiro: ['kiro'],
+  junie: ['junie', 'junie by jetbrains'],
   copilot: ['copilot', 'github copilot'],
   cursor: ['cursor'],
 };
@@ -26,6 +27,7 @@ const CURATED_PROVIDER_ALIASES: Record<string, string[]> = {
   gemini: ['google', 'gemini'],
   kilo: ['kilo'],
   kiro: ['kiro'],
+  junie: ['junie', 'jetbrains ai', 'jetbrains'],
   copilot: ['copilot', 'github copilot'],
   cursor: ['cursor'],
 };

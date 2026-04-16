@@ -61,6 +61,7 @@ import {
   normalizeCursorModelName,
   normalizeKiloModelName,
 } from './curatedModelCatalogNormalization.js';
+import { normalizeJunieModelName } from '../../backends/cli/junie/models.js';
 
 export interface ProviderModelCatalogEntry {
   id: string;
@@ -311,6 +312,10 @@ export function normalizeProviderCatalogModelId(
     return normalizeKiloModelName(normalized) || normalized;
   }
 
+  if (target.providerName === 'junie' && target.backend === 'cli') {
+    return normalizeJunieModelName(normalized) || normalized;
+  }
+
   return normalized;
 }
 
@@ -329,6 +334,10 @@ function resolveDefaultModel(
     : null;
   if (activeModel) {
     return normalizeProviderCatalogModelId(target, activeModel);
+  }
+
+  if (target.providerName === 'junie' && target.backend === 'cli') {
+    return null;
   }
 
   if (target.providerName === 'cursor' && target.backend === 'cli') {
@@ -606,6 +615,7 @@ function supportsCuratedStaticCliCatalog(providerName: string): boolean {
     || providerName === 'gemini'
     || providerName === 'kilo'
     || providerName === 'kiro'
+    || providerName === 'junie'
     || providerName === 'copilot'
     || providerName === 'cursor';
 }
@@ -666,7 +676,7 @@ function buildCuratedStaticCliModels(
 
     return [{
       id,
-      label: model.label || model.name,
+      label: target.providerName === 'junie' ? id : (model.label || model.name),
       ...(model.default !== undefined ? { default: model.default } : {}),
     }];
   });

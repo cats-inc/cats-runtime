@@ -3,6 +3,7 @@ import {
   normalizeCodexCuratedModelId,
   normalizeCopilotModelName,
   normalizeCursorModelName,
+  normalizeJunieCuratedModelId,
   normalizeKiloModelName,
   normalizeKiroCuratedModelId,
 } from './curatedModelCatalogNormalization.js';
@@ -68,5 +69,16 @@ describe('curatedModelCatalogNormalization', () => {
     expect(normalizeKiroCuratedModelId({ name: 'glm-5' })).toBe('glm-5');
     expect(normalizeKiroCuratedModelId({ name: 'qwen3-coder-next' })).toBe('qwen3-coder-next');
     expect(normalizeKiroCuratedModelId({ name: 'Unknown Kiro Model' })).toBeNull();
+  });
+
+  it('normalizes Junie picker labels into runtime-owned alias ids', () => {
+    expect(normalizeJunieCuratedModelId({ name: 'Gemini 3 Flash' })).toBe('gemini-flash');
+    expect(normalizeJunieCuratedModelId({ name: 'Claude Opus 4.7' })).toBe('opus');
+    expect(normalizeJunieCuratedModelId({ name: 'Claude Sonnet 4.6' })).toBe('sonnet');
+    expect(normalizeJunieCuratedModelId({ name: 'Gemini 3.1 Pro Preview' })).toBe('gemini-pro');
+    expect(normalizeJunieCuratedModelId({ name: 'GPT-5.3-codex' })).toBe('gpt-codex');
+    expect(normalizeJunieCuratedModelId({ name: 'GPT-5.4' })).toBe('gpt');
+    expect(normalizeJunieCuratedModelId({ name: 'Grok 4.1 Fast Reasoning' })).toBe('grok');
+    expect(normalizeJunieCuratedModelId({ name: 'Unknown Junie Model' })).toBeNull();
   });
 });

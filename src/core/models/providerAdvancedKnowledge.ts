@@ -31,6 +31,7 @@ import {
   normalizeCopilotCuratedModelId,
   normalizeCodexCuratedModelId,
   normalizeCursorCuratedModelId,
+  normalizeJunieCuratedModelId,
   normalizeKiloCuratedModelId,
   normalizeKiroCuratedModelId,
   normalizeLiteralCuratedModelId,
@@ -329,6 +330,35 @@ function buildCuratedEntryMetadata(
     ...(model.tags ? { capabilityTags: [...model.tags] } : {}),
     ...(notes ? { notes } : {}),
     ...(model.deprecated ? { deprecated: true } : {}),
+  };
+}
+
+function mergeCuratedEntryMetadata(
+  existing: CuratedEntryMetadata | undefined,
+  next: CuratedEntryMetadata,
+): CuratedEntryMetadata {
+  if (!existing) {
+    return next;
+  }
+
+  const mergedCapabilityTags = Array.from(new Set([
+    ...(existing.capabilityTags || []),
+    ...(next.capabilityTags || []),
+  ]));
+  const mergedNotes = Array.from(new Set([
+    ...(existing.notes || []),
+    ...(next.notes || []),
+  ]));
+
+  return {
+    label: existing.label || next.label,
+    ...(existing.default === true || next.default === true ? { default: true } : {}),
+    ...(existing.limits || next.limits
+      ? { limits: { ...(existing.limits || {}), ...(next.limits || {}) } }
+      : {}),
+    ...(mergedCapabilityTags.length > 0 ? { capabilityTags: mergedCapabilityTags } : {}),
+    ...(mergedNotes.length > 0 ? { notes: mergedNotes } : {}),
+    ...(existing.deprecated === true || next.deprecated === true ? { deprecated: true } : {}),
   };
 }
 
@@ -672,6 +702,47 @@ function buildCuratedKiroCliOverlay(
   }
 
   return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeKiroCuratedModelId);
+}
+
+function buildCuratedJunieCliOverlay(
+  document: CuratedModelCatalogDocument | undefined,
+): CuratedCatalogOverlay | null {
+  const catalog = findCuratedCliCatalog(document, 'junie');
+  if (!catalog) {
+    return null;
+  }
+
+  const scope = resolveCuratedCatalogScope(catalog, 'junie');
+  if (!scope) {
+    return null;
+  }
+
+  const entriesById: Record<string, CuratedEntryMetadata> = {};
+  const warnings: string[] = [];
+
+  for (const model of scope.models) {
+    const entryId = normalizeJunieCuratedModelId(model);
+    if (!entryId) {
+      warnings.push(
+        `Curated model '${describeCuratedModelLabel(model)}' for ${catalog.cli} could not be normalized and was ignored.`,
+      );
+      continue;
+    }
+
+    const nextEntry = buildCuratedEntryMetadata({
+      ...model,
+      label: entryId,
+    });
+    entriesById[entryId] = mergeCuratedEntryMetadata(entriesById[entryId], nextEntry);
+  }
+
+  return Object.keys(entriesById).length > 0
+    ? {
+        entriesById,
+        entryDefaults: {},
+        warnings,
+      }
+    : null;
 }
 
 function buildCuratedCopilotCliOverlay(
@@ -1276,6 +1347,7 @@ function loadCuratedOverlay(
       && target.providerName !== 'gemini'
       && target.providerName !== 'kilo'
       && target.providerName !== 'kiro'
+      && target.providerName !== 'junie'
       && target.providerName !== 'copilot'
       && target.providerName !== 'cursor'
     )
@@ -1300,6 +1372,8 @@ function loadCuratedOverlay(
         return buildCuratedKiloCliOverlay(result.document);
       case 'kiro':
         return buildCuratedKiroCliOverlay(result.document);
+      case 'junie':
+        return buildCuratedJunieCliOverlay(result.document);
       case 'copilot':
         return buildCuratedCopilotCliOverlay(result.document);
       case 'cursor':

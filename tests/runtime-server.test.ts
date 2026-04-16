@@ -3998,18 +3998,88 @@ providers:
         provider: 'junie',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'gpt',
+        defaultModel: 'gemini-flash',
         source: 'static',
         cache: null,
         models: [
-          { id: 'gpt', label: 'gpt', default: true },
-          { id: 'gpt-codex', label: 'gpt-codex', default: false },
-          { id: 'sonnet', label: 'sonnet', default: false },
+          { id: 'gemini-flash', label: 'gemini-flash', default: true },
           { id: 'opus', label: 'opus', default: false },
-          { id: 'gemini-pro', label: 'gemini-pro', default: false },
-          { id: 'gemini-flash', label: 'gemini-flash', default: false },
-          { id: 'grok', label: 'grok', default: false },
+          { id: 'sonnet', label: 'sonnet' },
+          { id: 'gemini-pro', label: 'gemini-pro' },
+          { id: 'gpt', label: 'gpt', default: false },
+          { id: 'gpt-codex', label: 'gpt-codex' },
+          { id: 'grok', label: 'grok' },
         ],
+        warnings: [
+          'Junie CLI does not expose a live model list; serving a curated alias fallback only. '
+          + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.",
+        ],
+      });
+    });
+  });
+
+  it('GET /providers/junie/models/advanced returns curated alias-backed advanced metadata with an honesty warning', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const response = await runtime.app.request('/providers/junie/models/advanced');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        provider: 'junie',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gemini-flash',
+        source: 'static',
+        cache: null,
+        entries: [
+          {
+            id: 'gemini-flash',
+            label: 'gemini-flash',
+            default: true,
+            capabilityTags: ['latency_optimized'],
+          },
+          {
+            id: 'opus',
+            label: 'opus',
+            default: false,
+            capabilityTags: ['reasoning'],
+          },
+          {
+            id: 'sonnet',
+            label: 'sonnet',
+            default: false,
+          },
+          {
+            id: 'gemini-pro',
+            label: 'gemini-pro',
+            default: false,
+            capabilityTags: ['reasoning'],
+          },
+          {
+            id: 'gpt',
+            label: 'gpt',
+            default: false,
+          },
+          {
+            id: 'gpt-codex',
+            label: 'gpt-codex',
+            default: false,
+          },
+          {
+            id: 'grok',
+            label: 'grok',
+            default: false,
+          },
+        ],
+        presets: [],
+        controls: [],
+        defaultSelection: null,
+        support: {
+          tier: 'entry_only',
+          advancedMetadataStatus: 'unverified_omitted',
+          discoveryMode: 'manual_refresh',
+          provenance: {
+            status: 'unverified_omitted',
+          },
+        },
         warnings: [
           'Junie CLI does not expose a live model list; serving a curated alias fallback only. '
           + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.",

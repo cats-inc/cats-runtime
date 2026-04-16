@@ -1,4 +1,5 @@
 import type { CuratedModelCatalogModel } from './curatedModelCatalog.js';
+import { normalizeJunieModelName } from '../../backends/cli/junie/models.js';
 
 function normalizeWhitespace(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -459,6 +460,18 @@ export function normalizeKiroCuratedModelId(model: CuratedModelCatalogModel): st
   return null;
 }
 
+export function normalizeJunieCuratedModelId(model: CuratedModelCatalogModel): string | null {
+  const candidates = [model.name, model.label].filter((value): value is string => Boolean(value));
+  for (const candidate of candidates) {
+    const normalized = normalizeJunieModelName(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
 export function normalizeCuratedModelId(
   providerName: string,
   model: CuratedModelCatalogModel,
@@ -474,6 +487,8 @@ export function normalizeCuratedModelId(
       return normalizeKiloCuratedModelId(model);
     case 'kiro':
       return normalizeKiroCuratedModelId(model);
+    case 'junie':
+      return normalizeJunieCuratedModelId(model);
     case 'copilot':
       return normalizeCopilotCuratedModelId(model);
     case 'cursor':

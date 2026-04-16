@@ -9,6 +9,7 @@ import {
   parseJunieStreamLine,
   type JunieUsageTotals,
 } from '../junie/parser.js';
+import { normalizeJunieModelName } from '../junie/models.js';
 import { buildProcessSpawnConfig } from '../runtime/runtime.js';
 import type {
   Provider,
@@ -447,44 +448,7 @@ function normalizeJunieModelId(model?: string): string | undefined {
   const trimmed = model.trim();
   if (!trimmed) return undefined;
 
-  const normalized = trimmed
-    .toLowerCase()
-    .replace(/[_\s]+/g, '-')
-    .replace(/^openai\//, '')
-    .replace(/^anthropic\//, '')
-    .replace(/^google\//, '')
-    .replace(/^xai\//, '')
-    .trim();
-
-  if (normalized.includes('codex')) {
-    return 'gpt-codex';
-  }
-
-  if (normalized.startsWith('gpt')) {
-    return 'gpt';
-  }
-
-  if (normalized.includes('opus')) {
-    return 'opus';
-  }
-
-  if (normalized.includes('sonnet')) {
-    return 'sonnet';
-  }
-
-  if (normalized.includes('gemini') && normalized.includes('flash')) {
-    return 'gemini-flash';
-  }
-
-  if (normalized.includes('gemini')) {
-    return 'gemini-pro';
-  }
-
-  if (normalized.includes('grok')) {
-    return 'grok';
-  }
-
-  return trimmed;
+  return normalizeJunieModelName(trimmed) || trimmed;
 }
 
 interface LiveJunieTurnState {
