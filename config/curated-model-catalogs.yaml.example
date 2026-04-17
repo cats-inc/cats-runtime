@@ -22,7 +22,7 @@ schema_version: 1
 
 catalogs:
   - cli: Claude
-    version: 2.1.111
+    version: 2.1.112
     last_updated: 2026-04-17
     notes:
       - "Source: claude /model picker and /effort output"
@@ -163,8 +163,8 @@ catalogs:
         label: gemini-2.5-flash-lite
 
   - cli: Cursor
-    version: 2026.04.13-a9d7fb5
-    last_updated: 2026-04-14
+    version: 2026.04.16-2d20146
+    last_updated: 2026-04-17
     notes:
       - "Source: Cursor Agent /model picker output supplied by user"
       - "Entries below are raw visible /model names only; provider grouping and canonical ids are intentionally omitted."
@@ -203,15 +203,25 @@ catalogs:
       - name: Codex 5.1 Max High Fast
       - name: Codex 5.1 Max Extra High
       - name: Codex 5.1 Max Extra High Fast
+      - name: Opus 4.7 Thinking
       - name: GPT-5.4 1M High
       - name: GPT-5.4 High Fast
       - name: GPT-5.4 Extra High Fast
+      - name: Opus 4.7 Low
+      - name: Opus 4.7 Medium
+      - name: Opus 4.7
+      - name: Opus 4.7 Extra High
+      - name: Opus 4.7 Max
+      - name: Opus 4.7 Low Thinking
+      - name: Opus 4.7 Medium Thinking
+      - name: Opus 4.7 Extra High Thinking
+      - name: Opus 4.7 Max Thinking
       - name: GPT-5.4 1M Low
       - name: GPT-5.4 1M
       - name: GPT-5.4 Fast
       - name: GPT-5.4 1M Extra High
-      - name: Opus 4.5
-      - name: Opus 4.5 Thinking
+      - name: Sonnet 4.6 1M
+      - name: Sonnet 4.6 1M Thinking
       - name: GPT-5.2 Low
       - name: GPT-5.2 Low Fast
       - name: GPT-5.2 Fast
@@ -232,8 +242,6 @@ catalogs:
       - name: GPT-5.4 Nano Extra High
       - name: Grok 4.20
       - name: Grok 4.20 Thinking
-      - name: Sonnet 4.5 1M
-      - name: Sonnet 4.5 1M Thinking
       - name: Gemini 3 Flash
       - name: Codex 5.1 Mini Low
       - name: Codex 5.1 Mini
@@ -242,8 +250,8 @@ catalogs:
       - name: Kimi K2.5
 
   - cli: Copilot
-    version: v1.0.26
-    last_updated: 2026-04-15
+    version: v1.0.31
+    last_updated: 2026-04-17
     notes:
       - "Source: Copilot model picker output supplied by user"
     providers:
@@ -273,8 +281,6 @@ catalogs:
                 default: High
 
           - name: GPT-5.2
-
-          - name: GPT-5.1
 
           - name: GPT-5.4 mini
 
@@ -307,9 +313,6 @@ catalogs:
             options: []
 
           - name: Claude Opus 4.6
-            options:
-              - name: Effort Level
-                default: High
 
           - name: Claude Opus 4.5
             options: []
@@ -319,7 +322,7 @@ catalogs:
 
   - cli: Kilo
     version: v7.2.0
-    last_updated: 2026-04-14
+    last_updated: 2026-04-17
     notes:
       - "Source: Kilo model picker output supplied by user."
       - "Entries below preserve picker-visible labels only; runtime maps them to Kilo gateway ids."
@@ -330,13 +333,13 @@ catalogs:
 
       - name: Kilo Auto Free
 
-      - name: "ByteDance Seed: Dola Seed 2.0 Pro (free)"
+      - name: "xAI: Grok Code Fast 1 Optimized"
 
-      - name: "xAI: Grok Code Fast 1 Optimized (free)"
+      - name: "StepFun: Step 3.5 Flash"
 
-      - name: Elephant (new)
+      - name: Elephant
 
-      - name: "Anthropic: Claude Opus 4.6"
+      - name: "Anthropic: Claude Opus 4.7"
 
       - name: "Anthropic: Claude Sonnet 4.6"
 
@@ -349,11 +352,11 @@ catalogs:
 
       - name: "MoonshotAI: Kimi K2.5"
 
-      - name: "Z.ai: GLM 5.1 (new)"
+      - name: "Z.ai: GLM 5.1"
 
   - cli: Kiro
     version: 2.0.0
-    last_updated: 2026-04-15
+    last_updated: 2026-04-17
     notes:
       - "Source: kiro-cli model list output supplied by user"
     models:
@@ -364,7 +367,7 @@ catalogs:
 
       - name: claude-opus-4.6
         notes:
-          - "The latest Claude Opus model with 1M context window"
+          - "The Claude Opus 4.6 model"
 
       - name: claude-sonnet-4.6
         notes:
