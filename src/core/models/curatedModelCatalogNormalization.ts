@@ -31,6 +31,27 @@ function normalizeCursorCodexSuffix(
   }
 }
 
+function normalizeCursorAnthropicEffortSuffix(
+  suffix: string | undefined,
+): string | null {
+  switch (suffix) {
+    case undefined:
+      return '';
+    case 'low':
+      return '-low';
+    case 'medium':
+      return '-medium';
+    case 'high':
+      return '-high';
+    case 'extra high':
+      return '-xhigh';
+    case 'max':
+      return '-max';
+    default:
+      return null;
+  }
+}
+
 function isKnownCursorCanonicalModelId(value: string): boolean {
   return /^auto$/.test(value)
     || /^composer-2(?:-fast)?$/.test(value)
@@ -48,7 +69,9 @@ function isKnownCursorCanonicalModelId(value: string): boolean {
     || /^gpt-5\.4-mini(?:-(none|low|high|xhigh))?$/.test(value)
     || /^gpt-5\.4-nano(?:-(none|low|high|xhigh))?$/.test(value)
     || /^gpt-5-mini$/.test(value)
-    || /^claude-4\.(5|6)-(opus|sonnet)(?:-high-thinking|-thinking)?$/.test(value)
+    || /^claude-4\.(5|6|7)-(opus|sonnet)(?:-(low|medium|high|xhigh|max))?(?:-thinking)?$/.test(
+      value,
+    )
     || /^gemini-3(?:\.1)?-(pro|flash)$/.test(value)
     || /^grok-4\.20(?:-thinking)?$/.test(value)
     || /^kimi-k2\.5$/.test(value);
@@ -153,19 +176,21 @@ function normalizeCursorAnthropicLabel(value: string): string | null {
   if (value === 'opus 4.6 1m thinking') {
     return 'claude-4.6-opus-high-thinking';
   }
-  if (value === 'opus 4.5') {
-    return 'claude-4.5-opus';
+
+  const match = value.match(
+    /^(opus|sonnet) (4\.[567])(?: 1m)?(?: (low|medium|high|extra high|max))?( thinking)?$/,
+  );
+  if (!match) {
+    return null;
   }
-  if (value === 'opus 4.5 thinking') {
-    return 'claude-4.5-opus-thinking';
+
+  const [, family, version, effortLabel, thinkingLabel] = match;
+  const effort = normalizeCursorAnthropicEffortSuffix(effortLabel);
+  if (effort === null) {
+    return null;
   }
-  if (value === 'sonnet 4.5 1m') {
-    return 'claude-4.5-sonnet';
-  }
-  if (value === 'sonnet 4.5 1m thinking') {
-    return 'claude-4.5-sonnet-thinking';
-  }
-  return null;
+
+  return `claude-${version}-${family}${effort}${thinkingLabel ? '-thinking' : ''}`;
 }
 
 export function normalizeCursorModelName(
@@ -289,14 +314,17 @@ export function normalizeKiloModelName(
     'kilo/kilo-auto/balanced',
     'kilo/kilo-auto/free',
     'kilo/bytedance-seed/dola-seed-2.0-pro:free',
+    'kilo/x-ai/grok-code-fast-1',
     'kilo/x-ai/grok-code-fast-1:optimized:free',
     'kilo/openrouter/elephant-alpha',
     'kilo/anthropic/claude-opus-4.6',
+    'kilo/anthropic/claude-opus-4.7',
     'kilo/anthropic/claude-sonnet-4.6',
     'kilo/openai/gpt-5.4',
     'kilo/google/gemini-3.1-pro-preview',
     'kilo/minimax/minimax-m2.7',
     'kilo/moonshotai/kimi-k2.5',
+    'kilo/stepfun/step-3.5-flash',
     'kilo/z-ai/glm-5.1',
   ]);
   if (knownIds.has(normalized)) {
@@ -312,12 +340,20 @@ export function normalizeKiloModelName(
       return 'kilo/kilo-auto/free';
     case 'bytedance seed: dola seed 2.0 pro (free)':
       return 'kilo/bytedance-seed/dola-seed-2.0-pro:free';
+    case 'xai: grok code fast 1':
+      return 'kilo/x-ai/grok-code-fast-1';
+    case 'xai: grok code fast 1 optimized':
     case 'xai: grok code fast 1 optimized (free)':
       return 'kilo/x-ai/grok-code-fast-1:optimized:free';
+    case 'stepfun: step 3.5 flash':
+      return 'kilo/stepfun/step-3.5-flash';
+    case 'elephant':
     case 'elephant (new)':
       return 'kilo/openrouter/elephant-alpha';
     case 'anthropic: claude opus 4.6':
       return 'kilo/anthropic/claude-opus-4.6';
+    case 'anthropic: claude opus 4.7':
+      return 'kilo/anthropic/claude-opus-4.7';
     case 'anthropic: claude sonnet 4.6':
       return 'kilo/anthropic/claude-sonnet-4.6';
     case 'openai: gpt-5.4':
@@ -329,6 +365,7 @@ export function normalizeKiloModelName(
       return 'kilo/minimax/minimax-m2.7';
     case 'moonshotai: kimi k2.5':
       return 'kilo/moonshotai/kimi-k2.5';
+    case 'z.ai: glm 5.1':
     case 'z.ai: glm 5.1 (new)':
       return 'kilo/z-ai/glm-5.1';
     default:

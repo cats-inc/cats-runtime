@@ -481,6 +481,97 @@ describe('buildProviderAdvancedKnowledge', () => {
     }
   });
 
+  it('normalizes current curated Cursor anthropic labels into advanced catalog entries', () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-curated-cursor-current-'));
+    const curatedPath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');
+    mkdirSync(join(runtimeRoot, 'config'), { recursive: true });
+    writeFileSync(curatedPath, [
+      'schema_version: 1',
+      'catalogs:',
+      '  - cli: Cursor',
+      '    last_updated: 2026-04-17',
+      '    models:',
+      '      - name: Composer 2 Fast',
+      '        default: true',
+      '      - name: Opus 4.7 Thinking',
+      '      - name: Opus 4.7 Max Thinking',
+      '      - name: Sonnet 4.6 1M',
+      '      - name: Sonnet 4.6 1M Thinking',
+      '',
+    ].join('\n'), 'utf8');
+
+    try {
+      const target: ProviderTargetDescriptor = {
+        providerName: 'cursor',
+        backend: 'cli',
+        instanceId: 'default',
+        defaultTarget: true,
+        cliInstance: {
+          id: 'default',
+          providerName: 'cursor',
+          backend: 'cli',
+          command: 'cursor-agent',
+        },
+      };
+
+      const knowledge = buildProviderAdvancedKnowledge(target, createCatalog({
+        provider: 'cursor',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'composer-2-fast',
+        models: [
+          { id: 'composer-2-fast', label: 'composer-2-fast', default: true },
+          { id: 'claude-4.7-opus-thinking', label: 'claude-4.7-opus-thinking' },
+          { id: 'claude-4.7-opus-max-thinking', label: 'claude-4.7-opus-max-thinking' },
+          { id: 'claude-4.6-sonnet', label: 'claude-4.6-sonnet' },
+          { id: 'claude-4.6-sonnet-thinking', label: 'claude-4.6-sonnet-thinking' },
+        ],
+      }), {
+        env: {
+          ...process.env,
+          CATS_RUNTIME_DIR: runtimeRoot,
+        },
+      });
+
+      expect(knowledge.supportTier).toBe('entry_only');
+      expect(knowledge.catalog.entries).toEqual([
+        {
+          id: 'composer-2-fast',
+          label: 'Composer 2 Fast',
+          default: true,
+        },
+        {
+          id: 'claude-4.7-opus-thinking',
+          label: 'Opus 4.7 Thinking',
+          default: false,
+          capabilityTags: ['reasoning'],
+        },
+        {
+          id: 'claude-4.7-opus-max-thinking',
+          label: 'Opus 4.7 Max Thinking',
+          default: false,
+          capabilityTags: ['reasoning'],
+        },
+        {
+          id: 'claude-4.6-sonnet',
+          label: 'Sonnet 4.6 1M',
+          default: false,
+        },
+        {
+          id: 'claude-4.6-sonnet-thinking',
+          label: 'Sonnet 4.6 1M Thinking',
+          default: false,
+          capabilityTags: ['reasoning'],
+        },
+      ]);
+      expect(knowledge.catalog.controls).toEqual([]);
+      expect(knowledge.catalog.defaultSelection).toBeNull();
+      expect(knowledge.catalog.warnings).toEqual([]);
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
   it('normalizes curated Copilot grouped providers into advanced catalog entries', () => {
     const runtimeRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-curated-copilot-'));
     const curatedPath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');
@@ -920,6 +1011,111 @@ describe('buildProviderAdvancedKnowledge', () => {
         {
           id: 'kilo/moonshotai/kimi-k2.5',
           label: 'MoonshotAI: Kimi K2.5',
+          default: false,
+        },
+      ]);
+      expect(knowledge.catalog.controls).toEqual([]);
+      expect(knowledge.catalog.defaultSelection).toBeNull();
+      expect(knowledge.catalog.warnings).toEqual([]);
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('normalizes current curated Kilo labels into advanced catalog entries', () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-curated-kilo-current-'));
+    const curatedPath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');
+    mkdirSync(join(runtimeRoot, 'config'), { recursive: true });
+    writeFileSync(curatedPath, [
+      'schema_version: 1',
+      'catalogs:',
+      '  - cli: Kilo',
+      '    last_updated: 2026-04-17',
+      '    models:',
+      '      - name: Kilo Auto Balanced',
+      '      - name: "xAI: Grok Code Fast 1 Optimized"',
+      '      - name: "StepFun: Step 3.5 Flash"',
+      '      - name: Elephant',
+      '      - name: "Anthropic: Claude Opus 4.7"',
+      '      - name: "OpenAI: GPT-5.4"',
+      '        default: true',
+      '      - name: "Z.ai: GLM 5.1"',
+      '',
+    ].join('\n'), 'utf8');
+
+    try {
+      const target: ProviderTargetDescriptor = {
+        providerName: 'kilo',
+        backend: 'cli',
+        instanceId: 'default',
+        defaultTarget: true,
+        cliInstance: {
+          id: 'default',
+          providerName: 'kilo',
+          backend: 'cli',
+          command: 'kilo',
+        },
+      };
+
+      const knowledge = buildProviderAdvancedKnowledge(target, createCatalog({
+        provider: 'kilo',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'kilo/openai/gpt-5.4',
+        models: [
+          { id: 'kilo/kilo-auto/balanced', label: 'kilo/kilo-auto/balanced' },
+          { id: 'kilo/x-ai/grok-code-fast-1:optimized:free', label: 'kilo/x-ai/grok-code-fast-1:optimized:free' },
+          { id: 'kilo/stepfun/step-3.5-flash', label: 'kilo/stepfun/step-3.5-flash' },
+          { id: 'kilo/openrouter/elephant-alpha', label: 'kilo/openrouter/elephant-alpha' },
+          { id: 'kilo/anthropic/claude-opus-4.7', label: 'kilo/anthropic/claude-opus-4.7' },
+          { id: 'kilo/openai/gpt-5.4', label: 'kilo/openai/gpt-5.4', default: true },
+          { id: 'kilo/z-ai/glm-5.1', label: 'kilo/z-ai/glm-5.1' },
+        ],
+      }), {
+        env: {
+          ...process.env,
+          CATS_RUNTIME_DIR: runtimeRoot,
+        },
+      });
+
+      expect(knowledge.supportTier).toBe('entry_only');
+      expect(knowledge.catalog.entries).toEqual([
+        {
+          id: 'kilo/kilo-auto/balanced',
+          label: 'Kilo Auto Balanced',
+          default: false,
+        },
+        {
+          id: 'kilo/x-ai/grok-code-fast-1:optimized:free',
+          label: 'xAI: Grok Code Fast 1 Optimized',
+          default: false,
+        },
+        {
+          id: 'kilo/stepfun/step-3.5-flash',
+          label: 'StepFun: Step 3.5 Flash',
+          default: false,
+          capabilityTags: ['latency_optimized'],
+        },
+        {
+          id: 'kilo/openrouter/elephant-alpha',
+          label: 'Elephant',
+          default: false,
+        },
+        {
+          id: 'kilo/anthropic/claude-opus-4.7',
+          label: 'Anthropic: Claude Opus 4.7',
+          default: false,
+          capabilityTags: ['reasoning'],
+        },
+        {
+          id: 'kilo/openai/gpt-5.4',
+          label: 'OpenAI: GPT-5.4',
+          default: true,
+          capabilityTags: ['reasoning'],
+        },
+        {
+          id: 'kilo/z-ai/glm-5.1',
+          label: 'Z.ai: GLM 5.1',
           default: false,
         },
       ]);

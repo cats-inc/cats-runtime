@@ -17,6 +17,13 @@ describe('curatedModelCatalogNormalization', () => {
     expect(normalizeCursorModelName('GPT-5.4 1M')).toBe('gpt-5.4-medium');
     expect(normalizeCursorModelName('GPT-5.4 Mini None')).toBe('gpt-5.4-mini-none');
     expect(normalizeCursorModelName('Opus 4.5 Thinking')).toBe('claude-4.5-opus-thinking');
+    expect(normalizeCursorModelName('Opus 4.7 Low')).toBe('claude-4.7-opus-low');
+    expect(normalizeCursorModelName('Opus 4.7 Thinking')).toBe('claude-4.7-opus-thinking');
+    expect(normalizeCursorModelName('Opus 4.7 Max Thinking'))
+      .toBe('claude-4.7-opus-max-thinking');
+    expect(normalizeCursorModelName('Sonnet 4.6 1M')).toBe('claude-4.6-sonnet');
+    expect(normalizeCursorModelName('Sonnet 4.6 1M Thinking'))
+      .toBe('claude-4.6-sonnet-thinking');
     expect(normalizeCursorModelName('Gemini 3 Flash')).toBe('gemini-3-flash');
     expect(normalizeCursorModelName('Kimi K2.5')).toBe('kimi-k2.5');
     expect(normalizeCursorModelName('Unknown Cursor Model')).toBeNull();
@@ -24,8 +31,12 @@ describe('curatedModelCatalogNormalization', () => {
 
   it('normalizes Copilot picker labels into runtime-owned catalog ids', () => {
     expect(normalizeCopilotModelName('GPT-5.4')).toBe('gpt-5.4');
+    expect(normalizeCopilotModelName('GPT-5.3-Codex')).toBe('gpt-5.3-codex');
     expect(normalizeCopilotModelName('GPT-5.4 mini')).toBe('gpt-5.4-mini');
     expect(normalizeCopilotModelName('GPT-5 mini')).toBe('gpt-5-mini');
+    expect(normalizeCopilotModelName('GPT-4.1')).toBe('gpt-4.1');
+    expect(normalizeCopilotModelName('Claude Sonnet 4.6')).toBe('claude-sonnet-4.6');
+    expect(normalizeCopilotModelName('Claude Haiku 4.5')).toBe('claude-haiku-4.5');
     expect(normalizeCopilotModelName('Claude Opus 4.6')).toBe('claude-opus-4.6');
     expect(normalizeCopilotModelName('Claude Sonnet 4')).toBe('claude-sonnet-4');
     expect(normalizeCopilotModelName('Unknown Copilot Model')).toBeNull();
@@ -47,14 +58,22 @@ describe('curatedModelCatalogNormalization', () => {
     expect(normalizeKiloModelName('Kilo Auto Frontier')).toBe('kilo/kilo-auto/frontier');
     expect(normalizeKiloModelName('ByteDance Seed: Dola Seed 2.0 Pro (free)'))
       .toBe('kilo/bytedance-seed/dola-seed-2.0-pro:free');
+    expect(normalizeKiloModelName('xAI: Grok Code Fast 1 Optimized'))
+      .toBe('kilo/x-ai/grok-code-fast-1:optimized:free');
     expect(normalizeKiloModelName('xAI: Grok Code Fast 1 Optimized (free)'))
       .toBe('kilo/x-ai/grok-code-fast-1:optimized:free');
+    expect(normalizeKiloModelName('StepFun: Step 3.5 Flash'))
+      .toBe('kilo/stepfun/step-3.5-flash');
+    expect(normalizeKiloModelName('Elephant')).toBe('kilo/openrouter/elephant-alpha');
     expect(normalizeKiloModelName('Elephant (new)')).toBe('kilo/openrouter/elephant-alpha');
     expect(normalizeKiloModelName('Anthropic: Claude Opus 4.6'))
       .toBe('kilo/anthropic/claude-opus-4.6');
+    expect(normalizeKiloModelName('Anthropic: Claude Opus 4.7'))
+      .toBe('kilo/anthropic/claude-opus-4.7');
     expect(normalizeKiloModelName('OpenAI: GPT-5.4')).toBe('kilo/openai/gpt-5.4');
     expect(normalizeKiloModelName('MiniMax: MiniMax M2.7')).toBe('kilo/minimax/minimax-m2.7');
     expect(normalizeKiloModelName('MoonshotAI: Kimi K2.5')).toBe('kilo/moonshotai/kimi-k2.5');
+    expect(normalizeKiloModelName('Z.ai: GLM 5.1')).toBe('kilo/z-ai/glm-5.1');
     expect(normalizeKiloModelName('Z.ai: GLM 5.1 (new)')).toBe('kilo/z-ai/glm-5.1');
     expect(normalizeKiloModelName('Unknown Kilo Model')).toBeNull();
   });

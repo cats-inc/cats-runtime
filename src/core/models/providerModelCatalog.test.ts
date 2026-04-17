@@ -125,7 +125,22 @@ describe('normalizeProviderCatalogModelId', () => {
     expect(normalizeProviderCatalogModelId({
       providerName: 'kilo',
       backend: 'cli',
-    }, 'Elephant (new)')).toBe('kilo/openrouter/elephant-alpha');
+    }, 'Elephant')).toBe('kilo/openrouter/elephant-alpha');
+    expect(normalizeProviderCatalogModelId({
+      providerName: 'kilo',
+      backend: 'cli',
+    }, 'Anthropic: Claude Opus 4.7')).toBe('kilo/anthropic/claude-opus-4.7');
+  });
+
+  it('normalizes current Cursor anthropic picker labels to canonical ids', () => {
+    expect(normalizeProviderCatalogModelId({
+      providerName: 'cursor',
+      backend: 'cli',
+    }, 'Opus 4.7 Thinking')).toBe('claude-4.7-opus-thinking');
+    expect(normalizeProviderCatalogModelId({
+      providerName: 'cursor',
+      backend: 'cli',
+    }, 'Sonnet 4.6 1M Thinking')).toBe('claude-4.6-sonnet-thinking');
   });
 
   it('preserves Junie picker labels as literal model ids', () => {
