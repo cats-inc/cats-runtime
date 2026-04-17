@@ -52,6 +52,38 @@ function normalizeCursorAnthropicEffortSuffix(
   }
 }
 
+const KNOWN_CURSOR_ANTHROPIC_CANONICAL_IDS = new Set([
+  'claude-4.5-opus',
+  'claude-4.5-opus-thinking',
+  'claude-4.5-sonnet',
+  'claude-4.5-sonnet-thinking',
+  'claude-4.6-opus-high-thinking',
+  'claude-4.6-sonnet',
+  'claude-4.6-sonnet-thinking',
+  'claude-4.7-opus',
+  'claude-4.7-opus-low',
+  'claude-4.7-opus-medium',
+  'claude-4.7-opus-xhigh',
+  'claude-4.7-opus-max',
+  'claude-4.7-opus-thinking',
+  'claude-4.7-opus-low-thinking',
+  'claude-4.7-opus-medium-thinking',
+  'claude-4.7-opus-xhigh-thinking',
+  'claude-4.7-opus-max-thinking',
+]);
+
+const LEGACY_CURSOR_ANTHROPIC_LABEL_IDS = new Map([
+  ['opus 4.5', 'claude-4.5-opus'],
+  ['opus 4.5 thinking', 'claude-4.5-opus-thinking'],
+  ['sonnet 4.5 1m', 'claude-4.5-sonnet'],
+  ['sonnet 4.5 1m thinking', 'claude-4.5-sonnet-thinking'],
+  // Cursor's observed legacy Opus 4.6 dynamic id is `claude-4.6-opus-high-thinking`
+  // even though the picker label only says "Opus 4.6 1M Thinking".
+  ['opus 4.6 1m thinking', 'claude-4.6-opus-high-thinking'],
+  ['sonnet 4.6 1m', 'claude-4.6-sonnet'],
+  ['sonnet 4.6 1m thinking', 'claude-4.6-sonnet-thinking'],
+]);
+
 function isKnownCursorCanonicalModelId(value: string): boolean {
   return /^auto$/.test(value)
     || /^composer-2(?:-fast)?$/.test(value)
@@ -69,9 +101,7 @@ function isKnownCursorCanonicalModelId(value: string): boolean {
     || /^gpt-5\.4-mini(?:-(none|low|high|xhigh))?$/.test(value)
     || /^gpt-5\.4-nano(?:-(none|low|high|xhigh))?$/.test(value)
     || /^gpt-5-mini$/.test(value)
-    || /^claude-4\.(5|6|7)-(opus|sonnet)(?:-(low|medium|high|xhigh|max))?(?:-thinking)?$/.test(
-      value,
-    )
+    || KNOWN_CURSOR_ANTHROPIC_CANONICAL_IDS.has(value)
     || /^gemini-3(?:\.1)?-(pro|flash)$/.test(value)
     || /^grok-4\.20(?:-thinking)?$/.test(value)
     || /^kimi-k2\.5$/.test(value);
@@ -173,13 +203,12 @@ function normalizeCursorGpt52Label(value: string): string | null {
 }
 
 function normalizeCursorAnthropicLabel(value: string): string | null {
-  if (value === 'opus 4.6 1m thinking') {
-    return 'claude-4.6-opus-high-thinking';
+  const legacyMatch = LEGACY_CURSOR_ANTHROPIC_LABEL_IDS.get(value);
+  if (legacyMatch) {
+    return legacyMatch;
   }
 
-  const match = value.match(
-    /^(opus|sonnet) (4\.[567])(?: 1m)?(?: (low|medium|high|extra high|max))?( thinking)?$/,
-  );
+  const match = value.match(/^(opus) (4\.7)(?: (low|medium|extra high|max))?( thinking)?$/);
   if (!match) {
     return null;
   }
@@ -342,6 +371,9 @@ export function normalizeKiloModelName(
       return 'kilo/bytedance-seed/dola-seed-2.0-pro:free';
     case 'xai: grok code fast 1':
       return 'kilo/x-ai/grok-code-fast-1';
+    // Current `kilo models` output exposes the optimized variant only as
+    // `kilo/x-ai/grok-code-fast-1:optimized:free`; the picker label omits the
+    // trailing "(free)" marker.
     case 'xai: grok code fast 1 optimized':
     case 'xai: grok code fast 1 optimized (free)':
       return 'kilo/x-ai/grok-code-fast-1:optimized:free';

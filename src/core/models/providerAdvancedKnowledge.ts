@@ -107,7 +107,6 @@ function buildEntryCapabilityTags(
     normalized.includes('opus')
     || normalized.includes('pro')
     || normalized.includes('gpt-5.4')
-    || normalized.includes('thinking')
     || normalized.includes('reason')
   ) {
     tags.add('reasoning');

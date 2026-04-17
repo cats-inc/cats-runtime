@@ -561,7 +561,6 @@ describe('buildProviderAdvancedKnowledge', () => {
           id: 'claude-4.6-sonnet-thinking',
           label: 'Sonnet 4.6 1M Thinking',
           default: false,
-          capabilityTags: ['reasoning'],
         },
       ]);
       expect(knowledge.catalog.controls).toEqual([]);

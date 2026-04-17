@@ -29,6 +29,14 @@ describe('curatedModelCatalogNormalization', () => {
     expect(normalizeCursorModelName('Unknown Cursor Model')).toBeNull();
   });
 
+  it('rejects unsupported or mistyped Cursor anthropic labels and ids', () => {
+    expect(normalizeCursorModelName('Sonnet 4.5')).toBeNull();
+    expect(normalizeCursorModelName('Sonnet 4.5 Thinking')).toBeNull();
+    expect(normalizeCursorModelName('Opus 4.5 1M')).toBeNull();
+    expect(normalizeCursorModelName('claude-4.7-sonnet-xhigh')).toBeNull();
+    expect(normalizeCursorModelName('claude-4.5-opus-low-thinking')).toBeNull();
+  });
+
   it('normalizes Copilot picker labels into runtime-owned catalog ids', () => {
     expect(normalizeCopilotModelName('GPT-5.4')).toBe('gpt-5.4');
     expect(normalizeCopilotModelName('GPT-5.3-Codex')).toBe('gpt-5.3-codex');
