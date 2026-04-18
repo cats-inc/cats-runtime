@@ -30,20 +30,17 @@ export type GooseCommandRunner = (command: string, args: string[]) => Promise<Co
 export interface GooseNativeSessionServiceOptions {
   command: string;
   runner?: GooseCommandRunner;
-  sessionDbPath?: string;
   projectsIndexPath?: string;
 }
 
 export class GooseNativeSessionService {
   private readonly command: string;
   private readonly runner: GooseCommandRunner;
-  private readonly sessionDbPath?: string;
   private readonly projectsIndexPath?: string;
 
   constructor(options: GooseNativeSessionServiceOptions) {
     this.command = options.command;
     this.runner = options.runner || defaultCommandRunner;
-    this.sessionDbPath = options.sessionDbPath || resolveExistingGooseSessionDbPath();
     this.projectsIndexPath = options.projectsIndexPath || resolveExistingGooseProjectsIndexPath();
   }
 
@@ -125,52 +122,41 @@ export class GooseNativeSessionService {
   }
 
   async deleteSession(_cwd: string, providerSessionId: string): Promise<boolean> {
-    const dbPath = this.sessionDbPath;
-    if (!dbPath || !existsSync(dbPath)) return false;
-    const matchingIdentifiers = await this.collectMatchingSessionIdentifiers(providerSessionId);
+    const matchingSessionIds = await this.collectMatchingSessionIds(providerSessionId);
+    const deleteTargets = matchingSessionIds.length > 0
+      ? matchingSessionIds
+      : [providerSessionId];
 
-    const deleteScript = [
-      'import sqlite3, sys, json',
-      'db = sqlite3.connect(sys.argv[1])',
-      'identifier = sys.argv[2]',
-      'db.execute("DELETE FROM messages WHERE session_id IN (SELECT id FROM sessions WHERE name = ? OR id = ?)", (identifier, identifier))',
-      'deleted = db.execute("DELETE FROM sessions WHERE name = ? OR id = ?", (identifier, identifier)).rowcount > 0',
-      'db.commit()',
-      'print(json.dumps({"deleted": deleted}))',
-      'db.close()',
-    ].join('\n');
-
-    for (const candidate of getPythonCommandCandidates()) {
-      const result = await this.runner(candidate.command, [
-        ...candidate.prefixArgs,
-        '-c',
-        deleteScript,
-        dbPath,
-        providerSessionId,
-      ]);
+    let deletedAny = false;
+    for (const sessionId of deleteTargets) {
+      const result = await this.runner(this.command, ['session', 'remove', '--session-id', sessionId]);
       if (result.code !== 0) {
-        continue;
-      }
-
-      try {
-        const data = JSON.parse(result.stdout);
-        if (!data.deleted) {
-          return false;
-        }
-
-        this.pruneProjectsIndex(matchingIdentifiers);
-        for (const identifier of matchingIdentifiers) {
-          if (await this.exportSessionJson(identifier)) {
-            return false;
+        if (matchingSessionIds.length === 0) {
+          const nameResult = await this.runner(this.command, ['session', 'remove', '--name', providerSessionId]);
+          if (nameResult.code === 0) {
+            deletedAny = true;
+            break;
           }
         }
-        return true;
-      } catch {
+        return false;
+      }
+      deletedAny = true;
+    }
+
+    if (!deletedAny) {
+      return false;
+    }
+
+    this.pruneProjectsIndex(deleteTargets);
+    for (const sessionId of deleteTargets) {
+      if (await this.exportSessionJson(sessionId)) {
         return false;
       }
     }
-
-    return false;
+    if (matchingSessionIds.length === 0 && await this.exportSessionJson(providerSessionId)) {
+      return false;
+    }
+    return true;
   }
 
   private async exportSession(name: string): Promise<GooseNativeSessionSummary | null> {
@@ -231,21 +217,26 @@ export class GooseNativeSessionService {
     return null;
   }
 
-  private async collectMatchingSessionIdentifiers(providerSessionId: string): Promise<string[]> {
-    const identifiers = new Set([providerSessionId]);
+  private async collectMatchingSessionIds(providerSessionId: string): Promise<string[]> {
+    const identifiers = new Set<string>();
     const result = await this.runner(this.command, ['session', 'list', '--format', 'json']);
     const sessions = result.code === 0 ? parseSessionListJson(result.stdout) : null;
-    if (!sessions) {
+    if (sessions) {
+      for (const session of sessions) {
+        if (session.providerSessionId === providerSessionId || session.summary === providerSessionId) {
+          identifiers.add(session.providerSessionId);
+        }
+      }
+
       return Array.from(identifiers);
     }
 
-    for (const session of sessions) {
-      if (session.providerSessionId === providerSessionId || session.summary === providerSessionId) {
-        identifiers.add(session.providerSessionId);
-        if (session.summary) {
-          identifiers.add(session.summary);
-        }
-      }
+    const exported = await this.exportSessionJson(providerSessionId);
+    const exportedId = exported
+      ? readStringField(exported.id) || readStringField(exported.name)
+      : undefined;
+    if (exportedId) {
+      identifiers.add(exportedId);
     }
 
     return Array.from(identifiers);
@@ -426,10 +417,6 @@ function readModelName(record: Record<string, unknown>): string | undefined {
   return readStringField((modelConfig as Record<string, unknown>).model_name);
 }
 
-function resolveExistingGooseSessionDbPath(): string | undefined {
-  return buildGoosePathCandidates('sessions', 'sessions.db').find((candidate) => existsSync(candidate));
-}
-
 function resolveExistingGooseProjectsIndexPath(): string | undefined {
   return buildGoosePathCandidates('projects.json').find((candidate) => existsSync(candidate));
 }
@@ -450,18 +437,6 @@ function buildGoosePathCandidates(...tail: string[]): string[] {
   ].filter((candidate): candidate is string => Boolean(candidate));
 
   return Array.from(new Set(candidates));
-}
-
-function getPythonCommandCandidates(): Array<{ command: string; prefixArgs: string[] }> {
-  return process.platform === 'win32'
-    ? [
-        { command: 'python', prefixArgs: [] },
-        { command: 'py', prefixArgs: ['-3'] },
-      ]
-    : [
-        { command: 'python3', prefixArgs: [] },
-        { command: 'python', prefixArgs: [] },
-      ];
 }
 
 async function defaultCommandRunner(command: string, args: string[]): Promise<CommandResult> {
