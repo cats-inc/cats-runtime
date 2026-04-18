@@ -434,7 +434,7 @@ describe('GooseNativeSessionService', () => {
     });
   });
 
-  it('cleans up the shared thread only when its last owning session is deleted', async () => {
+  it('preserves other sessions when the deleted session shares a thread', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-goose-thread-'));
     tempDirs.push(root);
     const sessionDbPath = join(root, 'sessions.db');
@@ -448,6 +448,14 @@ describe('GooseNativeSessionService', () => {
       .run('shared1', 'CLI Session', 'C:/repo', 'thread_b');
     setup.prepare('INSERT INTO sessions(id, name, working_dir, thread_id) VALUES (?, ?, ?, ?)')
       .run('shared2', 'CLI Session', 'C:/repo', 'thread_b');
+    setup.prepare('INSERT INTO thread_messages(thread_id, session_id, role, content_json) VALUES (?, ?, ?, ?)')
+      .run('thread_a', 'solo', 'user', '{"text":"solo-only"}');
+    setup.prepare('INSERT INTO thread_messages(thread_id, session_id, role, content_json) VALUES (?, ?, ?, ?)')
+      .run('thread_b', 'shared1', 'user', '{"text":"shared1-only"}');
+    setup.prepare('INSERT INTO thread_messages(thread_id, session_id, role, content_json) VALUES (?, ?, ?, ?)')
+      .run('thread_b', 'shared2', 'user', '{"text":"shared2-only"}');
+    setup.prepare('INSERT INTO thread_messages(thread_id, session_id, role, content_json) VALUES (?, ?, ?, ?)')
+      .run('thread_b', null, 'system', '{"text":"thread-scoped"}');
     setup.close();
 
     const runner = vi.fn(async (_command: string, args: string[]) => {
@@ -474,13 +482,44 @@ describe('GooseNativeSessionService', () => {
     });
 
     await expect(service.deleteSession('C:/repo', 'solo')).resolves.toBe(true);
-    await expect(service.deleteSession('C:/repo', 'shared1')).resolves.toBe(true);
 
-    const verifyDb = new DatabaseSync(sessionDbPath);
-    const threads = (verifyDb.prepare('SELECT id FROM threads ORDER BY id').all() as Array<{ id: string }>)
+    let verifyDb = new DatabaseSync(sessionDbPath);
+    let threads = (verifyDb.prepare('SELECT id FROM threads ORDER BY id').all() as Array<{ id: string }>)
       .map((row) => row.id);
+    let threadMsgs = (verifyDb.prepare('SELECT thread_id, session_id FROM thread_messages ORDER BY thread_id, session_id').all() as Array<{ thread_id: string; session_id: string | null }>);
     verifyDb.close();
     expect(threads).toEqual(['thread_b']);
+    expect(threadMsgs).toEqual([
+      { thread_id: 'thread_b', session_id: null },
+      { thread_id: 'thread_b', session_id: 'shared1' },
+      { thread_id: 'thread_b', session_id: 'shared2' },
+    ]);
+
+    await expect(service.deleteSession('C:/repo', 'shared1')).resolves.toBe(true);
+
+    verifyDb = new DatabaseSync(sessionDbPath);
+    const survivingSessions = (verifyDb.prepare('SELECT id FROM sessions ORDER BY id').all() as Array<{ id: string }>)
+      .map((row) => row.id);
+    threads = (verifyDb.prepare('SELECT id FROM threads ORDER BY id').all() as Array<{ id: string }>)
+      .map((row) => row.id);
+    threadMsgs = (verifyDb.prepare('SELECT thread_id, session_id FROM thread_messages ORDER BY thread_id, session_id').all() as Array<{ thread_id: string; session_id: string | null }>);
+    verifyDb.close();
+    expect(survivingSessions).toEqual(['shared2']);
+    expect(threads).toEqual(['thread_b']);
+    expect(threadMsgs).toEqual([
+      { thread_id: 'thread_b', session_id: null },
+      { thread_id: 'thread_b', session_id: 'shared2' },
+    ]);
+
+    await expect(service.deleteSession('C:/repo', 'shared2')).resolves.toBe(true);
+
+    verifyDb = new DatabaseSync(sessionDbPath);
+    threads = (verifyDb.prepare('SELECT id FROM threads ORDER BY id').all() as Array<{ id: string }>)
+      .map((row) => row.id);
+    threadMsgs = (verifyDb.prepare('SELECT thread_id, session_id FROM thread_messages').all() as Array<{ thread_id: string; session_id: string | null }>);
+    verifyDb.close();
+    expect(threads).toEqual([]);
+    expect(threadMsgs).toEqual([]);
   });
 
   it('reports success when the fallback runs against an already-clean sessions.db', async () => {

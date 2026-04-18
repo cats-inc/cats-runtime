@@ -198,12 +198,7 @@ export class GooseNativeSessionService {
         }
 
         const threadId = row.thread_id;
-        if (threadId) {
-          db.prepare('DELETE FROM thread_messages WHERE thread_id = ? OR session_id = ?')
-            .run(threadId, sessionId);
-        } else {
-          db.prepare('DELETE FROM thread_messages WHERE session_id = ?').run(sessionId);
-        }
+        db.prepare('DELETE FROM thread_messages WHERE session_id = ?').run(sessionId);
         db.prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId);
         const info = db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
 
@@ -212,6 +207,9 @@ export class GooseNativeSessionService {
             .prepare('SELECT 1 FROM sessions WHERE thread_id = ? LIMIT 1')
             .get(threadId);
           if (!stillReferenced) {
+            // Thread is now orphaned. Remove any remaining messages scoped to it
+            // (e.g. entries with a null session_id) before dropping the thread row.
+            db.prepare('DELETE FROM thread_messages WHERE thread_id = ?').run(threadId);
             db.prepare('DELETE FROM threads WHERE id = ?').run(threadId);
           }
         }
