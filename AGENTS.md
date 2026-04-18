@@ -62,6 +62,21 @@ If an agent realizes it has violated a MUST/MUST NOT directive:
 3. **Propose corrective action**
 4. **Do not proceed until correction is approved**
 
+### Codex-Only Git Guardrails
+
+> **Codex only**: Other agents may ignore this subsection.
+
+- Codex MUST NOT run dependent Git commands in parallel. If one command changes
+  repo state or determines the validity of the next command, run it first,
+  inspect the result, then run the next step.
+- Codex MUST keep `fetch -> rebase`, conflict resolution `-> --continue`, and
+  `commit -> push` as separate sequential steps.
+- Codex MUST inspect repo state after each state-changing Git step before
+  issuing the next one.
+- Codex MUST use non-interactive Git continue flows in this workspace and MUST
+  NOT rely on terminal editors during `rebase --continue`,
+  `cherry-pick --continue`, or `merge --continue`.
+
 ---
 
 ## Project Metadata
