@@ -1,8 +1,39 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GooseNativeSessionService } from './GooseNativeSessionService.js';
+
+function createGooseSessionsDb(path: string): DatabaseSync {
+  const db = new DatabaseSync(path);
+  db.exec(`
+    CREATE TABLE sessions (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL DEFAULT '',
+      working_dir TEXT NOT NULL,
+      thread_id TEXT
+    );
+    CREATE TABLE messages (
+      id INTEGER PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content_json TEXT NOT NULL
+    );
+    CREATE TABLE threads (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL
+    );
+    CREATE TABLE thread_messages (
+      id INTEGER PRIMARY KEY,
+      thread_id TEXT NOT NULL,
+      session_id TEXT,
+      role TEXT NOT NULL,
+      content_json TEXT NOT NULL
+    );
+  `);
+  return db;
+}
 
 describe('GooseNativeSessionService', () => {
   const tempDirs: string[] = [];
@@ -317,5 +348,170 @@ describe('GooseNativeSessionService', () => {
       last_instruction: null,
     });
     expect(runner).toHaveBeenCalledWith('goose', ['session', 'remove', '--session-id', '20260328_1']);
+  });
+
+  it('falls back to direct sqlite delete when Goose CLI aborts with the TTY bug', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-goose-fallback-'));
+    tempDirs.push(root);
+    const sessionDbPath = join(root, 'sessions.db');
+    const projectsIndexPath = join(root, 'projects.json');
+
+    const setup = createGooseSessionsDb(sessionDbPath);
+    setup.prepare('INSERT INTO sessions(id, name, working_dir, thread_id) VALUES (?, ?, ?, ?)')
+      .run('20260317_1', 'CLI Session', 'C:/repo', null);
+    setup.prepare('INSERT INTO sessions(id, name, working_dir, thread_id) VALUES (?, ?, ?, ?)')
+      .run('20260414_2', 'CLI Session', 'C:/repo', null);
+    setup.prepare('INSERT INTO messages(session_id, role, content_json) VALUES (?, ?, ?)')
+      .run('20260317_1', 'user', '{}');
+    setup.close();
+
+    writeFileSync(projectsIndexPath, `${JSON.stringify({
+      projects: {
+        repo: {
+          path: 'C:/repo',
+          last_session_id: '20260317_1',
+          last_instruction: 'hello',
+        },
+      },
+    }, null, 2)}\n`, 'utf8');
+
+    const runner = vi.fn(async (_command: string, args: string[]) => {
+      if (args.join(' ') === 'session list --format json') {
+        return {
+          code: 0,
+          stdout: JSON.stringify([
+            { id: '20260317_1', name: 'CLI Session', working_dir: 'C:/repo' },
+            { id: '20260414_2', name: 'CLI Session', working_dir: 'C:/repo' },
+          ]),
+          stderr: '',
+        };
+      }
+
+      if (args.join(' ') === 'session remove --session-id 20260317_1') {
+        // Reproduce Goose 1.31.0's TTY bug.
+        return {
+          code: 1,
+          stdout: 'The following sessions will be removed:\n- 20260317_1 CLI Session\n',
+          stderr: 'Error: not connected',
+        };
+      }
+
+      if (args[0] === 'session' && args[1] === 'export') {
+        return { code: 1, stdout: '', stderr: 'Session not found' };
+      }
+
+      return {
+        code: 1,
+        stdout: '',
+        stderr: `Unexpected goose invocation: ${args.join(' ')}`,
+      };
+    });
+
+    const service = new GooseNativeSessionService({
+      command: 'goose',
+      runner,
+      sessionDbPath,
+      projectsIndexPath,
+    });
+
+    await expect(service.deleteSession('C:/repo', '20260317_1')).resolves.toBe(true);
+
+    const verifyDb = new DatabaseSync(sessionDbPath);
+    const remainingIds = (verifyDb.prepare('SELECT id FROM sessions ORDER BY id').all() as Array<{ id: string }>)
+      .map((row) => row.id);
+    const remainingMessages = (verifyDb.prepare('SELECT COUNT(*) AS c FROM messages').get() as { c: number }).c;
+    verifyDb.close();
+    expect(remainingIds).toEqual(['20260414_2']);
+    expect(remainingMessages).toBe(0);
+
+    const projects = JSON.parse(readFileSync(projectsIndexPath, 'utf8')) as {
+      projects: Record<string, { path: string; last_session_id: string | null; last_instruction: string | null }>;
+    };
+    expect(projects.projects.repo).toEqual({
+      path: 'C:/repo',
+      last_session_id: null,
+      last_instruction: null,
+    });
+  });
+
+  it('cleans up the shared thread only when its last owning session is deleted', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-goose-thread-'));
+    tempDirs.push(root);
+    const sessionDbPath = join(root, 'sessions.db');
+
+    const setup = createGooseSessionsDb(sessionDbPath);
+    setup.prepare('INSERT INTO threads(id, name) VALUES (?, ?)').run('thread_a', 'Thread A');
+    setup.prepare('INSERT INTO threads(id, name) VALUES (?, ?)').run('thread_b', 'Thread B');
+    setup.prepare('INSERT INTO sessions(id, name, working_dir, thread_id) VALUES (?, ?, ?, ?)')
+      .run('solo', 'CLI Session', 'C:/repo', 'thread_a');
+    setup.prepare('INSERT INTO sessions(id, name, working_dir, thread_id) VALUES (?, ?, ?, ?)')
+      .run('shared1', 'CLI Session', 'C:/repo', 'thread_b');
+    setup.prepare('INSERT INTO sessions(id, name, working_dir, thread_id) VALUES (?, ?, ?, ?)')
+      .run('shared2', 'CLI Session', 'C:/repo', 'thread_b');
+    setup.close();
+
+    const runner = vi.fn(async (_command: string, args: string[]) => {
+      if (args.join(' ') === 'session list --format json') {
+        return { code: 0, stdout: '[]', stderr: '' };
+      }
+      if (args[0] === 'session' && args[1] === 'remove') {
+        return { code: 1, stdout: '', stderr: 'Error: not connected' };
+      }
+      if (args[0] === 'session' && args[1] === 'export') {
+        return { code: 1, stdout: '', stderr: 'Session not found' };
+      }
+      return {
+        code: 1,
+        stdout: '',
+        stderr: `Unexpected goose invocation: ${args.join(' ')}`,
+      };
+    });
+
+    const service = new GooseNativeSessionService({
+      command: 'goose',
+      runner,
+      sessionDbPath,
+    });
+
+    await expect(service.deleteSession('C:/repo', 'solo')).resolves.toBe(true);
+    await expect(service.deleteSession('C:/repo', 'shared1')).resolves.toBe(true);
+
+    const verifyDb = new DatabaseSync(sessionDbPath);
+    const threads = (verifyDb.prepare('SELECT id FROM threads ORDER BY id').all() as Array<{ id: string }>)
+      .map((row) => row.id);
+    verifyDb.close();
+    expect(threads).toEqual(['thread_b']);
+  });
+
+  it('reports success when the fallback runs against an already-clean sessions.db', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-goose-idempotent-'));
+    tempDirs.push(root);
+    const sessionDbPath = join(root, 'sessions.db');
+    createGooseSessionsDb(sessionDbPath).close();
+
+    const runner = vi.fn(async (_command: string, args: string[]) => {
+      if (args.join(' ') === 'session list --format json') {
+        return { code: 0, stdout: '[]', stderr: '' };
+      }
+      if (args[0] === 'session' && args[1] === 'remove') {
+        return { code: 1, stdout: '', stderr: 'Error: not connected' };
+      }
+      if (args[0] === 'session' && args[1] === 'export') {
+        return { code: 1, stdout: '', stderr: 'Session not found' };
+      }
+      return {
+        code: 1,
+        stdout: '',
+        stderr: `Unexpected goose invocation: ${args.join(' ')}`,
+      };
+    });
+
+    const service = new GooseNativeSessionService({
+      command: 'goose',
+      runner,
+      sessionDbPath,
+    });
+
+    await expect(service.deleteSession('C:/repo', 'never_existed')).resolves.toBe(true);
   });
 });

@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 
 export interface GooseNativeSessionSummary {
@@ -30,17 +31,20 @@ export type GooseCommandRunner = (command: string, args: string[]) => Promise<Co
 export interface GooseNativeSessionServiceOptions {
   command: string;
   runner?: GooseCommandRunner;
+  sessionDbPath?: string;
   projectsIndexPath?: string;
 }
 
 export class GooseNativeSessionService {
   private readonly command: string;
   private readonly runner: GooseCommandRunner;
+  private readonly sessionDbPath?: string;
   private readonly projectsIndexPath?: string;
 
   constructor(options: GooseNativeSessionServiceOptions) {
     this.command = options.command;
     this.runner = options.runner || defaultCommandRunner;
+    this.sessionDbPath = options.sessionDbPath || resolveExistingGooseSessionDbPath();
     this.projectsIndexPath = options.projectsIndexPath || resolveExistingGooseProjectsIndexPath();
   }
 
@@ -130,17 +134,32 @@ export class GooseNativeSessionService {
     let deletedAny = false;
     for (const sessionId of deleteTargets) {
       const result = await this.runner(this.command, ['session', 'remove', '--session-id', sessionId]);
-      if (result.code !== 0) {
-        if (matchingSessionIds.length === 0) {
-          const nameResult = await this.runner(this.command, ['session', 'remove', '--name', providerSessionId]);
-          if (nameResult.code === 0) {
-            deletedAny = true;
-            break;
-          }
-        }
-        return false;
+      if (result.code === 0) {
+        deletedAny = true;
+        continue;
       }
-      deletedAny = true;
+
+      if (matchingSessionIds.length === 0) {
+        const nameResult = await this.runner(this.command, ['session', 'remove', '--name', providerSessionId]);
+        if (nameResult.code === 0) {
+          deletedAny = true;
+          break;
+        }
+      }
+
+      // Tier-2 fallback: talk to sessions.db directly. Needed because Goose 1.31.0
+      // `session remove` unconditionally calls cliclack::confirm().interact(), which
+      // errors with "not connected" whenever we spawn goose without a TTY (every
+      // cats-runtime invocation). Upstream precedent for fixing this is PR #6412,
+      // which patched `session resume` but left `session remove` unchanged — so until
+      // a later Goose release skips confirm in non-interactive mode, the CLI contract
+      // cannot carry out the delete on its own.
+      if (this.sqliteFallbackDelete(sessionId)) {
+        deletedAny = true;
+        continue;
+      }
+
+      return false;
     }
 
     if (!deletedAny) {
@@ -157,6 +176,55 @@ export class GooseNativeSessionService {
       return false;
     }
     return true;
+  }
+
+  private sqliteFallbackDelete(sessionId: string): boolean {
+    const dbPath = this.sessionDbPath;
+    if (!dbPath || !existsSync(dbPath)) {
+      return false;
+    }
+
+    const db = new DatabaseSync(dbPath);
+    try {
+      db.exec('PRAGMA busy_timeout = 5000');
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        const row = db.prepare('SELECT thread_id FROM sessions WHERE id = ?').get(sessionId) as
+          | { thread_id: string | null }
+          | undefined;
+        if (!row) {
+          db.exec('ROLLBACK');
+          return true;
+        }
+
+        const threadId = row.thread_id;
+        if (threadId) {
+          db.prepare('DELETE FROM thread_messages WHERE thread_id = ? OR session_id = ?')
+            .run(threadId, sessionId);
+        } else {
+          db.prepare('DELETE FROM thread_messages WHERE session_id = ?').run(sessionId);
+        }
+        db.prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId);
+        const info = db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
+
+        if (threadId) {
+          const stillReferenced = db
+            .prepare('SELECT 1 FROM sessions WHERE thread_id = ? LIMIT 1')
+            .get(threadId);
+          if (!stillReferenced) {
+            db.prepare('DELETE FROM threads WHERE id = ?').run(threadId);
+          }
+        }
+
+        db.exec('COMMIT');
+        return Number(info.changes) > 0;
+      } catch (err) {
+        db.exec('ROLLBACK');
+        throw err;
+      }
+    } finally {
+      db.close();
+    }
   }
 
   private async exportSession(name: string): Promise<GooseNativeSessionSummary | null> {
@@ -415,6 +483,10 @@ function readModelName(record: Record<string, unknown>): string | undefined {
   }
 
   return readStringField((modelConfig as Record<string, unknown>).model_name);
+}
+
+function resolveExistingGooseSessionDbPath(): string | undefined {
+  return buildGoosePathCandidates('sessions', 'sessions.db').find((candidate) => existsSync(candidate));
 }
 
 function resolveExistingGooseProjectsIndexPath(): string | undefined {
