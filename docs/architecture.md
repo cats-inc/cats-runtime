@@ -250,8 +250,8 @@ src/
 - Exposes runtime/host diagnostics at `GET /diagnostics/runtime`
 - Exposes additive ACP coexistence summaries on `GET /diagnostics/runtime` and
   `GET /diagnostics/health` so hosts can distinguish the runtime-facing ACP
-  facade from provider-side `agent/acp` transports without inferring that split
-  from other route families
+  facade from provider-side `agent/acp` transports and the separate runtime-to-
+  peer A2A layer without inferring those boundaries from other route families
 - Exposes provider availability plus CLI compatibility diagnostics at
   `GET /diagnostics/providers`, including live API/local transport-native
   auth/model probes, additive OpenClaw gateway health-snapshot details, and

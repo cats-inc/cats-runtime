@@ -412,6 +412,13 @@ describe('provider diagnostics HTTP contract', () => {
           runtimeToProvider: {
             transport: string;
             diagnosticsPath: string;
+            summary: string;
+          };
+          runtimeToPeer: {
+            transport: string;
+            diagnosticsPath: string;
+            executionPath: string;
+            summary: string;
           };
         };
       };
@@ -419,6 +426,7 @@ describe('provider diagnostics HTTP contract', () => {
 
     expect(runtimePayload.runtime.acp.protocolVersion).toBe(1);
     expect(runtimePayload.runtime.acp.summary).toContain('client-to-runtime');
+    expect(runtimePayload.runtime.acp.summary).toContain('A2A');
     expect(runtimePayload.runtime.acp.clientToRuntime).toEqual({
       http: {
         enabled: true,
@@ -448,6 +456,12 @@ describe('provider diagnostics HTTP contract', () => {
     expect(runtimePayload.runtime.acp.runtimeToProvider.diagnosticsPath).toBe('/diagnostics/providers');
     expect(runtimePayload.runtime.acp.runtimeToProvider.summary)
       .toContain('Provider-side ACP targets stay under the agent backend family');
+    expect(runtimePayload.runtime.acp.runtimeToPeer).toEqual({
+      transport: 'a2a',
+      diagnosticsPath: '/diagnostics/peers',
+      executionPath: '/peer/executions',
+      summary: expect.stringContaining('runtime-to-runtime A2A/peer execution layer'),
+    });
 
     const healthResponse = await app.request('/diagnostics/health');
     expect(healthResponse.status).toBe(200);
@@ -460,6 +474,8 @@ describe('provider diagnostics HTTP contract', () => {
           stdioDefaultMode: string;
           stdioDirectRuntimeFlag: string;
           providerTransport: string;
+          peerTransport: string;
+          peerDiagnosticsPath: string;
           summary: string;
         };
       };
@@ -473,7 +489,9 @@ describe('provider diagnostics HTTP contract', () => {
         stdioDefaultMode: 'proxy',
         stdioDirectRuntimeFlag: '--serve-runtime',
         providerTransport: 'agent/acp',
-        summary: expect.stringContaining('HTTP NDJSON and stdio'),
+        peerTransport: 'a2a',
+        peerDiagnosticsPath: '/diagnostics/peers',
+        summary: expect.stringContaining('A2A layer'),
       },
     });
   });

@@ -1734,6 +1734,9 @@ follow-through on contract hardening, launch-truth hardening across the full
   `node build/runtime/bin/acp.js --inspect-proxy` path now provide a local ACP
   proxy preflight exit, mirroring the existing MCP helper posture for packaged
   and repo-local hosts
+- the ACP coexistence summary now also calls out the separate runtime-to-peer
+  A2A layer through `GET /diagnostics/peers` and `POST /peer/executions`, so
+  hosts do not have to infer whether peer routing lives inside the ACP facade
 - ADR 031, SPEC 025, and PLAN 032 define the provider-side ACP path, the
   runtime-owned ACP facade path, and the ACP + A2A layering model
 

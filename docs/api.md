@@ -771,6 +771,10 @@ integrate against:
   - `runtimeToProvider`: the fact that provider-facing ACP remains a separate
     `agent/acp` transport surfaced through provider diagnostics rather than a
     second runtime-facing provider catalog
+  - `runtimeToPeer`: the fact that peer routing remains a separate A2A/runtime-
+    to-runtime layer surfaced through `GET /diagnostics/peers` plus the
+    dedicated `POST /peer/executions` route instead of becoming part of the
+    client-facing ACP facade
 - runtime management backlog metadata under `runtime.management.operations`,
   including retained `polling` / `completed` / `failed` counts plus
   `oldestStartedAt` / `latestUpdatedAt`

@@ -25,6 +25,12 @@ export interface RuntimeAcpDiagnosticsSummary {
     diagnosticsPath: '/diagnostics/providers';
     summary: string;
   };
+  runtimeToPeer: {
+    transport: 'a2a';
+    diagnosticsPath: '/diagnostics/peers';
+    executionPath: '/peer/executions';
+    summary: string;
+  };
 }
 
 export interface RuntimeAcpHealthSummary {
@@ -34,6 +40,8 @@ export interface RuntimeAcpHealthSummary {
   stdioDefaultMode: 'proxy';
   stdioDirectRuntimeFlag: '--serve-runtime';
   providerTransport: 'agent/acp';
+  peerTransport: 'a2a';
+  peerDiagnosticsPath: '/diagnostics/peers';
   summary: string;
 }
 
@@ -52,7 +60,7 @@ const ACP_PROMPT_NOTIFICATIONS = ['session/update'] as const;
 export function buildRuntimeAcpDiagnosticsSummary(): RuntimeAcpDiagnosticsSummary {
   return {
     protocolVersion: ACP_PROTOCOL_VERSION,
-    summary: 'Runtime ACP is available for client-to-runtime traffic over HTTP and stdio, while provider-side ACP remains a separate agent/acp transport surfaced through provider diagnostics.',
+    summary: 'Runtime ACP is available for client-to-runtime traffic over HTTP and stdio, while provider-side ACP remains a separate agent/acp transport and peer execution remains a separate A2A/runtime-to-runtime layer.',
     clientToRuntime: {
       http: {
         enabled: true,
@@ -75,6 +83,12 @@ export function buildRuntimeAcpDiagnosticsSummary(): RuntimeAcpDiagnosticsSummar
       diagnosticsPath: '/diagnostics/providers',
       summary: 'Provider-side ACP targets stay under the agent backend family and continue to expose launch/probe/model/tool truth through provider diagnostics and inspection surfaces.',
     },
+    runtimeToPeer: {
+      transport: 'a2a',
+      diagnosticsPath: '/diagnostics/peers',
+      executionPath: '/peer/executions',
+      summary: 'Peer routing stays outside the client-facing ACP facade and continues to use the runtime-to-runtime A2A/peer execution layer surfaced through peer diagnostics and the dedicated peer execution route.',
+    },
   };
 }
 
@@ -86,6 +100,8 @@ export function buildRuntimeAcpHealthSummary(): RuntimeAcpHealthSummary {
     stdioDefaultMode: 'proxy',
     stdioDirectRuntimeFlag: '--serve-runtime',
     providerTransport: 'agent/acp',
-    summary: 'ACP prompt turns are available over HTTP NDJSON and stdio, while provider-side ACP continues to use the separate agent/acp transport.',
+    peerTransport: 'a2a',
+    peerDiagnosticsPath: '/diagnostics/peers',
+    summary: 'ACP prompt turns are available over HTTP NDJSON and stdio, while provider-side ACP continues to use the separate agent/acp transport and peer routing continues to use the separate A2A layer.',
   };
 }
