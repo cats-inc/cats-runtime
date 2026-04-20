@@ -1673,6 +1673,12 @@ function parseRemoteBackends(
         asOptionalObject(providerDoc.headers),
         `backends.${backend}.providers.${providerName}.headers`,
       );
+      const providerConnect = asOptionalObject(providerDoc.connect);
+      const providerConnectHeaders = parseStringMap(
+        asOptionalObject(providerConnect?.headers),
+        `backends.${backend}.providers.${providerName}.connect.headers`,
+      );
+      const mergedProviderHeaders = mergeStringMaps(providerHeaders, providerConnectHeaders);
       const providerLaunch = asOptionalObject(providerDoc.launch);
 
       const parsedInstances: Record<string, RemoteProviderInstanceConfig> = {};
@@ -1683,11 +1689,17 @@ function parseRemoteBackends(
             + `block in '${filePath}'`,
         );
         const instanceLaunch = asOptionalObject(instanceDoc.launch);
+        const instanceConnect = asOptionalObject(instanceDoc.connect);
 
         const instanceHeaders = parseStringMap(
           asOptionalObject(instanceDoc.headers),
           `backends.${backend}.providers.${providerName}.instances.${instanceId}.headers`,
         );
+        const instanceConnectHeaders = parseStringMap(
+          asOptionalObject(instanceConnect?.headers),
+          `backends.${backend}.providers.${providerName}.instances.${instanceId}.connect.headers`,
+        );
+        const mergedInstanceHeaders = mergeStringMaps(instanceHeaders, instanceConnectHeaders);
 
         parsedInstances[instanceId] = {
           id: instanceId,
@@ -1710,10 +1722,16 @@ function parseRemoteBackends(
             || readString(instanceDoc.cwd)
             || readString(providerLaunch?.cwd)
             || readString(providerDoc.cwd),
-          url: readString(instanceDoc.url)
+          url: readString(instanceConnect?.url)
+            || readString(instanceDoc.url)
+            || readString(providerConnect?.url)
             || readString(providerDoc.url),
-          urlEnv: readString(instanceDoc.url_env)
+          urlEnv: readString(instanceConnect?.url_env)
+            || readString(instanceConnect?.urlEnv)
+            || readString(instanceDoc.url_env)
             || readString(instanceDoc.urlEnv)
+            || readString(providerConnect?.url_env)
+            || readString(providerConnect?.urlEnv)
             || readString(providerDoc.url_env)
             || readString(providerDoc.urlEnv),
           model: readString(instanceDoc.model)
@@ -1722,24 +1740,44 @@ function parseRemoteBackends(
             || readString(instanceDoc.systemPrompt)
             || readString(providerDoc.system_prompt)
             || readString(providerDoc.systemPrompt),
-          apiKeyEnv: readString(instanceDoc.api_key_env)
+          apiKeyEnv: readString(instanceConnect?.api_key_env)
+            || readString(instanceConnect?.apiKeyEnv)
+            || readString(instanceDoc.api_key_env)
             || readString(instanceDoc.apiKeyEnv)
+            || readString(providerConnect?.api_key_env)
+            || readString(providerConnect?.apiKeyEnv)
             || readString(providerDoc.api_key_env)
             || readString(providerDoc.apiKeyEnv),
-          authTokenEnv: readString(instanceDoc.auth_token_env)
+          authTokenEnv: readString(instanceConnect?.auth_token_env)
+            || readString(instanceConnect?.authTokenEnv)
+            || readString(instanceDoc.auth_token_env)
             || readString(instanceDoc.authTokenEnv)
+            || readString(providerConnect?.auth_token_env)
+            || readString(providerConnect?.authTokenEnv)
             || readString(providerDoc.auth_token_env)
             || readString(providerDoc.authTokenEnv),
-          passwordEnv: readString(instanceDoc.password_env)
+          passwordEnv: readString(instanceConnect?.password_env)
+            || readString(instanceConnect?.passwordEnv)
+            || readString(instanceDoc.password_env)
             || readString(instanceDoc.passwordEnv)
+            || readString(providerConnect?.password_env)
+            || readString(providerConnect?.passwordEnv)
             || readString(providerDoc.password_env)
             || readString(providerDoc.passwordEnv),
-          baseUrl: readString(instanceDoc.base_url)
+          baseUrl: readString(instanceConnect?.base_url)
+            || readString(instanceConnect?.baseUrl)
+            || readString(instanceDoc.base_url)
             || readString(instanceDoc.baseUrl)
+            || readString(providerConnect?.base_url)
+            || readString(providerConnect?.baseUrl)
             || readString(providerDoc.base_url)
             || readString(providerDoc.baseUrl),
-          baseUrlEnv: readString(instanceDoc.base_url_env)
+          baseUrlEnv: readString(instanceConnect?.base_url_env)
+            || readString(instanceConnect?.baseUrlEnv)
+            || readString(instanceDoc.base_url_env)
             || readString(instanceDoc.baseUrlEnv)
+            || readString(providerConnect?.base_url_env)
+            || readString(providerConnect?.baseUrlEnv)
             || readString(providerDoc.base_url_env)
             || readString(providerDoc.baseUrlEnv),
           organizationEnv: readString(instanceDoc.organization_env)
@@ -1750,7 +1788,7 @@ function parseRemoteBackends(
             || readString(instanceDoc.projectEnv)
             || readString(providerDoc.project_env)
             || readString(providerDoc.projectEnv),
-          headers: mergeStringMaps(providerHeaders, instanceHeaders),
+          headers: mergeStringMaps(mergedProviderHeaders, mergedInstanceHeaders),
           clientId: readString(instanceDoc.client_id)
             || readString(instanceDoc.clientId)
             || readString(providerDoc.client_id)

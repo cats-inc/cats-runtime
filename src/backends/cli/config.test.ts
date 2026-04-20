@@ -1455,6 +1455,89 @@ backends:
     }
   });
 
+  it('loads ACP-backed agent connect settings from a nested connect block', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
+    writeFileSync(configPath, `
+version: 1
+routing:
+  providers:
+    codex:
+      default_target:
+        backend: agent
+        instance: acp-remote
+backends:
+  agent:
+    providers:
+      codex:
+        default_instance: acp-remote
+        transport: acp
+        connect:
+          url: https://acp.example.test/rpc
+          auth_token_env: CODEX_ACP_TOKEN
+        instances:
+          acp-remote:
+            connect:
+              headers:
+                x-client-id: cats-runtime
+            model: gpt-5.4
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_DIR: runtimeDir,
+      });
+
+      expect(config.providerDefaultTargets?.codex).toEqual({
+        backend: 'agent',
+        instance: 'acp-remote',
+      });
+
+      expect(config.remoteProviderCatalog?.agent.codex['acp-remote']).toEqual({
+        id: 'acp-remote',
+        providerName: 'codex',
+        backend: 'agent',
+        transport: 'acp',
+        command: undefined,
+        args: undefined,
+        cwd: undefined,
+        url: 'https://acp.example.test/rpc',
+        urlEnv: undefined,
+        model: 'gpt-5.4',
+        systemPrompt: undefined,
+        apiKeyEnv: undefined,
+        authTokenEnv: 'CODEX_ACP_TOKEN',
+        passwordEnv: undefined,
+        baseUrl: undefined,
+        baseUrlEnv: undefined,
+        organizationEnv: undefined,
+        projectEnv: undefined,
+        headers: {
+          'x-client-id': 'cats-runtime',
+        },
+        clientId: undefined,
+        clientMode: undefined,
+        clientVersion: undefined,
+        role: undefined,
+        scopes: undefined,
+        payloadTemplate: undefined,
+        waitTimeoutMs: undefined,
+        maxOutputTokens: undefined,
+        timeoutMs: undefined,
+        maxRetries: undefined,
+        maxToolSteps: undefined,
+        toolProfile: undefined,
+        startupTimeoutMs: undefined,
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('rejects providers that are configured in multiple backends without routing', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
     const runtimeDir = tempDir;
