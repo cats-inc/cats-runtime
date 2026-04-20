@@ -2278,6 +2278,83 @@ describe('provider diagnostics HTTP contract', () => {
     }));
   });
 
+  it('surfaces ACP stdio launch-env auth semantics on agent diagnostics', async () => {
+    vi.stubEnv('CODEX_ACP_TOKEN', 'test-codex-acp-token');
+    vi.stubEnv('CODEX_ACP_PASSWORD', 'test-codex-acp-password');
+
+    try {
+      const app = createTestApp(makeConfig({
+        providerDefaultTargets: {
+          codex: { backend: 'agent', instance: 'default' },
+        },
+        remoteProviderCatalog: {
+          api: {},
+          local: {},
+          agent: {
+            codex: {
+              default: {
+                id: 'default',
+                providerName: 'codex',
+                backend: 'agent',
+                transport: 'acp_stdio',
+                command: 'codex-acp',
+                args: ['serve'],
+                cwd: '/tmp/acp',
+                startupTimeoutMs: 15000,
+                authTokenEnv: 'CODEX_ACP_TOKEN',
+                passwordEnv: 'CODEX_ACP_PASSWORD',
+                model: 'gpt-5.4',
+              },
+            },
+          },
+        },
+      }));
+
+      const response = await app.request(
+        '/diagnostics/providers?provider=codex&backend=agent&instance=default',
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({
+        providers: [
+          expect.objectContaining({
+            provider: 'codex',
+            backend: 'agent',
+            instance: 'default',
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'agent_runtime_contract',
+                status: 'ok',
+                details: expect.objectContaining({
+                  auth: {
+                    mechanisms: ['launch_env'],
+                    credentials: [
+                      { kind: 'auth_token', configured: true },
+                      { kind: 'password', configured: true },
+                    ],
+                  },
+                }),
+              }),
+            ]),
+            config: expect.objectContaining({
+              agentRuntime: expect.objectContaining({
+                auth: {
+                  mechanisms: ['launch_env'],
+                  credentials: [
+                    { kind: 'auth_token', configured: true },
+                    { kind: 'password', configured: true },
+                  ],
+                },
+              }),
+            }),
+          }),
+        ],
+      }));
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('surfaces dynamic Pi model catalog details during live CLI diagnostics', async () => {
     const config = makeConfig({
       providerCommands: {
