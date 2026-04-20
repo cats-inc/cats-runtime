@@ -124,9 +124,11 @@ backends:
       claude:
         default_instance: sonnet
         transport: anthropic
-        api_key_env: ANTHROPIC_API_KEY
-        max_output_tokens: 32000
-        tool_profile: standard
+        connect:
+          api_key_env: ANTHROPIC_API_KEY
+        request:
+          max_output_tokens: 32000
+          tool_profile: standard
         instances:
           sonnet:
             # Model values below are illustrative examples and should be
@@ -138,8 +140,10 @@ backends:
       codex:
         default_instance: main
         transport: openai
-        api_key_env: OPENAI_API_KEY
-        tool_profile: standard
+        connect:
+          api_key_env: OPENAI_API_KEY
+        request:
+          tool_profile: standard
         instances:
           main:
             model: gpt-5
@@ -147,8 +151,10 @@ backends:
       gemini:
         default_instance: pro
         transport: google
-        api_key_env: GEMINI_API_KEY
-        tool_profile: standard
+        connect:
+          api_key_env: GEMINI_API_KEY
+        request:
+          tool_profile: standard
         instances:
           pro:
             model: gemini-2.5-pro
@@ -162,21 +168,25 @@ backends:
         instances:
           local:
             transport: ollama
-            base_url: http://127.0.0.1:11434
+            connect:
+              base_url: http://127.0.0.1:11434
+            request:
+              tool_profile: standard
             model: qwen3:latest
-            tool_profile: standard
 ```
 
 Rules:
 
 - `routing.providers.<name>.default_target` chooses the default backend and
   instance for that product family.
-- Shared remote settings such as `transport`, `api_key_env`, common headers,
-  and limits may be defined once at `backends.api.providers.<name>` and
-  inherited by all of that provider's instances.
-- API instances may optionally define `base_url`, `base_url_env`,
-  `organization_env`, `project_env`, `headers`, `timeout_ms`, `max_retries`,
-  `max_output_tokens`, and `tool_profile`.
+- Shared remote settings such as `transport` may be defined once at
+  `backends.api.providers.<name>`, while auth/endpoint metadata should prefer a
+  nested `connect:` block and request-shaping defaults should prefer a nested
+  `request:` block.
+- API instances may optionally define `connect.base_url`, `connect.base_url_env`,
+  `connect.organization_env`, `connect.project_env`, `connect.headers`,
+  `request.timeout_ms`, `request.max_retries`, `request.max_output_tokens`, and
+  `request.tool_profile`.
 - Individual instances may override inherited remote settings when one API key
   should expose several models or endpoints.
 - `transport: ollama` does not require an API key for the default local runtime,
