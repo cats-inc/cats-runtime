@@ -2280,6 +2280,7 @@ describe('provider diagnostics HTTP contract', () => {
 
   it('surfaces ACP stdio launch-env auth semantics on agent diagnostics', async () => {
     vi.stubEnv('CODEX_ACP_TOKEN', 'test-codex-acp-token');
+    vi.stubEnv('CODEX_ACP_API_KEY', 'test-codex-acp-api-key');
     vi.stubEnv('CODEX_ACP_PASSWORD', 'test-codex-acp-password');
 
     try {
@@ -2302,6 +2303,7 @@ describe('provider diagnostics HTTP contract', () => {
                 cwd: '/tmp/acp',
                 startupTimeoutMs: 15000,
                 authTokenEnv: 'CODEX_ACP_TOKEN',
+                apiKeyEnv: 'CODEX_ACP_API_KEY',
                 passwordEnv: 'CODEX_ACP_PASSWORD',
                 model: 'gpt-5.4',
               },
@@ -2330,6 +2332,7 @@ describe('provider diagnostics HTTP contract', () => {
                     mechanisms: ['launch_env'],
                     credentials: [
                       { kind: 'auth_token', configured: true },
+                      { kind: 'api_key', configured: true },
                       { kind: 'password', configured: true },
                     ],
                   },
@@ -2342,6 +2345,7 @@ describe('provider diagnostics HTTP contract', () => {
                   mechanisms: ['launch_env'],
                   credentials: [
                     { kind: 'auth_token', configured: true },
+                    { kind: 'api_key', configured: true },
                     { kind: 'password', configured: true },
                   ],
                 },

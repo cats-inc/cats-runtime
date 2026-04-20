@@ -191,11 +191,13 @@ describe('inspectAgentTarget', () => {
       cwd: '/tmp/acp',
       startupTimeoutMs: 15000,
       authTokenEnv: 'ACP_TOKEN',
+      apiKeyEnv: 'ACP_API_KEY',
       passwordEnv: 'ACP_PASSWORD',
       model: 'gpt-5.4',
     }, {
       env: {
         ACP_TOKEN: 'secret-token',
+        ACP_API_KEY: 'secret-api-key',
         ACP_PASSWORD: 'secret-password',
       },
     });
@@ -204,6 +206,7 @@ describe('inspectAgentTarget', () => {
       mechanisms: ['launch_env'],
       credentials: [
         { kind: 'auth_token', configured: true },
+        { kind: 'api_key', configured: true },
         { kind: 'password', configured: true },
       ],
     });

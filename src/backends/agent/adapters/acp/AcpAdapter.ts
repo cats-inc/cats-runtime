@@ -124,6 +124,12 @@ function buildInspection(
               configured: Boolean(env[instance.authTokenEnv]),
             }]
           : []),
+        ...(instance.apiKeyEnv
+          ? [{
+              kind: 'api_key' as const,
+              configured: Boolean(env[instance.apiKeyEnv]),
+            }]
+          : []),
         ...(instance.passwordEnv
           ? [{
               kind: 'password' as const,
@@ -189,6 +195,12 @@ function buildInspection(
               ? [{
                   kind: 'auth_token' as const,
                   configured: httpAuthConfigured,
+                }]
+              : []),
+            ...(instance.apiKeyEnv
+              ? [{
+                  kind: 'api_key' as const,
+                  configured: Boolean(env[instance.apiKeyEnv]),
                 }]
               : []),
             ...(instance.passwordEnv

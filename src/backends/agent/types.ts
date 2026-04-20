@@ -112,7 +112,7 @@ export interface AgentInvokeInput {
 }
 
 export interface AgentAdapterInspectionCredential {
-  kind: 'url' | 'base_url' | 'auth_token' | 'password';
+  kind: 'url' | 'base_url' | 'auth_token' | 'api_key' | 'password';
   configured: boolean;
 }
 

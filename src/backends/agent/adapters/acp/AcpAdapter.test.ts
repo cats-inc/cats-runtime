@@ -455,6 +455,7 @@ describe('AcpAdapter', () => {
     const adapter = new AcpAdapter({
       env: {
         ACP_TOKEN: 'secret-token',
+        ACP_API_KEY: 'secret-api-key',
         ACP_PASSWORD: 'secret-password',
       },
     });
@@ -462,6 +463,7 @@ describe('AcpAdapter', () => {
     const inspection = adapter.inspect({
       ...createStdioInstance(),
       authTokenEnv: 'ACP_TOKEN',
+      apiKeyEnv: 'ACP_API_KEY',
       passwordEnv: 'ACP_PASSWORD',
     });
 
@@ -469,6 +471,7 @@ describe('AcpAdapter', () => {
       mechanisms: ['launch_env'],
       credentials: [
         { kind: 'auth_token', configured: true },
+        { kind: 'api_key', configured: true },
         { kind: 'password', configured: true },
       ],
     });

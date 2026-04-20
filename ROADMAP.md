@@ -1758,7 +1758,8 @@ follow-through on contract hardening, launch-truth hardening across the full
   discovery, tool discovery, auth, or launch capabilities in practice
 - stdio ACP inspection now distinguishes env-propagated credential launch
   semantics through a dedicated `launch_env` auth mechanism instead of treating
-  all stdio ACP targets as auth-empty
+  all stdio ACP targets as auth-empty, including `auth_token`, `api_key`, and
+  `password` env credentials when configured
 - add a bidirectional HTTP-capable carrier or equivalent session-update path if
   the runtime wants HTTP ACP prompt turns rather than bounded control-plane-only
   HTTP
