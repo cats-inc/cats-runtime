@@ -387,6 +387,97 @@ describe('provider diagnostics HTTP contract', () => {
       ]);
   });
 
+  it('surfaces runtime ACP coexistence diagnostics on runtime and health snapshots', async () => {
+    const app = createTestApp();
+
+    const runtimeResponse = await app.request('/diagnostics/runtime');
+    expect(runtimeResponse.status).toBe(200);
+    const runtimePayload = await runtimeResponse.json() as {
+      runtime: {
+        acp: {
+          protocolVersion: number;
+          clientToRuntime: {
+            http: {
+              path: string;
+              promptCarrier: string;
+              supportedMethods: string[];
+            };
+            stdio: {
+              entrypoints: string[];
+              defaultMode: string;
+              directRuntimeFlag: string;
+              promptTurns: boolean;
+            };
+          };
+          runtimeToProvider: {
+            transport: string;
+            diagnosticsPath: string;
+          };
+        };
+      };
+    };
+
+    expect(runtimePayload.runtime.acp.protocolVersion).toBe(1);
+    expect(runtimePayload.runtime.acp.summary).toContain('client-to-runtime');
+    expect(runtimePayload.runtime.acp.clientToRuntime).toEqual({
+      http: {
+        enabled: true,
+        path: '/acp',
+        promptCarrier: 'application/x-ndjson',
+        notifications: ['session/update'],
+        supportedMethods: [
+          'initialize',
+          'ping',
+          'session/new',
+          'session/list',
+          'session/load',
+          'session/cancel',
+          'session/prompt',
+        ],
+      },
+      stdio: {
+        enabled: true,
+        entrypoints: ['cats-runtime acp', 'node build/runtime/bin/acp.js'],
+        defaultMode: 'proxy',
+        directRuntimeFlag: '--serve-runtime',
+        promptTurns: true,
+        notifications: ['session/update'],
+      },
+    });
+    expect(runtimePayload.runtime.acp.runtimeToProvider.transport).toBe('agent/acp');
+    expect(runtimePayload.runtime.acp.runtimeToProvider.diagnosticsPath).toBe('/diagnostics/providers');
+    expect(runtimePayload.runtime.acp.runtimeToProvider.summary)
+      .toContain('Provider-side ACP targets stay under the agent backend family');
+
+    const healthResponse = await app.request('/diagnostics/health');
+    expect(healthResponse.status).toBe(200);
+    const healthPayload = await healthResponse.json() as {
+      acp: {
+        summary: {
+          protocolVersion: number;
+          httpPath: string;
+          httpPromptCarrier: string;
+          stdioDefaultMode: string;
+          stdioDirectRuntimeFlag: string;
+          providerTransport: string;
+          summary: string;
+        };
+      };
+    };
+
+    expect(healthPayload.acp).toEqual({
+      summary: {
+        protocolVersion: 1,
+        httpPath: '/acp',
+        httpPromptCarrier: 'application/x-ndjson',
+        stdioDefaultMode: 'proxy',
+        stdioDirectRuntimeFlag: '--serve-runtime',
+        providerTransport: 'agent/acp',
+        summary: expect.stringContaining('HTTP NDJSON and stdio'),
+      },
+    });
+  });
+
   it('skips retained artifact reads on health diagnostics', async () => {
     const evidenceSpy = vi.spyOn(
       CompatibilityEvidenceService.prototype,

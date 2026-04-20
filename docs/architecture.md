@@ -248,6 +248,10 @@ src/
 - Exposes startup/readiness metadata at `GET /health`
 - Exposes aggregate runtime + provider health at `GET /diagnostics/health`
 - Exposes runtime/host diagnostics at `GET /diagnostics/runtime`
+- Exposes additive ACP coexistence summaries on `GET /diagnostics/runtime` and
+  `GET /diagnostics/health` so hosts can distinguish the runtime-facing ACP
+  facade from provider-side `agent/acp` transports without inferring that split
+  from other route families
 - Exposes provider availability plus CLI compatibility diagnostics at
   `GET /diagnostics/providers`, including live API/local transport-native
   auth/model probes, additive OpenClaw gateway health-snapshot details, and
@@ -861,4 +865,4 @@ the only durable memory surface for the Cats suite.
 
 ---
 
-*Last updated: 2026-03-29*
+*Last updated: 2026-04-20*

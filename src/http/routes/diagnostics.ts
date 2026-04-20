@@ -100,6 +100,10 @@ import {
 } from '../../startup.js';
 import { SetupDiagnosticService } from '../../core/diagnostics/SetupDiagnosticService.js';
 import { resolveEffectiveToolCatalogContext } from '../providerToolCatalogContext.js';
+import {
+  buildRuntimeAcpDiagnosticsSummary,
+  buildRuntimeAcpHealthSummary,
+} from '../../acp/inspection.js';
 
 type DiagnosticStatus = HealthStatus['status'];
 type DiagnosticsProbeMode = 'light' | 'live';
@@ -1869,6 +1873,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
   const tools = buildRuntimeToolCatalogSummary();
   const delivery = inspectRuntimeDeliveryContract();
   const pool = getRuntimeSessionManager(ctx).status();
+  const acp = buildRuntimeAcpDiagnosticsSummary();
 
   return c.json({
     service: RUNTIME_SERVICE_NAME,
@@ -1896,6 +1901,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
         operations: management.summary,
       },
       delivery,
+      acp,
       tools,
       skills,
       setup,
@@ -2128,6 +2134,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   const tools = buildRuntimeToolCatalogSummary();
   const delivery = inspectRuntimeDeliveryContract();
   const poolSummary = buildRuntimePoolDiagnosticsSummary(ctx);
+  const acp = buildRuntimeAcpHealthSummary();
   const providerSummary = summarizeProviderDiagnostics(catalog, providers, {
     defaultTargetsOnly: true,
     useAttentionSummary: true,
@@ -2200,6 +2207,9 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
     },
     delivery: {
       summary: delivery.summary,
+    },
+    acp: {
+      summary: acp,
     },
     tools: {
       summary: tools,

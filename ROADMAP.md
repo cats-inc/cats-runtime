@@ -1726,6 +1726,10 @@ follow-through on contract hardening, launch-truth hardening across the full
   continuity persistence, cancel/close, model discovery, and tool discovery
 - `src/acp/` now exists as a runtime-owned ACP facade with bounded HTTP and
   direct stdio carriers
+- `GET /diagnostics/runtime` and `GET /diagnostics/health` now also expose a
+  compact ACP coexistence summary that separates client-to-runtime ACP carriers
+  from provider-side `agent/acp` targets, so hosts do not need to infer that
+  layering from unrelated diagnostics surfaces
 - ADR 031, SPEC 025, and PLAN 032 define the provider-side ACP path, the
   runtime-owned ACP facade path, and the ACP + A2A layering model
 
@@ -1789,4 +1793,4 @@ follow-through on contract hardening, launch-truth hardening across the full
 - `docs/decisions/026-model-a2a-as-an-agent-backend-adapter.md`
 
 ---
-*Last updated: 2026-04-15*
+*Last updated: 2026-04-20*

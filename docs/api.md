@@ -703,6 +703,10 @@ desktop shells, and the embedded dashboard. It combines:
   delivery route
 - compact runtime execution-strategy summary metadata so hosts can distinguish
   implemented strategy families from compatibility-fallback-only hints
+- compact ACP coexistence summary metadata so hosts can distinguish the
+  client-to-runtime ACP facade (`POST /acp` plus stdio carriers) from
+  provider-side `agent/acp` targets without separately stitching together ACP
+  docs and provider diagnostics
 - a light provider-health summary over each provider's default target, suitable
   for polling and compatibility-aware setup UX
 - per-provider default target highlights so hosts do not need to stitch
@@ -756,6 +760,14 @@ integrate against:
   - `strategies`: per-family availability, execution model, bounded accepted
     `strategyContext` keys plus machine-readable `requestSupport` and
     `contextSchema` metadata, guardrail support, and emitted strategy events
+- runtime ACP coexistence metadata under `runtime.acp`, including:
+  - `clientToRuntime.http`: the bounded `/acp` HTTP carrier, its NDJSON prompt
+    transport requirement, and the currently advertised ACP methods
+  - `clientToRuntime.stdio`: the stdio carrier entrypoints, default proxy mode,
+    and the direct runtime `--serve-runtime` mode
+  - `runtimeToProvider`: the fact that provider-facing ACP remains a separate
+    `agent/acp` transport surfaced through provider diagnostics rather than a
+    second runtime-facing provider catalog
 - runtime management backlog metadata under `runtime.management.operations`,
   including retained `polling` / `completed` / `failed` counts plus
   `oldestStartedAt` / `latestUpdatedAt`
@@ -4251,4 +4263,4 @@ Errors use this format:
 
 ---
 
-*Last updated: 2026-04-15*
+*Last updated: 2026-04-20*
