@@ -634,6 +634,33 @@ for agent identity fields such as `id`, `mode`, `version`, `role`, and
 Keep each instance block focused on the fields that actually vary, usually
 `model`.
 
+For ACP-backed agent targets, prefer the dedicated nested blocks that match the
+runtime's current parser contract:
+
+```yaml
+backends:
+  agent:
+    providers:
+      codex:
+        default_instance: acp-local
+        transport: acp_stdio
+        launch:
+          command: codex-acp
+          args: [serve]
+          startup_timeout_ms: 15000
+        instances:
+          acp-local:
+            launch:
+              cwd: /workspace/project
+            connect:
+              auth_token_env: CODEX_ACP_TOKEN
+            model: gpt-5.4
+```
+
+That keeps subprocess launch metadata under `launch:` and connection/auth
+metadata under `connect:` instead of scattering ACP-specific fields across the
+provider root.
+
 That means one provider family can expose multiple backend targets at once. For
 example, `claude` can keep its default target on `cli/native`, still offer
 `api/sonnet` under `backends.api.providers.claude`, and additionally expose an
