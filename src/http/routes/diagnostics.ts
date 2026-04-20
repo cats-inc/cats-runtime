@@ -1873,7 +1873,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
   const tools = buildRuntimeToolCatalogSummary();
   const delivery = inspectRuntimeDeliveryContract();
   const pool = getRuntimeSessionManager(ctx).status();
-  const acp = buildRuntimeAcpDiagnosticsSummary();
+  const acp = buildRuntimeAcpDiagnosticsSummary(Boolean(ctx.peerRouting));
 
   return c.json({
     service: RUNTIME_SERVICE_NAME,
@@ -2134,7 +2134,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   const tools = buildRuntimeToolCatalogSummary();
   const delivery = inspectRuntimeDeliveryContract();
   const poolSummary = buildRuntimePoolDiagnosticsSummary(ctx);
-  const acp = buildRuntimeAcpHealthSummary();
+  const acp = buildRuntimeAcpHealthSummary(Boolean(ctx.peerRouting));
   const providerSummary = summarizeProviderDiagnostics(catalog, providers, {
     defaultTargetsOnly: true,
     useAttentionSummary: true,

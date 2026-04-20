@@ -414,6 +414,8 @@ describe('provider diagnostics HTTP contract', () => {
               supportedModes: string[];
               shareWorkspaceFlag: string;
               requiresRuntimeSessionOrigin: boolean;
+              peerModePolicyGate: boolean;
+              peerModeAvailable: boolean;
               summary: string;
             };
           };
@@ -465,7 +467,9 @@ describe('provider diagnostics HTTP contract', () => {
         supportedModes: ['local', 'peer'],
         shareWorkspaceFlag: 'shareWorkspace',
         requiresRuntimeSessionOrigin: true,
-        summary: expect.stringContaining('runtime-to-peer routing hints'),
+        peerModePolicyGate: true,
+        peerModeAvailable: false,
+        summary: expect.stringContaining('policy-gated'),
       },
     });
     expect(runtimePayload.runtime.acp.runtimeToProvider.transport).toBe('agent/acp');
@@ -491,6 +495,7 @@ describe('provider diagnostics HTTP contract', () => {
           stdioDirectRuntimeFlag: string;
           stdioInspectProxyFlag: string;
           routingMetaPath: string;
+          peerModeAvailable: boolean;
           providerTransport: string;
           peerTransport: string;
           peerDiagnosticsPath: string;
@@ -508,10 +513,11 @@ describe('provider diagnostics HTTP contract', () => {
         stdioDirectRuntimeFlag: '--serve-runtime',
         stdioInspectProxyFlag: '--inspect-proxy',
         routingMetaPath: '_meta.catsRuntime.routing',
+        peerModeAvailable: false,
         providerTransport: 'agent/acp',
         peerTransport: 'a2a',
         peerDiagnosticsPath: '/diagnostics/peers',
-        summary: expect.stringContaining('A2A layer'),
+        summary: expect.stringContaining('runtime-policy-gated'),
       },
     });
   });

@@ -213,6 +213,8 @@ describe('runtime ACP facade routes', () => {
               supportedModes: ['local', 'peer'],
               shareWorkspaceFlag: 'shareWorkspace',
               requiresRuntimeSessionOrigin: true,
+              peerModePolicyGate: true,
+              peerModeAvailable: false,
             },
             supportedMethods: [
               'initialize',
@@ -886,6 +888,63 @@ describe('runtime ACP facade routes', () => {
         message: 'routing must be an object when provided.',
         data: {
           reason: 'invalid_cats_runtime_routing',
+        },
+      },
+    });
+  });
+
+  it('surfaces shared peer-routing failure codes on ACP prompt errors', async () => {
+    const { app, rootDir, registry } = makeApp();
+    cleanupRoots.push(rootDir);
+
+    const cwd = join(rootDir, 'workspace-peer-disabled');
+    mkdirSync(cwd, { recursive: true });
+    const session = registry.create({
+      id: 'runtime-session-peer-disabled',
+      providerName: 'claude',
+      cwd,
+    });
+    registry.updateStatus(session.id, 'ready');
+
+    const response = await app.request('/acp', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/x-ndjson',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'prompt-peer-disabled',
+        method: 'session/prompt',
+        params: {
+          sessionId: session.id,
+          prompt: [{
+            type: 'text',
+            text: 'Try peer routing.',
+          }],
+          _meta: {
+            catsRuntime: {
+              routing: {
+                mode: 'peer',
+                peerId: 'lab-peer',
+              },
+            },
+          },
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 'prompt-peer-disabled',
+      error: {
+        code: -32603,
+        message: 'Peer routing service is not initialized.',
+        data: {
+          route: '/sessions/runtime-session-peer-disabled/messages',
+          httpStatus: 503,
+          code: 'peer_route_disabled',
         },
       },
     });

@@ -136,6 +136,10 @@ Current ACP HTTP limitations:
 - `session/prompt` may pass runtime-specific peer-routing hints through
   `_meta.catsRuntime.routing` using the same `mode` / `peerId` / `strategy` /
   `shareWorkspace` shape already accepted by `/sessions/{id}/messages`
+- that peer-routing hint path is runtime-policy-gated; ACP initialize metadata
+  now exposes `routingSupport.peerModeAvailable` for the current runtime, and
+  rejected prompt turns return the shared runtime peer-routing failure code in
+  JSON-RPC error data
 - when routing hints are supplied, the terminal prompt result now reflects
   `_meta.catsRuntime.routing.requested` plus the observed
   `_meta.catsRuntime.routing.effective` route, so ACP clients can see whether a
@@ -779,7 +783,9 @@ integrate against:
   - `clientToRuntime.routingSupport`: the runtime-specific
     `_meta.catsRuntime.routing` prompt-turn hint path that lets ACP clients ask
     the runtime to route work onward to the separate peer/A2A layer without
-    turning peer execution into a new ACP carrier
+    turning peer execution into a new ACP carrier, including whether peer mode
+    is currently available on this runtime and the fact that it remains
+    policy-gated
   - `runtimeToProvider`: the fact that provider-facing ACP remains a separate
     `agent/acp` transport surfaced through provider diagnostics rather than a
     second runtime-facing provider catalog

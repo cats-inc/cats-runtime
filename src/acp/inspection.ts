@@ -25,6 +25,8 @@ export interface RuntimeAcpDiagnosticsSummary {
       supportedModes: Array<'local' | 'peer'>;
       shareWorkspaceFlag: 'shareWorkspace';
       requiresRuntimeSessionOrigin: true;
+      peerModePolicyGate: true;
+      peerModeAvailable: boolean;
       summary: string;
     };
   };
@@ -49,6 +51,7 @@ export interface RuntimeAcpHealthSummary {
   stdioDirectRuntimeFlag: '--serve-runtime';
   stdioInspectProxyFlag: '--inspect-proxy';
   routingMetaPath: '_meta.catsRuntime.routing';
+  peerModeAvailable: boolean;
   providerTransport: 'agent/acp';
   peerTransport: 'a2a';
   peerDiagnosticsPath: '/diagnostics/peers';
@@ -67,7 +70,9 @@ const ACP_HTTP_SUPPORTED_METHODS = [
 
 const ACP_PROMPT_NOTIFICATIONS = ['session/update'] as const;
 
-export function buildRuntimeAcpDiagnosticsSummary(): RuntimeAcpDiagnosticsSummary {
+export function buildRuntimeAcpDiagnosticsSummary(
+  peerModeAvailable = false,
+): RuntimeAcpDiagnosticsSummary {
   return {
     protocolVersion: ACP_PROTOCOL_VERSION,
     summary: 'Runtime ACP is available for client-to-runtime traffic over HTTP and stdio, while provider-side ACP remains a separate agent/acp transport and peer execution remains a separate A2A/runtime-to-runtime layer.',
@@ -93,7 +98,9 @@ export function buildRuntimeAcpDiagnosticsSummary(): RuntimeAcpDiagnosticsSummar
         supportedModes: ['local', 'peer'],
         shareWorkspaceFlag: 'shareWorkspace',
         requiresRuntimeSessionOrigin: true,
-        summary: 'ACP clients can request runtime-to-peer routing hints on prompt turns through `_meta.catsRuntime.routing`, while peer execution itself remains on the separate A2A/runtime-to-runtime layer.',
+        peerModePolicyGate: true,
+        peerModeAvailable,
+        summary: 'ACP clients can request runtime-to-peer routing hints on prompt turns through `_meta.catsRuntime.routing`, but peer-mode execution remains policy-gated and the actual peer execution still stays on the separate A2A/runtime-to-runtime layer.',
       },
     },
     runtimeToProvider: {
@@ -110,7 +117,9 @@ export function buildRuntimeAcpDiagnosticsSummary(): RuntimeAcpDiagnosticsSummar
   };
 }
 
-export function buildRuntimeAcpHealthSummary(): RuntimeAcpHealthSummary {
+export function buildRuntimeAcpHealthSummary(
+  peerModeAvailable = false,
+): RuntimeAcpHealthSummary {
   return {
     protocolVersion: ACP_PROTOCOL_VERSION,
     httpPath: '/acp',
@@ -119,9 +128,10 @@ export function buildRuntimeAcpHealthSummary(): RuntimeAcpHealthSummary {
     stdioDirectRuntimeFlag: '--serve-runtime',
     stdioInspectProxyFlag: '--inspect-proxy',
     routingMetaPath: '_meta.catsRuntime.routing',
+    peerModeAvailable,
     providerTransport: 'agent/acp',
     peerTransport: 'a2a',
     peerDiagnosticsPath: '/diagnostics/peers',
-    summary: 'ACP prompt turns are available over HTTP NDJSON and stdio, peer-routing hints can be requested through `_meta.catsRuntime.routing`, while provider-side ACP continues to use the separate agent/acp transport and peer routing continues to use the separate A2A layer.',
+    summary: 'ACP prompt turns are available over HTTP NDJSON and stdio, peer-routing hints can be requested through `_meta.catsRuntime.routing`, but peer-mode execution remains runtime-policy-gated while provider-side ACP continues to use the separate agent/acp transport and peer routing continues to use the separate A2A layer.',
   };
 }

@@ -251,6 +251,8 @@ function buildInitializeResult(
           supportedModes: ['local', 'peer'],
           shareWorkspaceFlag: 'shareWorkspace',
           requiresRuntimeSessionOrigin: true,
+          peerModePolicyGate: true,
+          peerModeAvailable: Boolean(ctx.peerRouting),
         },
         supportedMethods,
       },
@@ -1199,6 +1201,7 @@ async function handlePromptSession(
       {
         route: `/sessions/${sessionId}/messages`,
         httpStatus: response.status,
+        ...(typeof failurePayload?.code === 'string' ? { code: failurePayload.code } : {}),
       },
     );
   }
