@@ -1782,12 +1782,20 @@ function parseRemoteBackends(
             || readString(providerConnect?.baseUrlEnv)
             || readString(providerDoc.base_url_env)
             || readString(providerDoc.baseUrlEnv),
-          organizationEnv: readString(instanceDoc.organization_env)
+          organizationEnv: readString(instanceConnect?.organization_env)
+            || readString(instanceConnect?.organizationEnv)
+            || readString(instanceDoc.organization_env)
             || readString(instanceDoc.organizationEnv)
+            || readString(providerConnect?.organization_env)
+            || readString(providerConnect?.organizationEnv)
             || readString(providerDoc.organization_env)
             || readString(providerDoc.organizationEnv),
-          projectEnv: readString(instanceDoc.project_env)
+          projectEnv: readString(instanceConnect?.project_env)
+            || readString(instanceConnect?.projectEnv)
+            || readString(instanceDoc.project_env)
             || readString(instanceDoc.projectEnv)
+            || readString(providerConnect?.project_env)
+            || readString(providerConnect?.projectEnv)
             || readString(providerDoc.project_env)
             || readString(providerDoc.projectEnv),
           headers: mergeStringMaps(mergedProviderHeaders, mergedInstanceHeaders),

@@ -1162,6 +1162,62 @@ backends:
     }
   });
 
+  it('loads remote provider organization and project envs from nested connect blocks', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
+    writeFileSync(configPath, `
+version: 1
+routing:
+  providers:
+    codex:
+      default_target:
+        backend: api
+        instance: main
+backends:
+  api:
+    providers:
+      codex:
+        default_instance: main
+        transport: openai
+        connect:
+          api_key_env: OPENAI_API_KEY
+          organization_env: OPENAI_ORG
+        instances:
+          main:
+            model: gpt-5
+          project:
+            model: gpt-5.4
+            connect:
+              project_env: OPENAI_PROJECT
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_DIR: runtimeDir,
+      });
+
+      expect(config.remoteProviderCatalog?.api.codex.main).toMatchObject({
+        transport: 'openai',
+        apiKeyEnv: 'OPENAI_API_KEY',
+        organizationEnv: 'OPENAI_ORG',
+        projectEnv: undefined,
+      });
+
+      expect(config.remoteProviderCatalog?.api.codex.project).toMatchObject({
+        transport: 'openai',
+        apiKeyEnv: 'OPENAI_API_KEY',
+        organizationEnv: 'OPENAI_ORG',
+        projectEnv: 'OPENAI_PROJECT',
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('loads agent-backed provider defaults and per-instance overrides', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
     const runtimeDir = tempDir;

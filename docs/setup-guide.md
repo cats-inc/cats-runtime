@@ -617,6 +617,11 @@ For remote API providers, shared settings belong at the provider level. Put
 actually differs, usually `model`. That avoids copying the same API key across
 `claude.sonnet`, `gemini.flash`, and similar instance variants.
 
+If a remote API target also needs organization- or project-scoped env names,
+prefer the nested `connect:` block for those connection metadata fields such as
+`organization_env` and `project_env` so the connection/auth surface stays
+grouped together.
+
 Keep the actual secret values in `.env` or your host environment. The
 `providers.yaml` should only reference env names such as
 `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`.
