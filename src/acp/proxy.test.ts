@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createHttpAcpProxyHandler,
+  inspectAcpProxy,
   resolveAcpProxyTarget,
   resolveAcpProxyTimeoutMs,
 } from './proxy.js';
@@ -120,6 +121,63 @@ describe('ACP HTTP proxy', () => {
           reason: 'upstream_unavailable',
           targetUrl: 'http://127.0.0.1:3110/acp',
         },
+      },
+    });
+  });
+
+  it('inspects proxy target and reports successful ping preflight', async () => {
+    const inspection = await inspectAcpProxy({
+      env: {
+        CATS_RUNTIME_ACP_PROXY_URL: 'http://127.0.0.1:4110/acp',
+        CATS_RUNTIME_API_KEY: 'secret',
+        CATS_RUNTIME_ACP_PROXY_TIMEOUT_MS: '1234',
+      },
+      fetchImpl: vi.fn(async () => new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'proxy-preflight',
+        result: { ok: true },
+      }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+        },
+      })) as typeof fetch,
+    });
+
+    expect(inspection).toEqual({
+      target: {
+        url: 'http://127.0.0.1:4110/acp',
+        authorizationConfigured: true,
+        timeoutMs: 1234,
+      },
+      probe: {
+        status: 'ok',
+        reason: 'reachable',
+        message: 'Primary cats-runtime ACP endpoint responded to ping at http://127.0.0.1:4110/acp.',
+      },
+    });
+  });
+
+  it('inspects proxy target and preserves classified preflight failures', async () => {
+    const inspection = await inspectAcpProxy({
+      env: {
+        CATS_RUNTIME_ACP_PROXY_TIMEOUT_MS: '5',
+      },
+      fetchImpl: vi.fn(async () => {
+        throw new TypeError('connect ECONNREFUSED');
+      }) as typeof fetch,
+    });
+
+    expect(inspection).toEqual({
+      target: {
+        url: 'http://127.0.0.1:3110/acp',
+        authorizationConfigured: false,
+        timeoutMs: 5,
+      },
+      probe: {
+        status: 'error',
+        reason: 'upstream_unavailable',
+        message: 'Primary cats-runtime ACP endpoint is unavailable at http://127.0.0.1:3110/acp. Start cats-runtime and retry.',
       },
     });
   });

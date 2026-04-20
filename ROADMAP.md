@@ -1730,6 +1730,10 @@ follow-through on contract hardening, launch-truth hardening across the full
   compact ACP coexistence summary that separates client-to-runtime ACP carriers
   from provider-side `agent/acp` targets, so hosts do not need to infer that
   layering from unrelated diagnostics surfaces
+- `cats-runtime acp --inspect-proxy` plus the repo-local
+  `node build/runtime/bin/acp.js --inspect-proxy` path now provide a local ACP
+  proxy preflight exit, mirroring the existing MCP helper posture for packaged
+  and repo-local hosts
 - ADR 031, SPEC 025, and PLAN 032 define the provider-side ACP path, the
   runtime-owned ACP facade path, and the ACP + A2A layering model
 

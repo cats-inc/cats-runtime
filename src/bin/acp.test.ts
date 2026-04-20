@@ -8,6 +8,7 @@ describe('parseAcpCliOptions', () => {
       '127.0.0.1',
       '--diagnose-setup',
     ])).toEqual({
+      inspectProxy: false,
       serveRuntime: false,
       passthroughArgv: [
         '--host',
@@ -24,11 +25,31 @@ describe('parseAcpCliOptions', () => {
       'zed',
       '--bootstrap',
     ])).toEqual({
+      inspectProxy: false,
       serveRuntime: true,
       passthroughArgv: [
         '--managed-by',
         'zed',
         '--bootstrap',
+      ],
+    });
+  });
+
+  it('extracts the proxy preflight flag without disturbing runtime options', () => {
+    expect(parseAcpCliOptions([
+      '--inspect-proxy',
+      '--host',
+      '127.0.0.1',
+      '--managed-by',
+      'cats',
+    ])).toEqual({
+      inspectProxy: true,
+      serveRuntime: false,
+      passthroughArgv: [
+        '--host',
+        '127.0.0.1',
+        '--managed-by',
+        'cats',
       ],
     });
   });

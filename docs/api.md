@@ -104,7 +104,10 @@ it runs an in-process runtime-backed ACP stdio server that supports the same
 HTTP NDJSON prompt stream instead of downgrading prompt turns back to plain JSON,
 and it rewrites ACP `_meta.catsRuntime.transport` to `stdio` with additive
 `proxy` metadata so subprocess clients do not mistake the local carrier for a
-direct HTTP session.
+direct HTTP session. `cats-runtime acp --inspect-proxy` and the repo-local
+`node build/runtime/bin/acp.js --inspect-proxy` form now provide a local
+preflight exit that resolves the current ACP proxy target, runs a `ping`
+probe, emits JSON to stdout, and exits without starting the stdio carrier.
 
 Supported JSON-RPC methods:
 

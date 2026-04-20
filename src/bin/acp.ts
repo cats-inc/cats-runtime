@@ -17,17 +17,23 @@ import {
   resolveRuntimeStartupState,
   validateRuntimeServerStartupState,
 } from '../startup.js';
-import { createHttpAcpProxyHandler } from '../acp/proxy.js';
+import { createHttpAcpProxyHandler, inspectAcpProxy } from '../acp/proxy.js';
 import { startAcpStdioServer } from '../acp/stdio.js';
 
 export function parseAcpCliOptions(argv: string[]): {
+  inspectProxy: boolean;
   serveRuntime: boolean;
   passthroughArgv: string[];
 } {
+  let inspectProxy = false;
   let serveRuntime = false;
   const passthroughArgv: string[] = [];
 
   for (const arg of argv) {
+    if (arg === '--inspect-proxy') {
+      inspectProxy = true;
+      continue;
+    }
     if (arg === '--serve-runtime') {
       serveRuntime = true;
       continue;
@@ -36,6 +42,7 @@ export function parseAcpCliOptions(argv: string[]): {
   }
 
   return {
+    inspectProxy,
     serveRuntime,
     passthroughArgv,
   };
@@ -53,6 +60,7 @@ function getHelpText(): string {
     'Options:',
     '  --host <host>          Override the target runtime host when deriving the proxy URL',
     '  --port <port>          Override the target runtime port when deriving the proxy URL',
+    '  --inspect-proxy        Resolve the ACP proxy target, run a ping preflight, and exit',
     '  --serve-runtime        Start a direct runtime-backed ACP stdio server instead of proxy mode',
     '  --diagnose-setup       Generate a local setup diagnostic report and exit',
     '  --refresh-setup-scan   Refresh the shared setup scan before generating a diagnostic report',
@@ -89,6 +97,20 @@ export async function runAcpCli(argv: string[] = process.argv.slice(2)): Promise
       artifactPath: result.artifactPath,
       report: result.report,
     })}\n`);
+    return;
+  }
+  if (acpCliOptions.inspectProxy) {
+    const inspection = await inspectAcpProxy({
+      env: process.env,
+    });
+    const statusLine = inspection.probe.status === 'ok'
+      ? `cats-runtime ACP proxy target ${inspection.target.url} is reachable (timeout ${inspection.target.timeoutMs}ms).\n`
+      : `cats-runtime ACP proxy preflight failed: ${inspection.probe.message}\n`;
+    process.stderr.write(statusLine);
+    process.stdout.write(`${JSON.stringify(inspection)}\n`);
+    if (inspection.probe.status !== 'ok') {
+      process.exitCode = 1;
+    }
     return;
   }
 

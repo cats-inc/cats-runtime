@@ -24,6 +24,20 @@ export interface AcpHttpProxyOptions {
   fetchImpl?: typeof fetch;
 }
 
+export interface AcpProxyInspection {
+  target: {
+    url: string | null;
+    authorizationConfigured: boolean;
+    timeoutMs: number | null;
+  };
+  probe: {
+    status: 'ok' | 'error';
+    reason: string;
+    message: string;
+    httpStatus?: number;
+  };
+}
+
 interface JsonRpcResponseRecord {
   jsonrpc: '2.0';
   id: string | number | null;
@@ -154,6 +168,16 @@ function createProxyError(
       },
     },
   };
+}
+
+function isProxyTimeoutConfigurationError(message: string): boolean {
+  return message.includes(PROXY_TIMEOUT_ENV);
+}
+
+function toProxyConfigurationReason(message: string): string {
+  return isProxyTimeoutConfigurationError(message)
+    ? 'invalid_proxy_timeout'
+    : 'invalid_proxy_target';
 }
 
 async function parseResponseBody(response: Response): Promise<unknown> {
@@ -372,7 +396,7 @@ export function createHttpAcpProxyHandler(
       return createProxyError(
         requestId,
         message,
-        message.includes(PROXY_TIMEOUT_ENV) ? 'invalid_proxy_timeout' : 'invalid_proxy_target',
+        toProxyConfigurationReason(message),
       );
     }
 
@@ -469,5 +493,76 @@ export function createHttpAcpProxyHandler(
         httpStatus: response.status,
       },
     );
+  };
+}
+
+export async function inspectAcpProxy(
+  options: AcpHttpProxyOptions = {},
+): Promise<AcpProxyInspection> {
+  const env = options.env ?? process.env;
+  const authorizationConfigured = Boolean(resolveAuthorizationHeader(env));
+  let target: AcpProxyTarget | undefined;
+  let timeoutMs: number | undefined;
+
+  try {
+    target = resolveAcpProxyTarget(env);
+    timeoutMs = resolveAcpProxyTimeoutMs(env);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid ACP proxy configuration';
+    return {
+      target: {
+        url: target?.url ?? null,
+        authorizationConfigured,
+        timeoutMs: timeoutMs ?? null,
+      },
+      probe: {
+        status: 'error',
+        reason: toProxyConfigurationReason(message),
+        message,
+      },
+    };
+  }
+
+  const response = await createHttpAcpProxyHandler(options)({
+    jsonrpc: '2.0',
+    id: 'proxy-preflight',
+    method: 'ping',
+  });
+  if (response && 'result' in response) {
+    return {
+      target: {
+        url: target.url,
+        authorizationConfigured,
+        timeoutMs,
+      },
+      probe: {
+        status: 'ok',
+        reason: 'reachable',
+        message: `Primary cats-runtime ACP endpoint responded to ping at ${target.url}.`,
+      },
+    };
+  }
+
+  const proxyErrorData = response?.error?.data && typeof response.error.data === 'object'
+    ? response.error.data as Record<string, unknown>
+    : undefined;
+  const httpStatus = typeof proxyErrorData?.httpStatus === 'number'
+    ? proxyErrorData.httpStatus
+    : undefined;
+
+  return {
+    target: {
+      url: target.url,
+      authorizationConfigured,
+      timeoutMs,
+    },
+    probe: {
+      status: 'error',
+      reason: typeof proxyErrorData?.reason === 'string'
+        ? proxyErrorData.reason
+        : 'proxy_probe_failed',
+      message: response?.error?.message ?? 'Primary cats-runtime ACP endpoint did not return a usable preflight response.',
+      ...(typeof httpStatus === 'number' ? { httpStatus } : {}),
+    },
   };
 }
