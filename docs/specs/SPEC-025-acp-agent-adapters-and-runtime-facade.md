@@ -158,7 +158,10 @@ ACP connect keys for the first executable slice. The runtime may accept a
 dedicated ACP stdio `launch:` sub-object while still normalizing onto the same
 remote provider shape internally, and ACP endpoint/auth settings may likewise
 move under a dedicated `connect:` sub-object while preserving backward
-compatibility with the older flat keys.
+compatibility with the older flat keys. Shared request-shaping metadata such as
+`system_prompt`, `payload_template`, timeout/retry/token/tool limits, and
+`tool_profile` may also live under a dedicated `request:` sub-object while
+keeping the same backward-compatible normalization.
 
 ```yaml
 routing:
@@ -186,6 +189,9 @@ backends:
               auth_token_env: CODEX_ACP_TOKEN
               headers:
                 x-client-id: cats-runtime
+            request:
+              system_prompt: You are the Codex ACP worker.
+              max_output_tokens: 8192
             model: gpt-5.4
 ```
 
@@ -204,6 +210,8 @@ That means the current config mental model stays intact:
   requiring a second top-level ACP config hierarchy
 - ACP connection settings can live under a dedicated `connect:` block without
   requiring a second top-level ACP config hierarchy
+- Shared remote request settings can live under a dedicated `request:` block
+  without requiring a second top-level ACP config hierarchy
 
 ### 2. Runtime-owned ACP Facade
 

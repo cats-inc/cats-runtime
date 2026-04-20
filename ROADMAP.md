@@ -1780,11 +1780,12 @@ follow-through on contract hardening, launch-truth hardening across the full
   `_meta.catsRuntime.routing` may ask the runtime to route a prompt turn
   onward, but peer execution itself must remain on the separate A2A/runtime-
   to-runtime layer rather than becoming a second ACP carrier
-- narrow the ACP launch/connect config shape before declaring ACP provider
+- narrow the ACP launch/connect/request config shape before declaring ACP provider
   config stable across multiple targets:
   - prefer a dedicated launch sub-object or discriminated transport config
-  - first follow-through slices now accept nested ACP `launch:` and `connect:`
-    blocks while preserving backward compatibility with the older flat keys
+  - first follow-through slices now accept nested ACP `launch:`, `connect:`,
+    and `request:` blocks while preserving backward compatibility with the
+    older flat keys
   - avoid leaving ACP-only stdio fields as forever-generic remote provider
     properties
 - make stdio auth semantics explicit if any future ACP target needs credential
