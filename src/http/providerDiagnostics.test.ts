@@ -406,6 +406,7 @@ describe('provider diagnostics HTTP contract', () => {
               entrypoints: string[];
               defaultMode: string;
               directRuntimeFlag: string;
+              inspectProxyFlag: string;
               promptTurns: boolean;
             };
           };
@@ -448,6 +449,7 @@ describe('provider diagnostics HTTP contract', () => {
         entrypoints: ['cats-runtime acp', 'node build/runtime/bin/acp.js'],
         defaultMode: 'proxy',
         directRuntimeFlag: '--serve-runtime',
+        inspectProxyFlag: '--inspect-proxy',
         promptTurns: true,
         notifications: ['session/update'],
       },
@@ -473,6 +475,7 @@ describe('provider diagnostics HTTP contract', () => {
           httpPromptCarrier: string;
           stdioDefaultMode: string;
           stdioDirectRuntimeFlag: string;
+          stdioInspectProxyFlag: string;
           providerTransport: string;
           peerTransport: string;
           peerDiagnosticsPath: string;
@@ -488,6 +491,7 @@ describe('provider diagnostics HTTP contract', () => {
         httpPromptCarrier: 'application/x-ndjson',
         stdioDefaultMode: 'proxy',
         stdioDirectRuntimeFlag: '--serve-runtime',
+        stdioInspectProxyFlag: '--inspect-proxy',
         providerTransport: 'agent/acp',
         peerTransport: 'a2a',
         peerDiagnosticsPath: '/diagnostics/peers',

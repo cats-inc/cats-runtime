@@ -767,7 +767,8 @@ integrate against:
   - `clientToRuntime.http`: the bounded `/acp` HTTP carrier, its NDJSON prompt
     transport requirement, and the currently advertised ACP methods
   - `clientToRuntime.stdio`: the stdio carrier entrypoints, default proxy mode,
-    and the direct runtime `--serve-runtime` mode
+    the direct runtime `--serve-runtime` mode, and the proxy preflight
+    `--inspect-proxy` entrypoint
   - `runtimeToProvider`: the fact that provider-facing ACP remains a separate
     `agent/acp` transport surfaced through provider diagnostics rather than a
     second runtime-facing provider catalog

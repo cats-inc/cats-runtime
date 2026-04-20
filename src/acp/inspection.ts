@@ -16,6 +16,7 @@ export interface RuntimeAcpDiagnosticsSummary {
       entrypoints: string[];
       defaultMode: 'proxy';
       directRuntimeFlag: '--serve-runtime';
+      inspectProxyFlag: '--inspect-proxy';
       promptTurns: boolean;
       notifications: string[];
     };
@@ -39,6 +40,7 @@ export interface RuntimeAcpHealthSummary {
   httpPromptCarrier: 'application/x-ndjson';
   stdioDefaultMode: 'proxy';
   stdioDirectRuntimeFlag: '--serve-runtime';
+  stdioInspectProxyFlag: '--inspect-proxy';
   providerTransport: 'agent/acp';
   peerTransport: 'a2a';
   peerDiagnosticsPath: '/diagnostics/peers';
@@ -74,6 +76,7 @@ export function buildRuntimeAcpDiagnosticsSummary(): RuntimeAcpDiagnosticsSummar
         entrypoints: ['cats-runtime acp', 'node build/runtime/bin/acp.js'],
         defaultMode: 'proxy',
         directRuntimeFlag: '--serve-runtime',
+        inspectProxyFlag: '--inspect-proxy',
         promptTurns: true,
         notifications: [...ACP_PROMPT_NOTIFICATIONS],
       },
@@ -99,6 +102,7 @@ export function buildRuntimeAcpHealthSummary(): RuntimeAcpHealthSummary {
     httpPromptCarrier: 'application/x-ndjson',
     stdioDefaultMode: 'proxy',
     stdioDirectRuntimeFlag: '--serve-runtime',
+    stdioInspectProxyFlag: '--inspect-proxy',
     providerTransport: 'agent/acp',
     peerTransport: 'a2a',
     peerDiagnosticsPath: '/diagnostics/peers',

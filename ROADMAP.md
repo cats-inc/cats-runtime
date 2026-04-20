@@ -1737,6 +1737,9 @@ follow-through on contract hardening, launch-truth hardening across the full
 - the ACP coexistence summary now also calls out the separate runtime-to-peer
   A2A layer through `GET /diagnostics/peers` and `POST /peer/executions`, so
   hosts do not have to infer whether peer routing lives inside the ACP facade
+- the same ACP diagnostics summary now also advertises the stdio proxy
+  `--inspect-proxy` capability directly, so hosts can discover ACP preflight
+  support without scraping CLI help text
 - ADR 031, SPEC 025, and PLAN 032 define the provider-side ACP path, the
   runtime-owned ACP facade path, and the ACP + A2A layering model
 
