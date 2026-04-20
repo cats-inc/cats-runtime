@@ -1821,10 +1821,15 @@ function parseRemoteBackends(
             || readString(providerClient?.clientVersion)
             || readString(providerDoc.client_version)
             || readString(providerDoc.clientVersion),
-          role: readString(instanceDoc.role)
+          role: readString(instanceClient?.role)
+            || readString(instanceDoc.role)
+            || readString(providerClient?.role)
             || readString(providerDoc.role),
           scopes: parseOptionalStringArray(
-            instanceDoc.scopes ?? providerDoc.scopes,
+            instanceClient?.scopes
+              ?? instanceDoc.scopes
+              ?? providerClient?.scopes
+              ?? providerDoc.scopes,
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.scopes`,
           ),
           payloadTemplate: parseOptionalObjectValue(

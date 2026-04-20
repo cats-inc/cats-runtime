@@ -1412,6 +1412,66 @@ backends:
     }
   });
 
+  it('loads agent-backed provider role and scopes from a nested client block', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
+    writeFileSync(configPath, `
+version: 1
+routing:
+  providers:
+    openclaw:
+      default_target:
+        backend: agent
+        instance: gateway
+backends:
+  agent:
+    providers:
+      openclaw:
+        default_instance: gateway
+        transport: openclaw_gateway
+        url: ws://gateway.example/ws
+        auth_token_env: OPENCLAW_TOKEN
+        client:
+          id: cats-runtime
+          role: operator
+          scopes:
+            - operator.admin
+        instances:
+          gateway:
+            model: openclaw-coder
+          preview:
+            model: openclaw-preview
+            client:
+              role: reviewer
+              scopes:
+                - operator.read
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_DIR: runtimeDir,
+      });
+
+      expect(config.remoteProviderCatalog?.agent.openclaw.gateway).toMatchObject({
+        clientId: 'cats-runtime',
+        role: 'operator',
+        scopes: ['operator.admin'],
+      });
+
+      expect(config.remoteProviderCatalog?.agent.openclaw.preview).toMatchObject({
+        clientId: 'cats-runtime',
+        role: 'reviewer',
+        scopes: ['operator.read'],
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('loads ACP-backed agent provider launch settings under the existing remote backend shape', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
     const runtimeDir = tempDir;
