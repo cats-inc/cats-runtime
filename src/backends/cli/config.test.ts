@@ -1293,6 +1293,125 @@ backends:
     }
   });
 
+  it('loads agent-backed provider client identity from a nested client block', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
+    writeFileSync(configPath, `
+version: 1
+routing:
+  providers:
+    openclaw:
+      default_target:
+        backend: agent
+        instance: gateway
+backends:
+  agent:
+    providers:
+      openclaw:
+        default_instance: gateway
+        transport: openclaw_gateway
+        url: ws://gateway.example/ws
+        auth_token_env: OPENCLAW_TOKEN
+        client:
+          id: cats-runtime
+          mode: interactive
+          version: 0.2.0
+        role: operator
+        scopes:
+          - operator.admin
+        instances:
+          gateway:
+            model: openclaw-coder
+          preview:
+            model: openclaw-preview
+            client:
+              mode: preview
+              version: 0.2.1
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_DIR: runtimeDir,
+      });
+
+      expect(config.remoteProviderCatalog?.agent.openclaw.gateway).toEqual({
+        id: 'gateway',
+        providerName: 'openclaw',
+        backend: 'agent',
+        transport: 'openclaw_gateway',
+        command: undefined,
+        args: undefined,
+        cwd: undefined,
+        url: 'ws://gateway.example/ws',
+        urlEnv: undefined,
+        model: 'openclaw-coder',
+        systemPrompt: undefined,
+        apiKeyEnv: undefined,
+        authTokenEnv: 'OPENCLAW_TOKEN',
+        passwordEnv: undefined,
+        baseUrl: undefined,
+        baseUrlEnv: undefined,
+        organizationEnv: undefined,
+        projectEnv: undefined,
+        headers: undefined,
+        clientId: 'cats-runtime',
+        clientMode: 'interactive',
+        clientVersion: '0.2.0',
+        role: 'operator',
+        scopes: ['operator.admin'],
+        payloadTemplate: undefined,
+        waitTimeoutMs: undefined,
+        maxOutputTokens: undefined,
+        timeoutMs: undefined,
+        maxRetries: undefined,
+        maxToolSteps: undefined,
+        toolProfile: undefined,
+        startupTimeoutMs: undefined,
+      });
+
+      expect(config.remoteProviderCatalog?.agent.openclaw.preview).toEqual({
+        id: 'preview',
+        providerName: 'openclaw',
+        backend: 'agent',
+        transport: 'openclaw_gateway',
+        command: undefined,
+        args: undefined,
+        cwd: undefined,
+        url: 'ws://gateway.example/ws',
+        urlEnv: undefined,
+        model: 'openclaw-preview',
+        systemPrompt: undefined,
+        apiKeyEnv: undefined,
+        authTokenEnv: 'OPENCLAW_TOKEN',
+        passwordEnv: undefined,
+        baseUrl: undefined,
+        baseUrlEnv: undefined,
+        organizationEnv: undefined,
+        projectEnv: undefined,
+        headers: undefined,
+        clientId: 'cats-runtime',
+        clientMode: 'preview',
+        clientVersion: '0.2.1',
+        role: 'operator',
+        scopes: ['operator.admin'],
+        payloadTemplate: undefined,
+        waitTimeoutMs: undefined,
+        maxOutputTokens: undefined,
+        timeoutMs: undefined,
+        maxRetries: undefined,
+        maxToolSteps: undefined,
+        toolProfile: undefined,
+        startupTimeoutMs: undefined,
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('loads ACP-backed agent provider launch settings under the existing remote backend shape', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
     const runtimeDir = tempDir;

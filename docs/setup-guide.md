@@ -588,7 +588,8 @@ backends:
         transport: openclaw_gateway
         url_env: OPENCLAW_URL
         auth_token_env: OPENCLAW_TOKEN
-        client_id: cats-runtime
+        client:
+          id: cats-runtime
         instances:
           gateway:
             # Use a model id exposed by your OpenClaw deployment.
@@ -618,9 +619,11 @@ Keep the actual secret values in `.env` or your host environment. The
 `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`.
 
 Agent backends follow the same pattern. Put shared gateway/auth settings such as
-`transport`, `url_env`, `auth_token_env`, and `client_id` at the provider
-level, then keep each instance block focused on the fields that actually vary,
-usually `model`.
+`transport`, `url_env`, `auth_token_env`, and shared client identity metadata
+once at the provider level. The recommended shape is a nested `client:` block
+for agent identity fields such as `id`, while the older flat `client_id` form
+remains backward-compatible. Keep each instance block focused on the fields
+that actually vary, usually `model`.
 
 That means one provider family can expose multiple backend targets at once. For
 example, `claude` can keep its default target on `cli/native`, still offer

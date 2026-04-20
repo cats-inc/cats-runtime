@@ -1673,6 +1673,7 @@ function parseRemoteBackends(
         asOptionalObject(providerDoc.headers),
         `backends.${backend}.providers.${providerName}.headers`,
       );
+      const providerClient = asOptionalObject(providerDoc.client);
       const providerConnect = asOptionalObject(providerDoc.connect);
       const providerConnectHeaders = parseStringMap(
         asOptionalObject(providerConnect?.headers),
@@ -1688,6 +1689,7 @@ function parseRemoteBackends(
           `Invalid backends.${backend}.providers.${providerName}.instances.${instanceId} `
             + `block in '${filePath}'`,
         );
+        const instanceClient = asOptionalObject(instanceDoc.client);
         const instanceLaunch = asOptionalObject(instanceDoc.launch);
         const instanceConnect = asOptionalObject(instanceDoc.connect);
 
@@ -1789,16 +1791,34 @@ function parseRemoteBackends(
             || readString(providerDoc.project_env)
             || readString(providerDoc.projectEnv),
           headers: mergeStringMaps(mergedProviderHeaders, mergedInstanceHeaders),
-          clientId: readString(instanceDoc.client_id)
+          clientId: readString(instanceClient?.id)
+            || readString(instanceClient?.client_id)
+            || readString(instanceClient?.clientId)
+            || readString(instanceDoc.client_id)
             || readString(instanceDoc.clientId)
+            || readString(providerClient?.id)
+            || readString(providerClient?.client_id)
+            || readString(providerClient?.clientId)
             || readString(providerDoc.client_id)
             || readString(providerDoc.clientId),
-          clientMode: readString(instanceDoc.client_mode)
+          clientMode: readString(instanceClient?.mode)
+            || readString(instanceClient?.client_mode)
+            || readString(instanceClient?.clientMode)
+            || readString(instanceDoc.client_mode)
             || readString(instanceDoc.clientMode)
+            || readString(providerClient?.mode)
+            || readString(providerClient?.client_mode)
+            || readString(providerClient?.clientMode)
             || readString(providerDoc.client_mode)
             || readString(providerDoc.clientMode),
-          clientVersion: readString(instanceDoc.client_version)
+          clientVersion: readString(instanceClient?.version)
+            || readString(instanceClient?.client_version)
+            || readString(instanceClient?.clientVersion)
+            || readString(instanceDoc.client_version)
             || readString(instanceDoc.clientVersion)
+            || readString(providerClient?.version)
+            || readString(providerClient?.client_version)
+            || readString(providerClient?.clientVersion)
             || readString(providerDoc.client_version)
             || readString(providerDoc.clientVersion),
           role: readString(instanceDoc.role)
