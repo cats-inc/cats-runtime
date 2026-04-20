@@ -50,7 +50,8 @@ without relying on hidden behavior.
 - [x] Show both the configured policy and the current state label in the UI
 
 **Deliverables**: Users can see why WSL discovery is active, skipped, disabled,
-or degraded.
+or degraded, both through the dedicated discovery route and through compact
+runtime/health diagnostics summaries.
 
 ### Phase 3: Follow-Up Items
 

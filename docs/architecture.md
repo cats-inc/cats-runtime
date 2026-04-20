@@ -794,7 +794,9 @@ For WSL-backed Cursor/Kiro discovery:
 3. `always` scans directly, `if_running` only scans already-running distros, and
    `manual_only` disables background WSL scans
 4. The runtime records discovery state per `provider@instance` for dashboard
-   polling via `GET /discovery/status`
+   polling via `GET /discovery/status`, and also projects compact WSL/Docker
+   discovery summaries onto `GET /diagnostics/runtime` and
+   `GET /diagnostics/health`
 
 For file-backed providers:
 
