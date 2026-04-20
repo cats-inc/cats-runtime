@@ -20,6 +20,13 @@ export interface RuntimeAcpDiagnosticsSummary {
       promptTurns: boolean;
       notifications: string[];
     };
+    routingSupport: {
+      requestedVia: '_meta.catsRuntime.routing';
+      supportedModes: Array<'local' | 'peer'>;
+      shareWorkspaceFlag: 'shareWorkspace';
+      requiresRuntimeSessionOrigin: true;
+      summary: string;
+    };
   };
   runtimeToProvider: {
     transport: 'agent/acp';
@@ -41,6 +48,7 @@ export interface RuntimeAcpHealthSummary {
   stdioDefaultMode: 'proxy';
   stdioDirectRuntimeFlag: '--serve-runtime';
   stdioInspectProxyFlag: '--inspect-proxy';
+  routingMetaPath: '_meta.catsRuntime.routing';
   providerTransport: 'agent/acp';
   peerTransport: 'a2a';
   peerDiagnosticsPath: '/diagnostics/peers';
@@ -80,6 +88,13 @@ export function buildRuntimeAcpDiagnosticsSummary(): RuntimeAcpDiagnosticsSummar
         promptTurns: true,
         notifications: [...ACP_PROMPT_NOTIFICATIONS],
       },
+      routingSupport: {
+        requestedVia: '_meta.catsRuntime.routing',
+        supportedModes: ['local', 'peer'],
+        shareWorkspaceFlag: 'shareWorkspace',
+        requiresRuntimeSessionOrigin: true,
+        summary: 'ACP clients can request runtime-to-peer routing hints on prompt turns through `_meta.catsRuntime.routing`, while peer execution itself remains on the separate A2A/runtime-to-runtime layer.',
+      },
     },
     runtimeToProvider: {
       transport: 'agent/acp',
@@ -103,9 +118,10 @@ export function buildRuntimeAcpHealthSummary(): RuntimeAcpHealthSummary {
     stdioDefaultMode: 'proxy',
     stdioDirectRuntimeFlag: '--serve-runtime',
     stdioInspectProxyFlag: '--inspect-proxy',
+    routingMetaPath: '_meta.catsRuntime.routing',
     providerTransport: 'agent/acp',
     peerTransport: 'a2a',
     peerDiagnosticsPath: '/diagnostics/peers',
-    summary: 'ACP prompt turns are available over HTTP NDJSON and stdio, while provider-side ACP continues to use the separate agent/acp transport and peer routing continues to use the separate A2A layer.',
+    summary: 'ACP prompt turns are available over HTTP NDJSON and stdio, peer-routing hints can be requested through `_meta.catsRuntime.routing`, while provider-side ACP continues to use the separate agent/acp transport and peer routing continues to use the separate A2A layer.',
   };
 }

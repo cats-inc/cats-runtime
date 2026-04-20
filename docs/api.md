@@ -133,6 +133,13 @@ Current ACP HTTP limitations:
   request receives a negotiation error instead of a prompt-turn stream
 - prompt-turn notifications and the final JSON-RPC result are emitted as NDJSON
   lines on the same HTTP response body
+- `session/prompt` may pass runtime-specific peer-routing hints through
+  `_meta.catsRuntime.routing` using the same `mode` / `peerId` / `strategy` /
+  `shareWorkspace` shape already accepted by `/sessions/{id}/messages`
+- when routing hints are supplied, the terminal prompt result now reflects
+  `_meta.catsRuntime.routing.requested` plus the observed
+  `_meta.catsRuntime.routing.effective` route, so ACP clients can see whether a
+  turn stayed local or traversed the runtime-to-peer layer
 - ACP-created sessions are still ordinary runtime sessions, so downstream
   peer-routing/A2A rules continue to apply through the shared
   `/sessions/{id}/messages` execution path
@@ -769,6 +776,10 @@ integrate against:
   - `clientToRuntime.stdio`: the stdio carrier entrypoints, default proxy mode,
     the direct runtime `--serve-runtime` mode, and the proxy preflight
     `--inspect-proxy` entrypoint
+  - `clientToRuntime.routingSupport`: the runtime-specific
+    `_meta.catsRuntime.routing` prompt-turn hint path that lets ACP clients ask
+    the runtime to route work onward to the separate peer/A2A layer without
+    turning peer execution into a new ACP carrier
   - `runtimeToProvider`: the fact that provider-facing ACP remains a separate
     `agent/acp` transport surfaced through provider diagnostics rather than a
     second runtime-facing provider catalog

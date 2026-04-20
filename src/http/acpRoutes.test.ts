@@ -89,6 +89,18 @@ function makeApp(
       off?: ReturnType<typeof vi.fn>;
       streamMessage(turnInput: string | TurnInput): AsyncGenerator<StreamEvent>;
     };
+    peerRouting?: {
+      decide: ReturnType<typeof vi.fn>;
+    };
+    peerExecutionClient?: {
+      buildRequest: ReturnType<typeof vi.fn>;
+      streamExecution(
+        peer: unknown,
+        request: unknown,
+        trace: unknown,
+        signal: AbortSignal,
+      ): AsyncGenerator<StreamEvent>;
+    };
   } = {},
 ) {
   const rootDir = mkdtempSync(join(tmpdir(), 'cats-runtime-acp-routes-'));
@@ -120,6 +132,8 @@ function makeApp(
     kiroNative: {} as KiroNativeSessionService,
     auggieSessions: {} as AuggieSessionService,
     opencodeNative: {} as OpencodeNativeSessionService,
+    peerRouting: options.peerRouting as never,
+    peerExecutionClient: options.peerExecutionClient as never,
   });
 
   return { app, rootDir, registry };
@@ -193,6 +207,12 @@ describe('runtime ACP facade routes', () => {
             promptStreaming: {
               accept: 'application/x-ndjson',
               notifications: ['session/update'],
+            },
+            routingSupport: {
+              requestedVia: '_meta.catsRuntime.routing',
+              supportedModes: ['local', 'peer'],
+              shareWorkspaceFlag: 'shareWorkspace',
+              requiresRuntimeSessionOrigin: true,
             },
             supportedMethods: [
               'initialize',
@@ -319,6 +339,7 @@ describe('runtime ACP facade routes', () => {
               providerBackend: 'cli',
               providerInstanceId: 'default',
               status: 'ready',
+              origin: 'runtime',
               workspaceMode: 'shared',
             },
           },
@@ -382,6 +403,7 @@ describe('runtime ACP facade routes', () => {
                   providerBackend: 'agent',
                   providerInstanceId: 'acp-local',
                   status: 'ready',
+                  origin: 'runtime',
                   workspaceMode: 'shared',
                 },
               },
@@ -635,6 +657,238 @@ describe('runtime ACP facade routes', () => {
         },
       },
     ]);
+  });
+
+  it('passes ACP prompt routing hints through to peer execution and surfaces the effective route in the result meta', async () => {
+    const peerRouting = {
+      decide: vi.fn(() => ({
+        mode: 'peer',
+        reason: "Routing to peer 'lab-peer' by explicit selection.",
+        localFallback: false,
+        strategy: 'explicit',
+        target: {
+          provider: 'claude',
+          backend: 'cli',
+          instance: 'default',
+          model: undefined,
+        },
+        peer: {
+          identity: {
+            peerId: 'lab-peer',
+          },
+        },
+      })),
+    };
+    const peerExecutionClient = {
+      buildRequest: vi.fn(() => ({
+        request: { route: 'peer' },
+        trace: {
+          requestId: 'peer-trace-1',
+          callerPeerId: 'local-peer',
+          callerSessionId: 'runtime-session-peer',
+          callerRunId: 'run-peer-1',
+          peerId: 'lab-peer',
+          routedAt: '2026-04-20T03:00:00.000Z',
+          transport: 'ndjson',
+          strategy: 'explicit',
+          workspaceMode: 'read_only',
+        },
+      })),
+      async *streamExecution(
+        peer: unknown,
+        request: unknown,
+        trace: unknown,
+        signal: AbortSignal,
+      ): AsyncGenerator<StreamEvent> {
+        void signal;
+        expect((peer as { identity: { peerId: string } }).identity.peerId).toBe('lab-peer');
+        expect(request).toEqual({ route: 'peer' });
+        expect(trace).toEqual(expect.objectContaining({
+          peerId: 'lab-peer',
+          strategy: 'explicit',
+          workspaceMode: 'read_only',
+        }));
+        yield {
+          type: 'text',
+          text: 'Peer handled the turn.',
+          metadata: {
+            peerRouting: {
+              mode: 'peer',
+              peerId: 'lab-peer',
+              strategy: 'explicit',
+              transport: 'ndjson',
+              workspaceMode: 'read_only',
+              routedAt: '2026-04-20T03:00:00.000Z',
+            },
+          },
+        };
+        yield {
+          type: 'result',
+          text: 'Peer turn complete.',
+          metadata: {
+            peerRouting: {
+              mode: 'peer',
+              peerId: 'lab-peer',
+              strategy: 'explicit',
+              transport: 'ndjson',
+              workspaceMode: 'read_only',
+              routedAt: '2026-04-20T03:00:00.000Z',
+            },
+          },
+        };
+      },
+    };
+    const { app, rootDir, registry } = makeApp({
+      peerRouting,
+      peerExecutionClient,
+    });
+    cleanupRoots.push(rootDir);
+
+    const cwd = join(rootDir, 'workspace-peer');
+    mkdirSync(cwd, { recursive: true });
+    const session = registry.create({
+      id: 'runtime-session-peer',
+      providerName: 'claude',
+      cwd,
+    });
+    registry.updateStatus(session.id, 'ready');
+
+    const response = await app.request('/acp', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/x-ndjson',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'prompt-peer',
+        method: 'session/prompt',
+        params: {
+          sessionId: session.id,
+          prompt: [{
+            type: 'text',
+            text: 'Route this through a peer.',
+          }],
+          _meta: {
+            catsRuntime: {
+              routing: {
+                mode: 'peer',
+                peerId: 'lab-peer',
+                shareWorkspace: true,
+              },
+            },
+          },
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = parseNdjsonBody(await response.text());
+    expect(body.at(-1)).toEqual({
+      jsonrpc: '2.0',
+      id: 'prompt-peer',
+      result: {
+        stopReason: 'end_turn',
+        _meta: {
+          catsRuntime: {
+            source: 'runtime_http_bridge',
+            transport: 'http',
+            turnStream: 'application/x-ndjson',
+            routing: {
+              requested: {
+                mode: 'peer',
+                peerId: 'lab-peer',
+                strategy: 'explicit',
+                shareWorkspace: true,
+              },
+              effective: {
+                mode: 'peer',
+                peerId: 'lab-peer',
+                strategy: 'explicit',
+                transport: 'ndjson',
+                workspaceMode: 'read_only',
+                routedAt: '2026-04-20T03:00:00.000Z',
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(peerRouting.decide).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: session.id,
+        origin: 'runtime',
+      }),
+      {
+        mode: 'peer',
+        peerId: 'lab-peer',
+        strategy: 'explicit',
+        shareWorkspace: true,
+      },
+    );
+    expect(peerExecutionClient.buildRequest).toHaveBeenCalledWith(expect.objectContaining({
+      session: expect.objectContaining({
+        id: session.id,
+      }),
+      routing: {
+        mode: 'peer',
+        peerId: 'lab-peer',
+        strategy: 'explicit',
+        shareWorkspace: true,
+      },
+    }));
+  });
+
+  it('rejects invalid ACP prompt routing metadata', async () => {
+    const { app, rootDir, registry } = makeApp();
+    cleanupRoots.push(rootDir);
+
+    const cwd = join(rootDir, 'workspace-invalid-routing');
+    mkdirSync(cwd, { recursive: true });
+    const session = registry.create({
+      id: 'runtime-session-invalid-routing',
+      providerName: 'claude',
+      cwd,
+    });
+    registry.updateStatus(session.id, 'ready');
+
+    const response = await app.request('/acp', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/x-ndjson',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'prompt-invalid-routing',
+        method: 'session/prompt',
+        params: {
+          sessionId: session.id,
+          prompt: [{
+            type: 'text',
+            text: 'hello',
+          }],
+          _meta: {
+            catsRuntime: {
+              routing: 'peer',
+            },
+          },
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 'prompt-invalid-routing',
+      error: {
+        code: -32602,
+        message: 'routing must be an object when provided.',
+        data: {
+          reason: 'invalid_cats_runtime_routing',
+        },
+      },
+    });
   });
 
   it('surfaces bootstrap mode truthfully before ACP session methods are enabled', async () => {

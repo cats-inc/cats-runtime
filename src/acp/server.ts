@@ -5,6 +5,7 @@ import {
   RUNTIME_SERVICE_NAME,
   RUNTIME_VERSION,
 } from '../startup.js';
+import { parsePeerMessageRoutingInput } from '../core/peers/PeerRoutingService.js';
 import { requestRuntimeSessionRoute } from './runtimeHttpBridge.js';
 import type {
   AcpJsonRpcError,
@@ -39,6 +40,22 @@ interface RuntimeAcpUsageSnapshot {
   size: number;
   costAmount?: number;
   costCurrency?: string;
+}
+
+interface CatsRuntimeRoutingRequest {
+  mode: 'local' | 'peer';
+  peerId?: string;
+  strategy?: string;
+  shareWorkspace: boolean;
+}
+
+interface CatsRuntimeRoutingSummary {
+  mode: 'local' | 'peer';
+  peerId?: string;
+  strategy?: string;
+  transport?: string;
+  workspaceMode?: string;
+  routedAt?: string;
 }
 
 class AcpFacadeError extends Error {
@@ -229,6 +246,12 @@ function buildInitializeResult(
               },
             }
           : {}),
+        routingSupport: {
+          requestedVia: '_meta.catsRuntime.routing',
+          supportedModes: ['local', 'peer'],
+          shareWorkspaceFlag: 'shareWorkspace',
+          requiresRuntimeSessionOrigin: true,
+        },
         supportedMethods,
       },
     },
@@ -260,10 +283,42 @@ function buildSessionInfo(session: SessionInfo) {
         providerBackend: session.providerBackend || 'cli',
         providerInstanceId: session.providerInstanceId || 'default',
         status: session.status,
+        origin: session.origin,
         workspaceMode: session.workspaceMode,
       },
     },
   };
+}
+
+function parseCatsRuntimeRouting(
+  catsRuntime: Record<string, unknown> | undefined,
+): CatsRuntimeRoutingRequest | undefined {
+  if (!catsRuntime || !('routing' in catsRuntime)) {
+    return undefined;
+  }
+
+  try {
+    const parsed = parsePeerMessageRoutingInput(catsRuntime.routing);
+    if (!parsed) {
+      return undefined;
+    }
+    return {
+      mode: parsed.mode,
+      ...(parsed.peerId ? { peerId: parsed.peerId } : {}),
+      ...(parsed.strategy ? { strategy: parsed.strategy } : {}),
+      shareWorkspace: parsed.shareWorkspace,
+    };
+  } catch (error) {
+    throw new AcpFacadeError(
+      -32602,
+      error instanceof Error
+        ? error.message
+        : 'session/prompt _meta.catsRuntime.routing is invalid.',
+      {
+        reason: 'invalid_cats_runtime_routing',
+      },
+    );
+  }
 }
 
 function handleListSessions(ctx: AppContext, params: unknown) {
@@ -876,6 +931,40 @@ function resolveProjectedToolId(
   return state.lastToolId ?? undefined;
 }
 
+function resolveRoutingFromStreamEvent(
+  streamEvent: StreamEvent,
+): CatsRuntimeRoutingSummary | undefined {
+  const metadata = parseRecord(streamEvent.metadata);
+  const peerRouting = parseRecord(metadata?.peerRouting);
+  if (readString(peerRouting?.mode) === 'peer') {
+    return {
+      mode: 'peer',
+      ...(readString(peerRouting?.peerId) ? { peerId: readString(peerRouting?.peerId) } : {}),
+      ...(readString(peerRouting?.strategy) ? { strategy: readString(peerRouting?.strategy) } : {}),
+      ...(readString(peerRouting?.transport) ? { transport: readString(peerRouting?.transport) } : {}),
+      ...(readString(peerRouting?.workspaceMode)
+        ? { workspaceMode: readString(peerRouting?.workspaceMode) }
+        : {}),
+      ...(readString(peerRouting?.routedAt) ? { routedAt: readString(peerRouting?.routedAt) } : {}),
+    };
+  }
+
+  const peerRoutingFailure = parseRecord(metadata?.peerRoutingFailure);
+  if (!peerRoutingFailure) {
+    return undefined;
+  }
+
+  const peerId = readString(peerRoutingFailure.peerId);
+  if (!peerId) {
+    return undefined;
+  }
+
+  return {
+    mode: 'peer',
+    peerId,
+  };
+}
+
 function buildToolCallAnnouncement(
   toolId: string | undefined,
   toolName: string | undefined,
@@ -1082,6 +1171,8 @@ async function handlePromptSession(
     throw new AcpFacadeError(-32602, 'session/prompt requires params.sessionId');
   }
 
+  const catsRuntime = readCatsRuntimeMeta(request);
+  const requestedRouting = parseCatsRuntimeRouting(catsRuntime);
   const message = flattenPromptContent(request);
   if (!message) {
     throw new AcpFacadeError(-32602, 'session/prompt requires at least one non-empty text-equivalent content block');
@@ -1094,6 +1185,7 @@ async function handlePromptSession(
     },
     body: {
       message,
+      ...(requestedRouting ? { routing: requestedRouting } : {}),
     },
   });
 
@@ -1117,6 +1209,9 @@ async function handlePromptSession(
 
   const projectionState = createPromptProjectionState();
   let stopReason: 'end_turn' | 'cancelled' | 'refusal' = 'end_turn';
+  let effectiveRouting: CatsRuntimeRoutingSummary | undefined = requestedRouting?.mode === 'local'
+    ? { mode: 'local' as const }
+    : undefined;
 
   for await (const ndjsonEvent of streamNdjsonMessages(response.body)) {
     const projected = mapRuntimeEventToAcpUpdates(ndjsonEvent, projectionState);
@@ -1132,6 +1227,7 @@ async function handlePromptSession(
     }
 
     const streamEvent = ndjsonEvent as StreamEvent;
+    effectiveRouting = resolveRoutingFromStreamEvent(streamEvent) || effectiveRouting;
     if (streamEvent.type === 'error') {
       stopReason = looksLikeCancelledStop(streamEvent.text) ? 'cancelled' : 'refusal';
     }
@@ -1144,6 +1240,16 @@ async function handlePromptSession(
         source: 'runtime_http_bridge',
         transport: resolveTransport(options),
         turnStream: 'application/x-ndjson',
+        ...(
+          requestedRouting || effectiveRouting
+            ? {
+                routing: {
+                  ...(requestedRouting ? { requested: requestedRouting } : {}),
+                  effective: effectiveRouting || { mode: 'local' as const },
+                },
+              }
+            : {}
+        ),
       },
     },
   };

@@ -1740,6 +1740,10 @@ follow-through on contract hardening, launch-truth hardening across the full
 - the same ACP diagnostics summary now also advertises the stdio proxy
   `--inspect-proxy` capability directly, so hosts can discover ACP preflight
   support without scraping CLI help text
+- runtime ACP prompt turns can now request peer-routing hints through
+  `_meta.catsRuntime.routing`, and the terminal ACP result now reflects both
+  the requested route and the observed effective route when execution crosses
+  into the separate runtime-to-peer layer
 - ADR 031, SPEC 025, and PLAN 032 define the provider-side ACP path, the
   runtime-owned ACP facade path, and the ACP + A2A layering model
 
@@ -1770,6 +1774,10 @@ follow-through on contract hardening, launch-truth hardening across the full
 - deepen Phase 5 follow-through so diagnostics and architecture docs stay
   explicit about which flows are client-to-runtime, runtime-to-provider, and
   runtime-to-peer
+- keep the ACP-owned peer-routing hint contract truthful and bounded:
+  `_meta.catsRuntime.routing` may ask the runtime to route a prompt turn
+  onward, but peer execution itself must remain on the separate A2A/runtime-
+  to-runtime layer rather than becoming a second ACP carrier
 - narrow the ACP launch/connect config shape before declaring ACP provider
   config stable across multiple targets:
   - prefer a dedicated launch sub-object or discriminated transport config

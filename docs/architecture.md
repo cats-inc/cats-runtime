@@ -123,7 +123,10 @@ collapsed into one transport story:
    ACP-created sessions still map onto the runtime's own session registry and
    `/sessions/:id/messages` execution path, so any later peer-routing decision
    remains a runtime-to-peer / A2A concern below the ACP layer rather than a
-   second client-facing transport.
+   second client-facing transport. ACP clients can now request that downstream
+   runtime-to-peer decision explicitly through `_meta.catsRuntime.routing` on
+   `session/prompt`, but the actual peer execution still stays on the separate
+   A2A/runtime-to-runtime layer.
 2. **Runtime-to-provider**
    `cats-runtime` consumes provider runtimes through `backends/cli`,
    `backends/api`, `backends/local`, and `backends/agent`, including the new

@@ -409,6 +409,13 @@ describe('provider diagnostics HTTP contract', () => {
               inspectProxyFlag: string;
               promptTurns: boolean;
             };
+            routingSupport: {
+              requestedVia: string;
+              supportedModes: string[];
+              shareWorkspaceFlag: string;
+              requiresRuntimeSessionOrigin: boolean;
+              summary: string;
+            };
           };
           runtimeToProvider: {
             transport: string;
@@ -453,6 +460,13 @@ describe('provider diagnostics HTTP contract', () => {
         promptTurns: true,
         notifications: ['session/update'],
       },
+      routingSupport: {
+        requestedVia: '_meta.catsRuntime.routing',
+        supportedModes: ['local', 'peer'],
+        shareWorkspaceFlag: 'shareWorkspace',
+        requiresRuntimeSessionOrigin: true,
+        summary: expect.stringContaining('runtime-to-peer routing hints'),
+      },
     });
     expect(runtimePayload.runtime.acp.runtimeToProvider.transport).toBe('agent/acp');
     expect(runtimePayload.runtime.acp.runtimeToProvider.diagnosticsPath).toBe('/diagnostics/providers');
@@ -476,6 +490,7 @@ describe('provider diagnostics HTTP contract', () => {
           stdioDefaultMode: string;
           stdioDirectRuntimeFlag: string;
           stdioInspectProxyFlag: string;
+          routingMetaPath: string;
           providerTransport: string;
           peerTransport: string;
           peerDiagnosticsPath: string;
@@ -492,6 +507,7 @@ describe('provider diagnostics HTTP contract', () => {
         stdioDefaultMode: 'proxy',
         stdioDirectRuntimeFlag: '--serve-runtime',
         stdioInspectProxyFlag: '--inspect-proxy',
+        routingMetaPath: '_meta.catsRuntime.routing',
         providerTransport: 'agent/acp',
         peerTransport: 'a2a',
         peerDiagnosticsPath: '/diagnostics/peers',

@@ -188,8 +188,8 @@ Current rationale for the tier split:
 
 - [x] Update architecture and terminology docs so ACP and A2A are shown as
       complementary layers
-- [ ] Confirm how runtime-owned ACP sessions can coexist with A2A peer routing
-- [ ] Keep diagnostics truthful about which flows are:
+- [x] Confirm how runtime-owned ACP sessions can coexist with A2A peer routing
+- [x] Keep diagnostics truthful about which flows are:
       - client-to-runtime over ACP
       - runtime-to-provider over `agent/acp`
       - runtime-to-peer over A2A
@@ -275,3 +275,4 @@ Current rationale for the tier split:
 | 2026-04-20 | Started narrowing the ACP provider config shape without breaking existing YAML: `providers.yaml` can now express ACP stdio launch settings through a dedicated nested `launch:` block (`command`, `args`, `cwd`, `startup_timeout_ms`) while the runtime still normalizes onto the same remote provider instance fields and remains backward-compatible with the older flat keys |
 | 2026-04-20 | Extended the same config-shape narrowing to ACP connection settings: `providers.yaml` can now express ACP endpoint/auth/header fields through a dedicated nested `connect:` block (`url`, `url_env`, `base_url`, `base_url_env`, `auth_token_env`, `api_key_env`, `password_env`, and `headers`) while still normalizing onto the existing remote provider instance fields and remaining backward-compatible with the older flat keys |
 | 2026-04-20 | Tightened provider-side ACP auth truth for stdio targets: ACP inspection now reports env-propagated credentials such as `auth_token`, `api_key`, and `password` under a dedicated `launch_env` auth mechanism when the stdio target is configured to pass those credentials through subprocess launch, instead of incorrectly reporting stdio ACP auth as always empty |
+| 2026-04-20 | Closed the first executable ACP/A2A coexistence gap: runtime ACP prompt turns now accept `_meta.catsRuntime.routing`, forward the parsed routing request into the shared `/sessions/:id/messages` peer-routing seam, return requested/effective routing metadata in the terminal ACP result, and advertise the same routing-support contract through ACP initialize metadata plus runtime diagnostics |
