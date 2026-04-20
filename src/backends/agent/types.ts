@@ -233,7 +233,7 @@ export interface AgentAdapterInspection {
     headerNames: string[];
   };
   auth: {
-    mechanisms: Array<'connect_auth' | 'handshake_header' | 'bearer_header'>;
+    mechanisms: Array<'connect_auth' | 'handshake_header' | 'bearer_header' | 'launch_env'>;
     credentials: AgentAdapterInspectionCredential[];
   };
   continuity: {

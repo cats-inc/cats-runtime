@@ -1756,6 +1756,9 @@ follow-through on contract hardening, launch-truth hardening across the full
   than rollout gates
 - extend truthful diagnostics as more ACP targets expose probe, model
   discovery, tool discovery, auth, or launch capabilities in practice
+- stdio ACP inspection now distinguishes env-propagated credential launch
+  semantics through a dedicated `launch_env` auth mechanism instead of treating
+  all stdio ACP targets as auth-empty
 - add a bidirectional HTTP-capable carrier or equivalent session-update path if
   the runtime wants HTTP ACP prompt turns rather than bounded control-plane-only
   HTTP

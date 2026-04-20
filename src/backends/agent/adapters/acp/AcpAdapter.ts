@@ -103,6 +103,10 @@ function buildInspection(
   const supportsModelDiscovery = Boolean(command && profile);
   const supportsToolCatalog = Boolean(command && profile);
   const transportKind = command ? 'stdio' as const : 'http' as const;
+  const authHeaderConfigured = Boolean(
+    instance.headers && Object.keys(instance.headers).some((key) =>
+      key.toLowerCase() === 'authorization'),
+  );
   const launch = command
     ? {
         kind: 'stdio' as const,
@@ -112,10 +116,24 @@ function buildInspection(
         ...(instance.startupTimeoutMs ? { startupTimeoutMs: instance.startupTimeoutMs } : {}),
       }
     : undefined;
-  const authConfigured = Boolean(
-    (instance.authTokenEnv && env[instance.authTokenEnv])
-    || (instance.headers && Object.keys(instance.headers).some((key) =>
-      key.toLowerCase() === 'authorization')),
+  const launchEnvCredentials = command
+    ? [
+        ...(instance.authTokenEnv
+          ? [{
+              kind: 'auth_token' as const,
+              configured: Boolean(env[instance.authTokenEnv]),
+            }]
+          : []),
+        ...(instance.passwordEnv
+          ? [{
+              kind: 'password' as const,
+              configured: Boolean(env[instance.passwordEnv]),
+            }]
+          : []),
+      ]
+    : [];
+  const httpAuthConfigured = Boolean(
+    (instance.authTokenEnv && env[instance.authTokenEnv]) || authHeaderConfigured,
   );
   const hostBridgeSummary = hostBridgeConfigured
     ? 'A runtime ACP host-capability bridge is configured; the current execution slice mediates ACP permission, filesystem, and terminal requests through runtime policy, while client MCP server exposure remains disabled unless the host bridge explicitly supplies MCP declarations.'
@@ -155,21 +173,31 @@ function buildInspection(
         .sort(),
     },
     auth: {
-      mechanisms: authConfigured && !command ? ['bearer_header'] : [],
-      credentials: [
-        ...(endpoint
-          ? [{
-              kind: 'base_url' as const,
-              configured: true,
-            }]
-          : []),
-        ...(instance.authTokenEnv || authConfigured
-          ? [{
-              kind: 'auth_token' as const,
-              configured: authConfigured,
-            }]
-          : []),
-      ],
+      mechanisms: command
+        ? (launchEnvCredentials.length > 0 ? ['launch_env'] : [])
+        : (httpAuthConfigured ? ['bearer_header'] : []),
+      credentials: command
+        ? launchEnvCredentials
+        : [
+            ...(endpoint
+              ? [{
+                  kind: 'base_url' as const,
+                  configured: true,
+                }]
+              : []),
+            ...(instance.authTokenEnv || httpAuthConfigured
+              ? [{
+                  kind: 'auth_token' as const,
+                  configured: httpAuthConfigured,
+                }]
+              : []),
+            ...(instance.passwordEnv
+              ? [{
+                  kind: 'password' as const,
+                  configured: Boolean(env[instance.passwordEnv]),
+                }]
+              : []),
+          ],
     },
     continuity: {
       providerManagedSessions: true,

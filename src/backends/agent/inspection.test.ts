@@ -180,6 +180,35 @@ describe('inspectAgentTarget', () => {
     });
   });
 
+  it('describes ACP stdio auth propagation through launch env credentials', () => {
+    const inspection = inspectAgentTarget({
+      id: 'acp-local-auth',
+      providerName: 'codex',
+      backend: 'agent',
+      transport: 'acp_stdio',
+      command: 'codex-acp',
+      args: ['serve'],
+      cwd: '/tmp/acp',
+      startupTimeoutMs: 15000,
+      authTokenEnv: 'ACP_TOKEN',
+      passwordEnv: 'ACP_PASSWORD',
+      model: 'gpt-5.4',
+    }, {
+      env: {
+        ACP_TOKEN: 'secret-token',
+        ACP_PASSWORD: 'secret-password',
+      },
+    });
+
+    expect(inspection.auth).toEqual({
+      mechanisms: ['launch_env'],
+      credentials: [
+        { kind: 'auth_token', configured: true },
+        { kind: 'password', configured: true },
+      ],
+    });
+  });
+
   it('describes ACP stdio transport semantics for claude profile', () => {
     const inspection = inspectAgentTarget({
       id: 'acp-claude-local',

@@ -451,6 +451,29 @@ describe('AcpAdapter', () => {
     });
   });
 
+  it('describes stdio ACP targets with launch-env auth when env credentials are configured', () => {
+    const adapter = new AcpAdapter({
+      env: {
+        ACP_TOKEN: 'secret-token',
+        ACP_PASSWORD: 'secret-password',
+      },
+    });
+
+    const inspection = adapter.inspect({
+      ...createStdioInstance(),
+      authTokenEnv: 'ACP_TOKEN',
+      passwordEnv: 'ACP_PASSWORD',
+    });
+
+    expect(inspection.auth).toEqual({
+      mechanisms: ['launch_env'],
+      credentials: [
+        { kind: 'auth_token', configured: true },
+        { kind: 'password', configured: true },
+      ],
+    });
+  });
+
   it('describes HTTP ACP targets with claude profile when provider name is claude', () => {
     const adapter = new AcpAdapter({
       env: { CLAUDE_ACP_TOKEN: 'secret-token' },
