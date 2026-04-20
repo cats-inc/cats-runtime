@@ -1675,6 +1675,7 @@ function parseRemoteBackends(
       );
       const providerClient = asOptionalObject(providerDoc.client);
       const providerConnect = asOptionalObject(providerDoc.connect);
+      const providerRequest = asOptionalObject(providerDoc.request);
       const providerConnectHeaders = parseStringMap(
         asOptionalObject(providerConnect?.headers),
         `backends.${backend}.providers.${providerName}.connect.headers`,
@@ -1692,6 +1693,7 @@ function parseRemoteBackends(
         const instanceClient = asOptionalObject(instanceDoc.client);
         const instanceLaunch = asOptionalObject(instanceDoc.launch);
         const instanceConnect = asOptionalObject(instanceDoc.connect);
+        const instanceRequest = asOptionalObject(instanceDoc.request);
 
         const instanceHeaders = parseStringMap(
           asOptionalObject(instanceDoc.headers),
@@ -1738,8 +1740,12 @@ function parseRemoteBackends(
             || readString(providerDoc.urlEnv),
           model: readString(instanceDoc.model)
             || readString(providerDoc.model),
-          systemPrompt: readString(instanceDoc.system_prompt)
+          systemPrompt: readString(instanceRequest?.system_prompt)
+            || readString(instanceRequest?.systemPrompt)
+            || readString(instanceDoc.system_prompt)
             || readString(instanceDoc.systemPrompt)
+            || readString(providerRequest?.system_prompt)
+            || readString(providerRequest?.systemPrompt)
             || readString(providerDoc.system_prompt)
             || readString(providerDoc.systemPrompt),
           apiKeyEnv: readString(instanceConnect?.api_key_env)
@@ -1841,49 +1847,77 @@ function parseRemoteBackends(
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.scopes`,
           ),
           payloadTemplate: parseOptionalObjectValue(
-            instanceDoc.payload_template
+            instanceRequest?.payload_template
+              ?? instanceRequest?.payloadTemplate
+              ?? instanceDoc.payload_template
               ?? instanceDoc.payloadTemplate
+              ?? providerRequest?.payload_template
+              ?? providerRequest?.payloadTemplate
               ?? providerDoc.payload_template
               ?? providerDoc.payloadTemplate,
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.payload_template`,
           ),
           waitTimeoutMs: parseOptionalIntValue(
-            instanceDoc.wait_timeout_ms
+            instanceRequest?.wait_timeout_ms
+              ?? instanceRequest?.waitTimeoutMs
+              ?? instanceDoc.wait_timeout_ms
               ?? instanceDoc.waitTimeoutMs
+              ?? providerRequest?.wait_timeout_ms
+              ?? providerRequest?.waitTimeoutMs
               ?? providerDoc.wait_timeout_ms
               ?? providerDoc.waitTimeoutMs,
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.wait_timeout_ms`,
           ),
           maxOutputTokens: parseOptionalIntValue(
-            instanceDoc.max_output_tokens
+            instanceRequest?.max_output_tokens
+              ?? instanceRequest?.maxOutputTokens
+              ?? instanceDoc.max_output_tokens
               ?? instanceDoc.maxOutputTokens
+              ?? providerRequest?.max_output_tokens
+              ?? providerRequest?.maxOutputTokens
               ?? providerDoc.max_output_tokens
               ?? providerDoc.maxOutputTokens,
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.max_output_tokens`,
           ),
           timeoutMs: parseOptionalIntValue(
-            instanceDoc.timeout_ms
+            instanceRequest?.timeout_ms
+              ?? instanceRequest?.timeoutMs
+              ?? instanceDoc.timeout_ms
               ?? instanceDoc.timeoutMs
+              ?? providerRequest?.timeout_ms
+              ?? providerRequest?.timeoutMs
               ?? providerDoc.timeout_ms
               ?? providerDoc.timeoutMs,
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.timeout_ms`,
           ),
           maxRetries: parseOptionalIntValue(
-            instanceDoc.max_retries
+            instanceRequest?.max_retries
+              ?? instanceRequest?.maxRetries
+              ?? instanceDoc.max_retries
               ?? instanceDoc.maxRetries
+              ?? providerRequest?.max_retries
+              ?? providerRequest?.maxRetries
               ?? providerDoc.max_retries
               ?? providerDoc.maxRetries,
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.max_retries`,
           ),
           maxToolSteps: parseOptionalIntValue(
-            instanceDoc.max_tool_steps
+            instanceRequest?.max_tool_steps
+              ?? instanceRequest?.maxToolSteps
+              ?? instanceDoc.max_tool_steps
               ?? instanceDoc.maxToolSteps
+              ?? providerRequest?.max_tool_steps
+              ?? providerRequest?.maxToolSteps
               ?? providerDoc.max_tool_steps
               ?? providerDoc.maxToolSteps,
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.max_tool_steps`,
           ),
-          toolProfile: readString(instanceDoc.tool_profile)
+          toolProfile: readString(instanceRequest?.tool_profile)
+            || readString(instanceRequest?.toolProfile)
+            || readString(instanceDoc.tool_profile)
             || readString(instanceDoc.toolProfile)
+            || readString(providerRequest?.tool_profile)
+            || readString(providerRequest?.toolProfile)
             || readString(providerDoc.tool_profile)
             || readString(providerDoc.toolProfile),
           startupTimeoutMs: parseOptionalIntValue(

@@ -1071,15 +1071,16 @@ backends:
         default_instance: sonnet
         transport: anthropic
         api_key_env: ANTHROPIC_API_KEY
-        system_prompt: You are the default Claude worker.
         headers:
           x-provider-family: claude
           x-shared: base
-        max_output_tokens: 8192
-        timeout_ms: 30000
-        max_retries: 2
-        max_tool_steps: 24
-        tool_profile: standard
+        request:
+          system_prompt: You are the default Claude worker.
+          max_output_tokens: 8192
+          timeout_ms: 30000
+          max_retries: 2
+          max_tool_steps: 24
+          tool_profile: standard
         instances:
           sonnet:
             model: claude-sonnet-4-20250514
@@ -1088,7 +1089,8 @@ backends:
             headers:
               x-shared: opus
               x-instance: opus
-            max_output_tokens: 16384
+            request:
+              max_output_tokens: 16384
 `.trimStart());
 
     try {
@@ -1244,11 +1246,12 @@ backends:
         role: operator
         scopes:
           - operator.admin
-        payload_template:
-          mode: agent
-        wait_timeout_ms: 45000
-        timeout_ms: 15000
-        max_retries: 2
+        request:
+          payload_template:
+            mode: agent
+          wait_timeout_ms: 45000
+          timeout_ms: 15000
+          max_retries: 2
         instances:
           gateway:
             model: openclaw-coder

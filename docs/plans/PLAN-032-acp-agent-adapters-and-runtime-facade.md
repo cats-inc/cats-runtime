@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Phase 4 Runtime HTTP/Stdio Facades Landed; Phase 5 Follow-Through Pending) |
+| **Status** | In Progress (Phase 4 Runtime HTTP/Stdio Facades Landed; Phase 5 Layering Baseline Landed; config/diagnostics follow-through continues) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -276,3 +276,4 @@ Current rationale for the tier split:
 | 2026-04-20 | Extended the same config-shape narrowing to ACP connection settings: `providers.yaml` can now express ACP endpoint/auth/header fields through a dedicated nested `connect:` block (`url`, `url_env`, `base_url`, `base_url_env`, `auth_token_env`, `api_key_env`, `password_env`, and `headers`) while still normalizing onto the existing remote provider instance fields and remaining backward-compatible with the older flat keys |
 | 2026-04-20 | Tightened provider-side ACP auth truth for stdio targets: ACP inspection now reports env-propagated credentials such as `auth_token`, `api_key`, and `password` under a dedicated `launch_env` auth mechanism when the stdio target is configured to pass those credentials through subprocess launch, instead of incorrectly reporting stdio ACP auth as always empty |
 | 2026-04-20 | Closed the first executable ACP/A2A coexistence gap: runtime ACP prompt turns now accept `_meta.catsRuntime.routing`, forward the parsed routing request into the shared `/sessions/:id/messages` peer-routing seam, return requested/effective routing metadata in the terminal ACP result, and advertise the same routing-support contract through ACP initialize metadata plus runtime diagnostics |
+| 2026-04-20 | Continued narrowing the shared remote-provider config shape used by ACP-capable targets: remote backends can now group `system_prompt`, `payload_template`, timeout/retry/token/tool limits, and `tool_profile` under a nested `request:` block while remaining backward-compatible with the older flat keys |

@@ -569,7 +569,11 @@ backends:
       claude:
         default_instance: sonnet
         transport: anthropic
-        api_key_env: ANTHROPIC_API_KEY
+        connect:
+          api_key_env: ANTHROPIC_API_KEY
+        request:
+          system_prompt: You are the default Claude worker.
+          max_output_tokens: 8192
         instances:
           sonnet:
             model: claude-sonnet-4-20250514
@@ -586,13 +590,18 @@ backends:
       openclaw:
         default_instance: gateway
         transport: openclaw_gateway
-        url_env: OPENCLAW_URL
-        auth_token_env: OPENCLAW_TOKEN
+        connect:
+          url_env: OPENCLAW_URL
+          auth_token_env: OPENCLAW_TOKEN
         client:
           id: cats-runtime
           role: operator
           scopes:
             - operator.admin
+        request:
+          payload_template:
+            mode: agent
+          wait_timeout_ms: 45000
         instances:
           gateway:
             # Use a model id exposed by your OpenClaw deployment.
@@ -612,10 +621,13 @@ such as several WSL distros on one Windows host or dedicated Docker-backed
 instances for providers that run inside containers.
 
 For remote API providers, shared settings belong at the provider level. Put
-`transport`, `api_key_env`, shared headers, and common limits once under
-`backends.api.providers.<name>`, then let each instance override only what
-actually differs, usually `model`. That avoids copying the same API key across
-`claude.sonnet`, `gemini.flash`, and similar instance variants.
+`transport` once under `backends.api.providers.<name>`, keep auth and endpoint
+metadata grouped under the nested `connect:` block, and keep shared
+request-shaping defaults such as `system_prompt`, `payload_template`, common
+limits, or `tool_profile` under the nested `request:` block. Then let each
+instance override only what actually differs, usually `model`. That avoids
+copying the same API key across `claude.sonnet`, `gemini.flash`, and similar
+instance variants.
 
 If a remote API target also needs organization- or project-scoped env names,
 prefer the nested `connect:` block for those connection metadata fields such as
@@ -627,12 +639,12 @@ Keep the actual secret values in `.env` or your host environment. The
 `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`.
 
 Agent backends follow the same pattern. Put shared gateway/auth settings such as
-`transport`, `url_env`, `auth_token_env`, and shared client identity metadata
-once at the provider level. The recommended shape is a nested `client:` block
-for agent identity fields such as `id`, `mode`, `version`, `role`, and
-`scopes`, while the older flat `client_id` form remains backward-compatible.
-Keep each instance block focused on the fields that actually vary, usually
-`model`.
+`transport` at the provider level, keep connection/auth metadata together under
+`connect:`, use a nested `client:` block for agent identity fields such as
+`id`, `mode`, `version`, `role`, and `scopes`, and keep request defaults such
+as `payload_template`, timeouts, token/tool limits, and `tool_profile` under
+`request:`. The older flat forms remain backward-compatible. Keep each instance
+block focused on the fields that actually vary, usually `model`.
 
 For ACP-backed agent targets, prefer the dedicated nested blocks that match the
 runtime's current parser contract:
