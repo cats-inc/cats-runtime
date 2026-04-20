@@ -2354,6 +2354,30 @@ describe('provider diagnostics HTTP contract', () => {
           }),
         ],
       }));
+
+      const configResponse = await app.request('/providers/config');
+      expect(configResponse.status).toBe(200);
+      await expect(configResponse.json()).resolves.toEqual(expect.objectContaining({
+        providers: expect.objectContaining({
+          codex: expect.objectContaining({
+            instances: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'default',
+                agentRuntime: expect.objectContaining({
+                  auth: {
+                    mechanisms: ['launch_env'],
+                    credentials: [
+                      { kind: 'auth_token', configured: true },
+                      { kind: 'api_key', configured: true },
+                      { kind: 'password', configured: true },
+                    ],
+                  },
+                }),
+              }),
+            ]),
+          }),
+        }),
+      }));
     } finally {
       vi.unstubAllEnvs();
     }
