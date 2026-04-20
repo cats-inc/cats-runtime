@@ -27,8 +27,8 @@ These important documents live in the project root:
 | [testing.md](./testing.md) | Complete | Testing strategy |
 | [deployment.md](./deployment.md) | Complete | Standalone and app-managed local deployment guidance |
 | [release-guide.md](./release-guide.md) | Complete | npm packaging, release, and repo-owned trusted publishing readiness workflow |
-| [security-guidelines.md](./security-guidelines.md) | Template | Security policies |
-| [mcp-config.md](./mcp-config.md) | Template | MCP server configuration |
+| [security-guidelines.md](./security-guidelines.md) | Partial | Runtime-specific secret/auth boundaries are documented, but deeper project-specific hardening guidance still needs follow-through |
+| [mcp-config.md](./mcp-config.md) | Partial | Current MCP facade ownership, transport, auth, and representative tool coverage are documented, but the full tool inventory and host setup patterns still need a later pass |
 | [services.md](./services.md) | Complete | Service registry and port assignments |
 | [SCRIPT-STANDARDS.md](./SCRIPT-STANDARDS.md) | Template | Script standards and naming |
 
@@ -89,7 +89,7 @@ later passes:
 
 - deeper browser-driver persistence, cleanup, and real-driver follow-ons beyond the current manual-driver substrate
 - deeper API/local live-probe and model-discovery follow-ons
-- project-specific security and MCP configuration docs beyond the inherited templates
+- fuller project-specific security hardening and MCP host-configuration coverage beyond the current baseline docs
 - a live A2A server/Agent Card surface; the current A2A files are still pilot-owned examples rather than active endpoints
 - `cats`-side follow-through so the first-wave pilot exists in both flagship repos instead of `cats-runtime` alone
 
@@ -102,4 +102,4 @@ later passes:
 
 ---
 
-*Last updated: 2026-04-15*
+*Last updated: 2026-04-20*
