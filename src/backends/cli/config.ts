@@ -1673,6 +1673,7 @@ function parseRemoteBackends(
         asOptionalObject(providerDoc.headers),
         `backends.${backend}.providers.${providerName}.headers`,
       );
+      const providerLaunch = asOptionalObject(providerDoc.launch);
 
       const parsedInstances: Record<string, RemoteProviderInstanceConfig> = {};
       for (const [instanceId, rawInstance] of Object.entries(instances)) {
@@ -1681,6 +1682,7 @@ function parseRemoteBackends(
           `Invalid backends.${backend}.providers.${providerName}.instances.${instanceId} `
             + `block in '${filePath}'`,
         );
+        const instanceLaunch = asOptionalObject(instanceDoc.launch);
 
         const instanceHeaders = parseStringMap(
           asOptionalObject(instanceDoc.headers),
@@ -1693,13 +1695,20 @@ function parseRemoteBackends(
           backend,
           transport: readString(instanceDoc.transport)
             || readString(providerDoc.transport),
-          command: readString(instanceDoc.command)
+          command: readString(instanceLaunch?.command)
+            || readString(instanceDoc.command)
+            || readString(providerLaunch?.command)
             || readString(providerDoc.command),
           args: parseOptionalStringArray(
-            instanceDoc.args ?? providerDoc.args,
+            instanceLaunch?.args
+              ?? instanceDoc.args
+              ?? providerLaunch?.args
+              ?? providerDoc.args,
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.args`,
           ),
-          cwd: readString(instanceDoc.cwd)
+          cwd: readString(instanceLaunch?.cwd)
+            || readString(instanceDoc.cwd)
+            || readString(providerLaunch?.cwd)
             || readString(providerDoc.cwd),
           url: readString(instanceDoc.url)
             || readString(providerDoc.url),
@@ -1807,8 +1816,12 @@ function parseRemoteBackends(
             || readString(providerDoc.tool_profile)
             || readString(providerDoc.toolProfile),
           startupTimeoutMs: parseOptionalIntValue(
-            instanceDoc.startup_timeout_ms
+            instanceLaunch?.startup_timeout_ms
+              ?? instanceLaunch?.startupTimeoutMs
+              ?? instanceDoc.startup_timeout_ms
               ?? instanceDoc.startupTimeoutMs
+              ?? providerLaunch?.startup_timeout_ms
+              ?? providerLaunch?.startupTimeoutMs
               ?? providerDoc.startup_timeout_ms
               ?? providerDoc.startupTimeoutMs,
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.startup_timeout_ms`,

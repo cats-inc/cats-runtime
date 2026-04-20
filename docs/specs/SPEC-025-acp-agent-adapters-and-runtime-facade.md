@@ -154,7 +154,9 @@ The example below intentionally follows the current `providers.yaml` family /
 `default_instance` / `instances` layout that existing remote backends already
 use today. It is conceptual only in the ACP-specific transport fields; it does
 not propose a second config hierarchy for ACP, and it does not freeze the exact
-ACP launch/connect keys for the first executable slice.
+ACP connect keys for the first executable slice. The runtime may accept a
+dedicated ACP stdio `launch:` sub-object while still normalizing onto the same
+remote provider shape internally.
 
 ```yaml
 routing:
@@ -169,12 +171,15 @@ backends:
     providers:
       codex:
         default_instance: acp-local
-        transport: acp
+        transport: acp_stdio
         instances:
           acp-local:
+            launch:
+              command: codex-acp
+              args: [serve]
+              cwd: /tmp/codex-acp
+              startup_timeout_ms: 15000
             model: gpt-5.4
-            # first executable slice may add launch-specific settings such as
-            # command/args/env when the ACP transport is finalized
 ```
 
 This preserves side-by-side targets such as:
@@ -188,6 +193,8 @@ That means the current config mental model stays intact:
 - `routing.providers.<family>.default_target` still chooses the active target
 - `backends.agent.providers.<family>` still owns remote agent transports
 - ACP only adds another transport family under that existing shape
+- ACP stdio launch settings can live under a dedicated `launch:` block without
+  requiring a second top-level ACP config hierarchy
 
 ### 2. Runtime-owned ACP Facade
 

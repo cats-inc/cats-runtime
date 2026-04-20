@@ -1769,6 +1769,8 @@ follow-through on contract hardening, launch-truth hardening across the full
 - narrow the ACP launch/connect config shape before declaring ACP provider
   config stable across multiple targets:
   - prefer a dedicated launch sub-object or discriminated transport config
+  - first follow-through slice now accepts a nested ACP stdio `launch:` block
+    while preserving backward compatibility with the older flat launch keys
   - avoid leaving ACP-only stdio fields as forever-generic remote provider
     properties
 - make stdio auth semantics explicit if any future ACP target needs credential

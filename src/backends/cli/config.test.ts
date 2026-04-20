@@ -1373,6 +1373,88 @@ backends:
     }
   });
 
+  it('loads ACP-backed agent provider launch settings from a nested launch block', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
+    writeFileSync(configPath, `
+version: 1
+routing:
+  providers:
+    codex:
+      default_target:
+        backend: agent
+        instance: acp-local
+backends:
+  agent:
+    providers:
+      codex:
+        default_instance: acp-local
+        transport: acp_stdio
+        launch:
+          command: codex-acp
+          args:
+            - serve
+          startup_timeout_ms: 15000
+        instances:
+          acp-local:
+            launch:
+              cwd: /tmp/codex-acp
+            model: gpt-5.4
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_DIR: runtimeDir,
+      });
+
+      expect(config.providerDefaultTargets?.codex).toEqual({
+        backend: 'agent',
+        instance: 'acp-local',
+      });
+
+      expect(config.remoteProviderCatalog?.agent.codex['acp-local']).toEqual({
+        id: 'acp-local',
+        providerName: 'codex',
+        backend: 'agent',
+        transport: 'acp_stdio',
+        command: 'codex-acp',
+        args: ['serve'],
+        cwd: '/tmp/codex-acp',
+        url: undefined,
+        urlEnv: undefined,
+        model: 'gpt-5.4',
+        systemPrompt: undefined,
+        apiKeyEnv: undefined,
+        authTokenEnv: undefined,
+        passwordEnv: undefined,
+        baseUrl: undefined,
+        baseUrlEnv: undefined,
+        organizationEnv: undefined,
+        projectEnv: undefined,
+        headers: undefined,
+        clientId: undefined,
+        clientMode: undefined,
+        clientVersion: undefined,
+        role: undefined,
+        scopes: undefined,
+        payloadTemplate: undefined,
+        waitTimeoutMs: undefined,
+        maxOutputTokens: undefined,
+        timeoutMs: undefined,
+        maxRetries: undefined,
+        maxToolSteps: undefined,
+        toolProfile: undefined,
+        startupTimeoutMs: 15000,
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('rejects providers that are configured in multiple backends without routing', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
     const runtimeDir = tempDir;
