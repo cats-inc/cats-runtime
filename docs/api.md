@@ -707,6 +707,9 @@ desktop shells, and the embedded dashboard. It combines:
 - compact setup-report summary metadata so hosts can see bootstrap mode plus the
   latest retained setup diagnostic headline/highlights without separately
   fetching `GET /setup-state`
+- compact background-discovery summary metadata so hosts can see WSL/Docker
+  discovery policy/state and jump to `GET /discovery/status` without a second
+  stitched diagnostics call
 - compact runtime-skill catalog summary metadata so hosts can see whether the
   runtime skill library loaded and how many packages are currently available
 - compact runtime-tooling summary metadata so hosts can see the standard and
@@ -793,6 +796,12 @@ integrate against:
     to-runtime layer surfaced through `GET /diagnostics/peers` plus the
     dedicated `POST /peer/executions` route instead of becoming part of the
     client-facing ACP facade
+- runtime background-discovery metadata under `runtime.discovery`, including:
+  - `statusPath`: the canonical `GET /discovery/status` route
+  - `wsl`: the same bounded WSL policy/state snapshot used by the dedicated
+    discovery route
+  - `docker`: the same bounded Docker discovery policy/state snapshot used by
+    the dedicated discovery route
 - runtime management backlog metadata under `runtime.management.operations`,
   including retained `polling` / `completed` / `failed` counts plus
   `oldestStartedAt` / `latestUpdatedAt`

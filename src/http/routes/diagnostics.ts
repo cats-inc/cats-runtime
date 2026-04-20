@@ -87,6 +87,10 @@ import {
   type RuntimeRouteEnv,
 } from './diagnosticsSupport.js';
 import {
+  createDiscoveryStatusPayload,
+  createDockerDiscoveryStatusSnapshot,
+} from '../../backends/cli/discovery/wslDiscovery.js';
+import {
   getPeerNetworkPostureSnapshot,
   buildPeerNetworkPostureSummary,
 } from './peerNetworkDiagnostics.js';
@@ -333,6 +337,37 @@ function buildRuntimePoolDiagnosticsSummary(ctx: AppContext) {
     providerCount,
     backends,
     summary: `Runtime pool tracks ${pool.active} active session(s) across ${providerCount} provider(s).`,
+  };
+}
+
+function getRuntimeDiscoveryDiagnostics(ctx: AppContext) {
+  const fallback = createDiscoveryStatusPayload(ctx.config);
+
+  return {
+    statusPath: '/discovery/status',
+    wsl: ctx.wslDiscoveryStatus?.snapshot() ?? fallback.wsl,
+    docker: createDockerDiscoveryStatusSnapshot(ctx.config),
+  };
+}
+
+function buildRuntimeDiscoveryHealthSummary(ctx: AppContext) {
+  const discovery = getRuntimeDiscoveryDiagnostics(ctx);
+  const wslConfiguredTargets = Object.values(discovery.wsl.providers)
+    .filter((provider) => provider.runtimeMode === 'wsl')
+    .length;
+  const dockerConfiguredTargets = discovery.docker.configuredTargets;
+
+  return {
+    statusPath: discovery.statusPath,
+    wslPolicy: discovery.wsl.policy,
+    wslState: discovery.wsl.summary.state,
+    wslConfiguredTargets,
+    dockerPolicy: discovery.docker.policy,
+    dockerState: discovery.docker.summary.state,
+    dockerConfiguredTargets,
+    summary: `Background discovery: WSL ${discovery.wsl.summary.state} `
+      + `(${wslConfiguredTargets} configured target(s)); Docker ${discovery.docker.summary.state} `
+      + `(${dockerConfiguredTargets} configured target(s)).`,
   };
 }
 
@@ -1874,6 +1909,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
   const delivery = inspectRuntimeDeliveryContract();
   const pool = getRuntimeSessionManager(ctx).status();
   const acp = buildRuntimeAcpDiagnosticsSummary(Boolean(ctx.peerRouting));
+  const discovery = getRuntimeDiscoveryDiagnostics(ctx);
 
   return c.json({
     service: RUNTIME_SERVICE_NAME,
@@ -1900,6 +1936,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
         adapters: managementAdapters,
         operations: management.summary,
       },
+      discovery,
       delivery,
       acp,
       tools,
@@ -2135,6 +2172,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   const delivery = inspectRuntimeDeliveryContract();
   const poolSummary = buildRuntimePoolDiagnosticsSummary(ctx);
   const acp = buildRuntimeAcpHealthSummary(Boolean(ctx.peerRouting));
+  const discovery = buildRuntimeDiscoveryHealthSummary(ctx);
   const providerSummary = summarizeProviderDiagnostics(catalog, providers, {
     defaultTargetsOnly: true,
     useAttentionSummary: true,
@@ -2204,6 +2242,9 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
     management: {
       adapters: managementAdapters.summary,
       summary: management.summary,
+    },
+    discovery: {
+      summary: discovery,
     },
     delivery: {
       summary: delivery.summary,

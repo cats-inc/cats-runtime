@@ -522,6 +522,147 @@ describe('provider diagnostics HTTP contract', () => {
     });
   });
 
+  it('surfaces background discovery summaries on runtime and health snapshots', async () => {
+    const config = makeConfig({
+      nativeDiscoveryIntervalMs: 5_000,
+      wslDiscoveryPolicy: 'if_running',
+      dockerDiscoveryPolicy: 'manual_only',
+      providerDefaultInstances: {
+        claude: 'default',
+        cursor: 'ubuntu',
+        goose: 'docker',
+      },
+      providerInstances: {
+        auggie: {},
+        claude: makeConfig().providerInstances?.claude || {},
+        codex: {},
+        copilot: {},
+        cursor: {
+          ubuntu: {
+            id: 'ubuntu',
+            providerName: 'cursor',
+            commandConfig: {
+              path: 'cursor-agent',
+              runner: 'auto',
+              runtime: { mode: 'wsl', distro: 'Ubuntu' },
+            },
+          },
+        },
+        gemini: {},
+        goose: {
+          docker: {
+            id: 'docker',
+            providerName: 'goose',
+            commandConfig: {
+              path: 'goose',
+              runner: 'auto',
+              runtime: { mode: 'docker', container: 'goose-dev' },
+            },
+          },
+        },
+        junie: {},
+        kiro: {},
+        kilo: {},
+        opencode: {},
+        pi: {},
+      },
+    });
+    const app = createTestApp(config);
+
+    const runtimeResponse = await app.request('/diagnostics/runtime');
+    expect(runtimeResponse.status).toBe(200);
+    const runtimePayload = await runtimeResponse.json() as {
+      runtime: {
+        discovery: {
+          statusPath: string;
+          wsl: {
+            policy: string;
+            summary: {
+              state: string;
+              message: string;
+            };
+            providers: Record<string, {
+              runtimeMode: string;
+              state: string;
+              distro?: string;
+            }>;
+          };
+          docker: {
+            policy: string;
+            summary: {
+              state: string;
+              message: string;
+            };
+            configuredTargets: number;
+          };
+        };
+      };
+    };
+
+    expect(runtimePayload.runtime.discovery).toMatchObject({
+      statusPath: '/discovery/status',
+      wsl: {
+        backgroundEnabled: true,
+        nativeDiscoveryIntervalMs: 5_000,
+        policy: 'if_running',
+        summary: {
+          state: 'idle',
+          message: 'Background WSL discovery is waiting for the first scan',
+        },
+        providers: {
+          cursor: {
+            provider: 'cursor',
+            instanceId: 'ubuntu',
+            runtimeMode: 'wsl',
+            distro: 'Ubuntu',
+            state: 'idle',
+            message: 'Waiting to scan when the WSL distro is already running',
+          },
+        },
+      },
+      docker: {
+        backgroundEnabled: true,
+        nativeDiscoveryIntervalMs: 5_000,
+        policy: 'manual_only',
+        summary: {
+          state: 'disabled',
+          message: 'Background Docker discovery is disabled by policy',
+        },
+        configuredTargets: 1,
+      },
+    });
+
+    const healthResponse = await app.request('/diagnostics/health');
+    expect(healthResponse.status).toBe(200);
+    const healthPayload = await healthResponse.json() as {
+      discovery: {
+        summary: {
+          statusPath: string;
+          wslPolicy: string;
+          wslState: string;
+          wslConfiguredTargets: number;
+          dockerPolicy: string;
+          dockerState: string;
+          dockerConfiguredTargets: number;
+          summary: string;
+        };
+      };
+    };
+
+    expect(healthPayload.discovery).toEqual({
+      summary: {
+        statusPath: '/discovery/status',
+        wslPolicy: 'if_running',
+        wslState: 'idle',
+        wslConfiguredTargets: 1,
+        dockerPolicy: 'manual_only',
+        dockerState: 'disabled',
+        dockerConfiguredTargets: 1,
+        summary: 'Background discovery: WSL idle (1 configured target(s)); Docker disabled (1 configured target(s)).',
+      },
+    });
+  });
+
   it('skips retained artifact reads on health diagnostics', async () => {
     const evidenceSpy = vi.spyOn(
       CompatibilityEvidenceService.prototype,

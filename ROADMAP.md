@@ -54,6 +54,8 @@ Current implementation status:
 
 - Implemented `CATS_RUNTIME_WSL_DISCOVERY_POLICY`
 - Implemented `GET /discovery/status`
+- Implemented compact WSL/Docker discovery summaries on
+  `GET /diagnostics/runtime` and `GET /diagnostics/health`
 - Implemented dashboard header visibility for WSL discovery state
 - Implemented bounded manual discovery overrides such as `startIfNeeded` on
   provider-native manual discovery routes and matching MCP entry points, so
