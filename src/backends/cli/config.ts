@@ -52,6 +52,7 @@ export interface ProviderRuntimeConfig {
 
 export interface ProviderCommandConfig {
   path: string;
+  args?: string[];
   runner: RunnerMode;
   runnerPath?: string;
   runtime: ProviderRuntimeConfig;
@@ -1394,9 +1395,18 @@ function buildCommandConfigFromFile(
   const runnerPath = readString(raw.runner_path)
     || readString(raw.runnerPath)
     || fallback.runnerPath;
+  const launch = asOptionalObject(raw.launch);
+  const args = parseOptionalStringArray(
+    launch?.args
+      ?? raw.launch_args
+      ?? raw.launchArgs
+      ?? raw.args,
+    `${provider}.instances.${instanceId}.args`,
+  );
 
   return {
     path,
+    ...(args && args.length > 0 ? { args } : {}),
     runner,
     runnerPath,
     runtime,
@@ -1607,6 +1617,7 @@ function cloneInstanceMap(
 function cloneProviderCommandConfig(input: ProviderCommandConfig): ProviderCommandConfig {
   return {
     ...input,
+    args: input.args ? [...input.args] : undefined,
     runtime: { ...input.runtime },
   };
 }

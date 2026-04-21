@@ -799,6 +799,63 @@ providers:
     }
   });
 
+  it('parses provider instance launch args from providers.yaml', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+backends:
+  cli:
+    providers:
+      claude:
+        default_instance: native
+        instances:
+          native-chrome:
+            environment: native
+            command: claude
+            args:
+              - --chrome
+            runner: auto
+            projects_dir: ~/.claude/projects
+          native:
+            environment: native
+            command: claude
+            runner: auto
+            projects_dir: ~/.claude/projects
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_DIR: runtimeDir,
+      });
+
+      const native = resolveProviderInstance(config, 'claude', 'native');
+      expect(native).toMatchObject({
+        id: 'native',
+        commandConfig: {
+          path: 'claude',
+        },
+      });
+      expect(native.commandConfig.args).toBeUndefined();
+      expect(resolveProviderInstance(config, 'claude', 'native-chrome')).toMatchObject({
+        id: 'native-chrome',
+        commandConfig: {
+          path: 'claude',
+          args: ['--chrome'],
+        },
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('rejects Docker environments without a container in providers.yaml', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
     const runtimeDir = tempDir;

@@ -85,7 +85,10 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   }
 
   private spawnProcess(): void {
-    const args = this.provider.buildSpawnArgs(this.spawnOpts);
+    const args = [
+      ...(this.commandConfig.args ?? []),
+      ...this.provider.buildSpawnArgs(this.spawnOpts),
+    ];
 
     // Strip CLAUDECODE env var so nested sessions don't get blocked
     const env = { ...process.env };

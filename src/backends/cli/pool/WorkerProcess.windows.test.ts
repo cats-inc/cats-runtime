@@ -74,4 +74,23 @@ describe('WorkerProcess Windows spawn options', () => {
       windowsHide: true,
     });
   });
+
+  it('prepends command-config launch args to provider spawn args', async () => {
+    spawnMock.mockReturnValue(createMockChildProcess());
+
+    const { WorkerProcess } = await import('./WorkerProcess.js');
+    const worker = new WorkerProcess(
+      createProvider(),
+      { cwd: process.cwd() },
+      {
+        ...createCommandConfig(),
+        args: ['--chrome'],
+      },
+    );
+
+    worker.start();
+
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    expect(spawnMock.mock.calls[0]?.[1]).toEqual(['--chrome', 'exec']);
+  });
 });

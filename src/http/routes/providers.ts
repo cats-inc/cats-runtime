@@ -103,6 +103,7 @@ providerRoutes.get('/providers/config', async (c) => {
           target: `${instance.backend}/${instance.instanceId}`,
           backend: instance.backend,
           command: instance.cliInstance?.commandConfig.path,
+          args: instance.cliInstance?.commandConfig.args,
           runner: instance.cliInstance?.commandConfig.runner,
           runtime: instance.cliInstance?.commandConfig.runtime,
           transport: instance.remoteInstance?.transport,
