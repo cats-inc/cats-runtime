@@ -1402,7 +1402,7 @@ function buildCommandConfigFromFile(
     launch?.args,
     `${provider}.instances.${instanceId}.launch.args`,
   );
-  const singleton = parseOptionalNonEmptyStringValue(
+  const singleton = parseOptionalSingletonResource(
     launch?.singleton,
     `${provider}.instances.${instanceId}.launch.singleton`,
   );
@@ -2194,7 +2194,7 @@ function parseOptionalLaunchArgs(
   });
 }
 
-function parseOptionalNonEmptyStringValue(
+function parseOptionalSingletonResource(
   value: unknown,
   label: string,
 ): string | undefined {
@@ -2202,11 +2202,21 @@ function parseOptionalNonEmptyStringValue(
     return undefined;
   }
 
-  if (typeof value !== 'string' || value.trim().length === 0) {
-    throw new Error(`${label} must be a non-empty string`);
+  if (typeof value !== 'string') {
+    throw new Error(
+      `${label} must be a string of the form '<namespace>:<resource>'`,
+    );
   }
 
-  return value.trim();
+  const trimmed = value.trim();
+  if (!/^[^\s:]+:[^\s:]+$/.test(trimmed)) {
+    throw new Error(
+      `${label} must be '<namespace>:<resource>' with no whitespace and exactly one ':' `
+      + `(got '${value}')`,
+    );
+  }
+
+  return trimmed;
 }
 
 function parseOptionalObjectValue(

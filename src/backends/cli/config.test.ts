@@ -969,6 +969,90 @@ backends:
     }
   });
 
+  it.each([
+    { label: 'empty string', yaml: 'singleton: ""' },
+    { label: 'missing colon', yaml: 'singleton: claude-chrome' },
+    { label: 'empty namespace', yaml: 'singleton: ":chrome"' },
+    { label: 'empty resource', yaml: 'singleton: "claude:"' },
+    { label: 'multiple colons', yaml: 'singleton: "claude:chrome:extra"' },
+    { label: 'whitespace inside', yaml: 'singleton: "claude : chrome"' },
+    { label: 'non-string', yaml: 'singleton: 123' },
+  ])('rejects malformed provider instance launch.singleton ($label)', ({ yaml }) => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+backends:
+  cli:
+    providers:
+      claude:
+        instances:
+          native-chrome:
+            environment: native
+            command: claude
+            launch:
+              ${yaml}
+              args:
+                - --chrome
+            runner: auto
+            projects_dir: ~/.claude/projects
+`.trimStart());
+
+    try {
+      expect(() => loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_DIR: runtimeDir,
+      })).toThrow(/claude\.instances\.native-chrome\.launch\.singleton/);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('trims surrounding whitespace on provider instance launch.singleton', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+backends:
+  cli:
+    providers:
+      claude:
+        instances:
+          native-chrome:
+            environment: native
+            command: claude
+            launch:
+              singleton: "  claude:chrome  "
+              args:
+                - --chrome
+            runner: auto
+            projects_dir: ~/.claude/projects
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_DIR: runtimeDir,
+      });
+      expect(resolveProviderInstance(config, 'claude', 'native-chrome').commandConfig.singleton)
+        .toBe('claude:chrome');
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it.each(['args', 'launch_args', 'launchArgs'])(
     'rejects unsupported provider instance launch args key %s',
     (legacyKey) => {

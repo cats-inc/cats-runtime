@@ -122,6 +122,10 @@ backends:
             environment: native
             command: claude
             launch:
+              # Singleton resource id, must be '<namespace>:<resource>'. Only one
+              # active Cats session per id is allowed at a time. Use the same id
+              # on any instance that competes for the same OS-level resource
+              # (Chrome extension, named pipe, exclusive device, etc.).
               singleton: claude:chrome
               args:
                 - --chrome

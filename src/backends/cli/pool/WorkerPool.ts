@@ -255,6 +255,10 @@ export class WorkerPool {
 
       const worker = this.workers.get(activeSessionId);
       if (!worker || !worker.alive) {
+        console.warn(
+          `[pool] Reclaiming singleton '${resource}' from stale session '${activeSessionId}' `
+          + '(worker missing or not alive). Exit handler may have been skipped.',
+        );
         this.releaseSingletonResource(activeSessionId);
         continue;
       }
