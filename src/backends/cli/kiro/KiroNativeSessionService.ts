@@ -466,15 +466,20 @@ workspace = sys.argv[2]
 conversation_id = sys.argv[3]
 
 db = sqlite3.connect(db_path)
-matched_key = resolve_stored_key(db, conversation_id, workspace)
-if matched_key is None:
-    deleted = False
-else:
-    cursor = db.execute(
-        "DELETE FROM conversations_v2 WHERE conversation_id = ? AND key = ?",
-        (conversation_id, matched_key),
-    )
-    deleted = cursor.rowcount > 0
+# Scope: conversation_id (a globally unique UUID — different separator forms
+# of the same conv_id represent the same logical session) AND only the
+# caller-provided workspace's separator variants. This never fans across
+# unrelated conv_ids or unrelated paths. Clearing every variant keeps the
+# DELETE and the upper-layer verify in sync: once the DB is mutated, no row
+# with this conv_id under this workspace should remain, so listSessions-based
+# verification and the next native discovery both agree the session is gone.
+candidates = workspace_key_candidates(workspace)
+placeholders = ",".join("?" * len(candidates))
+cursor = db.execute(
+    f"DELETE FROM conversations_v2 WHERE conversation_id = ? AND key IN ({placeholders})",
+    (conversation_id, *candidates),
+)
+deleted = cursor.rowcount > 0
 db.commit()
 db.close()
 
