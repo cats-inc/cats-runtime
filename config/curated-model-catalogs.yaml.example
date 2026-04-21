@@ -257,7 +257,7 @@ catalogs:
     providers:
       - name: OpenAI
         shared_options:
-          - name: Reasoning Effort
+          - name: Reasoning effort
             values:
               - name: Low
                 notes:
@@ -277,7 +277,7 @@ catalogs:
 
           - name: GPT-5.2-Codex
             options:
-              - name: Reasoning Effort
+              - name: Reasoning effort
                 default: High
 
           - name: GPT-5.2
