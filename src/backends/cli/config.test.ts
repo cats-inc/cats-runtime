@@ -818,8 +818,9 @@ backends:
           native-chrome:
             environment: native
             command: claude
-            args:
-              - --chrome
+            launch:
+              args:
+                - --chrome
             runner: auto
             projects_dir: ~/.claude/projects
           native:
@@ -855,6 +856,85 @@ backends:
       rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  it('preserves explicitly empty provider instance launch args', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+backends:
+  cli:
+    providers:
+      claude:
+        instances:
+          native-empty:
+            environment: native
+            command: claude
+            launch:
+              args: []
+            runner: auto
+            projects_dir: ~/.claude/projects
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_DIR: runtimeDir,
+      });
+
+      expect(resolveProviderInstance(config, 'claude', 'native-empty').commandConfig.args)
+        .toEqual([]);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it.each(['args', 'launch_args', 'launchArgs'])(
+    'rejects legacy provider instance launch args alias %s',
+    (legacyKey) => {
+      const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+      const runtimeDir = tempDir;
+      const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+      mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
+      writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+backends:
+  cli:
+    providers:
+      claude:
+        instances:
+          native-chrome:
+            environment: native
+            command: claude
+            ${legacyKey}:
+              - --chrome
+            runner: auto
+            projects_dir: ~/.claude/projects
+`.trimStart());
+
+      try {
+        expect(() => loadConfig({
+          HOME: '/home/tester',
+          USERPROFILE: '',
+          CATS_RUNTIME_DIR: runtimeDir,
+        })).toThrow(
+          `claude.instances.native-chrome.${legacyKey} is not supported. `
+          + 'Use claude.instances.native-chrome.launch.args instead.',
+        );
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    },
+  );
 
   it('rejects Docker environments without a container in providers.yaml', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));

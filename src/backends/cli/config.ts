@@ -1395,22 +1395,40 @@ function buildCommandConfigFromFile(
   const runnerPath = readString(raw.runner_path)
     || readString(raw.runnerPath)
     || fallback.runnerPath;
+  rejectUnsupportedCliLaunchArgs(raw, `${provider}.instances.${instanceId}`);
   const launch = asOptionalObject(raw.launch);
-  const args = parseOptionalStringArray(
-    launch?.args
-      ?? raw.launch_args
-      ?? raw.launchArgs
-      ?? raw.args,
-    `${provider}.instances.${instanceId}.args`,
+  const args = parseOptionalLaunchArgs(
+    launch?.args,
+    `${provider}.instances.${instanceId}.launch.args`,
   );
 
   return {
     path,
-    ...(args && args.length > 0 ? { args } : {}),
+    ...(args !== undefined ? { args } : {}),
     runner,
     runnerPath,
     runtime,
   };
+}
+
+function rejectUnsupportedCliLaunchArgs(
+  raw: Record<string, unknown>,
+  label: string,
+): void {
+  const legacyKey = raw.args !== undefined
+    ? 'args'
+    : raw.launch_args !== undefined
+      ? 'launch_args'
+      : raw.launchArgs !== undefined
+        ? 'launchArgs'
+        : undefined;
+  if (!legacyKey) {
+    return;
+  }
+
+  throw new Error(
+    `${label}.${legacyKey} is not supported. Use ${label}.launch.args instead.`,
+  );
 }
 
 function parseEnvironmentMap(
@@ -2150,6 +2168,34 @@ function parseOptionalStringArray(
   }).filter(Boolean);
 
   return parsed.length > 0 ? parsed : undefined;
+}
+
+function parseOptionalLaunchArgs(
+  value: unknown,
+  label: string,
+): string[] | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} must be a string or string[]`);
+  }
+
+  return value.map((entry) => {
+    const stringValue = readString(entry);
+    if (stringValue === undefined) {
+      throw new Error(`${label} entries must be strings`);
+    }
+    return stringValue;
+  }).filter(Boolean);
 }
 
 function parseOptionalObjectValue(

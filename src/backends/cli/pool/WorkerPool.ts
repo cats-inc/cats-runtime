@@ -35,6 +35,7 @@ interface ProviderServiceResolvers {
 
 export class WorkerPool {
   private workers = new Map<string, WorkerProcess>();
+  private workerSingletonResources = new Map<string, string>();
   private config: CliRuntimeConfig;
   private registry: SessionRegistry;
   private gooseNative: GooseNativeSessionService;
@@ -179,6 +180,13 @@ export class WorkerPool {
       providerName as ProviderName,
       providerInstanceId,
     );
+    const singletonResource = resolveCliSingletonResource(
+      providerName as ProviderName,
+      instance.commandConfig,
+    );
+    if (singletonResource) {
+      this.assertSingletonResourceAvailable(singletonResource, sessionId);
+    }
     const { provider, commandConfig } = this.resolveProvider(
       providerName as ProviderName,
       providerInstanceId,
@@ -211,6 +219,7 @@ export class WorkerPool {
       if (this.workers.get(sessionId) === worker) {
         this.registry.updateStatus(sessionId, 'closed');
         this.workers.delete(sessionId);
+        this.workerSingletonResources.delete(sessionId);
       }
     });
 
@@ -219,11 +228,40 @@ export class WorkerPool {
     });
 
     this.workers.set(sessionId, worker);
+    if (singletonResource) {
+      this.workerSingletonResources.set(sessionId, singletonResource);
+    }
     if (!provider.ephemeral) {
-      worker.start();
+      try {
+        worker.start();
+      } catch (error) {
+        if (this.workers.get(sessionId) === worker) {
+          this.workers.delete(sessionId);
+          this.workerSingletonResources.delete(sessionId);
+        }
+        throw error;
+      }
     }
 
     return worker;
+  }
+
+  private assertSingletonResourceAvailable(resource: string, sessionId: string): void {
+    for (const [activeSessionId, activeResource] of this.workerSingletonResources.entries()) {
+      if (activeSessionId === sessionId || activeResource !== resource) {
+        continue;
+      }
+
+      const worker = this.workers.get(activeSessionId);
+      if (!worker?.alive) {
+        continue;
+      }
+
+      throw new Error(
+        'Claude Chrome integration is already attached to an active Cats session '
+        + `'${activeSessionId}'. Close that session before starting another claude --chrome worker.`,
+      );
+    }
   }
 
   get(sessionId: string): WorkerProcess | undefined {
@@ -280,6 +318,21 @@ export class WorkerPool {
       providers,
     };
   }
+}
+
+function resolveCliSingletonResource(
+  providerName: ProviderName,
+  commandConfig: CliRuntimeConfig['providerCommands'][ProviderName],
+): string | undefined {
+  if (
+    providerName === 'claude'
+    && commandConfig.runtime.mode === 'native'
+    && commandConfig.args?.includes('--chrome')
+  ) {
+    return 'claude:chrome';
+  }
+
+  return undefined;
 }
 
 function resolveCliSpawnTimeoutMs(

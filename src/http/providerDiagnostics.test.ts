@@ -289,6 +289,52 @@ describe('provider diagnostics HTTP contract', () => {
     rmSync(rootDir, { recursive: true, force: true });
   });
 
+  it('redacts CLI launch args in provider config responses', async () => {
+    const config = makeConfig({
+      providerDefaultInstances: {
+        claude: 'native-chrome',
+      },
+      providerInstances: {
+        claude: {
+          'native-chrome': {
+            id: 'native-chrome',
+            providerName: 'claude',
+            commandConfig: {
+              path: 'claude',
+              args: ['--api-key', 'secret-token'],
+              runner: 'auto',
+              runtime: { mode: 'native' },
+            },
+          },
+        },
+      },
+    });
+    const app = createTestApp(config);
+
+    const response = await app.request('/providers/config');
+    expect(response.status).toBe(200);
+    const payload = await response.json() as {
+      providers: {
+        claude: {
+          instances: Array<{
+            id: string;
+            args?: string[];
+            argsRedacted?: boolean;
+          }>;
+        };
+      };
+    };
+    const instance = payload.providers.claude.instances.find((entry) => (
+      entry.id === 'native-chrome'
+    ));
+
+    expect(JSON.stringify(payload)).not.toContain('secret-token');
+    expect(instance).toMatchObject({
+      args: ['<redacted>'],
+      argsRedacted: true,
+    });
+  });
+
   it('limits health diagnostics probes to default provider targets', async () => {
     const config = makeConfig({
       providerCommands: {

@@ -113,13 +113,17 @@ backends:
           # Local desktop instance that starts Claude Code with the Claude in
           # Chrome integration enabled. Requires Chrome/Edge, the Claude in
           # Chrome extension, and a completed local extension connection.
-          # This should stay native because the Chrome extension bridge is a
-          # desktop browser integration, not a WSL/Docker runtime.
+          # This must stay native because the Chrome extension bridge is a
+          # desktop browser integration, not a WSL/Docker runtime. It is also
+          # an OS-level singleton: one active Cats claude --chrome worker can
+          # collide with another Cats session, Claude Desktop, or a manual
+          # Claude Code session that is already attached to Chrome.
           native-chrome:
             environment: native
             command: claude
-            args:
-              - --chrome
+            launch:
+              args:
+                - --chrome
             runner: auto
             projects_dir: ~/.claude/projects
           # Docker-backed instance example: runs claude inside a Docker container.

@@ -38,6 +38,14 @@ export const providerRoutes = new Hono();
 
 class ProviderCatalogQueryError extends Error {}
 
+function redactCommandArgs(args: string[] | undefined): string[] | undefined {
+  if (args === undefined) {
+    return undefined;
+  }
+
+  return args.length > 0 ? ['<redacted>'] : [];
+}
+
 function parseModelCatalogRefreshQuery(value: string | undefined): boolean {
   if (!value) {
     return false;
@@ -92,6 +100,7 @@ providerRoutes.get('/providers/config', async (c) => {
       }
 
       const instances = await Promise.all(provider.instances.map(async (instance) => {
+        const configuredArgs = instance.cliInstance?.commandConfig.args;
         const baseInstance = {
           ...(instance.backend === 'cli' && instance.cliInstance
             ? (() => {
@@ -103,7 +112,9 @@ providerRoutes.get('/providers/config', async (c) => {
           target: `${instance.backend}/${instance.instanceId}`,
           backend: instance.backend,
           command: instance.cliInstance?.commandConfig.path,
-          args: instance.cliInstance?.commandConfig.args,
+          ...(configuredArgs !== undefined
+            ? { args: redactCommandArgs(configuredArgs), argsRedacted: true }
+            : {}),
           runner: instance.cliInstance?.commandConfig.runner,
           runtime: instance.cliInstance?.commandConfig.runtime,
           transport: instance.remoteInstance?.transport,
