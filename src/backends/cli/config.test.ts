@@ -1014,7 +1014,7 @@ backends:
     }
   });
 
-  it('trims surrounding whitespace on provider instance launch.singleton', () => {
+  it('rejects surrounding whitespace on provider instance launch.singleton', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
     const runtimeDir = tempDir;
     const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
@@ -1041,13 +1041,14 @@ backends:
 `.trimStart());
 
     try {
-      const config = loadConfig({
+      expect(() => loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
         CATS_RUNTIME_DIR: runtimeDir,
-      });
-      expect(resolveProviderInstance(config, 'claude', 'native-chrome').commandConfig.singleton)
-        .toBe('claude:chrome');
+      })).toThrow(
+        "claude.instances.native-chrome.launch.singleton must be '<namespace>:<resource>' "
+        + "with no whitespace and exactly one ':'",
+      );
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

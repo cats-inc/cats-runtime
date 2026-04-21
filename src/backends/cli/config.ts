@@ -2208,15 +2208,14 @@ function parseOptionalSingletonResource(
     );
   }
 
-  const trimmed = value.trim();
-  if (!/^[^\s:]+:[^\s:]+$/.test(trimmed)) {
+  if (!/^[^\s:]+:[^\s:]+$/.test(value)) {
     throw new Error(
       `${label} must be '<namespace>:<resource>' with no whitespace and exactly one ':' `
       + `(got '${value}')`,
     );
   }
 
-  return trimmed;
+  return value;
 }
 
 function parseOptionalObjectValue(
