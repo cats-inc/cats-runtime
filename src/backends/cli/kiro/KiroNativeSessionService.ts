@@ -247,6 +247,27 @@ def workspace_key_candidates(workspace):
     return ordered
 
 
+def resolve_stored_key(db, conversation_id, workspace):
+    # Resolve the caller's workspace to the exact key the row was written
+    # under, so downstream SELECT/DELETE operate on one deterministic row.
+    # If the DB ever contains the same conversation under multiple separator
+    # forms (belt and suspenders — Kiro itself should not do this), we pick
+    # the first candidate in order rather than touching every match.
+    candidates = workspace_key_candidates(workspace)
+    placeholders = ",".join("?" * len(candidates))
+    stored = {
+        row[0]
+        for row in db.execute(
+            f"SELECT key FROM conversations_v2 WHERE conversation_id = ? AND key IN ({placeholders})",
+            (conversation_id, *candidates),
+        ).fetchall()
+    }
+    for candidate in candidates:
+        if candidate in stored:
+            return candidate
+    return None
+
+
 def to_iso(value):
     if value is None:
         return None
@@ -418,11 +439,15 @@ workspace = sys.argv[2]
 conversation_id = sys.argv[3]
 
 db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-candidates = workspace_key_candidates(workspace)
-placeholders = ",".join("?" * len(candidates))
+matched_key = resolve_stored_key(db, conversation_id, workspace)
+if matched_key is None:
+    db.close()
+    print("[]")
+    raise SystemExit(0)
+
 row = db.execute(
-    f"SELECT value FROM conversations_v2 WHERE conversation_id = ? AND key IN ({placeholders})",
-    (conversation_id, *candidates),
+    "SELECT value FROM conversations_v2 WHERE conversation_id = ? AND key = ?",
+    (conversation_id, matched_key),
 ).fetchone()
 db.close()
 
@@ -441,13 +466,15 @@ workspace = sys.argv[2]
 conversation_id = sys.argv[3]
 
 db = sqlite3.connect(db_path)
-candidates = workspace_key_candidates(workspace)
-placeholders = ",".join("?" * len(candidates))
-cursor = db.execute(
-    f"DELETE FROM conversations_v2 WHERE conversation_id = ? AND key IN ({placeholders})",
-    (conversation_id, *candidates),
-)
-deleted = cursor.rowcount > 0
+matched_key = resolve_stored_key(db, conversation_id, workspace)
+if matched_key is None:
+    deleted = False
+else:
+    cursor = db.execute(
+        "DELETE FROM conversations_v2 WHERE conversation_id = ? AND key = ?",
+        (conversation_id, matched_key),
+    )
+    deleted = cursor.rowcount > 0
 db.commit()
 db.close()
 
