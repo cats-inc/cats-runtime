@@ -232,6 +232,21 @@ import sys
 from datetime import datetime, timezone
 
 
+def workspace_key_candidates(workspace):
+    # Kiro stores the raw OS path as the conversations_v2.key value, so on
+    # Windows the stored key keeps backslashes. Callers hand us paths after
+    # toRuntimePath, which normalizes them to forward slashes, producing a
+    # mismatch against the stored key. Try every separator variant so the
+    # match works regardless of which form the caller used.
+    seen = set()
+    ordered = []
+    for candidate in (workspace, workspace.replace("\\", "/"), workspace.replace("/", "\\")):
+        if candidate not in seen:
+            seen.add(candidate)
+            ordered.append(candidate)
+    return ordered
+
+
 def to_iso(value):
     if value is None:
         return None
@@ -403,9 +418,11 @@ workspace = sys.argv[2]
 conversation_id = sys.argv[3]
 
 db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+candidates = workspace_key_candidates(workspace)
+placeholders = ",".join("?" * len(candidates))
 row = db.execute(
-    "SELECT value FROM conversations_v2 WHERE key = ? AND conversation_id = ?",
-    (workspace, conversation_id),
+    f"SELECT value FROM conversations_v2 WHERE conversation_id = ? AND key IN ({placeholders})",
+    (conversation_id, *candidates),
 ).fetchone()
 db.close()
 
@@ -424,9 +441,11 @@ workspace = sys.argv[2]
 conversation_id = sys.argv[3]
 
 db = sqlite3.connect(db_path)
+candidates = workspace_key_candidates(workspace)
+placeholders = ",".join("?" * len(candidates))
 cursor = db.execute(
-    "DELETE FROM conversations_v2 WHERE key = ? AND conversation_id = ?",
-    (workspace, conversation_id),
+    f"DELETE FROM conversations_v2 WHERE conversation_id = ? AND key IN ({placeholders})",
+    (conversation_id, *candidates),
 )
 deleted = cursor.rowcount > 0
 db.commit()

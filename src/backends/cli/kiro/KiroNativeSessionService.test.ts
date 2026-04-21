@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import {
   KiroNativeSessionService,
@@ -109,6 +110,51 @@ describe('KiroNativeSessionService', () => {
       'C:/Users/kenne/Source/SK2/one-man-digital-company',
       'kiro-latest',
     )).resolves.toBe(true);
+  });
+
+  it('emits delete and history scripts that try every separator form for the DB key', async () => {
+    // Regression: Kiro stores the raw OS path as conversations_v2.key, so on
+    // Windows the stored key keeps backslashes. normalizeWorkspace forces
+    // forward slashes, which previously left runtime-origin sessions impossible
+    // to delete and made history load return empty. The Python scripts must
+    // probe every separator form to match the stored key.
+    const capturedScripts: string[] = [];
+    const runner = vi.fn(async (_command: string, args: string[]) => {
+      if (args[0] === '-c') {
+        return { code: 0, stdout: 'python\n', stderr: '' };
+      }
+      const scriptPath = args.find(
+        (entry) => typeof entry === 'string' && entry.endsWith('script.py'),
+      );
+      if (!scriptPath) {
+        return { code: 0, stdout: '[]', stderr: '' };
+      }
+      const script = await readFile(scriptPath, 'utf8');
+      capturedScripts.push(script);
+      const stdout = script.includes('DELETE FROM conversations_v2')
+        ? '{"deleted": true}'
+        : '[]';
+      return { code: 0, stdout, stderr: '' };
+    });
+
+    const service = new KiroNativeSessionService({
+      command: 'kiro-cli',
+      dbPath: '~/AppData/Local/kiro-cli/data.sqlite3',
+      runtime: createRuntimeAdapter({ mode: 'native' }),
+      runner,
+    });
+
+    await service.deleteSession('C:/Users/test/project', 'conv-del');
+    await service.loadHistory('C:/Users/test/project', 'conv-load');
+
+    expect(capturedScripts).toHaveLength(2);
+    for (const script of capturedScripts) {
+      expect(script).toContain('def workspace_key_candidates(workspace):');
+      expect(script).toContain('workspace.replace("\\\\", "/")');
+      expect(script).toContain('workspace.replace("/", "\\\\")');
+      expect(script).toContain('key IN (');
+      expect(script).not.toMatch(/WHERE key = \? AND conversation_id = \?/);
+    }
   });
 
   it('skips WSL discovery when startIfNeeded is false and the distro is stopped', async () => {
