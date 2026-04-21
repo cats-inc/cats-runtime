@@ -180,88 +180,96 @@ export class WorkerPool {
       providerName as ProviderName,
       providerInstanceId,
     );
-    const singletonResource = resolveCliSingletonResource(
-      providerName as ProviderName,
-      instance.commandConfig,
-    );
-    if (singletonResource) {
-      this.assertSingletonResourceAvailable(singletonResource, sessionId);
-    }
-    const { provider, commandConfig } = this.resolveProvider(
-      providerName as ProviderName,
-      providerInstanceId,
-      this.compatibility.getCachedAssessment(
-        providerName as ProviderName,
-        instance.id,
-      )?.profile,
-    );
-    const resilience: SpawnResilienceConfig = {
-      retries: this.config.spawnRetries,
-      timeoutMs: resolveCliSpawnTimeoutMs(
-        providerName as ProviderName,
-        instance.timeoutMs,
-        this.config.spawnTimeoutMs,
-      ),
-    };
-    const worker = new WorkerProcess(provider, opts, commandConfig, resilience);
+    const singletonResource = instance.commandConfig.singleton;
+    let singletonReserved = false;
+    let worker: WorkerProcess | undefined;
 
-    worker.on('event', (event) => {
-      if ((event.type === 'init' || event.type === 'result') && event.sessionId) {
-        this.registry.setProviderSessionId(sessionId, event.sessionId);
-        this.registry.updateStatus(sessionId, 'ready');
+    try {
+      if (singletonResource) {
+        this.reserveSingletonResource(singletonResource, sessionId);
+        singletonReserved = true;
       }
-    });
 
-    worker.on('exit', (code) => {
-      // Ephemeral providers normally exit after each turn; keep the logical worker alive
-      // unless it was explicitly killed.
-      if (provider.ephemeral && worker.alive) return;
-      if (this.workers.get(sessionId) === worker) {
-        this.registry.updateStatus(sessionId, 'closed');
-        this.workers.delete(sessionId);
-        this.workerSingletonResources.delete(sessionId);
-      }
-    });
+      const { provider, commandConfig } = this.resolveProvider(
+        providerName as ProviderName,
+        providerInstanceId,
+        this.compatibility.getCachedAssessment(
+          providerName as ProviderName,
+          instance.id,
+        )?.profile,
+      );
+      const resilience: SpawnResilienceConfig = {
+        retries: this.config.spawnRetries,
+        timeoutMs: resolveCliSpawnTimeoutMs(
+          providerName as ProviderName,
+          instance.timeoutMs,
+          this.config.spawnTimeoutMs,
+        ),
+      };
+      worker = new WorkerProcess(provider, opts, commandConfig, resilience);
 
-    worker.on('error', (err) => {
-      console.error(`[pool] Worker ${sessionId} error:`, err.message);
-    });
-
-    this.workers.set(sessionId, worker);
-    if (singletonResource) {
-      this.workerSingletonResources.set(sessionId, singletonResource);
-    }
-    if (!provider.ephemeral) {
-      try {
-        worker.start();
-      } catch (error) {
-        if (this.workers.get(sessionId) === worker) {
-          this.workers.delete(sessionId);
-          this.workerSingletonResources.delete(sessionId);
+      worker.on('event', (event) => {
+        if ((event.type === 'init' || event.type === 'result') && event.sessionId) {
+          this.registry.setProviderSessionId(sessionId, event.sessionId);
+          this.registry.updateStatus(sessionId, 'ready');
         }
-        throw error;
-      }
-    }
+      });
 
-    return worker;
+      worker.on('exit', (code) => {
+        // Ephemeral providers normally exit after each turn; keep the logical worker alive
+        // unless it was explicitly killed.
+        if (provider.ephemeral && worker?.alive) return;
+        if (this.workers.get(sessionId) === worker) {
+          this.registry.updateStatus(sessionId, 'closed');
+          this.workers.delete(sessionId);
+          this.releaseSingletonResource(sessionId);
+        }
+      });
+
+      worker.on('error', (err) => {
+        console.error(`[pool] Worker ${sessionId} error:`, err.message);
+      });
+
+      this.workers.set(sessionId, worker);
+      if (!provider.ephemeral) {
+        worker.start();
+      }
+
+      return worker;
+    } catch (error) {
+      if (worker && this.workers.get(sessionId) === worker) {
+        this.workers.delete(sessionId);
+      }
+      if (singletonReserved) {
+        this.releaseSingletonResource(sessionId);
+      }
+      throw error;
+    }
   }
 
-  private assertSingletonResourceAvailable(resource: string, sessionId: string): void {
+  private reserveSingletonResource(resource: string, sessionId: string): void {
     for (const [activeSessionId, activeResource] of this.workerSingletonResources.entries()) {
       if (activeSessionId === sessionId || activeResource !== resource) {
         continue;
       }
 
       const worker = this.workers.get(activeSessionId);
-      if (!worker?.alive) {
+      if (!worker || !worker.alive) {
+        this.releaseSingletonResource(activeSessionId);
         continue;
       }
 
       throw new Error(
-        'Claude Chrome integration is already attached to an active Cats session '
-        + `'${activeSessionId}'. Close that session before starting another claude --chrome worker.`,
+        `Provider singleton resource '${resource}' is already attached to active Cats session `
+        + `'${activeSessionId}'. Close that session before starting another worker for this resource.`,
       );
     }
+
+    this.workerSingletonResources.set(sessionId, resource);
+  }
+
+  private releaseSingletonResource(sessionId: string): void {
+    this.workerSingletonResources.delete(sessionId);
   }
 
   get(sessionId: string): WorkerProcess | undefined {
@@ -318,21 +326,6 @@ export class WorkerPool {
       providers,
     };
   }
-}
-
-function resolveCliSingletonResource(
-  providerName: ProviderName,
-  commandConfig: CliRuntimeConfig['providerCommands'][ProviderName],
-): string | undefined {
-  if (
-    providerName === 'claude'
-    && commandConfig.runtime.mode === 'native'
-    && commandConfig.args?.includes('--chrome')
-  ) {
-    return 'claude:chrome';
-  }
-
-  return undefined;
 }
 
 function resolveCliSpawnTimeoutMs(

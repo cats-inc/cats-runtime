@@ -53,6 +53,7 @@ export interface ProviderRuntimeConfig {
 export interface ProviderCommandConfig {
   path: string;
   args?: string[];
+  singleton?: string;
   runner: RunnerMode;
   runnerPath?: string;
   runtime: ProviderRuntimeConfig;
@@ -1401,10 +1402,15 @@ function buildCommandConfigFromFile(
     launch?.args,
     `${provider}.instances.${instanceId}.launch.args`,
   );
+  const singleton = parseOptionalNonEmptyStringValue(
+    launch?.singleton,
+    `${provider}.instances.${instanceId}.launch.singleton`,
+  );
 
   return {
     path,
     ...(args !== undefined ? { args } : {}),
+    ...(singleton ? { singleton } : {}),
     runner,
     runnerPath,
     runtime,
@@ -1415,19 +1421,17 @@ function rejectUnsupportedCliLaunchArgs(
   raw: Record<string, unknown>,
   label: string,
 ): void {
-  const legacyKey = raw.args !== undefined
-    ? 'args'
-    : raw.launch_args !== undefined
-      ? 'launch_args'
-      : raw.launchArgs !== undefined
-        ? 'launchArgs'
-        : undefined;
-  if (!legacyKey) {
+  const unsupportedKeys = ['args', 'launch_args', 'launchArgs'].filter((key) => (
+    raw[key] !== undefined
+  ));
+  if (unsupportedKeys.length === 0) {
     return;
   }
 
+  const unsupportedLabels = unsupportedKeys.map((key) => `${label}.${key}`).join(', ');
   throw new Error(
-    `${label}.${legacyKey} is not supported. Use ${label}.launch.args instead.`,
+    `${unsupportedLabels} ${unsupportedKeys.length === 1 ? 'is' : 'are'} not supported. `
+    + `Use ${label}.launch.args instead.`,
   );
 }
 
@@ -2178,24 +2182,31 @@ function parseOptionalLaunchArgs(
     return undefined;
   }
 
-  if (typeof value === 'string') {
-    return value
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-  }
-
   if (!Array.isArray(value)) {
-    throw new Error(`${label} must be a string or string[]`);
+    throw new Error(`${label} must be string[]`);
   }
 
-  return value.map((entry) => {
-    const stringValue = readString(entry);
-    if (stringValue === undefined) {
-      throw new Error(`${label} entries must be strings`);
+  return value.map((entry, index) => {
+    if (typeof entry !== 'string' || entry.trim().length === 0) {
+      throw new Error(`${label}[${index}] must be a non-empty string`);
     }
-    return stringValue;
-  }).filter(Boolean);
+    return entry.trim();
+  });
+}
+
+function parseOptionalNonEmptyStringValue(
+  value: unknown,
+  label: string,
+): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`${label} must be a non-empty string`);
+  }
+
+  return value.trim();
 }
 
 function parseOptionalObjectValue(

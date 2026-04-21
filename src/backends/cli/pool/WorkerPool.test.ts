@@ -79,22 +79,22 @@ describe('WorkerPool', () => {
       });
   });
 
-  it('rejects a second active native Claude Chrome worker', () => {
+  it('rejects a second active worker for the same configured singleton resource', () => {
     const config = loadConfig({
       HOME: '/tmp/cats-runtime-workerpool-test',
       USERPROFILE: '',
     }, {
       skipProviderFile: true,
     });
-    const claudeInstance = resolveProviderInstance(config, 'claude');
-    config.providerDefaultInstances!.claude = 'native-chrome';
-    config.providerInstances!.claude = {
-      'native-chrome': {
-        ...claudeInstance,
-        id: 'native-chrome',
+    const geminiInstance = resolveProviderInstance(config, 'gemini');
+    config.providerDefaultInstances!.gemini = 'singleton';
+    config.providerInstances!.gemini = {
+      singleton: {
+        ...geminiInstance,
+        id: 'singleton',
         commandConfig: {
-          ...claudeInstance.commandConfig,
-          args: ['--chrome'],
+          ...geminiInstance.commandConfig,
+          singleton: 'test:shared-browser',
         },
       },
     };
@@ -115,17 +115,21 @@ describe('WorkerPool', () => {
       {} as never,
       { getCachedAssessment: () => undefined } as never,
     );
-    const internals = pool as unknown as {
-      workers: Map<string, { alive: boolean }>;
-      workerSingletonResources: Map<string, string>;
-    };
-    internals.workers.set('chrome-session-1', { alive: true });
-    internals.workerSingletonResources.set('chrome-session-1', 'claude:chrome');
-
-    expect(() => pool.spawn('chrome-session-2', 'claude', {
+    const first = pool.spawn('singleton-session-1', 'gemini', {
       cwd: '/tmp/cats-runtime-workerpool-test',
-    }, 'native-chrome')).toThrow(
-      "Claude Chrome integration is already attached to an active Cats session 'chrome-session-1'",
+    }, 'singleton');
+    expect(first.alive).toBe(true);
+
+    expect(() => pool.spawn('singleton-session-2', 'gemini', {
+      cwd: '/tmp/cats-runtime-workerpool-test',
+    }, 'singleton')).toThrow(
+      "Provider singleton resource 'test:shared-browser' is already attached "
+      + "to active Cats session 'singleton-session-1'",
     );
+
+    pool.kill('singleton-session-1');
+    expect(() => pool.spawn('singleton-session-2', 'gemini', {
+      cwd: '/tmp/cats-runtime-workerpool-test',
+    }, 'singleton')).not.toThrow();
   });
 });

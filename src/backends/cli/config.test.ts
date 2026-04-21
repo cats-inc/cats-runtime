@@ -819,6 +819,7 @@ backends:
             environment: native
             command: claude
             launch:
+              singleton: claude:chrome
               args:
                 - --chrome
             runner: auto
@@ -850,8 +851,81 @@ backends:
         commandConfig: {
           path: 'claude',
           args: ['--chrome'],
+          singleton: 'claude:chrome',
         },
       });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects provider instance launch args written as a string', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+backends:
+  cli:
+    providers:
+      claude:
+        instances:
+          native-chrome:
+            environment: native
+            command: claude
+            launch:
+              args: "--foo=a,b"
+            runner: auto
+            projects_dir: ~/.claude/projects
+`.trimStart());
+
+    try {
+      expect(() => loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_DIR: runtimeDir,
+      })).toThrow('claude.instances.native-chrome.launch.args must be string[]');
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects empty provider instance launch args entries', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+backends:
+  cli:
+    providers:
+      claude:
+        instances:
+          native-chrome:
+            environment: native
+            command: claude
+            launch:
+              args:
+                - --chrome
+                - ""
+            runner: auto
+            projects_dir: ~/.claude/projects
+`.trimStart());
+
+    try {
+      expect(() => loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_DIR: runtimeDir,
+      })).toThrow('claude.instances.native-chrome.launch.args[1] must be a non-empty string');
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -896,7 +970,7 @@ backends:
   });
 
   it.each(['args', 'launch_args', 'launchArgs'])(
-    'rejects legacy provider instance launch args alias %s',
+    'rejects unsupported provider instance launch args key %s',
     (legacyKey) => {
       const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
       const runtimeDir = tempDir;
@@ -935,6 +1009,50 @@ backends:
       }
     },
   );
+
+  it('reports all unsupported provider instance launch args keys at once', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+backends:
+  cli:
+    providers:
+      claude:
+        instances:
+          native-chrome:
+            environment: native
+            command: claude
+            args:
+              - --chrome
+            launch_args:
+              - --chrome
+            launchArgs:
+              - --chrome
+            runner: auto
+            projects_dir: ~/.claude/projects
+`.trimStart());
+
+    try {
+      expect(() => loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_DIR: runtimeDir,
+      })).toThrow(
+        'claude.instances.native-chrome.args, '
+        + 'claude.instances.native-chrome.launch_args, '
+        + 'claude.instances.native-chrome.launchArgs are not supported. '
+        + 'Use claude.instances.native-chrome.launch.args instead.',
+      );
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 
   it('rejects Docker environments without a container in providers.yaml', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));

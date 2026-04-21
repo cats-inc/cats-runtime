@@ -122,6 +122,7 @@ backends:
             environment: native
             command: claude
             launch:
+              singleton: claude:chrome
               args:
                 - --chrome
             runner: auto

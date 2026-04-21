@@ -306,6 +306,16 @@ describe('provider diagnostics HTTP contract', () => {
               runtime: { mode: 'native' },
             },
           },
+          'native-empty': {
+            id: 'native-empty',
+            providerName: 'claude',
+            commandConfig: {
+              path: 'claude',
+              args: [],
+              runner: 'auto',
+              runtime: { mode: 'native' },
+            },
+          },
         },
       },
     });
@@ -327,12 +337,19 @@ describe('provider diagnostics HTTP contract', () => {
     const instance = payload.providers.claude.instances.find((entry) => (
       entry.id === 'native-chrome'
     ));
+    const emptyInstance = payload.providers.claude.instances.find((entry) => (
+      entry.id === 'native-empty'
+    ));
 
     expect(JSON.stringify(payload)).not.toContain('secret-token');
     expect(instance).toMatchObject({
       args: ['<redacted>'],
       argsRedacted: true,
     });
+    expect(emptyInstance).toMatchObject({
+      args: [],
+    });
+    expect(emptyInstance?.argsRedacted).toBeUndefined();
   });
 
   it('limits health diagnostics probes to default provider targets', async () => {
