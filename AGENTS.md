@@ -107,6 +107,19 @@ contract.
 
 ---
 
+## Pre-Release Compatibility Policy
+
+- This runtime has never had a public or stable release. Agents MUST NOT keep
+  backward-compatibility code for old HTTP routes, payload shapes, provider
+  names, event formats, environment variables, feature flags, backend adapter
+  shims, or unnecessary aliases when those paths are superseded.
+- When changing a runtime contract, delete the obsolete path in the same change
+  and keep only the correct current architecture. Update direct consumers,
+  tests, and documentation to match the current contract instead of carrying
+  fallback overhead for unreleased versions.
+
+---
+
 ## Tech Stack
 
 | Category | Technology | Version |
@@ -710,6 +723,7 @@ chore: maintenance tasks
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.2.2 | 2026-04-22 | Add pre-release compatibility policy |
 | 1.2.1 | 2026-01-05 | Normalize compliance headings and template guidance |
 | 1.2.0 | 2025-01 | Add Development Workflow overview, Feature Specifications, Implementation Plans (CDD support) |
 | 1.1.0 | 2025-01 | Add Project Overview, Tech Stack, Coding Conventions, Testing Protocols, PR Guidelines (AAIF compliance) |
