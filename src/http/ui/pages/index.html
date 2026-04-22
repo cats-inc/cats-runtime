@@ -1545,6 +1545,13 @@ async function fetchProviderAdvancedCatalog(providerName, instanceTarget) {
 function setCreateModelSupportBadge(text, state) {
   const badge = document.getElementById('inputModelSupportBadge');
   if (!badge) return;
+  if (state === 'hidden') {
+    badge.textContent = '';
+    badge.hidden = true;
+    badge.dataset.state = 'hidden';
+    return;
+  }
+  badge.hidden = false;
   badge.textContent = text;
   badge.dataset.state = state || 'idle';
 }
@@ -2095,10 +2102,13 @@ async function refreshCreateModelRouting() {
     syncCreateRoutingSelectors(catalog, true);
 
     const tier = catalog?.support?.tier || 'read_only';
-    setCreateModelSupportBadge(
-      tier === 'full' ? 'Advanced' : (tier === 'entry_only' ? 'Catalog' : 'Read-only'),
-      tier === 'read_only' ? 'idle' : 'active',
-    );
+    if (tier === 'full') {
+      setCreateModelSupportBadge('Advanced', 'active');
+    } else if (tier === 'read_only') {
+      setCreateModelSupportBadge('Read-only', 'idle');
+    } else {
+      setCreateModelSupportBadge('', 'hidden');
+    }
     renderCreateModelChoice();
   } catch (error) {
     if (requestId !== createModelCatalogRequestId) return;
