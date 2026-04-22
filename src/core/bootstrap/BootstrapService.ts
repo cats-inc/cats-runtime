@@ -22,7 +22,7 @@ import type { RuntimeConfig } from '../config.js';
 // Types
 // ---------------------------------------------------------------------------
 
-const DEFAULT_SCAN_CONCURRENCY = 3;
+const DEFAULT_SCAN_CONCURRENCY = 12;
 
 export interface ProviderUniverseEntry {
   provider: ProviderName;
