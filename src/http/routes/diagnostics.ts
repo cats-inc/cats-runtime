@@ -1697,6 +1697,10 @@ function createAvailabilityDiagnosticsCacheKey(
 ): string {
   return JSON.stringify({
     probeMode,
+    provider: filters.provider ?? null,
+    backend: filters.backend ?? null,
+    instance: filters.instance ?? null,
+    defaultOnly: filters.defaultOnly,
     toolCatalogScope: filters.toolCatalogScope,
     sessionId: filters.sessionId ?? null,
     sessionKey: filters.sessionKey ?? null,
@@ -1788,18 +1792,15 @@ async function collectAvailabilityDiagnostics(
   forceRefresh = false,
   filters: ProviderDiagnosticsFilters = { defaultOnly: false, toolCatalogScope: 'catalog' },
 ): Promise<ProviderDiagnosticsCollectionResult> {
-  // Availability collection always probes the full catalog so prime and
-  // per-provider queries share a single cache entry; provider/backend/
-  // instance/defaultOnly are applied post-hoc to the returned snapshot.
-  const probeFilters = stripProviderTargetFilters(filters);
-
   if (forceRefresh || probeMode !== 'light') {
+    // Bypass cache. Respect the caller's scope so force/live scoped requests
+    // don't block on probes for unrelated provider targets.
     const result = await collectProviderDiagnostics(
       ctx,
       probeMode,
       env,
       forceRefresh,
-      probeFilters,
+      filters,
       {
         includeArtifacts: false,
         compatibilityPurpose: 'health',
@@ -1809,42 +1810,68 @@ async function collectAvailabilityDiagnostics(
   }
 
   const cache = getAvailabilityDiagnosticsCacheMap(ctx);
-  const cacheKey = createAvailabilityDiagnosticsCacheKey(probeMode, probeFilters);
-  let entry = cache.get(cacheKey);
-  if (!entry) {
-    entry = createAvailabilityDiagnosticsCacheEntry();
-    cache.set(cacheKey, entry);
-  }
+  const scopedKey = createAvailabilityDiagnosticsCacheKey(probeMode, filters);
+  const rootFilters = stripProviderTargetFilters(filters);
+  const rootKey = createAvailabilityDiagnosticsCacheKey(probeMode, rootFilters);
+
+  let scopedEntry = cache.get(scopedKey);
+  const rootEntry = scopedKey !== rootKey ? cache.get(rootKey) : null;
 
   const now = Date.now();
-  if (entry.snapshot && entry.freshUntilMs > now) {
-    return filterAvailabilityDiagnosticsResult(entry.snapshot, filters);
+  if (scopedEntry?.snapshot && scopedEntry.freshUntilMs > now) {
+    return filterAvailabilityDiagnosticsResult(scopedEntry.snapshot, filters);
+  }
+  if (rootEntry?.snapshot && rootEntry.freshUntilMs > now) {
+    // Prime / unscoped queries populate the root entry; per-provider queries
+    // can serve from it directly without re-probing.
+    return filterAvailabilityDiagnosticsResult(rootEntry.snapshot, filters);
   }
 
-  if (entry.snapshot && entry.staleUntilMs > now) {
-    if (!entry.inflight) {
+  if (scopedEntry?.snapshot && scopedEntry.staleUntilMs > now) {
+    if (!scopedEntry.inflight) {
       void startAvailabilityDiagnosticsRefresh(
         ctx,
-        entry,
+        scopedEntry,
         probeMode,
         env,
-        probeFilters,
+        filters,
       ).catch(() => undefined);
     }
-    return filterAvailabilityDiagnosticsResult(entry.snapshot, filters);
+    return filterAvailabilityDiagnosticsResult(scopedEntry.snapshot, filters);
   }
 
-  if (entry.inflight) {
-    const inflightResult = await entry.inflight;
+  if (rootEntry?.snapshot && rootEntry.staleUntilMs > now) {
+    if (!rootEntry.inflight) {
+      void startAvailabilityDiagnosticsRefresh(
+        ctx,
+        rootEntry,
+        probeMode,
+        env,
+        rootFilters,
+      ).catch(() => undefined);
+    }
+    return filterAvailabilityDiagnosticsResult(rootEntry.snapshot, filters);
+  }
+
+  if (scopedEntry?.inflight) {
+    const inflightResult = await scopedEntry.inflight;
     return filterAvailabilityDiagnosticsResult(inflightResult, filters);
   }
 
+  // Cold miss. Probe with the caller's filters — narrow for scoped requests
+  // (so a slow unrelated provider can't block them) and full for unscoped /
+  // prime. The narrow snapshot is cached under the scoped key so repeat
+  // scoped reads benefit from fresh/stale-while-revalidate semantics.
+  if (!scopedEntry) {
+    scopedEntry = createAvailabilityDiagnosticsCacheEntry();
+    cache.set(scopedKey, scopedEntry);
+  }
   const result = await startAvailabilityDiagnosticsRefresh(
     ctx,
-    entry,
+    scopedEntry,
     probeMode,
     env,
-    probeFilters,
+    filters,
   );
   return filterAvailabilityDiagnosticsResult(result, filters);
 }

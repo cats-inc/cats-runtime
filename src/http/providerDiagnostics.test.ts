@@ -352,7 +352,7 @@ describe('provider diagnostics HTTP contract', () => {
     expect(emptyInstance?.argsRedacted).toBeUndefined();
   });
 
-  it('returns only default provider targets from the health diagnostics response', async () => {
+  it('limits health diagnostics probes to default provider targets', async () => {
     const config = makeConfig({
       providerCommands: {
         claude: { path: 'claude-default', runner: 'auto', runtime: { mode: 'native' } },
@@ -447,8 +447,6 @@ describe('provider diagnostics HTTP contract', () => {
       .toEqual([
         'claude-default:--version',
         'claude-default:--help',
-        'claude-mirror:--version',
-        'claude-mirror:--help',
       ]);
   });
 
