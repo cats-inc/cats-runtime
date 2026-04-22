@@ -1989,9 +1989,10 @@ async function loadProviderOptions() {
         PROVIDER_AVAILABILITY[providerName] = status;
       }
     });
-    for (const name of configuredProviders) {
-      if (!providers[name]) continue;
-      if (!PROVIDER_MODELS[name]) continue;
+    const eligibleProviders = configuredProviders.filter(
+      (name) => providers[name] && PROVIDER_MODELS[name],
+    );
+    await Promise.all(eligibleProviders.map(async (name) => {
       try {
         const advancedRes = await fetch(`/providers/${name}/models/advanced`, { headers });
         if (advancedRes.ok) {
@@ -2008,7 +2009,7 @@ async function loadProviderOptions() {
                 label: entry.label || (index === 0 ? `${entry.id} (default)` : entry.id),
               }));
             }
-            continue;
+            return;
           }
         }
       } catch {}
@@ -2043,7 +2044,7 @@ async function loadProviderOptions() {
           }
         }
       } catch {}
-    }
+    }));
     loaded=SELECTABLE_PROVIDERS.length>0;
     if(loaded&&requestId===providerOptionsRequestId){
       providerOptionsLoading=false;
