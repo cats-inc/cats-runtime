@@ -1020,6 +1020,8 @@ export function createRuntimeServer(
     }
 
     startup.bootstrapRequired = false;
+
+    primeProviderAvailabilityDiagnosticsCache(context);
   };
 
   const app = createRuntimeApp(context);
