@@ -1697,14 +1697,45 @@ function createAvailabilityDiagnosticsCacheKey(
 ): string {
   return JSON.stringify({
     probeMode,
-    provider: filters.provider ?? null,
-    backend: filters.backend ?? null,
-    instance: filters.instance ?? null,
-    defaultOnly: filters.defaultOnly,
     toolCatalogScope: filters.toolCatalogScope,
     sessionId: filters.sessionId ?? null,
     sessionKey: filters.sessionKey ?? null,
   });
+}
+
+function stripProviderTargetFilters(
+  filters: ProviderDiagnosticsFilters,
+): ProviderDiagnosticsFilters {
+  return {
+    defaultOnly: false,
+    toolCatalogScope: filters.toolCatalogScope,
+    ...(filters.sessionId ? { sessionId: filters.sessionId } : {}),
+    ...(filters.sessionKey ? { sessionKey: filters.sessionKey } : {}),
+  };
+}
+
+function filterAvailabilityDiagnosticsResult(
+  result: ProviderDiagnosticsCollectionResult,
+  filters: ProviderDiagnosticsFilters,
+): ProviderDiagnosticsCollectionResult {
+  return {
+    catalog: filterProviderDiagnosticsCatalog(result.catalog, filters),
+    providers: result.providers.filter((provider) => {
+      if (filters.provider && provider.provider !== filters.provider) {
+        return false;
+      }
+      if (filters.backend && provider.backend !== filters.backend) {
+        return false;
+      }
+      if (filters.instance && provider.instance !== filters.instance) {
+        return false;
+      }
+      if (filters.defaultOnly && !provider.defaultTarget) {
+        return false;
+      }
+      return true;
+    }),
+  };
 }
 
 function createAvailabilityDiagnosticsCacheEntry(): AvailabilityDiagnosticsCacheEntry {
@@ -1757,22 +1788,28 @@ async function collectAvailabilityDiagnostics(
   forceRefresh = false,
   filters: ProviderDiagnosticsFilters = { defaultOnly: false, toolCatalogScope: 'catalog' },
 ): Promise<ProviderDiagnosticsCollectionResult> {
+  // Availability collection always probes the full catalog so prime and
+  // per-provider queries share a single cache entry; provider/backend/
+  // instance/defaultOnly are applied post-hoc to the returned snapshot.
+  const probeFilters = stripProviderTargetFilters(filters);
+
   if (forceRefresh || probeMode !== 'light') {
-    return collectProviderDiagnostics(
+    const result = await collectProviderDiagnostics(
       ctx,
       probeMode,
       env,
       forceRefresh,
-      filters,
+      probeFilters,
       {
         includeArtifacts: false,
         compatibilityPurpose: 'health',
       },
     );
+    return filterAvailabilityDiagnosticsResult(result, filters);
   }
 
   const cache = getAvailabilityDiagnosticsCacheMap(ctx);
-  const cacheKey = createAvailabilityDiagnosticsCacheKey(probeMode, filters);
+  const cacheKey = createAvailabilityDiagnosticsCacheKey(probeMode, probeFilters);
   let entry = cache.get(cacheKey);
   if (!entry) {
     entry = createAvailabilityDiagnosticsCacheEntry();
@@ -1781,7 +1818,7 @@ async function collectAvailabilityDiagnostics(
 
   const now = Date.now();
   if (entry.snapshot && entry.freshUntilMs > now) {
-    return entry.snapshot;
+    return filterAvailabilityDiagnosticsResult(entry.snapshot, filters);
   }
 
   if (entry.snapshot && entry.staleUntilMs > now) {
@@ -1791,23 +1828,25 @@ async function collectAvailabilityDiagnostics(
         entry,
         probeMode,
         env,
-        filters,
+        probeFilters,
       ).catch(() => undefined);
     }
-    return entry.snapshot;
+    return filterAvailabilityDiagnosticsResult(entry.snapshot, filters);
   }
 
   if (entry.inflight) {
-    return entry.inflight;
+    const inflightResult = await entry.inflight;
+    return filterAvailabilityDiagnosticsResult(inflightResult, filters);
   }
 
-  return startAvailabilityDiagnosticsRefresh(
+  const result = await startAvailabilityDiagnosticsRefresh(
     ctx,
     entry,
     probeMode,
     env,
-    filters,
+    probeFilters,
   );
+  return filterAvailabilityDiagnosticsResult(result, filters);
 }
 
 function summarizeProviderDiagnostics(
