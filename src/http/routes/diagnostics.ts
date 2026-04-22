@@ -115,7 +115,7 @@ type ProviderDiagnosticsScope = 'full' | 'availability';
 const DIAGNOSTIC_BACKENDS: readonly BackendKind[] = ['cli', 'api', 'local', 'agent'];
 const DEFAULT_REMOTE_ENDPOINT_PROBE_TIMEOUT_MS = DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS;
 const AVAILABILITY_DIAGNOSTICS_FRESH_TTL_MS = 30_000;
-const AVAILABILITY_DIAGNOSTICS_STALE_TTL_MS = 15 * 60_000;
+const AVAILABILITY_DIAGNOSTICS_STALE_TTL_MS = 5 * 60_000;
 
 interface DiagnosticCheck {
   code: string;
