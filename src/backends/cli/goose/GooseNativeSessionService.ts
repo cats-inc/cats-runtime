@@ -2,7 +2,6 @@ import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { DatabaseSync } from 'node:sqlite';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 
 export interface GooseNativeSessionSummary {
@@ -154,7 +153,7 @@ export class GooseNativeSessionService {
       // which patched `session resume` but left `session remove` unchanged — so until
       // a later Goose release skips confirm in non-interactive mode, the CLI contract
       // cannot carry out the delete on its own.
-      if (this.sqliteFallbackDelete(sessionId)) {
+      if (await this.sqliteFallbackDelete(sessionId)) {
         deletedAny = true;
         continue;
       }
@@ -178,12 +177,15 @@ export class GooseNativeSessionService {
     return true;
   }
 
-  private sqliteFallbackDelete(sessionId: string): boolean {
+  private async sqliteFallbackDelete(sessionId: string): Promise<boolean> {
     const dbPath = this.sessionDbPath;
     if (!dbPath || !existsSync(dbPath)) {
       return false;
     }
 
+    // Lazy-load node:sqlite so its experimental warning only fires when the
+    // Goose CLI fallback is actually exercised, not on every runtime startup.
+    const { DatabaseSync } = await import('node:sqlite');
     const db = new DatabaseSync(dbPath);
     try {
       db.exec('PRAGMA busy_timeout = 5000');
