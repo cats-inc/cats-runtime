@@ -92,7 +92,7 @@ describe('CodexProvider', () => {
       expect(threadFork.params.persistExtendedHistory).toBeUndefined();
     });
 
-    it('maps read_only workspace to a rejecting read-only policy', () => {
+    it('maps read_only workspace to the current Codex no-approval policy', () => {
       provider.buildSpawnArgs({
         ...baseOpts,
         workspaceMode: 'read_only',
@@ -104,13 +104,7 @@ describe('CodexProvider', () => {
       const threadStart = JSON.parse(lines[2]);
 
       expect(threadStart.params.sandbox).toBe('read-only');
-      expect(threadStart.params.approvalPolicy).toEqual({
-        reject: {
-          sandbox_approval: true,
-          rules: true,
-          mcp_elicitations: true,
-        },
-      });
+      expect(threadStart.params.approvalPolicy).toBe('never');
     });
 
     it('returns empty string when still initializing', () => {

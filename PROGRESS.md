@@ -4,6 +4,12 @@
 
 ## Current Status
 
+Latest update (2026-04-28): Codex CLI read-only/default sessions now send the
+current Codex JSON-RPC approval policy variant (`never`) with a read-only
+sandbox instead of the obsolete structured `reject` payload, preserving
+read-only behavior while keeping relay-style supervised fan-out compatible with
+current Codex.
+
 | Component | Status | Description |
 |-----------|--------|-------------|
 | Core | Completed | Embedded CLI runtime, shared session contracts, discovery, worker pool, runtime-owned shared/isolated/worktree workspace lifecycle helpers, structured runtime storage under `CATS_RUNTIME_DIR` with `config/`, `data/`, and `sessions/` subtrees, the compiled `build/runtime` output contract, first-slice runtime-owned usage/incident/guardrail contracts, a first conservative discriminated `StreamEvent` union cleanup that keeps the wire shape stable while tightening core event typing, additive session-maintenance/reset-boundary hooks, persisted maintenance trigger metadata, and a bounded stale-temp cleanup seam for transient `cats-runtime-*` workspaces are in-repo |

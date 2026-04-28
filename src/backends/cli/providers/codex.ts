@@ -52,11 +52,7 @@ type CodexState = 'uninitialized' | 'initializing' | 'ready' | 'failed';
 type CodexApprovalDecision = 'accept' | 'decline' | 'approved' | 'denied';
 
 interface CodexPermissionPolicy {
-  approvalPolicy: 'never' | 'untrusted' | { reject: {
-    sandbox_approval: boolean;
-    rules: boolean;
-    mcp_elicitations: boolean;
-  } };
+  approvalPolicy: 'never' | 'untrusted';
   sandbox: 'read-only' | 'workspace-write';
 }
 
@@ -706,13 +702,7 @@ export class CodexProvider implements Provider {
 
     if (permissionMode === 'default') {
       return {
-        approvalPolicy: {
-          reject: {
-            sandbox_approval: true,
-            rules: true,
-            mcp_elicitations: true,
-          },
-        },
+        approvalPolicy: 'never',
         sandbox,
       };
     }
