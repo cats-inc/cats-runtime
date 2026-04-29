@@ -1,5 +1,7 @@
 # === Agent Local Configs ===
 .claude/
+.codex
+.codex/
 .gemini/
 .agents/
 .cursor/
