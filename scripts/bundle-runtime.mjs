@@ -13,6 +13,8 @@ await build({
   format: 'esm',
   sourcemap: true,
   external: [
+    // yaml's published CJS build uses dynamic require("process") when bundled to ESM.
+    'yaml',
     // Browser automation is optional and large; keep it out of the hot startup bundle.
     'playwright-core',
   ],
