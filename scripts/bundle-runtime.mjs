@@ -12,5 +12,8 @@ await build({
   target: 'node22',
   format: 'esm',
   sourcemap: true,
-  packages: 'external',
+  external: [
+    // Browser automation is optional and large; keep it out of the hot startup bundle.
+    'playwright-core',
+  ],
 });
