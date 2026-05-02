@@ -461,7 +461,7 @@ describe('runtime-managed skills HTTP contract', () => {
       expect.objectContaining({
         instructionsFile,
       }),
-      undefined,
+      'default',
     );
   });
 

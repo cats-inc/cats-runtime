@@ -129,7 +129,7 @@ function buildMinimalProvidersYaml(
     };
 
     if (provider === 'kiro') {
-      const kiroDbPath = config.providerInstances?.kiro?.default?.kiroDbPath;
+      const kiroDbPath = config.providerInstances?.kiro?.native?.kiroDbPath;
       if (kiroDbPath) {
         instanceDoc.db_path = kiroDbPath;
       }
@@ -137,7 +137,7 @@ function buildMinimalProvidersYaml(
 
     cliProviders[provider] = {
       instances: {
-        default: instanceDoc,
+        native: instanceDoc,
       },
     };
   }

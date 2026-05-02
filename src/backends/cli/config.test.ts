@@ -438,7 +438,7 @@ describe('config platform defaults', () => {
       expect(config.providerCommands.claude.path).toBeTruthy();
       expect(config.providerDefaultTargets.claude).toEqual({
         backend: 'cli',
-        instance: 'default',
+        instance: 'native',
       });
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -578,7 +578,7 @@ providers:
         distro: undefined,
         environmentId: 'native',
       });
-      expect(resolveProviderInstance(config, 'kiro', 'default')).toMatchObject({
+      expect(resolveProviderInstance(config, 'kiro', 'native')).toMatchObject({
         id: 'native',
         commandConfig: {
           runtime: {

@@ -123,8 +123,8 @@ export class WslDiscoveryStatusStore {
     this.policy = config.wslDiscoveryPolicy ?? 'always';
     this.nativeDiscoveryIntervalMs = config.nativeDiscoveryIntervalMs;
     this.defaultInstances = {
-      cursor: config.providerDefaultInstances?.cursor || 'default',
-      kiro: config.providerDefaultInstances?.kiro || 'default',
+      cursor: config.providerDefaultInstances?.cursor || 'native',
+      kiro: config.providerDefaultInstances?.kiro || 'native',
     };
     this.providers = {};
 
@@ -441,7 +441,7 @@ function getConfiguredProviderRuntimes(
   }
 
   return [{
-    instanceId: config.providerDefaultInstances?.[provider] || 'default',
+    instanceId: config.providerDefaultInstances?.[provider] || 'native',
     runtime: provider === 'cursor' ? config.cursorRuntime : config.kiroRuntime,
   }];
 }

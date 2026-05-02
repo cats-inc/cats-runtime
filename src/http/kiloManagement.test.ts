@@ -203,7 +203,7 @@ describe('Kilo native session management', () => {
         cwd: 'C:/repo',
         resumeSessionId: 'kilo-123',
       }),
-      undefined,
+      'native',
     );
   });
 

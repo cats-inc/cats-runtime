@@ -415,7 +415,7 @@ describe('codex management', () => {
         forkSession: true,
         permissionMode: 'skip',
       },
-      undefined,
+      'native',
     );
   });
 });

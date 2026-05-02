@@ -190,7 +190,7 @@ export class RuntimeSessionManager {
       : opts;
 
     if (target.backend === 'cli') {
-      const cliInstanceId = !providerInstanceId || providerInstanceId === 'default'
+      const cliInstanceId = !providerInstanceId
         ? undefined
         : target.instanceId;
       const worker = this.pool.spawn(

@@ -581,7 +581,7 @@ describe('Pi session management', () => {
         resumeSourcePath: expectedResumePath,
         instructionsFile: expectedNewSkills?.delivery.instructions?.filePath,
       }),
-      undefined,
+      'default',
     );
     expect(registry.get(session.id)?.skills?.requestedSkills).toEqual(['delivery-auditor']);
   });
@@ -651,7 +651,7 @@ describe('Pi session management', () => {
       expect.objectContaining({
         instructionsFile: regeneratedInstructionsFile,
       }),
-      undefined,
+      'default',
     );
     expect(responseBody.hydration).toEqual(expect.objectContaining({
       trigger: 'resume',

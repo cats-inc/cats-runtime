@@ -487,7 +487,7 @@ function sessionMatchesTarget(
 ): boolean {
   return session.providerName === target.providerName
     && (session.providerBackend || 'cli') === target.backend
-    && (session.providerInstanceId || 'default') === target.instanceId;
+    && (session.providerInstanceId || target.instanceId) === target.instanceId;
 }
 
 async function resolveRequestedSessionModelState(

@@ -426,7 +426,7 @@ export function isNativeForkCompatible(
   if ((session.providerBackend || 'cli') !== target.backend) {
     return { compatible: false, reason: 'backend override requires context_transplant' };
   }
-  if ((session.providerInstanceId || 'default') !== (target.instanceId || 'default')) {
+  if ((session.providerInstanceId || target.instanceId) !== target.instanceId) {
     return { compatible: false, reason: 'instance override requires context_transplant' };
   }
   if (request.model !== undefined && request.model !== session.model) {

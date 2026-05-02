@@ -173,7 +173,7 @@ describe('Kiro native session management', () => {
         cwd: 'C:/repo',
         model: 'claude-sonnet-4.5',
       }),
-      undefined,
+      'native',
     );
   });
 
@@ -296,7 +296,7 @@ describe('Kiro native session management', () => {
       source: string;
       models: string[];
     };
-    expect(body.instance).toBe('default');
+    expect(body.instance).toBe('native');
     expect(body.runtime).toEqual({
       mode: 'native',
     });
@@ -306,58 +306,6 @@ describe('Kiro native session management', () => {
       'deepseek-3.2',
       'minimax-m2.1',
     ]);
-  });
-
-  it('treats instance=default as an alias for the configured default Kiro instance', async () => {
-    const config = makeConfig();
-    config.providerDefaultInstances = {
-      kiro: 'ubuntu',
-    };
-    config.providerInstances = {
-      kiro: {
-        native: {
-          id: 'native',
-          providerName: 'kiro',
-          commandConfig: {
-            ...config.providerCommands.kiro,
-            runtime: { mode: 'native' },
-          },
-          kiroDbPath: 'C:/kiro/native.sqlite3',
-        },
-        ubuntu: {
-          id: 'ubuntu',
-          providerName: 'kiro',
-          commandConfig: {
-            ...config.providerCommands.kiro,
-            runtime: { mode: 'wsl', distro: 'Ubuntu', environmentId: 'ubuntu' },
-          },
-          kiroDbPath: '/home/tester/.local/share/kiro-cli/data.sqlite3',
-        },
-      },
-    };
-    app = createApp({
-      config,
-      registry,
-      pool,
-      cursorNative,
-      kiroNative,
-      auggieSessions,
-      opencodeNative,
-    });
-
-    const res = await app.request('/kiro/models?instance=default');
-    const body = await res.json() as {
-      instance: string;
-      runtime: { mode: string; distro?: string; environmentId?: string };
-    };
-
-    expect(res.status).toBe(200);
-    expect(body.instance).toBe('ubuntu');
-    expect(body.runtime).toEqual({
-      mode: 'wsl',
-      distro: 'Ubuntu',
-      environmentId: 'ubuntu',
-    });
   });
 
   it('returns 400 when a requested Kiro instance does not exist', async () => {

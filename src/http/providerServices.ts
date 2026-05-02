@@ -94,7 +94,7 @@ function resolveNativeService<T>(
   }
 
   const defaultInstanceId = getProviderDefaultInstanceId(ctx.config, provider);
-  if (!instanceId || instanceId === 'default' || instanceId === defaultInstanceId) {
+  if (!instanceId || instanceId === defaultInstanceId) {
     return fallback;
   }
 

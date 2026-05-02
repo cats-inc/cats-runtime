@@ -186,7 +186,7 @@ function resolveContextService<T>(
   }
 
   const defaultInstanceId = getProviderDefaultInstanceId(config, provider);
-  if (!instanceId || instanceId === 'default' || instanceId === defaultInstanceId) {
+  if (!instanceId || instanceId === defaultInstanceId) {
     return fallback;
   }
 

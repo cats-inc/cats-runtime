@@ -525,7 +525,7 @@ export function getProviderDefaultInstanceId(
   config: Pick<CliRuntimeConfig, 'providerDefaultInstances'>,
   provider: ProviderName,
 ): string {
-  return config.providerDefaultInstances?.[provider] || 'default';
+  return config.providerDefaultInstances?.[provider] || 'native';
 }
 
 export function listProviderInstances(
@@ -602,9 +602,7 @@ export function resolveProviderInstance(
       throw new ProviderNotConfiguredError(provider);
     }
 
-    const selected = !instanceId || instanceId === 'default'
-      ? getProviderDefaultInstanceId(config, provider)
-      : instanceId;
+    const selected = instanceId || getProviderDefaultInstanceId(config, provider);
     const instance = configured[selected];
     if (instance) {
       return instance;
@@ -614,7 +612,7 @@ export function resolveProviderInstance(
   }
 
   const defaultInstanceId = getProviderDefaultInstanceId(config, provider);
-  if (instanceId && instanceId !== defaultInstanceId && instanceId !== 'default') {
+  if (instanceId && instanceId !== defaultInstanceId) {
     throw new UnknownProviderInstanceError(provider, instanceId, [defaultInstanceId]);
   }
 
@@ -644,18 +642,18 @@ function buildLegacyRuntimeShape(
   const providerCommands = buildLegacyProviderCommands(env);
   const kiroRuntime = providerCommands.kiro.runtime;
   const providerDefaultInstances = {
-    auggie: 'default',
-    claude: 'default',
-    codex: 'default',
-    copilot: 'default',
-    cursor: 'default',
-    gemini: 'default',
-    opencode: 'default',
-    kilo: 'default',
-    goose: 'default',
-    pi: 'default',
-    junie: 'default',
-    kiro: 'default',
+    auggie: 'native',
+    claude: 'native',
+    codex: 'native',
+    copilot: 'native',
+    cursor: 'native',
+    gemini: 'native',
+    opencode: 'native',
+    kilo: 'native',
+    goose: 'native',
+    pi: 'native',
+    junie: 'native',
+    kiro: 'native',
   } satisfies Record<ProviderName, string>;
   const providerDefaultTargets = Object.fromEntries(
     Object.entries(providerDefaultInstances).map(([provider, instance]) => [provider, {
@@ -692,64 +690,64 @@ function buildLegacyRuntimeShape(
 
   const providerInstances: Record<ProviderName, Record<string, ProviderInstanceConfig>> = {
     auggie: {
-      default: {
-        id: 'default',
+      native: {
+        id: 'native',
         providerName: 'auggie',
         commandConfig: providerCommands.auggie,
         auggieSessionsDir,
       },
     },
     claude: {
-      default: {
-        id: 'default',
+      native: {
+        id: 'native',
         providerName: 'claude',
         commandConfig: providerCommands.claude,
         claudeProjectsDir: env.CLAUDE_PROJECTS_DIR || `${home}/.claude/projects`,
       },
     },
     codex: {
-      default: {
-        id: 'default',
+      native: {
+        id: 'native',
         providerName: 'codex',
         commandConfig: providerCommands.codex,
         codexSessionsDir: env.CODEX_SESSIONS_DIR || `${home}/.codex/sessions`,
       },
     },
     copilot: {
-      default: {
-        id: 'default',
+      native: {
+        id: 'native',
         providerName: 'copilot',
         commandConfig: providerCommands.copilot,
         copilotSessionsDir: env.COPILOT_SESSIONS_DIR || `${home}/.copilot/session-state`,
       },
     },
     cursor: {
-      default: {
-        id: 'default',
+      native: {
+        id: 'native',
         providerName: 'cursor',
         commandConfig: providerCommands.cursor,
         cursorChatsDir,
       },
     },
     gemini: {
-      default: {
-        id: 'default',
+      native: {
+        id: 'native',
         providerName: 'gemini',
         commandConfig: providerCommands.gemini,
         geminiSessionsDir: env.GEMINI_SESSIONS_DIR || `${home}/.gemini/tmp`,
       },
     },
     kiro: {
-      default: {
-        id: 'default',
+      native: {
+        id: 'native',
         providerName: 'kiro',
         commandConfig: providerCommands.kiro,
         kiroDbPath,
       },
     },
     kilo: {
-      default: {
-        id: 'default',
+      native: {
+        id: 'native',
         providerName: 'kilo',
         commandConfig: providerCommands.kilo,
         kiloServerHost,
@@ -758,8 +756,8 @@ function buildLegacyRuntimeShape(
       },
     },
     opencode: {
-      default: {
-        id: 'default',
+      native: {
+        id: 'native',
         providerName: 'opencode',
         commandConfig: providerCommands.opencode,
         opencodeServerHost,
@@ -768,23 +766,23 @@ function buildLegacyRuntimeShape(
       },
     },
     pi: {
-      default: {
-        id: 'default',
+      native: {
+        id: 'native',
         providerName: 'pi',
         commandConfig: providerCommands.pi,
         piSessionsDir: env.PI_SESSIONS_DIR || defaultPiSessionsDir(),
       },
     },
     goose: {
-      default: {
-        id: 'default',
+      native: {
+        id: 'native',
         providerName: 'goose',
         commandConfig: providerCommands.goose,
       },
     },
     junie: {
-      default: {
-        id: 'default',
+      native: {
+        id: 'native',
         providerName: 'junie',
         commandConfig: providerCommands.junie,
       },
@@ -1087,7 +1085,7 @@ function applyFileBasedProviderConfig(
         );
         const fallback = nextInstances[instanceId]
           || Object.values(nextInstances)[0]
-          || legacy.providerInstances[provider].default;
+          || legacy.providerInstances[provider].native;
         const commandConfig = buildCommandConfigFromFile(
           provider,
           instanceId,

@@ -1323,12 +1323,13 @@ function formatInstanceOptionLabel(providerName, instance) {
 function shouldShowInstance(session) {
   const provider = providerMeta(session.providerName);
   if (!provider || !provider.instances || provider.instances.length <= 1) return false;
-  const instanceId = session.providerInstanceId || 'default';
-  return instanceId !== 'default' && instanceId !== provider.defaultInstance;
+  const instanceId = session.providerInstanceId;
+  return !!instanceId && instanceId !== provider.defaultInstance;
 }
 
 function formatSessionInstance(session) {
-  const instanceId = session.providerInstanceId || 'default';
+  const provider = providerMeta(session.providerName);
+  const instanceId = session.providerInstanceId || provider?.defaultInstance || '';
   const instance = instanceMeta(session.providerName, instanceId, session.providerBackend);
   if (instance) {
     return formatInstanceOptionLabel(session.providerName, instance);

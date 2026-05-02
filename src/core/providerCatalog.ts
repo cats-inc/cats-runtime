@@ -348,7 +348,7 @@ export function resolveProviderTarget(
     );
   }
 
-  if (!requestedInstance || requestedInstance === 'default') {
+  if (!requestedInstance) {
     const defaultTarget = providerCatalog.defaultTarget;
     if (defaultTarget) {
       const matched = providerCatalog.instances.find((instance) =>
