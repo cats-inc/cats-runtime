@@ -1214,20 +1214,16 @@ function escapeHtml(value) {
 const INJECTED_RUNTIME_API_BASE = typeof window.__CATS_RUNTIME_API_BASE__ === 'string'
   ? window.__CATS_RUNTIME_API_BASE__.trim()
   : '';
-const EXPECTED_PLATFORM_RUNTIME_PROXY = window.location.pathname === '/runtime'
-  || window.location.pathname.startsWith('/runtime/');
-const PLATFORM_RUNTIME_PROXY = Boolean(INJECTED_RUNTIME_API_BASE || EXPECTED_PLATFORM_RUNTIME_PROXY);
-if (!INJECTED_RUNTIME_API_BASE && EXPECTED_PLATFORM_RUNTIME_PROXY) {
+const PLATFORM_RUNTIME_PROXY = window.__CATS_RUNTIME_PROXY_MODE__ === true;
+if (PLATFORM_RUNTIME_PROXY && !INJECTED_RUNTIME_API_BASE) {
   console.warn(
-    'Cats runtime dashboard expected cats-platform proxy injection '
-    + 'but window.__CATS_RUNTIME_API_BASE__ is missing. Falling back to /runtime/api.',
+    'Cats runtime dashboard: platform proxy mode active but '
+    + 'window.__CATS_RUNTIME_API_BASE__ is missing. Falling back to window.location.origin.',
   );
 }
 const API_BASE = INJECTED_RUNTIME_API_BASE
   ? INJECTED_RUNTIME_API_BASE.replace(/\/+$/, '')
-  : EXPECTED_PLATFORM_RUNTIME_PROXY
-    ? '/runtime/api'
-    : window.location.origin;
+  : window.location.origin;
 const PROVIDER_ORDER = ['claude', 'codex', 'gemini', 'cursor', 'copilot', 'opencode', 'kilo', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'ollama', 'openclaw'];
 const CLI_RUNTIME_ORDER = ['native', 'wsl', 'docker'];
 let currentSessionId = null;

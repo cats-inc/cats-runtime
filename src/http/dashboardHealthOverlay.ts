@@ -42,20 +42,17 @@ const DASHBOARD_HEALTH_OVERLAY = `
     const configuredBase = typeof window.__CATS_RUNTIME_API_BASE__ === 'string'
       ? window.__CATS_RUNTIME_API_BASE__.trim()
       : '';
-    const expectedPlatformRuntimeProxy = window.location.pathname === '/runtime'
-      || window.location.pathname.indexOf('/runtime/') === 0;
-    if (!configuredBase && expectedPlatformRuntimeProxy && !runtimeProxyWarningEmitted) {
+    const proxyMode = window.__CATS_RUNTIME_PROXY_MODE__ === true;
+    if (proxyMode && !configuredBase && !runtimeProxyWarningEmitted) {
       runtimeProxyWarningEmitted = true;
       console.warn(
-        'Cats runtime health overlay expected cats-platform proxy injection '
-        + 'but window.__CATS_RUNTIME_API_BASE__ is missing. Falling back to /runtime/api.',
+        'Cats runtime health overlay: platform proxy mode active but '
+        + 'window.__CATS_RUNTIME_API_BASE__ is missing. Falling back to window.location.origin.',
       );
     }
     const base = configuredBase
       ? configuredBase.replace(/\\/+$/, '')
-      : expectedPlatformRuntimeProxy
-        ? '/runtime/api'
-        : window.location.origin;
+      : window.location.origin;
     return base + path;
   }
 

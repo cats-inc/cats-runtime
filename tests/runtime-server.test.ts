@@ -249,6 +249,7 @@ describe('runtime server', () => {
       expect(html).toContain('Session Dashboard');
       expect(html).toContain('session?.lastInputPreview');
       expect(html).toContain('window.__CATS_RUNTIME_API_BASE__');
+      expect(html).toContain('window.__CATS_RUNTIME_PROXY_MODE__');
       expect(html.indexOf('<option value="claude">claude</option>'))
         .toBeLessThan(html.indexOf('<option value="codex">codex</option>'));
       expect(html.indexOf('<option value="codex">codex</option>'))
