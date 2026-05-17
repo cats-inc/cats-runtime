@@ -32,6 +32,7 @@ const DASHBOARD_HEALTH_OVERLAY = `
   const summaryPath = ${JSON.stringify(RUNTIME_DIAGNOSTICS_PATHS.health)};
   let runtimeHealthPayload = null;
   let refreshInFlight = false;
+  let runtimeProxyWarningEmitted = false;
 
   function healthHeaders() {
     return typeof window.headers === 'function' ? window.headers() : {};
@@ -41,9 +42,20 @@ const DASHBOARD_HEALTH_OVERLAY = `
     const configuredBase = typeof window.__CATS_RUNTIME_API_BASE__ === 'string'
       ? window.__CATS_RUNTIME_API_BASE__.trim()
       : '';
+    const expectedPlatformRuntimeProxy = window.location.pathname === '/runtime'
+      || window.location.pathname.indexOf('/runtime/') === 0;
+    if (!configuredBase && expectedPlatformRuntimeProxy && !runtimeProxyWarningEmitted) {
+      runtimeProxyWarningEmitted = true;
+      console.warn(
+        'Cats runtime health overlay expected cats-platform proxy injection '
+        + 'but window.__CATS_RUNTIME_API_BASE__ is missing. Falling back to /runtime/api.',
+      );
+    }
     const base = configuredBase
       ? configuredBase.replace(/\\/+$/, '')
-      : window.location.origin;
+      : expectedPlatformRuntimeProxy
+        ? '/runtime/api'
+        : window.location.origin;
     return base + path;
   }
 

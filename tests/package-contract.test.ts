@@ -200,6 +200,14 @@ describe('package contract', () => {
     expect(packedPaths.has('build/runtime/stale/old-artifact.txt')).toBe(false);
   }, 90000);
 
+  it('emits public runtime HTML pages from the source UI pages', () => {
+    for (const filename of ['index.html', 'playground.html', 'provider-setup.html']) {
+      expect(readFileSync(join(runtimeRoot, 'public', filename), 'utf8')).toBe(
+        readFileSync(join(runtimeRoot, 'src', 'http', 'ui', 'pages', filename), 'utf8'),
+      );
+    }
+  });
+
   it('smokes the installed runtime entrypoint plus bundled helper scripts from a local tarball', () => {
     const installRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-pack-install-'));
     cleanupPaths.push(installRoot);
