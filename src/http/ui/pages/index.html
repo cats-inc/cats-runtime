@@ -1211,7 +1211,11 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-const API_BASE = window.location.origin;
+const PLATFORM_RUNTIME_PROXY = typeof window.__CATS_RUNTIME_API_BASE__ === 'string'
+  && window.__CATS_RUNTIME_API_BASE__.trim();
+const API_BASE = PLATFORM_RUNTIME_PROXY
+  ? window.__CATS_RUNTIME_API_BASE__.replace(/\/+$/, '')
+  : window.location.origin;
 const PROVIDER_ORDER = ['claude', 'codex', 'gemini', 'cursor', 'copilot', 'opencode', 'kilo', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'ollama', 'openclaw'];
 const CLI_RUNTIME_ORDER = ['native', 'wsl', 'docker'];
 let currentSessionId = null;
@@ -3833,13 +3837,23 @@ function validateApiKey(value) {
 
 function updateRuntimeAuthState() {
   const apiKeyInput = document.getElementById('apiKeyInput');
-  const hasValue = apiKeyInput.value.trim().length > 0;
   const authStatus = document.getElementById('runtimeAuthStatus');
+  const authToggle = document.getElementById('runtimeAuthToggle');
+  if (PLATFORM_RUNTIME_PROXY) {
+    authStatus.textContent = 'Proxied';
+    authStatus.dataset.state = 'active';
+    if (authToggle) authToggle.disabled = true;
+    document.getElementById('runtimeAuthEditor').classList.add('hidden');
+    return;
+  }
+  const hasValue = apiKeyInput.value.trim().length > 0;
   authStatus.textContent = hasValue ? 'Set' : 'Missing';
   authStatus.dataset.state = hasValue ? 'active' : 'idle';
+  if (authToggle) authToggle.disabled = false;
 }
 
 function toggleRuntimeAuthEditor(forceOpen) {
+  if (PLATFORM_RUNTIME_PROXY) return;
   const editor = document.getElementById('runtimeAuthEditor');
   const toggle = document.getElementById('runtimeAuthToggle');
   const shouldOpen = typeof forceOpen === 'boolean'

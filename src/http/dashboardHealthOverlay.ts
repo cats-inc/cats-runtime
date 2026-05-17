@@ -37,6 +37,16 @@ const DASHBOARD_HEALTH_OVERLAY = `
     return typeof window.headers === 'function' ? window.headers() : {};
   }
 
+  function runtimeApiUrl(path) {
+    const configuredBase = typeof window.__CATS_RUNTIME_API_BASE__ === 'string'
+      ? window.__CATS_RUNTIME_API_BASE__.trim()
+      : '';
+    const base = configuredBase
+      ? configuredBase.replace(/\\/+$/, '')
+      : window.location.origin;
+    return base + path;
+  }
+
   function mapRuntimeHealthState(status) {
     switch (status) {
       case 'ok':
@@ -174,7 +184,7 @@ const DASHBOARD_HEALTH_OVERLAY = `
 
     refreshInFlight = true;
     try {
-      const response = await fetch(window.location.origin + summaryPath, {
+      const response = await fetch(runtimeApiUrl(summaryPath), {
         headers: healthHeaders(),
       });
 
