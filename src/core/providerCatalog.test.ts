@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from './config.js';
-import { listConfiguredProviders, listProviderCatalog } from './providerCatalog.js';
+import {
+  listConfiguredProviders,
+  listProviderCatalog,
+  resolveProviderTarget,
+} from './providerCatalog.js';
 
 describe('provider catalog ordering', () => {
   it('uses the runtime canonical provider order for configured providers', () => {
@@ -62,5 +66,42 @@ describe('provider catalog ordering', () => {
       'ollama',
       'openclaw',
     ]);
+  });
+
+  it('treats instance=default as the configured provider default target alias', () => {
+    const config = loadConfig({
+      HOME: '/tmp/cats-runtime-provider-default-alias',
+      USERPROFILE: '/tmp/cats-runtime-provider-default-alias',
+    });
+    const nativeCursor = config.providerInstances.cursor?.native;
+    expect(nativeCursor).toBeDefined();
+
+    config.providerDefaultInstances = {
+      ...config.providerDefaultInstances,
+      cursor: 'ubuntu',
+    };
+    config.providerDefaultTargets = {
+      ...config.providerDefaultTargets,
+      cursor: { backend: 'cli', instance: 'ubuntu' },
+    };
+    config.providerInstances.cursor = {
+      ubuntu: {
+        id: 'ubuntu',
+        providerName: 'cursor',
+        commandConfig: {
+          path: 'cursor-agent',
+          runner: 'auto',
+          runtime: { mode: 'wsl', distro: 'Ubuntu', environmentId: 'ubuntu' },
+        },
+        cursorChatsDir: '/wsl/ubuntu/.cursor/chats',
+      },
+      native: nativeCursor!,
+    };
+
+    expect(resolveProviderTarget(config, 'cursor', 'default')).toMatchObject({
+      backend: 'cli',
+      instanceId: 'ubuntu',
+      defaultTarget: true,
+    });
   });
 });
