@@ -387,7 +387,7 @@ Current importer status in runtime:
   the CLI static-fallback catalog and the advanced catalog
 - Codex CLI: curated entry metadata plus effort control normalization on both
   the CLI static-fallback catalog and the advanced catalog
-- Gemini CLI: curated entry metadata on both the CLI static-fallback catalog
+- Antigravity CLI: curated entry metadata on both the CLI static-fallback catalog
   and the advanced catalog
 - Kilo CLI: curated entry metadata on both the CLI static-fallback catalog
   and the advanced catalog
