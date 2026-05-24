@@ -1693,7 +1693,7 @@ bounded form:
 - provider-side ACP execution is real through the shared `AgentAdapter` seam,
   with runtime-owned host capability mediation, persisted provider-managed
   continuity, cancel/close support, and full 12-family CLI ACP profile
-  coverage for `claude`, `codex`, `gemini`, `cursor`, `copilot`, `opencode`,
+  coverage for `claude`, `codex`, `antigravity`, `cursor`, `copilot`, `opencode`,
   `kilo`, `goose`, `pi`, `auggie`, `junie`, and `kiro`
 - `cats-runtime` can now be consumed directly by ACP-capable clients through a
   runtime-owned ACP facade:
@@ -1757,7 +1757,7 @@ follow-through on contract hardening, launch-truth hardening across the full
   `docs/specs/SPEC-025-acp-agent-adapters-and-runtime-facade.md`, anchored to
   the runtime's existing provider families rather than to the full public ACP
   ecosystem
-- keep the full 12-family CLI ACP matrix (`claude`, `codex`, `gemini`,
+- keep the full 12-family CLI ACP matrix (`claude`, `codex`, `antigravity`,
   `cursor`, `copilot`, `opencode`, `kilo`, `goose`, `pi`, `auggie`, `junie`,
   `kiro`) aligned across runtime docs, diagnostics, inspection, and launch
   guidance, while still treating Tier labels as prioritization metadata rather

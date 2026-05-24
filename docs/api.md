@@ -4281,7 +4281,7 @@ Errors use this format:
 - `GET /discovery/status` reports the configured WSL discovery policy plus the
   current background scan state for WSL-backed Cursor/Kiro discovery; when a
   provider has multiple WSL instances, the payload keys are `provider@instance`
-- File-scanned providers (`claude`, `codex`, `copilot`, `gemini`, `auggie`) now
+- File-scanned providers (`claude`, `codex`, `copilot`, `pi`, `auggie`) now
   discover external sessions per configured provider instance as well
 - File-backed provider paths are resolved on the host. On Windows, WSL-backed
   file providers may use Linux-style paths such as `~/.codex/sessions`; the
