@@ -29,9 +29,9 @@ describe('resolveAcpProviderProfile', () => {
       expected: { id: 'claude-acp', tier: 1 },
     },
     {
-      label: 'Gemini',
-      instance: createInstance('npx', ['-y', '@google/gemini-acp@latest', 'serve']),
-      expected: { id: 'gemini-acp', tier: 1 },
+      label: 'Antigravity',
+      instance: createInstance('agy-acp', ['serve']),
+      expected: { id: 'agy-acp', tier: 1 },
     },
     {
       label: 'Cursor',
@@ -158,5 +158,18 @@ describe('resolveAcpProviderProfile', () => {
     },
   ])('does not resolve $label without an ACP-specific launch signal', ({ instance }) => {
     expect(resolveAcpProviderProfile(instance)).toBeUndefined();
+  });
+
+  it('resolves Antigravity provider-managed ACP without treating raw agy stdio as ACP', () => {
+    expect(resolveAcpProviderProfile({
+      ...createInstance('', []),
+      providerName: 'antigravity',
+      transport: 'acp',
+    })).toEqual(expect.objectContaining({ id: 'agy-acp' }));
+
+    expect(resolveAcpProviderProfile({
+      ...createInstance('agy', []),
+      providerName: 'antigravity',
+    })).toBeUndefined();
   });
 });

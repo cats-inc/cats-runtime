@@ -132,33 +132,33 @@ function createClaudeStdioInstance(): RemoteProviderInstanceConfig {
   };
 }
 
-function createGeminiHttpInstance(): RemoteProviderInstanceConfig {
+function createAntigravityHttpInstance(): RemoteProviderInstanceConfig {
   return {
-    id: 'acp-gemini-remote',
-    providerName: 'gemini',
+    id: 'acp-antigravity-remote',
+    providerName: 'antigravity',
     backend: 'agent',
     transport: 'acp',
-    baseUrl: 'http://gemini-acp.test',
-    authTokenEnv: 'GEMINI_ACP_TOKEN',
+    baseUrl: 'http://agy-acp.test',
+    authTokenEnv: 'ANTIGRAVITY_ACP_TOKEN',
     headers: {
       'x-client-id': 'cats-runtime',
       accept: 'application/json',
     },
-    model: 'gemini-2.5-pro',
+    model: 'antigravity-default',
   };
 }
 
-function createGeminiStdioInstance(): RemoteProviderInstanceConfig {
+function createAntigravityStdioInstance(): RemoteProviderInstanceConfig {
   return {
-    id: 'acp-gemini-local',
-    providerName: 'gemini',
+    id: 'acp-antigravity-local',
+    providerName: 'antigravity',
     backend: 'agent',
     transport: 'acp_stdio',
-    command: 'gemini-acp',
+    command: 'agy-acp',
     args: ['serve'],
     cwd: '/tmp/acp',
     startupTimeoutMs: 15000,
-    model: 'gemini-2.5-pro',
+    model: 'antigravity-default',
   };
 }
 
@@ -586,22 +586,22 @@ describe('AcpAdapter', () => {
     });
   });
 
-  it('describes HTTP ACP targets with gemini profile when provider name is gemini', () => {
+  it('describes HTTP ACP targets with Antigravity profile when provider name is antigravity', () => {
     const adapter = new AcpAdapter({
-      env: { GEMINI_ACP_TOKEN: 'secret-token' },
+      env: { ANTIGRAVITY_ACP_TOKEN: 'secret-token' },
     });
 
-    const inspection = adapter.inspect(createGeminiHttpInstance());
+    const inspection = adapter.inspect(createAntigravityHttpInstance());
 
     expect(inspection).toEqual({
       adapter: 'acp',
       family: 'protocol',
       summary: expect.stringContaining('provider-managed ACP transport'),
-      endpoint: 'http://gemini-acp.test',
+      endpoint: 'http://agy-acp.test',
       profile: {
-        id: 'gemini-acp',
-        label: 'Gemini ACP',
-        family: 'gemini',
+        id: 'agy-acp',
+        label: 'Antigravity ACP',
+        family: 'antigravity',
         tier: 1,
       },
       transport: {
@@ -638,23 +638,23 @@ describe('AcpAdapter', () => {
     });
   });
 
-  it('describes stdio ACP targets with Gemini ACP profile label', () => {
+  it('describes stdio ACP targets with Antigravity ACP profile label', () => {
     const adapter = new AcpAdapter();
-    const inspection = adapter.inspect(createGeminiStdioInstance());
+    const inspection = adapter.inspect(createAntigravityStdioInstance());
 
     expect(inspection).toEqual({
       adapter: 'acp',
       family: 'protocol',
-      summary: expect.stringContaining('Gemini ACP is a supported Tier 1 ACP target'),
+      summary: expect.stringContaining('Antigravity ACP is a supported Tier 1 ACP target'),
       profile: {
-        id: 'gemini-acp',
-        label: 'Gemini ACP',
-        family: 'gemini',
+        id: 'agy-acp',
+        label: 'Antigravity ACP',
+        family: 'antigravity',
         tier: 1,
       },
       launch: {
         kind: 'stdio',
-        command: 'gemini-acp',
+        command: 'agy-acp',
         args: ['serve'],
         cwd: '/tmp/acp',
         startupTimeoutMs: 15000,
@@ -1191,7 +1191,7 @@ describe('AcpAdapter', () => {
     });
   });
 
-  it('runs a stdio help probe for gemini ACP Tier 1 targets', async () => {
+  it('runs a stdio help probe for Antigravity ACP Tier 1 targets', async () => {
     const process = new FakeAcpProcess();
     startFakeServer(process, async (message) => {
       if (message.method === 'initialize') {
@@ -1204,7 +1204,7 @@ describe('AcpAdapter', () => {
       if (message.method === 'session/new') {
         process.stdout.write(JSON.stringify({
           jsonrpc: '2.0', id: message.id,
-          result: { sessionId: 'probe-session-gemini', models: [{ modelId: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' }] },
+          result: { sessionId: 'probe-session-antigravity', models: [{ modelId: 'antigravity-default', name: 'Antigravity default' }] },
         }) + '\n');
       }
     });
@@ -1214,18 +1214,18 @@ describe('AcpAdapter', () => {
       acpProcessSpawner: createSpawner(process),
     });
 
-    const result = await adapter.probe!(createGeminiStdioInstance());
+    const result = await adapter.probe!(createAntigravityStdioInstance());
     expect(result.health.status).toBe('ok');
     expect(result.liveProbe).toEqual(expect.objectContaining({
-      profile: 'gemini-acp',
-      profileLabel: 'Gemini ACP',
+      profile: 'agy-acp',
+      profileLabel: 'Antigravity ACP',
       profileTier: 1,
-      command: 'gemini-acp',
+      command: 'agy-acp',
     }));
     expect(result.checks).toEqual(expect.arrayContaining([
       expect.objectContaining({
         code: 'acp_target_profile',
-        details: expect.objectContaining({ profile: 'gemini-acp', label: 'Gemini ACP', family: 'gemini', tier: 1 }),
+        details: expect.objectContaining({ profile: 'agy-acp', label: 'Antigravity ACP', family: 'antigravity', tier: 1 }),
       }),
     ]));
   });
@@ -1844,7 +1844,7 @@ describe('AcpAdapter', () => {
     expect(capabilities?._meta).toBeUndefined();
   });
 
-  it('keeps gemini ACP stdio initialize payloads free of provider-specific capability hints', async () => {
+  it('keeps Antigravity ACP stdio initialize payloads free of provider-specific capability hints', async () => {
     const process = new FakeAcpProcess();
     let initializeParams: Record<string, unknown> | undefined;
 
@@ -1855,7 +1855,7 @@ describe('AcpAdapter', () => {
         return;
       }
       if (message.method === 'session/new') {
-        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { sessionId: 'acp-session-init-gemini' } }) + '\n');
+        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { sessionId: 'acp-session-init-antigravity' } }) + '\n');
         return;
       }
       if (message.method === 'session/prompt') {
@@ -1865,7 +1865,7 @@ describe('AcpAdapter', () => {
 
     const hostBridge = createHostBridge();
     const adapter = new AcpAdapter({ acpHostBridge: hostBridge, acpProcessSpawner: createSpawner(process) });
-    await collectEvents(adapter.invoke(createInvokeInput(createGeminiStdioInstance(), hostBridge)));
+    await collectEvents(adapter.invoke(createInvokeInput(createAntigravityStdioInstance(), hostBridge)));
 
     const capabilities = initializeParams?.clientCapabilities as Record<string, unknown> | undefined;
     expect(capabilities?._meta).toBeUndefined();

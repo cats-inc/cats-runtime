@@ -38,12 +38,12 @@ const CLAUDE_ACP_PROFILE: AcpProviderProfile = {
   },
 };
 
-const GEMINI_ACP_PROFILE: AcpProviderProfile = {
-  id: 'gemini-acp',
-  label: 'Gemini ACP',
-  family: 'gemini',
+const ANTIGRAVITY_ACP_PROFILE: AcpProviderProfile = {
+  id: 'agy-acp',
+  label: 'Antigravity ACP',
+  family: 'antigravity',
   tier: 1,
-  summary: 'Tier 1 Gemini ACP target with public and curated registry overlap.',
+  summary: 'Tier 1 Antigravity ACP target aligned with the agy-acp adapter contract.',
   probe: {
     helpArgs: ['--help'],
   },
@@ -243,12 +243,11 @@ export function resolveAcpProviderProfile(
   }
 
   if (
-    providerName === 'gemini'
-    || commandName === 'gemini-acp'
-    || argNames.has('gemini-acp')
-    || argNames.has('@google/gemini-acp')
+    (providerName === 'antigravity' && instance.transport === 'acp')
+    || commandName === 'agy-acp'
+    || argNames.has('agy-acp')
   ) {
-    return GEMINI_ACP_PROFILE;
+    return ANTIGRAVITY_ACP_PROFILE;
   }
 
   if (

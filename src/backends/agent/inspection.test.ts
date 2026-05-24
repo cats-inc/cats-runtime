@@ -275,29 +275,29 @@ describe('inspectAgentTarget', () => {
     });
   });
 
-  it('describes ACP stdio transport semantics for gemini profile', () => {
+  it('describes ACP stdio transport semantics for Antigravity profile', () => {
     const inspection = inspectAgentTarget({
-      id: 'acp-gemini-local',
-      providerName: 'gemini',
+      id: 'acp-antigravity-local',
+      providerName: 'antigravity',
       backend: 'agent',
       transport: 'acp_stdio',
-      command: 'gemini-acp',
+      command: 'agy-acp',
       args: ['serve'],
       cwd: '/tmp/acp',
       startupTimeoutMs: 15000,
-      model: 'gemini-2.5-pro',
+      model: 'antigravity-default',
     });
 
     expect(inspection).toEqual(expect.objectContaining({
       adapter: 'acp',
       family: 'protocol',
-      summary: expect.stringContaining('Gemini ACP is a supported Tier 1 ACP target'),
+      summary: expect.stringContaining('Antigravity ACP is a supported Tier 1 ACP target'),
       profile: expect.objectContaining({
-        id: 'gemini-acp',
-        family: 'gemini',
+        id: 'agy-acp',
+        family: 'antigravity',
         tier: 1,
       }),
-      launch: expect.objectContaining({ command: 'gemini-acp' }),
+      launch: expect.objectContaining({ command: 'agy-acp' }),
     }));
   });
 
