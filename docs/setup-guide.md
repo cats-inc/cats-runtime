@@ -6,7 +6,7 @@
 
 - Node.js 22+
 - Installed local CLIs for the providers you want to use (`claude`, `codex`,
-  `gemini`, `cursor-agent`, `kiro-cli`, `kilo`, `opencode`, etc.)
+  `agy` for Antigravity, `cursor-agent`, `kiro-cli`, `kilo`, `opencode`, etc.)
 
 ## Quick Start (npx)
 
@@ -189,7 +189,7 @@ node build/runtime/index.js --review-provider-evolution-artifact artifact-id --p
 
 The probe path is intentionally manual-first and currently supports the
 highest-value CLI families first: `codex`, `copilot`, `pi`, `goose`,
-`gemini`, and `claude`. It now also supports the first agent-backed targets
+`antigravity`, and `claude`. It now also supports the first agent-backed targets
 through the same retained-artifact flow when the selected provider resolves to
 an `agent/<instance>` target such as `claude` on `agent/sdk`.
 
@@ -686,7 +686,7 @@ Currently supported agent transports are:
 
 Path semantics matter:
 
-- File-backed providers (`claude`, `codex`, `copilot`, `gemini`, `auggie`, `pi`) use
+- File-backed providers (`claude`, `codex`, `copilot`, `antigravity`, `auggie`, `pi`) use
   host-side discovery paths. `projects_dir` / `sessions_dir` must point to a
   path that the `cats-runtime` host process can read directly.
 - On Windows, if one of those file-backed providers is configured as
