@@ -192,7 +192,7 @@ describe('ProviderCompatibilityService', () => {
     tempDirs.push(root);
     mkdirSync(join(root, 'data'), { recursive: true });
     mkdirSync(join(root, 'sessions'), { recursive: true });
-    const fakeGemini = join(root, 'fake-gemini');
+    const fakeAgy = join(root, 'fake-agy');
     const originalHome = process.env.HOME;
     writeFileSync(
       join(root, '.bash_profile'),
@@ -200,24 +200,24 @@ describe('ProviderCompatibilityService', () => {
       'utf8',
     );
     writeFileSync(
-      fakeGemini,
+      fakeAgy,
       `#!/usr/bin/env bash
 set -euo pipefail
 if [[ "\${CATS_RUNTIME_SHELL_FALLBACK_READY:-0}" != "1" ]]; then
   exit 0
 fi
 if [[ "\${1:-}" == "--version" ]]; then
-  printf '0.35.3\\n'
+  printf 'agy 1.0.0\\n'
   exit 0
 fi
-printf 'Usage: gemini --output-format --resume\\n'
+printf 'Antigravity CLI\\nUsage: agy\\n'
 `,
       'utf8',
     );
-    chmodSync(fakeGemini, 0o755);
+    chmodSync(fakeAgy, 0o755);
 
-    const target = createCliTarget('gemini');
-    target.cliInstance!.commandConfig.path = fakeGemini;
+    const target = createCliTarget('antigravity');
+    target.cliInstance!.commandConfig.path = fakeAgy;
 
     process.env.HOME = root;
     try {
@@ -227,8 +227,8 @@ printf 'Usage: gemini --output-format --resume\\n'
       }, {
         installCheckRunner: createInstallCheckRunner({
           lookupCommand: vi.fn(async (command: string) => ({
-            available: command === fakeGemini || command === 'gemini' || command === 'node' || command === 'npm',
-            resolvedPath: command === fakeGemini ? fakeGemini : `/runtime/bin/${command}`,
+            available: command === fakeAgy || command === 'agy' || command === 'node' || command === 'npm',
+            resolvedPath: command === fakeAgy ? fakeAgy : `/runtime/bin/${command}`,
             timedOut: false,
           })),
         }),
@@ -236,10 +236,10 @@ printf 'Usage: gemini --output-format --resume\\n'
       });
 
       const assessment = await service.assessCliTarget(target);
-      expect(assessment.classification).toBe('ready');
-      expect(assessment.profile.id).toBe('gemini-cli-stream-json-v1');
-      expect(assessment.fingerprint.version.normalized).toBe('0.35.3');
-      expect(assessment.fingerprint.features).toContain('token:--output-format');
+      expect(assessment.classification).toBe('degraded');
+      expect(assessment.profile.id).toBe('antigravity-cli-runtime-default');
+      expect(assessment.summary).toBe("No provider-specific compatibility profile is shipped for 'antigravity'.");
+      expect(assessment.fingerprint.version.normalized).toBe('1.0.0');
       expect(assessment.setup.command.status).toBe('ready');
     } finally {
       if (originalHome === undefined) {
@@ -247,81 +247,6 @@ printf 'Usage: gemini --output-format --resume\\n'
       } else {
         process.env.HOME = originalHome;
       }
-    }
-  });
-
-  it('infers Gemini compatibility from npm metadata when macOS headless probes time out', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-gemini-metadata-'));
-    tempDirs.push(root);
-    const prefixDir = join(root, 'prefix');
-    const binDir = join(prefixDir, 'bin');
-    const packageJsonPath = join(
-      prefixDir,
-      'lib',
-      'node_modules',
-      '@google',
-      'gemini-cli',
-      'package.json',
-    );
-    mkdirSync(binDir, { recursive: true });
-    mkdirSync(join(prefixDir, 'lib', 'node_modules', '@google', 'gemini-cli'), { recursive: true });
-    writeFileSync(join(binDir, 'gemini'), '#!/usr/bin/env node\n', 'utf8');
-    writeFileSync(packageJsonPath, JSON.stringify({ version: '0.35.3' }), 'utf8');
-
-    const originalPlatform = process.platform;
-    Object.defineProperty(process, 'platform', {
-      configurable: true,
-      value: 'darwin',
-    });
-    try {
-      const target = createCliTarget('gemini');
-      target.cliInstance!.commandConfig.path = 'gemini';
-      const service = new ProviderCompatibilityService({
-        dataDir: join(root, 'data'),
-        sessionBaseDir: join(root, 'sessions'),
-      }, {
-        runner: {
-          run: vi.fn(async () => ({
-            exitCode: null,
-            stdout: '',
-            stderr: '',
-            timedOut: true,
-            durationMs: 5_500,
-            error: 'Timed out after 5000ms',
-          })),
-        },
-        installCheckRunner: createInstallCheckRunner({
-          lookupCommand: vi.fn(async (command: string) => ({
-            available: command === 'gemini' || command === 'node' || command === 'npm',
-            resolvedPath: command === 'gemini' ? join(binDir, 'gemini') : `/runtime/bin/${command}`,
-            timedOut: false,
-          })),
-          checkNpmPackage: vi.fn(async () => ({
-            exists: true,
-            timedOut: false,
-          })),
-        }),
-        now: () => Date.parse('2026-03-23T00:00:00.750Z'),
-      });
-
-      const assessment = await service.assessCliTarget(target);
-      expect(assessment.classification).toBe('ready');
-      expect(assessment.status).toBe('ok');
-      expect(assessment.profile.id).toBe('gemini-cli-stream-json-v1');
-      expect(assessment.summary).toBe("Gemini CLI matched compatibility profile 'gemini-cli-stream-json-v1'.");
-      expect(assessment.fingerprint.version.normalized).toBe('0.35.3');
-      expect(assessment.fingerprint.features).toContain('metadata:--output-format');
-      expect(assessment.checks).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          code: 'metadata_probe_inference',
-          status: 'ok',
-        }),
-      ]));
-    } finally {
-      Object.defineProperty(process, 'platform', {
-        configurable: true,
-        value: originalPlatform,
-      });
     }
   });
 
@@ -408,11 +333,6 @@ printf 'Usage: gemini --output-format --resume\\n'
       helpOutput: string;
     }> = [
       {
-        providerName: 'gemini',
-        versionOutput: '0.35.3\n',
-        helpOutput: 'Usage: gemini --output-format --resume\n',
-      },
-      {
         providerName: 'pi',
         versionOutput: '0.63.1\n',
         helpOutput: 'Usage: pi --mode rpc --session <path>\n',
@@ -495,8 +415,8 @@ printf 'Usage: gemini --output-format --resume\\n'
       run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
         exitCode: 0,
         stdout: args[0] === '--version'
-          ? 'gemini 1.0.0\n'
-          : '--output-format --resume\n',
+          ? 'agy 1.0.0\n'
+          : 'Antigravity CLI\nUsage: agy\n',
         stderr: '',
         timedOut: false,
         durationMs: 3,
@@ -512,8 +432,8 @@ printf 'Usage: gemini --output-format --resume\\n'
       now: () => Date.parse('2026-03-23T00:00:00.000Z'),
     });
 
-    const first = await service.assessCliTarget(createCliTarget('gemini'));
-    const second = await service.assessCliTarget(createCliTarget('gemini'));
+    const first = await service.assessCliTarget(createCliTarget('antigravity'));
+    const second = await service.assessCliTarget(createCliTarget('antigravity'));
     expect(first.cache.hit).toBe(false);
     expect(second.cache.hit).toBe(true);
     expect(runner.run).toHaveBeenCalledTimes(2);
@@ -1180,18 +1100,18 @@ printf 'Usage: gemini --output-format --resume\\n'
           if (args[0] === '--version') {
             return {
               exitCode: 0,
-              stdout: 'gemini 1.3.0\n',
+              stdout: 'codex-cli 0.117.0\n',
               stderr: '',
               timedOut: false,
               durationMs: 2,
             };
           }
 
-          if (args.includes('--yolo')) {
+          if (args[0] === 'app-server' && args.includes('--help')) {
             return {
               exitCode: 2,
               stdout: '',
-              stderr: 'unknown option --yolo',
+              stderr: 'app-server unavailable',
               timedOut: false,
               durationMs: 2,
             };
@@ -1199,7 +1119,7 @@ printf 'Usage: gemini --output-format --resume\\n'
 
           return {
             exitCode: 0,
-            stdout: 'Usage: gemini --output-format --resume\n',
+            stdout: 'Codex CLI\n\nCommands:\n  app-server  Run the app server\n',
             stderr: '',
             timedOut: false,
             durationMs: 2,
@@ -1210,13 +1130,13 @@ printf 'Usage: gemini --output-format --resume\\n'
       now: () => Date.parse('2026-03-23T00:01:10.000Z'),
     });
 
-    const assessment = await service.assessCliTarget(createCliTarget('gemini'), {
+    const assessment = await service.assessCliTarget(createCliTarget('codex'), {
       probeMode: 'live',
     });
     expect(assessment.classification).toBe('probe_failed');
     expect(assessment.profile.confidence).toBe('weak');
     expect(assessment.probe.liveValidated).toBe(false);
-    expect(assessment.evidence?.relativePath).toMatch(/^gemini\//);
+    expect(assessment.evidence?.relativePath).toMatch(/^codex\//);
     expect(assessment.checks).toEqual(expect.arrayContaining([
       expect.objectContaining({
         code: 'live_probe_failed',

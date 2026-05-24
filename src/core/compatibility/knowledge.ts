@@ -11,11 +11,6 @@ const CLAUDE_STREAM_JSON_ARGS = [
   '--include-partial-messages',
 ];
 
-const GEMINI_STREAM_JSON_ARGS = [
-  '--output-format', 'stream-json',
-  '--yolo',
-];
-
 const COPILOT_JSON_ARGS = [
   '--output-format', 'json',
   '--stream', 'on',
