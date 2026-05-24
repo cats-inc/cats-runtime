@@ -39,7 +39,7 @@ This spec is the runtime counterpart to cats-platform SPEC-110. ADR-032 captures
 ## User Stories
 
 - As a runtime operator, I want `Settings > Runtime` and the dashboard to show `antigravity` as a known Google-family CLI so that the local `agy` install is recognized as a usable provider.
-- As a playground user, I want the provider dropdown to expose `antigravity` with a working model list so that I can compose runs against the local `agy` CLI.
+- As a playground user, I want the provider dropdown to expose `antigravity` without fabricated model ids, so I can compose runs only after the `agy` execution and model-selection contracts are verified.
 - As a runtime maintainer, I want `gemini` removed from provider knowledge so that diagnostics don't claim a non-installable provider is missing.
 - As an ACP adopter, I want `agent/acp:antigravity` available alongside the CLI-subprocess transport so I can drive Antigravity through openab's `agy-acp` profile when desired.
 
@@ -77,7 +77,7 @@ The fix is not additive. The Gemini-named seams must be replaced, not extended.
    - Replace `gemini` in the agent-enabled list (line ~1266) with `antigravity`.
 10. The runtime shall update the playground at `src/http/ui/pages/playground.html`:
     - Replace the `gemini:` badge style block with `antigravity:`.
-    - Replace the `gemini:` model list with an `antigravity:` model list mirrored from `cats-platform/src/shared/providerCatalogData.ts` after SPEC-110 Phase 1 lands.
+    - Replace the `gemini:` model list with an `antigravity:` entry. Keep the bundled runtime list empty until Phase 1 proves raw `agy` model ids; user-curated YAML may populate local entries explicitly.
     - Replace `gemini` in the `PROVIDERS` array with `antigravity`.
     - Replace the default agent provider entry that points at `gemini`.
     - Update any provider-id reference in `copilot` and `cursor` model lists that names `gemini-*` models — these are vendor-named submodels and may stay, but their string labels must be reviewed.

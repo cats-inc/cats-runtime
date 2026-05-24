@@ -2422,7 +2422,7 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
-  it('applies curated Antigravity CLI entry metadata from curated-model-catalogs.yaml', () => {
+  it('applies user-curated Antigravity CLI entry metadata from curated-model-catalogs.yaml', () => {
     const runtime = createRuntimeRoot();
 
     try {
@@ -2433,15 +2433,18 @@ describe('ProviderModelCatalogService', () => {
         '    version: probe-required',
         '    last_updated: 2026-05-24',
         '    models:',
-        '      - name: Gemini 3.1 Pro (high)',
-        '        label: Gemini 3.1 Pro (high)',
+        '      - name: antigravity-fixture-high',
+        '        label: Antigravity fixture high',
         '        default: true',
+        '        tags: [reasoning]',
         '        notes:',
-        '          - Primary reasoning model.',
-        '      - name: Gemini 3.1 Pro (low)',
-        '        label: Gemini 3.1 Pro (low)',
-        '      - name: Gemini 3 Flash',
-        '        label: Gemini 3 Flash',
+        '          - User supplied model entry.',
+        '      - name: antigravity-fixture-low',
+        '        label: Antigravity fixture low',
+        '        tags: [reasoning]',
+        '      - name: antigravity-fixture-fast',
+        '        label: Antigravity fixture fast',
+        '        tags: [latency_optimized]',
         '',
       ].join('\n'), 'utf8');
 
@@ -2486,24 +2489,22 @@ describe('ProviderModelCatalogService', () => {
         provider: 'antigravity',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'Gemini 3.1 Pro (high)',
+        defaultModel: 'antigravity-fixture-high',
         source: 'static',
         cache: null,
         models: [
           {
-            id: 'Gemini 3.1 Pro (high)',
-            label: 'Gemini 3.1 Pro (high)',
+            id: 'antigravity-fixture-high',
+            label: 'Antigravity fixture high',
             default: true,
           },
           {
-            id: 'Gemini 3.1 Pro (low)',
-            label: 'Gemini 3.1 Pro (low)',
-            default: false,
+            id: 'antigravity-fixture-low',
+            label: 'Antigravity fixture low',
           },
           {
-            id: 'Gemini 3 Flash',
-            label: 'Gemini 3 Flash',
-            default: false,
+            id: 'antigravity-fixture-fast',
+            label: 'Antigravity fixture fast',
           },
         ],
         warnings: [],
@@ -2512,26 +2513,26 @@ describe('ProviderModelCatalogService', () => {
         provider: 'antigravity',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'Gemini 3.1 Pro (high)',
+        defaultModel: 'antigravity-fixture-high',
         source: 'static',
         cache: null,
         entries: [
           {
-            id: 'Gemini 3.1 Pro (high)',
-            label: 'Gemini 3.1 Pro (high)',
+            id: 'antigravity-fixture-high',
+            label: 'Antigravity fixture high',
             default: true,
             capabilityTags: ['reasoning'],
-            notes: ['Primary reasoning model.'],
+            notes: ['User supplied model entry.'],
           },
           {
-            id: 'Gemini 3.1 Pro (low)',
-            label: 'Gemini 3.1 Pro (low)',
+            id: 'antigravity-fixture-low',
+            label: 'Antigravity fixture low',
             default: false,
             capabilityTags: ['reasoning'],
           },
           {
-            id: 'Gemini 3 Flash',
-            label: 'Gemini 3 Flash',
+            id: 'antigravity-fixture-fast',
+            label: 'Antigravity fixture fast',
             default: false,
             capabilityTags: ['latency_optimized'],
           },

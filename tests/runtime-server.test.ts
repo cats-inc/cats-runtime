@@ -482,6 +482,7 @@ describe('runtime server', () => {
       expect(html).toContain('Runtime Health');
       expect(html).toContain('validateRuntimeApiKey');
       expect(html).toContain('getRuntimeAuthHeaders');
+      expect(html).toContain('antigravity:[],');
       expect(html).toContain("junie:[{value:'Gemini 3 Flash',label:'Gemini 3 Flash (default)'},{value:'Claude Opus 4.6',label:'Claude Opus 4.6'},{value:'Claude Opus 4.7',label:'Claude Opus 4.7'},{value:'Claude Sonnet 4.6',label:'Claude Sonnet 4.6'},{value:'Gemini 3.1 Flash Lite',label:'Gemini 3.1 Flash Lite'},{value:'Gemini 3.1 Pro Preview',label:'Gemini 3.1 Pro Preview'},{value:'GPT-5',label:'GPT-5'},{value:'GPT-5.2',label:'GPT-5.2'},{value:'GPT-5.3-codex',label:'GPT-5.3-codex'},{value:'GPT-5.4',label:'GPT-5.4'},{value:'Grok 4.1 Fast Reasoning',label:'Grok 4.1 Fast Reasoning'}],");
       expect(html).not.toContain("junie:[{value:'gpt-5.4',label:'gpt-5.4 (default)'}],");
       expect(html).toContain('/providers/${name}/models/advanced');
@@ -4007,7 +4008,7 @@ providers:
     });
   });
 
-  it('GET /providers/antigravity/models preserves the curated Antigravity CLI order', async () => {
+  it('GET /providers/antigravity/models omits bundled models until agy model ids are verified', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/antigravity/models');
       expect(response.status).toBe(200);
@@ -4015,34 +4016,14 @@ providers:
         provider: 'antigravity',
         backend: 'cli',
         instance: 'native',
-        defaultModel: 'Gemini 3.1 Pro (high)',
+        defaultModel: null,
         source: 'static',
         cache: null,
-        models: [
-          {
-            id: 'Gemini 3.1 Pro (high)',
-            label: 'Gemini 3.1 Pro (high)',
-            default: true,
-          },
-          {
-            id: 'Gemini 3.1 Pro (low)',
-            label: 'Gemini 3.1 Pro (low)',
-            default: false,
-          },
-          { id: 'Gemini 3 Flash', label: 'Gemini 3 Flash', default: false },
-          {
-            id: 'Claude Sonnet 4.6 (thinking)',
-            label: 'Claude Sonnet 4.6 (thinking)',
-            default: false,
-          },
-          {
-            id: 'Claude Opus 4.6 (thinking)',
-            label: 'Claude Opus 4.6 (thinking)',
-            default: false,
-          },
-          { id: 'GPT-OSS-120b', label: 'GPT-OSS-120b', default: false },
+        models: [],
+        warnings: [
+          'Antigravity CLI model ids are not verified by a live agy model-list probe yet; '
+          + 'serving no bundled static model ids until that contract is proven.',
         ],
-        warnings: [],
       });
     });
   });
@@ -4537,7 +4518,7 @@ providers:
     });
   });
 
-  it('GET /providers/antigravity/models and /advanced honor curated Antigravity CLI YAML', async () => {
+  it('GET /providers/antigravity/models and /advanced honor user-curated Antigravity CLI YAML', async () => {
     await withCuratedCatalogRuntime([
       'schema_version: 1',
       'catalogs:',
@@ -4545,15 +4526,18 @@ providers:
       '    version: probe-required',
       '    last_updated: 2026-05-24',
       '    models:',
-      '      - name: Gemini 3.1 Pro (high)',
-      '        label: Gemini 3.1 Pro (high)',
+      '      - name: antigravity-fixture-high',
+      '        label: Antigravity fixture high',
       '        default: true',
+      '        tags: [reasoning]',
       '        notes:',
-      '          - Primary reasoning model.',
-      '      - name: Gemini 3.1 Pro (low)',
-      '        label: Gemini 3.1 Pro (low)',
-      '      - name: Gemini 3 Flash',
-      '        label: Gemini 3 Flash',
+      '          - User supplied model entry.',
+      '      - name: antigravity-fixture-low',
+      '        label: Antigravity fixture low',
+      '        tags: [reasoning]',
+      '      - name: antigravity-fixture-fast',
+      '        label: Antigravity fixture fast',
+      '        tags: [latency_optimized]',
     ], {}, {}, async (runtime) => {
       const modelsResponse = await runtime.app.request('/providers/antigravity/models');
       expect(modelsResponse.status).toBe(200);
@@ -4561,24 +4545,22 @@ providers:
         provider: 'antigravity',
         backend: 'cli',
         instance: 'native',
-        defaultModel: 'Gemini 3.1 Pro (high)',
+        defaultModel: 'antigravity-fixture-high',
         source: 'static',
         cache: null,
         models: [
           {
-            id: 'Gemini 3.1 Pro (high)',
-            label: 'Gemini 3.1 Pro (high)',
+            id: 'antigravity-fixture-high',
+            label: 'Antigravity fixture high',
             default: true,
           },
           {
-            id: 'Gemini 3.1 Pro (low)',
-            label: 'Gemini 3.1 Pro (low)',
-            default: false,
+            id: 'antigravity-fixture-low',
+            label: 'Antigravity fixture low',
           },
           {
-            id: 'Gemini 3 Flash',
-            label: 'Gemini 3 Flash',
-            default: false,
+            id: 'antigravity-fixture-fast',
+            label: 'Antigravity fixture fast',
           },
         ],
         warnings: [],
@@ -4590,26 +4572,26 @@ providers:
         provider: 'antigravity',
         backend: 'cli',
         instance: 'native',
-        defaultModel: 'Gemini 3.1 Pro (high)',
+        defaultModel: 'antigravity-fixture-high',
         source: 'static',
         cache: null,
         entries: [
           {
-            id: 'Gemini 3.1 Pro (high)',
-            label: 'Gemini 3.1 Pro (high)',
+            id: 'antigravity-fixture-high',
+            label: 'Antigravity fixture high',
             default: true,
             capabilityTags: ['reasoning'],
-            notes: ['Primary reasoning model.'],
+            notes: ['User supplied model entry.'],
           },
           {
-            id: 'Gemini 3.1 Pro (low)',
-            label: 'Gemini 3.1 Pro (low)',
+            id: 'antigravity-fixture-low',
+            label: 'Antigravity fixture low',
             default: false,
             capabilityTags: ['reasoning'],
           },
           {
-            id: 'Gemini 3 Flash',
-            label: 'Gemini 3 Flash',
+            id: 'antigravity-fixture-fast',
+            label: 'Antigravity fixture fast',
             default: false,
             capabilityTags: ['latency_optimized'],
           },

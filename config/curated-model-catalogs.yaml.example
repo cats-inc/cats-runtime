@@ -144,25 +144,8 @@ catalogs:
     last_updated: 2026-05-24
     notes:
       - "Source: cats-runtime Phase 0 Antigravity CLI probe notes. Raw agy model IDs are not yet verified."
-    models:
-      - name: Gemini 3.1 Pro (high)
-        label: Gemini 3.1 Pro (high)
-        default: true
-
-      - name: Gemini 3.1 Pro (low)
-        label: Gemini 3.1 Pro (low)
-
-      - name: Gemini 3 Flash
-        label: Gemini 3 Flash
-
-      - name: Claude Sonnet 4.6 (thinking)
-        label: Claude Sonnet 4.6 (thinking)
-
-      - name: Claude Opus 4.6 (thinking)
-        label: Claude Opus 4.6 (thinking)
-
-      - name: GPT-OSS-120b
-        label: GPT-OSS-120b
+      - "Bundled static Antigravity model IDs stay empty until a live agy model-list contract is proven."
+    models: []
 
   - cli: Cursor
     version: 2026.04.16-2d20146

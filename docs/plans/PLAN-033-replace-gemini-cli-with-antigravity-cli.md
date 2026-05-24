@@ -91,7 +91,7 @@ This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
   - [ ] `src/http/ui/shared.ts:36` (badge style)
   - [ ] `src/http/ui/pages/index.html:34,177,194,218` (dashboard CSS / selectors)
 - [ ] In `src/http/ui/pages/index.html:1098,1227,1266`, replace the `gemini` option, `PROVIDER_ORDER` entry, and agent-enabled list entry with `antigravity`.
-- [ ] In `src/http/ui/pages/playground.html:389,407,421,1274`, replace the `gemini` badge style block, model list, `PROVIDERS` array entry, and default agent provider with `antigravity`. Mirror the new model list from the updated `cats-platform/src/shared/providerCatalogData.ts`.
+- [ ] In `src/http/ui/pages/playground.html:389,407,421,1274`, replace the `gemini` badge style block, model list, `PROVIDERS` array entry, and default agent provider with `antigravity`. Keep the bundled Antigravity model list empty until Phase 1 proves raw `agy` model ids; user-curated YAML may populate local entries explicitly.
 - [ ] In `src/http/ui/pages/playground.html:408,413,414`, audit the `copilot` / `openrouter` / `cursor` model lists for references to `gemini-*` vendor models — those are vendor-named submodels and may stay if Google still ships them under Copilot / Cursor, but the labels should be reviewed for accuracy.
 - [ ] Audit `src/http/ui/pages/provider-setup.html` for any Gemini-specific UI that the SPEC-026 grep did not catch (the file showed no matches but should be eyeballed).
 - [ ] Regenerate `src/http/ui/generated/runtimeTailwind.ts` via the runtime UI build (`npm run build:runtime-ui-css` or equivalent).
@@ -171,7 +171,7 @@ This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
 - **Integration tests**: `npm test -- src/http` after Phase 6 completes.
 - **Manual testing**: Start the runtime (`npm run dev`), confirm:
   - Dashboard shows Antigravity badge in the slot Gemini previously occupied.
-  - Playground provider dropdown lists `antigravity` and the model list populates.
+  - Playground provider dropdown lists `antigravity` and does not fabricate bundled model ids before the `agy` model contract is proven.
   - `Settings > Runtime` (if visible from runtime side) lists `antigravity` as the Google-family provider.
   - With `agy` not installed, the provider shows as missing with an install hint; with `agy` installed, it shows as available.
 - **Cross-repo verification**: After cats-platform PLAN-100 lands and the desktop app is repackaged, smoke-test the Electron flow end-to-end.
@@ -179,7 +179,7 @@ This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
 ## Risks & Mitigations
 
 - **Antigravity CLI's actual contract differs from openab's `agy-acp` profile**: Phase 1 probe surfaces this before any code is written. Mitigation: gate Phases 2-3 on the probe research note.
-- **Cross-repo phase ordering breaks**: if runtime UI lands before platform shared catalog, the playground model list can drift from the packaged provider catalog. Mitigation: Phase 4 explicitly waits on cats-platform PLAN-100 Phase 1 and mirrors the finalized values.
+- **Cross-repo phase ordering breaks**: if runtime UI lands before platform shared catalog, the playground model list can drift from the packaged provider catalog. Mitigation: Phase 4 keeps the bundled runtime list empty until the shared `agy` probe produces finalized values.
 - **Tests rely on `gemini` as a generic provider id**: silent test-only references may survive Phase 6. Mitigation: final grep sweep in Phase 7 catches stragglers.
 - **Agent-governance files are misclassified as CLI files**: editing `GEMINI.md` would violate the project file-ownership rules and conflate Gemini-the-agent with Gemini CLI. Mitigation: leave `GEMINI.md` out of scope and justify governance references during the final grep sweep.
 

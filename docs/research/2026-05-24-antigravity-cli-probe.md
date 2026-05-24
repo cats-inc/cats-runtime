@@ -81,6 +81,7 @@ Findings:
 - `setupAssets.ts` should mark Antigravity helpers as user-scoped
   (`requiresElevation: false`) and resumable, based on the local wrapper
   re-check / retry semantics.
-- Platform static catalog can expose the official Antigravity reasoning-model
-  display names, while runtime dynamic catalog work should wait for live CLI
-  evidence before asserting raw `agy` model ids.
+- Runtime bundled static catalog should stay empty for Antigravity until a live
+  CLI model-list contract proves raw `agy` model ids. User-curated YAML may
+  still supply local entries explicitly, but the bundled runtime must not lock
+  documented display names as canonical ids.

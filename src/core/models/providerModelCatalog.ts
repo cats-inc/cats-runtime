@@ -206,14 +206,7 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark' },
     { id: 'gpt-5.2', label: 'gpt-5.2' },
   ],
-  antigravity: [
-    { id: 'Gemini 3.1 Pro (high)', label: 'Gemini 3.1 Pro (high)', default: true },
-    { id: 'Gemini 3.1 Pro (low)', label: 'Gemini 3.1 Pro (low)' },
-    { id: 'Gemini 3 Flash', label: 'Gemini 3 Flash' },
-    { id: 'Claude Sonnet 4.6 (thinking)', label: 'Claude Sonnet 4.6 (thinking)' },
-    { id: 'Claude Opus 4.6 (thinking)', label: 'Claude Opus 4.6 (thinking)' },
-    { id: 'GPT-OSS-120b', label: 'GPT-OSS-120b' },
-  ],
+  antigravity: [],
   copilot: [
     { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
     { id: 'claude-opus-4.6', label: 'claude-opus-4.6' },
@@ -1516,11 +1509,18 @@ export class ProviderModelCatalogService {
     warnings: string[],
   ): ProviderModelCatalogResult {
     const curatedModels = buildCuratedStaticCliModels(target, this.config, this.env, warnings);
+    const staticModels = curatedModels || getStaticProviderModels(target);
+    if (target.backend === 'cli' && target.providerName === 'antigravity' && staticModels.length === 0) {
+      warnings.push(
+        'Antigravity CLI model ids are not verified by a live agy model-list probe yet; '
+        + 'serving no bundled static model ids until that contract is proven.',
+      );
+    }
     return this.buildCatalog(target, {
       defaultModel,
       source: 'static',
       cache: null,
-      models: withDefaultModel(curatedModels || getStaticProviderModels(target), defaultModel).models,
+      models: withDefaultModel(staticModels, defaultModel).models,
       warnings,
     });
   }
