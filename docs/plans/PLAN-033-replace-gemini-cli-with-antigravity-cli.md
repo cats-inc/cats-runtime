@@ -112,7 +112,7 @@ This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
 - [x] Update fixtures in `src/http/providerDiagnostics.test.ts` (the heaviest user of `gemini`): CLI-provider fixtures move to `antigravity`; the remaining `gemini` references are Google API transport/model probe tests and stay out of this CLI migration.
 - [x] Update fixtures across the remaining `src/http/*.test.ts` files that mention `gemini`: CLI-provider fixtures moved to `antigravity` or another provider where provider-agnostic; the remaining hits are Google API transport/cache tests, vendor model labels, or explicit regression text for not parsing Antigravity with the legacy Gemini parser.
 - [x] Update `src/http/ui/shared.playground.test.ts` to match the playground changes.
-- [ ] Run `npm test -- src/http` and confirm green.
+- [x] Run `npm test -- src/http` and confirm green.
 
 **Deliverables**: Test suite passes with no Gemini CLI-provider references in the codebase; Google API transport/model references may remain.
 
@@ -190,6 +190,7 @@ This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
 | 2026-05-24 | Plan created alongside ADR-032 and SPEC-026. |
 | 2026-05-24 | Follow-up tightened the plan around evidence gaps: Antigravity native-session discovery stays absent until a real `agy` session path exists; workspace substrate drops Gemini without adding Antigravity; runtime playground mirrors the platform `antigravity-default` sentinel while the HTTP model catalog still avoids unverified raw model ids. |
 | 2026-05-24 | Implementation progress synced: provider-install knowledge, compatibility, ACP profile, session/history removal, diagnostics/UI/provider config, generated UI artifacts, and historical Docker-login docs now reflect Antigravity. Live `agy --help` / `agy --version`, session storage, and importable session evidence remain open. |
+| 2026-05-24 | Runtime HTTP verification is green: `npm test -- src/http` passed after the maintenance follow-through tie-break fix, with remaining Gemini references justified as Google API transport/model ids, vendor-routed submodel labels, historical research, or agent-governance files. |
 
 ---
 
