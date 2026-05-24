@@ -58,7 +58,7 @@ describe('WorkerProcess PowerShell helpers', () => {
     );
 
     await expect(worker.sendMessage('ignored')).rejects.toThrow(
-      'Gemini has no capacity available for the selected model right now.',
+      'Antigravity has no capacity available for the selected model right now.',
     );
   });
 
@@ -72,7 +72,7 @@ describe('WorkerProcess PowerShell helpers', () => {
 
     const startedAt = Date.now();
     await expect(worker.sendMessage('ignored')).rejects.toThrow(
-      'Gemini has no capacity available for the selected model right now.',
+      'Antigravity has no capacity available for the selected model right now.',
     );
     expect(Date.now() - startedAt).toBeLessThan(2500);
   });
@@ -156,12 +156,12 @@ describe('WorkerProcess PowerShell helpers', () => {
     const stream = worker.streamMessage('ignored');
     await expect(stream.next()).resolves.toMatchObject({
       done: false,
-      value: { type: 'init', sessionId: 'gemini-session' },
+      value: { type: 'init', sessionId: 'antigravity-session' },
     });
 
     const startedAt = Date.now();
     await expect(stream.next()).rejects.toThrow(
-      'Gemini stopped responding after the initial response for 1500ms.',
+      'Antigravity stopped responding after the initial response for 1500ms.',
     );
     expect(Date.now() - startedAt).toBeLessThan(3000);
   });
@@ -210,7 +210,7 @@ function createCompletionOnlyProvider(
 
 function createRefusalBeforeTimeoutProvider(exitDelayMs = 50): Provider {
   return {
-    name: 'gemini',
+    name: 'antigravity',
     capabilities: { resume: true, fork: false, permissions: false },
     ephemeral: true,
     buildSpawnArgs() {
@@ -231,7 +231,7 @@ function createRefusalBeforeTimeoutProvider(exitDelayMs = 50): Provider {
     classifyLaunchFailure() {
       return {
         category: 'capacity_exhausted',
-        message: 'Gemini has no capacity available for the selected model right now.',
+        message: 'Antigravity has no capacity available for the selected model right now.',
         statusCode: 429,
         retryable: true,
         source: 'stderr',
@@ -318,7 +318,7 @@ function createPortNumberOnlyErrorProvider(): Provider {
 
 function createSigtermIgnoringSilentProvider(): Provider {
   return {
-    name: 'gemini',
+    name: 'antigravity',
     capabilities: { resume: true, fork: false, permissions: false },
     ephemeral: true,
     buildSpawnArgs() {
@@ -341,14 +341,14 @@ function createSigtermIgnoringSilentProvider(): Provider {
 
 function createInitThenStallProvider(): Provider {
   return {
-    name: 'gemini',
+    name: 'antigravity',
     capabilities: { resume: true, fork: false, permissions: false },
     ephemeral: true,
     buildSpawnArgs() {
       return [
         '-e',
         [
-          "process.stdout.write(JSON.stringify({ type: 'init', session_id: 'gemini-session' }) + '\\n');",
+          "process.stdout.write(JSON.stringify({ type: 'init', session_id: 'antigravity-session' }) + '\\n');",
           "process.on('SIGTERM', () => {});",
           'setTimeout(() => process.exit(0), 2000);',
         ].join(' '),

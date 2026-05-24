@@ -55,7 +55,7 @@ describe('SessionRegistry', () => {
 
   it('filters by provider', () => {
     registry.create({ providerName: 'claude', cwd: '/a' });
-    registry.create({ providerName: 'gemini', cwd: '/b' });
+    registry.create({ providerName: 'antigravity', cwd: '/b' });
     expect(registry.list({ provider: 'claude' })).toHaveLength(1);
   });
 
