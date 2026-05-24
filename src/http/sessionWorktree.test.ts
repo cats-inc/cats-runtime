@@ -272,7 +272,7 @@ describe('session worktree routes', () => {
         cwd: body.cwd,
         workspaceMode: 'shared',
       }),
-      undefined,
+      'native',
     );
   });
 

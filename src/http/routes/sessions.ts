@@ -1787,7 +1787,7 @@ function getMaintenanceFollowThrough(
     if (followThrough.action !== action || followThrough.phase !== phase) {
       continue;
     }
-    if (!latest || followThrough.observedAt > latest.observedAt) {
+    if (!latest || followThrough.observedAt >= latest.observedAt) {
       latest = followThrough;
     }
   }

@@ -467,6 +467,99 @@ describe('buildSessionMaintenance', () => {
     expect(maintenance.followThroughHistory).toHaveLength(2);
   });
 
+  it('prefers later pre-flush follow-through records when timestamps tie', () => {
+    const maintenance = buildSessionMaintenance({
+      session: createSession({
+        status: 'closed',
+        messageCount: 3,
+        totalInputTokens: 300,
+        totalOutputTokens: 100,
+        workspaceIsolation: {
+          mode: 'worktree',
+          sourceCwd: '/repo',
+          worktree: {
+            id: 'repo-session-1',
+            sourceRepoRoot: '/repo',
+            worktreePath: '/sessions/worktrees/repo/session-1',
+            preparedAt: '2026-03-23T00:00:00.000Z',
+          },
+        },
+      }),
+      view: createView({
+        attached: false,
+        activity: 'inactive',
+      }),
+      trackedMaintenance: {
+        lastRequest: {
+          action: 'delete',
+          sessionId: 'session-1',
+          requestedAt: '2026-03-24T04:00:00.000Z',
+          workspaceMode: 'shared',
+          isolationMode: 'worktree',
+          runtimeCwd: '/sessions/worktrees/repo/session-1',
+          sourceCwd: '/repo',
+          worktreePath: '/sessions/worktrees/repo/session-1',
+          hookPayloads: [],
+        },
+        requestHistory: [
+          {
+            action: 'delete',
+            sessionId: 'session-1',
+            requestedAt: '2026-03-24T04:00:00.000Z',
+            workspaceMode: 'shared',
+            isolationMode: 'worktree',
+            runtimeCwd: '/sessions/worktrees/repo/session-1',
+            sourceCwd: '/repo',
+            worktreePath: '/sessions/worktrees/repo/session-1',
+            hookPayloads: [],
+          },
+        ],
+        lastFollowThrough: {
+          action: 'delete',
+          phase: 'pre_flush',
+          sessionId: 'session-1',
+          observedAt: '2026-03-24T04:02:00.000Z',
+          outcome: 'retry_requested',
+          reason: 'memory_flush_needs_retry',
+          hookPayloads: [],
+        },
+        followThroughHistory: [
+          {
+            action: 'delete',
+            phase: 'pre_flush',
+            sessionId: 'session-1',
+            observedAt: '2026-03-24T04:02:00.000Z',
+            outcome: 'acknowledged',
+            reason: 'memory_flush_completed',
+            hookPayloads: [],
+          },
+          {
+            action: 'delete',
+            phase: 'pre_flush',
+            sessionId: 'session-1',
+            observedAt: '2026-03-24T04:02:00.000Z',
+            outcome: 'retry_requested',
+            reason: 'memory_flush_needs_retry',
+            hookPayloads: [],
+          },
+        ],
+        markers: [],
+      },
+    });
+
+    expect(maintenance.flush).toEqual(expect.objectContaining({
+      status: 'retry_requested',
+      phase: 'pre_flush',
+      hookCount: 1,
+      action: 'delete',
+      reasonCodes: ['follow_through_retry_requested'],
+      lastFollowThrough: expect.objectContaining({
+        outcome: 'retry_requested',
+        reason: 'memory_flush_needs_retry',
+      }),
+    }));
+  });
+
   it('uses the last compaction baseline to evaluate only post-compaction live context', () => {
     const maintenance = buildSessionMaintenance({
       session: createSession({

@@ -328,7 +328,7 @@ function resolveLatestMaintenanceRequest(
     if (!actions.includes(request.action)) {
       continue;
     }
-    if (!latest || request.requestedAt > latest.requestedAt) {
+    if (!latest || request.requestedAt >= latest.requestedAt) {
       latest = request;
     }
   }
@@ -345,7 +345,7 @@ function resolveLatestMaintenanceFollowThrough(
     if (!actions.includes(followThrough.action) || followThrough.phase !== phase) {
       continue;
     }
-    if (!latest || followThrough.observedAt > latest.observedAt) {
+    if (!latest || followThrough.observedAt >= latest.observedAt) {
       latest = followThrough;
     }
   }
