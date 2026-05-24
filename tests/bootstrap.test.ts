@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -24,12 +24,13 @@ import {
   createRuntimeTestPaths,
   ensureRuntimeTestDirs,
 } from './support/runtimeTestPaths.js';
+import { cleanupTempDirWithRetries } from './tempCleanup.js';
 
 function createTestRoot(): { root: string; cleanup: () => void } {
   const root = mkdtempSync(join(tmpdir(), 'cats-bootstrap-test-'));
   return {
     root,
-    cleanup: () => rmSync(root, { recursive: true, force: true }),
+    cleanup: () => cleanupTempDirWithRetries(root),
   };
 }
 
@@ -590,13 +591,22 @@ describe('bootstrap mode server', () => {
           providers: Record<string, {
             defaultBackend?: string;
             defaultInstance?: string;
+            instances?: Array<{ id?: string; target?: string }>;
           }>;
         };
         expect(configBody.providers).toHaveProperty('claude');
         expect(configBody.providers.claude).toEqual(expect.objectContaining({
           defaultBackend: 'cli',
-          defaultInstance: 'default',
+          defaultInstance: 'native',
         }));
+        expect(configBody.providers.claude.instances).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              id: 'native',
+              target: 'cli/native',
+            }),
+          ]),
+        );
       } finally {
         await runtime.close();
       }

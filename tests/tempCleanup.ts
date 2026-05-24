@@ -17,8 +17,8 @@ export function cleanupTempDirWithRetries(
     return;
   }
 
-  const attempts = options.attempts ?? 5;
-  const delayMs = options.delayMs ?? 75;
+  const attempts = options.attempts ?? 10;
+  const delayMs = options.delayMs ?? 100;
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
