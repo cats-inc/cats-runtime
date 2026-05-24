@@ -1,6 +1,11 @@
 # Docker CLI Agent Login Validation
 
-> Validated: 2026-03-17 | Updated: 2026-03-18
+> Validated: 2026-03-17 | Updated: 2026-05-24
+
+> 2026-05-24 status: the Gemini CLI rows in this note are historical
+> validation evidence only. `@google/gemini-cli` has been superseded by
+> Antigravity CLI (`agy`) in the current local Google-family provider plan, and
+> this note must not be used as current Gemini CLI setup guidance.
 
 ## Purpose
 
@@ -33,6 +38,8 @@ export PATH="/root/.local/bin:$PATH"
 
 - claude, cursor-agent, kiro-cli, goose: dedicated installer scripts
 - codex, gemini, copilot, auggie, opencode, junie, pi: `npm i -g`
+  at the time of the 2026-03-17 validation. Gemini is now historical; current
+  Google-family local CLI setup uses the native Antigravity `agy` installer.
 
 Source: `environment-bootstrap/platform/linux/install-node-packages.sh`
 and individual `install-*.sh` scripts.
@@ -48,7 +55,7 @@ No arguments are needed for most of the login commands.
 |-------|--------------|-----------|--------|
 | claude | `claude auth login` | OAuth (copy code) | Pass |
 | codex | `codex auth` | Device code | Pass |
-| gemini | `gemini auth login` | Device code | Pass |
+| gemini | `gemini auth login` | Device code | Pass (historical; superseded by Antigravity `agy`) |
 | copilot | `copilot auth login` | Device code (github.com) | Pass |
 | cursor-agent | `cursor-agent` | OAuth (browser) | Pass |
 | kiro-cli | `kiro-cli auth login` | OAuth (AWS Builder ID) | Pass |

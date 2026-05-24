@@ -53,30 +53,30 @@ This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
 - [ ] Install `agy` locally via environment-bootstrap `Install-AntigravityCLI.ps1` (Windows) or `install-antigravity-cli.sh` (macOS/Linux).
 - [ ] Capture `agy --version` output (or equivalent flag) and parse format.
 - [ ] Capture `agy --help` to identify ACP / stream-json / session subcommands.
-- [ ] Look for model-id evidence using candidate subcommands (`agy models`, `agy models list`, or equivalent), documented config files, official product documentation, and smoke-run acceptance. `agy --help` alone is not sufficient model-id evidence.
-- [ ] For the shared platform probe, record whether Antigravity's user-scoped installer requires elevation and whether native-binary download retries are idempotent enough for Cats Desktop to mark the setup helper `resumable: true`.
+- [x] Look for model-id evidence using candidate subcommands (`agy models`, `agy models list`, or equivalent), documented config files, official product documentation, and smoke-run acceptance. `agy --help` alone is not sufficient model-id evidence. The shared research note found display-name evidence only and kept bundled Antigravity model ids out of the runtime catalog.
+- [x] For the shared platform probe, record whether Antigravity's user-scoped installer requires elevation and whether native-binary download retries are idempotent enough for Cats Desktop to mark the setup helper `resumable: true`.
 - [ ] Identify Antigravity's session storage path (PATH, `LOCALAPPDATA`, `~/.local`, or none).
 - [ ] If sessions exist, capture a sample session file to determine readable format.
 - [ ] Compare against openab's `agy-acp` adapter expectations to confirm ACP transport contract.
-- [ ] Document findings in a research note under `docs/research/2026-05-24-antigravity-cli-probe.md`.
+- [x] Document findings in a research note under `docs/research/2026-05-24-antigravity-cli-probe.md`.
 
 **Deliverables**: Research note with concrete answers to all SPEC-026 Open Questions.
 
 ### Phase 2: Data Layer
 
-- [ ] In `src/core/provider-install/knowledge.ts:471-476`, remove the `gemini` `createGenericNpmKnowledge(...)` entry and add an `antigravity` `createNativeInstall(...)` entry using the binary name `agy` and the PATH/LOCALAPPDATA detection contract.
-- [ ] In `src/core/compatibility/knowledge.ts:152-174`, remove `gemini-cli-stream-json-v1` and `gemini-cli-stream-json-best-fit` profiles. Add `antigravity-*` profiles if Phase 1 confirms a stream contract worth profiling; otherwise leave Antigravity profile-less and let the evidence engine fall back to presence detection.
-- [ ] In `src/backends/agent/adapters/acp/profiles.ts:41-50`, remove `GEMINI_ACP_PROFILE` and add `ANTIGRAVITY_ACP_PROFILE` (family `antigravity`, tier 1) aligned with openab's `agy-acp` adapter. Detect `agy-acp` command / args for ACP; do not treat raw `agy` as ACP-capable unless Phase 1 proves it.
-- [ ] In `src/core/models/providerModelCatalog.ts`, decouple local CLI provider selection from the Google API model catalog. Keep Google/Gemini API model ids and transport behavior intact unless a separate API-provider rename lands.
+- [x] In `src/core/provider-install/knowledge.ts:471-476`, remove the `gemini` `createGenericNpmKnowledge(...)` entry and add an `antigravity` `createNativeInstall(...)` entry using the binary name `agy` and the PATH/LOCALAPPDATA detection contract.
+- [x] In `src/core/compatibility/knowledge.ts:152-174`, remove `gemini-cli-stream-json-v1` and `gemini-cli-stream-json-best-fit` profiles. Add `antigravity-*` profiles if Phase 1 confirms a stream contract worth profiling; otherwise leave Antigravity profile-less and let the evidence engine fall back to presence detection.
+- [x] In `src/backends/agent/adapters/acp/profiles.ts:41-50`, remove `GEMINI_ACP_PROFILE` and add `ANTIGRAVITY_ACP_PROFILE` (family `antigravity`, tier 1) aligned with openab's `agy-acp` adapter. Detect `agy-acp` command / args for ACP; do not treat raw `agy` as ACP-capable unless Phase 1 proves it.
+- [x] In `src/core/models/providerModelCatalog.ts`, decouple local CLI provider selection from the Google API model catalog. Keep Google/Gemini API model ids and transport behavior intact unless a separate API-provider rename lands.
 
 **Deliverables**: Provider data layer recognizes `antigravity`, no longer recognizes `gemini`.
 
 ### Phase 3: Session, Discovery, History
 
-- [ ] Remove Gemini native-session discovery and do not add an Antigravity scanner until Phase 1 records a real `agy` session storage contract. If `agy` later exposes scannable sessions, add an `AntigravitySessionScanner` from that evidence instead of porting the legacy Gemini reader.
-- [ ] Remove `getGeminiSessionsDir` / Gemini file-backed path resolution. Do not add `getAntigravitySessionsDir` until a real session path is known.
-- [ ] In `src/http/routes/sessions.ts`, remove Gemini native-session import/discovery branches. Add Antigravity discovery only if Phase 1 confirms an importable session format.
-- [ ] In `src/http/routes/history.ts:32,35,64,479-500`, remove `geminiExtractText`, the `gemini_native` parser branch, and the `'gemini_native'` parser id. Add an `antigravity_native` parser only if Phase 1 confirms a readable format.
+- [x] Remove Gemini native-session discovery and do not add an Antigravity scanner until Phase 1 records a real `agy` session storage contract. If `agy` later exposes scannable sessions, add an `AntigravitySessionScanner` from that evidence instead of porting the legacy Gemini reader.
+- [x] Remove `getGeminiSessionsDir` / Gemini file-backed path resolution. Do not add `getAntigravitySessionsDir` until a real session path is known.
+- [x] In `src/http/routes/sessions.ts`, remove Gemini native-session import/discovery branches. Add Antigravity discovery only if Phase 1 confirms an importable session format.
+- [x] In `src/http/routes/history.ts:32,35,64,479-500`, remove `geminiExtractText`, the `gemini_native` parser branch, and the `'gemini_native'` parser id. Add an `antigravity_native` parser only if Phase 1 confirms a readable format.
 
 **Deliverables**: Session discovery and history import operate on Antigravity (or honestly return empty).
 
@@ -84,26 +84,26 @@ This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
 
 **Blocking dependency**: cats-platform PLAN-100 Phase 1 (shared provider catalog data) must be merged before this phase touches UI files. Confirm by checking that `cats-platform/src/shared/providerCatalogData.ts` lists `antigravity` as the platform-side provider, then mirror those values here.
 
-- [ ] In `src/http/routes/diagnostics.ts:1382` and `src/http/routes/diagnosticsSupport.ts:27`, replace `'gemini'` literals with `'antigravity'`.
-- [ ] In `src/http/routes/workspaceSubstrate.ts:33,48,50`, remove `gemini` from the `ENABLED_AGENTS` literal and related union type. Do not add `antigravity` unless a later probe confirms a workspace-substrate / skills-file contract equivalent to the existing Claude/Codex support.
-- [ ] Decide on a new `--antigravity` color token value (resolves SPEC-026 Open Question). Apply it in:
-  - [ ] `src/http/ui/tailwind.runtime.css` (CSS var definition)
-  - [ ] `src/http/ui/shared.ts:36` (badge style)
-  - [ ] `src/http/ui/pages/index.html:34,177,194,218` (dashboard CSS / selectors)
-- [ ] In `src/http/ui/pages/index.html:1098,1227,1266`, replace the `gemini` option, `PROVIDER_ORDER` entry, and agent-enabled list entry with `antigravity`.
-- [ ] In `src/http/ui/pages/playground.html:389,407,421,1274`, replace the `gemini` badge style block, model list, `PROVIDERS` array entry, and default agent provider with `antigravity`. Expose only the `antigravity-default` provider-default sentinel in the bundled playground list until Phase 1 proves raw `agy` model ids; user-curated YAML may populate local entries explicitly.
+- [x] Audit `src/http/routes/diagnostics.ts` and `src/http/routes/diagnosticsSupport.ts` for Gemini CLI provider literals. Local-provider diagnostics now use `antigravity`; the remaining `instance.transport === 'gemini'` checks are Google API transport aliases and intentionally stay out of this CLI migration.
+- [x] In `src/http/routes/workspaceSubstrate.ts:33,48,50`, remove `gemini` from the `ENABLED_AGENTS` literal and related union type. Do not add `antigravity` unless a later probe confirms a workspace-substrate / skills-file contract equivalent to the existing Claude/Codex support.
+- [x] Decide on a new `--antigravity` color token value (resolves SPEC-026 Open Question). Apply it in:
+  - [x] `src/http/ui/tailwind.runtime.css` (CSS var definition)
+  - [x] `src/http/ui/shared.ts:36` (badge style)
+  - [x] `src/http/ui/pages/index.html:34,177,194,218` (dashboard CSS / selectors)
+- [x] In `src/http/ui/pages/index.html:1098,1227,1266`, replace the `gemini` option, `PROVIDER_ORDER` entry, and agent-enabled list entry with `antigravity`.
+- [x] In `src/http/ui/pages/playground.html:389,407,421,1274`, replace the `gemini` badge style block, model list, `PROVIDERS` array entry, and default agent provider with `antigravity`. Expose only the `antigravity-default` provider-default sentinel in the bundled playground list until Phase 1 proves raw `agy` model ids; user-curated YAML may populate local entries explicitly.
 - [ ] In `src/http/ui/pages/playground.html:408,413,414`, audit the `copilot` / `openrouter` / `cursor` model lists for references to `gemini-*` vendor models — those are vendor-named submodels and may stay if Google still ships them under Copilot / Cursor, but the labels should be reviewed for accuracy.
-- [ ] Audit `src/http/ui/pages/provider-setup.html` for any Gemini-specific UI that the SPEC-026 grep did not catch (the file showed no matches but should be eyeballed).
-- [ ] Regenerate `src/http/ui/generated/runtimeTailwind.ts` via the runtime UI build (`npm run build:runtime-ui-css` or equivalent).
-- [ ] Regenerate `public/index.html` and `public/playground.html` from the updated sources.
+- [x] Audit `src/http/ui/pages/provider-setup.html` for any Gemini-specific UI that the SPEC-026 grep did not catch (the file showed no matches but should be eyeballed).
+- [x] Regenerate `src/http/ui/generated/runtimeTailwind.ts` via the runtime UI build (`npm run build:runtime-ui-css` or equivalent).
+- [x] Regenerate `public/index.html` and `public/playground.html` from the updated sources.
 
 **Deliverables**: Dashboard, playground, and diagnostics surfaces present Antigravity in the slot Gemini previously held.
 
 ### Phase 5: Config and Env Examples
 
-- [ ] In `config/providers.yaml.example:41-44,150-157`, rename the top-level default target and CLI backend `gemini` blocks to `antigravity`, update `command:` from `gemini` to `agy`, update session-timeout if Antigravity has a different expected latency profile, and adjust the auth-hint copy if Antigravity has a different login flow.
-- [ ] Leave `config/providers.yaml.example:262-270` (`backends.api.providers.gemini`, `transport: google`, `GEMINI_API_KEY`) intact unless a separate API-provider rename lands.
-- [ ] In `.env.example:28`, keep `GEMINI_API_KEY=` for the existing Google API transport. Do not add `ANTIGRAVITY_API_KEY=` in this plan (Antigravity is a local CLI provider, not an API backend).
+- [x] In `config/providers.yaml.example:41-44,150-157`, rename the top-level default target and CLI backend `gemini` blocks to `antigravity`, update `command:` from `gemini` to `agy`, update session-timeout if Antigravity has a different expected latency profile, and adjust the auth-hint copy if Antigravity has a different login flow.
+- [x] Leave `config/providers.yaml.example:262-270` (`backends.api.providers.gemini`, `transport: google`, `GEMINI_API_KEY`) intact unless a separate API-provider rename lands.
+- [x] In `.env.example:28`, keep `GEMINI_API_KEY=` for the existing Google API transport. Do not add `ANTIGRAVITY_API_KEY=` in this plan (Antigravity is a local CLI provider, not an API backend).
 
 **Deliverables**: Generated-config bootstrap (per ADR-021) produces an Antigravity entry instead of a Gemini entry.
 
@@ -189,6 +189,7 @@ This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
 |------|--------|
 | 2026-05-24 | Plan created alongside ADR-032 and SPEC-026. |
 | 2026-05-24 | Follow-up tightened the plan around evidence gaps: Antigravity native-session discovery stays absent until a real `agy` session path exists; workspace substrate drops Gemini without adding Antigravity; runtime playground mirrors the platform `antigravity-default` sentinel while the HTTP model catalog still avoids unverified raw model ids. |
+| 2026-05-24 | Implementation progress synced: provider-install knowledge, compatibility, ACP profile, session/history removal, diagnostics/UI/provider config, generated UI artifacts, and historical Docker-login docs now reflect Antigravity. Live `agy --help` / `agy --version`, session storage, and importable session evidence remain open. |
 
 ---
 
