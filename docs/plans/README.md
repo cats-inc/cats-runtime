@@ -46,6 +46,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
+| [PLAN-033](./PLAN-033-replace-gemini-cli-with-antigravity-cli.md) | Replace Gemini CLI with Antigravity CLI | Draft | [SPEC-026](../specs/SPEC-026-antigravity-cli-provider-replacing-gemini.md), [ADR-032](../decisions/032-replace-gemini-cli-with-antigravity-cli.md) |
 | [PLAN-032](./PLAN-032-acp-agent-adapters-and-runtime-facade.md) | ACP Agent Adapters and Runtime ACP Facade | In Progress (Phase 4 Runtime HTTP/Stdio Facades Landed; Phase 5 Layering Baseline Landed; config/diagnostics follow-through continues) | [SPEC-025](../specs/SPEC-025-acp-agent-adapters-and-runtime-facade.md), [ADR-031](../decisions/031-keep-acp-inside-agent-backend-and-model-runtime-acp-as-a-separate-facade.md), [ADR-026](../decisions/026-model-a2a-as-an-agent-backend-adapter.md) |
 | [PLAN-031](./PLAN-031-align-runtime-build-output-under-build-runtime.md) | Align Runtime Build Output Under `build/runtime` | Completed | N/A |
 | [PLAN-030](./PLAN-030-provider-setup-workflow-rail-and-workspace-split.md) | Provider Setup Workflow Rail and Workspace Split | Completed | [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md), [PLAN-019](./PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md), [ADR-027](../decisions/027-adopt-a-playground-derived-dark-runtime-ui-shell-with-sidebar-surface-switching.md) |

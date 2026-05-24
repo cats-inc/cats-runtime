@@ -48,6 +48,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 | Spec | Title | Status | Related Plan |
 |------|-------|--------|--------------|
+| [SPEC-026](./SPEC-026-antigravity-cli-provider-replacing-gemini.md) | Antigravity CLI Provider Replacing Gemini CLI | Draft | [PLAN-033](../plans/PLAN-033-replace-gemini-cli-with-antigravity-cli.md), [ADR-032](../decisions/032-replace-gemini-cli-with-antigravity-cli.md) |
 | [SPEC-025](./SPEC-025-acp-agent-adapters-and-runtime-facade.md) | ACP Agent Adapters and Runtime ACP Facade | In Progress | [PLAN-032](../plans/PLAN-032-acp-agent-adapters-and-runtime-facade.md) |
 | [SPEC-024](./SPEC-024-curated-cli-catalog-pack-and-evidence-overlay.md) | Curated CLI Catalog Input and Runtime Evidence Overlay | Draft | TBD |
 | [SPEC-023](./SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md) | Verified Advanced Provider Catalogs and Manual-Refresh Discovery | In Progress (Safety, Cache-First Reads, and Entry-Scoped Controls Landed) | [PLAN-026](../plans/PLAN-026-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md) |
