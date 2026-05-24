@@ -48,7 +48,6 @@ function createTestEnv(root: string, configPath?: string): NodeJS.ProcessEnv {
     CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
     COPILOT_SESSIONS_DIR: join(root, '.copilot', 'session-state'),
     CURSOR_CHATS_DIR: join(root, '.cursor', 'chats'),
-    GEMINI_SESSIONS_DIR: join(root, '.gemini', 'tmp'),
     KIRO_DB_PATH: join(root, '.kiro', 'data.sqlite3'),
     PI_SESSIONS_DIR: join(root, '.pi', 'agent', 'sessions'),
   });
@@ -63,7 +62,6 @@ function ensureDirs(env: NodeJS.ProcessEnv): void {
     'CODEX_SESSIONS_DIR',
     'COPILOT_SESSIONS_DIR',
     'CURSOR_CHATS_DIR',
-    'GEMINI_SESSIONS_DIR',
     'PI_SESSIONS_DIR',
   ]) {
     if (env[key]) {

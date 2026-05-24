@@ -78,7 +78,6 @@ function createConfig() {
     codexSessionsDir: '',
     copilotSessionsDir: '',
     cursorChatsDir: '',
-    geminiSessionsDir: '',
     kiroDbPath: '',
     kiloServerHost: '',
     kiloServerPort: 0,

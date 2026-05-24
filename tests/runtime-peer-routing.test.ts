@@ -39,7 +39,6 @@ function createTestConfig(
     CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
     COPILOT_SESSIONS_DIR: join(root, '.copilot', 'session-state'),
     CURSOR_CHATS_DIR: join(root, '.cursor', 'chats'),
-    GEMINI_SESSIONS_DIR: join(root, '.gemini', 'tmp'),
     KIRO_DB_PATH: join(root, '.kiro', 'data.sqlite3'),
     PI_SESSIONS_DIR: join(root, '.pi', 'agent', 'sessions'),
     ...(overrides.env || {}),
@@ -52,7 +51,6 @@ function createTestConfig(
     env.CODEX_SESSIONS_DIR,
     env.COPILOT_SESSIONS_DIR,
     env.CURSOR_CHATS_DIR,
-    env.GEMINI_SESSIONS_DIR,
     env.PI_SESSIONS_DIR,
     join(root, '.junie', 'sessions'),
   ]) {

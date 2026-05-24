@@ -26,7 +26,6 @@ function createTestConfig() {
     CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
     COPILOT_SESSIONS_DIR: join(root, '.copilot', 'session-state'),
     CURSOR_CHATS_DIR: join(root, '.cursor', 'chats'),
-    GEMINI_SESSIONS_DIR: join(root, '.gemini', 'tmp'),
     KIRO_DB_PATH: join(root, '.kiro', 'data.sqlite3'),
     PI_SESSIONS_DIR: join(root, '.pi', 'agent', 'sessions'),
   });
@@ -38,7 +37,6 @@ function createTestConfig() {
     env.CODEX_SESSIONS_DIR,
     env.COPILOT_SESSIONS_DIR,
     env.CURSOR_CHATS_DIR,
-    env.GEMINI_SESSIONS_DIR,
     env.PI_SESSIONS_DIR,
     join(root, '.junie', 'sessions'),
   ]) {
@@ -139,7 +137,7 @@ describe('session branching route', () => {
         target: {
           provider: 'codex',
           backend: 'cli',
-          instance: 'default',
+          instance: 'native',
         },
         capabilityTruth: {
           nativeFork: {
@@ -159,7 +157,7 @@ describe('session branching route', () => {
           forkSession: true,
           model: 'gpt-5.4',
         }),
-        undefined,
+        'native',
       );
     } finally {
       cleanup();
@@ -285,7 +283,7 @@ describe('session branching route', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           mode: 'auto',
-          provider: 'gemini',
+          provider: 'antigravity',
           instructions: 'Child instructions',
           context: {
             labels: ['child-label'],
@@ -321,7 +319,7 @@ describe('session branching route', () => {
       };
 
       expect(response.status).toBe(201);
-      expect(body.providerName).toBe('gemini');
+      expect(body.providerName).toBe('antigravity');
       expect(body.lineage).toMatchObject({
         branchMode: 'context_transplant',
         parentSessionId: 'parent-transplant',
@@ -333,9 +331,9 @@ describe('session branching route', () => {
         fallbackApplied: true,
         fallbackReason: 'provider override requires context_transplant',
         target: {
-          provider: 'gemini',
+          provider: 'antigravity',
           backend: 'cli',
-          instance: 'default',
+          instance: 'native',
         },
         transplant: {
           provided: true,
@@ -358,12 +356,12 @@ describe('session branching route', () => {
       ]);
       expect(vi.mocked(pool.spawn)).toHaveBeenCalledWith(
         body.id,
-        'gemini',
+        'antigravity',
         expect.not.objectContaining({
           forkSession: true,
           resumeSessionId: 'thread-parent',
         }),
-        undefined,
+        'native',
       );
     } finally {
       cleanup();
@@ -401,7 +399,7 @@ describe('session branching route', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           mode: 'native_fork',
-          provider: 'gemini',
+          provider: 'antigravity',
         }),
       });
 
@@ -429,9 +427,9 @@ describe('session branching route', () => {
       expect(body.branch).toMatchObject({
         requestedMode: 'native_fork',
         target: {
-          provider: 'gemini',
+          provider: 'antigravity',
           backend: 'cli',
-          instance: 'default',
+          instance: 'native',
         },
         capabilityTruth: {
           nativeFork: {
@@ -579,7 +577,7 @@ describe('session branching route', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           mode: 'context_transplant',
-          provider: 'gemini',
+          provider: 'antigravity',
           transplant: {
             summary: 'grandchild handoff',
           },

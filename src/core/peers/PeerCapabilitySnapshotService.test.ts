@@ -21,7 +21,6 @@ function createConfigEnv(overrides: Record<string, string> = {}): NodeJS.Process
     CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
     COPILOT_SESSIONS_DIR: join(root, '.copilot', 'session-state'),
     CURSOR_CHATS_DIR: join(root, '.cursor', 'chats'),
-    GEMINI_SESSIONS_DIR: join(root, '.gemini', 'tmp'),
     KIRO_DB_PATH: join(root, '.kiro', 'data.sqlite3'),
     PI_SESSIONS_DIR: join(root, '.pi', 'agent', 'sessions'),
     ...overrides,

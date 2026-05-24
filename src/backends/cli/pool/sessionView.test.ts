@@ -109,9 +109,9 @@ describe('sessionView helpers', () => {
 
   it('serializes interactive runtime sessions with actionable controls', () => {
     const view = toSessionView(makeSession({
-      providerName: 'gemini',
+      providerName: 'antigravity',
       status: 'ready',
-      providerSessionId: 'gem-1',
+      providerSessionId: 'agy-1',
     }), { attached: true });
 
     expect(view.activity).toBe('interactive');

@@ -24,7 +24,7 @@ function makeConfig(sessionBaseDir: string, dataDir: string): CliRuntimeConfig {
     codexPath: 'codex',
     copilotPath: 'copilot',
     cursorPath: 'cursor-agent',
-    geminiPath: 'gemini',
+    antigravityPath: 'agy',
     goosePath: 'goose',
     juniePath: 'junie',
     kiroPath: 'kiro-cli',
@@ -45,7 +45,6 @@ function makeConfig(sessionBaseDir: string, dataDir: string): CliRuntimeConfig {
     cursorRuntime: {
       mode: 'native',
     },
-    geminiSessionsDir: '',
     kiroDbPath: '',
     kiroRuntime: {
       mode: 'native',
@@ -60,7 +59,7 @@ function makeConfig(sessionBaseDir: string, dataDir: string): CliRuntimeConfig {
       codex: { path: 'codex', runner: 'auto', runtime: { mode: 'native' } },
       copilot: { path: 'copilot', runner: 'auto', runtime: { mode: 'native' } },
       cursor: { path: 'cursor-agent', runner: 'auto', runtime: { mode: 'native' } },
-      gemini: { path: 'gemini', runner: 'auto', runtime: { mode: 'native' } },
+      antigravity: { path: 'agy', runner: 'auto', runtime: { mode: 'native' } },
       goose: { path: 'goose', runner: 'auto', runtime: { mode: 'native' } },
       junie: { path: 'junie', runner: 'auto', runtime: { mode: 'native' } },
       kiro: { path: 'kiro-cli', runner: 'auto', runtime: { mode: 'native' } },

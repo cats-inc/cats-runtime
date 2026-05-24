@@ -25,8 +25,6 @@ describe('file-discovered session deletion', () => {
   let claudeProjectsDir: string;
   let codexSessionsDir: string;
   let copilotSessionsDir: string;
-  let geminiRootDir: string;
-  let geminiSessionsDir: string;
   let junieSessionsDir: string;
   let sessionBaseDir: string;
 
@@ -40,7 +38,7 @@ describe('file-discovered session deletion', () => {
     codexPath: 'codex',
     copilotPath: 'copilot',
     cursorPath: 'cursor-agent',
-    geminiPath: 'gemini',
+    antigravityPath: 'agy',
     kiroPath: 'kiro-cli',
     opencodePath: 'opencode',
     opencodeServerHost: '127.0.0.1',
@@ -55,7 +53,6 @@ describe('file-discovered session deletion', () => {
       mode: 'wsl',
       distro: 'Ubuntu',
     },
-    geminiSessionsDir,
     kiroDbPath: '~/AppData/Local/kiro-cli/data.sqlite3',
     kiroRuntime: {
       mode: 'native',
@@ -70,7 +67,7 @@ describe('file-discovered session deletion', () => {
       codex: { path: 'codex', runner: 'auto', runtime: { mode: 'native' } },
       copilot: { path: 'copilot', runner: 'auto', runtime: { mode: 'native' } },
       cursor: { path: 'cursor-agent', runner: 'auto', runtime: { mode: 'wsl', distro: 'Ubuntu' } },
-      gemini: { path: 'gemini', runner: 'auto', runtime: { mode: 'native' } },
+      antigravity: { path: 'agy', runner: 'auto', runtime: { mode: 'native' } },
       kiro: { path: 'kiro-cli', runner: 'auto', runtime: { mode: 'native' } },
       opencode: { path: 'opencode', runner: 'auto', runtime: { mode: 'native' } },
     },
@@ -80,14 +77,11 @@ describe('file-discovered session deletion', () => {
     claudeProjectsDir = join(tmpdir(), `claude-delete-test-${Date.now()}`);
     codexSessionsDir = join(tmpdir(), `codex-delete-test-${Date.now()}`);
     copilotSessionsDir = join(tmpdir(), `copilot-delete-test-${Date.now()}`);
-    geminiRootDir = join(tmpdir(), `gemini-delete-test-${Date.now()}`);
-    geminiSessionsDir = join(geminiRootDir, 'tmp');
     junieSessionsDir = join(tmpdir(), `junie-delete-test-${Date.now()}`);
     sessionBaseDir = join(tmpdir(), `cats-runtime-delete-test-${Date.now()}`, 'sessions');
     mkdirSync(claudeProjectsDir, { recursive: true });
     mkdirSync(codexSessionsDir, { recursive: true });
     mkdirSync(copilotSessionsDir, { recursive: true });
-    mkdirSync(geminiSessionsDir, { recursive: true });
     mkdirSync(junieSessionsDir, { recursive: true });
     mkdirSync(sessionBaseDir, { recursive: true });
 
@@ -153,7 +147,6 @@ describe('file-discovered session deletion', () => {
     rmSync(claudeProjectsDir, { recursive: true, force: true });
     rmSync(codexSessionsDir, { recursive: true, force: true });
     rmSync(copilotSessionsDir, { recursive: true, force: true });
-    rmSync(geminiRootDir, { recursive: true, force: true });
     rmSync(junieSessionsDir, { recursive: true, force: true });
     rmSync(sessionBaseDir, { recursive: true, force: true });
   });
@@ -485,47 +478,6 @@ describe('file-discovered session deletion', () => {
     expect(registry.get(session!.id)).toBeUndefined();
     expect(existsSync(workspacePath)).toBe(false);
     expect(existsSync(eventsPath)).toBe(false);
-  });
-
-  it('deletes discovered Gemini session files so they cannot be rediscovered', async () => {
-    const historyDir = join(geminiRootDir, 'history', 'repo-slug');
-    const chatsDir = join(geminiSessionsDir, 'repo-slug', 'chats');
-    mkdirSync(historyDir, { recursive: true });
-    mkdirSync(chatsDir, { recursive: true });
-    writeFileSync(join(historyDir, '.project_root'), 'C:/repo');
-
-    const sourcePath = join(chatsDir, 'session-gemini-delete.json');
-    writeFileSync(
-      sourcePath,
-      JSON.stringify({
-        sessionId: 'gemini-delete',
-        messages: [
-          {
-            type: 'user',
-            content: 'Delete me',
-            timestamp: '2026-03-11T08:10:00Z',
-          },
-        ],
-      }),
-    );
-
-    const session = registry.upsertDiscovered('gemini-delete', {
-      providerName: 'gemini',
-      cwd: 'C:/repo',
-      summary: 'Delete me',
-      sourcePath,
-      messageCount: 1,
-    });
-
-    const res = await app.request(`/sessions/${session!.id}`, {
-      method: 'DELETE',
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
-    expect(body.status).toBe('deleted');
-    expect(registry.get(session!.id)).toBeUndefined();
-    expect(existsSync(sourcePath)).toBe(false);
   });
 
   it('deletes discovered Junie sessions without leaving index entries behind', async () => {
