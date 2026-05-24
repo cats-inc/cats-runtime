@@ -34,7 +34,7 @@ This spec is the runtime counterpart to cats-platform SPEC-110. ADR-032 captures
 - Designing the Antigravity API HTTP backend or renaming the existing Google/Gemini API env strategy. `GEMINI_API_KEY` remains part of the Google API transport unless a separate API-provider rename lands.
 - Reshaping the broader CLI provider taxonomy or the `agent` backend family boundary.
 - Coordinating the packaged Desktop installer change — owned by cats-platform SPEC-110.
-- Coordinating the shared provider catalog data (`cats-platform/src/shared/providerCatalogData.ts`) — owned by cats-platform SPEC-110; this spec only describes how the runtime UI mirrors those values or adds an explicit generated import.
+- Coordinating the shared provider catalog data (`cats-platform/src/shared/providerCatalogData.ts`) — owned by cats-platform SPEC-110; this spec only describes how the runtime UI mirrors those values in this slice.
 
 ## User Stories
 
@@ -77,7 +77,7 @@ The fix is not additive. The Gemini-named seams must be replaced, not extended.
    - Replace `gemini` in the agent-enabled list (line ~1266) with `antigravity`.
 10. The runtime shall update the playground at `src/http/ui/pages/playground.html`:
     - Replace the `gemini:` badge style block with `antigravity:`.
-    - Replace the `gemini:` model list with an `antigravity:` model list mirrored from `cats-platform/src/shared/providerCatalogData.ts` after SPEC-110 Phase 1 lands, or implement a real generated catalog import.
+    - Replace the `gemini:` model list with an `antigravity:` model list mirrored from `cats-platform/src/shared/providerCatalogData.ts` after SPEC-110 Phase 1 lands.
     - Replace `gemini` in the `PROVIDERS` array with `antigravity`.
     - Replace the default agent provider entry that points at `gemini`.
     - Update any provider-id reference in `copilot` and `cursor` model lists that names `gemini-*` models — these are vendor-named submodels and may stay, but their string labels must be reviewed.
@@ -111,13 +111,13 @@ The migration moves through five concentric layers, each depending on the previo
                        setup-guide.md
 ```
 
-Layer 4 depends on cats-platform SPEC-110 Phase 1 landing first, because the platform catalog (`cats-platform/src/shared/providerCatalogData.ts`) defines the product-side provider/model values that the runtime UI must mirror or import. The runtime currently keeps its own hardcoded dashboard/playground data, so PLAN-033 sequences this cross-repo dependency explicitly.
+Layer 4 depends on cats-platform SPEC-110 Phase 1 landing first, because the platform catalog (`cats-platform/src/shared/providerCatalogData.ts`) defines the product-side provider/model values that the runtime UI must mirror. The runtime currently keeps its own hardcoded dashboard/playground data, so PLAN-033 sequences this cross-repo dependency explicitly.
 
 ## Dependencies
 
 - environment-bootstrap commits `b273f63a` and `5725e637` (already merged; pulled into this monorepo on 2026-05-24 via the submodule bump in commit `85540ced9`).
 - openab `agy-acp` adapter (PR #896, v0.8.4-beta.3) — drives `ANTIGRAVITY_ACP_PROFILE` shape.
-- cats-platform SPEC-110 Phase 1 (shared provider catalog data update) — must land before runtime UI Phase 4.
+- cats-platform SPEC-110 Phase 1 (shared provider catalog data update) — must land before runtime UI Phase 4. cats-platform PLAN-100 Phase 0 and cats-runtime PLAN-033 Phase 1 refer to the same shared `agy` probe.
 - Verified knowledge of `agy`'s actual session storage layout, version probe contract, and stream output framing — probed during PLAN-033 Phase 1.
 
 ## Open Questions

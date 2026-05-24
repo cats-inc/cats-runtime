@@ -19,7 +19,7 @@ This plan executes the runtime side of the Gemini-to-Antigravity provider swap. 
 
 Phase ordering matters because:
 
-- UI phases depend on the platform shared provider catalog landing first in cats-platform SPEC-110 / PLAN-100, then runtime mirrors those values or adds an explicit generated import.
+- UI phases depend on the platform shared provider catalog landing first in cats-platform SPEC-110 / PLAN-100, then runtime mirrors those values.
 - Session/discovery phases depend on a live `agy` install being probed first so we don't invent a fake session layout.
 - Test fixture updates piggyback on the route + UI updates and are batched at the end.
 
@@ -41,16 +41,19 @@ Cross-repo blocking points are called out per phase.
 5. Do not edit `cats-platform/src/shared/providerCatalogData.ts` from this plan — that is owned by cats-platform PLAN-100 Phase 1.
 6. Do not remove or rename `GEMINI_API_KEY` / Google API transport surfaces in this plan; that is a separate API-provider decision.
 7. Do not read, rename, or delete `GEMINI.md`; it is an agent-specific instruction file, not Gemini CLI runtime config.
+8. Do not design any cross-package catalog handoff from `cats-platform` in this slice; runtime UI mirrors the platform catalog values explicitly.
 
 ## Implementation Phases
 
 ### Phase 1: Probe `agy` Reality
 
 Goal: replace guesses with facts before touching code.
+This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
 
 - [ ] Install `agy` locally via environment-bootstrap `Install-AntigravityCLI.ps1` (Windows) or `install-antigravity-cli.sh` (macOS/Linux).
 - [ ] Capture `agy --version` output (or equivalent flag) and parse format.
 - [ ] Capture `agy --help` to identify ACP / stream-json / session subcommands.
+- [ ] Look for model-id evidence using candidate subcommands (`agy models`, `agy models list`, or equivalent), documented config files, official product documentation, and smoke-run acceptance. `agy --help` alone is not sufficient model-id evidence.
 - [ ] Identify Antigravity's session storage path (PATH, `LOCALAPPDATA`, `~/.local`, or none).
 - [ ] If sessions exist, capture a sample session file to determine readable format.
 - [ ] Compare against openab's `agy-acp` adapter expectations to confirm ACP transport contract.
@@ -78,7 +81,7 @@ Goal: replace guesses with facts before touching code.
 
 ### Phase 4: Routes and UI
 
-**Blocking dependency**: cats-platform PLAN-100 Phase 1 (shared provider catalog data) must be merged before this phase touches UI files. Confirm by checking that `cats-platform/src/shared/providerCatalogData.ts` lists `antigravity` as the platform-side provider, then mirror those values here or add an explicit generated import.
+**Blocking dependency**: cats-platform PLAN-100 Phase 1 (shared provider catalog data) must be merged before this phase touches UI files. Confirm by checking that `cats-platform/src/shared/providerCatalogData.ts` lists `antigravity` as the platform-side provider, then mirror those values here.
 
 - [ ] In `src/http/routes/diagnostics.ts:1382` and `src/http/routes/diagnosticsSupport.ts:27`, replace `'gemini'` literals with `'antigravity'`.
 - [ ] In `src/http/routes/workspaceSubstrate.ts:33,48,50`, replace the `ENABLED_AGENTS` literal and the `'claude' | 'gemini' | 'codex'` union type with `antigravity`.
@@ -87,7 +90,7 @@ Goal: replace guesses with facts before touching code.
   - [ ] `src/http/ui/shared.ts:36` (badge style)
   - [ ] `src/http/ui/pages/index.html:34,177,194,218` (dashboard CSS / selectors)
 - [ ] In `src/http/ui/pages/index.html:1098,1227,1266`, replace the `gemini` option, `PROVIDER_ORDER` entry, and agent-enabled list entry with `antigravity`.
-- [ ] In `src/http/ui/pages/playground.html:389,407,421,1274`, replace the `gemini` badge style block, model list, `PROVIDERS` array entry, and default agent provider with `antigravity`. Mirror the new model list from the updated `cats-platform/src/shared/providerCatalogData.ts`, or implement a real generated import if that handoff is added.
+- [ ] In `src/http/ui/pages/playground.html:389,407,421,1274`, replace the `gemini` badge style block, model list, `PROVIDERS` array entry, and default agent provider with `antigravity`. Mirror the new model list from the updated `cats-platform/src/shared/providerCatalogData.ts`.
 - [ ] In `src/http/ui/pages/playground.html:408,413,414`, audit the `copilot` / `openrouter` / `cursor` model lists for references to `gemini-*` vendor models — those are vendor-named submodels and may stay if Google still ships them under Copilot / Cursor, but the labels should be reviewed for accuracy.
 - [ ] Audit `src/http/ui/pages/provider-setup.html` for any Gemini-specific UI that the SPEC-026 grep did not catch (the file showed no matches but should be eyeballed).
 - [ ] Regenerate `src/http/ui/generated/runtimeTailwind.ts` via the runtime UI build (`npm run build:runtime-ui-css` or equivalent).
@@ -159,7 +162,7 @@ Goal: replace guesses with facts before touching code.
 - **New provider id is `antigravity` (lowercase) and display label is `Antigravity`**: matches the installer naming and disambiguates from the Google API backend.
 - **Phase 1 (probe) blocks all code changes**: the runtime should not invent Antigravity behavior. If a contract is unclear, the runtime returns honest "not yet supported" instead of guessing.
 - **No backwards-compat shim**: per project policy, this is a swap, not an additive migration.
-- **Cross-repo handoff order**: cats-platform PLAN-100 Phase 1 (shared catalog) -> cats-runtime PLAN-033 Phases 2-3 (data + discovery) -> cats-runtime PLAN-033 Phase 4 (UI mirrors catalog values or adds an explicit import) -> both repos' Phase 5+ in parallel.
+- **Cross-repo handoff order**: cats-platform PLAN-100 Phase 1 (shared catalog) -> cats-runtime PLAN-033 Phases 2-3 (data + discovery) -> cats-runtime PLAN-033 Phase 4 (UI mirrors catalog values) -> both repos' Phase 5+ in parallel.
 
 ## Testing Strategy
 
@@ -175,7 +178,7 @@ Goal: replace guesses with facts before touching code.
 ## Risks & Mitigations
 
 - **Antigravity CLI's actual contract differs from openab's `agy-acp` profile**: Phase 1 probe surfaces this before any code is written. Mitigation: gate Phases 2-3 on the probe research note.
-- **Cross-repo phase ordering breaks**: if runtime UI lands before platform shared catalog, the playground model list can drift from the packaged provider catalog. Mitigation: Phase 4 explicitly waits on cats-platform PLAN-100 Phase 1 and mirrors or imports the finalized values.
+- **Cross-repo phase ordering breaks**: if runtime UI lands before platform shared catalog, the playground model list can drift from the packaged provider catalog. Mitigation: Phase 4 explicitly waits on cats-platform PLAN-100 Phase 1 and mirrors the finalized values.
 - **Tests rely on `gemini` as a generic provider id**: silent test-only references may survive Phase 6. Mitigation: final grep sweep in Phase 7 catches stragglers.
 - **Agent-governance files are misclassified as CLI files**: editing `GEMINI.md` would violate the project file-ownership rules and conflate Gemini-the-agent with Gemini CLI. Mitigation: leave `GEMINI.md` out of scope and justify governance references during the final grep sweep.
 
