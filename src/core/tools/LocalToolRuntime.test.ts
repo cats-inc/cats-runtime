@@ -2080,7 +2080,7 @@ describe('LocalToolRuntime', () => {
         expect(result.isError).toBeUndefined();
         expect(JSON.parse(result.output)).toEqual({
           defaultProfile: 'standard',
-          allowedAgents: ['claude', 'gemini', 'codex'],
+          allowedAgents: ['claude', 'antigravity', 'codex'],
           profiles: [
             expect.objectContaining({ id: 'minimal' }),
             expect.objectContaining({ id: 'standard' }),

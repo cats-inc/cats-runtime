@@ -58,7 +58,7 @@ const PERMISSION_MODES = ['skip', 'whitelist', 'default'] as const;
 const REUSE_POLICIES = ['create_new', 'prefer_existing', 'require_existing'] as const;
 const FORK_MODES = ['auto', 'native_fork', 'context_transplant'] as const;
 const SUBSTRATE_PROFILES = ['minimal', 'standard', 'a2a-enabled'] as const;
-const ENABLED_AGENTS = ['claude', 'gemini', 'codex'] as const;
+const ENABLED_AGENTS = ['claude', 'antigravity', 'codex'] as const;
 const DIAGNOSTICS_PROBE_MODES = ['light', 'live'] as const;
 const PROVIDER_BACKENDS = ['cli', 'api', 'local', 'agent'] as const;
 const PROVIDER_EVOLUTION_TRANSPORTS = ['cli', 'agent', 'api', 'unknown'] as const;
@@ -1848,7 +1848,7 @@ async function auditWorkspace(
     args,
     'enabledAgents',
     ENABLED_AGENTS,
-    'enabledAgents must be one of: claude, gemini, codex',
+    'enabledAgents must be one of: claude, antigravity, codex',
   );
   const includeA2A = readOptionalBoolean(args, 'includeA2A');
   const result = await service.execute({
@@ -2632,7 +2632,7 @@ async function initWorkspace(
       args,
       'enabledAgents',
       ENABLED_AGENTS,
-      'enabledAgents must be one of: claude, gemini, codex',
+      'enabledAgents must be one of: claude, antigravity, codex',
     ),
     ...(readOptionalBoolean(args, 'includeA2A') !== undefined
       ? { includeA2A: readOptionalBoolean(args, 'includeA2A') }
@@ -2685,7 +2685,7 @@ async function updateWorkspace(
       args,
       'enabledAgents',
       ENABLED_AGENTS,
-      'enabledAgents must be one of: claude, gemini, codex',
+      'enabledAgents must be one of: claude, antigravity, codex',
     ),
     ...(readOptionalBoolean(args, 'includeA2A') !== undefined
       ? { includeA2A: readOptionalBoolean(args, 'includeA2A') }

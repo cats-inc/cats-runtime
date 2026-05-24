@@ -429,7 +429,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         profile: { type: 'string', enum: ['minimal', 'standard', 'a2a-enabled'] },
         enabled_agents: {
           type: 'array',
-          items: { type: 'string', enum: ['claude', 'gemini', 'codex'] },
+          items: { type: 'string', enum: ['claude', 'antigravity', 'codex'] },
         },
         include_a2a: { type: 'boolean' },
         project_type: { type: 'string', enum: ['single-project', 'monorepo'] },
@@ -450,7 +450,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         profile: { type: 'string', enum: ['minimal', 'standard', 'a2a-enabled'] },
         enabled_agents: {
           type: 'array',
-          items: { type: 'string', enum: ['claude', 'gemini', 'codex'] },
+          items: { type: 'string', enum: ['claude', 'antigravity', 'codex'] },
         },
         include_a2a: { type: 'boolean' },
         project_type: { type: 'string', enum: ['single-project', 'monorepo'] },
@@ -477,7 +477,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         profile: { type: 'string', enum: ['minimal', 'standard', 'a2a-enabled'] },
         enabled_agents: {
           type: 'array',
-          items: { type: 'string', enum: ['claude', 'gemini', 'codex'] },
+          items: { type: 'string', enum: ['claude', 'antigravity', 'codex'] },
         },
         include_a2a: { type: 'boolean' },
         project_type: { type: 'string', enum: ['single-project', 'monorepo'] },
@@ -2382,8 +2382,8 @@ export class LocalToolRuntime {
       ? args.profile as 'minimal' | 'standard' | 'a2a-enabled'
       : undefined;
     const enabledAgents = readOptionalStringArray(args, 'enabled_agents')
-      ?.filter((agent): agent is 'claude' | 'gemini' | 'codex' =>
-        agent === 'claude' || agent === 'gemini' || agent === 'codex');
+      ?.filter((agent): agent is 'claude' | 'antigravity' | 'codex' =>
+        agent === 'claude' || agent === 'antigravity' || agent === 'codex');
     const technologyLabels = readOptionalStringArray(args, 'technology_labels');
     const actorRole = typeof args.actor_role === 'string'
       && [

@@ -268,7 +268,7 @@ export interface WorkspaceSubstrateRequest {
   operation: WorkspaceSubstrateOperation;
   workspacePath: string;
   profile?: WorkspaceSubstrateProfileId;
-  enabledAgents?: Array<'claude' | 'gemini' | 'codex'>;
+  enabledAgents?: Array<'claude' | 'antigravity' | 'codex'>;
   includeA2A?: boolean;
   apply?: boolean;
   hints?: WorkspaceSubstrateHints;
@@ -279,13 +279,13 @@ export interface WorkspaceSubstrateProfileSummary {
   id: WorkspaceSubstrateProfileId;
   title: string;
   description: string;
-  defaultEnabledAgents: Array<'claude' | 'gemini' | 'codex'>;
+  defaultEnabledAgents: Array<'claude' | 'antigravity' | 'codex'>;
   includeA2AByDefault: boolean;
 }
 
 export interface WorkspaceSubstrateProfileCatalog {
   defaultProfile: WorkspaceSubstrateProfileId;
-  allowedAgents: Array<'claude' | 'gemini' | 'codex'>;
+  allowedAgents: Array<'claude' | 'antigravity' | 'codex'>;
   profiles: WorkspaceSubstrateProfileSummary[];
 }
 
@@ -325,7 +325,7 @@ export interface WorkspaceSubstrateApplyPayload {
   operation: 'init-workspace' | 'update-workspace';
   workspacePath: string;
   profile: WorkspaceSubstrateProfileId;
-  enabledAgents: Array<'claude' | 'gemini' | 'codex'>;
+  enabledAgents: Array<'claude' | 'antigravity' | 'codex'>;
   includeA2A: boolean;
   hints?: WorkspaceSubstrateHints;
   apply: true;
@@ -361,7 +361,7 @@ export interface WorkspaceSubstrateResult {
   operation: WorkspaceSubstrateOperation;
   workspacePath: string;
   profile: WorkspaceSubstrateProfileId;
-  enabledAgents: Array<'claude' | 'gemini' | 'codex'>;
+  enabledAgents: Array<'claude' | 'antigravity' | 'codex'>;
   includeA2A: boolean;
   status: WorkspaceSubstrateAuditStatus;
   contract: WorkspaceSubstrateContract;
