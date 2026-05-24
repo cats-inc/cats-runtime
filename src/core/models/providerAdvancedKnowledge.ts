@@ -35,6 +35,7 @@ import {
   normalizeKiloCuratedModelId,
   normalizeKiroCuratedModelId,
   normalizeLiteralCuratedModelId,
+  normalizeVerbatimCuratedModelId,
 } from './curatedModelCatalogNormalization.js';
 
 export interface ProviderAdvancedKnowledgeContext {
@@ -636,20 +637,20 @@ function buildCuratedEntryOnlyOverlay(
     : null;
 }
 
-function buildCuratedGeminiCliOverlay(
+function buildCuratedAntigravityCliOverlay(
   document: CuratedModelCatalogDocument | undefined,
 ): CuratedCatalogOverlay | null {
-  const catalog = findCuratedCliCatalog(document, 'gemini');
+  const catalog = findCuratedCliCatalog(document, 'antigravity');
   if (!catalog) {
     return null;
   }
 
-  const scope = resolveCuratedCatalogScope(catalog, 'gemini');
+  const scope = resolveCuratedCatalogScope(catalog, 'antigravity');
   if (!scope) {
     return null;
   }
 
-  return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeLiteralCuratedModelId);
+  return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeVerbatimCuratedModelId);
 }
 
 function flattenCuratedCatalogProviderModels(
@@ -1345,7 +1346,7 @@ function loadCuratedOverlay(
     || (
       target.providerName !== 'claude'
       && target.providerName !== 'codex'
-      && target.providerName !== 'gemini'
+      && target.providerName !== 'antigravity'
       && target.providerName !== 'kilo'
       && target.providerName !== 'kiro'
       && target.providerName !== 'junie'
@@ -1367,8 +1368,8 @@ function loadCuratedOverlay(
         return buildCuratedClaudeCliOverlay(result.document);
       case 'codex':
         return buildCuratedCodexCliOverlay(result.document);
-      case 'gemini':
-        return buildCuratedGeminiCliOverlay(result.document);
+      case 'antigravity':
+        return buildCuratedAntigravityCliOverlay(result.document);
       case 'kilo':
         return buildCuratedKiloCliOverlay(result.document);
       case 'kiro':

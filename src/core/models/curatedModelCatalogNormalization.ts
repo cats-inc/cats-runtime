@@ -553,8 +553,8 @@ export function normalizeCuratedModelId(
       return normalizeClaudeCuratedModelId(model);
     case 'codex':
       return normalizeCodexCuratedModelId(model);
-    case 'gemini':
-      return normalizeLiteralCuratedModelId(model);
+    case 'antigravity':
+      return normalizeVerbatimCuratedModelId(model);
     case 'kilo':
       return normalizeKiloCuratedModelId(model);
     case 'kiro':

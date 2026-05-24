@@ -26,7 +26,7 @@ environments:
     container: cats-cli-dev
 
 # Routing picks the default execution target for each provider family.
-# Provider families use product names (`claude`, `codex`, `gemini`) while
+# Provider families use product names (`claude`, `codex`, `antigravity`) while
 # `transport` uses the vendor API (`anthropic`, `openai`, `google`, `ollama`).
 routing:
   providers:
@@ -38,7 +38,7 @@ routing:
       default_target:
         backend: cli
         instance: native
-    gemini:
+    antigravity:
       default_target:
         backend: cli
         instance: native
@@ -147,13 +147,12 @@ backends:
             runner: auto
             sessions_dir: ~/.codex/sessions
 
-      gemini:
+      antigravity:
         instances:
           native:
             environment: native
-            command: gemini
+            command: agy
             runner: auto
-            sessions_dir: ~/.gemini/tmp
             timeout_ms: 120000
 
       cursor:

@@ -2422,26 +2422,26 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
-  it('applies curated Gemini CLI entry metadata from curated-model-catalogs.yaml', () => {
+  it('applies curated Antigravity CLI entry metadata from curated-model-catalogs.yaml', () => {
     const runtime = createRuntimeRoot();
 
     try {
       writeFileSync(runtime.paths.curatedModelCatalogPath, [
         'schema_version: 1',
         'catalogs:',
-        '  - cli: Gemini',
-        '    version: 0.36.0',
-        '    last_updated: 2026-04-08',
+        '  - cli: Antigravity',
+        '    version: probe-required',
+        '    last_updated: 2026-05-24',
         '    models:',
-        '      - name: gemini-3.1-pro-preview',
-        '        label: Gemini 3.1 Pro Preview',
+        '      - name: Gemini 3.1 Pro (high)',
+        '        label: Gemini 3.1 Pro (high)',
         '        default: true',
         '        notes:',
         '          - Primary reasoning model.',
-        '      - name: gemini-3-flash-preview',
-        '        label: Gemini 3 Flash Preview',
-        '      - name: gemini-3.1-flash-lite-preview',
-        '        label: Gemini 3.1 Flash Lite Preview',
+        '      - name: Gemini 3.1 Pro (low)',
+        '        label: Gemini 3.1 Pro (low)',
+        '      - name: Gemini 3 Flash',
+        '        label: Gemini 3 Flash',
         '',
       ].join('\n'), 'utf8');
 
@@ -2452,16 +2452,16 @@ describe('ProviderModelCatalogService', () => {
         sessionBaseDir: runtime.paths.sessionBaseDir,
         providerDefaultTargets: {
           ...base.providerDefaultTargets,
-          gemini: { backend: 'cli', instance: 'default' },
+          antigravity: { backend: 'cli', instance: 'default' },
         },
         providerInstances: {
           ...base.providerInstances,
-          gemini: {
+          antigravity: {
             default: {
               id: 'default',
-              providerName: 'gemini',
+              providerName: 'antigravity',
               commandConfig: {
-                path: 'gemini',
+                path: 'agy',
                 runner: 'auto',
                 runtime: { mode: 'native' },
               },
@@ -2470,8 +2470,8 @@ describe('ProviderModelCatalogService', () => {
         },
         providerCommands: {
           ...base.providerCommands,
-          gemini: {
-            path: 'gemini',
+          antigravity: {
+            path: 'agy',
             runner: 'auto',
             runtime: { mode: 'native' },
           },
@@ -2482,58 +2482,58 @@ describe('ProviderModelCatalogService', () => {
         env: runtime.env,
       });
 
-      expect(service.getImmediateCatalog('gemini')).toEqual({
-        provider: 'gemini',
+      expect(service.getImmediateCatalog('antigravity')).toEqual({
+        provider: 'antigravity',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'gemini-3.1-pro-preview',
+        defaultModel: 'Gemini 3.1 Pro (high)',
         source: 'static',
         cache: null,
         models: [
           {
-            id: 'gemini-3.1-pro-preview',
-            label: 'Gemini 3.1 Pro Preview',
+            id: 'Gemini 3.1 Pro (high)',
+            label: 'Gemini 3.1 Pro (high)',
             default: true,
           },
           {
-            id: 'gemini-3-flash-preview',
-            label: 'Gemini 3 Flash Preview',
+            id: 'Gemini 3.1 Pro (low)',
+            label: 'Gemini 3.1 Pro (low)',
             default: false,
           },
           {
-            id: 'gemini-3.1-flash-lite-preview',
-            label: 'Gemini 3.1 Flash Lite Preview',
+            id: 'Gemini 3 Flash',
+            label: 'Gemini 3 Flash',
             default: false,
           },
         ],
         warnings: [],
       });
-      expect(service.getImmediateAdvancedCatalog('gemini')).toEqual({
-        provider: 'gemini',
+      expect(service.getImmediateAdvancedCatalog('antigravity')).toEqual({
+        provider: 'antigravity',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'gemini-3.1-pro-preview',
+        defaultModel: 'Gemini 3.1 Pro (high)',
         source: 'static',
         cache: null,
         entries: [
           {
-            id: 'gemini-3.1-pro-preview',
-            label: 'Gemini 3.1 Pro Preview',
+            id: 'Gemini 3.1 Pro (high)',
+            label: 'Gemini 3.1 Pro (high)',
             default: true,
-            capabilityTags: ['tool_use', 'reasoning'],
+            capabilityTags: ['reasoning'],
             notes: ['Primary reasoning model.'],
           },
           {
-            id: 'gemini-3-flash-preview',
-            label: 'Gemini 3 Flash Preview',
+            id: 'Gemini 3.1 Pro (low)',
+            label: 'Gemini 3.1 Pro (low)',
             default: false,
-            capabilityTags: ['tool_use', 'latency_optimized'],
+            capabilityTags: ['reasoning'],
           },
           {
-            id: 'gemini-3.1-flash-lite-preview',
-            label: 'Gemini 3.1 Flash Lite Preview',
+            id: 'Gemini 3 Flash',
+            label: 'Gemini 3 Flash',
             default: false,
-            capabilityTags: ['tool_use', 'latency_optimized'],
+            capabilityTags: ['latency_optimized'],
           },
         ],
         presets: [],

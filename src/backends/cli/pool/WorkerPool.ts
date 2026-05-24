@@ -11,11 +11,11 @@ import type { Provider, ProviderCapabilities, ProviderName, ProviderSpawnOptions
 import type { CompatibilityProfileSelection } from '../../../core/compatibility/types.js';
 import type { ProviderCompatibilityService } from '../../../core/compatibility/ProviderCompatibilityService.js';
 import { AuggieProvider } from '../providers/auggie.js';
+import { AntigravityProvider } from '../providers/antigravity.js';
 import { ClaudeProvider } from '../providers/claude.js';
 import { CodexProvider } from '../providers/codex.js';
 import { CopilotProvider } from '../providers/copilot.js';
 import { CursorProvider } from '../providers/cursor.js';
-import { GeminiProvider } from '../providers/gemini.js';
 import { KiroProvider } from '../providers/kiro.js';
 import { KiloProvider } from '../providers/kilo.js';
 import { OpencodeProvider } from '../providers/opencode.js';
@@ -96,14 +96,14 @@ export class WorkerPool {
           provider: new CodexProvider(compatibilityProfile),
           commandConfig: instance.commandConfig,
         };
+      case 'antigravity':
+        return {
+          provider: new AntigravityProvider(),
+          commandConfig: instance.commandConfig,
+        };
       case 'claude':
         return {
           provider: new ClaudeProvider(compatibilityProfile),
-          commandConfig: instance.commandConfig,
-        };
-      case 'gemini':
-        return {
-          provider: new GeminiProvider(compatibilityProfile),
           commandConfig: instance.commandConfig,
         };
       case 'copilot':
@@ -154,7 +154,7 @@ export class WorkerPool {
           commandConfig: instance.commandConfig,
         };
       default:
-        throw new Error(`Unknown provider: '${name}'. Valid: claude, codex, gemini, cursor, copilot, opencode, kilo, goose, pi, auggie, junie, kiro`);
+        throw new Error(`Unknown provider: '${name}'. Valid: claude, codex, antigravity, cursor, copilot, opencode, kilo, goose, pi, auggie, junie, kiro`);
     }
   }
 
@@ -339,9 +339,6 @@ function resolveCliSpawnTimeoutMs(
 ): number {
   if (typeof instanceTimeoutMs === 'number') {
     return instanceTimeoutMs;
-  }
-  if (providerName === 'gemini') {
-    return 60_000;
   }
   return fallbackTimeoutMs;
 }

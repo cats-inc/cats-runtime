@@ -24,7 +24,6 @@ const FILE_BACKED_PROVIDER_NAMES = [
   'claude',
   'codex',
   'copilot',
-  'gemini',
   'pi',
 ] as const;
 

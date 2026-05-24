@@ -206,13 +206,13 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark' },
     { id: 'gpt-5.2', label: 'gpt-5.2' },
   ],
-  gemini: [
-    { id: 'gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview', default: true },
-    { id: 'gemini-3-flash-preview', label: 'gemini-3-flash-preview' },
-    { id: 'gemini-3.1-flash-lite-preview', label: 'gemini-3.1-flash-lite-preview' },
-    { id: 'gemini-2.5-pro', label: 'gemini-2.5-pro' },
-    { id: 'gemini-2.5-flash', label: 'gemini-2.5-flash' },
-    { id: 'gemini-2.5-flash-lite', label: 'gemini-2.5-flash-lite' },
+  antigravity: [
+    { id: 'Gemini 3.1 Pro (high)', label: 'Gemini 3.1 Pro (high)', default: true },
+    { id: 'Gemini 3.1 Pro (low)', label: 'Gemini 3.1 Pro (low)' },
+    { id: 'Gemini 3 Flash', label: 'Gemini 3 Flash' },
+    { id: 'Claude Sonnet 4.6 (thinking)', label: 'Claude Sonnet 4.6 (thinking)' },
+    { id: 'Claude Opus 4.6 (thinking)', label: 'Claude Opus 4.6 (thinking)' },
+    { id: 'GPT-OSS-120b', label: 'GPT-OSS-120b' },
   ],
   copilot: [
     { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
@@ -611,7 +611,7 @@ export function getStaticProviderModels(
 function supportsCuratedStaticCliCatalog(providerName: string): boolean {
   return providerName === 'claude'
     || providerName === 'codex'
-    || providerName === 'gemini'
+    || providerName === 'antigravity'
     || providerName === 'kilo'
     || providerName === 'kiro'
     || providerName === 'junie'

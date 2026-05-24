@@ -14,7 +14,7 @@ import {
 const PROVIDER_ORDER = [
   'claude',
   'codex',
-  'gemini',
+  'antigravity',
   'cursor',
   'copilot',
   'opencode',

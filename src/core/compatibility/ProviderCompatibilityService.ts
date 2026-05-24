@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type {
   CliRuntimeConfig,
@@ -1909,56 +1909,8 @@ async function maybeInferCompatibilityFromInstallMetadata(input: {
   detectedFeatures: string[];
   summary: string;
 } | undefined> {
-  if (
-    input.providerName !== 'gemini'
-    || process.platform !== 'darwin'
-    || input.runtime.mode !== 'native'
-    || input.commandSummary.status !== 'ready'
-    || !input.commandSummary.resolvedCommand
-    || (!input.versionProbe?.timedOut && !input.helpProbe?.timedOut)
-  ) {
-    return undefined;
-  }
-
-  const packageJsonPath = resolveGeminiPackageJsonPath(input.commandSummary.resolvedCommand);
-  if (!packageJsonPath) {
-    return undefined;
-  }
-
-  try {
-    const parsed = JSON.parse(await readFile(packageJsonPath, 'utf8')) as {
-      version?: unknown;
-    };
-    const versionText = typeof parsed.version === 'string' ? parsed.version : '';
-    const parsedVersion = parseVersion(versionText);
-    if (!parsedVersion) {
-      return undefined;
-    }
-
-    const helpTokens = input.compatibilityKnowledge?.primaryProfile.helpTokens || [];
-    return {
-      parsedVersion,
-      detectedFeatures: helpTokens.map((token) => `metadata:${token}`),
-      summary: 'Inferred Gemini CLI compatibility from npm metadata after headless macOS probes timed out.',
-    };
-  } catch {
-    return undefined;
-  }
-}
-
-function resolveGeminiPackageJsonPath(resolvedCommand: string): string | undefined {
-  const marker = `${join('bin', 'gemini')}`;
-  const normalizedCommand = resolvedCommand.replace(/\\/g, '/');
-  if (!normalizedCommand.endsWith(marker.replace(/\\/g, '/'))) {
-    return undefined;
-  }
-
-  const prefixDir = normalizedCommand.slice(0, -marker.length);
-  if (!prefixDir) {
-    return undefined;
-  }
-
-  return join(prefixDir, 'lib', 'node_modules', '@google', 'gemini-cli', 'package.json');
+  void input;
+  return undefined;
 }
 
 function toProbeRecord(

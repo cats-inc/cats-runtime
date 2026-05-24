@@ -158,23 +158,23 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       'Progress remains a runtime-derived view over those native blocks and deltas.',
     ],
   },
-  gemini: {
+  antigravity: {
     normalizedStream: {
-      text: { mode: 'final', stepwise: false },
-      toolUse: 'native',
-      toolResult: 'native',
-      progress: 'derived',
+      text: { mode: 'unknown', stepwise: false },
+      toolUse: 'unknown',
+      toolResult: 'unknown',
+      progress: 'unknown',
       reasoning: 'none',
     },
     transcript: {
-      contentBlocks: 'none',
+      contentBlocks: 'unknown',
     },
     presentation: {
-      recommended: 'content_blocks',
+      recommended: 'unknown',
     },
     notes: [
-      'Text typically arrives as a full message rather than stepwise deltas.',
-      'Tool and progress milestones are still available to the host.',
+      'Raw agy subprocess streaming has not been probed yet.',
+      'Treat Antigravity execution semantics as unknown until a verified compatibility profile exists.',
     ],
   },
   goose: {

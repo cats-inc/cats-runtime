@@ -8,7 +8,7 @@ import {
 
 type FileBackedProviderName = Extract<
   ProviderName,
-  'auggie' | 'claude' | 'codex' | 'copilot' | 'gemini' | 'pi'
+  'auggie' | 'claude' | 'codex' | 'copilot' | 'pi'
 >;
 
 type FileBackedInstancePathField = Extract<
@@ -17,7 +17,6 @@ type FileBackedInstancePathField = Extract<
   | 'claudeProjectsDir'
   | 'codexSessionsDir'
   | 'copilotSessionsDir'
-  | 'geminiSessionsDir'
   | 'piSessionsDir'
 >;
 
@@ -27,7 +26,6 @@ type FileBackedConfigPathField = Extract<
   | 'claudeProjectsDir'
   | 'codexSessionsDir'
   | 'copilotSessionsDir'
-  | 'geminiSessionsDir'
   | 'piSessionsDir'
 >;
 
@@ -50,11 +48,6 @@ const FILE_BACKED_PROVIDER_PATHS = {
   copilot: {
     instanceField: 'copilotSessionsDir',
     configField: 'copilotSessionsDir',
-    configKey: 'sessions_dir',
-  },
-  gemini: {
-    instanceField: 'geminiSessionsDir',
-    configField: 'geminiSessionsDir',
     configKey: 'sessions_dir',
   },
   pi: {

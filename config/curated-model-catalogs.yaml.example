@@ -139,28 +139,30 @@ catalogs:
             values: [Medium, High]
             default: Medium
 
-  - cli: Gemini
-    version: 0.38.1
-    last_updated: 2026-04-17
+  - cli: Antigravity
+    version: probe-required
+    last_updated: 2026-05-24
+    notes:
+      - "Source: cats-runtime Phase 0 Antigravity CLI probe notes. Raw agy model IDs are not yet verified."
     models:
-      - name: gemini-3.1-pro-preview
-        label: gemini-3.1-pro-preview
+      - name: Gemini 3.1 Pro (high)
+        label: Gemini 3.1 Pro (high)
         default: true
 
-      - name: gemini-3-flash-preview
-        label: gemini-3-flash-preview
+      - name: Gemini 3.1 Pro (low)
+        label: Gemini 3.1 Pro (low)
 
-      - name: gemini-3.1-flash-lite-preview
-        label: gemini-3.1-flash-lite-preview
+      - name: Gemini 3 Flash
+        label: Gemini 3 Flash
 
-      - name: gemini-2.5-pro
-        label: gemini-2.5-pro
+      - name: Claude Sonnet 4.6 (thinking)
+        label: Claude Sonnet 4.6 (thinking)
 
-      - name: gemini-2.5-flash
-        label: gemini-2.5-flash
+      - name: Claude Opus 4.6 (thinking)
+        label: Claude Opus 4.6 (thinking)
 
-      - name: gemini-2.5-flash-lite
-        label: gemini-2.5-flash-lite
+      - name: GPT-OSS-120b
+        label: GPT-OSS-120b
 
   - cli: Cursor
     version: 2026.04.16-2d20146

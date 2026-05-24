@@ -115,7 +115,6 @@ export function sessionOwnership(
     case 'kiro':
       return 'workspace_latest';
     case 'auggie':
-    case 'gemini':
     case 'copilot':
     case 'cursor':
     default:
@@ -139,7 +138,6 @@ export function sessionResumeStrategy(
     case 'codex':
     case 'copilot':
     case 'cursor':
-    case 'gemini':
     default:
       return 'provider_session';
   }

@@ -55,9 +55,6 @@ import {
   CopilotSessionScanner,
 } from '../../backends/cli/discovery/CopilotSessionScanner.js';
 import {
-  GeminiSessionScanner,
-} from '../../backends/cli/discovery/GeminiSessionScanner.js';
-import {
   PiSessionScanner,
 } from '../../backends/cli/discovery/PiSessionScanner.js';
 import {
@@ -73,7 +70,6 @@ import {
   getClaudeProjectsDir,
   getCodexSessionsDir,
   getCopilotSessionsDir,
-  getGeminiSessionsDir,
 } from '../providerServices.js';
 import { resolvePiResumeTarget } from '../../backends/cli/pi/resume.js';
 import { JunieSessionScanner } from '../../backends/cli/junie/JunieSessionScanner.js';
@@ -2031,7 +2027,6 @@ function tracksProviderDiscoveryState(session: SessionInfo): boolean {
       || session.providerName === 'claude'
       || session.providerName === 'codex'
       || session.providerName === 'copilot'
-      || session.providerName === 'gemini'
       || session.providerName === 'pi'
       || session.providerName === 'junie'),
   );
@@ -2177,13 +2172,6 @@ async function scanProviderDiscoveryArtifactsForDelete(
         return {
           items: await new CopilotSessionScanner(
             getCopilotSessionsDir(ctx, session.providerInstanceId),
-          ).scan(),
-          scanFailed: false,
-        };
-      case 'gemini':
-        return {
-          items: await new GeminiSessionScanner(
-            getGeminiSessionsDir(ctx, session.providerInstanceId),
           ).scan(),
           scanFailed: false,
         };

@@ -173,9 +173,9 @@ export interface CliRuntimeConfig {
   auggiePath: string;
   claudePath: string;
   codexPath: string;
+  antigravityPath: string;
   copilotPath: string;
   cursorPath: string;
-  geminiPath: string;
   kiroPath: string;
   kiloPath: string;
   opencodePath: string;
@@ -432,9 +432,9 @@ export function loadConfig(
     auggiePath: configured.providerCommands.auggie.path,
     claudePath: configured.providerCommands.claude.path,
     codexPath: configured.providerCommands.codex.path,
+    antigravityPath: configured.providerCommands.antigravity.path,
     copilotPath: configured.providerCommands.copilot.path,
     cursorPath: configured.providerCommands.cursor.path,
-    geminiPath: configured.providerCommands.gemini.path,
     kiroPath: configured.providerCommands.kiro.path,
     kiloPath: configured.providerCommands.kilo.path,
     opencodePath: configured.providerCommands.opencode.path,
@@ -645,9 +645,9 @@ function buildLegacyRuntimeShape(
     auggie: 'native',
     claude: 'native',
     codex: 'native',
+    antigravity: 'native',
     copilot: 'native',
     cursor: 'native',
-    gemini: 'native',
     opencode: 'native',
     kilo: 'native',
     goose: 'native',
@@ -713,6 +713,13 @@ function buildLegacyRuntimeShape(
         codexSessionsDir: env.CODEX_SESSIONS_DIR || `${home}/.codex/sessions`,
       },
     },
+    antigravity: {
+      native: {
+        id: 'native',
+        providerName: 'antigravity',
+        commandConfig: providerCommands.antigravity,
+      },
+    },
     copilot: {
       native: {
         id: 'native',
@@ -727,14 +734,6 @@ function buildLegacyRuntimeShape(
         providerName: 'cursor',
         commandConfig: providerCommands.cursor,
         cursorChatsDir,
-      },
-    },
-    gemini: {
-      native: {
-        id: 'native',
-        providerName: 'gemini',
-        commandConfig: providerCommands.gemini,
-        geminiSessionsDir: env.GEMINI_SESSIONS_DIR || `${home}/.gemini/tmp`,
       },
     },
     kiro: {
@@ -824,9 +823,9 @@ function buildLegacyProviderCommands(
   const auggiePath = env.AUGGIE_PATH || 'auggie';
   const claudePath = env.CLAUDE_PATH || 'claude';
   const codexPath = env.CODEX_PATH || 'codex';
+  const antigravityPath = env.ANTIGRAVITY_PATH || 'agy';
   const copilotPath = env.COPILOT_PATH || 'copilot';
   const cursorPath = env.CURSOR_PATH || 'cursor-agent';
-  const geminiPath = env.GEMINI_PATH || 'gemini';
   const kiroPath = env.KIRO_PATH || 'kiro-cli';
   const kiloPath = env.KILO_PATH || 'kilo';
   const opencodePath = env.OPENCODE_PATH || 'opencode';
@@ -853,6 +852,12 @@ function buildLegacyProviderCommands(
       defaultProviderRuntimeMode('codex'),
       env,
     ),
+    antigravity: readProviderCommandConfig(
+      'ANTIGRAVITY',
+      antigravityPath,
+      defaultProviderRuntimeMode('antigravity'),
+      env,
+    ),
     copilot: readProviderCommandConfig(
       'COPILOT',
       copilotPath,
@@ -863,12 +868,6 @@ function buildLegacyProviderCommands(
       'CURSOR',
       cursorPath,
       defaultProviderRuntimeMode('cursor'),
-      env,
-    ),
-    gemini: readProviderCommandConfig(
-      'GEMINI',
-      geminiPath,
-      defaultProviderRuntimeMode('gemini'),
       env,
     ),
     kiro: readProviderCommandConfig(
@@ -941,7 +940,6 @@ function buildLegacyProviderInstance(
     codexSessionsDir: provider === 'codex' ? config.codexSessionsDir : undefined,
     copilotSessionsDir: provider === 'copilot' ? config.copilotSessionsDir : undefined,
     cursorChatsDir: provider === 'cursor' ? config.cursorChatsDir : undefined,
-    geminiSessionsDir: provider === 'gemini' ? config.geminiSessionsDir : undefined,
     kiroDbPath: provider === 'kiro' ? config.kiroDbPath : undefined,
     kiloServerHost: provider === 'kilo' ? config.kiloServerHost : undefined,
     kiloServerPort: provider === 'kilo' ? config.kiloServerPort : undefined,
@@ -1053,11 +1051,6 @@ function applyFileBasedProviderConfig(
             || readString(providerDoc.sessions_dir)
             || copilotSessionsDir;
           break;
-        case 'gemini':
-          geminiSessionsDir = readString(discovery?.sessions_dir)
-            || readString(providerDoc.sessions_dir)
-            || geminiSessionsDir;
-          break;
         case 'pi':
           piSessionsDir = readString(discovery?.sessions_dir)
             || readString(providerDoc.sessions_dir)
@@ -1127,11 +1120,6 @@ function applyFileBasedProviderConfig(
             ? readString(instanceDoc.chats_dir)
               || fallback.cursorChatsDir
               || cursorChatsDir
-            : undefined,
-          geminiSessionsDir: provider === 'gemini'
-            ? readString(instanceDoc.sessions_dir)
-              || fallback.geminiSessionsDir
-              || geminiSessionsDir
             : undefined,
           kiroDbPath: provider === 'kiro'
             ? readString(instanceDoc.db_path)
@@ -1229,9 +1217,6 @@ function applyFileBasedProviderConfig(
       if (provider === 'copilot') {
         copilotSessionsDir = nextInstances[defaultInstance].copilotSessionsDir || copilotSessionsDir;
       }
-      if (provider === 'gemini') {
-        geminiSessionsDir = nextInstances[defaultInstance].geminiSessionsDir || geminiSessionsDir;
-      }
       if (provider === 'kiro') {
         kiroDbPath = nextInstances[defaultInstance].kiroDbPath || kiroDbPath;
         kiroRuntime = nextInstances[defaultInstance].commandConfig.runtime;
@@ -1315,9 +1300,6 @@ function applyFileBasedProviderConfig(
     }
     if (provider === 'copilot') {
       copilotSessionsDir = instance.copilotSessionsDir || copilotSessionsDir;
-    }
-    if (provider === 'gemini') {
-      geminiSessionsDir = instance.geminiSessionsDir || geminiSessionsDir;
     }
     if (provider === 'kiro') {
       kiroDbPath = instance.kiroDbPath || kiroDbPath;
@@ -1592,9 +1574,9 @@ function cloneProviderCommands(
     auggie: cloneProviderCommandConfig(commands.auggie),
     claude: cloneProviderCommandConfig(commands.claude),
     codex: cloneProviderCommandConfig(commands.codex),
+    antigravity: cloneProviderCommandConfig(commands.antigravity),
     copilot: cloneProviderCommandConfig(commands.copilot),
     cursor: cloneProviderCommandConfig(commands.cursor),
-    gemini: cloneProviderCommandConfig(commands.gemini),
     kiro: cloneProviderCommandConfig(commands.kiro),
     kilo: cloneProviderCommandConfig(commands.kilo),
     opencode: cloneProviderCommandConfig(commands.opencode),
@@ -1611,9 +1593,9 @@ function cloneProviderInstances(
     auggie: cloneInstanceMap(instances.auggie),
     claude: cloneInstanceMap(instances.claude),
     codex: cloneInstanceMap(instances.codex),
+    antigravity: cloneInstanceMap(instances.antigravity),
     copilot: cloneInstanceMap(instances.copilot),
     cursor: cloneInstanceMap(instances.cursor),
-    gemini: cloneInstanceMap(instances.gemini),
     kiro: cloneInstanceMap(instances.kiro),
     kilo: cloneInstanceMap(instances.kilo),
     opencode: cloneInstanceMap(instances.opencode),

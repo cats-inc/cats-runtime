@@ -316,8 +316,8 @@ describe('config platform defaults', () => {
       CLAUDE_RUNTIME_DISTRO: process.env.CLAUDE_RUNTIME_DISTRO,
       CODEX_RUNTIME: process.env.CODEX_RUNTIME,
       CODEX_RUNTIME_DISTRO: process.env.CODEX_RUNTIME_DISTRO,
-      GEMINI_RUNTIME: process.env.GEMINI_RUNTIME,
-      GEMINI_RUNTIME_DISTRO: process.env.GEMINI_RUNTIME_DISTRO,
+      ANTIGRAVITY_RUNTIME: process.env.ANTIGRAVITY_RUNTIME,
+      ANTIGRAVITY_RUNTIME_DISTRO: process.env.ANTIGRAVITY_RUNTIME_DISTRO,
       COPILOT_RUNTIME: process.env.COPILOT_RUNTIME,
       COPILOT_RUNTIME_DISTRO: process.env.COPILOT_RUNTIME_DISTRO,
       OPENCODE_RUNTIME: process.env.OPENCODE_RUNTIME,
@@ -334,8 +334,8 @@ describe('config platform defaults', () => {
     process.env.CLAUDE_RUNTIME_DISTRO = 'Ubuntu';
     process.env.CODEX_RUNTIME = 'wsl';
     process.env.CODEX_RUNTIME_DISTRO = 'Ubuntu';
-    process.env.GEMINI_RUNTIME = 'wsl';
-    process.env.GEMINI_RUNTIME_DISTRO = 'Ubuntu';
+    process.env.ANTIGRAVITY_RUNTIME = 'wsl';
+    process.env.ANTIGRAVITY_RUNTIME_DISTRO = 'Ubuntu';
     process.env.COPILOT_RUNTIME = 'wsl';
     process.env.COPILOT_RUNTIME_DISTRO = 'Ubuntu';
     process.env.OPENCODE_RUNTIME = 'wsl';
@@ -358,7 +358,7 @@ describe('config platform defaults', () => {
         mode: 'wsl',
         distro: 'Ubuntu',
       });
-      expect(config.providerCommands.gemini.runtime).toEqual({
+      expect(config.providerCommands.antigravity.runtime).toEqual({
         mode: 'wsl',
         distro: 'Ubuntu',
       });
@@ -1235,7 +1235,7 @@ providers:
       expect(listProviderInstances(config, 'codex')).toHaveLength(1);
 
       // Unlisted providers return empty
-      expect(listProviderInstances(config, 'gemini')).toHaveLength(0);
+      expect(listProviderInstances(config, 'antigravity')).toHaveLength(0);
       expect(listProviderInstances(config, 'kiro')).toHaveLength(0);
       expect(listProviderInstances(config, 'cursor')).toHaveLength(0);
       expect(listProviderInstances(config, 'copilot')).toHaveLength(0);
@@ -1244,8 +1244,8 @@ providers:
       expect(listProviderInstances(config, 'pi')).toHaveLength(0);
 
       // Resolving an unlisted provider throws ProviderNotConfiguredError
-      expect(() => resolveProviderInstance(config, 'gemini'))
-        .toThrow(/Provider 'gemini' is not configured/);
+      expect(() => resolveProviderInstance(config, 'antigravity'))
+        .toThrow(/Provider 'antigravity' is not configured/);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -1333,9 +1333,9 @@ backends:
       });
 
       expect(config.providerDefaultInstances?.claude).toBe('native');
-      expect(config.providerDefaultTargets?.gemini).toBeUndefined();
+      expect(config.providerDefaultTargets?.antigravity).toBeUndefined();
       expect(listProviderInstances(config, 'claude')).toHaveLength(1);
-      expect(listProviderInstances(config, 'gemini')).toHaveLength(0);
+      expect(listProviderInstances(config, 'antigravity')).toHaveLength(0);
 
       expect(config.remoteProviderCatalog).toMatchObject({
         api: {
@@ -2326,18 +2326,18 @@ environments:
     kind: native
 routing:
   providers:
-    gemini:
+    antigravity:
       default_target:
         backend: cli
         instance: native
 backends:
   cli:
     providers:
-      gemini:
+      antigravity:
         instances:
           native:
             environment: native
-            command: gemini
+            command: agy
             runner: auto
             timeout_ms: 60000
 `.trimStart());
@@ -2349,7 +2349,7 @@ backends:
         CATS_RUNTIME_DIR: runtimeDir,
       });
 
-      expect(resolveProviderInstance(config, 'gemini', 'native')).toMatchObject({
+      expect(resolveProviderInstance(config, 'antigravity', 'native')).toMatchObject({
         id: 'native',
         timeoutMs: 60000,
       });

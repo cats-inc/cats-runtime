@@ -24,7 +24,7 @@ export type {
 export const KNOWN_PROVIDERS = [
   'claude',
   'codex',
-  'gemini',
+  'antigravity',
   'cursor',
   'copilot',
   'opencode',

@@ -13,4 +13,14 @@ describe('buildProviderInstallCatalogView', () => {
       'Kiro CLI should run in a Linux or WSL execution environment on Windows hosts.',
     );
   });
+
+  it('keeps Antigravity on the native installer path', () => {
+    const view = buildProviderInstallCatalogView('antigravity', { mode: 'native' }, 'win32');
+
+    expect(view.familyLabel).toBe('Antigravity CLI');
+    expect(view.install.method).toBe('native_installer');
+    expect(view.install.command).toBe('irm https://antigravity.google/cli/install.ps1 | iex');
+    expect(view.binaryName).toBe('agy');
+    expect(view.path.expectedPath).toBe('%LOCALAPPDATA%\\agy\\bin\\agy.exe');
+  });
 });

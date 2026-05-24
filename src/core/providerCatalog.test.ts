@@ -33,7 +33,7 @@ describe('provider catalog ordering', () => {
     expect(listConfiguredProviders(config)).toEqual([
       'claude',
       'codex',
-      'gemini',
+      'antigravity',
       'cursor',
       'copilot',
       'opencode',
@@ -49,7 +49,7 @@ describe('provider catalog ordering', () => {
     expect(Object.keys(listProviderCatalog(config))).toEqual([
       'claude',
       'codex',
-      'gemini',
+      'antigravity',
       'cursor',
       'copilot',
       'opencode',

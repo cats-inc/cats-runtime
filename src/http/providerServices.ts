@@ -78,10 +78,6 @@ export function getCopilotSessionsDir(ctx: AppContext, instanceId?: string) {
   return resolveFileBackedProviderPath(ctx.config, 'copilot', instanceId);
 }
 
-export function getGeminiSessionsDir(ctx: AppContext, instanceId?: string) {
-  return resolveFileBackedProviderPath(ctx.config, 'gemini', instanceId);
-}
-
 function resolveNativeService<T>(
   ctx: AppContext,
   provider: ProviderName,

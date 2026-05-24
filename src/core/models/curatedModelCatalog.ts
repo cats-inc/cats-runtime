@@ -13,6 +13,7 @@ const SUPPORTED_SCHEMA_VERSION = 1;
 const CURATED_CLI_ALIASES: Record<string, string[]> = {
   claude: ['claude', 'claude code'],
   codex: ['codex'],
+  antigravity: ['antigravity', 'agy'],
   gemini: ['gemini'],
   kilo: ['kilo'],
   kiro: ['kiro'],

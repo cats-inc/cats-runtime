@@ -26,8 +26,8 @@ import { ClaudeProvider } from '../../backends/cli/providers/claude.js';
 import { CodexProvider } from '../../backends/cli/providers/codex.js';
 import { CopilotProvider } from '../../backends/cli/providers/copilot.js';
 import { AuggieProvider } from '../../backends/cli/providers/auggie.js';
+import { AntigravityProvider } from '../../backends/cli/providers/antigravity.js';
 import { CursorProvider } from '../../backends/cli/providers/cursor.js';
-import { GeminiProvider } from '../../backends/cli/providers/gemini.js';
 import { GooseProvider } from '../../backends/cli/providers/goose.js';
 import { JunieProvider } from '../../backends/cli/providers/junie.js';
 import { KiloProvider } from '../../backends/cli/providers/kilo.js';
@@ -69,7 +69,7 @@ const SUPPORTED_CLI_PROBE_PROVIDERS = new Set<ProviderName>([
   'cursor',
   'pi',
   'goose',
-  'gemini',
+  'antigravity',
   'claude',
   'junie',
   'kilo',
@@ -509,8 +509,8 @@ function createProbeProvider(
       return { provider: new ClaudeProvider(compatibilityProfile, observer) };
     case 'codex':
       return { provider: new CodexProvider(compatibilityProfile, observer) };
-    case 'gemini':
-      return { provider: new GeminiProvider(compatibilityProfile, observer) };
+    case 'antigravity':
+      return { provider: new AntigravityProvider() };
     case 'copilot':
       return { provider: new CopilotProvider(compatibilityProfile, observer) };
     case 'cursor':

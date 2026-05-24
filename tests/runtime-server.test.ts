@@ -2709,7 +2709,7 @@ backends:
       const response = await runtime.app.request('/kiro/models');
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
-        instance: 'default',
+        instance: 'native',
         runtime: { mode: 'wsl' },
         source: 'static',
         models: ['claude-sonnet-4.5', 'deepseek-3.2', 'minimax-m2.1'],
@@ -3965,28 +3965,40 @@ providers:
     });
   });
 
-  it('GET /providers/gemini/models preserves the curated Gemini CLI order', async () => {
+  it('GET /providers/antigravity/models preserves the curated Antigravity CLI order', async () => {
     await withRuntime({}, {}, async (runtime) => {
-      const response = await runtime.app.request('/providers/gemini/models');
+      const response = await runtime.app.request('/providers/antigravity/models');
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
-        provider: 'gemini',
+        provider: 'antigravity',
         backend: 'cli',
-        instance: 'default',
-        defaultModel: 'gemini-3.1-pro-preview',
+        instance: 'native',
+        defaultModel: 'Gemini 3.1 Pro (high)',
         source: 'static',
         cache: null,
         models: [
-          { id: 'gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview', default: true },
-          { id: 'gemini-3-flash-preview', label: 'gemini-3-flash-preview', default: false },
           {
-            id: 'gemini-3.1-flash-lite-preview',
-            label: 'gemini-3.1-flash-lite-preview',
+            id: 'Gemini 3.1 Pro (high)',
+            label: 'Gemini 3.1 Pro (high)',
+            default: true,
+          },
+          {
+            id: 'Gemini 3.1 Pro (low)',
+            label: 'Gemini 3.1 Pro (low)',
             default: false,
           },
-          { id: 'gemini-2.5-pro', label: 'gemini-2.5-pro', default: false },
-          { id: 'gemini-2.5-flash', label: 'gemini-2.5-flash', default: false },
-          { id: 'gemini-2.5-flash-lite', label: 'gemini-2.5-flash-lite', default: false },
+          { id: 'Gemini 3 Flash', label: 'Gemini 3 Flash', default: false },
+          {
+            id: 'Claude Sonnet 4.6 (thinking)',
+            label: 'Claude Sonnet 4.6 (thinking)',
+            default: false,
+          },
+          {
+            id: 'Claude Opus 4.6 (thinking)',
+            label: 'Claude Opus 4.6 (thinking)',
+            default: false,
+          },
+          { id: 'GPT-OSS-120b', label: 'GPT-OSS-120b', default: false },
         ],
         warnings: [],
       });
@@ -4483,81 +4495,81 @@ providers:
     });
   });
 
-  it('GET /providers/gemini/models and /advanced honor curated Gemini CLI YAML', async () => {
+  it('GET /providers/antigravity/models and /advanced honor curated Antigravity CLI YAML', async () => {
     await withCuratedCatalogRuntime([
       'schema_version: 1',
       'catalogs:',
-      '  - cli: Gemini',
-      '    version: 0.36.0',
-      '    last_updated: 2026-04-08',
+      '  - cli: Antigravity',
+      '    version: probe-required',
+      '    last_updated: 2026-05-24',
       '    models:',
-      '      - name: gemini-3.1-pro-preview',
-      '        label: Gemini 3.1 Pro Preview',
+      '      - name: Gemini 3.1 Pro (high)',
+      '        label: Gemini 3.1 Pro (high)',
       '        default: true',
       '        notes:',
       '          - Primary reasoning model.',
-      '      - name: gemini-3-flash-preview',
-      '        label: Gemini 3 Flash Preview',
-      '      - name: gemini-3.1-flash-lite-preview',
-      '        label: Gemini 3.1 Flash Lite Preview',
+      '      - name: Gemini 3.1 Pro (low)',
+      '        label: Gemini 3.1 Pro (low)',
+      '      - name: Gemini 3 Flash',
+      '        label: Gemini 3 Flash',
     ], {}, {}, async (runtime) => {
-      const modelsResponse = await runtime.app.request('/providers/gemini/models');
+      const modelsResponse = await runtime.app.request('/providers/antigravity/models');
       expect(modelsResponse.status).toBe(200);
       expect(await modelsResponse.json()).toEqual({
-        provider: 'gemini',
+        provider: 'antigravity',
         backend: 'cli',
-        instance: 'default',
-        defaultModel: 'gemini-3.1-pro-preview',
+        instance: 'native',
+        defaultModel: 'Gemini 3.1 Pro (high)',
         source: 'static',
         cache: null,
         models: [
           {
-            id: 'gemini-3.1-pro-preview',
-            label: 'Gemini 3.1 Pro Preview',
+            id: 'Gemini 3.1 Pro (high)',
+            label: 'Gemini 3.1 Pro (high)',
             default: true,
           },
           {
-            id: 'gemini-3-flash-preview',
-            label: 'Gemini 3 Flash Preview',
+            id: 'Gemini 3.1 Pro (low)',
+            label: 'Gemini 3.1 Pro (low)',
             default: false,
           },
           {
-            id: 'gemini-3.1-flash-lite-preview',
-            label: 'Gemini 3.1 Flash Lite Preview',
+            id: 'Gemini 3 Flash',
+            label: 'Gemini 3 Flash',
             default: false,
           },
         ],
         warnings: [],
       });
 
-      const advancedResponse = await runtime.app.request('/providers/gemini/models/advanced');
+      const advancedResponse = await runtime.app.request('/providers/antigravity/models/advanced');
       expect(advancedResponse.status).toBe(200);
       expect(await advancedResponse.json()).toEqual({
-        provider: 'gemini',
+        provider: 'antigravity',
         backend: 'cli',
-        instance: 'default',
-        defaultModel: 'gemini-3.1-pro-preview',
+        instance: 'native',
+        defaultModel: 'Gemini 3.1 Pro (high)',
         source: 'static',
         cache: null,
         entries: [
           {
-            id: 'gemini-3.1-pro-preview',
-            label: 'Gemini 3.1 Pro Preview',
+            id: 'Gemini 3.1 Pro (high)',
+            label: 'Gemini 3.1 Pro (high)',
             default: true,
-            capabilityTags: ['tool_use', 'reasoning'],
+            capabilityTags: ['reasoning'],
             notes: ['Primary reasoning model.'],
           },
           {
-            id: 'gemini-3-flash-preview',
-            label: 'Gemini 3 Flash Preview',
+            id: 'Gemini 3.1 Pro (low)',
+            label: 'Gemini 3.1 Pro (low)',
             default: false,
-            capabilityTags: ['tool_use', 'latency_optimized'],
+            capabilityTags: ['reasoning'],
           },
           {
-            id: 'gemini-3.1-flash-lite-preview',
-            label: 'Gemini 3.1 Flash Lite Preview',
+            id: 'Gemini 3 Flash',
+            label: 'Gemini 3 Flash',
             default: false,
-            capabilityTags: ['tool_use', 'latency_optimized'],
+            capabilityTags: ['latency_optimized'],
           },
         ],
         presets: [],
