@@ -301,7 +301,11 @@ describe('SessionRegistry', () => {
 
     try {
       registry = new SessionRegistry(persistDir);
-      const session = registry.create({ providerName: 'gemini', cwd: '/repo' });
+      const session = registry.create({
+        providerName: 'gemini',
+        providerBackend: 'api',
+        cwd: '/repo',
+      });
       registry.setProviderState(session.id, {
         geminiCachedContent: {
           name: 'cachedContents/test-cache',

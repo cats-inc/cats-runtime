@@ -82,8 +82,8 @@ describe('PeerRegistry', () => {
       { sourceId: 'static:peer-a', sourceKind: 'static' },
     );
     registry.upsert(
-      createAdvertisement('peer-a', '2026-03-25T00:00:05.000Z', 5_000, ['gemini']),
-      { sourceId: 'legacy:peer-a', sourceKind: 'lan' },
+      createAdvertisement('peer-a', '2026-03-25T00:00:05.000Z', 5_000, ['antigravity']),
+      { sourceId: 'stale:peer-a', sourceKind: 'lan' },
     );
 
     const peer = registry.get('peer-a', { includeStale: true, now });
@@ -91,7 +91,7 @@ describe('PeerRegistry', () => {
       capabilities: expect.objectContaining({
         providers: ['codex'],
       }),
-      sources: ['lan:peer-a', 'legacy:peer-a', 'static:peer-a'],
+      sources: ['lan:peer-a', 'stale:peer-a', 'static:peer-a'],
       sourceKinds: ['lan', 'static'],
     }));
   });
