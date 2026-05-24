@@ -20,8 +20,8 @@ This spec is the runtime counterpart to cats-platform SPEC-110. ADR-032 captures
 
 - Register `antigravity` as a CLI provider family using `createNativeInstall(...)` against the `agy` binary, with the same shape as other native-installer providers.
 - Replace the `GEMINI_ACP_PROFILE` with `ANTIGRAVITY_ACP_PROFILE` aligned with openab's `agy-acp` adapter (PR #896, v0.8.4-beta.3); raw `agy` stays the CLI-subprocess command unless the probe proves it has a native ACP mode.
-- Replace the Gemini compatibility profiles (`gemini-cli-stream-json-v1` family) with Antigravity equivalents grounded in the actual `agy` stream contract.
-- Replace `GeminiSessionScanner` and `getGeminiSessionsDir` with Antigravity equivalents driven by `agy`'s real session storage layout.
+- Remove the Gemini compatibility profiles (`gemini-cli-stream-json-v1` family); add Antigravity stream profiles only after a live `agy` stream contract is proven. Until then, compatibility falls back to presence-only evidence.
+- Remove `GeminiSessionScanner` and `getGeminiSessionsDir`; add Antigravity session discovery only after `agy`'s real session storage layout and readable format are proven.
 - Replace the `gemini_native` history parser with an `antigravity_native` parser, or remove the parser entirely if `agy` produces no compatible session format.
 - Migrate dashboard (`index.html`), playground (`playground.html`), provider-setup (`provider-setup.html`), shared CSS, generated Tailwind, and `public/` mirrors to use `antigravity` as the provider id and badge token.
 - Update `config/providers.yaml.example` and `docs/setup-guide.md` to reflect the new CLI provider id and install path.
@@ -65,22 +65,22 @@ The fix is not additive. The Gemini-named seams must be replaced, not extended.
 2. The runtime shall remove the `gemini` entry from `src/core/provider-install/knowledge.ts` entirely.
 3. The runtime shall add an `ANTIGRAVITY_ACP_PROFILE` in `src/backends/agent/adapters/acp/profiles.ts`, family `antigravity`, tier 1, aligned with the `agy-acp` adapter contract shipped in openab v0.8.4-beta.3. Profile detection shall recognize `agy-acp` command / args; it shall not assume raw `agy` speaks ACP unless Phase 1 proves that contract.
 4. The runtime shall remove `GEMINI_ACP_PROFILE`.
-5. The runtime shall replace `GeminiSessionScanner` with `AntigravitySessionScanner`. The session directory resolution and parser format shall be driven by `agy`'s actual session storage (probed during PLAN-033 Phase 1); if `agy` does not emit a Cats-readable session format, the scanner shall return an empty result and the routes shall skip the provider rather than fabricate sessions.
+5. The runtime shall remove `GeminiSessionScanner`. It shall not add `AntigravitySessionScanner` until `agy`'s actual session storage path and readable parser format are proven; until then, session-discovery routes shall skip Antigravity rather than fabricate sessions.
 6. The runtime shall remove the `gemini_native` parser branch from `src/http/routes/history.ts`. If Antigravity emits its own importable format, an `antigravity_native` parser may replace it; otherwise the parser is removed without replacement.
 7. The runtime shall update `src/http/routes/sessions.ts`, `src/http/routes/diagnostics.ts`, `src/http/routes/diagnosticsSupport.ts`, and `src/http/routes/workspaceSubstrate.ts` so all `gemini` literals become `antigravity`.
-8. The runtime shall update `src/http/providerServices.ts` so `getGeminiSessionsDir` becomes `getAntigravitySessionsDir`.
+8. The runtime shall remove `getGeminiSessionsDir` from `src/http/providerServices.ts`. A `getAntigravitySessionsDir` helper is out of scope until a live probe proves a real session directory.
 9. The runtime shall update the dashboard at `src/http/ui/pages/index.html`:
-   - Replace `--gemini` CSS color token with `--antigravity` (color token value: TBD in Phase 2, see Open Questions).
+   - Replace `--gemini` CSS color token with `--antigravity` using the retained Google-family blue value (`#60a5fa`).
    - Replace `data-provider="gemini"` and `data-p="gemini"` selectors with `antigravity`.
    - Replace the `<option value="gemini">` entry with `<option value="antigravity">`.
    - Replace `gemini` in `PROVIDER_ORDER` with `antigravity`, preserving the same slot.
    - Replace `gemini` in the agent-enabled list (line ~1266) with `antigravity`.
 10. The runtime shall update the playground at `src/http/ui/pages/playground.html`:
     - Replace the `gemini:` badge style block with `antigravity:`.
-    - Replace the `gemini:` model list with an `antigravity:` entry. Keep the bundled runtime list empty until Phase 1 proves raw `agy` model ids; user-curated YAML may populate local entries explicitly.
+    - Replace the `gemini:` model list with an `antigravity:` entry exposing only the `antigravity-default` provider-default sentinel until Phase 1 proves raw `agy` model ids; user-curated YAML may populate local entries explicitly.
     - Replace `gemini` in the `PROVIDERS` array with `antigravity`.
     - Replace the default agent provider entry that points at `gemini`.
-    - Update any provider-id reference in `copilot` and `cursor` model lists that names `gemini-*` models — these are vendor-named submodels and may stay, but their string labels must be reviewed.
+    - Audit any `copilot`, `cursor`, or other vendor-owned model-list references that name `gemini-*` models — these are vendor-named submodels and may stay, but they are not Antigravity CLI model-id evidence.
 11. The runtime shall update `src/http/ui/shared.ts` and `src/http/ui/tailwind.runtime.css` to use the new `--antigravity` token, then rebuild `src/http/ui/generated/runtimeTailwind.ts`.
 12. The runtime shall regenerate `public/index.html` and `public/playground.html` from the updated UI sources.
 13. The runtime shall update `config/providers.yaml.example`: rename the top-level default target and CLI backend `gemini` blocks to `antigravity`, update the CLI `command:` field from `gemini` to `agy`, and adjust auth hints if Antigravity uses a different login flow than Gemini. The `backends.api.providers.gemini` block with `transport: google` and `GEMINI_API_KEY` remains intact unless a separate API-provider rename lands.
@@ -118,14 +118,14 @@ Layer 4 depends on cats-platform SPEC-110 Phase 1 landing first, because the pla
 - environment-bootstrap commits `b273f63a` and `5725e637` (already merged; pulled into this monorepo on 2026-05-24 via the submodule bump in commit `85540ced9`).
 - openab `agy-acp` adapter (PR #896, v0.8.4-beta.3) — drives `ANTIGRAVITY_ACP_PROFILE` shape.
 - cats-platform SPEC-110 Phase 1 (shared provider catalog data update) — must land before runtime UI Phase 4. cats-platform PLAN-100 Phase 0 and cats-runtime PLAN-033 Phase 1 refer to the same shared `agy` probe.
-- Verified knowledge of `agy`'s actual session storage layout, version probe contract, and stream output framing — probed during PLAN-033 Phase 1.
+- Verified knowledge of `agy`'s actual session storage layout, version probe contract, and stream output framing remains a live-probe gap recorded in `docs/research/2026-05-24-antigravity-cli-probe.md`; code paths depending on those facts stay absent or presence-only until a later probe proves them.
 
 ## Open Questions
 
-- [ ] What is the `--antigravity` dashboard badge color value? Current `--gemini: #60a5fa` is Google blue; Antigravity has its own brand identity. Decision: PLAN-033 Phase 4 pre-work.
-- [ ] Does `agy` produce a Cats-importable session file format, or are sessions opaque to the runtime? If opaque, `AntigravitySessionScanner` and the history-import path are removed without replacement.
-- [ ] Does Antigravity CLI support a `--version` flag with a parseable output, suitable for the compatibility evidence engine? If not, the runtime falls back to a presence-only probe.
-- [ ] Does raw `agy` expose any ACP mode, or is `agy-acp` the only ACP entry point? Default: `agent/acp:antigravity` uses `agy-acp`; raw `agy` remains CLI-subprocess only.
+- [x] What is the `--antigravity` dashboard badge color value? Use the previous Google-family blue (`#60a5fa`) for this swap so Antigravity keeps Gemini's dashboard slot and visual weight.
+- [x] Does `agy` produce a Cats-importable session file format, or are sessions opaque to the runtime? No live session-storage evidence exists yet. `AntigravitySessionScanner` and the history-import path are therefore absent until a later probe proves a readable format.
+- [x] Does Antigravity CLI support a `--version` flag with a parseable output, suitable for the compatibility evidence engine? No live `agy --version` evidence exists yet. Runtime compatibility uses presence-only checks until a parseable version contract is proven.
+- [x] Does raw `agy` expose any ACP mode, or is `agy-acp` the only ACP entry point? Raw `agy` ACP behavior was not proven. `agent/acp:antigravity` uses `agy-acp`; raw `agy` remains CLI-subprocess only unless later evidence changes that.
 
 ## References
 

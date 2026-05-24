@@ -92,7 +92,7 @@ This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
   - [x] `src/http/ui/pages/index.html:34,177,194,218` (dashboard CSS / selectors)
 - [x] In `src/http/ui/pages/index.html:1098,1227,1266`, replace the `gemini` option, `PROVIDER_ORDER` entry, and agent-enabled list entry with `antigravity`.
 - [x] In `src/http/ui/pages/playground.html:389,407,421,1274`, replace the `gemini` badge style block, model list, `PROVIDERS` array entry, and default agent provider with `antigravity`. Expose only the `antigravity-default` provider-default sentinel in the bundled playground list until Phase 1 proves raw `agy` model ids; user-curated YAML may populate local entries explicitly.
-- [ ] In `src/http/ui/pages/playground.html:408,413,414`, audit the `copilot` / `openrouter` / `cursor` model lists for references to `gemini-*` vendor models — those are vendor-named submodels and may stay if Google still ships them under Copilot / Cursor, but the labels should be reviewed for accuracy.
+- [x] In `src/http/ui/pages/playground.html:408,413,414`, audit the `copilot` / `junie` / `cursor` model lists for references to `gemini-*` vendor models or Gemini display names. These are vendor-named submodels and stay in their vendor-owned rows; they are not Antigravity CLI model-id evidence.
 - [x] Audit `src/http/ui/pages/provider-setup.html` for any Gemini-specific UI that the SPEC-026 grep did not catch (the file showed no matches but should be eyeballed).
 - [x] Regenerate `src/http/ui/generated/runtimeTailwind.ts` via the runtime UI build (`npm run build:runtime-ui-css` or equivalent).
 - [x] Regenerate `public/index.html` and `public/playground.html` from the updated sources.
@@ -109,19 +109,19 @@ This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
 
 ### Phase 6: Tests
 
-- [ ] Update fixtures in `src/http/providerDiagnostics.test.ts` (the heaviest user of `gemini`): CLI-provider fixtures move to `antigravity`; Google API probe tests stay under the existing Google/Gemini API transport unless a separate API-provider rename lands.
-- [ ] Update fixtures across the remaining `src/http/*.test.ts` files that mention `gemini`: `acpRoutes`, `sessionWorktree`, `sessionClose`, `messagesRoute`, `fileDiscoveredDelete`, `auggieManagement`, `browserRoutes`, `mcpRoutes`, `wakeupRoutes`, `opencodeManagement`, `kiloManagement`, `kiroManagement`, `cursorManagement`, `codexManagement`. Replace `gemini` with `antigravity` where the test cares about a Google-family provider; replace with a different existing provider id where the test is provider-agnostic.
-- [ ] Update `src/http/ui/shared.playground.test.ts` to match the playground changes.
+- [x] Update fixtures in `src/http/providerDiagnostics.test.ts` (the heaviest user of `gemini`): CLI-provider fixtures move to `antigravity`; the remaining `gemini` references are Google API transport/model probe tests and stay out of this CLI migration.
+- [x] Update fixtures across the remaining `src/http/*.test.ts` files that mention `gemini`: CLI-provider fixtures moved to `antigravity` or another provider where provider-agnostic; the remaining hits are Google API transport/cache tests, vendor model labels, or explicit regression text for not parsing Antigravity with the legacy Gemini parser.
+- [x] Update `src/http/ui/shared.playground.test.ts` to match the playground changes.
 - [ ] Run `npm test -- src/http` and confirm green.
 
-**Deliverables**: Test suite passes with no Gemini references in the codebase.
+**Deliverables**: Test suite passes with no Gemini CLI-provider references in the codebase; Google API transport/model references may remain.
 
 ### Phase 7: Docs and Repo Hygiene
 
-- [ ] Update `docs/setup-guide.md:9,192,497,629,689` to name Antigravity / `agy`.
-- [ ] Update `docs/security-guidelines.md`, `docs/plans/PLAN-003-api-backend.md`, `docs/research/2026-03-17-docker-cli-agent-login-validation.md` where they mention Gemini.
-- [ ] Leave `cats-runtime/GEMINI.md` untouched. It is agent-instruction content, not Gemini CLI runtime config, and Codex must not edit other agents' files.
-- [ ] Final grep sweep: `git grep -i gemini` across `cats-runtime/` — every remaining hit must be justified (e.g. Google API transport/model ids, third-party vendor model labels, or agent-governance references) or removed.
+- [x] Update `docs/setup-guide.md:9,192,497,629,689` to name Antigravity / `agy` where the text describes local CLI setup. Remaining Gemini mentions in this guide are Google API env/model examples and intentionally stay out of this CLI swap.
+- [x] Update `docs/security-guidelines.md`, `docs/plans/PLAN-003-api-backend.md`, `docs/research/2026-03-17-docker-cli-agent-login-validation.md` where they mention Gemini. Remaining references are Google API security/config guidance, the API backend plan, or explicitly historical Docker-login evidence.
+- [x] Leave `cats-runtime/GEMINI.md` untouched. It is agent-instruction content, not Gemini CLI runtime config, and Codex must not edit other agents' files.
+- [x] Final grep sweep: `git grep -i gemini` across `cats-runtime/` — remaining hits are justified as Google API transport/model ids/env vars, vendor-routed submodel labels, Junie/Kilo/Cursor model names, historical research, or agent-governance references.
 
 **Deliverables**: No accidental Gemini references; docs reflect the new reality.
 
