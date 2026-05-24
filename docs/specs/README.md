@@ -98,4 +98,4 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 ---
 
 *See also: [plans/](../plans/) for implementation plans*
-*Last updated: 2026-04-15*
+*Last updated: 2026-05-24 (SPEC-026 added: Antigravity CLI provider replacing Gemini CLI.)*

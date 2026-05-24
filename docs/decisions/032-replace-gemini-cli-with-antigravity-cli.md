@@ -19,7 +19,8 @@ The owner has confirmed that Antigravity CLI is the native replacement for Gemin
 - `src/backends/agent/adapters/acp/profiles.ts` (`GEMINI_ACP_PROFILE`)
 - `src/http/ui/pages/{index,playground,provider-setup}.html` (dashboard + playground + setup UI)
 - `src/http/routes/{sessions,history,diagnostics,workspaceSubstrate}.ts`
-- `config/providers.yaml.example`, `.env.example`, `docs/setup-guide.md`
+- `config/providers.yaml.example`, `docs/setup-guide.md`
+- `.env.example` contains the Google API key surface and is explicitly out of scope for the CLI swap.
 - assorted test fixtures
 
 The question is whether the runtime should:
@@ -34,10 +35,10 @@ The question is whether the runtime should:
 
 Specifically:
 
-1. The provider family identifier `gemini` is retired from runtime config, knowledge, compatibility, ACP profile, session scanner, model catalog dispatch, and UI lists.
+1. The local CLI provider family identifier `gemini` is retired from runtime CLI config, provider-install knowledge, compatibility, ACP profile, session scanner, model catalog dispatch for local CLIs, and setup/dashboard/playground local-provider UI lists. Google API provider names, model ids, and env vars that still use "gemini" stay out of scope unless a separate API-provider rename lands.
 2. A new provider family `antigravity` (id) / `Antigravity` (label) takes its place, registered through `createNativeInstall(...)` against the `agy` binary delivered by environment-bootstrap.
-3. The ACP-direction `agy-acp` adapter (already shipped in openab v0.8.4-beta.3 as PR #896) is the preferred transport profile for Antigravity in the agent backend.
-4. The Google API backend (HTTP completion against Google's API, distinct from the local CLI) is **not** retired by this ADR. The `GEMINI_API_KEY` env var and Google transport in `providerModelCatalog.ts` may be kept under an explicit `google` API backend entry if owner-driven separation is desired — but no Gemini CLI subprocess wiring remains.
+3. The ACP-direction uses openab's `agy-acp` adapter (already shipped in openab v0.8.4-beta.3 as PR #896) as the preferred Antigravity agent backend profile. Raw `agy` remains the CLI-subprocess command unless Phase 1 proves it exposes an ACP mode itself.
+4. The Google API backend (HTTP completion against Google's API, distinct from the local CLI) is **not** retired by this ADR. `GEMINI_API_KEY`, Google/Gemini model ids, and the Google API transport stay out of this CLI swap unless a separate API-provider rename decision lands. No Gemini CLI subprocess wiring remains.
 5. Session storage, history parser, and `gemini_native` parser id are removed; Antigravity's own session storage format becomes the new truth (to be probed during PLAN-033 Phase 1).
 6. Runtime dashboard color tokens, provider badges, playground model list, and `ENABLED_AGENTS` enums lose their `gemini` entry; a new `antigravity` entry takes its slot in the same provider ordering position.
 
@@ -103,7 +104,7 @@ This project has not shipped; no migration shim, dual-config support, or depreca
 
 ## Notes for Future Work
 
-- If the Google API completion path becomes a first-class provider after this slice, it should land as a separate ADR under the existing `api` backend family, not under `antigravity`.
+- If the Google API completion path is renamed from `gemini` to `google`, that should land as a separate ADR under the existing `api` backend family, not under `antigravity`.
 - The Antigravity CLI ACP profile may eventually subsume the CLI-subprocess transport entirely (openab's `agy-acp` adapter already exposes ACP from day one). The runtime should treat the CLI-subprocess `antigravity` transport as the baseline and add `agent/acp:antigravity` opportunistically.
 
 ## Related

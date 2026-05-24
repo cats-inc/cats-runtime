@@ -106,4 +106,4 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 ---
 
 *See also: [specs/](../specs/) for feature specifications*
-*Last updated: 2026-04-15*
+*Last updated: 2026-05-24 (PLAN-033 added: Gemini CLI to Antigravity CLI runtime migration.)*

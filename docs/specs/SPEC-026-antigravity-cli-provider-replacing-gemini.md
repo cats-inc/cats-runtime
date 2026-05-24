@@ -19,22 +19,22 @@ This spec is the runtime counterpart to cats-platform SPEC-110. ADR-032 captures
 ## Goals
 
 - Register `antigravity` as a CLI provider family using `createNativeInstall(...)` against the `agy` binary, with the same shape as other native-installer providers.
-- Replace the `GEMINI_ACP_PROFILE` with `ANTIGRAVITY_ACP_PROFILE` aligned with openab's `agy-acp` adapter (PR #896, v0.8.4-beta.3).
+- Replace the `GEMINI_ACP_PROFILE` with `ANTIGRAVITY_ACP_PROFILE` aligned with openab's `agy-acp` adapter (PR #896, v0.8.4-beta.3); raw `agy` stays the CLI-subprocess command unless the probe proves it has a native ACP mode.
 - Replace the Gemini compatibility profiles (`gemini-cli-stream-json-v1` family) with Antigravity equivalents grounded in the actual `agy` stream contract.
 - Replace `GeminiSessionScanner` and `getGeminiSessionsDir` with Antigravity equivalents driven by `agy`'s real session storage layout.
 - Replace the `gemini_native` history parser with an `antigravity_native` parser, or remove the parser entirely if `agy` produces no compatible session format.
 - Migrate dashboard (`index.html`), playground (`playground.html`), provider-setup (`provider-setup.html`), shared CSS, generated Tailwind, and `public/` mirrors to use `antigravity` as the provider id and badge token.
-- Update `config/providers.yaml.example`, `.env.example`, and `docs/setup-guide.md` to reflect the new provider id and install path.
+- Update `config/providers.yaml.example` and `docs/setup-guide.md` to reflect the new CLI provider id and install path.
 - Update test fixtures across `src/http/*.test.ts` to use `antigravity` where they currently use `gemini`.
 - Keep the Google API completion path (HTTP completion against Google's API) outside the scope of this spec; it remains owned by the `api` backend family and is not part of this provider swap.
 
 ## Non-Goals
 
 - Retaining `gemini` as a provider family alias or fallback id (the project has not shipped; no migration shim is owed).
-- Designing the Antigravity API HTTP backend or `GEMINI_API_KEY` env strategy (separate follow-up if owner chooses to keep an HTTP path).
+- Designing the Antigravity API HTTP backend or renaming the existing Google/Gemini API env strategy. `GEMINI_API_KEY` remains part of the Google API transport unless a separate API-provider rename lands.
 - Reshaping the broader CLI provider taxonomy or the `agent` backend family boundary.
 - Coordinating the packaged Desktop installer change — owned by cats-platform SPEC-110.
-- Coordinating the shared provider catalog data (`cats-platform/src/shared/providerCatalogData.ts`) — owned by cats-platform SPEC-110; this spec only describes how the runtime UI consumes that catalog.
+- Coordinating the shared provider catalog data (`cats-platform/src/shared/providerCatalogData.ts`) — owned by cats-platform SPEC-110; this spec only describes how the runtime UI mirrors those values or adds an explicit generated import.
 
 ## User Stories
 
@@ -63,7 +63,7 @@ The fix is not additive. The Gemini-named seams must be replaced, not extended.
 
 1. The runtime shall register `antigravity` as a CLI provider family via `createNativeInstall(...)` in `src/core/provider-install/knowledge.ts`. Binary name: `agy`. Install verification: PATH lookup followed by `LOCALAPPDATA` / `~/.local/bin` fallback (matching `Check-Installation` upstream).
 2. The runtime shall remove the `gemini` entry from `src/core/provider-install/knowledge.ts` entirely.
-3. The runtime shall add an `ANTIGRAVITY_ACP_PROFILE` in `src/backends/agent/adapters/acp/profiles.ts`, family `antigravity`, tier 1, aligned with the `agy-acp` adapter contract shipped in openab v0.8.4-beta.3.
+3. The runtime shall add an `ANTIGRAVITY_ACP_PROFILE` in `src/backends/agent/adapters/acp/profiles.ts`, family `antigravity`, tier 1, aligned with the `agy-acp` adapter contract shipped in openab v0.8.4-beta.3. Profile detection shall recognize `agy-acp` command / args; it shall not assume raw `agy` speaks ACP unless Phase 1 proves that contract.
 4. The runtime shall remove `GEMINI_ACP_PROFILE`.
 5. The runtime shall replace `GeminiSessionScanner` with `AntigravitySessionScanner`. The session directory resolution and parser format shall be driven by `agy`'s actual session storage (probed during PLAN-033 Phase 1); if `agy` does not emit a Cats-readable session format, the scanner shall return an empty result and the routes shall skip the provider rather than fabricate sessions.
 6. The runtime shall remove the `gemini_native` parser branch from `src/http/routes/history.ts`. If Antigravity emits its own importable format, an `antigravity_native` parser may replace it; otherwise the parser is removed without replacement.
@@ -77,17 +77,17 @@ The fix is not additive. The Gemini-named seams must be replaced, not extended.
    - Replace `gemini` in the agent-enabled list (line ~1266) with `antigravity`.
 10. The runtime shall update the playground at `src/http/ui/pages/playground.html`:
     - Replace the `gemini:` badge style block with `antigravity:`.
-    - Replace the `gemini:` model list with `antigravity:` model list (model values from `cats-platform/src/shared/providerCatalogData.ts` after SPEC-110 Phase 1 lands).
+    - Replace the `gemini:` model list with an `antigravity:` model list mirrored from `cats-platform/src/shared/providerCatalogData.ts` after SPEC-110 Phase 1 lands, or implement a real generated catalog import.
     - Replace `gemini` in the `PROVIDERS` array with `antigravity`.
     - Replace the default agent provider entry that points at `gemini`.
     - Update any provider-id reference in `copilot` and `cursor` model lists that names `gemini-*` models — these are vendor-named submodels and may stay, but their string labels must be reviewed.
 11. The runtime shall update `src/http/ui/shared.ts` and `src/http/ui/tailwind.runtime.css` to use the new `--antigravity` token, then rebuild `src/http/ui/generated/runtimeTailwind.ts`.
 12. The runtime shall regenerate `public/index.html` and `public/playground.html` from the updated UI sources.
-13. The runtime shall update `config/providers.yaml.example`: rename the `gemini` CLI provider block to `antigravity`, update the `command:` field from `gemini` to `agy`, and adjust auth hints if Antigravity uses a different login flow than Gemini.
-14. The runtime shall remove `GEMINI_API_KEY` from `.env.example` unless an Antigravity API path is added in the same slice (no API path is added here).
+13. The runtime shall update `config/providers.yaml.example`: rename the top-level default target and CLI backend `gemini` blocks to `antigravity`, update the CLI `command:` field from `gemini` to `agy`, and adjust auth hints if Antigravity uses a different login flow than Gemini. The `backends.api.providers.gemini` block with `transport: google` and `GEMINI_API_KEY` remains intact unless a separate API-provider rename lands.
+14. The runtime shall leave `GEMINI_API_KEY` and Google API transport examples intact unless a separate API-provider rename from `gemini` to `google` lands in the same slice. Do not add `ANTIGRAVITY_API_KEY`; Antigravity is a local CLI provider here.
 15. The runtime shall update `docs/setup-guide.md` references at lines 9, 192, 497, 629, 689 to name Antigravity / `agy` instead of Gemini / `gemini`.
 16. The runtime shall update all `src/http/*.test.ts` fixtures that use `gemini` as a test provider id to use `antigravity`. Fixture replacement may use a different provider id where the test is about CLI provider behavior in general rather than the Gemini specifics.
-17. The runtime shall remove `GEMINI.md` from the repo root if present, since this project does not use Gemini-CLI-specific agent instructions after the swap (decision deferred to PLAN-033 Phase 7).
+17. The runtime shall not read, rename, or delete `GEMINI.md`. That file is an agent-specific instruction file governed by `AGENTS.md` / `CODEX.md`, not Gemini CLI runtime config.
 
 ### Non-Functional Requirements
 
@@ -108,10 +108,10 @@ The migration moves through five concentric layers, each depending on the previo
 4. UI                → dashboard, playground, provider-setup, shared CSS,
                        generated Tailwind, public mirrors
 5. Tests + docs      → *.test.ts fixtures, providers.yaml.example,
-                       setup-guide.md, .env.example
+                       setup-guide.md
 ```
 
-Layer 4 depends on cats-platform SPEC-110 Phase 1 landing first, because the shared provider catalog (`cats-platform/src/shared/providerCatalogData.ts`) is the source of truth for both the playground model list and the dashboard's provider ordering. PLAN-033 sequences this cross-repo dependency explicitly.
+Layer 4 depends on cats-platform SPEC-110 Phase 1 landing first, because the platform catalog (`cats-platform/src/shared/providerCatalogData.ts`) defines the product-side provider/model values that the runtime UI must mirror or import. The runtime currently keeps its own hardcoded dashboard/playground data, so PLAN-033 sequences this cross-repo dependency explicitly.
 
 ## Dependencies
 
@@ -125,7 +125,7 @@ Layer 4 depends on cats-platform SPEC-110 Phase 1 landing first, because the sha
 - [ ] What is the `--antigravity` dashboard badge color value? Current `--gemini: #60a5fa` is Google blue; Antigravity has its own brand identity. Decision: PLAN-033 Phase 4 pre-work.
 - [ ] Does `agy` produce a Cats-importable session file format, or are sessions opaque to the runtime? If opaque, `AntigravitySessionScanner` and the history-import path are removed without replacement.
 - [ ] Does Antigravity CLI support a `--version` flag with a parseable output, suitable for the compatibility evidence engine? If not, the runtime falls back to a presence-only probe.
-- [ ] Should the runtime also wire `agent/acp:antigravity` (the openab `agy-acp` direction) in this slice, or defer to a follow-up plan? Default: defer to keep this slice focused on the CLI-subprocess swap.
+- [ ] Does raw `agy` expose any ACP mode, or is `agy-acp` the only ACP entry point? Default: `agent/acp:antigravity` uses `agy-acp`; raw `agy` remains CLI-subprocess only.
 
 ## References
 
