@@ -2684,6 +2684,54 @@ backends:
     });
   });
 
+  it('GET /sessions/:id/history does not parse Antigravity sources with the legacy Gemini JSON parser', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const transcriptPath = join(runtime.context.config.sessionBaseDir, 'antigravity-provider.json');
+      writeFileSync(transcriptPath, JSON.stringify({
+        messages: [
+          { type: 'user', content: 'legacy Gemini-shaped prompt', timestamp: '2026-05-24T00:00:00.000Z' },
+          { type: 'gemini', content: [{ text: 'legacy Gemini-shaped response' }], timestamp: '2026-05-24T00:00:01.000Z' },
+        ],
+      }), 'utf8');
+
+      const session = runtime.context.registry.create({
+        id: 'antigravity-json-history',
+        providerName: 'antigravity',
+        providerBackend: 'cli',
+        cwd: runtime.context.config.sessionBaseDir,
+        model: 'antigravity-default',
+      });
+      session.providerSourcePath = transcriptPath;
+
+      const response = await runtime.app.request(`/sessions/${session.id}/history`);
+      expect(response.status).toBe(200);
+      const payload = await response.json() as {
+        messages: unknown[];
+        transcript: {
+          ownership: string;
+          source: string;
+          parser: string;
+          sources?: Array<Record<string, unknown>>;
+        };
+      };
+      expect(payload.messages).toEqual([]);
+      expect(payload.transcript).toEqual(expect.objectContaining({
+        ownership: 'provider',
+        source: 'jsonl',
+        parser: 'generic_jsonl',
+        sources: [
+          expect.objectContaining({
+            ownership: 'provider',
+            source: 'jsonl',
+            parser: 'generic_jsonl',
+            path: transcriptPath,
+            messageCount: 0,
+          }),
+        ],
+      }));
+    });
+  });
+
   it('POST /sessions rejects unknown providers before spawning', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/sessions', {

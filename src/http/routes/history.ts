@@ -1,4 +1,4 @@
-import { createReadStream, readFileSync } from 'node:fs';
+import { createReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { Hono } from 'hono';
 import {
@@ -28,24 +28,6 @@ import type { PiMessagePart, PiStreamEvent } from '../../backends/cli/pi/parser.
 
 export const historyRoutes = new Hono();
 
-/**
- * Extract text from Gemini content which can be a string or a part-list array.
- * Part-list format: [{ text: "..." }, { functionCall: ... }, ...]
- */
-function geminiExtractText(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((part: Record<string, unknown>) => {
-        if (typeof part.text === 'string') return part.text;
-        return '';
-      })
-      .filter(Boolean)
-      .join('');
-  }
-  return '';
-}
-
 interface HistoryMessage {
   role: 'user' | 'assistant';
   text: string;
@@ -61,7 +43,6 @@ interface HistoryTranscriptMetadata {
     | 'kilo_native'
     | 'auggie_native'
     | 'opencode_native'
-    | 'gemini_native'
     | 'generic_jsonl'
     | 'pi_native'
     | 'none';
@@ -474,35 +455,6 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
       } catch {
         // Fall through to the generic parser for any unreadable Pi transcripts.
       }
-    }
-
-    // Gemini single-JSON session format
-    if (filePath.endsWith('.json')) {
-      const messageCountBefore = messages.length;
-      try {
-        const raw = readFileSync(filePath, 'utf-8');
-        const data = JSON.parse(raw);
-        for (const msg of data.messages || []) {
-          const text = geminiExtractText(msg.content);
-          if (msg.type === 'user' && text)
-            messages.push({ role: 'user', text, timestamp: msg.timestamp });
-          else if (msg.type === 'gemini' && text)
-            messages.push({ role: 'assistant', text, timestamp: msg.timestamp });
-        }
-        transcript = {
-          ownership,
-          source: 'json',
-          parser: 'gemini_native',
-        };
-        transcriptSources.push(buildTranscriptSource(filePath, messages.length - messageCountBefore, {
-          ownership,
-          source: 'json',
-          parser: 'gemini_native',
-        }));
-      } catch {
-        // Non-fatal
-      }
-      continue;
     }
 
     const messageCountBefore = messages.length;
