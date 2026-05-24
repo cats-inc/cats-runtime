@@ -74,8 +74,9 @@ Findings:
 
 ## Implementation Decisions From This Probe
 
-- Packaged setup wrappers use the Cats Desktop host-facing lifecycle flags and
-  translate only install / upgrade / force to environment-bootstrap.
+- Packaged setup wrappers use the Cats Desktop host-facing lifecycle flags,
+  invoke Google's official installer directly, and port environment-bootstrap's
+  refresh behavior by deleting the existing `agy` binary before upgrade / force.
 - Packaged uninstall is binary-only by default and does not delete auth,
   session, plugin, or settings state under `~/.gemini/antigravity-cli`.
 - `setupAssets.ts` should mark Antigravity helpers as user-scoped
