@@ -20,7 +20,7 @@ describe('WorkspaceSubstrateService', () => {
 
     expect(service.listProfiles()).toEqual({
       defaultProfile: 'standard',
-      allowedAgents: ['claude', 'antigravity', 'codex'],
+      allowedAgents: ['claude', 'codex'],
       profiles: [
         expect.objectContaining({
           id: 'minimal',
@@ -29,12 +29,12 @@ describe('WorkspaceSubstrateService', () => {
         }),
         expect.objectContaining({
           id: 'standard',
-          defaultEnabledAgents: ['claude', 'antigravity', 'codex'],
+          defaultEnabledAgents: ['claude', 'codex'],
           includeA2AByDefault: false,
         }),
         expect.objectContaining({
           id: 'a2a-enabled',
-          defaultEnabledAgents: ['claude', 'antigravity', 'codex'],
+          defaultEnabledAgents: ['claude', 'codex'],
           includeA2AByDefault: true,
         }),
       ],

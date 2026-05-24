@@ -30,7 +30,7 @@ const ACTOR_ROLES: WorkspaceSubstrateActorRole[] = [
   'operator',
 ];
 
-const ENABLED_AGENTS = ['claude', 'antigravity', 'codex'] as const;
+const ENABLED_AGENTS = ['claude', 'codex'] as const;
 
 export const workspaceSubstrateRoutes = new Hono<RuntimeRouteEnv>();
 
@@ -45,9 +45,9 @@ function parseProfile(value: unknown): WorkspaceSubstrateProfileId | undefined {
     : undefined;
 }
 
-function parseEnabledAgents(value: unknown): Array<'claude' | 'antigravity' | 'codex'> | undefined {
+function parseEnabledAgents(value: unknown): Array<'claude' | 'codex'> | undefined {
   const enabledAgents = parseStringArray(value)
-    ?.filter((agent): agent is 'claude' | 'antigravity' | 'codex' =>
+    ?.filter((agent): agent is 'claude' | 'codex' =>
       ENABLED_AGENTS.includes(agent as (typeof ENABLED_AGENTS)[number]));
   return enabledAgents && enabledAgents.length > 0 ? enabledAgents : undefined;
 }

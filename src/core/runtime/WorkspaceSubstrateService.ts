@@ -27,7 +27,7 @@ import { buildTextDiffPreview } from '../diff/textDiff.js';
 
 const MANAGED_MARKER = 'cats-runtime:workspace-substrate';
 const REVIEW_COPY_SUFFIX = '.bootstrap';
-const DEFAULT_STANDARD_AGENTS = ['claude', 'antigravity', 'codex'] as const;
+const DEFAULT_STANDARD_AGENTS = ['claude', 'codex'] as const;
 const PRIVILEGED_ACTOR_ROLES = ['boss_cat', 'system', 'owner'] as const;
 const LEGACY_A2A_STARTER_FILES = [
   {
@@ -70,8 +70,8 @@ function normalizeProfile(profile?: WorkspaceSubstrateProfileId): WorkspaceSubst
 
 function normalizeAgents(
   profile: WorkspaceSubstrateProfileId,
-  enabledAgents?: Array<'claude' | 'antigravity' | 'codex'>,
-): Array<'claude' | 'antigravity' | 'codex'> {
+  enabledAgents?: Array<'claude' | 'codex'>,
+): Array<'claude' | 'codex'> {
   if (enabledAgents && enabledAgents.length > 0) {
     return Array.from(new Set(enabledAgents));
   }
@@ -130,12 +130,10 @@ function scriptMarker(profile: WorkspaceSubstrateProfileId, filePath: string): s
   return `# ${MANAGED_MARKER} profile=${profile} file=${filePath}`;
 }
 
-function humanizeAgent(agent: 'claude' | 'antigravity' | 'codex'): string {
+function humanizeAgent(agent: 'claude' | 'codex'): string {
   switch (agent) {
     case 'claude':
       return 'Claude';
-    case 'antigravity':
-      return 'Antigravity';
     case 'codex':
       return 'Codex';
   }
@@ -158,7 +156,7 @@ function renderMetadataLines(hints: WorkspaceSubstrateHints | undefined): string
 function buildAgentsFile(
   profile: WorkspaceSubstrateProfileId,
   hints: WorkspaceSubstrateHints | undefined,
-  enabledAgents: Array<'claude' | 'antigravity' | 'codex'>,
+  enabledAgents: Array<'claude' | 'codex'>,
 ): string {
   const metadataLines = renderMetadataLines(hints);
   const agentFiles = enabledAgents
@@ -194,7 +192,7 @@ function buildAgentsFile(
 }
 
 function buildAgentSpecificFile(
-  agent: 'claude' | 'antigravity' | 'codex',
+  agent: 'claude' | 'codex',
   profile: WorkspaceSubstrateProfileId,
 ): string {
   const name = humanizeAgent(agent);
@@ -222,7 +220,7 @@ function buildAgentSpecificFile(
 
 function buildAgentGuide(
   profile: WorkspaceSubstrateProfileId,
-  enabledAgents: Array<'claude' | 'antigravity' | 'codex'>,
+  enabledAgents: Array<'claude' | 'codex'>,
 ): string {
   const agentList = enabledAgents.length > 0
     ? enabledAgents.map((agent) => `- ${humanizeAgent(agent)} -> ${agent.toUpperCase()}.md`).join('\n')
@@ -375,7 +373,7 @@ function buildScriptsReadme(profile: WorkspaceSubstrateProfileId): string {
     '',
     '## Collaboration Helpers',
     '',
-    '- `scripts/windows/Sync-AgentSkills.ps1` syncs `skills/` into `.claude/skills`, `.agents/skills`, and `.antigravity/skills`.',
+    '- `scripts/windows/Sync-AgentSkills.ps1` syncs `skills/` into `.claude/skills` and `.agents/skills`.',
     '- `scripts/linux/sync-agent-skills.sh` and `scripts/macos/sync-agent-skills.sh` provide the same sync contract on POSIX hosts.',
     '',
   ].join('\n');
@@ -390,7 +388,7 @@ function buildWindowsSyncAgentSkillsScript(profile: WorkspaceSubstrateProfileId)
     scriptMarker(profile, 'scripts/windows/Sync-AgentSkills.ps1'),
     'param(',
     '  [switch]$Clean,',
-    '  [ValidateSet("claude", "codex", "antigravity")]',
+    '  [ValidateSet("claude", "codex")]',
     '  [string]$Agent',
     ')',
     '',
@@ -418,7 +416,6 @@ function buildWindowsSyncAgentSkillsScript(profile: WorkspaceSubstrateProfileId)
     '$AgentPaths = @{',
     '  "claude" = Join-Path $ProjectRoot ".claude" "skills"',
     '  "codex"  = Join-Path $ProjectRoot ".agents" "skills"',
-    '  "antigravity" = Join-Path $ProjectRoot ".antigravity" "skills"',
     '}',
     '',
     '$TargetAgents = if ($Agent) { @{ $Agent = $AgentPaths[$Agent] } } else { $AgentPaths }',
@@ -465,7 +462,7 @@ function buildPosixSyncAgentSkillsScript(
     '',
     'print_usage() {',
     '  cat <<\'EOF\'',
-    'Usage: sync-agent-skills.sh [--clean] [--agent claude|codex|antigravity]',
+    'Usage: sync-agent-skills.sh [--clean] [--agent claude|codex]',
     'EOF',
     '}',
     '',
@@ -482,7 +479,7 @@ function buildPosixSyncAgentSkillsScript(
     '        exit 1',
     '      fi',
     '      case "$1" in',
-    '        claude|codex|antigravity)',
+    '        claude|codex)',
     '          agent="$1"',
     '          ;;',
     '        *)',
@@ -525,12 +522,11 @@ function buildPosixSyncAgentSkillsScript(
     '  case "$1" in',
     '    claude) echo "$project_root/.claude/skills" ;;',
     '    codex) echo "$project_root/.agents/skills" ;;',
-    '    antigravity) echo "$project_root/.antigravity/skills" ;;',
     '    *) return 1 ;;',
     '  esac',
     '}',
     '',
-    'agents=(claude codex antigravity)',
+    'agents=(claude codex)',
     'if [[ -n "$agent" ]]; then',
     '  agents=("$agent")',
     'fi',
@@ -666,7 +662,7 @@ function buildGetTaskExample(profile: WorkspaceSubstrateProfileId): string {
 function buildTemplates(input: {
   profile: WorkspaceSubstrateProfileId;
   hints?: WorkspaceSubstrateHints;
-  enabledAgents: Array<'claude' | 'antigravity' | 'codex'>;
+  enabledAgents: Array<'claude' | 'codex'>;
   includeA2A: boolean;
 }): WorkspaceTemplateFile[] {
   const files: WorkspaceTemplateFile[] = [
@@ -837,7 +833,7 @@ function createApplyPayload(input: {
   operation: WorkspaceSubstrateRequest['operation'];
   workspacePath: string;
   profile: WorkspaceSubstrateProfileId;
-  enabledAgents: Array<'claude' | 'antigravity' | 'codex'>;
+  enabledAgents: Array<'claude' | 'codex'>;
   includeA2A: boolean;
   hints?: WorkspaceSubstrateHints;
 }): WorkspaceSubstrateApplyPayload | undefined {

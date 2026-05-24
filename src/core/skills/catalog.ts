@@ -56,7 +56,6 @@ const OPTIONAL_RUNTIME_LIBRARY_FRONTMATTER_FIELDS = [
 ] as const;
 const INSTRUCTION_DELIVERY_CLI_PROVIDERS = new Set([
   'claude',
-  'antigravity',
   'copilot',
   'cursor',
   'kiro',

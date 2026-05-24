@@ -36,7 +36,7 @@ describe('workspace substrate routes', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       defaultProfile: 'standard',
-      allowedAgents: ['claude', 'antigravity', 'codex'],
+      allowedAgents: ['claude', 'codex'],
       profiles: [
         expect.objectContaining({
           id: 'minimal',

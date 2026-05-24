@@ -26,7 +26,7 @@ const VALID_PROJECT_TYPES = new Set<NonNullable<WorkspaceSubstrateHints['project
   'single-project',
   'monorepo',
 ]);
-const VALID_AGENTS = new Set(['claude', 'antigravity', 'codex']);
+const VALID_AGENTS = new Set(['claude', 'codex']);
 const VALID_ACTOR_ROLES = new Set<WorkspaceSubstrateActorRole>([
   'boss_cat',
   'specialist_cat',
@@ -46,7 +46,7 @@ Options:
   --workspace-path <path>         Target workspace path (default: current dir)
   --operation <name>              audit|init|update or full substrate operation id
   --profile <id>                  minimal|standard|a2a-enabled
-  --agent <id[,id...]>            claude|antigravity|codex (repeatable)
+  --agent <id[,id...]>            claude|codex (repeatable)
   --include-a2a                   Force A2A starter artifacts on
   --no-include-a2a                Force A2A starter artifacts off
   --apply                         Apply changes instead of preview only
@@ -92,9 +92,9 @@ function normalizeProfile(raw: string): WorkspaceSubstrateProfileId {
   throw new Error(`Unsupported profile '${raw}'`);
 }
 
-function normalizeAgent(raw: string): 'claude' | 'antigravity' | 'codex' {
+function normalizeAgent(raw: string): 'claude' | 'codex' {
   if (VALID_AGENTS.has(raw)) {
-    return raw as 'claude' | 'antigravity' | 'codex';
+    return raw as 'claude' | 'codex';
   }
   throw new Error(`Unsupported agent '${raw}'`);
 }
@@ -118,7 +118,7 @@ function parseArgs(argv: string[]): WorkspaceSubstrateRequest {
     workspacePath: resolve(process.cwd()),
     operation: 'audit-workspace',
   };
-  const enabledAgents = new Set<'claude' | 'antigravity' | 'codex'>();
+  const enabledAgents = new Set<'claude' | 'codex'>();
   const technologyLabels = new Set<string>();
   let operationExplicit = false;
 
