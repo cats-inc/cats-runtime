@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-05-24-antigravity-cli-probe](./2026-05-24-antigravity-cli-probe.md) | Antigravity CLI Phase 0 probe | Local environment-bootstrap installer contract, official Antigravity CLI docs, skills/plugin behavior, model display names, and remaining live-probe gaps before replacing Gemini CLI |
 | [2026-04-15-acp-agent-backend-and-runtime-facade-alignment](./2026-04-15-acp-agent-backend-and-runtime-facade-alignment.md) | ACP agent backend and runtime facade alignment | Why ACP should land as `agent/acp` for provider targets, why IDE-facing ACP must stay a separate runtime facade, and how ACP complements A2A |
 | [2026-04-07-advanced-provider-manifest-onboarding-checklist](./2026-04-07-advanced-provider-manifest-onboarding-checklist.md) | Advanced provider manifest onboarding checklist | The explicit evidence, wiring, regression, and documentation gates required before promoting any runtime target from conservative advanced catalogs to `verified_manifest` |
 | [2026-04-07-npm-trusted-publishing-readiness](./2026-04-07-npm-trusted-publishing-readiness.md) | npm trusted publishing readiness | Which exact npm/GitHub repo-side and external settings `cats-runtime` needs before a real trusted publish can succeed, and which parts can land safely before any publish happens |
@@ -39,4 +40,4 @@ Action Items:
 
 ---
 
-*Last updated: 2026-04-15*
+*Last updated: 2026-05-24*
