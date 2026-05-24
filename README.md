@@ -44,7 +44,7 @@ Current capabilities:
   hard-coding provider behavior
 - provider-side ACP support under the existing `agent` backend family,
   including all 12 current CLI ACP provider families with runtime-owned tier
-  metadata for Claude, Codex, Gemini, Cursor, Copilot, OpenCode, Kilo, Goose,
+  metadata for Claude, Codex, Antigravity, Cursor, Copilot, OpenCode, Kilo, Goose,
   Pi, Auggie, Junie, and Kiro
 - a bounded runtime-owned ACP facade on `POST /acp` plus a direct stdio ACP
   carrier for prompt-turn capable IDE/client integration
@@ -231,9 +231,9 @@ installed package.
 
 Current runtime behavior:
 
-- Claude, Codex, Gemini, Kilo, Copilot, and Cursor can all consume curated YAML on the CLI
+- Claude, Codex, Antigravity, Kilo, Copilot, and Cursor can all consume curated YAML on the CLI
   static-fallback path
-- Claude, Codex, Gemini, Kilo, Copilot, and Cursor advanced catalogs also consume the same
+- Claude, Codex, Antigravity, Kilo, Copilot, and Cursor advanced catalogs also consume the same
   curated input
 - packaged desktop hosts seed `management.yaml` and
   `curated-model-catalogs.yaml` into `~/.cats/runtime/config/` when those
@@ -252,7 +252,7 @@ Current runtime behavior:
 
 Current stabilization status:
 
-- Claude, Codex, Gemini, Copilot, and Kilo curated CLI support now has
+- Claude, Codex, Antigravity, Copilot, and Kilo curated CLI support now has
   model-layer and route-layer regression coverage on both
   `/providers/{provider}/models` and `/providers/{provider}/models/advanced`
 - Cursor curated support remains available, but grouped `providers[]`
@@ -271,7 +271,7 @@ Current stabilization status:
 - `config/providers.yaml.example` - reference topology for manual/preseeded config
 - `config/management.yaml.example` - default management adapter template used as
   the packaged fallback when `~/.cats/runtime/config/management.yaml` is absent
-- `config/curated-model-catalogs.yaml.example` - human-curated CLI model catalog input example consumed by the current Claude/Codex/Gemini/Kilo/Copilot/Cursor importer slices
+- `config/curated-model-catalogs.yaml.example` - human-curated CLI model catalog input example consumed by the current Claude/Codex/Antigravity/Kilo/Copilot/Cursor importer slices
 - `docs/api.md` - public HTTP surface
 - `docs/architecture.md` - internal layout and data flow
 

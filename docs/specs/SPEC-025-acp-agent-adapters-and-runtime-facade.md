@@ -259,7 +259,7 @@ That currently means these overlapping families are in scope for ACP tracking:
 
 - `claude`
 - `codex`
-- `gemini`
+- `antigravity`
 - `cursor`
 - `copilot`
 - `opencode`
@@ -279,7 +279,7 @@ adds them as first-class providers for other reasons.
 The provider-side ACP adoption matrix currently uses these runtime-owned
 support tiers:
 
-- **Tier 1**: `claude`, `codex`, `gemini`, `cursor`, `copilot`
+- **Tier 1**: `claude`, `codex`, `antigravity`, `cursor`, `copilot`
 - **Tier 2**: `opencode`, `kilo`, `goose`, `pi`, `auggie`, `junie`, `kiro`
 
 ### Tier Criteria
@@ -296,12 +296,12 @@ Rationale:
 
 - Tier 1 is a simultaneous support matrix, not a single-provider pilot track:
   runtime docs, diagnostics, and inspection summaries should treat
-  `claude`, `codex`, `gemini`, `cursor`, and `copilot` as the same rollout
+  `claude`, `codex`, `antigravity`, `cursor`, and `copilot` as the same rollout
   bucket unless a later decision explicitly narrows that policy
 - `codex` has the most protocol-shaped runtime seam today, so some
   Codex-specific transport details may land earlier than other Tier 1 families
   without changing the matrix itself
-- `claude`, `gemini`, `cursor`, and `copilot` are the highest-value provider
+- `claude`, `antigravity`, `cursor`, and `copilot` are the highest-value provider
   families in the runtime's product direction and all have strong public ACP
   ecosystem presence alongside `codex`
 - `opencode`, `kilo`, `goose`, `pi`, `auggie`, `junie`, and `kiro` are all

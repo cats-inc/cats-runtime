@@ -133,7 +133,7 @@ The canonical ACP adoption matrix lives in
 Phase 3 should interpret that matrix this way:
 
 - Tier 1 is the simultaneous provider-family support set:
-  `claude`, `codex`, `gemini`, `cursor`, `copilot`
+  `claude`, `codex`, `antigravity`, `cursor`, `copilot`
 - Tier 2 is the lower-priority-but-supported set:
   `opencode`, `kilo`, `goose`, `pi`, `auggie`, `junie`, `kiro`
 - runtime docs, diagnostics, and inspection summaries should treat all 12
@@ -151,7 +151,7 @@ Phase 3 implementation still needs to stay grounded in:
 
 Current rationale for the tier split:
 
-- `claude`, `codex`, `gemini`, `cursor`, and `copilot` are the primary runtime
+- `claude`, `codex`, `antigravity`, `cursor`, and `copilot` are the primary runtime
   families with the strongest ACP ecosystem overlap and product relevance
 - `codex` still has the deepest protocol-shaped runtime seam today, so some
   Codex-specific transport details may land earlier than the rest of Tier 1
@@ -228,7 +228,7 @@ Current rationale for the tier split:
 | 2026-04-15 | Draft plan created to stage ACP under `agent` while reserving a separate runtime-owned ACP facade and documenting ACP + A2A complementarity |
 | 2026-04-15 | Phase 1 skeleton landed with `agent/acp` transport recognition, ACP launch config fields, truthful inspection, and focused coverage; execution remains a Phase 2 follow-up |
 | 2026-04-15 | Phase 2 host-bridge contract landed with a runtime-owned ACP host bridge backed by runtime tool policy, `LocalToolRuntime`, and session workspace/permission context; ACP transport lifecycle execution remains Phase 3 work |
-| 2026-04-15 | Expanded the ACP adoption plan from a `claude`/`codex` framing to a provider-overlap support matrix with SPEC-owned tiers, so Phase 3 treats Tier 1 (`claude`, `codex`, `gemini`, `cursor`, `copilot`) as one rollout bucket rather than a special-case two-provider branch |
+| 2026-04-15 | Expanded the ACP adoption plan from a `claude`/`codex` framing to a provider-overlap support matrix with SPEC-owned tiers, so Phase 3 treats Tier 1 (`claude`, `codex`, `antigravity`, `cursor`, `copilot`) as one rollout bucket rather than a special-case two-provider branch |
 | 2026-04-15 | Phase 3 bootstrap diagnostics landed for `codex-acp`: the runtime can run a stdio help probe for ACP command launches before lifecycle execution is enabled, and that bootstrap path now anchors shared Tier 1 diagnostics behavior |
 | 2026-04-15 | Phase 3 stdio JSON-RPC plumbing landed for `agent/acp`: the runtime now has an ACP stdio client that can frame requests, match responses, handle notifications, and answer server-side requests such as permission prompts before adapter-level lifecycle mapping is wired in |
 | 2026-04-15 | Phase 3 prompt lifecycle slice landed for `codex-acp`: `agent/acp` can now initialize a stdio ACP process, create or load a provider-managed session, suppress replay noise during `session/load`, route prompt-turn updates into runtime stream events, and answer basic ACP permission requests through runtime permission-mode mapping |
