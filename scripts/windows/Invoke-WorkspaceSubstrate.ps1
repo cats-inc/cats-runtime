@@ -55,7 +55,7 @@ param(
     [string]$Profile = 'standard',
 
     [Parameter(Mandatory = $false)]
-    [ValidateSet('claude', 'gemini', 'codex')]
+    [ValidateSet('claude', 'codex')]
     [string[]]$Agent = @(),
 
     [Parameter(Mandatory = $false)]

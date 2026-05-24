@@ -1411,7 +1411,7 @@ Shared request fields:
 
 - `workspacePath` (required)
 - `profile`: `minimal`, `standard`, or `a2a-enabled`
-- `enabledAgents`: bounded subset of `claude`, `gemini`, `codex`
+- `enabledAgents`: bounded subset of `claude`, `codex`
 - `includeA2A`: optional boolean
 - `apply`: optional boolean
 - `hints`: optional structured workspace metadata such as `projectType`,

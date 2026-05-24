@@ -230,7 +230,7 @@ Illustrative runtime-side shapes:
 interface WorkspaceSubstrateProfile {
   id: string;
   description: string;
-  enabledAgents?: Array<'claude' | 'gemini' | 'codex'>;
+  enabledAgents?: Array<'claude' | 'codex'>;
   includeA2A?: boolean;
   files: WorkspaceSubstrateFileSpec[];
 }
