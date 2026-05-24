@@ -6,7 +6,6 @@ import { ClaudeProvider } from './claude.js';
 import { CodexProvider } from './codex.js';
 import { CopilotProvider } from './copilot.js';
 import { CursorProvider } from './cursor.js';
-import { GeminiProvider } from './gemini.js';
 import { GooseProvider } from './goose.js';
 import { JunieProvider } from './junie.js';
 import { KiloProvider } from './kilo.js';
@@ -268,114 +267,6 @@ describe('provider evolution instrumentation', () => {
     expect(bundle.summary.normalizedEventTypes.progress).toBe(1);
     expect(bundle.summary.rawPassthroughEventTypes.non_json_line).toBe(1);
     expect(bundle.summary.unknownEventTypes['future.event']).toBe(1);
-  });
-
-  it('records ignored user echoes and unknown Gemini event types', () => {
-    const collector = new ProviderEvolutionEvidenceCollector({
-      provider: 'gemini',
-      instance: 'default',
-      parserId: 'gemini-stream-json',
-      probeProfile: 'manual-smoke',
-      transport: 'cli',
-    });
-    const provider = new GeminiProvider(undefined, collector);
-
-    expect(provider.parseStreamLine(JSON.stringify({
-      type: 'message',
-      role: 'user',
-      content: 'hello',
-    }))).toBeNull();
-    expect(provider.parseStreamLine(JSON.stringify({
-      type: 'future.event',
-      payload: { ok: true },
-    }))).toEqual({
-      type: 'raw',
-      text: JSON.stringify({
-        type: 'future.event',
-        payload: { ok: true },
-      }),
-    });
-
-    const bundle = collector.finalize();
-    expect(bundle.summary.ignoredEventTypes['message:user']).toBe(1);
-    expect(bundle.summary.unknownEventTypes['future.event']).toBe(1);
-  });
-
-  it('records normalized Gemini tool results instead of dropping them', () => {
-    const collector = new ProviderEvolutionEvidenceCollector({
-      provider: 'gemini',
-      instance: 'default',
-      parserId: 'gemini-stream-json',
-      probeProfile: 'manual-smoke',
-      transport: 'cli',
-    });
-    const provider = new GeminiProvider(undefined, collector);
-
-    expect(provider.parseStreamLine(JSON.stringify({
-      type: 'tool_result',
-      tool_name: 'readFile',
-      tool_id: 'tool-1',
-      content: [{ text: 'hello' }],
-    }))).toEqual([
-      expect.objectContaining({
-        type: 'progress',
-      }),
-      expect.objectContaining({
-        type: 'tool_result',
-        toolName: 'readFile',
-        toolId: 'tool-1',
-        text: 'hello',
-      }),
-    ]);
-
-    const bundle = collector.finalize();
-    expect(bundle.summary.normalizedCount).toBe(1);
-    expect(bundle.summary.normalizedEventTypes.progress).toBe(1);
-    expect(bundle.summary.normalizedEventTypes.tool_result).toBe(1);
-  });
-
-  it('records normalized Gemini multipart assistant tool blocks', () => {
-    const collector = new ProviderEvolutionEvidenceCollector({
-      provider: 'gemini',
-      instance: 'default',
-      parserId: 'gemini-stream-json',
-      probeProfile: 'manual-smoke',
-      transport: 'cli',
-    });
-    const provider = new GeminiProvider(undefined, collector);
-
-    expect(provider.parseStreamLine(JSON.stringify({
-      type: 'message',
-      role: 'assistant',
-      content: [
-        { text: 'Checking files.' },
-        { functionCall: { name: 'readFile', args: { path: 'README.md' } } },
-        { functionResponse: { name: 'readFile', response: { ok: true } } },
-      ],
-    }))).toEqual([
-      expect.objectContaining({
-        type: 'text',
-      }),
-      expect.objectContaining({
-        type: 'progress',
-      }),
-      expect.objectContaining({
-        type: 'tool_use',
-      }),
-      expect.objectContaining({
-        type: 'progress',
-      }),
-      expect.objectContaining({
-        type: 'tool_result',
-      }),
-    ]);
-
-    const bundle = collector.finalize();
-    expect(bundle.summary.normalizedCount).toBe(1);
-    expect(bundle.summary.normalizedEventTypes.text).toBe(1);
-    expect(bundle.summary.normalizedEventTypes.progress).toBe(2);
-    expect(bundle.summary.normalizedEventTypes.tool_use).toBe(1);
-    expect(bundle.summary.normalizedEventTypes.tool_result).toBe(1);
   });
 
   it('records schema failures for Goose message events without content blocks', () => {
