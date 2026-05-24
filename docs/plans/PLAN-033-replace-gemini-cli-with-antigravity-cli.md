@@ -41,7 +41,7 @@ Cross-repo blocking points are called out per phase.
 5. Do not edit `cats-platform/src/shared/providerCatalogData.ts` from this plan — that is owned by cats-platform PLAN-100 Phase 1.
 6. Do not remove or rename `GEMINI_API_KEY` / Google API transport surfaces in this plan; that is a separate API-provider decision.
 7. Do not read, rename, or delete `GEMINI.md`; it is an agent-specific instruction file, not Gemini CLI runtime config.
-8. Do not design any cross-package catalog handoff from `cats-platform` in this slice; runtime UI mirrors the platform catalog values explicitly.
+8. Do not design any cross-package catalog handoff from `cats-platform` in this slice; runtime UI mirrors the platform catalog values explicitly. The runtime HTTP model catalog may still omit bundled Antigravity model ids until live `agy` model evidence exists; the playground may expose only the `antigravity-default` provider-default sentinel.
 
 ## Implementation Phases
 
@@ -73,9 +73,9 @@ This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
 
 ### Phase 3: Session, Discovery, History
 
-- [ ] Rename `src/backends/cli/discovery/GeminiSessionScanner.ts` → `AntigravitySessionScanner.ts`. Rewrite the body per Phase 1 evidence. If `agy` exposes no scannable sessions, the scanner returns an empty list and logs at debug level.
-- [ ] In `src/http/providerServices.ts:81-82`, rename `getGeminiSessionsDir` → `getAntigravitySessionsDir` and adjust the resolver argument.
-- [ ] In `src/http/routes/sessions.ts:58-59,76,2034,2183-2186`, replace the `GeminiSessionScanner` import, `getGeminiSessionsDir` reference, and the `case 'gemini':` switch arm with `antigravity` equivalents.
+- [ ] Remove Gemini native-session discovery and do not add an Antigravity scanner until Phase 1 records a real `agy` session storage contract. If `agy` later exposes scannable sessions, add an `AntigravitySessionScanner` from that evidence instead of porting the legacy Gemini reader.
+- [ ] Remove `getGeminiSessionsDir` / Gemini file-backed path resolution. Do not add `getAntigravitySessionsDir` until a real session path is known.
+- [ ] In `src/http/routes/sessions.ts`, remove Gemini native-session import/discovery branches. Add Antigravity discovery only if Phase 1 confirms an importable session format.
 - [ ] In `src/http/routes/history.ts:32,35,64,479-500`, remove `geminiExtractText`, the `gemini_native` parser branch, and the `'gemini_native'` parser id. Add an `antigravity_native` parser only if Phase 1 confirms a readable format.
 
 **Deliverables**: Session discovery and history import operate on Antigravity (or honestly return empty).
@@ -85,13 +85,13 @@ This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
 **Blocking dependency**: cats-platform PLAN-100 Phase 1 (shared provider catalog data) must be merged before this phase touches UI files. Confirm by checking that `cats-platform/src/shared/providerCatalogData.ts` lists `antigravity` as the platform-side provider, then mirror those values here.
 
 - [ ] In `src/http/routes/diagnostics.ts:1382` and `src/http/routes/diagnosticsSupport.ts:27`, replace `'gemini'` literals with `'antigravity'`.
-- [ ] In `src/http/routes/workspaceSubstrate.ts:33,48,50`, replace the `ENABLED_AGENTS` literal and the `'claude' | 'gemini' | 'codex'` union type with `antigravity`.
+- [ ] In `src/http/routes/workspaceSubstrate.ts:33,48,50`, remove `gemini` from the `ENABLED_AGENTS` literal and related union type. Do not add `antigravity` unless a later probe confirms a workspace-substrate / skills-file contract equivalent to the existing Claude/Codex support.
 - [ ] Decide on a new `--antigravity` color token value (resolves SPEC-026 Open Question). Apply it in:
   - [ ] `src/http/ui/tailwind.runtime.css` (CSS var definition)
   - [ ] `src/http/ui/shared.ts:36` (badge style)
   - [ ] `src/http/ui/pages/index.html:34,177,194,218` (dashboard CSS / selectors)
 - [ ] In `src/http/ui/pages/index.html:1098,1227,1266`, replace the `gemini` option, `PROVIDER_ORDER` entry, and agent-enabled list entry with `antigravity`.
-- [ ] In `src/http/ui/pages/playground.html:389,407,421,1274`, replace the `gemini` badge style block, model list, `PROVIDERS` array entry, and default agent provider with `antigravity`. Keep the bundled Antigravity model list empty until Phase 1 proves raw `agy` model ids; user-curated YAML may populate local entries explicitly.
+- [ ] In `src/http/ui/pages/playground.html:389,407,421,1274`, replace the `gemini` badge style block, model list, `PROVIDERS` array entry, and default agent provider with `antigravity`. Expose only the `antigravity-default` provider-default sentinel in the bundled playground list until Phase 1 proves raw `agy` model ids; user-curated YAML may populate local entries explicitly.
 - [ ] In `src/http/ui/pages/playground.html:408,413,414`, audit the `copilot` / `openrouter` / `cursor` model lists for references to `gemini-*` vendor models — those are vendor-named submodels and may stay if Google still ships them under Copilot / Cursor, but the labels should be reviewed for accuracy.
 - [ ] Audit `src/http/ui/pages/provider-setup.html` for any Gemini-specific UI that the SPEC-026 grep did not catch (the file showed no matches but should be eyeballed).
 - [ ] Regenerate `src/http/ui/generated/runtimeTailwind.ts` via the runtime UI build (`npm run build:runtime-ui-css` or equivalent).
@@ -150,12 +150,12 @@ This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
 
 ### Create
 
-- `src/backends/cli/discovery/AntigravitySessionScanner.ts` (renamed from `GeminiSessionScanner.ts`)
+- `src/backends/cli/discovery/AntigravitySessionScanner.ts` only if the Phase 1 probe finds a readable `agy` session format
 - `docs/research/2026-05-24-antigravity-cli-probe.md`
 
 ### Delete
 
-- `src/backends/cli/discovery/GeminiSessionScanner.ts` (after rename)
+- `src/backends/cli/discovery/GeminiSessionScanner.ts` (removed; do not replace until `agy` session evidence exists)
 - Regenerated artifacts under `src/http/ui/generated/` (rebuilt, not hand-edited)
 
 ## Technical Decisions
@@ -188,6 +188,7 @@ This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
 | Date | Update |
 |------|--------|
 | 2026-05-24 | Plan created alongside ADR-032 and SPEC-026. |
+| 2026-05-24 | Follow-up tightened the plan around evidence gaps: Antigravity native-session discovery stays absent until a real `agy` session path exists; workspace substrate drops Gemini without adding Antigravity; runtime playground mirrors the platform `antigravity-default` sentinel while the HTTP model catalog still avoids unverified raw model ids. |
 
 ---
 
