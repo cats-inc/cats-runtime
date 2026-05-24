@@ -54,6 +54,7 @@ This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
 - [ ] Capture `agy --version` output (or equivalent flag) and parse format.
 - [ ] Capture `agy --help` to identify ACP / stream-json / session subcommands.
 - [ ] Look for model-id evidence using candidate subcommands (`agy models`, `agy models list`, or equivalent), documented config files, official product documentation, and smoke-run acceptance. `agy --help` alone is not sufficient model-id evidence.
+- [ ] For the shared platform probe, record whether Antigravity's user-scoped installer requires elevation and whether native-binary download retries are idempotent enough for Cats Desktop to mark the setup helper `resumable: true`.
 - [ ] Identify Antigravity's session storage path (PATH, `LOCALAPPDATA`, `~/.local`, or none).
 - [ ] If sessions exist, capture a sample session file to determine readable format.
 - [ ] Compare against openab's `agy-acp` adapter expectations to confirm ACP transport contract.
