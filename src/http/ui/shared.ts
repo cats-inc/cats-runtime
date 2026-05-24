@@ -33,7 +33,7 @@ export const PROVIDER_BADGE_CSS = `
 }
 .provider-badge[data-p="claude"]   { background: rgba(251,146,60,0.18);  color: var(--claude, #fb923c); }
 .provider-badge[data-p="codex"]    { background: rgba(52,211,153,0.18);  color: var(--codex, #34d399); }
-.provider-badge[data-p="gemini"]   { background: rgba(96,165,250,0.18);  color: var(--gemini, #60a5fa); }
+.provider-badge[data-p="antigravity"] { background: rgba(96,165,250,0.18);  color: var(--antigravity, #60a5fa); }
 .provider-badge[data-p="cursor"]   { background: rgba(244,114,182,0.18); color: var(--cursorp, #f472b6); }
 .provider-badge[data-p="copilot"]  { background: rgba(129,140,248,0.18); color: var(--copilot, #818cf8); }
 .provider-badge[data-p="opencode"] { background: rgba(192,132,252,0.18); color: var(--opencode, #c084fc); }

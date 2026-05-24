@@ -34,14 +34,14 @@ describe('shared playground selection helpers', () => {
     const catsUI = createCatsUI();
 
     expect(catsUI.listSelectablePlaygroundProviders(
-      ['claude', 'codex', 'gemini'],
-      ['claude', 'codex', 'gemini'],
+      ['claude', 'codex', 'antigravity'],
+      ['claude', 'codex', 'antigravity'],
       {
         claude: 'ok',
         codex: 'unavailable',
-        gemini: 'degraded',
+        antigravity: 'degraded',
       },
-    )).toEqual(['claude', 'gemini', 'codex']);
+    )).toEqual(['claude', 'antigravity', 'codex']);
   });
 
   it('falls back from an unavailable preset provider to the first usable provider', () => {

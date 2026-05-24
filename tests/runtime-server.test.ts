@@ -253,15 +253,15 @@ describe('runtime server', () => {
       expect(html.indexOf('<option value="claude">claude</option>'))
         .toBeLessThan(html.indexOf('<option value="codex">codex</option>'));
       expect(html.indexOf('<option value="codex">codex</option>'))
-        .toBeLessThan(html.indexOf('<option value="gemini">gemini</option>'));
-      expect(html.indexOf('<option value="gemini">gemini</option>'))
+        .toBeLessThan(html.indexOf('<option value="antigravity">antigravity</option>'));
+      expect(html.indexOf('<option value="antigravity">antigravity</option>'))
         .toBeLessThan(html.indexOf('<option value="cursor">cursor</option>'));
       expect(html.indexOf('<option value="cursor">cursor</option>'))
         .toBeLessThan(html.indexOf('<option value="copilot">copilot</option>'));
       expect(html.indexOf('<option value="copilot">copilot</option>'))
         .toBeLessThan(html.indexOf('<option value="opencode">opencode</option>'));
       expect(html).toContain(
-        "const PROVIDER_ORDER = ['claude', 'codex', 'gemini', 'cursor', 'copilot', 'opencode', 'kilo', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'ollama', 'openclaw'];",
+        "const PROVIDER_ORDER = ['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'opencode', 'kilo', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'ollama', 'openclaw'];",
       );
       expect(html).toContain('--openclaw: #f87171;');
       expect(html).toContain('.provider-badge[data-p="openclaw"]');
@@ -413,7 +413,7 @@ describe('runtime server', () => {
       expect(html).toContain('const STARTER_AGENT_PRESET = [');
       expect(html).toContain("{ name:'Agent-1', provider:'claude', model:'', tags:['orchestrator'] },");
       expect(html).toContain("{ name:'Agent-2', provider:'codex', model:'', tags:['coder'] },");
-      expect(html).toContain("{ name:'Agent-1', provider:'gemini', model:getDefaultModel('gemini'), tags:['orchestrator'] },");
+      expect(html).toContain("{ name:'Agent-1', provider:'antigravity', model:getDefaultModel('antigravity'), tags:['orchestrator'] },");
       expect(html).toContain("{ name:'Agent-2', provider:'cursor', model:getDefaultModel('cursor'), tags:['pm'] },");
       expect(html).toContain("{ name:'Agent-12', provider:'openclaw', model:getDefaultModel('openclaw'), tags:['marketer'] },");
       expect(html).toContain('id="agents-loading-state"');
