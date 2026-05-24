@@ -71,7 +71,6 @@ type ManualSessionDiscoveryConfig = Pick<
   | 'codexSessionsDir'
   | 'copilotSessionsDir'
   | 'cursorChatsDir'
-  | 'geminiSessionsDir'
   | 'kiroDbPath'
   | 'kiloServerHost'
   | 'kiloServerPort'

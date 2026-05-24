@@ -69,7 +69,7 @@ describe('config platform defaults', () => {
   it('defaults provider runtimes explicitly for all CLIs', () => {
     expect(defaultProviderRuntimeMode('claude', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('codex', 'win32')).toBe('native');
-    expect(defaultProviderRuntimeMode('gemini', 'win32')).toBe('native');
+    expect(defaultProviderRuntimeMode('antigravity', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('copilot', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('opencode', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('auggie', 'win32')).toBe('native');

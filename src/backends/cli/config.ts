@@ -145,7 +145,6 @@ export interface ProviderInstanceConfig {
   codexSessionsDir?: string;
   copilotSessionsDir?: string;
   cursorChatsDir?: string;
-  geminiSessionsDir?: string;
   kiroDbPath?: string;
   kiloServerHost?: string;
   kiloServerPort?: number;
@@ -194,7 +193,6 @@ export interface CliRuntimeConfig {
   copilotSessionsDir: string;
   cursorChatsDir: string;
   cursorRuntime: ProviderRuntimeConfig;
-  geminiSessionsDir: string;
   kiroDbPath: string;
   kiroRuntime: ProviderRuntimeConfig;
   piSessionsDir: string;
@@ -228,7 +226,6 @@ interface LegacyRuntimeShape {
   copilotSessionsDir: string;
   cursorChatsDir: string;
   cursorRuntime: ProviderRuntimeConfig;
-  geminiSessionsDir: string;
   kiroDbPath: string;
   kiroRuntime: ProviderRuntimeConfig;
   kiloServerHost: string;
@@ -453,7 +450,6 @@ export function loadConfig(
     copilotSessionsDir: configured.copilotSessionsDir,
     cursorChatsDir: configured.cursorChatsDir,
     cursorRuntime: configured.cursorRuntime,
-    geminiSessionsDir: configured.geminiSessionsDir,
     kiroDbPath: configured.kiroDbPath,
     kiroRuntime: configured.kiroRuntime,
     piSessionsDir: configured.piSessionsDir,
@@ -539,7 +535,6 @@ export function listProviderInstances(
     | 'codexSessionsDir'
     | 'copilotSessionsDir'
     | 'cursorChatsDir'
-    | 'geminiSessionsDir'
     | 'kiroDbPath'
     | 'kiloServerHost'
     | 'kiloServerPort'
@@ -583,7 +578,6 @@ export function resolveProviderInstance(
     | 'codexSessionsDir'
     | 'copilotSessionsDir'
     | 'cursorChatsDir'
-    | 'geminiSessionsDir'
     | 'kiroDbPath'
     | 'kiloServerHost'
     | 'kiloServerPort'
@@ -798,7 +792,6 @@ function buildLegacyRuntimeShape(
     copilotSessionsDir: env.COPILOT_SESSIONS_DIR || `${home}/.copilot/session-state`,
     cursorChatsDir,
     cursorRuntime: providerCommands.cursor.runtime,
-    geminiSessionsDir: env.GEMINI_SESSIONS_DIR || `${home}/.gemini/tmp`,
     kiroDbPath,
     kiroRuntime,
     kiloServerHost,
@@ -920,7 +913,6 @@ function buildLegacyProviderInstance(
     | 'codexSessionsDir'
     | 'copilotSessionsDir'
     | 'cursorChatsDir'
-    | 'geminiSessionsDir'
     | 'kiroDbPath'
     | 'kiloServerHost'
     | 'kiloServerPort'
@@ -978,7 +970,6 @@ function applyFileBasedProviderConfig(
   let copilotSessionsDir = legacy.copilotSessionsDir;
   let cursorChatsDir = legacy.cursorChatsDir;
   let cursorRuntime = legacy.cursorRuntime;
-  let geminiSessionsDir = legacy.geminiSessionsDir;
   let kiroDbPath = legacy.kiroDbPath;
   let kiroRuntime = legacy.kiroRuntime;
   let kiloServerHost = legacy.kiloServerHost;
@@ -1335,7 +1326,6 @@ function applyFileBasedProviderConfig(
     copilotSessionsDir,
     cursorChatsDir,
     cursorRuntime,
-    geminiSessionsDir,
     kiroDbPath,
     kiroRuntime,
     kiloServerHost,
