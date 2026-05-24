@@ -4,8 +4,8 @@
 
 .DESCRIPTION
     Copies skill directories from the project's skills/ directory to the agent-specific
-    discovery paths (.claude/skills/, .agents/skills/, .gemini/skills/), including any
-    supporting files under each skill (e.g., scripts/, references/, assets/).
+    discovery paths (.claude/skills/, .agents/skills/), including any supporting files
+    under each skill (e.g., scripts/, references/, assets/).
 
     This script follows the Agent Skills open standard (agentskills.io).
 
@@ -13,7 +13,7 @@
     Remove existing skills in target directories before syncing.
 
 .PARAMETER Agent
-    Only sync to a specific agent (claude, codex, gemini). If not specified, syncs to all.
+    Only sync to a specific agent (claude, codex). If not specified, syncs to all.
 
 .EXAMPLE
     .\Sync-AgentSkills.ps1
@@ -32,7 +32,7 @@ param(
     [switch]$Clean,
 
     [Parameter(Mandatory = $false)]
-    [ValidateSet("claude", "codex", "gemini")]
+    [ValidateSet("claude", "codex")]
     [string]$Agent
 )
 
@@ -64,7 +64,6 @@ if (-not (Test-Path $SkillsDir)) {
 $AgentPaths = @{
     "claude" = Join-Path $ProjectRoot ".claude" "skills"
     "codex"  = Join-Path $ProjectRoot ".agents" "skills"
-    "gemini" = Join-Path $ProjectRoot ".gemini" "skills"
 }
 
 # Filter to specific agent if requested

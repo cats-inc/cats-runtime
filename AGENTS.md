@@ -131,7 +131,7 @@ contract.
 | Build | TypeScript compiler | 5.x |
 
 **Additional Tools**:
-- Local provider CLIs such as `claude`, `codex`, `gemini`, `cursor-agent`, `kiro-cli`, `opencode`
+- Local provider CLIs such as `claude`, `codex`, `agy`, `cursor-agent`, `kiro-cli`, `opencode`
 
 ---
 
@@ -258,7 +258,7 @@ Each subproject directory should contain:
 
 ## Agent Skills
 
-This project supports [Agent Skills](https://agentskills.io), an open standard adopted by Claude Code, Codex, and Gemini CLI for structured, reusable agent instructions.
+This project supports [Agent Skills](https://agentskills.io), an open standard for structured, reusable agent instructions. The repo-owned sync helpers currently target Claude Code and Codex.
 
 ### How It Works
 
@@ -268,7 +268,9 @@ Skills live in `skills/` (version-controlled) and are synced to each agent's dis
 |-------|---------------|
 | Claude Code | `.claude/skills/<name>/SKILL.md` |
 | Codex | `.agents/skills/<name>/SKILL.md` |
-| Gemini CLI | `.gemini/skills/<name>/SKILL.md` |
+Antigravity CLI is intentionally not listed here yet. Its repo/project skill
+discovery path has not been verified, so the sync helpers do not create an
+`.antigravity/skills` convention.
 
 ### Syncing Skills
 

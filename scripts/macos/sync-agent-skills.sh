@@ -6,7 +6,7 @@ agent=""
 
 print_usage() {
   cat <<'EOF'
-Usage: sync-agent-skills.sh [--clean] [--agent claude|codex|gemini]
+Usage: sync-agent-skills.sh [--clean] [--agent claude|codex]
 EOF
 }
 
@@ -23,7 +23,7 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       case "$1" in
-        claude|codex|gemini)
+        claude|codex)
           agent="$1"
           ;;
         *)
@@ -66,12 +66,11 @@ resolve_target_dir() {
   case "$1" in
     claude) echo "$project_root/.claude/skills" ;;
     codex) echo "$project_root/.agents/skills" ;;
-    gemini) echo "$project_root/.gemini/skills" ;;
     *) return 1 ;;
   esac
 }
 
-agents=(claude codex gemini)
+agents=(claude codex)
 if [[ -n "$agent" ]]; then
   agents=("$agent")
 fi
