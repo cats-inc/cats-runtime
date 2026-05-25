@@ -86,3 +86,20 @@ Findings:
   CLI model-list contract proves raw `agy` model ids. User-curated YAML may
   still supply local entries explicitly, but the bundled runtime must not lock
   documented display names as canonical ids.
+
+## Brand Color Decision
+
+Picked `#a78bfa` (Tailwind violet-400) for the runtime dashboard
+`--antigravity` token, replacing the day-one carryover of `#60a5fa` (Tailwind
+blue-400, the old `--gemini` value). Rationale:
+
+- Same brightness band as other provider badges in the dashboard palette, so it
+  does not require layout adjustment.
+- Visually distinct from the retired Gemini blue so the badge does not look
+  identical to the previous provider.
+- Does not clash with the existing palette: blue / cyan / pink / green / amber
+  / orange / teal / indigo / fuchsia are all taken; violet was free.
+- This is not Google's official Antigravity brand color; a future palette pass
+  can swap to the official accent once it is documented in this repo.
+  Playground tile classes use `bg-violet-900/40` / `border-violet-500` /
+  `text-violet-400` to match.

@@ -14,7 +14,6 @@ const CURATED_CLI_ALIASES: Record<string, string[]> = {
   claude: ['claude', 'claude code'],
   codex: ['codex'],
   antigravity: ['antigravity', 'agy'],
-  gemini: ['gemini'],
   kilo: ['kilo'],
   kiro: ['kiro'],
   junie: ['junie', 'junie by jetbrains'],
@@ -25,7 +24,7 @@ const CURATED_CLI_ALIASES: Record<string, string[]> = {
 const CURATED_PROVIDER_ALIASES: Record<string, string[]> = {
   claude: ['anthropic', 'claude'],
   codex: ['openai', 'codex'],
-  gemini: ['google', 'gemini'],
+  antigravity: ['antigravity', 'agy', 'google', 'gemini'],
   kilo: ['kilo'],
   kiro: ['kiro'],
   junie: ['junie', 'jetbrains ai', 'jetbrains'],

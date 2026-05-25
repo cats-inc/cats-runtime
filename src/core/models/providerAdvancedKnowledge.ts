@@ -99,6 +99,7 @@ function buildEntryCapabilityTags(
     || target.providerName === 'codex'
     || target.providerName === 'claude'
     || target.providerName === 'gemini'
+    || target.providerName === 'antigravity'
   ) {
     tags.add('tool_use');
   }
@@ -1174,6 +1175,7 @@ function buildPresetCatalog(
       case 'claude':
         return pickEntryByPatterns(entries, [/haiku/i, /sonnet/i]);
       case 'gemini':
+      case 'antigravity':
         return pickEntryByPatterns(entries, [/flash/i, /pro/i]);
       case 'codex':
         return pickEntryByPatterns(entries, [/5\.3-codex/i, /gpt-5/i]);
@@ -1199,6 +1201,7 @@ function buildPresetCatalog(
       case 'claude':
         return pickEntryByPatterns(entries, [/opus/i, /sonnet/i]);
       case 'gemini':
+      case 'antigravity':
         return pickEntryByPatterns(entries, [/pro/i]);
       case 'codex':
         return pickEntryByPatterns(entries, [/gpt-5\.4/i, /gpt-5/i]);

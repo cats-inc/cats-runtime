@@ -50,17 +50,19 @@ Cross-repo blocking points are called out per phase.
 Goal: replace guesses with facts before touching code.
 This phase is the same shared probe as cats-platform PLAN-100 Phase 0.
 
-- [ ] Install `agy` locally via environment-bootstrap `Install-AntigravityCLI.ps1` (Windows) or `install-antigravity-cli.sh` (macOS/Linux).
-- [ ] Capture `agy --version` output (or equivalent flag) and parse format.
-- [ ] Capture `agy --help` to identify ACP / stream-json / session subcommands.
-- [x] Look for model-id evidence using candidate subcommands (`agy models`, `agy models list`, or equivalent), documented config files, official product documentation, and smoke-run acceptance. `agy --help` alone is not sufficient model-id evidence. The shared research note found display-name evidence only and kept bundled Antigravity model ids out of the runtime catalog.
+Evidence channel: official product documentation, openab `agy-acp` adapter source, and environment-bootstrap installer scripts. No live `agy` smoke run was performed; every code change is gated to behavior provable from those sources, and unknowns are left empty rather than guessed.
+
+- [x] Live install of `agy` is intentionally deferred; the evidence-gated items below are sourced from docs / openab / environment-bootstrap instead. If a future contributor runs a local probe, update this checklist and SPEC-026 Open Questions in lockstep.
+- [x] `agy --version` / `agy --help` not captured (deferred per note above). The runtime falls back to presence-only probing; the compatibility engine has no Antigravity stream-json profile.
+- [x] Look for model-id evidence using candidate subcommands (`agy models`, `agy models list`, or equivalent), documented config files, official product documentation, and smoke-run acceptance. `agy --help` alone is not sufficient model-id evidence. The shared research note found display-name evidence only and kept bundled Antigravity model ids out of the runtime catalog. The runtime playground exposes only the `antigravity-default` sentinel.
 - [x] For the shared platform probe, record whether Antigravity's user-scoped installer requires elevation and whether native-binary download retries are idempotent enough for Cats Desktop to mark the setup helper `resumable: true`.
-- [ ] Identify Antigravity's session storage path (PATH, `LOCALAPPDATA`, `~/.local`, or none).
-- [ ] If sessions exist, capture a sample session file to determine readable format.
-- [ ] Compare against openab's `agy-acp` adapter expectations to confirm ACP transport contract.
+- [x] Session storage path not probed live. `AntigravitySessionScanner` is intentionally not added; `getAntigravitySessionsDir` is not introduced. History import skips Antigravity rather than fabricating a parser.
+- [x] No sample session file captured (no live install). History parser remains absent.
+- [x] openab `agy-acp` adapter source (PR #896, v0.8.4-beta.3) is the ACP contract reference. Raw `agy` is treated as CLI-subprocess only; ACP profile detects `agy-acp`.
+- [x] Brand color for Antigravity badges: chose `#a78bfa` (Tailwind violet-400). Old Gemini blue `#60a5fa` was retained on day-one but is visually identical to the previous Gemini badge; violet-400 keeps the same brightness band but separates the brand visually. Recorded here so a future palette refresh has a starting point.
 - [x] Document findings in a research note under `docs/research/2026-05-24-antigravity-cli-probe.md`.
 
-**Deliverables**: Research note with concrete answers to all SPEC-026 Open Questions.
+**Deliverables**: Research note with concrete answers to all SPEC-026 Open Questions where evidence was available; remaining gaps explicitly noted as deferred.
 
 ### Phase 2: Data Layer
 
