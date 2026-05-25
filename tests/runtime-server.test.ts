@@ -5,7 +5,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { cleanupTempDirWithRetries } from './tempCleanup.js';
+import { cleanupTempDirWithRetriesAsync } from './tempCleanup.js';
 import {
   createRuntimeTestEnv,
   createRuntimeTestPaths,
@@ -31,6 +31,8 @@ import {
   loadCuratedModelCatalog,
   resolveCuratedCatalogScope,
 } from '../src/core/models/curatedModelCatalog.js';
+
+const RUNTIME_SERVER_INTEGRATION_TIMEOUT_MS = 20_000;
 
 function alignDefaultProviderRuntime(
   config: ReturnType<typeof loadConfig>,
@@ -201,7 +203,7 @@ function createTestConfig(overrides = {}) {
     );
   }
 
-  return { root, config, cleanup: () => cleanupTempDirWithRetries(root) };
+  return { root, config, cleanup: () => cleanupTempDirWithRetriesAsync(root) };
 }
 
 async function withRuntime(
@@ -215,7 +217,7 @@ async function withRuntime(
     await run(runtime);
   } finally {
     await runtime.close();
-    cleanup();
+    await cleanup();
   }
 }
 
@@ -233,7 +235,7 @@ async function withCuratedCatalogRuntime(
     await run(runtime);
   } finally {
     await runtime.close();
-    cleanup();
+    await cleanup();
   }
 }
 
@@ -716,9 +718,9 @@ describe('runtime server', () => {
       });
     } finally {
       await runtime.close();
-      cleanup();
+      await cleanup();
     }
-  });
+  }, RUNTIME_SERVER_INTEGRATION_TIMEOUT_MS);
 
   it('close waits for an in-flight start to settle before tearing resources down', async () => {
     const { config, cleanup } = createTestConfig();
@@ -751,9 +753,9 @@ describe('runtime server', () => {
     } finally {
       poolKillSpy.mockRestore();
       await runtime.close();
-      cleanup();
+      await cleanup();
     }
-  });
+  }, RUNTIME_SERVER_INTEGRATION_TIMEOUT_MS);
 
   it('GET /diagnostics/runtime exposes the frozen startup contract', async () => {
     await withRuntime({}, {}, async (runtime) => {
@@ -2670,7 +2672,7 @@ backends:
           resolveClose();
         });
       });
-      cleanup();
+      await cleanup();
     }
   });
 
@@ -3344,7 +3346,7 @@ backends:
     } finally {
       vi.unstubAllEnvs();
       await runtime.close();
-      cleanup();
+      await cleanup();
     }
   }, 15_000);
 
@@ -3836,9 +3838,9 @@ providers:
     } finally {
       await runtime.close();
       expect(runtime.context.peerDiscovery?.snapshot().status).toBe('stopped');
-      cleanup();
+      await cleanup();
     }
-  });
+  }, RUNTIME_SERVER_INTEGRATION_TIMEOUT_MS);
 
   it('boots with Docker-backed file providers without trying to host-resolve their container paths', async () => {
     const { config, cleanup } = createTestConfig({
@@ -3881,9 +3883,9 @@ providers:
       expect(response.status).toBe(200);
     } finally {
       await runtime.close();
-      cleanup();
+      await cleanup();
     }
-  });
+  }, RUNTIME_SERVER_INTEGRATION_TIMEOUT_MS);
 
   it('deduplicates overlapping file discovery watchers even when one path uses ~', async () => {
     const { root, config, cleanup } = createTestConfig();
@@ -3987,7 +3989,7 @@ providers:
       discovery.stop();
       warnSpy.mockRestore();
       await runtime.close();
-      cleanup();
+      await cleanup();
     }
   });
 
@@ -6729,7 +6731,7 @@ providers:
       })).not.toThrow();
     } finally {
       await runtime.close();
-      cleanup();
+      await cleanup();
     }
   });
 });

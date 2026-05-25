@@ -21,7 +21,15 @@ describe('loadManagementConfig', () => {
   function createTestEnv(runtimeRoot?: string): NodeJS.ProcessEnv {
     return {
       ...process.env,
-      ...(runtimeRoot ? { CATS_RUNTIME_DIR: runtimeRoot } : { CATS_RUNTIME_DIR: '' }),
+      ...(runtimeRoot
+        ? {
+            CATS_RUNTIME_DIR: runtimeRoot,
+            CATS_RUNTIME_PACKAGE_ROOT: join(runtimeRoot, 'package-root'),
+          }
+        : {
+            CATS_RUNTIME_DIR: '',
+            CATS_RUNTIME_PACKAGE_ROOT: '',
+          }),
     };
   }
 

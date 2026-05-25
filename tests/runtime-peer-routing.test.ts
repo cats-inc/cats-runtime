@@ -1,15 +1,18 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../src/core/config.js';
 import { createRuntimeServer } from '../src/server.js';
 import { parseCoreNdjson as parseNdjson } from './streamEventTestUtils.js';
+import { cleanupTempDirWithRetriesAsync } from './tempCleanup.js';
 import {
   createRuntimeTestEnv,
   createRuntimeTestPaths,
   ensureRuntimeTestDirs,
 } from './support/runtimeTestPaths.js';
+
+const PEER_ROUTING_TEST_TIMEOUT_MS = 20_000;
 
 function parseSse(text: string): Array<Record<string, unknown>> {
   return text
@@ -88,7 +91,7 @@ function createTestConfig(
     root,
     env,
     config,
-    cleanup: () => rmSync(root, { recursive: true, force: true }),
+    cleanup: () => cleanupTempDirWithRetriesAsync(root),
   };
 }
 
@@ -253,11 +256,11 @@ describe('runtime peer routing integration', () => {
       expect(calleeFetch).toHaveBeenCalledTimes(1);
     } finally {
       await caller.close();
-      callerConfig.cleanup();
       await callee.close();
-      calleeConfig.cleanup();
+      await callerConfig.cleanup();
+      await calleeConfig.cleanup();
     }
-  });
+  }, PEER_ROUTING_TEST_TIMEOUT_MS);
 
   it('surfaces peer trust failures as streamed caller-visible errors', async () => {
     const calleeConfig = createTestConfig({
@@ -345,11 +348,11 @@ describe('runtime peer routing integration', () => {
       ]);
     } finally {
       await caller.close();
-      callerConfig.cleanup();
       await callee.close();
-      calleeConfig.cleanup();
+      await callerConfig.cleanup();
+      await calleeConfig.cleanup();
     }
-  });
+  }, PEER_ROUTING_TEST_TIMEOUT_MS);
 
   it('keeps /sessions/:id/stream usable during a peer-routed turn', async () => {
     let releaseExecution: (() => void) | undefined;
@@ -473,9 +476,9 @@ describe('runtime peer routing integration', () => {
       ]));
     } finally {
       await caller.close();
-      callerConfig.cleanup();
       await callee.close();
-      calleeConfig.cleanup();
+      await callerConfig.cleanup();
+      await calleeConfig.cleanup();
     }
-  });
+  }, PEER_ROUTING_TEST_TIMEOUT_MS);
 });

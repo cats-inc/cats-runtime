@@ -10,6 +10,8 @@ import {
   createRuntimeAdapter,
 } from './runtime.js';
 
+const UNRESOLVED_FIXTURE_COMMAND = 'cats-runtime-fixture-cli';
+
 describe('runtime adapters', () => {
   it('keeps native POSIX paths unchanged', () => {
     const runtime = createRuntimeAdapter({
@@ -143,7 +145,7 @@ describe('runtime adapters', () => {
   it('passes native auto command arguments through without shell interpolation', () => {
     const spawnConfig = buildProcessSpawnConfig(
       {
-        path: 'kiro-cli',
+        path: UNRESOLVED_FIXTURE_COMMAND,
         runner: 'auto',
         runtime: {
           mode: 'native',
@@ -161,7 +163,7 @@ describe('runtime adapters', () => {
         '/v:off',
         '/s',
         '/c',
-        buildWindowsCmdProxyCommandLine('kiro-cli', [
+        buildWindowsCmdProxyCommandLine(UNRESOLVED_FIXTURE_COMMAND, [
           'chat',
           '--no-interactive',
           'Review ${summary}\n- **user** (stakeholder)',
@@ -170,7 +172,7 @@ describe('runtime adapters', () => {
       expect(spawnConfig.windowsVerbatimArguments).toBe(true);
       expect(spawnConfig.env).toBeUndefined();
     } else {
-      expect(spawnConfig.command).toBe('kiro-cli');
+      expect(spawnConfig.command).toBe(UNRESOLVED_FIXTURE_COMMAND);
       expect(spawnConfig.args).toEqual([
         'chat',
         '--no-interactive',
@@ -219,7 +221,7 @@ describe('runtime adapters', () => {
   it('keeps explicit PowerShell runners on the env-based PowerShell proxy', () => {
     const spawnConfig = buildProcessSpawnConfig(
       {
-        path: 'kiro-cli',
+        path: UNRESOLVED_FIXTURE_COMMAND,
         runner: 'pwsh',
         runnerPath: 'pwsh.exe',
         runtime: {
@@ -241,7 +243,7 @@ describe('runtime adapters', () => {
       ]);
       expect(spawnConfig.env).toEqual({
         CATS_RUNTIME_PWSH_EXEC_B64: Buffer.from(JSON.stringify({
-          command: 'kiro-cli',
+          command: UNRESOLVED_FIXTURE_COMMAND,
           args: [
             'chat',
             '--no-interactive',
@@ -253,7 +255,7 @@ describe('runtime adapters', () => {
       return;
     }
 
-    expect(spawnConfig.command).toBe('kiro-cli');
+    expect(spawnConfig.command).toBe(UNRESOLVED_FIXTURE_COMMAND);
     expect(spawnConfig.args).toEqual([
       'chat',
       '--no-interactive',
