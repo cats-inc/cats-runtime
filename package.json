@@ -4,12 +4,11 @@
   "description": "Unified runtime for subscription CLIs and future API backends.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sammykenny2/one-man-digital-company.git",
-    "directory": "cats-runtime"
+    "url": "git+https://github.com/cats-inc/cats-runtime.git"
   },
-  "homepage": "https://github.com/sammykenny2/one-man-digital-company/tree/main/cats-runtime#readme",
+  "homepage": "https://github.com/cats-inc/cats-runtime#readme",
   "bugs": {
-    "url": "https://github.com/sammykenny2/one-man-digital-company/issues"
+    "url": "https://github.com/cats-inc/cats-runtime/issues"
   },
   "type": "module",
   "main": "build/runtime/index.js",

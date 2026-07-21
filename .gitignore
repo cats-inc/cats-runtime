@@ -51,3 +51,13 @@ logs/
 tmp/
 temp/
 *.tmp
+
+# === Runtime Data (ported from monorepo root .gitignore at repo split) ===
+data/
+output/
+media/
+datasets/
+workspace/
+!src/core/workspace/
+!src/core/workspace/**
+knowledge/
