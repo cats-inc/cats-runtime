@@ -500,6 +500,14 @@ function buildNativeSpawnConfig(
       };
 
     case 'cmd':
+      if (process.platform !== 'win32') {
+        return {
+          command: commandPath,
+          args,
+          shell: false,
+          cwd,
+        };
+      }
       return buildWindowsShellProxySpawnConfig(
         commandPath,
         args,
@@ -508,6 +516,14 @@ function buildNativeSpawnConfig(
       );
 
     case 'pwsh':
+      if (process.platform !== 'win32') {
+        return {
+          command: commandPath,
+          args,
+          shell: false,
+          cwd,
+        };
+      }
       return buildPowerShellSpawnConfig(
         commandPath,
         args,
@@ -516,6 +532,14 @@ function buildNativeSpawnConfig(
       );
 
     case 'powershell':
+      if (process.platform !== 'win32') {
+        return {
+          command: commandPath,
+          args,
+          shell: false,
+          cwd,
+        };
+      }
       return buildPowerShellSpawnConfig(
         commandPath,
         args,

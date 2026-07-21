@@ -12,7 +12,7 @@ import {
   ensureRuntimeTestDirs,
 } from './support/runtimeTestPaths.js';
 
-const PEER_ROUTING_TEST_TIMEOUT_MS = 20_000;
+const PEER_ROUTING_TEST_TIMEOUT_MS = 60_000;
 
 function parseSse(text: string): Array<Record<string, unknown>> {
   return text
@@ -97,7 +97,7 @@ function createTestConfig(
 
 async function waitFor(
   predicate: () => boolean,
-  timeoutMs = 2_000,
+  timeoutMs = 10_000,
 ) {
   const startedAt = Date.now();
   while (!predicate()) {

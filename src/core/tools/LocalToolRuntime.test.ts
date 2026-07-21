@@ -1620,10 +1620,12 @@ describe('LocalToolRuntime', () => {
         });
         expect(result.isError).toBeUndefined();
 
-        const sourceStat = statSync(sourcePath);
+        // Compare against the fixed fixture time, not a post-copy stat of the
+        // source: reading the source during the copy updates its atime on
+        // POSIX filesystems (relatime), while NTFS leaves it untouched.
         const destinationStat = statSync(destinationPath);
-        expect(destinationStat.mtime.toISOString()).toBe(sourceStat.mtime.toISOString());
-        expect(destinationStat.atime.toISOString()).toBe(sourceStat.atime.toISOString());
+        expect(destinationStat.mtime.toISOString()).toBe(preservedTime.toISOString());
+        expect(destinationStat.atime.toISOString()).toBe(preservedTime.toISOString());
       } finally {
         cleanup();
       }

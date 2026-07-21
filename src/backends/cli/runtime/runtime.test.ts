@@ -445,7 +445,15 @@ describe('runtime adapters', () => {
 
   it('maps isolated runtime workspaces into a container-local sessions directory for Docker', () => {
     const previousRuntimeDir = process.env.CATS_RUNTIME_DIR;
-    process.env.CATS_RUNTIME_DIR = 'C:\\Users\\sammy\\.cats\\runtime';
+    // Host-native fixture paths: runtime-root resolution uses the host
+    // platform's path semantics, so a Windows-style root only maps on win32.
+    const hostRuntimeDir = process.platform === 'win32'
+      ? 'C:\\Users\\sammy\\.cats\\runtime'
+      : '/home/sammy/.cats/runtime';
+    const hostSessionDir = process.platform === 'win32'
+      ? 'C:\\Users\\sammy\\.cats\\runtime\\sessions\\sess-1'
+      : '/home/sammy/.cats/runtime/sessions/sess-1';
+    process.env.CATS_RUNTIME_DIR = hostRuntimeDir;
 
     try {
       const spawnConfig = buildProcessSpawnConfig(
@@ -458,8 +466,8 @@ describe('runtime adapters', () => {
           },
         },
         'auggie',
-        ['--workspace-root', 'C:\\Users\\sammy\\.cats\\runtime\\sessions\\sess-1'],
-        'C:\\Users\\sammy\\.cats\\runtime\\sessions\\sess-1',
+        ['--workspace-root', hostSessionDir],
+        hostSessionDir,
       );
 
       expect(spawnConfig.env).toEqual({
