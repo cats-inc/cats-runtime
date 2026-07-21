@@ -1,5 +1,5 @@
 {
-  "name": "cats-runtime",
+  "name": "@cats-inc/cats-runtime",
   "version": "0.1.0",
   "description": "Unified runtime for subscription CLIs and future API backends.",
   "repository": {

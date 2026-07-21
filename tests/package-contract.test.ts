@@ -77,21 +77,28 @@ function runBuild(): void {
   runNpmCommand(['run', 'build']);
 }
 
+function parsePackPayload(stdout: string): NpmPackDryRunResult[] {
+  // npm pack --json emits an array for unscoped packages but an object
+  // keyed by package name for scoped packages.
+  const parsed = JSON.parse(stdout.trim()) as NpmPackDryRunResult[] | Record<string, NpmPackDryRunResult>;
+  return Array.isArray(parsed) ? parsed : Object.values(parsed);
+}
+
 function runPackDryRun(): NpmPackDryRunResult {
   const stdout = runNpmCommand(['pack', '--json', '--dry-run', '--ignore-scripts']);
 
-  const payload = JSON.parse(stdout.trim()) as NpmPackDryRunResult[];
-  if (!Array.isArray(payload) || payload.length !== 1) {
+  const payload = parsePackPayload(stdout);
+  if (payload.length !== 1 || !payload[0]) {
     throw new Error(`Unexpected npm pack payload: ${stdout}`);
   }
 
-  return payload[0]!;
+  return payload[0];
 }
 
 function runPack(): { packed: NpmPackDryRunResult; tarballPath: string } {
   const stdout = runNpmCommand(['pack', '--json', '--ignore-scripts']);
-  const payload = JSON.parse(stdout.trim()) as NpmPackDryRunResult[];
-  if (!Array.isArray(payload) || payload.length !== 1 || !payload[0]?.filename) {
+  const payload = parsePackPayload(stdout);
+  if (payload.length !== 1 || !payload[0]?.filename) {
     throw new Error(`Unexpected npm pack payload: ${stdout}`);
   }
 
@@ -159,7 +166,7 @@ describe('package contract', () => {
     expect(manifest.scripts?.['build:runtime']).toBe('tsc -p tsconfig.json');
     expect(manifest.scripts?.['build:runtime-bundle']).toBe('node scripts/bundle-runtime.mjs');
 
-    expect(packed.name).toBe('cats-runtime');
+    expect(packed.name).toBe('@cats-inc/cats-runtime');
     expect(packed.version).toBeTruthy();
     expect([...packedPaths]).toEqual(expect.arrayContaining([
       '.env.example',
@@ -229,7 +236,7 @@ describe('package contract', () => {
       },
     });
 
-    const installedRoot = join(consumerDir, 'node_modules', 'cats-runtime');
+    const installedRoot = join(consumerDir, 'node_modules', '@cats-inc', 'cats-runtime');
 
     const runtimeHelp = runNodeCommand([join(installedRoot, 'build', 'runtime', 'index.js'), '--help'], {
       cwd: consumerDir,
