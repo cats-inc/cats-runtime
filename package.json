@@ -20,7 +20,7 @@
     }
   },
   "bin": {
-    "cats-runtime": "./build/runtime/index.js"
+    "cats-runtime": "build/runtime/index.js"
   },
   "files": [
     "build/runtime",

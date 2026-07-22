@@ -145,7 +145,7 @@ describe('package contract', () => {
     const packedPaths = new Set(packed.files.map((entry) => entry.path));
 
     expect(manifest.bin).toEqual({
-      'cats-runtime': './build/runtime/index.js',
+      'cats-runtime': 'build/runtime/index.js',
     });
     expect(manifest.exports?.['.']).toEqual({
       import: './build/runtime/index.js',
