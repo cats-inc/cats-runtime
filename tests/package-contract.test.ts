@@ -151,6 +151,8 @@ describe('package contract', () => {
       import: './build/runtime/index.js',
       types: './build/runtime/index.d.ts',
     });
+    // The cats-one launcher resolves the runtime bin through this export.
+    expect(manifest.exports?.['./package.json']).toBe('./package.json');
     expect(manifest.files).toEqual([
       'build/runtime',
       'public',
