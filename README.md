@@ -134,17 +134,16 @@ Workspace substrate helper:
 
 ## Package-Ready Startup
 
-`cats-runtime` is now shaped for repo-local executable package verification, and
-is intended to publish as an executable npm package once the first registry
-release is ready:
+`cats-runtime` ships as the executable npm package
+[`@cats-inc/cats-runtime`](https://www.npmjs.com/package/@cats-inc/cats-runtime):
 
-- `npm install -g cats-runtime` then `cats-runtime`
-- `npm install -g cats-runtime` then `cats-runtime mcp` for stdio MCP hosts
-- `npx cats-runtime` once the package is published
+- `npm install -g @cats-inc/cats-runtime` then `cats-runtime`
+- `npm install -g @cats-inc/cats-runtime` then `cats-runtime mcp` for stdio MCP hosts
+- `npx @cats-inc/cats-runtime`
 
-The first public package name is frozen to the unscoped package
-`cats-runtime`, and prerelease validation should use the `next` dist-tag rather
-than `latest`.
+The canonical package name is `@cats-inc/cats-runtime`; the unscoped
+`cats-runtime` name is a deprecated reserved stub. Prerelease validation uses
+the `next` dist-tag rather than `latest`.
 
 For local packaged-flow verification before publish, use the platform helper
 scripts:
@@ -157,11 +156,11 @@ Each helper supports interactive install/delete prompts plus explicit
 `--pack-only`, `--install`, `--clean`, and `--skip-build` modes.
 
 The repo also includes a non-publishing GitHub Actions preflight workflow at
-`../.github/workflows/cats-runtime-release-preflight.yml` that runs
+`.github/workflows/release-preflight.yml` that runs
 `npm run release:check` without attempting a registry publish.
 
 The repo also now carries a manual publish workflow at
-`../.github/workflows/cats-runtime-npm-publish.yml` with OIDC
+`.github/workflows/npm-publish.yml` with OIDC
 `id-token: write` permission and `next` / `latest` dist-tag selection, but that
 workflow is still only a repo-owned skeleton until the exact npm trusted
 publisher is configured against the matching GitHub repository and workflow

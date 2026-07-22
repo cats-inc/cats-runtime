@@ -8,7 +8,7 @@
 `cats-runtime` is an executable-first npm package:
 
 - consumers should be able to `npm install cats-runtime`
-- technical evaluators should be able to `npx cats-runtime`
+- technical evaluators should be able to `npx @cats-inc/cats-runtime`
 - upper-layer hosts such as `cats` should continue to treat it as a
   separate process and HTTP runtime boundary
 
@@ -16,8 +16,8 @@ This guide documents the release path that matches that packaging direction.
 
 ## Current Package Posture
 
-The first public npm release has not happened yet. Before publishing,
-`cats-runtime` already has:
+The first public npm release shipped as `@cats-inc/cats-runtime@0.1.0`
+(2026-07-22) with OIDC trusted publishing and provenance. The package has:
 
 - a package entry at `build/runtime/index.js`
 - an executable `bin` entry for `cats-runtime`
@@ -94,7 +94,7 @@ Consumers can then install or run the beta with:
 
 ```powershell
 npm install cats-runtime@next
-npx cats-runtime@next
+npx @cats-inc/cats-runtime@next
 ```
 
 ## Repo-Owned Preflight Automation
@@ -185,7 +185,7 @@ npx cats-runtime@latest --help
 For a beta tag:
 
 ```powershell
-npx cats-runtime@next --help
+npx @cats-inc/cats-runtime@next --help
 ```
 
 Also validate installation:

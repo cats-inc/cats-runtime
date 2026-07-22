@@ -9,7 +9,7 @@
 |-------------|-----|---------|
 | Development | `http://127.0.0.1:3110` | Local development with source checkout |
 | Built local | `http://127.0.0.1:3110` | Production-style local run from built assets |
-| npm package (repo-ready local path; public package name `cats-runtime`; registry publish pending) | `http://127.0.0.1:3110` by default | Executable package run via `cats-runtime` / `npx cats-runtime` once published |
+| npm package (`@cats-inc/cats-runtime`, published) | `http://127.0.0.1:3110` by default | Executable package run via the `cats-runtime` command / `npx @cats-inc/cats-runtime` |
 | App-managed local | Host-assigned | Started and supervised by a local product app such as `cats` |
 
 ## Deployment Modes
@@ -62,14 +62,14 @@ publisher configuration before any successful registry publish can happen.
 Once published, the public package flow is expected to be:
 
 ```powershell
-npm install -g cats-runtime
+npm install -g @cats-inc/cats-runtime
 cats-runtime
 ```
 
 or:
 
 ```powershell
-npx cats-runtime
+npx @cats-inc/cats-runtime
 ```
 
 The executable package uses the same runtime entrypoint and supports either
