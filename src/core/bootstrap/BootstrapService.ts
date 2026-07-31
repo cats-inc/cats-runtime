@@ -17,6 +17,7 @@ import type {
 import type { ProviderCompatibilityService } from '../compatibility/ProviderCompatibilityService.js';
 import type { ProviderTargetDescriptor } from '../providerCatalog.js';
 import type { RuntimeConfig } from '../config.js';
+import { refreshWindowsProcessPath } from './windowsEnvironmentPath.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -211,6 +212,11 @@ export class BootstrapService {
     const state = await this.getSetupState();
     state.status = 'scanning';
     writeJsonAtomic(this.setupStatePath, state);
+
+    // A CLI installed since this runtime started is only on the persisted PATH,
+    // not on the one we inherited at boot. Pick it up before probing; a failure
+    // here just means we scan with the PATH we already have.
+    await refreshWindowsProcessPath().catch(() => ({ refreshed: false, added: [] }));
 
     const entries = await this.probeProviders();
     const isManual = options.manual === true;
