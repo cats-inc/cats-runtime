@@ -76,13 +76,12 @@ To sync skills after changes:
 
 ### MCP Server Configurations
 
-```json
-{
-  "mcpServers": {
-    // Add Claude-specific MCP server configurations here if needed
-  }
-}
-```
+None. This repo does not require a Claude-specific MCP server to work on it.
+
+Note the direction of the relationship: `cats-runtime` *publishes* an MCP facade
+(`POST /mcp`, plus the `cats-runtime mcp` stdio proxy) for hosts to consume. That is
+product surface under `src/mcp/`, not tooling for the agent editing this repo. See
+`docs/mcp-config.md` when wiring an external host against it.
 
 ### Preferred Behaviors
 
@@ -93,7 +92,62 @@ To sync skills after changes:
 
 ### Project-Specific Context
 
-(Add any project-specific context or conventions that Claude should be aware of)
+#### Layer boundaries
+
+- `src/core/` — runtime-wide contracts, config, session registry, workspace/worktree
+  handling, skills, hydration, usage metering, peers, management adapters
+- `src/backends/{cli,api,agent,browser}/` — provider-specific execution. Provider quirks
+  belong **inside** the owning adapter; they must not leak up into `core/` or `http/`.
+- `src/http/` — the inbound HTTP contract plus the embedded dashboard, playground, and
+  provider-setup pages
+- `src/mcp/` and `src/acp/` — the MCP and (bounded) ACP facades over that same core
+
+ACP under `src/acp/` is the **client-to-runtime** layer. Peer/A2A execution routing is a
+separate **runtime-to-peer** concern that sits below it. Do not collapse the two, and do not
+add a second client-facing transport when an existing one can carry the case
+(`docs/architecture.md` → "Protocol Layering").
+
+#### Generated files that are committed
+
+`npm run build:ui` regenerates `src/http/ui/generated/runtimeTailwind.ts` and copies
+`src/http/ui/pages/*.html` into `public/`. Both outputs are tracked in git.
+
+- **MUST** run `npm run build:ui` and commit the regenerated output after touching
+  `src/http/ui/**`. `tests/runtime-ui-build.test.ts` fails when `public/*.html` drifts from
+  its source page or is left uncommitted.
+- This is also why `npm run typecheck` runs `build:ui` first — the generated module has to
+  exist before `tsc` sees it.
+
+#### Tests
+
+- Vitest, single-threaded. `npm test` runs a full `npm run build` first, so it is slow.
+  For a focused run use `npx vitest run tests/<name>.test.ts`, building once beforehand if
+  that test asserts against `build/runtime/**`.
+- Tests **MUST NOT** touch the real `~/.cats/runtime`. Use `createRuntimeTestEnv` /
+  `createRuntimeTestPaths` from `tests/support/runtimeTestPaths.ts`; they redirect `HOME`,
+  `USERPROFILE`, and `CATS_RUNTIME_DIR` at a temp root.
+- `npm run verify:skills` validates the runtime-owned `skills/` library. `npm run
+  release:check` (verify:skills + test + `npm pack --dry-run`) is what CI preflight runs.
+
+#### Runtime state
+
+Default listener is `127.0.0.1:3110` (`CATS_RUNTIME_PORT`). Persistent state lives under
+`~/.cats/runtime/{config,data,sessions}` (`CATS_RUNTIME_DIR`). A missing `management.yaml`
+or `curated-model-catalogs.yaml` falls back to the bundled `config/*.yaml.example`, so
+deleting one changes behavior instead of failing loudly.
+
+#### Code style
+
+See `AGENTS.md` → Coding Conventions and Testing Protocols. The rule most likely to bite:
+`NodeNext` module resolution means relative imports carry a `.js` extension even when the
+file on disk is `.ts` (`import { loadConfig } from '../backends/cli/config.js'`).
+
+#### Pre-release policy
+
+Per `AGENTS.md`, this runtime has never had a stable release. When a route, payload shape,
+event format, env var, or backend adapter contract changes, delete the superseded path in the
+same change — no aliases, fallbacks, or compatibility shims — and update its consumers, tests,
+and docs to the current contract.
 
 ---
 
@@ -101,4 +155,4 @@ To sync skills after changes:
 
 This file is maintained by Claude only. Other agents should not modify this file.
 
-Last updated: <!-- Update this when making changes -->
+Last updated: 2026-08-03

@@ -312,8 +312,6 @@ See `skills/README.md` for full details on the SKILL.md format and available ski
 
 ## Coding Conventions
 
-<!-- TODO: Customize based on your tech stack -->
-
 ### General Principles
 
 - **DRY** (Don't Repeat Yourself): Extract common logic into reusable functions
@@ -326,78 +324,107 @@ See `skills/README.md` for full details on the SKILL.md format and available ski
 
 | Aspect | Convention |
 |--------|------------|
-| Indentation | [Spaces (2/4) or Tabs] |
-| Line length | [80 / 100 / 120 characters] |
-| Quotes | [Single / Double] |
-| Trailing commas | [Yes / No] |
-| Semicolons (JS/TS) | [Yes / No] |
+| Indentation | 2 spaces |
+| Line length | 100 characters (soft target; long string literals and type unions may exceed it) |
+| Quotes | Single |
+| Trailing commas | Yes |
+| Semicolons (JS/TS) | Yes |
 
 ### Language-Specific Rules
 
-<!-- Uncomment and customize the section for your language -->
+This repo is TypeScript only. There is no Python, C#, or React code here; ignore
+generic template guidance for those stacks.
 
-<!--
-#### Python
-- Use type hints for function signatures
-- Use `async/await` for I/O operations
-- Prefer f-strings over `.format()` or `%`
-- Use dataclasses or Pydantic for data structures
--->
-
-<!--
 #### TypeScript
-- Always use strict mode
-- Prefer `interface` over `type` for object shapes
-- Use `async/await` over raw Promises
-- Avoid `any` type; use `unknown` if type is uncertain
--->
 
-<!--
-#### C# (.NET)
-- Use PascalCase for public members, _camelCase for private fields
-- Prefix interfaces with "I" (e.g., `IUserService`)
-- Use `async/await` with "Async" suffix for async methods
-- Use dependency injection via constructor
--->
+- Always use strict mode (`tsconfig.json` sets `"strict": true`)
+- Module resolution is `NodeNext`. Relative imports **MUST** carry a `.js`
+  extension even though the file on disk is `.ts`:
+  `import { loadConfig } from '../backends/cli/config.js'`. A missing extension
+  compiles under some editors and then fails at runtime.
+- Prefer `interface` over `type` for object shapes; reserve `type` for unions,
+  aliases, and mapped types
+- Use `async`/`await` over raw promise chains
+- Avoid `any`. The codebase has effectively eliminated it in favour of `unknown`
+  plus narrowing — do not reintroduce it to silence a compiler error.
+- Keep provider-specific types inside the owning `src/backends/*` adapter rather
+  than widening a shared `src/core/types.ts` shape to fit one provider
 
 ### Error Handling
 
-- [Describe your error handling strategy]
-- [e.g., Use custom exception classes, Always log errors with context]
+- Keep transport errors explicit and structured. HTTP handlers return a minimal
+  JSON body through the Hono context — `c.json({ error: 'Session not found' }, 404)`
+  — optionally with a small number of identifying fields such as `operationId`.
+- Do not leak secrets, API keys, upstream auth tokens, or raw provider stderr into
+  error payloads
+- Fail loudly on missing required configuration or an uninitialized service rather
+  than silently degrading. `getRuntimeMeteringService` and its siblings throw when
+  the service was never initialized; keep that posture for new services.
+- Provider execution failures belong to the owning backend adapter, which should
+  normalize them into runtime-level events instead of letting provider-shaped
+  errors escape into `core/` or `http/`
 
 ### Dependency Injection
 
-- [Describe your DI approach]
-- [e.g., Constructor injection preferred, Avoid service locator pattern]
+- The composition root is `src/server.ts`. It constructs collaborators (session
+  registry, worker pool, backend managers, provider services) and assembles the
+  `AppContext` defined in `src/http/app.ts`.
+- `createRuntimeApp(ctx)` and every route module receive that `AppContext`
+  explicitly. Do not reach for module-level singletons or a service locator.
+- Optional services use lazy `getX(ctx)` accessors that either construct and cache
+  on the context or throw when the service is required but absent. Follow that
+  shape when adding a service rather than inventing a second lifecycle.
+- Pass `env` / config objects as parameters with a sensible default
+  (`loadConfig(env = process.env)`) so tests can inject a temp environment
 
 ---
 
 ## Testing Protocols
 
-<!-- TODO: Customize based on your testing strategy -->
-
 ### Testing Framework
 
-- **Unit Tests**: [pytest / Jest / NUnit / xUnit]
-- **Integration Tests**: [pytest / Supertest / etc.]
-- **E2E Tests**: [Playwright / Cypress / Selenium]
+- **All tests**: Vitest 3.x, run single-threaded
+  (`vitest run --pool=threads --poolOptions.threads.singleThread`)
+- There is no separate unit / integration / E2E runner. The same suite mixes pure
+  contract assertions, real HTTP server boots, and real child-process spawns.
+- `npm test` runs a full `npm run build` first, so it is slow. For a focused run use
+  `npx vitest run tests/<name>.test.ts`, building once beforehand if that test
+  asserts against `build/runtime/**`.
 
 ### Test Structure
 
+The layout is flat — there are no `unit/`, `integration/`, or `e2e/` subdirectories.
+
 ```
 tests/
-├── unit/           # Unit tests (isolated, fast)
-├── integration/    # Integration tests (with dependencies)
-└── e2e/            # End-to-end tests (full system)
+├── <area>.test.ts              # one file per area, e.g. runtime-server.test.ts
+├── support/
+│   └── runtimeTestPaths.ts     # temp-root runtime dirs and env
+├── tempCleanup.ts              # retrying temp-dir removal helper
+└── streamEventTestUtils.ts     # shared stream/event assertions
 ```
 
 ### Testing Rules
 
-1. **Before Commit**: All unit tests must pass (`npm test` / `pytest` / `dotnet test`)
-2. **Coverage Target**: [e.g., Minimum 80% code coverage]
-3. **Naming Convention**: `test_<function_name>_<scenario>` or `describe/it` blocks
-4. **Mocking**: Use [Mock library] for external dependencies
-5. **CI Requirement**: All tests must pass before merge
+1. **Before Commit**: `npm test` must pass. `npm run release:check`
+   (`verify:skills` + `test` + `npm pack --dry-run`) is the fuller gate and mirrors
+   the CI preflight workflow.
+2. **Isolation from user state**: tests **MUST NOT** read or write the real
+   `~/.cats/runtime`. Use `createRuntimeTestEnv` / `createRuntimeTestPaths` from
+   `tests/support/runtimeTestPaths.ts`, which repoint `HOME`, `USERPROFILE`, and
+   `CATS_RUNTIME_DIR` at a temp root, and clean up through `tempCleanup.ts`.
+3. **Coverage Target**: no coverage tool is configured and no percentage gate is
+   enforced. Cover the contract instead: every public HTTP route, event shape, and
+   backend adapter seam that a host depends on.
+4. **Naming Convention**: `tests/<kebab-case-area>.test.ts` with `describe` / `it`
+   blocks and scenario-oriented names.
+5. **Mocking**: prefer real objects against temp directories over mocking. `vi.fn` /
+   `vi.spyOn` are used sparingly for injected collaborators, and `vi.mock` is a last
+   resort — the suite currently uses it in a single file.
+6. **Generated UI artifacts**: `tests/runtime-ui-build.test.ts` fails when
+   `public/*.html` drifts from `src/http/ui/pages/*.html` or is left uncommitted.
+   Run `npm run build:ui` and commit the result after touching `src/http/ui/**`.
+7. **CI Requirement**: all tests must pass before merge.
 
 ### What to Test
 
@@ -725,6 +752,7 @@ chore: maintenance tasks
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.2.3 | 2026-08-03 | Fill in Coding Conventions and Testing Protocols from the current codebase |
 | 1.2.2 | 2026-04-22 | Add pre-release compatibility policy |
 | 1.2.1 | 2026-01-05 | Normalize compliance headings and template guidance |
 | 1.2.0 | 2025-01 | Add Development Workflow overview, Feature Specifications, Implementation Plans (CDD support) |
