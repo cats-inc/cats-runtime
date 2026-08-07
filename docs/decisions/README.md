@@ -38,6 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [033-adopt-grok-devin-cline-aider-as-cli-provider-families](./033-adopt-grok-devin-cline-aider-as-cli-provider-families.md) | Adopt Grok, Devin, Cline, and Aider as CLI provider families, install-tier first | Proposed | 2026-08-07 |
 | [032-replace-gemini-cli-with-antigravity-cli](./032-replace-gemini-cli-with-antigravity-cli.md) | Replace Gemini CLI with Antigravity CLI as the Google-family provider | Proposed | 2026-05-24 |
 | [031-keep-acp-inside-agent-backend-and-model-runtime-acp-as-a-separate-facade](./031-keep-acp-inside-agent-backend-and-model-runtime-acp-as-a-separate-facade.md) | Keep ACP inside the `agent` backend family and model runtime ACP as a separate facade | Proposed | 2026-04-15 |
 | [030-use-structured-cats-home-runtime-storage](./030-use-structured-cats-home-runtime-storage.md) | Use structured `~/.cats` runtime storage with a config subtree | Accepted | 2026-04-05 |
@@ -81,6 +82,6 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 ---
 
-*Last updated: 2026-05-24*
+*Last updated: 2026-08-07*
 
 *See also: [AGENTS.md](../../../AGENTS.md) for decision-making protocols*
