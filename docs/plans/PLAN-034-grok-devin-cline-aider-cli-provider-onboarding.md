@@ -62,18 +62,19 @@ Install facts already extracted from upstream (no further probing needed):
 - [ ] Aider — `platform/windows/Install-Aider.ps1`, `platform/{linux,macos}/install-aider.sh`. Installer `https://aider.chat/install.{ps1,sh}`, which is the `uv` installer plus `uv tool install --force --python python3.12 --with pip aider-chat@latest`. Binary `~/.local/bin/aider{,.exe}`. Auth via model API-key env vars. Upstream Full mode.
 - [ ] Cline — npm package `cline`, added to `Install-NodeCLITools.ps1` / `install-node-cli-tools.sh`. Upstream Full mode.
 
-Live probe questions (gate execution adapters, not this plan's install tier):
+Live probe questions (SPEC-027 Probe Items; gate execution adapters, not this plan's install tier):
 
-- [ ] Capture `--version` and `--help` for each of the four. Record exact version-string shapes for the check path.
-- [ ] Determine whether each exposes a non-interactive/headless mode and whether any emits machine-readable output.
-- [ ] Determine whether Devin executes locally or orchestrates remote sessions (resolves the ADR-023 classification).
+- [ ] **P5** — Capture `--version` and `--help` for each of the four. Record exact version-string shapes for the check path.
+- [ ] **P2** — Determine whether each exposes a non-interactive/headless mode and whether any emits machine-readable output. Feeds the D4 ordering.
+- [ ] **P1** — Determine whether Devin executes locally or orchestrates remote sessions (resolves the ADR-023 classification).
 - [ ] Determine whether any exposes an enumerable model list. `--help` alone is not model-id evidence.
-- [ ] Determine whether any writes scannable session storage.
-- [ ] Determine whether Cline needs the `--allow-scripts` handling upstream applies for `npm 12+`.
-- [ ] Confirm the badge token palette (SPEC-027 open question) with the platform catalog owner.
+- [ ] **P3** — Determine whether any writes scannable session storage.
+- [ ] **P4** — Determine whether Cline needs the `--allow-scripts` handling upstream applies for `npm 12+`. Documentation only; SPEC-027 D5 already applies it unconditionally.
 - [ ] Record findings in `docs/research/2026-08-07-grok-devin-cline-aider-cli-probe.md`, marking unanswered questions as deferred rather than guessing.
 
-**Deliverables**: Research note answering every SPEC-027 open question that evidence supports; explicit deferrals for the rest.
+The badge palette is no longer a probe item — SPEC-027 D1 fixes it. Nothing in this phase blocks on it.
+
+**Deliverables**: Research note answering every SPEC-027 Probe Item that evidence supports; explicit deferrals for the rest.
 
 ### Phase 2: Widen the Taxonomy
 
@@ -113,7 +114,7 @@ Live probe questions (gate execution adapters, not this plan's install tier):
 - [ ] Add `native` to `defaultProviderRuntimeMode` for all four.
 - [ ] Add the four to `readProviderCommandConfig` wiring, instance-map construction, and the clone helpers.
 - [ ] Add routing defaults and `backends.cli.providers.<id>.instances.native` blocks to `config/providers.yaml.example`.
-- [ ] Decide whether `GROK_DEPLOYMENT_KEY` belongs in `.env.example` (SPEC-027 open question) and apply the decision.
+- [ ] Leave `.env.example` unchanged. Per SPEC-027 D2, `GROK_DEPLOYMENT_KEY`, `DEEPSEEK_API_KEY`, and `OPENROUTER_API_KEY` stay out; they are CLI-consumed, not runtime-consumed.
 
 **Deliverables**: A fresh `providers.yaml` bootstrap produces `cli/native` instances for all four.
 
@@ -121,7 +122,7 @@ Live probe questions (gate execution adapters, not this plan's install tier):
 
 **Blocking dependency**: `cats-platform` PLAN-102 Phase 1 must be merged first. Confirm `cats-platform/src/shared/providerCatalogData.ts` lists all four, then mirror those values here.
 
-- [ ] Add badge tokens to `src/http/ui/tailwind.runtime.css` and `src/http/ui/shared.ts` using the Phase 1-confirmed palette.
+- [ ] Add badge tokens to `src/http/ui/tailwind.runtime.css` and `src/http/ui/shared.ts` using the SPEC-027 D1 values: `--grok #e5e7eb`, `--devin #38bdf8`, `--cline #e879f9`, `--aider #60a5fa`.
 - [ ] Add the four to `src/http/ui/pages/index.html` — provider dropdown, `PROVIDER_ORDER`, and dashboard CSS selectors.
 - [ ] Add the four to `src/http/ui/pages/playground.html` — badge style blocks, `PROVIDERS` array, and `<provider>-default` sentinels only.
 - [ ] Update `src/http/ui/pages/provider-setup.html` so Aider renders env-key readiness with no sign-in affordance, and Devin renders `devin setup` as a manual step.
@@ -219,6 +220,7 @@ Live probe questions (gate execution adapters, not this plan's install tier):
 | Date | Update |
 |------|--------|
 | 2026-08-07 | Plan created alongside ADR-033 and SPEC-027, after auditing `environment-bootstrap` commits `cb5efc7`, `d131535`, `216ef96`, `54992d6`, `05be416`, `bef3411`, `0d1831d`, `cfe7785`. Pi npm package drift found during the same audit and folded into Phase 3. |
+| 2026-08-07 | SPEC-027 open questions resolved as Decisions D1–D5 (decided by Claude, pending human review) and the remaining items reclassified as Probe Items P1–P5. Phase 1 no longer gates on the badge palette; Phase 5 no longer defers the `.env.example` question; Phase 6 carries fixed token values. Auditing the live palette found the originally proposed Cline token collided exactly with `--codex`; all four values changed. |
 
 ---
 

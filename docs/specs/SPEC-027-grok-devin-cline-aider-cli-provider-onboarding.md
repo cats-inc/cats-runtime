@@ -113,11 +113,16 @@ Separately, `provider-install/knowledge.ts` installs Pi from `@mariozechner/pi-c
 
 #### Surfaces
 
-20. `src/http/ui/shared.ts` and `src/http/ui/tailwind.runtime.css` shall define badge tokens for the four. Proposed values, chosen to stay inside the existing brightness band while remaining mutually distinguishable and distinct from the twelve in use: `--grok #e5e7eb` (xAI monochrome), `--devin #38bdf8` (sky-400), `--cline #34d399` (emerald-400), `--aider #f97316` (orange-500). Final values are an open question below.
+20. `src/http/ui/shared.ts` and `src/http/ui/tailwind.runtime.css` shall define badge tokens for the four, using the values fixed in Decision D1 below:
+    - `--grok: #e5e7eb` (gray-200)
+    - `--devin: #38bdf8` (sky-400)
+    - `--cline: #e879f9` (fuchsia-400)
+    - `--aider: #60a5fa` (blue-400)
 21. `src/http/ui/pages/index.html` shall list the four in its provider dropdown and `PROVIDER_ORDER`.
 22. `src/http/ui/pages/playground.html` shall list the four in `PROVIDERS` and expose only `grok-default`, `devin-default`, `cline-default`, `aider-default` sentinels.
 23. `src/http/ui/generated/runtimeTailwind.ts` and `public/*.html` shall be regenerated, not hand-edited.
 24. Provider-setup shall render Aider's env-key readiness without a sign-in affordance, and Devin's `devin setup` as a manual step.
+24a. Per Decision D3, Aider's readiness shall be computed as "at least one configured model key is present", and the set of detected keys shall be reported alongside it as information only. The runtime shall not assert which key Aider will route to.
 
 #### Documentation
 
@@ -175,18 +180,63 @@ All four support `--version` and `--help` per the upstream check scripts, which 
 
 - **An upstream installer changes its URL or install directory.** Mitigation: the knowledge entries cite the upstream script that sourced them, so reconciliation is a diff rather than a re-investigation.
 - **Devin turns out to be a control-plane tool.** Mitigation: recorded reversal condition in ADR-033; the install tier remains valid either way.
-- **Badge tokens collide visually with existing providers.** Mitigation: the open question below asks for confirmation before the tokens are frozen into generated Tailwind.
+- **Badge tokens collide visually with existing providers.** Mitigation: Decision D1 fixes the values against an audit of the live palette, which caught an exact collision in the first draft. The residual risk is Grok's lightness-differentiated grey sitting near two existing greys; a reviewer pass before the tokens are frozen into generated Tailwind is the cheapest place to catch it.
 - **Adding four families widens provider-order assertions across both repos.** Mitigation: append-only ordering keeps existing indices stable.
 - **Aider may have no automatable output at all.** Mitigation: the refusal stub is the correct terminal state if so; the install tier still delivers value.
 
-## Open Questions
+## Resolved Decisions
 
-- [ ] Are the proposed badge token values acceptable, or should the palette be picked alongside the platform provider catalog?
-- [ ] Should `GROK_DEPLOYMENT_KEY` appear in `.env.example`, or stay out because it is an enterprise-only path?
-- [ ] Does Devin CLI execute locally or orchestrate remote sessions? Resolves its ADR-023 classification.
-- [ ] Does any of the four expose a machine-readable output mode (`--output-format`, `--json`, `--print`)? Determines which gets an execution adapter first.
-- [ ] Does Cline's CLI require the `--allow-scripts` handling upstream applies for `npm 12+`?
-- [ ] Should the runtime model Aider's per-key readiness granularly (which key is present) or as a single "at least one key present" boolean?
+> **Decided by Claude on 2026-08-07, pending human review.** These were open questions in the first draft. Each is resolved below so implementation is not blocked; a reviewer should confirm or overturn any of them. Overturning D1 or D4 is cheap. Overturning D2 or D3 is also cheap but changes an established convention, so those carry the most reviewer value.
+
+### D1 — Badge palette
+
+**Decision**: `--grok #e5e7eb` (gray-200), `--devin #38bdf8` (sky-400), `--cline #e879f9` (fuchsia-400), `--aider #60a5fa` (blue-400). Fixed here, in the runtime; the platform mirrors these values rather than picking its own.
+
+**Why**: The first draft proposed `--cline #34d399`, which is an exact collision with `--codex`. Auditing the live palette in `src/http/ui/shared.ts` showed the existing fourteen tokens already occupy almost the whole Tailwind-400 band: orange, emerald, violet, pink, indigo, purple, rose, lime, stone, cyan, amber, teal, slate, red. Only sky, blue, and fuchsia remain unused, and `#60a5fa` (blue-400) is specifically free because PLAN-033 deliberately vacated it when Antigravity moved off the old Gemini blue to violet.
+
+That leaves three clean hues for four providers, so Grok takes a lightness-differentiated near-white rather than a fourth hue. This is brand-true for xAI's monochrome identity, and it separates from `--pi` (warm grey) and `--ollama` (cool grey) by lightness rather than hue. It is the weakest of the four assignments and the most likely reviewer target.
+
+Devin and Aider hold the adjacent sky/blue pair, which is the other soft spot; they are non-adjacent in provider order with Cline's fuchsia between them, so they do not sit side by side in the dashboard.
+
+Precedent for prioritizing distinguishability over brand fidelity: PLAN-033 Phase 1 moved Antigravity to violet-400 specifically because keeping Google's blue was visually identical to the badge it replaced.
+
+**Follow-on finding**: with eighteen providers, the single-lightness-band palette is at capacity. A nineteenth provider cannot be assigned a clean 400-band hue. The palette needs a second lightness band or a designed token system before the next provider lands — worth its own small follow-up rather than another ad-hoc pick.
+
+### D2 — `GROK_DEPLOYMENT_KEY` in `.env.example`
+
+**Decision**: No. It lives only in the provider's `auth.envVars` in `knowledge.ts`, where provider setup can surface it. The same rule excludes `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` from `.env.example` for Aider.
+
+**Why**: `.env.example` labels its credential block "API/local provider credentials" — it documents keys **the runtime itself** consumes for API and local backends, not keys a CLI subprocess reads from the ambient environment. `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are there because Anthropic and OpenAI API backends exist, not because Claude Code and Codex CLIs read them. Grok has no API backend in scope, so adding its key would imply a runtime-consumed credential that does not exist.
+
+Revisit if an xAI API backend ever lands, at which point it belongs in `.env.example` for that reason rather than this one.
+
+### D3 — Aider readiness granularity
+
+**Decision**: Readiness is a boolean — at least one of the configured model keys is present. Alongside it, the runtime reports **which** keys were detected, as information only, without asserting which one Aider will use.
+
+**Why**: Neither pure option is right. Per-key readiness would require the runtime to know which provider Aider will route to, which depends on the user's `.aider.conf.yml` and `--model` flag; reporting "missing `OPENAI_API_KEY`" to a user who intends to use Anthropic is a false negative. Pure boolean throws away information the user needs to debug a misconfigured environment. Splitting readiness (boolean, because any one key suffices) from detection (a list, because it is useful and makes no claim) is honest on both counts.
+
+### D4 — Which CLI gets an execution adapter first
+
+**Decision**: Grok, once P2 confirms it has a machine-readable output mode. If P2 shows it does not and another of the four does, that one goes first instead.
+
+**Why**: Grok is the only one of the four that upstream promoted into **Quick** mode (`05be416`), which is the owner's own curated core set — the strongest available demand signal. Ordering by demand rather than by implementation convenience means the first adapter is also the first one anyone uses.
+
+### D5 — Cline and `--allow-scripts` under npm 12+
+
+**Decision**: Include `cline` in the `--allow-scripts` list, mirroring upstream, without waiting for P4 to confirm it is required.
+
+**Why**: Upstream applies `--allow-scripts` to the whole package list rather than per package, so mirroring is also the smaller diff. The asymmetry decides it: including it when unnecessary costs nothing, while omitting it when necessary produces a package that installs "successfully" with a non-functional shim — a failure mode that surfaces only when a user tries to run the tool. P4 remains worth answering, but as documentation rather than as a gate.
+
+## Probe Items
+
+These are facts to be captured, not decisions to be made. They gate execution adapters only; the install/check tier proceeds without them. See PLAN-034 Phase 1.
+
+- [ ] **P1** — Does Devin CLI execute locally or orchestrate remote sessions? Resolves its ADR-023 classification. Default until answered: registered as a CLI family, install/check tier only, per ADR-033 §8.
+- [ ] **P2** — Does any of the four expose a machine-readable output mode (`--output-format`, `--json`, `--print`)? Feeds D4.
+- [ ] **P3** — Does any of the four write scannable session storage?
+- [ ] **P4** — Does Cline's CLI actually require `--allow-scripts` under npm 12+? Documentation only; D5 already applies it.
+- [ ] **P5** — Exact `--version` and `--help` output shapes for the check path.
 
 ## Related
 
