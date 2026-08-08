@@ -39,6 +39,11 @@ ACP agent target — `config/providers.yaml.example` carries a working block. Th
 handshake is verified against 3000.3.27: protocol version 1, `loadSession`
 support, and four session modes (Code, Ask, Plan, Bypass Permissions).
 
+The runtime pins Devin's session mode to match its own permission mode, because
+Devin's default (`accept-edits`) writes files without asking: `skip` runs as
+`bypass`, `default` runs as `ask`, and `whitelist` is refused — no Devin mode can
+both permit and constrain an edit tool.
+
 ## Quick Start (npx)
 
 ```bash

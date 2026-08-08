@@ -195,10 +195,46 @@ is not at fault. The guard now accepts both, `AcpJsonRpcRequest.id` widened to
 
 This bug was latent for every ACP provider that uses string ids, not just Devin.
 
+### Session modes — a safety gap in the default configuration
+
+Three turns were driven with the prompt "Create a file named written-by-devin.txt", with the
+probe client **rejecting** every `session/request_permission` it received:
+
+- `accept-edits` (Devin's default) — **file written**. Devin issued
+  `fs/write_text_file` to the client with **no permission request for the write at all**.
+  Two permission requests did arrive, but for later, unrelated tool calls.
+- `ask` — no write attempted, no permission request. Ask means "answer without code
+  changes", not "prompt before acting".
+- `bypass` — file written, no permission request.
+
+The first line is the problem. The runtime's permission enforcement is request-driven: it
+decides when `session/request_permission` arrives. In `accept-edits` that request never
+arrives for edits, so a runtime turn in the conservative `default` mode would have edited
+the workspace un-gated — and since the adapter never called `session/set_mode`, every Devin
+session ran in `accept-edits`.
+
+`session/set_mode` works (`{sessionId, modeId}` → `{}`), so the fix is to pin the mode at
+bootstrap. The mapping now applied:
+
+- runtime `skip` → `bypass`
+- runtime `default` → `ask`
+- runtime `whitelist` → **refused**
+
+`whitelist` is refused rather than approximated because no Devin mode can both permit and
+constrain an edit tool: `accept-edits` lets edits through un-gated, and `ask` blocks them
+outright. Downgrading to either would present as a working allowlist while enforcing
+something else — the same reasoning applied to Cline's global `--auto-approve`.
+
+The mapping is declared on the ACP profile (`sessionModes`), not hardcoded in the adapter,
+so agents that route every tool through `session/request_permission` keep their existing
+behavior and need no mapping. If `session/set_mode` fails, the turn fails: a mode that
+cannot be pinned must not silently fall back to a more permissive one.
+
 ## Not probed
 
-- Mapping the four ACP session modes onto the runtime's `skip` / `default` / `whitelist`.
-- `session/request_permission`, which neither probe turn triggered.
+- `session/request_permission` option semantics beyond `allow_once` / `allow_always` /
+  `reject_once`; the runtime's existing option-kind selection was not re-verified per mode.
+- Whether `plan` mode is worth exposing as a distinct runtime concept.
 - Cancellation over ACP (`session/cancel`).
 - `session/load` despite `loadSession: true` being advertised.
 - `--agent-type` (`summarizer`, `review`) as ACP server variants.

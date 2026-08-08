@@ -189,6 +189,24 @@ describe('resolveAcpProviderProfile', () => {
     expect(profile?.probe.helpArgs).toEqual(['acp', '--help']);
   });
 
+  it('pins Devin session modes so a conservative turn cannot edit un-gated', () => {
+    // Live probe (Devin 3000.3.27): in the default accept-edits mode Devin calls
+    // fs/write_text_file with no session/request_permission at all, so leaving
+    // the mode unset would let a runtime `default` turn edit the workspace.
+    const profile = resolveAcpProviderProfile(createInstance('devin', ['acp']));
+
+    expect(profile?.sessionModes).toEqual({
+      skip: 'bypass',
+      default: 'ask',
+      whitelist: null,
+    });
+  });
+
+  it('leaves agents without a declared mapping governed by permission requests', () => {
+    expect(resolveAcpProviderProfile(createInstance('codex-acp', ['serve']))?.sessionModes)
+      .toBeUndefined();
+  });
+
   it('resolves Antigravity provider-managed ACP without treating raw agy stdio as ACP', () => {
     expect(resolveAcpProviderProfile({
       ...createInstance('', []),

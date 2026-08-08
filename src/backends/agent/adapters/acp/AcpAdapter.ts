@@ -24,7 +24,11 @@ import {
   type AcpJsonRpcNotification,
   type AcpJsonRpcRequest,
 } from './AcpStdioClient.js';
-import { buildAcpHelpProbeArgs, resolveAcpProviderProfile } from './profiles.js';
+import {
+  buildAcpHelpProbeArgs,
+  resolveAcpProviderProfile,
+  type AcpProviderProfile,
+} from './profiles.js';
 
 const DEFAULT_ACP_PROTOCOL_VERSION = 1;
 const DEFAULT_ACP_STDIN_PROBE_TIMEOUT_MS = 5_000;
@@ -534,6 +538,43 @@ async function runTransientBootstrap(
   } finally {
     await client.close();
   }
+}
+
+/**
+ * Some ACP agents default to a session mode that acts on the workspace without
+ * ever issuing `session/request_permission`, which would let a conservative
+ * runtime turn edit files un-gated. When a profile declares a mapping, the
+ * adapter pins the agent's session mode to match the runtime permission mode.
+ *
+ * Returns the mode id to set, or undefined when the profile declares no mapping
+ * (the agent is governed entirely by permission requests) or the mapping has no
+ * entry for this runtime mode.
+ */
+export function resolveAcpSessionModeId(
+  profile: AcpProviderProfile | undefined,
+  permissionMode: PermissionMode | undefined,
+  providerName: string,
+): string | undefined {
+  const mapping = profile?.sessionModes;
+  if (!mapping) {
+    return undefined;
+  }
+
+  const mode: PermissionMode = permissionMode ?? 'default';
+  if (!(mode in mapping)) {
+    return undefined;
+  }
+
+  const target = mapping[mode];
+  if (target === null) {
+    throw new Error(
+      `${providerName} cannot enforce the '${mode}' permission mode over ACP: `
+      + `${profile?.label ?? 'this agent'} exposes no session mode that represents it. `
+      + 'Use a permission mode the agent supports.',
+    );
+  }
+
+  return target ?? undefined;
 }
 
 function selectPermissionOption(
@@ -1984,6 +2025,18 @@ export class AcpAdapter implements AgentAdapter {
         if (!providerSessionId) {
           throw new Error('ACP session bootstrap returned no session id.');
         }
+      }
+
+      const sessionModeId = resolveAcpSessionModeId(
+        resolveAcpProviderProfile(input.instance),
+        input.acpHost?.context.permissionMode,
+        input.providerName,
+      );
+      if (sessionModeId) {
+        await client.request('session/set_mode', {
+          sessionId: providerSessionId,
+          modeId: sessionModeId,
+        }, { timeoutMs: bootstrapTimeoutMs });
       }
 
       push({

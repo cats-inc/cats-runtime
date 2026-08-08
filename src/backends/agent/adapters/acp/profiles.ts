@@ -1,6 +1,23 @@
 import { basename, win32 } from 'node:path';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
 
+/**
+ * Maps runtime permission modes onto an agent's own ACP session modes.
+ *
+ * Only declare this for agents whose default session mode is more permissive
+ * than the runtime's `default`. Agents that route every tool through
+ * `session/request_permission` need no mapping, because the runtime's
+ * request-time decision already governs them.
+ *
+ * `null` marks a runtime mode the agent cannot represent, and makes the adapter
+ * refuse rather than silently run under a weaker mode.
+ */
+export interface AcpSessionModeMapping {
+  skip?: string | null;
+  default?: string | null;
+  whitelist?: string | null;
+}
+
 export interface AcpProviderProfile {
   id: string;
   label: string;
@@ -8,6 +25,7 @@ export interface AcpProviderProfile {
   tier: 1 | 2;
   summary: string;
   clientCapabilityMeta?: Record<string, unknown>;
+  sessionModes?: AcpSessionModeMapping;
   probe: {
     helpArgs: string[];
   };
@@ -155,6 +173,23 @@ const DEVIN_ACP_PROFILE: AcpProviderProfile = {
   tier: 1,
   summary: 'Tier 1 Devin ACP target served by the devin acp stdio subcommand, verified against '
     + 'Devin 3000.3.27 (protocolVersion 1, loadSession, four session modes).',
+  // Devin defaults to `accept-edits`, which performs fs/write_text_file without
+  // ever issuing session/request_permission. Leaving the mode unset would let a
+  // runtime `default` turn edit the workspace un-gated, so the mode is pinned.
+  //
+  // Live probe (Devin 3000.3.27, "create a file" prompt, permission requests
+  // rejected by the client):
+  //   accept-edits -> file written, no permission request for the write
+  //   ask          -> no write attempted, no permission request
+  //   bypass       -> file written, no permission request
+  sessionModes: {
+    skip: 'bypass',
+    default: 'ask',
+    // No Devin mode enforces a per-tool allowlist: `accept-edits` lets edits
+    // through un-gated and `ask` blocks them outright, so an allowlist could
+    // never both permit and constrain an edit tool.
+    whitelist: null,
+  },
   probe: {
     // Devin serves ACP from a subcommand, so its help lives behind `acp`.
     helpArgs: ['acp', '--help'],
