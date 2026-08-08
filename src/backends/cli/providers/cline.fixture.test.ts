@@ -102,8 +102,50 @@ describe('Cline 3.0.51 authenticated stream fixtures', () => {
   });
 
   it('drops metadata lines instead of leaking them as raw events', () => {
-    const events = normalize('tool-use.success.redacted.ndjson');
+    for (const fixture of [
+      'text.success.redacted.ndjson',
+      'tool-use.success.redacted.ndjson',
+      'tool-denied.aborted.redacted.ndjson',
+    ]) {
+      expect(normalize(fixture).filter((event) => event.type === 'raw')).toHaveLength(0);
+    }
+  });
 
-    expect(events.filter((event) => event.type === 'raw')).toHaveLength(0);
+  it('marks a denied tool call as an error even though output is an object', () => {
+    // On failure `output` is `{ error }` rather than the success-path array. A
+    // parser that only inspects arrays reports every failed tool as successful.
+    const raw = readFixtureLines('tool-denied.aborted.redacted.ndjson').map((l) => JSON.parse(l));
+    const denied = raw.find((line) => line.event?.type === 'content_end'
+      && line.event?.contentType === 'tool');
+    expect(Array.isArray(denied.event.output)).toBe(false);
+
+    const results = normalize('tool-denied.aborted.redacted.ndjson')
+      .filter((event) => event.type === 'tool_result');
+    expect(results.length).toBeGreaterThan(0);
+    for (const result of results) {
+      expect(result.isError).toBe(true);
+      expect(result.text).toContain('Tool approval requires an interactive session');
+    }
+  });
+
+  it('streams the reasoning channel as reasoning progress', () => {
+    const events = normalize('tool-denied.aborted.redacted.ndjson');
+    const reasoning = events.filter((event) => event.type === 'progress'
+      && event.metadata?.kind === 'reasoning');
+
+    expect(reasoning.length).toBeGreaterThan(0);
+    expect(reasoning.map((event) => event.text).join('')).toContain('tools are blocked');
+    // Reasoning must not leak into the assistant text channel.
+    expect(events.filter((event) => event.type === 'text').map((event) => event.text).join(''))
+      .not.toContain('tools are blocked');
+  });
+
+  it('surfaces run_aborted as an error carrying the abort reason', () => {
+    const aborted = normalize('tool-denied.aborted.redacted.ndjson')
+      .filter((event) => event.type === 'error');
+
+    expect(aborted).toHaveLength(1);
+    expect(aborted[0].text).toContain('aborted by another client');
+    expect(aborted[0].text).toContain('external_abort');
   });
 });

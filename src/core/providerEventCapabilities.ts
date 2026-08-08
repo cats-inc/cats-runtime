@@ -259,7 +259,7 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       toolUse: 'native',
       toolResult: 'native',
       progress: 'derived',
-      reasoning: 'none',
+      reasoning: 'native',
     },
     transcript: {
       contentBlocks: 'none',
@@ -268,11 +268,11 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       recommended: 'content_blocks',
     },
     notes: [
-      'Cline 3.0.51 --json streams incremental text deltas on content_start.',
+      'Cline 3.0.51 --json streams incremental text and reasoning deltas on content_start.',
       'Tool calls and results are native; runtime progress is derived from them.',
       'The stream repeats final text three more times (content_end, done, run_result); only the deltas are emitted.',
       'Per-iteration usage events are cumulative, so usage is taken from run_result.aggregateUsage alone.',
-      'No reasoning channel was observed, and the stream carries no resumable session id.',
+      'The stream carries no resumable session id.',
     ],
   },
   auggie: {

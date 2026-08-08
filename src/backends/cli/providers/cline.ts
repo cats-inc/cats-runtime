@@ -43,10 +43,13 @@ interface ClineAgentEvent {
   type?: unknown;
   contentType?: unknown;
   text?: unknown;
+  reasoning?: unknown;
+  redacted?: unknown;
   toolCallId?: unknown;
   toolName?: unknown;
   input?: unknown;
   output?: unknown;
+  error?: unknown;
   iteration?: unknown;
 }
 
@@ -56,6 +59,7 @@ interface ClineStreamLine {
   hookEventName?: unknown;
   event?: ClineAgentEvent;
   message?: unknown;
+  reason?: unknown;
   finishReason?: unknown;
   usage?: ClineUsage;
   aggregateUsage?: ClineUsage;
@@ -116,6 +120,17 @@ export class ClineProvider implements Provider {
         }, null);
       case 'run_result':
         return this.parseRunResult(parsed);
+      case 'run_aborted':
+        // Emitted after run_result when a turn ends abnormally, e.g. every tool
+        // call being denied under --auto-approve false.
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: 'run_aborted',
+          rawSample: parsed,
+        }, {
+          type: 'error',
+          text: buildAbortMessage(parsed),
+          raw: parsed,
+        } satisfies ErrorStreamEvent);
       case 'error':
         return observeNormalized(this.evolutionObserver, {
           rawEventType: 'error',
@@ -152,23 +167,28 @@ export class ClineProvider implements Provider {
 
     switch (event.type) {
       case 'content_start':
-        // Despite the name, this is the delta itself for text and the call for
-        // tools; several arrive per block.
-        return event.contentType === 'tool'
-          ? this.parseToolCall(event)
-          : this.parseTextDelta(event);
+        // Despite the name, this is the delta itself for text and reasoning,
+        // and the call for tools; several arrive per block.
+        if (event.contentType === 'tool') {
+          return this.parseToolCall(event);
+        }
+        if (event.contentType === 'reasoning') {
+          return this.parseReasoningDelta(event);
+        }
+        return this.parseTextDelta(event);
 
       case 'content_end':
-        // For text this repeats the whole block the deltas already streamed, so
-        // emitting it would duplicate the message. Only the tool form carries
-        // new information.
-        return event.contentType === 'tool'
-          ? this.parseToolResult(event)
-          : observeIgnored(this.evolutionObserver, {
-            rawEventType: 'content_end:text',
-            reason: 'duplicate_of_streamed_text',
-            rawSample: event,
-          }, null);
+        // For text and reasoning this repeats the whole block the deltas
+        // already streamed, so emitting it would duplicate the message. Only
+        // the tool form carries new information.
+        if (event.contentType === 'tool') {
+          return this.parseToolResult(event);
+        }
+        return observeIgnored(this.evolutionObserver, {
+          rawEventType: `content_end:${String(event.contentType ?? 'text')}`,
+          reason: 'duplicate_of_streamed_content',
+          rawSample: event,
+        }, null);
 
       case 'usage':
         // Cumulative, not incremental: every event carries both per-call and
@@ -225,6 +245,27 @@ export class ClineProvider implements Provider {
     } satisfies TextStreamEvent);
   }
 
+  private parseReasoningDelta(event: ClineAgentEvent): StreamEvent | null {
+    const reasoning = typeof event.reasoning === 'string' ? event.reasoning : '';
+    if (!reasoning) return null;
+
+    return observeNormalized(this.evolutionObserver, {
+      rawEventType: 'content_start:reasoning',
+      rawSample: event,
+    }, createRuntimeProgressEvent({
+      text: reasoning,
+      provider: 'cline',
+      backend: 'cli',
+      kind: 'reasoning',
+      status: 'running',
+      source: 'provider',
+      native: {
+        sourceEvent: 'content_start',
+        ...(event.redacted === true ? { redacted: true } : {}),
+      },
+    }));
+  }
+
   private parseToolCall(event: ClineAgentEvent): StreamEvent[] {
     const toolName = typeof event.toolName === 'string' ? event.toolName : 'unknown';
     const toolId = typeof event.toolCallId === 'string' ? event.toolCallId : undefined;
@@ -260,7 +301,7 @@ export class ClineProvider implements Provider {
   private parseToolResult(event: ClineAgentEvent): StreamEvent[] {
     const toolName = typeof event.toolName === 'string' ? event.toolName : 'unknown';
     const toolId = typeof event.toolCallId === 'string' ? event.toolCallId : undefined;
-    const { text, isError } = summarizeToolOutput(event.output);
+    const { text, isError } = summarizeToolOutput(event.output, event.error);
 
     return observeNormalized(this.evolutionObserver, {
       rawEventType: 'content_end:tool',
@@ -309,13 +350,31 @@ export class ClineProvider implements Provider {
   }
 }
 
-function summarizeToolOutput(output: unknown): { text?: string; isError: boolean } {
+function summarizeToolOutput(
+  output: unknown,
+  error: unknown,
+): { text?: string; isError: boolean } {
+  // `output` is an array of per-query results on success, but an object shaped
+  // `{ error }` when the call fails — a denied tool under --auto-approve false
+  // produces the latter. Treating a non-array as "no error" would report every
+  // failed tool as successful.
+  const outputRecord = asRecord(output);
+  if (outputRecord) {
+    const message = typeof outputRecord.error === 'string' && outputRecord.error
+      ? outputRecord.error
+      : typeof error === 'string' && error
+        ? error
+        : undefined;
+    return { ...(message ? { text: message } : {}), isError: true };
+  }
+
   if (!Array.isArray(output)) {
-    return { isError: false };
+    const message = typeof error === 'string' && error ? error : undefined;
+    return message ? { text: message, isError: true } : { isError: false };
   }
 
   const parts: string[] = [];
-  let isError = false;
+  let isError = typeof error === 'string' && error.length > 0;
   for (const entry of output) {
     const record = asRecord(entry) as ClineToolOutputEntry | null;
     if (!record) continue;
@@ -331,6 +390,13 @@ function summarizeToolOutput(output: unknown): { text?: string; isError: boolean
     ...(parts.length > 0 ? { text: parts.join('\n') } : {}),
     isError,
   };
+}
+
+function buildAbortMessage(line: ClineStreamLine): string {
+  const reason = typeof line.reason === 'string' ? line.reason : undefined;
+  const message = typeof line.message === 'string' ? line.message : undefined;
+  const detail = [message, reason ? `(${reason})` : undefined].filter(Boolean).join(' ');
+  return detail ? `Cline run aborted: ${detail}` : 'Cline run aborted.';
 }
 
 function normalizeClineUsage(usage: ClineUsage) {

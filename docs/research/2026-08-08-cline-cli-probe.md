@@ -140,6 +140,8 @@ host's absolute workspace path with `/workspace`:
 - `text.success.redacted.ndjson` — 10 lines, text-only turn.
 - `tool-use.success.redacted.ndjson` — 17 lines, one `read_files` round trip then a text answer.
 - `resume-rejected.error.redacted.ndjson` — 1 line, the `--id` + `--json` rejection above.
+- `tool-denied.aborted.redacted.ndjson` — 40 lines, `--auto-approve false` denying three
+  tool calls, including the reasoning channel and the terminal `run_aborted`.
 
 `src/backends/cli/providers/cline.fixture.test.ts` pins the parser against these. The tests
 assert the traps directly rather than only the happy path: that the three redundant copies
@@ -152,12 +154,49 @@ with `cacheReadTokens` 7806 and `cacheWriteTokens` 0 yields 8100 fresh prompt to
 matches iteration 1's 7808 plus iteration 2's 292. Cline's `inputTokens` therefore already
 includes cache reads, and the runtime derives `promptInputTokens` by subtraction.
 
+## Permission behavior — `--auto-approve false` denies, it does not ask
+
+`--auto-approve` defaults to `true`. Setting it to `false` under `--json` does **not** hang
+waiting for a TTY, which was the risk worth checking. Every tool call is refused with:
+
+```
+Tool approval requires an interactive session, but this session is non-interactive.
+```
+
+The agent then retries other tools, burned four iterations and ~$0.06 in the captured run,
+and finally ends with `done.reason` and `run_result.finishReason` both `aborted`, followed
+by a `run_aborted` line. The process still exits `0`, and `cline history` records the
+session as `cancelled` with `exitCode: 0` — so exit status alone cannot be used to judge
+success.
+
+Cline 3.0.51 exposes no per-tool allowlist flag, so there is no way to express the runtime's
+`whitelist` permission mode. The only two reachable states are approve-everything and
+deny-everything.
+
+Three further contract details surfaced only on this denied run, each of which the
+success-path fixtures would have hidden:
+
+- **A `reasoning` content channel exists.** `content_start` / `content_end` carry
+  `contentType: "reasoning"` with the payload in a `reasoning` field (not `text`) plus a
+  `redacted` boolean. The earlier capability note claiming no reasoning channel was wrong.
+- **Failed tool `output` is an object, not an array.** Success yields
+  `[{ query, result, success }]`; failure yields `{ error }`, with a sibling `error` field
+  holding the JSON-encoded same. A parser that inspects only arrays reports every failed
+  tool as successful.
+- **`run_aborted`** is a top-level line: `{ reason: "external_abort", message: "aborted by
+  another client" }`, emitted after `run_result`.
+
+## Working directory
+
+`-c/--cwd` is recorded verbatim rather than resolved: passing a relative `cline-probe`
+stored `cwd: "cline-probe"` in the session history. The runtime always passes an absolute
+path, so this is a note rather than a problem.
+
 ## Not probed
 
 - `--acp` (Agent Client Protocol mode). Cline advertises it; no ACP profile is added here.
   This is the most promising follow-up, since ADR-031 already houses an ACP adapter family.
 - Cancellation / SIGTERM behavior mid-run.
-- `--auto-approve false` interactive approval flow (needs a TTY).
 - Plan mode (`-p/--plan`) stream differences.
 - `--zen` background hub, `--worktree`, subagent (`parentAgentId`) streams.
 - Authentication failure output, so `auth.errorPatterns` uses the generic set.
