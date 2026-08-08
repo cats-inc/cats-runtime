@@ -21,6 +21,7 @@ import { AntigravityProvider } from '../providers/antigravity.js';
 import { GrokProvider } from '../providers/grok.js';
 import { ClineProvider } from '../providers/cline.js';
 import { DevinProvider } from '../providers/devin.js';
+import { AiderProvider } from '../providers/aider.js';
 import { ClaudeProvider } from '../providers/claude.js';
 import { CodexProvider } from '../providers/codex.js';
 import { CopilotProvider } from '../providers/copilot.js';
@@ -123,6 +124,11 @@ export class WorkerPool {
       case 'devin':
         return {
           provider: new DevinProvider(),
+          commandConfig: instance.commandConfig,
+        };
+      case 'aider':
+        return {
+          provider: new AiderProvider(),
           commandConfig: instance.commandConfig,
         };
       case 'claude':

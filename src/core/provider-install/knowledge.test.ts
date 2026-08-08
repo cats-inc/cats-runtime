@@ -122,6 +122,45 @@ describe('buildProviderInstallCatalogView', () => {
       .toMatchObject({ expectedPath: '~/.local/bin/devin' });
   });
 
+  it.each([
+    ['win32', 'windows', 'irm https://aider.chat/install.ps1 | iex', '~/.local/bin/aider.exe'],
+    ['darwin', 'macos', 'curl -LsSf https://aider.chat/install.sh | sh', '~/.local/bin/aider'],
+    ['linux', 'linux', 'curl -LsSf https://aider.chat/install.sh | sh', '~/.local/bin/aider'],
+  ] as const)('describes the Aider installer on %s', (
+    hostPlatform,
+    executionPlatform,
+    command,
+    expectedPath,
+  ) => {
+    const view = buildProviderInstallCatalogView('aider', { mode: 'native' }, hostPlatform);
+
+    expect(view).toMatchObject({
+      familyLabel: 'Aider',
+      installPack: 'native-cli',
+      executionPlatform,
+      binaryName: 'aider',
+      install: { installerId: 'aider', method: 'native_installer', command },
+      path: { expectedPath },
+    });
+    // Deleting the shim leaves aider-chat installed in the uv tool environment.
+    expect(view.install.notes?.some((note) => note.includes('uv tool uninstall aider-chat')))
+      .toBe(true);
+  });
+
+  it('models Aider auth as multi-source rather than env-var-only', () => {
+    // Aider reads credentials from env vars, .env, .aider.conf.yml, and an
+    // OpenRouter OAuth store it writes to ~/.aider/oauth-keys.env. A probe host
+    // with no model env vars set still reached the model, so env presence alone
+    // cannot decide readiness.
+    const view = buildProviderInstallCatalogView('aider', { mode: 'native' }, 'linux');
+
+    expect(view.auth.envVars).toContain('ANTHROPIC_API_KEY');
+    expect(view.auth.envVars).toContain('OPENROUTER_API_KEY');
+    expect(view.auth.interactive).toBe(true);
+    expect(view.auth.hint).toContain('oauth-keys.env');
+    expect(view.auth.hint).toContain('do not prove readiness');
+  });
+
   it('installs Pi from the renamed npm package', () => {
     // The abandoned @mariozechner/pi-coding-agent still resolves on npm and reports
     // itself as up to date, so pointing at it silently disables every Pi upgrade.

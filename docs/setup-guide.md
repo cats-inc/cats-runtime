@@ -7,7 +7,7 @@
 - Node.js 22+
 - Installed local CLIs for the providers you want to use (`claude`, `codex`,
   `agy` for Antigravity, `cursor-agent`, `kiro-cli`, `grok`, `cline`, `devin`,
-  `kilo`, `opencode`, etc.)
+  `aider`, `kilo`, `opencode`, etc.)
 
 Grok CLI installs with `irm https://x.ai/cli/install.ps1 | iex` on Windows or
 `curl -fsSL https://x.ai/cli/install.sh | bash` on macOS/Linux. Its binary is
@@ -38,6 +38,18 @@ backend rather than the CLI backend. To run Devin sessions, configure it as an
 ACP agent target — `config/providers.yaml.example` carries a working block. The
 handshake is verified against 3000.3.27: protocol version 1, `loadSession`
 support, and four session modes (Code, Ask, Plan, Bypass Permissions).
+
+Aider installs with `irm https://aider.chat/install.ps1 | iex` on Windows or
+`curl -LsSf https://aider.chat/install.sh | sh` on macOS/Linux, into
+`~/.local/bin`. Cats detects and installs Aider but cannot run sessions through
+it: version 0.86.2 has no machine-readable output, no ACP or server mode, exits
+0 even when the model call fails, and runs `git init` in whatever directory it
+is pointed at. Aider also reads credentials from several places — environment,
+`.env`, `.aider.conf.yml`, and its own `~/.aider/oauth-keys.env` written by a
+first-run OpenRouter sign-in — so Cats reports the credential names it can see
+as evidence rather than claiming Aider is ready or unready. Uninstall with
+`uv tool uninstall aider-chat`; deleting `~/.local/bin/aider` only removes the
+shim.
 
 The runtime pins Devin's session mode to match its own permission mode, because
 Devin's default (`accept-edits`) writes files without asking: `skip` runs as

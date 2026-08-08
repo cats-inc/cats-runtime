@@ -276,6 +276,27 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       'Execution is pinned to the exact fixture-backed 3.0.51 compatibility profile.',
     ],
   },
+  aider: {
+    normalizedStream: {
+      text: { mode: 'none', stepwise: false },
+      toolUse: 'none',
+      toolResult: 'none',
+      progress: 'none',
+      reasoning: 'none',
+    },
+    transcript: {
+      contentBlocks: 'none',
+    },
+    presentation: {
+      recommended: 'unknown',
+    },
+    notes: [
+      'Aider 0.86.2 has no machine-readable output, ACP, or server mode.',
+      'It prints human-formatted prose and rounded usage text ("Tokens: 2.3k sent").',
+      'It exits 0 even when the model call fails, so success cannot be detected.',
+      'Install and detection only; the runtime cannot execute Aider turns.',
+    ],
+  },
   devin: {
     normalizedStream: {
       text: { mode: 'final', stepwise: false },

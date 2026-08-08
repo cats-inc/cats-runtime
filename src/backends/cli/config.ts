@@ -176,6 +176,7 @@ export interface CliRuntimeConfig {
   grokPath: string;
   clinePath: string;
   devinPath: string;
+  aiderPath: string;
   copilotPath: string;
   cursorPath: string;
   kiroPath: string;
@@ -436,6 +437,7 @@ export function loadConfig(
     grokPath: configured.providerCommands.grok.path,
     clinePath: configured.providerCommands.cline.path,
     devinPath: configured.providerCommands.devin.path,
+    aiderPath: configured.providerCommands.aider.path,
     copilotPath: configured.providerCommands.copilot.path,
     cursorPath: configured.providerCommands.cursor.path,
     kiroPath: configured.providerCommands.kiro.path,
@@ -657,6 +659,7 @@ function buildLegacyRuntimeShape(
     grok: 'native',
     cline: 'native',
     devin: 'native',
+    aider: 'native',
   } satisfies Record<ProviderName, string>;
   const providerDefaultTargets = Object.fromEntries(
     Object.entries(providerDefaultInstances).map(([provider, instance]) => [provider, {
@@ -742,6 +745,13 @@ function buildLegacyRuntimeShape(
         id: 'native',
         providerName: 'devin',
         commandConfig: providerCommands.devin,
+      },
+    },
+    aider: {
+      native: {
+        id: 'native',
+        providerName: 'aider',
+        commandConfig: providerCommands.aider,
       },
     },
     copilot: {
@@ -850,6 +860,7 @@ function buildLegacyProviderCommands(
   const grokPath = env.GROK_PATH || 'grok';
   const clinePath = env.CLINE_PATH || 'cline';
   const devinPath = env.DEVIN_PATH || 'devin';
+  const aiderPath = env.AIDER_PATH || 'aider';
   const copilotPath = env.COPILOT_PATH || 'copilot';
   const cursorPath = env.CURSOR_PATH || 'cursor-agent';
   const kiroPath = env.KIRO_PATH || 'kiro-cli';
@@ -900,6 +911,12 @@ function buildLegacyProviderCommands(
       'DEVIN',
       devinPath,
       defaultProviderRuntimeMode('devin'),
+      env,
+    ),
+    aider: readProviderCommandConfig(
+      'AIDER',
+      aiderPath,
+      defaultProviderRuntimeMode('aider'),
       env,
     ),
     copilot: readProviderCommandConfig(
@@ -1619,6 +1636,7 @@ function cloneProviderCommands(
     grok: cloneProviderCommandConfig(commands.grok),
     cline: cloneProviderCommandConfig(commands.cline),
     devin: cloneProviderCommandConfig(commands.devin),
+    aider: cloneProviderCommandConfig(commands.aider),
     copilot: cloneProviderCommandConfig(commands.copilot),
     cursor: cloneProviderCommandConfig(commands.cursor),
     kiro: cloneProviderCommandConfig(commands.kiro),
@@ -1641,6 +1659,7 @@ function cloneProviderInstances(
     grok: cloneInstanceMap(instances.grok),
     cline: cloneInstanceMap(instances.cline),
     devin: cloneInstanceMap(instances.devin),
+    aider: cloneInstanceMap(instances.aider),
     copilot: cloneInstanceMap(instances.copilot),
     cursor: cloneInstanceMap(instances.cursor),
     kiro: cloneInstanceMap(instances.kiro),

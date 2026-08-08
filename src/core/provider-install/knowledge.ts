@@ -631,6 +631,59 @@ const INSTALL_KNOWLEDGE: Record<ProviderName, ProviderInstallKnowledge> = {
     '@earendil-works/pi-coding-agent',
     'Complete the Pi Coding Agent CLI authentication flow after install.',
   ),
+  aider: {
+    provider: 'aider',
+    familyLabel: 'Aider',
+    installPack: 'native-cli',
+    binaryName: 'aider',
+    defaultDocsUrl: 'https://aider.chat/docs/llms.html',
+    check: {
+      versionArgs: ['--version'],
+      helpArgs: ['--help'],
+      prerequisites: createNativeInstallerPrerequisites('Aider'),
+      expectedPaths: {
+        windows: '~/.local/bin/aider.exe',
+        macos: '~/.local/bin/aider',
+        linux: '~/.local/bin/aider',
+      },
+      pathHints: createLocalBinPathHints('aider'),
+    },
+    auth: {
+      requiredAfterInstall: true,
+      // Aider is BYO-model: it routes to whichever provider it finds a
+      // credential for, so no single variable is authoritative.
+      envVars: [
+        'ANTHROPIC_API_KEY',
+        'OPENAI_API_KEY',
+        'GEMINI_API_KEY',
+        'DEEPSEEK_API_KEY',
+        'OPENROUTER_API_KEY',
+      ],
+      // Aider has no `login` subcommand, but running it without a credential
+      // starts an OpenRouter browser sign-in and persists the result to
+      // ~/.aider/oauth-keys.env. That flow is undocumented in --help and was
+      // only found by probing; see docs/research/2026-08-09-aider-cli-probe.md.
+      interactive: true,
+      docsUrl: 'https://aider.chat/docs/llms.html',
+      hint: 'Set a model API key, or complete the OpenRouter sign-in Aider offers on first run '
+        + '(stored in ~/.aider/oauth-keys.env). Aider also reads .env and .aider.conf.yml, so '
+        + 'environment variables alone do not prove readiness.',
+      errorPatterns: [...GENERIC_AUTH_ERROR_PATTERNS, 'no api key', 'litellm.authenticationerror'],
+    },
+    platforms: createNativeInstall(
+      'aider',
+      'irm https://aider.chat/install.ps1 | iex',
+      'curl -LsSf https://aider.chat/install.sh | sh',
+      {
+        docsUrl: 'https://aider.chat/docs/llms.html',
+        notes: [
+          'The official installer is the uv installer plus uv tool install --force --python python3.12 --with pip aider-chat@latest.',
+          'It also installs its own uv into ~/.local/bin, which may shadow a newer uv depending on PATH order.',
+          'Uninstall with uv tool uninstall aider-chat; deleting ~/.local/bin/aider only removes the shim.',
+        ],
+      },
+    ),
+  },
   devin: {
     provider: 'devin',
     familyLabel: 'Devin CLI',

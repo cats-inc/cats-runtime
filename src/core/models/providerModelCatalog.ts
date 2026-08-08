@@ -218,6 +218,9 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
   // execute Devin through the CLI backend, so no ids are bundled until the ACP
   // path lands and can prove which of them are selectable from it.
   devin: [],
+  // Aider is BYO-model and routes through litellm to whatever provider the
+  // user configured, so there is no runtime-owned catalog to bundle.
+  aider: [],
   copilot: [
     { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
     { id: 'claude-opus-4.6', label: 'claude-opus-4.6' },

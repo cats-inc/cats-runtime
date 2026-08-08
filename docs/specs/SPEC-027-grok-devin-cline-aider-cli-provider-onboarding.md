@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress — Grok 1.0.0 and Cline 3.0.51 execution complete; Devin install-tier complete with CLI execution refused on evidence; Aider pending User approval |
+| **Status** | In Progress — Grok 1.0.0 and Cline 3.0.51 execute via CLI; Devin executes via the verified devin-acp agent profile; Aider is install-tier only, execution refused on settled evidence |
 | **Owner** | User |
 | **Reviewer** | User |
 
@@ -87,7 +87,8 @@ Separately, `provider-install/knowledge.ts` installs Pi from `@mariozechner/pi-c
    - `familyLabel` "Aider", `installPack` `native-cli`, `binaryName` `aider`, `defaultDocsUrl` `https://aider.chat/docs/llms.html`.
    - Windows command `irm https://aider.chat/install.ps1 | iex`; Unix command `curl -LsSf https://aider.chat/install.sh | sh`.
    - Expected paths: `~/.local/bin/aider.exe` (Windows), `~/.local/bin/aider` (macOS, Linux), reusing `createLocalBinPathHints('aider')`.
-   - Auth: **`interactive: false`**, `requiredAfterInstall: true`, `envVars: ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY', 'OPENROUTER_API_KEY']`, hint stating that Aider has no single login and may read credentials from environment, `.env`, `.aider.conf.yml`, or command-line options; local models may need no API key.
+   - Auth: **`interactive: true`**, `requiredAfterInstall: true`, `envVars: ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY', 'OPENROUTER_API_KEY']`, hint stating that Aider reads credentials from environment, `.env`, `.aider.conf.yml`, and its own `~/.aider/oauth-keys.env`, so environment variables alone do not prove readiness.
+     > **Corrected 2026-08-09 by the 0.86.2 probe.** This originally specified `interactive: false` on the assumption that Aider is purely BYO-key. It is not: running Aider without a credential starts an OpenRouter browser sign-in and persists the result to `~/.aider/oauth-keys.env`. The probe host had no model env var set anywhere yet Aider reached the model from that store. See `docs/research/2026-08-09-aider-cli-probe.md`.
    - Notes shall record that the official installer bundles its own `uv` into `~/.local/bin` and then runs `uv tool install --force --python python3.12 --with pip aider-chat@latest`, so a separately installed newer `uv` may be shadowed depending on PATH order.
 7. `cline` shall register via `createGenericNpmKnowledge('cline', 'Cline CLI', 'cline', …)` with `binaryName` `cline`, supported for packaged install on macOS and Linux. Windows install metadata shall remain unsupported until Cline officially supports Windows or a reviewed Windows install-and-execution probe is recorded.
 8. `createGenericNpmKnowledge` currently derives `binaryName` through a hardcoded `provider === 'opencode'` check. It shall be refactored to take an explicit binary name and optional supported-platform overrides so provider id, binary name, and install support are decoupled.
@@ -142,7 +143,7 @@ Separately, `provider-install/knowledge.ts` installs Pi from `@mariozechner/pi-c
 - [ ] `KNOWN_PROVIDERS` contains sixteen families and `npm run typecheck` passes with every exhaustive map filled.
 - [ ] `buildProviderInstallCatalogView` returns correct install/check/auth/path metadata for all four on windows, macos, and linux execution platforms.
 - [ ] With `grok` on PATH, `GET /setup-state` reports `grok` available; with only an unrelated `agent` binary on PATH, it does not.
-- [ ] Aider's catalog view reports `auth.interactive === false`, its configured evidence keys, and auth status `unknown` rather than `ready` or `missing`.
+- [x] Aider's catalog view reports `auth.interactive === true`, its configured evidence keys, and auth status `unknown` rather than `ready` or `missing`.
 - [ ] Aider setup summaries report only detected variable names from an injected test environment, never values; an empty detection list is not treated as missing auth.
 - [ ] Devin's catalog view carries the `devin setup` manual step.
 - [ ] Starting Grok 1.0.0 parses the authenticated native stream, tools, errors, cancellation, resume, and fork; another Grok version refuses compatibility, and Devin, Cline, and Aider retain their refusal messages.
@@ -218,7 +219,9 @@ Revisit if an xAI API backend ever lands, at which point it belongs in `.env.exa
 
 **Proposal**: Do not derive readiness from ambient key presence. Keep Aider auth `unknown` at the install/check tier and report only `detectedEnvVars` as optional, non-secret evidence.
 
-**Why**: Aider can obtain credentials from process environment, `.env`, `.aider.conf.yml`, or command-line arguments, and it can use local models without an API key. An ambient key is therefore neither necessary nor sufficient for the effective model to work. Reporting detected names is useful evidence; calling that evidence readiness or calling unobserved names missing would be false.
+**Why**: Aider can obtain credentials from process environment, `.env`, `.aider.conf.yml`, command-line arguments, and its own `~/.aider/oauth-keys.env`, and it can use local models without an API key. An ambient key is therefore neither necessary nor sufficient for the effective model to work. Reporting detected names is useful evidence; calling that evidence readiness or calling unobserved names missing would be false.
+
+**Confirmed 2026-08-09 by the 0.86.2 probe**, which found a concrete counterexample to the readiness-from-env-vars model this decision rejected: a host with no model API key set in either the shell or the Windows user environment, and no `~/.aider.conf.yml`, still reached the model — Aider read an `OPENROUTER_API_KEY` it had written to `~/.aider/oauth-keys.env` during an undocumented first-run browser sign-in. An env-only readiness check would have called that fully working host not ready. The oauth store is added to the enumerated sources above. See `docs/research/2026-08-09-aider-cli-probe.md`.
 
 ### D4 — Which CLI gets an execution adapter first
 

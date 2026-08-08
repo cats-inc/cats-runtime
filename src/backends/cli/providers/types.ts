@@ -37,6 +37,7 @@ export const KNOWN_PROVIDERS = [
   'grok',
   'cline',
   'devin',
+  'aider',
 ] as const;
 export type ProviderName = typeof KNOWN_PROVIDERS[number];
 
