@@ -82,6 +82,6 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 ---
 
-*Last updated: 2026-08-07*
+*Last updated: 2026-08-08 (ADR-033 Grok 1.0.0 execution follow-up recorded.)*
 
 *See also: [AGENTS.md](../../../AGENTS.md) for decision-making protocols*

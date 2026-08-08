@@ -1494,6 +1494,10 @@ function buildSupportedRange(
 
   const min = knowledge.primaryProfile.minVersionMajor;
   const max = knowledge.primaryProfile.maxVersionMajor;
+  const supportedVersions = knowledge.primaryProfile.supportedVersions;
+  if (supportedVersions?.length) {
+    return supportedVersions.join(', ');
+  }
   if (min !== undefined && max !== undefined) {
     return `>=${min} <=${max}`;
   }
@@ -1604,6 +1608,24 @@ function selectProfile(input: {
       summary: `No provider-specific compatibility profile is shipped for '${input.providerName}'.`,
       warnings: ['Using the runtime default provider adapter without family-specific compatibility knowledge.'],
       reason: 'no_knowledge',
+    };
+  }
+
+  if (
+    input.parsedVersion
+    && knowledge.primaryProfile.supportedVersions?.length
+    && !knowledge.primaryProfile.supportedVersions.includes(input.parsedVersion.normalized)
+  ) {
+    const profileDefinition = knowledge.fallbackProfile || knowledge.primaryProfile;
+    return {
+      classification: 'unsupported_version',
+      profile: toSelection(profileDefinition, 'weak'),
+      profileDefinition,
+      summary: `${knowledge.familyLabel} version ${input.parsedVersion.normalized} is outside the explicitly supported compatibility baseline.`,
+      warnings: [
+        `Verified versions: ${knowledge.primaryProfile.supportedVersions.join(', ')}.`,
+      ],
+      reason: 'unsupported_version',
     };
   }
 

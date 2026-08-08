@@ -1,0 +1,122 @@
+{"type":"available_commands","tools":["<REDACTED_TOOL_CATALOG>"],"commands":["<REDACTED_COMMAND_CATALOG>"]}
+{"type":"available_commands","tools":["<REDACTED_TOOL_CATALOG>"],"commands":["<REDACTED_COMMAND_CATALOG>"]}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"text","data":"Creating"}
+{"type":"text","data":" the"}
+{"type":"text","data":" probe"}
+{"type":"text","data":" file"}
+{"type":"text","data":" with"}
+{"type":"text","data":" a"}
+{"type":"text","data":" shell"}
+{"type":"text","data":" command"}
+{"type":"text","data":"."}
+{"type":"available_commands","tools":["<REDACTED_TOOL_CATALOG>"],"commands":["<REDACTED_COMMAND_CATALOG>"]}
+{"type":"usage","usage":{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"reasoning_tokens":0},"signature":"<REDACTED_SIGNATURE>"}
+{"type":"tool_call","toolCallId":"fixture-tool-call-5","title":"run_terminal_command","kind":"execute","status":"pending","toolName":"run_terminal_command","rawInput":{"command":"Set-Content -Path \"grok-all-tools-disabled-probe.txt\" -Value \"CATS_GROK_ALL_DISABLED_FILE\" -NoNewline; Get-Content \"grok-all-tools-disabled-probe.txt\"","description":"Create probe file with required content"},"content":[],"locations":[]}
+{"type":"tool_call_update","toolCallId":"fixture-tool-call-5","status":null,"content":[{"type":"content","content":{"type":"text","text":"Create probe file with required content"}}],"rawOutput":null,"locations":[]}
+{"type":"tool_call_update","toolCallId":"fixture-tool-call-5","status":"in_progress","content":[{"type":"content","content":{"type":"text","text":""}}],"rawOutput":{"type":"Bash","output":[],"output_for_prompt":"","exit_code":0,"command":"Set-Content -Path \"grok-all-tools-disabled-probe.txt\" -Value \"CATS_GROK_ALL_DISABLED_FILE\" -NoNewline; Get-Content \"grok-all-tools-disabled-probe.txt\"","truncated":false,"signal":null,"timed_out":false,"description":null,"current_dir":"<REDACTED_CWD>","output_file":"","total_bytes":0},"locations":[]}
+{"type":"tool_call_update","toolCallId":"fixture-tool-call-5","status":"in_progress","content":[{"type":"content","content":{"type":"text","text":"CATS_GROK_ALL_DISABLED_FILE"}}],"rawOutput":{"type":"Bash","output":[67,65,84,83,95,71,82,79,75,95,65,76,76,95,68,73,83,65,66,76,69,68,95,70,73,76,69],"output_for_prompt":"CATS_GROK_ALL_DISABLED_FILE","exit_code":0,"command":"Set-Content -Path \"grok-all-tools-disabled-probe.txt\" -Value \"CATS_GROK_ALL_DISABLED_FILE\" -NoNewline; Get-Content \"grok-all-tools-disabled-probe.txt\"","truncated":false,"signal":null,"timed_out":false,"description":null,"current_dir":"<REDACTED_CWD>","output_file":"","total_bytes":27},"locations":[]}
+{"type":"tool_call_update","toolCallId":"fixture-tool-call-5","status":"in_progress","content":[{"type":"content","content":{"type":"text","text":"CATS_GROK_ALL_DISABLED_FILE\r\n"}}],"rawOutput":{"type":"Bash","output":[67,65,84,83,95,71,82,79,75,95,65,76,76,95,68,73,83,65,66,76,69,68,95,70,73,76,69,13,10],"output_for_prompt":"CATS_GROK_ALL_DISABLED_FILE\n","exit_code":0,"command":"Set-Content -Path \"grok-all-tools-disabled-probe.txt\" -Value \"CATS_GROK_ALL_DISABLED_FILE\" -NoNewline; Get-Content \"grok-all-tools-disabled-probe.txt\"","truncated":false,"signal":null,"timed_out":false,"description":null,"current_dir":"<REDACTED_CWD>","output_file":"","total_bytes":29},"locations":[]}
+{"type":"tool_call_update","toolCallId":"fixture-tool-call-5","status":"completed","content":[{"type":"content","content":{"type":"text","text":"CATS_GROK_ALL_DISABLED_FILE\r\n"}}],"rawOutput":{"type":"Bash","output":[67,65,84,83,95,71,82,79,75,95,65,76,76,95,68,73,83,65,66,76,69,68,95,70,73,76,69,13,10],"output_for_prompt":"exit: 0\nCATS_GROK_ALL_DISABLED_FILE\n","exit_code":0,"command":"Set-Content -Path \"grok-all-tools-disabled-probe.txt\" -Value \"CATS_GROK_ALL_DISABLED_FILE\" -NoNewline; Get-Content \"grok-all-tools-disabled-probe.txt\"","truncated":false,"signal":null,"timed_out":false,"description":"Create probe file with required content","current_dir":"<REDACTED_CWD>","output_file":"<REDACTED_CWD>/call-3ec064ee-8925-4735-b3be-0a98e7a6f4ba-0.log","total_bytes":29},"locations":[]}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"thought","data":"<REDACTED_REASONING_DELTA>"}
+{"type":"text","data":"Created"}
+{"type":"text","data":" `"}
+{"type":"text","data":"gro"}
+{"type":"text","data":"k"}
+{"type":"text","data":"-"}
+{"type":"text","data":"all"}
+{"type":"text","data":"-"}
+{"type":"text","data":"tools"}
+{"type":"text","data":"-"}
+{"type":"text","data":"disabled"}
+{"type":"text","data":"-"}
+{"type":"text","data":"probe"}
+{"type":"text","data":".txt"}
+{"type":"text","data":"`"}
+{"type":"text","data":" in"}
+{"type":"text","data":" the"}
+{"type":"text","data":" current"}
+{"type":"text","data":" directory"}
+{"type":"text","data":" with"}
+{"type":"text","data":" content"}
+{"type":"text","data":":\n\n"}
+{"type":"text","data":"`"}
+{"type":"text","data":"CAT"}
+{"type":"text","data":"S"}
+{"type":"text","data":"_"}
+{"type":"text","data":"GRO"}
+{"type":"text","data":"K"}
+{"type":"text","data":"_"}
+{"type":"text","data":"ALL"}
+{"type":"text","data":"_"}
+{"type":"text","data":"DISABLED"}
+{"type":"text","data":"_"}
+{"type":"text","data":"FILE"}
+{"type":"text","data":"`"}
+{"type":"available_commands","tools":["<REDACTED_TOOL_CATALOG>"],"commands":["<REDACTED_COMMAND_CATALOG>"]}
+{"type":"usage","usage":{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"reasoning_tokens":0},"signature":"<REDACTED_SIGNATURE>"}
+{"type":"end","stopReason":"end_turn","sessionId":"fixture-session-5","requestId":"fixture-request-5","usage":{"input_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"output_tokens":0,"reasoning_tokens":0,"total_tokens":0},"num_turns":2,"total_cost_usd":0,"total_cost_usd_ticks":0,"modelUsage":{"grok-4.5-build":{"inputTokens":0,"outputTokens":0,"cacheReadInputTokens":0,"cacheCreationInputTokens":0,"modelCalls":2,"costUSD":0}}}

@@ -295,7 +295,7 @@ const junieCuratedAdvancedEntries = [
 ];
 
 describe('ProviderModelCatalogService', () => {
-  it('keeps the refusal-only Grok catalog empty until model ids are verified', () => {
+  it('serves the model id verified by the authenticated Grok model-list probe', () => {
     const base = createCatalogConfig();
     const config = {
       ...base,
@@ -329,12 +329,15 @@ describe('ProviderModelCatalogService', () => {
 
     const catalog = new ProviderModelCatalogService(config as never).getImmediateCatalog('grok');
 
-    expect(catalog.models).toEqual([]);
-    expect(catalog.defaultModel).toBeNull();
-    expect(catalog.warnings).toEqual([
-      'Grok CLI model ids are not verified by a live model-list probe yet; '
-      + 'serving no bundled static model ids until that contract is proven.',
+    expect(catalog.models).toEqual([
+      {
+        id: 'grok-4.5',
+        label: 'grok-4.5',
+        default: true,
+      },
     ]);
+    expect(catalog.defaultModel).toBe('grok-4.5');
+    expect(catalog.warnings).toEqual([]);
   });
 
   it('marks running Ollama models, injects missing configured defaults, and caches warnings', async () => {

@@ -514,7 +514,7 @@ function createProbeProvider(
     case 'antigravity':
       return { provider: new AntigravityProvider() };
     case 'grok':
-      return { provider: new GrokProvider() };
+      return { provider: new GrokProvider(compatibilityProfile, observer) };
     case 'copilot':
       return { provider: new CopilotProvider(compatibilityProfile, observer) };
     case 'cursor':

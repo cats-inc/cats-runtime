@@ -1,4 +1,8 @@
 import type { ProviderName } from '../../backends/cli/providers/types.js';
+import {
+  GROK_STREAMING_JSON_BASE_ARGS,
+  GROK_STREAMING_JSON_PROFILE_ID,
+} from '../../backends/cli/providers/grok.js';
 import type {
   ProviderCompatibilityKnowledge,
   ProviderCompatibilityProfile,
@@ -363,6 +367,36 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       helpTokens: ['--output-format'],
       liveProbeArgs: buildLiveHelpArgs(AUGGIE_JSON_ARGS),
       liveProbeTokens: ['--output-format'],
+    },
+  ),
+  grok: buildKnowledge(
+    'grok',
+    'Grok CLI',
+    {
+      id: GROK_STREAMING_JSON_PROFILE_ID,
+      label: 'Grok CLI 1.0.0 native streaming-json',
+      provider: 'grok',
+      protocolFamily: 'streaming-json',
+      parserId: 'grok-native-streaming-json',
+      spawnBaseArgs: [...GROK_STREAMING_JSON_BASE_ARGS],
+      supportedVersions: ['1.0.0'],
+      helpTokens: [
+        '--single',
+        'streaming-json',
+        '--resume',
+        '--fork-session',
+        '--tools',
+        '--permission-mode',
+      ],
+      liveProbeArgs: ['--help'],
+      liveProbeTokens: ['streaming-json', '--resume', '--tools'],
+    },
+    {
+      id: 'grok-cli-unverified',
+      label: 'Grok CLI unverified version refusal',
+      provider: 'grok',
+      protocolFamily: 'unverified',
+      parserId: 'grok-refusal',
     },
   ),
   opencode: buildKnowledge(

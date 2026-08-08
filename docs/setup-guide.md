@@ -12,8 +12,9 @@ Grok CLI installs with `irm https://x.ai/cli/install.ps1 | iex` on Windows or
 `curl -fsSL https://x.ai/cli/install.sh | bash` on macOS/Linux. Its binary is
 under `~/.grok/bin`; authenticate with `grok login` (which writes
 `~/.grok/auth.json`) or `XAI_API_KEY`. Cats detects only the `grok` binary, not
-the installer's generic `agent` alias. Grok is currently setup/check-only:
-session execution refuses until its subprocess and stream contract is verified.
+the installer's generic `agent` alias. Grok 1.0.0 can execute through the
+fixture-backed native adapter with model `grok-4.5`; other CLI versions are
+refused until their lifecycle contract is probed.
 
 ## Quick Start (npx)
 

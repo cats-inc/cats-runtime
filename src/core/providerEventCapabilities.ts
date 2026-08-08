@@ -235,21 +235,22 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
   },
   grok: {
     normalizedStream: {
-      text: { mode: 'unknown', stepwise: false },
-      toolUse: 'unknown',
-      toolResult: 'unknown',
-      progress: 'unknown',
-      reasoning: 'unknown',
+      text: { mode: 'chunk', stepwise: true },
+      toolUse: 'native',
+      toolResult: 'native',
+      progress: 'derived',
+      reasoning: 'native',
     },
     transcript: {
-      contentBlocks: 'unknown',
+      contentBlocks: 'none',
     },
     presentation: {
-      recommended: 'unknown',
+      recommended: 'content_blocks',
     },
     notes: [
-      'Grok CLI subprocess and streaming behavior have not been probed yet.',
-      'Treat Grok execution semantics as unknown until a verified compatibility profile exists.',
+      'Grok 1.0.0 native streaming-json emits incremental text and reasoning deltas.',
+      'Tool calls and terminal tool updates are native; runtime progress is derived from them.',
+      'Execution is pinned to the exact fixture-backed 1.0.0 compatibility profile.',
     ],
   },
   auggie: {

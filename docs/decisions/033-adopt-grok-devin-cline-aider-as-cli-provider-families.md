@@ -4,7 +4,9 @@ Date: 2026-08-07
 Status: Proposed
 
 Implementation note: the User approved the Grok-only subset on 2026-08-08.
-The broader Devin, Cline, and Aider decision remains proposed.
+Grok subsequently completed an authenticated lifecycle probe and now executes
+through an exact-version 1.0.0 adapter. The broader Devin, Cline, and Aider
+decision remains proposed.
 
 ## Context
 
@@ -34,21 +36,21 @@ The question this ADR would settle is not *whether* to recognize the four CLIs �
 
 ## Decision
 
-This ADR proposes that `cats-runtime` adopt `grok`, `devin`, `cline`, and `aider` as first-class CLI provider **families**, landing them at the install/check/setup tier first. Session execution adapters would be gated behind per-CLI probe evidence and ship as explicit refusals until that evidence exists.
+This ADR proposes that `cats-runtime` adopt `grok`, `devin`, `cline`, and `aider` as first-class CLI provider **families**, landing them at the install/check/setup tier first. Session execution adapters are gated behind per-CLI probe evidence and ship as explicit refusals until that evidence exists. Grok has now satisfied that gate; the other three have not.
 
 Specifically:
 
 1. **Four new provider ids** join `KNOWN_PROVIDERS`: `grok`, `devin`, `cline`, `aider`. They append to the CLI-family segment after `kiro` and before `ollama` / `openclaw` in `PROVIDER_ORDER`. Existing providers keep their relative order, while the two non-CLI providers move four absolute positions later in the dashboard.
 2. **Install packs follow the upstream install method**, not a house style: `grok`, `devin`, and `aider` register through `createNativeInstall(...)`; `cline` registers through `createGenericNpmKnowledge(...)` against the `cline` npm package.
-3. **Execution adapters ship as refusal stubs**, following the `AntigravityProvider` precedent (ADR-032). `buildSpawnArgs` throws a message that names the missing evidence and points at provider setup. The runtime does not invent a stream contract, a `-p`/`--print` flag, a session storage layout, or a model id list for any of the four.
-4. **Compatibility falls back to presence-only detection.** No `*-stream-json-v1` profiles are added in `src/core/compatibility/knowledge.ts` until a live probe captures a real stream contract per CLI.
+3. **Execution adapters begin as refusal stubs**, following the `AntigravityProvider` precedent (ADR-032). A provider is promoted only by a complete live probe. Grok 1.0.0 is promoted to native `streaming-json`; Devin, Cline, and Aider still refuse with their missing evidence.
+4. **Compatibility is exact where proven and presence-only otherwise.** Grok selects `grok-cli-streaming-json-1.0.0` only for parsed version 1.0.0. No execution profile exists for Devin, Cline, or Aider.
 5. **Aider is modeled as non-interactive credential evidence, not env-key readiness.** Its `auth` block sets `interactive: false` and carries common BYO-model env vars (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`), with `docsUrl` pointing at `https://aider.chat/docs/llms.html`. Provider setup may report the names of non-empty variables visible to the runtime, but their presence does not prove that Aider's selected model is usable and their absence does not prove that Aider is unconfigured: Aider can also load `.env`, `.aider.conf.yml`, command-line credentials, or a local model. Until a provider-specific non-interactive auth probe exists, Aider auth remains `unknown` and provider setup must not render a "sign in" affordance.
 6. **Devin is modeled as install-complete-but-auth-unverified by default.** Because upstream deliberately strips the trailing `devin setup` from both official installers, a successful install never implies a usable CLI. Devin's knowledge entry carries `requiresShellRestart: true` plus an explicit manual step (`devin setup`) in `notes`, and provider setup surfaces that step without claiming whether it has subsequently been completed. A future non-interactive Devin auth probe is required before the runtime may report auth as ready.
 7. **Grok registers only the `grok` binary.** The upstream installer also drops an `agent` / `agent.exe` alias next to it; the runtime does not add `agent` as a PATH candidate. `agent` is a generic name with a high collision probability on a developer PATH, and a false positive there would report Grok as installed on a machine that has some unrelated `agent` binary.
 8. **Devin's classification is probe-gated, not assumed.** Upstream documents Devin CLI as an interactive terminal coding agent with a Kanban surface for parallel tasks, which reads as a session provider. If a probe shows it only orchestrates remote Devin sessions and does not execute locally, it is reclassified as a management adapter under ADR-023 and removed from `KNOWN_PROVIDERS` in a follow-up ADR. This ADR registers it as a CLI family on the strength of the upstream description and accepts that reversal risk explicitly.
 9. **Quick/Full pack membership stays upstream metadata.** The runtime treats the supported platform/provider pairs as installable; pack membership (`native_cli_pack`) is carried by `cats-platform` setup-asset metadata, matching how the existing twelve are handled. Cline is installable through packaged setup on macOS and Linux only until its official Windows support or a reviewed Windows execution probe exists.
 10. **The Pi package rename is corrected in the same slice.** `src/core/provider-install/knowledge.ts` moves to `@earendil-works/pi-coding-agent`. This is not scope creep: it is the same "runtime provider knowledge drifted from the upstream installer suite" defect the rest of this ADR exists to fix, and leaving it means Pi upgrades silently no-op forever.
-11. **Install visibility and product executability remain separate.** The runtime dashboard, diagnostics, and provider-setup surfaces may list the four at the install/check tier, but `cats-platform` must not add them to its shared product execution catalog until a working runtime adapter exists. A refusal stub is a runtime safety boundary, not a selectable product capability.
+11. **Install visibility and product executability remain separate.** The runtime dashboard, diagnostics, and provider-setup surfaces may list all four, but `cats-platform` adds a provider to its shared execution catalog only with a working runtime adapter. Grok now qualifies; Devin, Cline, and Aider do not.
 
 This project has not shipped a stable release. Per the pre-release policy in `AGENTS.md`, no aliases, shims, or deprecation windows are owed for any of the above.
 
@@ -68,7 +70,7 @@ Meanwhile the install tier needs no guessing at all: the binary names, install U
 
 ### Why the four take slots after `kiro`
 
-`PROVIDER_ORDER` drives runtime dashboard layout. Appending to the CLI-family segment preserves the relative order of every existing provider and keeps all CLI families ahead of the API/local-provider entries. It does shift `ollama` and `openclaw` four absolute positions later; tests and documentation must state that explicitly rather than claiming no position changes. `cats-platform` no longer mirrors this list into its executable product catalog while the adapters are refusal-only.
+`PROVIDER_ORDER` drives runtime dashboard layout. Appending to the CLI-family segment preserves the relative order of every existing provider and keeps all CLI families ahead of the API/local-provider entries. It does shift `ollama` and `openclaw` four absolute positions later; tests and documentation must state that explicitly rather than claiming no position changes. `cats-platform` mirrors only providers whose adapters have crossed the execution evidence gate, which now includes Grok.
 
 ### Why Aider gets a different auth model rather than being forced into the existing one
 
@@ -90,14 +92,14 @@ The alternative — hold Devin out until someone probes it — leaves upstream i
 
 ### Negative
 
-- Four providers appear in the runtime dashboard and provider-setup that cannot yet run a session. They remain absent from product execution selectors until an adapter lands, and the refusal message must still be good enough for direct API/config attempts to read as "not yet supported" rather than "broken".
+- All four providers appear in runtime setup. Grok can run through its verified 1.0.0 adapter; the remaining three stay absent from product execution selectors, and direct API/config attempts receive an actionable refusal.
 - Sixteen exhaustive maps across two repos each grow by four entries; the diff is wide even though it is shallow.
 - Devin may be reclassified later, which would mean removing a provider id that briefly existed. Accepted per the rationale above.
 - Registering `cline` in the npm pack means the platform npm installer inherits whatever install-script handling upstream needed (`npm 12+` blocks package install scripts by default and `Install-NodeCLITools.ps1` passes `--allow-scripts`); the platform side must mirror that or Cline may install without a working shim.
 
 ### Neutral
 
-- Runtime model catalogs stay empty for all four. `curatedModelCatalog` / `providerAdvancedKnowledge` gain provider keys with no bundled model ids, and the runtime playground exposes only `<provider>-default` sentinels. These sentinels do not enter the `cats-platform` product execution catalog while adapters are refusal-only.
+- Runtime model catalogs stay empty until enumerated by live evidence. Grok now exposes the sole observed id `grok-4.5`; Devin, Cline, and Aider retain empty catalogs and default sentinels outside the platform execution catalog.
 - Grok's `agent` alias remains installed on user machines; the runtime simply does not look at it.
 - The runtime does not adopt upstream's Quick/Full split as a runtime concept.
 
@@ -129,7 +131,7 @@ The alternative — hold Devin out until someone probes it — leaves upstream i
 
 ## Notes for Future Work
 
-- Each CLI's execution adapter should arrive as its own small slice, gated on a research note under `docs/research/`, rather than as one four-provider batch. They share no stream contract.
+- Each CLI's execution adapter arrives as its own small slice, gated on a research note under `docs/research/`, rather than as one four-provider batch. Grok is the first completed example; they share no stream contract.
 - If two or more of the four turn out to expose no machine-readable output at all (Aider is the likeliest — it is a human-facing TUI with no documented JSON stream), the runtime should consider a shared "presence-only provider" tier so the dashboard can distinguish *not yet probed* from *probed and not automatable*.
 - The Pi package rename exposed a class of drift no test catches: the runtime's install knowledge silently diverging from the upstream installer suite. A periodic reconciliation check between `environment-bootstrap` and `provider-install/knowledge.ts` is worth its own follow-up.
 

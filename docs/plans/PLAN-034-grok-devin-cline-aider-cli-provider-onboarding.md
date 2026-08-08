@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress — Grok slice implemented; Devin, Cline, and Aider pending User approval |
+| **Status** | In Progress — Grok 1.0.0 execution complete; Devin, Cline, and Aider pending User approval |
 | **Owner** | User |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -21,29 +21,29 @@ Phase ordering:
 
 - Phase 1 records upstream install facts and probe results before any code is written.
 - Phase 2 widens the taxonomy and lets `npm run typecheck` produce the authoritative list of touch points.
-- Phases 3–5 fill those touch points: install knowledge, refusal adapters, config.
-- Phase 6 touches runtime-owned UI. Refusal-only providers do not enter the platform product execution catalog.
+- Phases 3–5 fill those touch points: install knowledge, evidence-gated adapters, config.
+- Phase 6 touches runtime-owned UI. Only providers with working adapters enter the platform product execution catalog; Grok now qualifies.
 - Phases 7–8 batch tests and docs.
 
 ## Coordination With cats-platform
 
 This plan and `cats-platform` PLAN-102 land as one coordinated change.
 
-- **Runtime owns**: provider taxonomy, install/check knowledge, refusal adapters, capability and evolution metadata, runtime config and `providers.yaml.example`, dashboard/playground/provider-setup UI, runtime tests and docs.
+- **Runtime owns**: provider taxonomy, install/check knowledge, evidence-gated adapters, capability and evolution metadata, runtime config and `providers.yaml.example`, dashboard/playground/provider-setup UI, runtime tests and docs.
 - **Platform owns**: packaged installer helpers (`scripts/{windows,linux,macos}`), desktop host wiring (`cliInventoryProbe`, `contracts`, `setupAssets`, `packaging`, `bootstrapPage`), the setup-provider inventory, smoke tests, platform docs. It does not add refusal-only providers to the product execution catalog.
 
 Handoff order: runtime Phase 2 (taxonomy) → platform PLAN-102 Phase 1 (desktop setup contracts) → both repos' remaining phases in parallel. Runtime UI values are runtime-owned and no longer block on a platform catalog landing.
 
 ## Architecture Guardrails
 
-1. Do not implement session execution, stream parsing, session discovery, or history import for any of the four. Refusal stubs only.
-2. Do not add compatibility profiles in `src/core/compatibility/knowledge.ts`. Presence-only evidence is the intended state.
-3. Do not add bundled model ids. Only `<provider>-default` sentinels.
+1. Do not implement session execution, stream parsing, session discovery, or history import without a complete per-provider live probe. Grok 1.0.0 has passed this gate; the other three remain refusal-only.
+2. Do not add compatibility profiles without fixture-backed evidence. Grok is pinned to exact version 1.0.0; the remaining providers stay presence-only.
+3. Do not add unverified model ids. Grok uses the sole live-enumerated id `grok-4.5`; the other three keep `<provider>-default` sentinels.
 4. Do not register Grok's `agent` alias as a detection candidate.
 5. Do not treat a successful Devin install as readiness; `devin setup` is a required manual step.
 6. Do not render an interactive sign-in affordance for Aider.
 7. Preserve existing provider relative order. The four append to the CLI-family segment after `kiro`; `ollama` and `openclaw` shift four absolute positions later.
-8. Do not add the four to `cats-platform/src/shared/providerCatalogData.ts` or `providerCatalogInstances.ts` while their adapters are refusal-only.
+8. Add providers to `cats-platform/src/shared/providerCatalogData.ts` and `providerCatalogInstances.ts` only after their adapters work. Grok is promoted; Devin, Cline, and Aider remain excluded.
 9. Do not invent behavior. If a probe cannot answer a question, leave the field empty and record the gap.
 10. Do not hand-edit `src/http/ui/generated/runtimeTailwind.ts` or `public/*.html`; regenerate them.
 
@@ -57,18 +57,18 @@ Evidence channel: the `environment-bootstrap` installer and check scripts are au
 
 Install facts already extracted from upstream (no further probing needed):
 
-- [ ] Grok — `platform/windows/Install-GrokCLI.ps1`, `platform/{linux,macos}/install-grok-cli.sh`. Installer `https://x.ai/cli/install.{ps1,sh}`. Binary `~/.grok/bin/grok{,.exe}` plus an `agent` alias. Auth `grok login` → `~/.grok/auth.json`, or `XAI_API_KEY`. Upstream Quick mode.
+- [x] Grok — install contract plus authenticated Grok 1.0.0 success, model, tool, permission, error, cancellation, resume, and fork lifecycle captured in `docs/research/2026-08-08-grok-cli-install-tier-probe.md`.
 - [ ] Devin — `platform/windows/Install-DevinCLI.ps1`, `platform/{linux,macos}/install-devin-cli.sh`. Installer `https://static.devin.ai/cli/setup.ps1` (Windows, PowerShell-only) / `https://cli.devin.ai/install.sh` (Unix). Binary `%LOCALAPPDATA%\devin\cli\bin\devin.exe` / `~/.local/bin/devin`, versions under `$XDG_DATA_HOME/devin/cli/_versions`. Upstream strips the trailing `devin setup`. Upstream Full mode.
 - [ ] Aider — `platform/windows/Install-Aider.ps1`, `platform/{linux,macos}/install-aider.sh`. Installer `https://aider.chat/install.{ps1,sh}`, which is the `uv` installer plus `uv tool install --force --python python3.12 --with pip aider-chat@latest`. Binary `~/.local/bin/aider{,.exe}`. Credential sources include environment, `.env`, `.aider.conf.yml`, command-line options, and local models; ambient key names are evidence, not readiness. Upstream Full mode.
 - [ ] Cline — npm package `cline`, added to `Install-NodeCLITools.ps1` / `install-node-cli-tools.sh`. Official CLI support is macOS/Linux preview only; Windows packaged install remains unsupported pending official support or a reviewed Windows execution probe. Upstream Full mode.
 
 Live probe questions (SPEC-027 Probe Items; gate execution adapters, not this plan's install tier):
 
-- [ ] **P5** — Capture `--version` and `--help` for each of the four. Record exact version-string shapes for the check path.
-- [ ] **P2** — Determine whether each exposes a non-interactive/headless mode and whether any emits machine-readable output. Feeds the D4 ordering.
+- [x] **P5 (Grok)** — Captured exact 1.0.0 version/help and model enumeration. Remaining providers stay open.
+- [x] **P2 (Grok)** — Verified native `streaming-json` and alternate Messages-compatible NDJSON. Remaining providers stay open.
 - [ ] **P1** — Determine whether Devin executes locally or orchestrates remote sessions (resolves the ADR-023 classification).
-- [ ] Determine whether any exposes an enumerable model list. `--help` alone is not model-id evidence.
-- [ ] **P3** — Determine whether any writes scannable session storage.
+- [x] **Grok model list** — `grok models` returned only `grok-4.5`, marked default. Remaining providers stay open.
+- [x] **P3 (Grok)** — Resume and fork work by returned session id; private history scanning/import remains out of scope. Remaining providers stay open.
 - [ ] **P4** — Capture the exact upstream Cline allowlist and determine how the helper feature-detects npm's global `allow-scripts` support. Documentation and compatibility coverage only; SPEC-027 D5 already defines the policy.
 - [ ] Record findings in `docs/research/2026-08-07-grok-devin-cline-aider-cli-probe.md`, marking unanswered questions as deferred rather than guessing.
 
@@ -99,14 +99,20 @@ The badge palette is no longer a technical probe item: SPEC-027 D1 proposes cand
 
 **Deliverables**: `buildProviderInstallCatalogView` returns correct metadata for all four across the three execution platforms.
 
-### Phase 4: Refusal Adapters and Capability Metadata
+### Phase 4: Evidence-Gated Adapters and Capability Metadata
 
-- [ ] Add `src/backends/cli/providers/{grok,devin,cline,aider}.ts`, modeled on `antigravity.ts`, each with a refusal message naming its own missing evidence.
+- [ ] Add `src/backends/cli/providers/{grok,devin,cline,aider}.ts`; unprobed providers use the Antigravity-style refusal.
 - [ ] Wire the four into `WorkerPool.createProvider` and update the unknown-provider error string to list all sixteen families.
 - [ ] Add conservative entries to `src/core/providerEventCapabilities.ts`, declaring nothing unobserved.
 - [ ] Register the four in `src/core/compatibility/providerEvolutionEntry.ts` so evidence capture has a home.
-- [ ] Confirm `src/core/compatibility/knowledge.ts` gains no profiles.
-- [ ] Add `src/core/models/curatedModelCatalog.ts` / `providerAdvancedKnowledge.ts` / `curatedModelCatalogNormalization.ts` keys with empty bundled model lists.
+- [ ] Confirm unprobed providers gain no compatibility profiles or fabricated model ids.
+
+Grok execution follow-up (completed 2026-08-08):
+
+- [x] Replace the Grok refusal with a native `streaming-json` adapter pinned to exact CLI version 1.0.0.
+- [x] Parse text, reasoning, tool use/result, errors, terminal usage, resume, and fork; terminate the worker on cancellation without requiring a terminal record.
+- [x] Compile permissions from observed behavior: a non-empty `--tools` allowlist is the hard boundary; reject empty whitelists and `search_replace` without `read_file`.
+- [x] Add sanitized full lifecycle fixtures, adapter/fixture/compatibility tests, `grok-4.5`, and provider-evolution observation.
 
 **Deliverables**: Session attempts against the four refuse honestly; evidence capture is wired.
 
@@ -122,11 +128,11 @@ The badge palette is no longer a technical probe item: SPEC-027 D1 proposes cand
 
 ### Phase 6: Routes and UI
 
-The runtime owns these install/check surfaces. Do not wait for or mirror a platform product catalog entry; the four remain excluded from executable product selectors.
+The runtime owns these surfaces. Grok is now mirrored into the platform product catalog because its adapter works; the remaining three stay excluded.
 
 - [ ] Add badge tokens to `src/http/ui/tailwind.runtime.css` and `src/http/ui/shared.ts` using the SPEC-027 D1 proposal once approved: `--grok #e5e7eb`, `--devin #38bdf8`, `--cline #e879f9`, `--aider #60a5fa`.
 - [ ] Add the four to `src/http/ui/pages/index.html` — provider dropdown, `PROVIDER_ORDER`, and dashboard CSS selectors.
-- [ ] Add the four to `src/http/ui/pages/playground.html` — badge style blocks, `PROVIDERS` array, and `<provider>-default` sentinels only.
+- [ ] Add the four to `src/http/ui/pages/playground.html` — badge style blocks and `PROVIDERS`; use verified `grok-4.5` for Grok and default sentinels for the remaining three.
 - [ ] Update `src/http/ui/pages/provider-setup.html` so Aider renders credential evidence with auth still unverified and no sign-in affordance, and Devin renders `devin setup` as a manual step without claiming completion state.
 - [ ] Audit `src/http/routes/diagnostics.ts` and `diagnosticsSupport.ts` for provider-list literals that need the four.
 - [ ] Leave `src/http/routes/workspaceSubstrate.ts` `ENABLED_AGENTS` unchanged; none of the four has a proven workspace-substrate contract.
@@ -143,14 +149,14 @@ The runtime owns these install/check surfaces. Do not wait for or mirror a platf
 - [ ] Update `src/http/ui/shared.playground.test.ts` for the new badges and sentinels.
 - [ ] Run `npm test` and confirm green.
 
-**Deliverables**: Suite passes; the four are covered at the install/check/refusal tier.
+**Deliverables**: Suite passes; Grok is covered at the exact-version execution tier and the other three at install/check/refusal tier.
 
 ### Phase 8: Docs and Hygiene
 
 - [ ] Update `docs/setup-guide.md` with install commands, binary locations, and auth for all four, calling out `devin setup` and Aider's optional, non-secret credential evidence with auth remaining unknown.
 - [ ] Update `docs/decisions/README.md`, `docs/specs/README.md`, `docs/plans/README.md` indexes.
 - [ ] Note in the research note that the Pi package rename was corrected here and why it was invisible to version checks.
-- [ ] Final sweep: confirm no fabricated model ids, no stream profiles, and no session scanners were added for the four.
+- [ ] Final sweep: confirm Grok has only fixture-backed model/profile data and the remaining providers have no fabricated ids, stream profiles, or session scanners.
 
 **Deliverables**: Docs match the shipped reality; indexes current.
 
@@ -191,7 +197,7 @@ The runtime owns these install/check surfaces. Do not wait for or mirror a platf
 ## Technical Decisions
 
 - **Taxonomy widening comes before knowledge**: the compiler is a better integration checklist than a grep.
-- **Refusal over guessing**: per ADR-025 and the ADR-032 precedent, an unprobed provider refuses with a message naming the missing evidence.
+- **Evidence over guessing**: an unprobed provider refuses; a probed provider such as Grok is pinned to the exact verified compatibility profile.
 - **CLI-segment append ordering**: preserves existing relative order while explicitly shifting the two non-CLI providers four absolute positions later.
 - **Pi rename rides along**: same defect class, same file; splitting it would leave a known-broken upgrade path in place.
 - **No backwards-compat shim**: pre-release policy.
@@ -207,14 +213,14 @@ The runtime owns these install/check surfaces. Do not wait for or mirror a platf
   - With Grok installed, it shows available; planting an unrelated `agent` binary does not flip it.
   - Devin shows the `devin setup` manual step with auth unverified.
   - Aider shows only detected credential names, keeps auth unverified, never leaks values, and has no sign-in button.
-  - Starting a session against any of the four returns the refusal message.
+  - Grok 1.0.0 executes and another Grok version refuses compatibility; Devin, Cline, and Aider return their refusal messages.
 - **Cross-repo**: after platform PLAN-102 lands and Desktop is repackaged, smoke-test install-from-setup for each on each OS.
 
 ## Risks & Mitigations
 
-- **Live probe unavailable for some CLIs** (Devin and Grok both need accounts): Phase 1 gates only the execution tier; the install tier proceeds from upstream scripts. Deferred items are recorded, not guessed.
+- **Live probe unavailable for some CLIs**: Grok is complete; Phase 1 continues to gate Devin, Cline, and Aider execution while their install tier proceeds from upstream scripts. Deferred items are recorded, not guessed.
 - **Compiler list is larger than expected**: Phase 2 deliberately produces it before estimating Phases 3–5.
-- **Refusal-only providers leak into product selectors**: runtime UI remains install/check-owned, while platform execution catalogs exclude the four until working adapters land.
+- **Refusal-only providers leak into product selectors**: platform execution catalogs include Grok and exclude Devin, Cline, and Aider until their adapters land.
 - **`agent` alias false positives**: covered by a dedicated negative test in Phase 7.
 - **Aider evidence is mistaken for readiness or leaks secrets**: the summary returns names only from an injected environment, keeps status `unknown`, and provider-setup branches on `auth.interactive` rather than special-casing the id.
 - **Devin reclassification**: if Phase 1 shows it is control-plane only, stop at the install tier and raise a follow-up ADR rather than forcing it into session routing.
@@ -226,6 +232,7 @@ The runtime owns these install/check surfaces. Do not wait for or mirror a platf
 | 2026-08-07 | Plan created alongside ADR-033 and SPEC-027, after auditing `environment-bootstrap` commits `cb5efc7`, `d131535`, `216ef96`, `54992d6`, `05be416`, `bef3411`, `0d1831d`, `cfe7785`. Pi npm package drift found during the same audit and folded into Phase 3. |
 | 2026-08-07 | SPEC-027 open questions rewritten as Proposed Decisions D1–D5 pending User approval, so implementation remains blocked. Review corrections use the official Grok `XAI_API_KEY`, treat Aider keys as evidence rather than readiness, keep Cline Windows install unsupported, and separate runtime setup visibility from the platform product execution catalog. |
 | 2026-08-08 | User approved implementation starting with Grok. The Grok install/check taxonomy, native config, refusal adapter, conservative capabilities, empty bundled model catalog, dashboard/playground/setup surfaces, tests, setup guide, and read-only version/help probe landed as the first slice. Devin, Cline, Aider, and the Pi rename remain pending. |
+| 2026-08-08 | Completed the authenticated Grok 1.0.0 lifecycle probe and promoted Grok to exact-version native execution. Added full sanitized fixtures, tool/error/cancellation/resume/fork parsing, permission safeguards, `grok-4.5`, compatibility refusal for version drift, and the platform catalog handoff. |
 
 ---
 

@@ -110,7 +110,7 @@ export class WorkerPool {
         };
       case 'grok':
         return {
-          provider: new GrokProvider(),
+          provider: new GrokProvider(compatibilityProfile),
           commandConfig: instance.commandConfig,
         };
       case 'claude':

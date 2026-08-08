@@ -4,15 +4,15 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress — Grok slice implemented; Devin, Cline, and Aider pending User approval |
+| **Status** | In Progress — Grok 1.0.0 execution complete; Devin, Cline, and Aider pending User approval |
 | **Owner** | User |
 | **Reviewer** | User |
 
 ## Summary
 
-`environment-bootstrap` now installs four AI coding CLIs that `cats-runtime` does not recognize: Grok CLI (xAI), Devin CLI (Cognition), Cline, and Aider. This spec defines how each becomes a registered CLI provider family in the runtime — install knowledge, check metadata, config bootstrap, diagnostics, dashboard/playground/setup surfaces — while their session-execution contracts stay unimplemented until probed.
+`environment-bootstrap` installs four AI coding CLIs that this spec onboards as runtime provider families: Grok CLI (xAI), Devin CLI (Cognition), Cline, and Aider. It covers install knowledge, check metadata, config bootstrap, diagnostics, dashboard/playground/setup surfaces, and evidence-gated execution. Grok 1.0.0 now has a complete fixture-backed native adapter; Devin, Cline, and Aider remain refusal-only until separately probed.
 
-It is the runtime counterpart to `cats-platform` SPEC-112, which owns packaged installer helpers, the setup-provider inventory, and desktop host wiring. The four remain outside the platform's executable product catalog until working adapters exist. ADR-033 captures the underlying proposal.
+It is the runtime counterpart to `cats-platform` SPEC-112, which owns packaged installer helpers, the setup-provider inventory, desktop host wiring, and promotion of each working adapter into the product execution catalog. ADR-033 captures the underlying decision.
 
 ## Goals
 
@@ -21,21 +21,21 @@ It is the runtime counterpart to `cats-platform` SPEC-112, which owns packaged i
 - Model Aider's BYO-key auth as non-interactive credential evidence rather than a login flow or an env-var readiness claim.
 - Model Devin's stripped `devin setup` step as an explicit post-install manual action, so presence never implies auth readiness and completion is not guessed.
 - Probe only the `grok` binary, never its `agent` alias.
-- Ship refusal-stub execution adapters that name the missing evidence, following `AntigravityProvider`.
+- Ship refusal-stub execution adapters for unprobed providers and promote Grok 1.0.0 to an exact-version native streaming adapter after its lifecycle probe.
 - Extend `config/providers.yaml.example` and the generated-config bootstrap so each family gets a `cli/native` instance.
-- Surface all four in the dashboard, playground, and provider-setup with distinct badge tokens and no fabricated model ids.
+- Surface all four in the dashboard, playground, and provider-setup with distinct badge tokens; expose only the live-enumerated `grok-4.5` id for Grok and no fabricated ids for the remaining providers.
 - Correct the Pi npm package name to `@earendil-works/pi-coding-agent`, matching upstream `cfe7785`.
 
 ## Non-Goals
 
-- Implementing session execution, stream parsing, session discovery, or history import for any of the four. Those are per-CLI follow-up slices gated on research notes.
-- Adding compatibility profiles in `src/core/compatibility/knowledge.ts`. Presence-only evidence is the intended state.
-- Adding bundled model ids to `curatedModelCatalog` / `providerAdvancedKnowledge`. Only `<provider>-default` sentinels are exposed.
+- Implementing session execution, stream parsing, session discovery, or history import for Devin, Cline, or Aider. Those are per-CLI follow-up slices gated on research notes.
+- Adding compatibility profiles for Devin, Cline, or Aider. Grok is pinned to the exact verified version 1.0.0.
+- Adding unverified bundled model ids. Grok exposes the live-enumerated `grok-4.5`; the remaining providers keep their default sentinels.
 - Adding ACP profiles for any of the four.
 - Deciding Devin's final classification (CLI session provider vs. ADR-023 management adapter). This spec registers it as a CLI family and records the reversal condition.
 - Adopting upstream's Quick/Full mode split as a runtime concept.
 - Packaged installer helpers and desktop host wiring — owned by `cats-platform` SPEC-112.
-- Adding any of the four to `cats-platform`'s shared product execution catalog before its runtime adapter works.
+- Adding a provider to `cats-platform`'s shared product execution catalog before its runtime adapter works. Grok joins with its adapter; the other three remain excluded.
 
 ## User Stories
 
@@ -93,18 +93,18 @@ Separately, `provider-install/knowledge.ts` installs Pi from `@mariozechner/pi-c
 8. `createGenericNpmKnowledge` currently derives `binaryName` through a hardcoded `provider === 'opencode'` check. It shall be refactored to take an explicit binary name and optional supported-platform overrides so provider id, binary name, and install support are decoupled.
 9. The Pi entry shall install `@earendil-works/pi-coding-agent`.
 
-#### Execution refusal
+#### Execution adapters
 
-10. Four provider classes shall be added under `src/backends/cli/providers/`, each implementing `Provider` with `ephemeral = true` and `capabilities: { resume: false, fork: false, permissions: false }`.
-11. `buildSpawnArgs` shall throw a message naming the provider, stating that its subprocess/stream contract has not been probed, and directing the user to install it through setup and add a verified compatibility profile first.
-12. `parseStreamLine` shall return a `raw` event for non-empty lines and `null` otherwise.
+10. Four provider classes shall be added under `src/backends/cli/providers/`. Devin, Cline, and Aider remain ephemeral refusal adapters with no claimed resume, fork, or permission capability.
+11. Grok 1.0.0 shall execute through `streaming-json`, expose resume, fork, and whitelist permission compilation, parse native text/thought/tool/error/end records, and terminate its subprocess on cancellation even when no terminal record arrives.
+12. Grok compatibility shall be exact-version: parsed version 1.0.0 selects `grok-cli-streaming-json-1.0.0`; all other versions refuse until separately probed. A non-empty `--tools` list is the only supported permission boundary: default exposes only probed `read_file`, empty explicit whitelists refuse, and `search_replace` requires `read_file`.
 13. `WorkerPool.createProvider` shall construct them by name, and its unknown-provider error string shall list all sixteen families.
 
 #### Capability and evolution metadata
 
-14. `src/core/providerEventCapabilities.ts` shall gain conservative entries for the four, declaring no capability that has not been observed.
+14. `src/core/providerEventCapabilities.ts` shall describe Grok's observed native text, reasoning, tool, result, and derived-progress events; entries for the other three remain conservative.
 15. `src/core/compatibility/providerEvolutionEntry.ts` shall register the four so evidence capture has a home, without asserting a stream profile.
-16. `src/core/compatibility/knowledge.ts` shall gain **no** profiles for the four.
+16. `src/core/compatibility/knowledge.ts` shall contain only the exact Grok 1.0.0 execution profile; the other three gain no profiles.
 
 #### Config
 
@@ -120,7 +120,7 @@ Separately, `provider-install/knowledge.ts` installs Pi from `@mariozechner/pi-c
     - `--cline: #e879f9` (fuchsia-400)
     - `--aider: #60a5fa` (blue-400)
 21. `src/http/ui/pages/index.html` shall list the four in its provider dropdown and `PROVIDER_ORDER`.
-22. `src/http/ui/pages/playground.html` shall list the four in `PROVIDERS` and expose only `grok-default`, `devin-default`, `cline-default`, `aider-default` sentinels.
+22. `src/http/ui/pages/playground.html` shall list the four in `PROVIDERS`, expose verified `grok-4.5` for Grok, and keep `devin-default`, `cline-default`, and `aider-default` sentinels for the unprobed providers.
 23. `src/http/ui/generated/runtimeTailwind.ts` and `public/*.html` shall be regenerated, not hand-edited.
 24. Provider-setup shall render Aider credential evidence with auth remaining unverified and no sign-in affordance, and shall render Devin's `devin setup` as a manual step without claiming that it has been completed.
 25. Per Proposed Decision D3, Aider auth shall remain `unknown` at this tier. The runtime may report `detectedEnvVars` containing only the names of configured, non-empty variables visible in its injected environment; it shall never return values, declare absent variables missing, infer the selected model, or treat any detected variable as proof of readiness.
@@ -145,9 +145,9 @@ Separately, `provider-install/knowledge.ts` installs Pi from `@mariozechner/pi-c
 - [ ] Aider's catalog view reports `auth.interactive === false`, its configured evidence keys, and auth status `unknown` rather than `ready` or `missing`.
 - [ ] Aider setup summaries report only detected variable names from an injected test environment, never values; an empty detection list is not treated as missing auth.
 - [ ] Devin's catalog view carries the `devin setup` manual step.
-- [ ] Starting a session against any of the four yields the refusal message, not a spawn error.
+- [ ] Starting Grok 1.0.0 parses the authenticated native stream, tools, errors, cancellation, resume, and fork; another Grok version refuses compatibility, and Devin, Cline, and Aider retain their refusal messages.
 - [ ] Bootstrapping a fresh `providers.yaml` produces `cli/native` instances for all four.
-- [ ] Dashboard and playground render all four with distinct badges and no fabricated model ids.
+- [ ] Dashboard and playground render all four with distinct badges, verified `grok-4.5`, and no fabricated model ids.
 - [ ] Pi's install knowledge names `@earendil-works/pi-coding-agent`.
 - [ ] `npm test` passes.
 
@@ -161,9 +161,9 @@ All four reuse the existing `ProviderInstallKnowledge` contract from ADR-013. Th
 - `createLocalBinPathHints` is reused for Aider; Grok needs a new hint builder for `~/.grok/bin` and Devin needs a Windows-specific hint for `%LOCALAPPDATA%\devin\cli\bin` (the same shape Kiro already uses for `%LOCALAPPDATA%\Kiro-Cli`).
 - The `auth` block's existing `interactive?: boolean` prevents a false sign-in affordance, but the summary contract also needs additive `detectedEnvVars` evidence plus an injected environment. Evidence and readiness remain separate.
 
-### Refusal adapters
+### Evidence-gated adapters
 
-`AntigravityProvider` is the template. Each new class is roughly twenty lines and carries a message specific to its own missing evidence — for example, Aider's names its lack of a documented machine-readable output mode, while Devin's names the unresolved local-execution-vs-remote-orchestration question.
+`AntigravityProvider` is the refusal template for Devin, Cline, and Aider. Grok is the first promoted adapter: its native parser and spawn contract are tied to the complete Grok 1.0.0 fixture set, and compatibility refuses version drift rather than assuming it.
 
 ### Detection contract per CLI
 
@@ -194,7 +194,7 @@ All four support `--version` and `--help` per the upstream check scripts, which 
 
 ### D1 — Badge palette
 
-**Proposal**: `--grok #e5e7eb` (gray-200), `--devin #38bdf8` (sky-400), `--cline #e879f9` (fuchsia-400), `--aider #60a5fa` (blue-400). These values are owned by the runtime UI; the platform does not add refusal-only providers to its product execution palette.
+**Proposal**: `--grok #e5e7eb` (gray-200), `--devin #38bdf8` (sky-400), `--cline #e879f9` (fuchsia-400), `--aider #60a5fa` (blue-400). These values are owned by the runtime UI. Grok is executable and present in the platform catalog; refusal-only providers remain excluded.
 
 **Why**: The first draft proposed `--cline #34d399`, which is an exact collision with `--codex`. Auditing the live palette in `src/http/ui/shared.ts` showed the existing fourteen tokens already occupy almost the whole Tailwind-400 band: orange, emerald, violet, pink, indigo, purple, rose, lime, stone, cyan, amber, teal, slate, red. Only sky, blue, and fuchsia remain unused, and `#60a5fa` (blue-400) is specifically free because PLAN-033 deliberately vacated it when Antigravity moved off the old Gemini blue to violet.
 
@@ -222,7 +222,7 @@ Revisit if an xAI API backend ever lands, at which point it belongs in `.env.exa
 
 ### D4 — Which CLI gets an execution adapter first
 
-**Proposal**: Grok, once P2 confirms it has a machine-readable output mode. If P2 shows it does not and another of the four does, that one goes first instead.
+**Decision**: Grok went first. The completed probe confirmed native machine-readable output and closed its full lifecycle contract.
 
 **Why**: Grok is the only one of the four that upstream promoted into **Quick** mode (`05be416`), which is the owner's own curated core set — the strongest available demand signal. Ordering by demand rather than by implementation convenience means the first adapter is also the first one anyone uses.
 
@@ -237,10 +237,10 @@ Revisit if an xAI API backend ever lands, at which point it belongs in `.env.exa
 These are facts to be captured, not decisions to be made. They gate execution adapters only; the install/check tier proceeds without them. See PLAN-034 Phase 1.
 
 - [ ] **P1** — Does Devin CLI execute locally or orchestrate remote sessions? Resolves its ADR-023 classification. Default until answered: registered as a CLI family, install/check tier only, per ADR-033 §8.
-- [ ] **P2** — Does any of the four expose a machine-readable output mode (`--output-format`, `--json`, `--print`)? Feeds D4.
-- [ ] **P3** — Does any of the four write scannable session storage?
+- [x] **P2 (Grok)** — Grok 1.0.0 exposes native `streaming-json` plus Messages-compatible streaming output; the native format backs the adapter. Other providers remain open.
+- [x] **P3 (Grok)** — Resume and fork were exercised by returned session id; Cats does not scan or import Grok's private session storage. Other providers remain open.
 - [ ] **P4** — Capture the exact upstream Cline allowlist and the npm feature-detection boundary. Documentation and compatibility coverage only; Proposed Decision D5 already defines the policy.
-- [ ] **P5** — Exact `--version` and `--help` output shapes for the check path.
+- [x] **P5 (Grok)** — Captured `grok 1.0.0 (3cd0d0cbce)`, help, and model-list output. Other providers remain open.
 
 ## Related
 

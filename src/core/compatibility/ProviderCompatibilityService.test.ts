@@ -886,6 +886,82 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
     expect(assessment.setup.remediation.map((step) => step.code)).toContain('upgrade_provider');
   });
 
+  it('selects the exact fixture-backed Grok 1.0.0 profile', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-grok-exact-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
+          exitCode: 0,
+          stdout: args[0] === '--version'
+            ? 'grok 1.0.0 (3cd0d0cbce)\n'
+            : 'Usage: grok --single --output-format streaming-json --resume '
+              + '--fork-session --tools --permission-mode\n',
+          stderr: '',
+          timedOut: false,
+          durationMs: 4,
+        })),
+      },
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-08-08T00:00:00.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('grok'));
+
+    expect(assessment.classification).toBe('ready');
+    expect(assessment.profile).toMatchObject({
+      id: 'grok-cli-streaming-json-1.0.0',
+      confidence: 'exact',
+      protocolFamily: 'streaming-json',
+      parserId: 'grok-native-streaming-json',
+    });
+    expect(assessment.setup.version).toMatchObject({
+      status: 'ready',
+      detected: '1.0.0',
+      supportedRange: '1.0.0',
+    });
+  });
+
+  it('refuses unprobed Grok patch versions instead of assuming stream compatibility', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-grok-unverified-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
+          exitCode: 0,
+          stdout: args[0] === '--version'
+            ? 'grok 1.0.1 (fixture)\n'
+            : 'Usage: grok --single --output-format streaming-json --resume '
+              + '--fork-session --tools --permission-mode\n',
+          stderr: '',
+          timedOut: false,
+          durationMs: 4,
+        })),
+      },
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-08-08T00:00:01.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('grok'));
+
+    expect(assessment.classification).toBe('unsupported_version');
+    expect(assessment.profile).toMatchObject({
+      id: 'grok-cli-unverified',
+      confidence: 'weak',
+    });
+    expect(assessment.setup.version).toMatchObject({
+      status: 'unsupported',
+      detected: '1.0.1',
+      supportedRange: '1.0.0',
+    });
+  });
+
   it('reports npm prefix drift when npm-global packages are installed off the expected prefix', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-npm-prefix-'));
     tempDirs.push(root);
