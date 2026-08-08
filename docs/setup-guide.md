@@ -34,7 +34,10 @@ hand and check with `devin auth status`. Cats detects and installs Devin but
 cannot run sessions through it: version 3000.3.27 has no machine-readable output
 mode, so `--print` returns plain prose with no tool, usage, or session data. Its
 structured surface is the ACP server (`devin acp`), which belongs to the agent
-backend rather than the CLI backend.
+backend rather than the CLI backend. To run Devin sessions, configure it as an
+ACP agent target — `config/providers.yaml.example` carries a working block. The
+handshake is verified against 3000.3.27: protocol version 1, `loadSession`
+support, and four session modes (Code, Ask, Plan, Bypass Permissions).
 
 ## Quick Start (npx)
 

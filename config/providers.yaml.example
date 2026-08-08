@@ -337,3 +337,15 @@ backends:
         instances:
           sdk:
             model: claude-sonnet-4-20250514
+
+      # Devin speaks ACP over stdio from a subcommand of its own binary rather
+      # than a separate *-acp package, so `command` is the CLI and `args` names
+      # the subcommand. This is Devin's only structured surface: the CLI
+      # backend's --print emits plain prose, so `cli/native` stays detect-only.
+      devin:
+        default_instance: acp
+        transport: acp_stdio
+        instances:
+          acp:
+            command: devin
+            args: ['acp']

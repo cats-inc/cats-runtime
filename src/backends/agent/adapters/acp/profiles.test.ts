@@ -96,6 +96,19 @@ describe('resolveAcpProviderProfile', () => {
       expected: { id: 'kiro-acp', tier: 2 },
     },
     {
+      label: 'Devin',
+      instance: createInstance('devin', ['acp']),
+      expected: { id: 'devin-acp', tier: 1 },
+    },
+    {
+      label: 'Devin with an absolute Windows path',
+      instance: createInstance(
+        String.raw`C:\Users\dev\AppData\Local\devin\cli\bin\devin.exe`,
+        ['acp'],
+      ),
+      expected: { id: 'devin-acp', tier: 1 },
+    },
+    {
       label: 'Auggie alternate name',
       instance: createInstance('augment-code-acp', ['serve']),
       expected: { id: 'auggie-acp', tier: 2 },
@@ -156,8 +169,24 @@ describe('resolveAcpProviderProfile', () => {
         providerName: 'kiro',
       } satisfies RemoteProviderInstanceConfig,
     },
+    {
+      // Bare `devin` is the CLI backend's plain-prose surface, not an ACP
+      // server. Resolving it here would route sessions at a transport that
+      // does not exist on that command.
+      label: 'Devin without the acp subcommand',
+      instance: createInstance('devin', ['--print', 'hello']),
+    },
   ])('does not resolve $label without an ACP-specific launch signal', ({ instance }) => {
     expect(resolveAcpProviderProfile(instance)).toBeUndefined();
+  });
+
+  it('resolves Devin ACP and probes help behind the acp subcommand', () => {
+    const profile = resolveAcpProviderProfile(createInstance('devin', ['acp']));
+
+    expect(profile).toEqual(expect.objectContaining({ id: 'devin-acp', family: 'devin', tier: 1 }));
+    // Devin has no standalone *-acp binary, so `devin --help` describes the CLI
+    // rather than the ACP server.
+    expect(profile?.probe.helpArgs).toEqual(['acp', '--help']);
   });
 
   it('resolves Antigravity provider-managed ACP without treating raw agy stdio as ACP', () => {

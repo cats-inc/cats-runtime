@@ -148,6 +148,19 @@ const KIRO_ACP_PROFILE: AcpProviderProfile = {
   },
 };
 
+const DEVIN_ACP_PROFILE: AcpProviderProfile = {
+  id: 'devin-acp',
+  label: 'Devin ACP',
+  family: 'devin',
+  tier: 1,
+  summary: 'Tier 1 Devin ACP target served by the devin acp stdio subcommand, verified against '
+    + 'Devin 3000.3.27 (protocolVersion 1, loadSession, four session modes).',
+  probe: {
+    // Devin serves ACP from a subcommand, so its help lives behind `acp`.
+    helpArgs: ['acp', '--help'],
+  },
+};
+
 function stripPackageVersion(token: string): string {
   if (!token) {
     return '';
@@ -329,6 +342,17 @@ export function resolveAcpProviderProfile(
     || argNames.has('kiro-cli-acp')
   ) {
     return KIRO_ACP_PROFILE;
+  }
+
+  // Devin ships no standalone *-acp binary; ACP is a subcommand of the CLI
+  // itself, so `devin` alone is not an ACP target.
+  if (
+    providerName === 'devin'
+    || commandName === 'devin-acp'
+    || argNames.has('devin-acp')
+    || (commandName === 'devin' && hasAcpSubcommand)
+  ) {
+    return DEVIN_ACP_PROFILE;
   }
 
   return undefined;

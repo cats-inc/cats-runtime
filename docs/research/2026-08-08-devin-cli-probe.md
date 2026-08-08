@@ -52,13 +52,47 @@ settled one.
 (`summarizer`, `review`) and `--model` options. That is the transport the runtime should use
 for Devin execution, and it belongs under ADR-031's agent backend, not the CLI backend.
 
-One structural difference from every existing ACP profile: the current profiles in
-`src/backends/agent/adapters/acp/profiles.ts` all key on a **separate binary**
-(`agy-acp`, `junie-acp`, `cursor-acp`, …). Devin exposes ACP as a **subcommand of the same
-binary** (`devin acp`). Adding a Devin profile therefore needs command+arg detection rather
-than the binary-name matching the existing profiles rely on.
+Devin exposes ACP as a **subcommand of the same binary** (`devin acp`) rather than as a
+separate `*-acp` binary.
 
-Not attempted in this slice: no ACP handshake was performed, so no profile is added yet.
+*(Correction to the first version of this note, which claimed every existing profile keys on
+a separate binary and that Devin would therefore need new detection machinery. That was
+wrong: `resolveAcpProviderProfile` already computes `hasAcpSubcommand`, and `opencode acp`,
+`kilo acp`, `goose acp`, and `kiro-cli acp` all use it. Devin needed no new machinery.)*
+
+### Verified handshake
+
+A live ACP session was driven against `devin acp` over stdio using the same request shapes
+`AcpAdapter` sends.
+
+`initialize` (with the runtime's `protocolVersion: 1`) returned:
+
+- `protocolVersion: 1` — matches `DEFAULT_ACP_PROTOCOL_VERSION`, so no version negotiation
+  gap.
+- `agentCapabilities.loadSession: true` — **session loading is supported**, which the CLI
+  surface could not offer.
+- `promptCapabilities`: `image: true`, `audio: false`, `embeddedContext: true`.
+- `sessionCapabilities`: `list`, `delete`, `additionalDirectories`.
+- `authMethods`: `[{ id: 'devin-browser', name: 'Log in with browser' }]`.
+- `agentInfo`: `{ name: 'affogato', title: 'Devin Agent', version: '0.0.0-dev' }`.
+- Vendor extensions under `_meta` as `cognition.ai/*` flags (multiRootWorkspace,
+  sessionRename, documentLifecycle, userEdits, terminalLifecycle, megaplan, …).
+
+`session/new` returned `sessionId: "stump-mask"` (human-readable, not a UUID) plus a `modes`
+block: `currentModeId: "accept-edits"` with `accept-edits` (Code), `ask` (Ask), `plan`
+(Plan), and `bypass` (Bypass Permissions). The server also pushes `session/update`
+notifications carrying `available_commands_update`.
+
+Those four modes are the natural mapping target for the runtime's permission modes, and are
+strictly richer than what the CLI backend could express — note that Cline, by contrast, had
+only a global on/off.
+
+### Operational note — stderr is noisy
+
+`devin acp` writes continuous INFO-level tracing to stderr (`chisel: …`, one line per
+lifecycle step) and also logs to
+`%APPDATA%\devin\cli\logs\devin_<timestamp>_<pid>.log`. Any launch-failure
+classification that scans stderr must not treat this traffic as error output.
 
 ## Install tier
 
@@ -111,8 +145,12 @@ is the source to populate from.
 
 ## Not probed
 
-- The ACP handshake and session lifecycle over `devin acp`.
-- `--permission-mode` behavior per level, and how `--agent-config` expresses tool visibility.
+- `session/prompt` — no turn was driven, so the update-notification stream, tool-call
+  shapes, usage reporting, and cancellation over ACP remain uncharacterized.
+- Mapping the four ACP session modes onto the runtime's `skip` / `default` / `whitelist`.
+- `--agent-type` (`summarizer`, `review`) as ACP server variants.
+- `--permission-mode` behavior per level on the CLI surface, and how `--agent-config`
+  expresses tool visibility.
 - `-c/--continue` and `-r/--resume` semantics, and where session ids are exposed.
 - `devin list` (sessions in the current directory) output shape.
 - `--export` conversation format, which may be the only structured transcript available.
