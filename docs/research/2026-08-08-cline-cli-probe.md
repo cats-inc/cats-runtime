@@ -186,17 +186,48 @@ success-path fixtures would have hidden:
 - **`run_aborted`** is a top-level line: `{ reason: "external_abort", message: "aborted by
   another client" }`, emitted after `run_result`.
 
+## Cancellation — SIGTERM truncates the stream and orphans the history row
+
+Sending `SIGTERM` mid-turn kills the process promptly, but the consequences are worse than
+a clean stop:
+
+- **No terminal event is emitted.** The stream simply stops. There is no `run_result`, no
+  `done`, and no `run_aborted` — the captured stream ended on `iteration_start`. Any runtime
+  abort path must synthesize its own terminal event rather than wait for one.
+- **Usage for the cancelled turn is lost.** Usage is only reported cumulatively on
+  `run_result`, so a turn killed before it finishes reports nothing. Tokens were spent and
+  cannot be attributed.
+- **Cline's own history row is orphaned.** The session stays at `status: "running"` with
+  `endedAt: null` and `exitCode: null` indefinitely. Since `cline history` is the only place
+  the resumable session id appears, any future correlation logic must not treat
+  `status: "running"` as evidence of a live session — after a kill it means the opposite.
+
+This is a design input for the execution slice, not a blocker: the runtime already owns
+abort handling and would synthesize the terminal event. It does mean cancelled Cline turns
+cannot contribute usage metering.
+
 ## Working directory
 
 `-c/--cwd` is recorded verbatim rather than resolved: passing a relative `cline-probe`
 stored `cwd: "cline-probe"` in the session history. The runtime always passes an absolute
 path, so this is a note rather than a problem.
 
+## Remaining before execution can be enabled
+
+The stream contract is now fully characterized, but spawn-side behavior is not:
+
+- Spawn-argument shape for a runtime-driven turn (prompt passing, `--cwd`, `--model`,
+  `--timeout`, `--retries`) has not been exercised through the runtime's spawn path.
+- No compatibility profile exists yet, so execution stays pinned behind the same
+  exact-version gate Grok uses.
+- Permission mapping is constrained: `skip` maps to `--auto-approve true`, `default` maps to
+  `--auto-approve false` (deny-all), and `whitelist` has no representation in 3.0.51 and
+  should refuse rather than silently downgrade.
+
 ## Not probed
 
 - `--acp` (Agent Client Protocol mode). Cline advertises it; no ACP profile is added here.
   This is the most promising follow-up, since ADR-031 already houses an ACP adapter family.
-- Cancellation / SIGTERM behavior mid-run.
 - Plan mode (`-p/--plan`) stream differences.
 - `--zen` background hub, `--worktree`, subagent (`parentAgentId`) streams.
 - Authentication failure output, so `auth.errorPatterns` uses the generic set.
