@@ -6,7 +6,8 @@
 
 - Node.js 22+
 - Installed local CLIs for the providers you want to use (`claude`, `codex`,
-  `agy` for Antigravity, `cursor-agent`, `kiro-cli`, `grok`, `kilo`, `opencode`, etc.)
+  `agy` for Antigravity, `cursor-agent`, `kiro-cli`, `grok`, `cline`, `kilo`,
+  `opencode`, etc.)
 
 Grok CLI installs with `irm https://x.ai/cli/install.ps1 | iex` on Windows or
 `curl -fsSL https://x.ai/cli/install.sh | bash` on macOS/Linux. Its binary is
@@ -15,6 +16,15 @@ under `~/.grok/bin`; authenticate with `grok login` (which writes
 the installer's generic `agent` alias. Grok 1.0.0 can execute through the
 fixture-backed native adapter with model `grok-4.5`; other CLI versions are
 refused until their lifecycle contract is probed.
+
+Cline installs with `npm install -g cline` and authenticates with `cline auth`,
+which stores credentials under `~/.cline`. Cline 3.0.51 executes through the
+fixture-backed JSON adapter; other versions are refused until re-probed. Two
+limits are inherent to that version rather than to Cats: sessions cannot be
+resumed, because passing `--id` alongside `--json` fails and the stream never
+emits a resumable id; and the runtime's `whitelist` permission mode is
+unavailable, because `--auto-approve` is a global boolean with no per-tool form.
+Use `skip` to auto-approve tools or `default` to deny them all.
 
 ## Quick Start (npx)
 

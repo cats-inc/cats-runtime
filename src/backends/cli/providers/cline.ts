@@ -1,8 +1,12 @@
 import type {
+  CompatibilityProfileSelection,
   Provider,
   ProviderCapabilities,
+  ProviderLaunchFailureInput,
   ProviderSpawnOptions,
+  RuntimeProviderRefusal,
   StreamEvent,
+  TurnInput,
 } from './types.js';
 import type {
   ErrorStreamEvent,
@@ -20,6 +24,7 @@ import {
   observeUnknown,
 } from '../../../core/compatibility/providerEvolution.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
+import { compileRuntimeTurnPrompt } from './prompt.js';
 
 export const CLINE_JSON_PROFILE_ID = 'cline-cli-json-3.0.51';
 
@@ -61,6 +66,7 @@ interface ClineStreamLine {
   message?: unknown;
   reason?: unknown;
   finishReason?: unknown;
+  text?: unknown;
   usage?: ClineUsage;
   aggregateUsage?: ClineUsage;
   durationMs?: unknown;
@@ -74,18 +80,101 @@ export class ClineProvider implements Provider {
   // docs/research/2026-08-08-cline-cli-probe.md.
   capabilities: ProviderCapabilities = { resume: false, fork: false, permissions: true };
 
-  constructor(private readonly evolutionObserver?: ProviderEvolutionEvidenceObserver) {}
+  private pendingPrompt: string | null = null;
 
-  buildSpawnArgs(_opts: ProviderSpawnOptions): string[] {
-    throw new Error(
-      'Cline CLI execution is not enabled yet. The 3.0.51 --json stream is parsed and '
-      + 'fixture-backed, but spawn arguments, permission mapping, and cancellation have '
-      + 'not been probed. Install cline through setup and wait for the verified adapter.',
-    );
+  constructor(
+    private readonly compatibilityProfile?: CompatibilityProfileSelection,
+    private readonly evolutionObserver?: ProviderEvolutionEvidenceObserver,
+  ) {}
+
+  prepareEphemeralTurn(turn: TurnInput): void {
+    this.pendingPrompt = compileRuntimeTurnPrompt(turn.message, turn);
+  }
+
+  buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
+    this.assertVerifiedProfile();
+
+    const prompt = this.pendingPrompt;
+    if (!prompt) {
+      throw new Error('Cline CLI requires prepareEphemeralTurn before building spawn arguments.');
+    }
+    this.pendingPrompt = null;
+
+    if (opts.resumeSessionId) {
+      throw new Error(
+        'Cline CLI 3.0.51 cannot resume a session: passing --id alongside --json fails '
+        + 'regardless of whether the id is valid, and the stream never emits a resumable id.',
+      );
+    }
+    if (opts.forkSession) {
+      throw new Error('Cline CLI 3.0.51 has no session fork mechanism.');
+    }
+
+    const args = [
+      ...(this.compatibilityProfile?.spawnBaseArgs ?? CLINE_JSON_BASE_ARGS),
+      '--cwd', opts.cwd,
+    ];
+
+    const model = normalizeClineModelId(opts.model);
+    if (model) {
+      args.push('--model', model);
+    }
+
+    appendClinePermissionArgs(args, opts);
+
+    // The prompt is positional and must come last. Cline matches subcommands on
+    // an exact first-argument match, so a prompt is only ambiguous when it is a
+    // single bare word like "doctor"; keeping it last behind valued flags means
+    // it is never the first argument.
+    args.push(prompt);
+    return args;
   }
 
   buildStdinMessage(_content: string): string {
     return '';
+  }
+
+  classifyLaunchFailure(input: ProviderLaunchFailureInput): RuntimeProviderRefusal | null {
+    const evidenceSummary = [input.line, ...input.stderrLines]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .join(' | ');
+    const normalized = evidenceSummary.toLowerCase();
+
+    if (normalized.includes('insufficient balance') || normalized.includes('credits balance')) {
+      return {
+        category: 'provider_rejected',
+        message: 'Cline rejected the request for insufficient credits. Top up the Cline account or switch provider with cline auth.',
+        statusCode: 402,
+        retryable: false,
+        source: input.source,
+        evidenceSummary,
+      };
+    }
+
+    if (normalized.includes('not authenticated') || normalized.includes('run cline auth')) {
+      return {
+        category: 'auth_required',
+        message: 'Cline CLI is not signed in. Run cline auth to configure a provider.',
+        statusCode: 401,
+        retryable: false,
+        source: input.source,
+        evidenceSummary,
+      };
+    }
+
+    return null;
+  }
+
+  private assertVerifiedProfile(): void {
+    if (
+      this.compatibilityProfile?.id !== CLINE_JSON_PROFILE_ID
+      || this.compatibilityProfile.confidence !== 'exact'
+    ) {
+      throw new Error(
+        'Cline CLI execution requires the exact Cline 3.0.51 JSON compatibility profile. '
+        + 'Run provider compatibility diagnostics and install the verified CLI version.',
+      );
+    }
   }
 
   parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
@@ -333,7 +422,24 @@ export class ClineProvider implements Provider {
     ]);
   }
 
-  private parseRunResult(line: ClineStreamLine): StreamEvent {
+  private parseRunResult(line: ClineStreamLine): StreamEvent | null {
+    // run_result arrives *before* the trailing error / run_aborted line, and the
+    // runtime treats the first result-or-error as terminal. Emitting a result
+    // for a failed run would swallow the real reason and report the turn as
+    // successful; emitting an error here would win over the trailing line and
+    // report the generic finishReason instead of the specific cause. Both
+    // observed failure modes carry a trailing terminal line with the better
+    // message ("Insufficient balance…", "aborted by another client"), so this
+    // yields to it. If a future version omits that line the turn terminates on
+    // process exit, the same path SIGTERM already relies on.
+    if (line.finishReason !== 'completed') {
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: `run_result:${String(line.finishReason)}`,
+        reason: 'superseded_by_trailing_terminal_line',
+        rawSample: line,
+      }, null);
+    }
+
     // No session id is emitted anywhere in the stream. `taskId` (conv_*) is not
     // the id `cline history` reports, and not the one `--id` accepts, so the
     // result deliberately carries none rather than a value that cannot resume.
@@ -390,6 +496,31 @@ function summarizeToolOutput(
     ...(parts.length > 0 ? { text: parts.join('\n') } : {}),
     isError,
   };
+}
+
+function appendClinePermissionArgs(args: string[], opts: ProviderSpawnOptions): void {
+  if (opts.permissionMode === 'whitelist') {
+    // Cline 3.0.51 exposes only a global --auto-approve boolean; there is no
+    // per-tool allowlist flag. Silently downgrading to deny-all would look like
+    // a working whitelist while blocking every tool, so refuse instead.
+    throw new Error(
+      'Cline CLI 3.0.51 cannot enforce a tool allowlist: --auto-approve is a global '
+      + 'boolean with no per-tool form. Use skip or default permission mode.',
+    );
+  }
+
+  // Anything other than skip is deny-all. Cline does not prompt in --json mode;
+  // it refuses each call with "Tool approval requires an interactive session",
+  // lets the agent retry, and ends the run aborted.
+  args.push('--auto-approve', opts.permissionMode === 'skip' ? 'true' : 'false');
+}
+
+function normalizeClineModelId(model?: string): string | undefined {
+  const trimmed = model?.trim();
+  if (!trimmed || trimmed === 'cline-default') {
+    return undefined;
+  }
+  return trimmed;
 }
 
 function buildAbortMessage(line: ClineStreamLine): string {

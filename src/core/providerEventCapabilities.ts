@@ -272,7 +272,8 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       'Tool calls and results are native; runtime progress is derived from them.',
       'The stream repeats final text three more times (content_end, done, run_result); only the deltas are emitted.',
       'Per-iteration usage events are cumulative, so usage is taken from run_result.aggregateUsage alone.',
-      'The stream carries no resumable session id.',
+      'The stream carries no resumable session id, and 3.0.51 rejects --id under --json.',
+      'Execution is pinned to the exact fixture-backed 3.0.51 compatibility profile.',
     ],
   },
   auggie: {

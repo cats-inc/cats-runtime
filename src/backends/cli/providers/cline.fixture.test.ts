@@ -140,12 +140,27 @@ describe('Cline 3.0.51 authenticated stream fixtures', () => {
       .not.toContain('tools are blocked');
   });
 
-  it('surfaces run_aborted as an error carrying the abort reason', () => {
-    const aborted = normalize('tool-denied.aborted.redacted.ndjson')
-      .filter((event) => event.type === 'error');
+  it('surfaces run_aborted as the single terminal error, not a bare finishReason', () => {
+    const events = normalize('tool-denied.aborted.redacted.ndjson');
+    const terminal = events.filter((event) => event.type === 'error' || event.type === 'result');
 
-    expect(aborted).toHaveLength(1);
-    expect(aborted[0].text).toContain('aborted by another client');
-    expect(aborted[0].text).toContain('external_abort');
+    // The failed run_result must yield to the trailing run_aborted line, which
+    // carries the specific cause. Two terminal events would let the generic one
+    // win, since the runtime finishes on whichever arrives first.
+    expect(terminal).toHaveLength(1);
+    expect(terminal[0].type).toBe('error');
+    expect(terminal[0].text).toContain('aborted by another client');
+    expect(terminal[0].text).toContain('external_abort');
+  });
+
+  it('reports a provider refusal from the trailing error, not as a successful result', () => {
+    const events = normalize('provider-error.balance.redacted.ndjson');
+    const terminal = events.filter((event) => event.type === 'error' || event.type === 'result');
+
+    // run_result arrives first with finishReason "error" and zero usage; taking
+    // it at face value would report a clean turn that cost nothing.
+    expect(terminal.every((event) => event.type === 'error')).toBe(true);
+    expect(terminal.some((event) => event.text?.includes('Insufficient balance'))).toBe(true);
+    expect(events.some((event) => event.type === 'result')).toBe(false);
   });
 });

@@ -3,6 +3,10 @@ import {
   GROK_STREAMING_JSON_BASE_ARGS,
   GROK_STREAMING_JSON_PROFILE_ID,
 } from '../../backends/cli/providers/grok.js';
+import {
+  CLINE_JSON_BASE_ARGS,
+  CLINE_JSON_PROFILE_ID,
+} from '../../backends/cli/providers/cline.js';
 import type {
   ProviderCompatibilityKnowledge,
   ProviderCompatibilityProfile,
@@ -397,6 +401,32 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       provider: 'grok',
       protocolFamily: 'unverified',
       parserId: 'grok-refusal',
+    },
+  ),
+  cline: buildKnowledge(
+    'cline',
+    'Cline CLI',
+    {
+      id: CLINE_JSON_PROFILE_ID,
+      label: 'Cline CLI 3.0.51 JSON stream',
+      provider: 'cline',
+      protocolFamily: 'json-stream',
+      parserId: 'cline-native-json',
+      spawnBaseArgs: [...CLINE_JSON_BASE_ARGS],
+      // Pinned exactly. The contract this parser encodes was read off 3.0.51
+      // fixtures, including quirks (reasoning field name, object-shaped failed
+      // tool output, cumulative usage) that a minor bump could silently change.
+      supportedVersions: ['3.0.51'],
+      helpTokens: ['--json', '--auto-approve', '--thinking', '--acp'],
+      liveProbeArgs: ['--help'],
+      liveProbeTokens: ['--json', '--auto-approve'],
+    },
+    {
+      id: 'cline-cli-unverified',
+      label: 'Cline CLI unverified version refusal',
+      provider: 'cline',
+      protocolFamily: 'unverified',
+      parserId: 'cline-refusal',
     },
   ),
   opencode: buildKnowledge(

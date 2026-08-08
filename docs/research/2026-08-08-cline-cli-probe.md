@@ -142,6 +142,7 @@ host's absolute workspace path with `/workspace`:
 - `resume-rejected.error.redacted.ndjson` — 1 line, the `--id` + `--json` rejection above.
 - `tool-denied.aborted.redacted.ndjson` — 40 lines, `--auto-approve false` denying three
   tool calls, including the reasoning channel and the terminal `run_aborted`.
+- `provider-error.balance.redacted.ndjson` — 6 lines, an insufficient-credit refusal.
 
 `src/backends/cli/providers/cline.fixture.test.ts` pins the parser against these. The tests
 assert the traps directly rather than only the happy path: that the three redundant copies
@@ -212,17 +213,44 @@ cannot contribute usage metering.
 stored `cwd: "cline-probe"` in the session history. The runtime always passes an absolute
 path, so this is a note rather than a problem.
 
-## Remaining before execution can be enabled
+## Provider refusal — insufficient credits
 
-The stream contract is now fully characterized, but spawn-side behavior is not:
+Captured as `provider-error.balance.redacted.ndjson` when the probe account ran out of
+credit mid-session. The shape matters because it differs from every other failure mode:
 
-- Spawn-argument shape for a runtime-driven turn (prompt passing, `--cwd`, `--model`,
-  `--timeout`, `--retries`) has not been exercised through the runtime's spawn path.
-- No compatibility profile exists yet, so execution stays pinned behind the same
-  exact-version gate Grok uses.
-- Permission mapping is constrained: `skip` maps to `--auto-approve true`, `default` maps to
-  `--auto-approve false` (deny-all), and `whitelist` has no representation in 3.0.51 and
-  should refuse rather than silently downgrade.
+- Exit code **1** (the denied-tool abort exits `0`).
+- `run_result` with `finishReason: "error"`, zero usage, and `text` holding the actual
+  message — here `Insufficient balance. Your Cline Credits balance is $-0.11`.
+- A trailing `{"type":"error","message":"Insufficient balance…"}` line.
+
+This drove a parser decision. `run_result` arrives **before** the trailing terminal line, and
+the runtime finishes on whichever result-or-error event arrives first. Emitting a `result`
+for a non-completed run would report a failed turn as a clean one that cost nothing;
+emitting a generic error from `run_result` would beat the trailing line and hide the
+specific cause. So a non-completed `run_result` is ignored and the trailing line terminates
+the turn, which yields the precise message in both observed failure modes. The cost is that
+usage on failed turns is not reported, consistent with the cancellation finding above.
+
+## Argument parsing
+
+The prompt is positional. A prompt whose text merely *starts* with a subcommand name is
+safe — `cline --json "config is a word. Reply OK."` began a normal agent run rather than the
+`config` subcommand, because matching is on an exact first-argument equality against a
+single argv element. The residual risk is a prompt that is exactly one bare subcommand word.
+The adapter places the prompt last, behind valued flags, so it is never the first argument.
+
+## Execution status
+
+Execution is enabled for exactly 3.0.51 behind the compatibility profile
+`cline-cli-json-3.0.51`. Every flag the adapter emits was exercised live during this probe:
+`--json`, `--cwd` (confirmed via the history record), `--auto-approve` in both states,
+`--model`, and the positional prompt.
+
+**Not verified end to end.** The probe account reached a zero credit balance before a full
+turn could be driven through `WorkerPool` with the exact argument vector the adapter builds.
+The individual flags are live-verified and the parser is fixture-backed, but the assembled
+invocation has not completed a real turn. One authenticated end-to-end run is the remaining
+check; the exact-version profile gate is what keeps the blast radius to 3.0.51 until then.
 
 ## Not probed
 

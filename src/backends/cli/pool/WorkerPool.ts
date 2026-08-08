@@ -116,7 +116,7 @@ export class WorkerPool {
         };
       case 'cline':
         return {
-          provider: new ClineProvider(),
+          provider: new ClineProvider(compatibilityProfile),
           commandConfig: instance.commandConfig,
         };
       case 'claude':
