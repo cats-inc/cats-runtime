@@ -162,6 +162,39 @@ describe('AcpStdioClient', () => {
     });
   });
 
+  it('handles server requests carrying string JSON-RPC ids', async () => {
+    // JSON-RPC 2.0 allows String, Number, or NULL ids. Devin's ACP server issues
+    // fs/read_text_file with a string UUID; a number-only request guard sent that
+    // frame to failAll, which tore down the session on the first file read.
+    const process = new FakeAcpProcess();
+    const seen: string[] = [];
+    const client = new AcpStdioClient({
+      command: 'devin',
+      args: ['acp'],
+      spawnProcess: createSpawner(process),
+      onServerRequest(message) {
+        seen.push(message.method);
+        return { content: 'alpha\nbravo\n' };
+      },
+    });
+    activeClients.push(client);
+
+    process.stdout.write(JSON.stringify({
+      jsonrpc: '2.0',
+      id: 'd36679fd-d753-4cfd-97f5-f5aa657f4160',
+      method: 'fs/read_text_file',
+      params: { sessionId: 'humorous-sprite', path: '/work/sample.txt' },
+    }) + '\n');
+
+    const responseLine = await readNextLine(process.stdin);
+    expect(JSON.parse(responseLine)).toEqual({
+      jsonrpc: '2.0',
+      id: 'd36679fd-d753-4cfd-97f5-f5aa657f4160',
+      result: { content: 'alpha\nbravo\n' },
+    });
+    expect(seen).toEqual(['fs/read_text_file']);
+  });
+
   it('rejects pending requests when the process exits early', async () => {
     const process = new FakeAcpProcess();
     const client = new AcpStdioClient({

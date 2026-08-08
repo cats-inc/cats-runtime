@@ -143,11 +143,64 @@ bundling a selectable-looking model list would imply a capability that does not 
 playground exposes only the `devin-default` sentinel. When the ACP path lands, this command
 is the source to populate from.
 
+### session/prompt — the execution contract
+
+Two turns were driven end to end (text-only, and one forcing a file read).
+
+`session/prompt` returns `{ stopReason, usage, _meta }`, e.g.
+`{"stopReason":"end_turn","usage":{"totalTokens":10078,"inputTokens":10072,"outputTokens":6,
+"cachedReadTokens":9878,"cachedWriteTokens":191}}`. **Usage is reported over ACP**, which the
+CLI backend could not provide at all.
+
+`session/update` types observed, all of which `AcpAdapter` already handles:
+`session_info_update`, `config_option_update`, `current_mode_update`,
+`available_commands_update`, `agent_message_chunk`, `usage_update`, `tool_call`,
+`tool_call_update`. No adapter change was needed for any of them.
+
+Shapes worth noting:
+
+- `tool_call` → `{ toolCallId, title: "Read file", kind: "read", locations: [{path}],
+  _meta: {"cognition.ai/inferenceToolName": "read"} }`. Note it carries `title`/`kind`/
+  `locations` rather than a raw input blob.
+- `tool_call_update` arrives twice — first `{status}`, then `{status, content}`.
+- `usage_update` is context-window occupancy, not per-turn cost: `{ used, size }` with token
+  counts tucked under vendor `_meta` keys (`cognition.ai/inputTokens`, `…/cachedReadTokens`).
+  The authoritative per-turn usage is the `session/prompt` result.
+
+Two vendor notifications sit outside the ACP spec and are ignored as unknown methods:
+`_cognition.ai/mcp/serversChanged` and `_cognition.ai/agent_stopped` (the latter carries
+useful stats — `toolCalls`, `filesChanged`, `commandsRun`, `ttftMs`, `tokensPerSec`,
+`modelLabel`).
+
+No `session/request_permission` was issued in either turn: the default `accept-edits` mode
+auto-approved the read. Permission-prompt behavior is still uncharacterized.
+
+### Runtime bug found and fixed — string JSON-RPC ids
+
+Devin issues agent-to-client requests with **string UUID ids**:
+
+```
+{"jsonrpc":"2.0","id":"d36679fd-d753-4cfd-97f5-f5aa657f4160","method":"fs/read_text_file",…}
+```
+
+`AcpStdioClient`'s `isRequest` guard required `typeof id === 'number'`. Such a frame
+therefore matched neither `isRequest` (id not a number) nor `isNotification` (an `id` is
+present) nor `isResponse` (a `method` is present), and fell through to
+`failAll('Received malformed ACP JSON-RPC frame')` — **tearing down the whole session on the
+first file read**.
+
+JSON-RPC 2.0 permits String, Number, or NULL ids, so the runtime was non-compliant and Devin
+is not at fault. The guard now accepts both, `AcpJsonRpcRequest.id` widened to
+`number | string`, and a regression test pins it (verified to fail against the old guard).
+
+This bug was latent for every ACP provider that uses string ids, not just Devin.
+
 ## Not probed
 
-- `session/prompt` — no turn was driven, so the update-notification stream, tool-call
-  shapes, usage reporting, and cancellation over ACP remain uncharacterized.
 - Mapping the four ACP session modes onto the runtime's `skip` / `default` / `whitelist`.
+- `session/request_permission`, which neither probe turn triggered.
+- Cancellation over ACP (`session/cancel`).
+- `session/load` despite `loadSession: true` being advertised.
 - `--agent-type` (`summarizer`, `review`) as ACP server variants.
 - `--permission-mode` behavior per level on the CLI surface, and how `--agent-config`
   expresses tool visibility.

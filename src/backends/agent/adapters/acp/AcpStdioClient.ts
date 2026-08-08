@@ -9,9 +9,14 @@ export interface AcpJsonRpcErrorPayload {
   data?: unknown;
 }
 
+export type AcpJsonRpcId = number | string;
+
 export interface AcpJsonRpcRequest<T = unknown> {
   jsonrpc: '2.0';
-  id: number;
+  // JSON-RPC 2.0 allows String, Number, or NULL ids. Devin's ACP server issues
+  // agent-to-client requests with string UUIDs, so this cannot be narrowed to
+  // number without dropping those frames.
+  id: AcpJsonRpcId;
   method: string;
   params?: T;
 }
@@ -24,7 +29,7 @@ export interface AcpJsonRpcNotification<T = unknown> {
 
 export interface AcpJsonRpcResponse<T = unknown> {
   jsonrpc: '2.0';
-  id: number | null;
+  id: AcpJsonRpcId | null;
   result?: T;
   error?: AcpJsonRpcErrorPayload;
 }
@@ -83,8 +88,9 @@ function isResponse(message: AcpJsonRpcMessage): message is AcpJsonRpcResponse {
 }
 
 function isRequest(message: AcpJsonRpcMessage): message is AcpJsonRpcRequest {
+  const id = (message as { id?: unknown }).id;
   return typeof (message as { method?: unknown }).method === 'string'
-    && typeof (message as { id?: unknown }).id === 'number';
+    && (typeof id === 'number' || typeof id === 'string');
 }
 
 function isNotification(message: AcpJsonRpcMessage): message is AcpJsonRpcNotification {
