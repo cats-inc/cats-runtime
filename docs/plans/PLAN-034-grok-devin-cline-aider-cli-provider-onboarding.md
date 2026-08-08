@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress — Grok 1.0.0 and Cline 3.0.51 execution complete; Devin and Aider pending User approval |
+| **Status** | In Progress — Grok 1.0.0 and Cline 3.0.51 execution complete; Devin install-tier complete with CLI execution refused on evidence; Aider pending User approval |
 | **Owner** | User |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -58,7 +58,7 @@ Evidence channel: the `environment-bootstrap` installer and check scripts are au
 Install facts already extracted from upstream (no further probing needed):
 
 - [x] Grok — install contract plus authenticated Grok 1.0.0 success, model, tool, permission, error, cancellation, resume, and fork lifecycle captured in `docs/research/2026-08-08-grok-cli-install-tier-probe.md`.
-- [ ] Devin — `platform/windows/Install-DevinCLI.ps1`, `platform/{linux,macos}/install-devin-cli.sh`. Installer `https://static.devin.ai/cli/setup.ps1` (Windows, PowerShell-only) / `https://cli.devin.ai/install.sh` (Unix). Binary `%LOCALAPPDATA%\devin\cli\bin\devin.exe` / `~/.local/bin/devin`, versions under `$XDG_DATA_HOME/devin/cli/_versions`. Upstream strips the trailing `devin setup`. Upstream Full mode.
+- [x] Devin — install tier landed; CLI execution refused on evidence. `devin --version` is `devin 3000.3.27 (0becb483)` (prefixed, not bare semver). Auth is `devin auth login` / `devin auth status`, with `devin setup` as the broader wizard. Probe: `docs/research/2026-08-08-devin-cli-probe.md`.
 - [ ] Aider — `platform/windows/Install-Aider.ps1`, `platform/{linux,macos}/install-aider.sh`. Installer `https://aider.chat/install.{ps1,sh}`, which is the `uv` installer plus `uv tool install --force --python python3.12 --with pip aider-chat@latest`. Binary `~/.local/bin/aider{,.exe}`. Credential sources include environment, `.env`, `.aider.conf.yml`, command-line options, and local models; ambient key names are evidence, not readiness. Upstream Full mode.
 - [x] Cline — npm package `cline`, binary `cline`, auth via `cline auth` into `~/.cline`. Install tier plus the full 3.0.51 execution contract captured in `docs/research/2026-08-08-cline-cli-probe.md` with four fixtures. The upstream macOS/Linux-preview note does not hold for the runtime tier: version, help, JSON execution, tool calls, and history all work on Windows 11. Packaged Windows support remains a separate call under cats-platform PLAN-102.
 
@@ -66,7 +66,7 @@ Live probe questions (SPEC-027 Probe Items; gate execution adapters, not this pl
 
 - [x] **P5 (Grok)** — Captured exact 1.0.0 version/help and model enumeration. Remaining providers stay open.
 - [x] **P2 (Grok)** — Verified native `streaming-json` and alternate Messages-compatible NDJSON. Remaining providers stay open.
-- [ ] **P1** — Determine whether Devin executes locally or orchestrates remote sessions (resolves the ADR-023 classification).
+- [x] **P1** — Resolved: Devin executes locally (`-p/--print`, `--permission-mode`, `--sandbox`) and keeps its remote surface in a separate `cloud` subcommand, so the ADR-023 reclassification is not triggered and no follow-up ADR is needed.
 - [x] **Grok model list** — `grok models` returned only `grok-4.5`, marked default. Remaining providers stay open.
 - [x] **P3 (Grok)** — Resume and fork work by returned session id; private history scanning/import remains out of scope. Remaining providers stay open.
 - [ ] **P4** — Capture the exact upstream Cline allowlist and determine how the helper feature-detects npm's global `allow-scripts` support. Documentation and compatibility coverage only; SPEC-027 D5 already defines the policy.
@@ -233,6 +233,7 @@ The runtime owns these surfaces. Grok is now mirrored into the platform product 
 | 2026-08-07 | SPEC-027 open questions rewritten as Proposed Decisions D1–D5 pending User approval, so implementation remains blocked. Review corrections use the official Grok `XAI_API_KEY`, treat Aider keys as evidence rather than readiness, keep Cline Windows install unsupported, and separate runtime setup visibility from the platform product execution catalog. |
 | 2026-08-08 | User approved implementation starting with Grok. The Grok install/check taxonomy, native config, refusal adapter, conservative capabilities, empty bundled model catalog, dashboard/playground/setup surfaces, tests, setup guide, and read-only version/help probe landed as the first slice. Devin, Cline, Aider, and the Pi rename remain pending. |
 | 2026-08-08 | Completed the authenticated Grok 1.0.0 lifecycle probe and promoted Grok to exact-version native execution. Added full sanitized fixtures, tool/error/cancellation/resume/fork parsing, permission safeguards, `grok-4.5`, compatibility refusal for version drift, and the platform catalog handoff. |
+| 2026-08-08 | Devin 3000.3.27 install tier landed and P1 resolved: it executes locally, so it stays a CLI family and no ADR-023 reclassification is needed. CLI execution is refused on settled evidence rather than pending a probe — 3000.3.27 has no machine-readable output mode at all, so tool calls, usage, and session identity are unrecoverable from stdout. Its structured surface is `devin acp`, which belongs to the agent backend under ADR-031 and is the natural next slice. |
 | 2026-08-08 | Cline 3.0.51 landed across five slices: install tier, the Pi package-rename fix, stream capture with a fixture-backed parser, a denied-tool fix that corrected three parser gaps the success fixtures hid, and execution enablement behind the exact-version profile `cline-cli-json-3.0.51`. Resume is disabled (`--id` fails under `--json`) and `whitelist` permission mode refuses (no per-tool flag exists), per User approval. One authenticated end-to-end run through WorkerPool remains outstanding; the probe account hit a zero credit balance mid-slice. |
 
 ---

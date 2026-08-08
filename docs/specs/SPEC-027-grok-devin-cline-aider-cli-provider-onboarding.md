@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress — Grok 1.0.0 and Cline 3.0.51 execution complete; Devin and Aider pending User approval |
+| **Status** | In Progress — Grok 1.0.0 and Cline 3.0.51 execution complete; Devin install-tier complete with CLI execution refused on evidence; Aider pending User approval |
 | **Owner** | User |
 | **Reviewer** | User |
 

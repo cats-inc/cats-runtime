@@ -276,6 +276,26 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       'Execution is pinned to the exact fixture-backed 3.0.51 compatibility profile.',
     ],
   },
+  devin: {
+    normalizedStream: {
+      text: { mode: 'final', stepwise: false },
+      toolUse: 'none',
+      toolResult: 'none',
+      progress: 'none',
+      reasoning: 'none',
+    },
+    transcript: {
+      contentBlocks: 'none',
+    },
+    presentation: {
+      recommended: 'final_message',
+    },
+    notes: [
+      'Devin 3000.3.27 --print emits plain prose with no machine-readable mode.',
+      'Tool calls, usage, and session identity are unrecoverable from CLI stdout.',
+      'Its structured surface is the ACP server (devin acp), owned by the agent backend.',
+    ],
+  },
   auggie: {
     normalizedStream: {
       text: { mode: 'final', stepwise: false },

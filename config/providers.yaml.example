@@ -86,6 +86,10 @@ routing:
       default_target:
         backend: cli
         instance: native
+    devin:
+      default_target:
+        backend: cli
+        instance: native
     ollama:
       default_target:
         backend: local
@@ -257,6 +261,13 @@ backends:
           native:
             environment: native
             command: cline
+            runner: auto
+
+      devin:
+        instances:
+          native:
+            environment: native
+            command: devin
             runner: auto
 
   api:

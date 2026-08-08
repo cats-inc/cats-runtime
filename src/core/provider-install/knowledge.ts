@@ -631,6 +631,57 @@ const INSTALL_KNOWLEDGE: Record<ProviderName, ProviderInstallKnowledge> = {
     '@earendil-works/pi-coding-agent',
     'Complete the Pi Coding Agent CLI authentication flow after install.',
   ),
+  devin: {
+    provider: 'devin',
+    familyLabel: 'Devin CLI',
+    installPack: 'native-cli',
+    binaryName: 'devin',
+    defaultDocsUrl: 'https://devin.ai/cli',
+    check: {
+      versionArgs: ['--version'],
+      helpArgs: ['--help'],
+      prerequisites: createNativeInstallerPrerequisites('Devin CLI'),
+      expectedPaths: {
+        windows: '%LOCALAPPDATA%\devin\cli\bin\devin.exe',
+        macos: '~/.local/bin/devin',
+        linux: '~/.local/bin/devin',
+      },
+      pathHints: {
+        ...createLocalBinPathHints('devin'),
+        windows: {
+          expectedPath: '%LOCALAPPDATA%\devin\cli\bin\devin.exe',
+          directoryHint: '%LOCALAPPDATA%\devin\cli\bin',
+          exportCommand: 'setx PATH "%LOCALAPPDATA%\devin\cli\bin;%PATH%"',
+          reloadHint: 'Open a new terminal window after installing Devin CLI.',
+        },
+      },
+    },
+    auth: {
+      requiredAfterInstall: true,
+      envVars: [],
+      interactive: true,
+      docsUrl: 'https://devin.ai/cli',
+      hint: 'Run devin auth login, or devin setup for the full wizard. Packaged installs skip it.',
+      errorPatterns: [...GENERIC_AUTH_ERROR_PATTERNS, 'devin auth login'],
+    },
+    platforms: createNativeInstall(
+      'devin-cli',
+      'irm https://static.devin.ai/cli/setup.ps1 | iex',
+      'curl -fsSL https://cli.devin.ai/install.sh | bash',
+      {
+        docsUrl: 'https://devin.ai/cli',
+        notes: [
+          'Both official installers end by running the interactive devin setup; packaged installs strip it, so run devin auth login once by hand.',
+          'Credentials live in the devin config directory; check state with devin auth status.',
+        ],
+        windowsNotes: [
+          'Devin installs into %LOCALAPPDATA%\devin\cli\bin\devin.exe.',
+          'The official installer runs under PowerShell only; Git Bash and CMD fail. The installed binary works from any shell.',
+          'Packaged installs strip the trailing interactive devin setup, so run devin auth login once by hand.',
+        ],
+      },
+    ),
+  },
   cline: createGenericNpmKnowledge(
     'cline',
     'Cline CLI',

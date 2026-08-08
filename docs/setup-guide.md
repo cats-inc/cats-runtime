@@ -6,8 +6,8 @@
 
 - Node.js 22+
 - Installed local CLIs for the providers you want to use (`claude`, `codex`,
-  `agy` for Antigravity, `cursor-agent`, `kiro-cli`, `grok`, `cline`, `kilo`,
-  `opencode`, etc.)
+  `agy` for Antigravity, `cursor-agent`, `kiro-cli`, `grok`, `cline`, `devin`,
+  `kilo`, `opencode`, etc.)
 
 Grok CLI installs with `irm https://x.ai/cli/install.ps1 | iex` on Windows or
 `curl -fsSL https://x.ai/cli/install.sh | bash` on macOS/Linux. Its binary is
@@ -25,6 +25,16 @@ resumed, because passing `--id` alongside `--json` fails and the stream never
 emits a resumable id; and the runtime's `whitelist` permission mode is
 unavailable, because `--auto-approve` is a global boolean with no per-tool form.
 Use `skip` to auto-approve tools or `default` to deny them all.
+
+Devin installs with `irm https://static.devin.ai/cli/setup.ps1 | iex` on Windows
+(PowerShell only; the installed binary works from any shell) or
+`curl -fsSL https://cli.devin.ai/install.sh | bash` on macOS/Linux. Packaged
+installs strip the trailing interactive step, so run `devin auth login` once by
+hand and check with `devin auth status`. Cats detects and installs Devin but
+cannot run sessions through it: version 3000.3.27 has no machine-readable output
+mode, so `--print` returns plain prose with no tool, usage, or session data. Its
+structured surface is the ACP server (`devin acp`), which belongs to the agent
+backend rather than the CLI backend.
 
 ## Quick Start (npx)
 

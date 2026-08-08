@@ -398,6 +398,7 @@ const PROVIDER_COLORS = {
   kiro:    { bg:'bg-teal-900/40',border:'border-teal-500',text:'text-teal-400',dot:'bg-teal-400' },
   grok:    { bg:'bg-gray-950/40',border:'border-gray-200',text:'text-gray-200',dot:'bg-gray-200' },
   cline:   { bg:'bg-fuchsia-950/40',border:'border-fuchsia-400',text:'text-fuchsia-400',dot:'bg-fuchsia-400' },
+  devin:   { bg:'bg-sky-950/40',border:'border-sky-400',text:'text-sky-400',dot:'bg-sky-400' },
   ollama:  { bg:'bg-slate-900/70',border:'border-slate-500',text:'text-slate-400',dot:'bg-slate-400' },
   openclaw:{ bg:'bg-red-900/40',border:'border-red-500',text:'text-red-400',dot:'bg-red-400' },
 };
@@ -417,12 +418,13 @@ const PROVIDER_MODELS = {
   kiro:[{value:'auto',label:'auto (default)'},{value:'claude-opus-4.6',label:'claude-opus-4.6'},{value:'claude-sonnet-4.6',label:'claude-sonnet-4.6'},{value:'claude-opus-4.5',label:'claude-opus-4.5'},{value:'claude-sonnet-4.5',label:'claude-sonnet-4.5'},{value:'claude-sonnet-4',label:'claude-sonnet-4'},{value:'claude-haiku-4.5',label:'claude-haiku-4.5'},{value:'deepseek-3.2',label:'deepseek-3.2'},{value:'minimax-m2.5',label:'minimax-m2.5'},{value:'minimax-m2.1',label:'minimax-m2.1'},{value:'glm-5',label:'glm-5'},{value:'qwen3-coder-next',label:'qwen3-coder-next'}],
   grok:[{value:'grok-4.5',label:'grok-4.5 (default)'}],
   cline:[{value:'cline-default',label:'Cline default'}],
+  devin:[{value:'devin-default',label:'Devin default'}],
   goose:[{value:'chatgpt_codex/gpt-5.2-codex',label:'chatgpt_codex/gpt-5.2-codex (default)'}],
   ollama:[{value:'qwen2.5-coder:7b',label:'qwen2.5-coder:7b (default)'}],
   openclaw:[{value:'openclaw-coder',label:'openclaw-coder (default)'},{value:'openclaw-preview',label:'openclaw-preview'}],
 };
 const PROVIDER_ADVANCED_CATALOGS = {};
-const PROVIDERS = ['claude','codex','antigravity','cursor','copilot','opencode','kilo','goose','pi','auggie','junie','kiro','grok','cline','ollama','openclaw'];
+const PROVIDERS = ['claude','codex','antigravity','cursor','copilot','opencode','kilo','goose','pi','auggie','junie','kiro','grok','cline','devin','ollama','openclaw'];
 const PROVIDER_AVAILABILITY = {};
 let SELECTABLE_PROVIDERS = [...PROVIDERS];
 let providerOptionsReady = false;

@@ -90,6 +90,38 @@ describe('buildProviderInstallCatalogView', () => {
     expect(view.auth.hint).toContain('cline auth');
   });
 
+  it.each([
+    ['win32', 'windows', 'irm https://static.devin.ai/cli/setup.ps1 | iex'],
+    ['darwin', 'macos', 'curl -fsSL https://cli.devin.ai/install.sh | bash'],
+    ['linux', 'linux', 'curl -fsSL https://cli.devin.ai/install.sh | bash'],
+  ] as const)('describes the Devin native installer on %s', (
+    hostPlatform,
+    executionPlatform,
+    command,
+  ) => {
+    const view = buildProviderInstallCatalogView('devin', { mode: 'native' }, hostPlatform);
+
+    expect(view).toMatchObject({
+      familyLabel: 'Devin CLI',
+      installPack: 'native-cli',
+      executionPlatform,
+      binaryName: 'devin',
+      install: { installerId: 'devin-cli', method: 'native_installer', command },
+      auth: { envVars: [], interactive: true },
+    });
+    // Packaged installers strip the trailing interactive step, so a successful
+    // install never implies the CLI is usable.
+    expect(view.auth.hint).toContain('devin auth login');
+    expect(view.install.notes?.some((note) => note.includes('devin setup'))).toBe(true);
+  });
+
+  it('points Devin detection at the platform-specific install directory', () => {
+    expect(buildProviderInstallCatalogView('devin', { mode: 'native' }, 'win32').path)
+      .toMatchObject({ directoryHint: '%LOCALAPPDATA%\devin\cli\bin' });
+    expect(buildProviderInstallCatalogView('devin', { mode: 'native' }, 'linux').path)
+      .toMatchObject({ expectedPath: '~/.local/bin/devin' });
+  });
+
   it('installs Pi from the renamed npm package', () => {
     // The abandoned @mariozechner/pi-coding-agent still resolves on npm and reports
     // itself as up to date, so pointing at it silently disables every Pi upgrade.

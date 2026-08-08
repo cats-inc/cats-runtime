@@ -214,6 +214,10 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
   // whatever the signed-in account has configured. Left empty rather than
   // bundling a one-account sample as a catalog.
   cline: [],
+  // `devin models list` enumerates 37 live families, but the runtime cannot
+  // execute Devin through the CLI backend, so no ids are bundled until the ACP
+  // path lands and can prove which of them are selectable from it.
+  devin: [],
   copilot: [
     { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
     { id: 'claude-opus-4.6', label: 'claude-opus-4.6' },
