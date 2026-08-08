@@ -90,6 +90,15 @@ describe('buildProviderInstallCatalogView', () => {
     expect(view.auth.hint).toContain('cline auth');
   });
 
+  it('installs Pi from the renamed npm package', () => {
+    // The abandoned @mariozechner/pi-coding-agent still resolves on npm and reports
+    // itself as up to date, so pointing at it silently disables every Pi upgrade.
+    const view = buildProviderInstallCatalogView('pi', { mode: 'native' }, 'linux');
+
+    expect(view.npm?.packageName).toBe('@earendil-works/pi-coding-agent');
+    expect(view.install.command).toBe('npm install -g @earendil-works/pi-coding-agent');
+  });
+
   it('derives the npm binary name from the provider id unless overridden', () => {
     // Guards the createGenericNpmKnowledge refactor that replaced the hardcoded
     // `provider === 'opencode'` check with an explicit binaryName option.

@@ -622,10 +622,13 @@ const INSTALL_KNOWLEDGE: Record<ProviderName, ProviderInstallKnowledge> = {
     '@augmentcode/auggie',
     'Complete the Auggie CLI authentication flow after install.',
   ),
+  // Upstream renamed this package (environment-bootstrap cfe7785). npm resolves the
+  // old name to its final published version and reports it as current forever, so
+  // `npm outdated -g` never flags it and every upgrade path silently skips it.
   pi: createGenericNpmKnowledge(
     'pi',
     'Pi Coding Agent CLI',
-    '@mariozechner/pi-coding-agent',
+    '@earendil-works/pi-coding-agent',
     'Complete the Pi Coding Agent CLI authentication flow after install.',
   ),
   cline: createGenericNpmKnowledge(
