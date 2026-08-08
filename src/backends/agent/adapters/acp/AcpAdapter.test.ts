@@ -1448,6 +1448,96 @@ describe('AcpAdapter', () => {
     expect(inspection.capabilities.runtimeServices).toBe(true);
   });
 
+  function createDevinStdioInstance(): RemoteProviderInstanceConfig {
+    return {
+      id: 'acp',
+      providerName: 'devin',
+      backend: 'agent',
+      transport: 'acp_stdio',
+      command: 'devin',
+      args: ['acp'],
+      cwd: '/tmp/acp',
+      startupTimeoutMs: 15000,
+    };
+  }
+
+  function startDevinServer(process: FakeAcpProcess, seen: string[], resumed = false) {
+    startFakeServer(process, async (message) => {
+      if (message.method) seen.push(message.method);
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            ...(resumed ? { agentCapabilities: { loadSession: true } } : {}),
+          },
+        }) + '\n');
+        return;
+      }
+      if (message.method === 'session/new' || message.method === 'session/load') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          // Devin reports accept-edits after load regardless of any mode set
+          // before the process restarted.
+          result: { sessionId: 'sage-origin', modes: { currentModeId: 'accept-edits' } },
+        }) + '\n');
+        return;
+      }
+      if (message.method === 'session/set_mode' || message.method === 'session/prompt') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: message.method === 'session/prompt' ? { stopReason: 'end_turn' } : {},
+        }) + '\n');
+      }
+    });
+  }
+
+  it('pins the Devin session mode on a fresh ACP session', async () => {
+    const process = new FakeAcpProcess();
+    const seen: string[] = [];
+    startDevinServer(process, seen);
+
+    const adapter = new AcpAdapter({
+      acpHostBridge: createHostBridge(),
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    await collectEvents(adapter.invoke({
+      ...createInvokeInput(createDevinStdioInstance(), createHostBridge(), 'default'),
+      providerName: 'devin',
+    }));
+
+    expect(seen).toContain('session/set_mode');
+    expect(seen.indexOf('session/set_mode')).toBeLessThan(seen.indexOf('session/prompt'));
+  });
+
+  it('re-pins the Devin session mode after resuming, because load resets it', async () => {
+    // Live probe: session/load returns currentModeId "accept-edits" regardless of
+    // the mode set before the restart, so a resumed turn would silently become
+    // permissive if the adapter only set the mode on the session/new path.
+    const process = new FakeAcpProcess();
+    const seen: string[] = [];
+    startDevinServer(process, seen, true);
+
+    const adapter = new AcpAdapter({
+      acpHostBridge: createHostBridge(),
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    await collectEvents(adapter.invoke({
+      ...createInvokeInput(createDevinStdioInstance(), createHostBridge(), 'default'),
+      providerName: 'devin',
+      providerSessionId: 'sage-origin',
+    }));
+
+    expect(seen).toContain('session/load');
+    expect(seen).toContain('session/set_mode');
+    expect(seen.indexOf('session/set_mode')).toBeGreaterThan(seen.indexOf('session/load'));
+  });
+
   it('throws when invoke is used without a runtime ACP host bridge binding', async () => {
     const adapter = new AcpAdapter();
     const iterator = adapter.invoke({

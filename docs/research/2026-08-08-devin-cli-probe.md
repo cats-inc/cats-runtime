@@ -230,11 +230,61 @@ so agents that route every tool through `session/request_permission` keep their 
 behavior and need no mapping. If `session/set_mode` fails, the turn fails: a mode that
 cannot be pinned must not silently fall back to a more permissive one.
 
+### Cancellation — clean, and far better than the CLI surface
+
+Sending the `session/cancel` notification mid-turn settled the in-flight `session/prompt`
+in **~12ms** with `{"stopReason":"cancelled"}`, and the session stayed usable: a follow-up
+prompt on the same session returned `end_turn` normally.
+
+Two details matter:
+
+- The cancelled result carries **no `usage` field**, so a cancelled turn reports no token
+  spend. Same consequence as the CLI path, reached a different way.
+- Contrast with the CLI backend, where SIGTERM produced no terminal event at all. Over ACP
+  the runtime gets a real, prompt terminal event and does not need to synthesize one.
+
+### session/load — works, but silently resets the session mode
+
+Loading a session id from a **previous process** succeeded and genuinely restored context:
+the reloaded session correctly answered a question about a turn from the earlier process.
+Replayed updates: `user_message_chunk`, `agent_message_chunk`, `session_info_update`,
+`available_commands_update`, `usage_update`.
+
+**The important finding**: `session/load` returns `modes.currentModeId: "accept-edits"` —
+Devin's permissive default — regardless of what the mode was before the restart. A resumed
+turn would therefore silently drop back to the mode that writes files without asking, undoing
+the permission-mode pinning.
+
+The adapter applies `session/set_mode` after the bootstrap branch rather than inside the
+`session/new` branch, so resume is covered. A regression test pins it, verified by moving
+the call into the fresh-session branch and confirming the test fails.
+
+#### Session locking
+
+If the previous process still holds the session, `session/load` fails with:
+
+```
+-32015 "Session 'X' is already open in another process. Close the other instance before
+opening it here."   data: {"cognition.ai/errorKind":"session_locked","cognition.ai/retryable":true}
+```
+
+History is replayed *before* the error arrives, so replay is not evidence of success. After a
+failed load, `session/prompt` on that id returns `-32016 session_not_found`.
+
+A correctly terminated server does release the lock: the first probe left six orphaned
+`devin.exe` processes, but that was an artifact of the probe spawning through `shell: true`
+so SIGTERM hit the shell instead of the agent. The runtime spawns ACP processes with
+`shell: false` (`defaultSpawnProcess`), and a direct SIGTERM both exits cleanly and frees the
+session — re-verified after fixing the probe. No runtime change is needed here; it is
+recorded so the orphan symptom is not re-diagnosed as a Devin defect.
+
 ## Not probed
 
 - `session/request_permission` option semantics beyond `allow_once` / `allow_always` /
   `reject_once`; the runtime's existing option-kind selection was not re-verified per mode.
 - Whether `plan` mode is worth exposing as a distinct runtime concept.
+- Whether `session_locked` should become a typed retryable refusal rather than a generic
+  turn failure.
 - Cancellation over ACP (`session/cancel`).
 - `session/load` despite `loadSession: true` being advertised.
 - `--agent-type` (`summarizer`, `review`) as ACP server variants.
