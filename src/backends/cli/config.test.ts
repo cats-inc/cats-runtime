@@ -70,6 +70,7 @@ describe('config platform defaults', () => {
     expect(defaultProviderRuntimeMode('claude', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('codex', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('antigravity', 'win32')).toBe('native');
+    expect(defaultProviderRuntimeMode('grok', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('copilot', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('opencode', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('auggie', 'win32')).toBe('native');
@@ -293,6 +294,28 @@ describe('config platform defaults', () => {
       runner: 'auto',
       runnerPath: undefined,
       runtime: { mode: 'native', distro: undefined },
+    });
+  });
+
+  it('loads the Grok command override and creates a native instance', () => {
+    const config = loadConfigWithoutProviderFile({
+      GROK_PATH: '/custom/grok',
+    });
+
+    expect(config.grokPath).toBe('/custom/grok');
+    expect(config.providerCommands.grok).toEqual({
+      path: '/custom/grok',
+      runner: 'auto',
+      runnerPath: undefined,
+      runtime: { mode: 'native', distro: undefined },
+    });
+    expect(resolveProviderInstance(config, 'grok')).toMatchObject({
+      id: 'native',
+      providerName: 'grok',
+      commandConfig: {
+        path: '/custom/grok',
+        runtime: { mode: 'native' },
+      },
     });
   });
 

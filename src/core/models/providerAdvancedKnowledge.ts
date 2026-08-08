@@ -654,6 +654,22 @@ function buildCuratedAntigravityCliOverlay(
   return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeVerbatimCuratedModelId);
 }
 
+function buildCuratedGrokCliOverlay(
+  document: CuratedModelCatalogDocument | undefined,
+): CuratedCatalogOverlay | null {
+  const catalog = findCuratedCliCatalog(document, 'grok');
+  if (!catalog) {
+    return null;
+  }
+
+  const scope = resolveCuratedCatalogScope(catalog, 'grok');
+  if (!scope) {
+    return null;
+  }
+
+  return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeVerbatimCuratedModelId);
+}
+
 function flattenCuratedCatalogProviderModels(
   catalog: CuratedModelCatalogEntry,
 ): CuratedModelCatalogModel[] {
@@ -1350,6 +1366,7 @@ function loadCuratedOverlay(
       target.providerName !== 'claude'
       && target.providerName !== 'codex'
       && target.providerName !== 'antigravity'
+      && target.providerName !== 'grok'
       && target.providerName !== 'kilo'
       && target.providerName !== 'kiro'
       && target.providerName !== 'junie'
@@ -1373,6 +1390,8 @@ function loadCuratedOverlay(
         return buildCuratedCodexCliOverlay(result.document);
       case 'antigravity':
         return buildCuratedAntigravityCliOverlay(result.document);
+      case 'grok':
+        return buildCuratedGrokCliOverlay(result.document);
       case 'kilo':
         return buildCuratedKiloCliOverlay(result.document);
       case 'kiro':

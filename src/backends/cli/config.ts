@@ -173,6 +173,7 @@ export interface CliRuntimeConfig {
   claudePath: string;
   codexPath: string;
   antigravityPath: string;
+  grokPath: string;
   copilotPath: string;
   cursorPath: string;
   kiroPath: string;
@@ -430,6 +431,7 @@ export function loadConfig(
     claudePath: configured.providerCommands.claude.path,
     codexPath: configured.providerCommands.codex.path,
     antigravityPath: configured.providerCommands.antigravity.path,
+    grokPath: configured.providerCommands.grok.path,
     copilotPath: configured.providerCommands.copilot.path,
     cursorPath: configured.providerCommands.cursor.path,
     kiroPath: configured.providerCommands.kiro.path,
@@ -648,6 +650,7 @@ function buildLegacyRuntimeShape(
     pi: 'native',
     junie: 'native',
     kiro: 'native',
+    grok: 'native',
   } satisfies Record<ProviderName, string>;
   const providerDefaultTargets = Object.fromEntries(
     Object.entries(providerDefaultInstances).map(([provider, instance]) => [provider, {
@@ -712,6 +715,13 @@ function buildLegacyRuntimeShape(
         id: 'native',
         providerName: 'antigravity',
         commandConfig: providerCommands.antigravity,
+      },
+    },
+    grok: {
+      native: {
+        id: 'native',
+        providerName: 'grok',
+        commandConfig: providerCommands.grok,
       },
     },
     copilot: {
@@ -817,6 +827,7 @@ function buildLegacyProviderCommands(
   const claudePath = env.CLAUDE_PATH || 'claude';
   const codexPath = env.CODEX_PATH || 'codex';
   const antigravityPath = env.ANTIGRAVITY_PATH || 'agy';
+  const grokPath = env.GROK_PATH || 'grok';
   const copilotPath = env.COPILOT_PATH || 'copilot';
   const cursorPath = env.CURSOR_PATH || 'cursor-agent';
   const kiroPath = env.KIRO_PATH || 'kiro-cli';
@@ -849,6 +860,12 @@ function buildLegacyProviderCommands(
       'ANTIGRAVITY',
       antigravityPath,
       defaultProviderRuntimeMode('antigravity'),
+      env,
+    ),
+    grok: readProviderCommandConfig(
+      'GROK',
+      grokPath,
+      defaultProviderRuntimeMode('grok'),
       env,
     ),
     copilot: readProviderCommandConfig(
@@ -1565,6 +1582,7 @@ function cloneProviderCommands(
     claude: cloneProviderCommandConfig(commands.claude),
     codex: cloneProviderCommandConfig(commands.codex),
     antigravity: cloneProviderCommandConfig(commands.antigravity),
+    grok: cloneProviderCommandConfig(commands.grok),
     copilot: cloneProviderCommandConfig(commands.copilot),
     cursor: cloneProviderCommandConfig(commands.cursor),
     kiro: cloneProviderCommandConfig(commands.kiro),
@@ -1584,6 +1602,7 @@ function cloneProviderInstances(
     claude: cloneInstanceMap(instances.claude),
     codex: cloneInstanceMap(instances.codex),
     antigravity: cloneInstanceMap(instances.antigravity),
+    grok: cloneInstanceMap(instances.grok),
     copilot: cloneInstanceMap(instances.copilot),
     cursor: cloneInstanceMap(instances.cursor),
     kiro: cloneInstanceMap(instances.kiro),

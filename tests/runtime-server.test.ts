@@ -261,8 +261,12 @@ describe('runtime server', () => {
       expect(html.indexOf('<option value="copilot">copilot</option>'))
         .toBeLessThan(html.indexOf('<option value="opencode">opencode</option>'));
       expect(html).toContain(
-        "const PROVIDER_ORDER = ['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'opencode', 'kilo', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'ollama', 'openclaw'];",
+        "const PROVIDER_ORDER = ['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'opencode', 'kilo', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'grok', 'ollama', 'openclaw'];",
       );
+      expect(html.indexOf('<option value="kiro">kiro</option>'))
+        .toBeLessThan(html.indexOf('<option value="grok">grok</option>'));
+      expect(html).toContain('--grok: #e5e7eb;');
+      expect(html).toContain('.provider-badge[data-p="grok"]');
       expect(html).toContain('--openclaw: #f87171;');
       expect(html).toContain('.provider-badge[data-p="openclaw"]');
 
@@ -485,6 +489,7 @@ describe('runtime server', () => {
       expect(html).toContain('validateRuntimeApiKey');
       expect(html).toContain('getRuntimeAuthHeaders');
       expect(html).toContain("antigravity:[{value:'antigravity-default',label:'Antigravity default'}],");
+      expect(html).toContain("grok:[{value:'grok-default',label:'Grok default'}],");
       expect(html).toContain("junie:[{value:'Gemini 3 Flash',label:'Gemini 3 Flash (default)'},{value:'Claude Opus 4.6',label:'Claude Opus 4.6'},{value:'Claude Opus 4.7',label:'Claude Opus 4.7'},{value:'Claude Sonnet 4.6',label:'Claude Sonnet 4.6'},{value:'Gemini 3.1 Flash Lite',label:'Gemini 3.1 Flash Lite'},{value:'Gemini 3.1 Pro Preview',label:'Gemini 3.1 Pro Preview'},{value:'GPT-5',label:'GPT-5'},{value:'GPT-5.2',label:'GPT-5.2'},{value:'GPT-5.3-codex',label:'GPT-5.3-codex'},{value:'GPT-5.4',label:'GPT-5.4'},{value:'Grok 4.1 Fast Reasoning',label:'Grok 4.1 Fast Reasoning'}],");
       expect(html).not.toContain("junie:[{value:'gpt-5.4',label:'gpt-5.4 (default)'}],");
       expect(html).toContain('/providers/${name}/models/advanced');

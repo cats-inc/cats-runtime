@@ -23,4 +23,42 @@ describe('buildProviderInstallCatalogView', () => {
     expect(view.binaryName).toBe('agy');
     expect(view.path.expectedPath).toBe('%LOCALAPPDATA%\\agy\\bin\\agy.exe');
   });
+
+  it.each([
+    ['win32', 'windows', 'irm https://x.ai/cli/install.ps1 | iex', '~/.grok/bin/grok.exe'],
+    ['darwin', 'macos', 'curl -fsSL https://x.ai/cli/install.sh | bash', '~/.grok/bin/grok'],
+    ['linux', 'linux', 'curl -fsSL https://x.ai/cli/install.sh | bash', '~/.grok/bin/grok'],
+  ] as const)('describes the Grok native installer on %s', (
+    hostPlatform,
+    executionPlatform,
+    command,
+    expectedPath,
+  ) => {
+    const view = buildProviderInstallCatalogView('grok', { mode: 'native' }, hostPlatform);
+
+    expect(view).toMatchObject({
+      familyLabel: 'Grok CLI',
+      installPack: 'native-cli',
+      executionPlatform,
+      binaryName: 'grok',
+      install: {
+        installerId: 'grok-cli',
+        method: 'native_installer',
+        command,
+      },
+      auth: {
+        envVars: ['XAI_API_KEY'],
+        interactive: true,
+      },
+      path: {
+        expectedPath,
+        directoryHint: '~/.grok/bin',
+      },
+    });
+    expect(view.auth.hint).toContain('grok login');
+    expect(view.auth.hint).toContain('~/.grok/auth.json');
+    expect(view.install.notes).toContain(
+      'The installer also creates an agent alias; Cats intentionally detects only grok.',
+    );
+  });
 });

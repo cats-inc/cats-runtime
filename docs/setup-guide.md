@@ -6,7 +6,14 @@
 
 - Node.js 22+
 - Installed local CLIs for the providers you want to use (`claude`, `codex`,
-  `agy` for Antigravity, `cursor-agent`, `kiro-cli`, `kilo`, `opencode`, etc.)
+  `agy` for Antigravity, `cursor-agent`, `kiro-cli`, `grok`, `kilo`, `opencode`, etc.)
+
+Grok CLI installs with `irm https://x.ai/cli/install.ps1 | iex` on Windows or
+`curl -fsSL https://x.ai/cli/install.sh | bash` on macOS/Linux. Its binary is
+under `~/.grok/bin`; authenticate with `grok login` (which writes
+`~/.grok/auth.json`) or `XAI_API_KEY`. Cats detects only the `grok` binary, not
+the installer's generic `agent` alias. Grok is currently setup/check-only:
+session execution refuses until its subprocess and stream contract is verified.
 
 ## Quick Start (npx)
 

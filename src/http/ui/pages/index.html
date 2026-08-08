@@ -33,6 +33,7 @@
     --cursorp: #f472b6;
     --antigravity: #a78bfa;
     --kiro: #2dd4bf;
+    --grok: #e5e7eb;
     --kilo: #fb7185;
     --opencode: #c084fc;
     --pi: #a8a29e;
@@ -176,6 +177,7 @@
   .project-header[data-provider="cursor"] { border-left-color: var(--cursorp); }
   .project-header[data-provider="antigravity"] { border-left-color: var(--antigravity); }
   .project-header[data-provider="kiro"] { border-left-color: var(--kiro); }
+  .project-header[data-provider="grok"] { border-left-color: var(--grok); }
   .project-header[data-provider="kilo"] { border-left-color: var(--kilo); }
   .project-header[data-provider="opencode"] { border-left-color: var(--opencode); }
   .project-header[data-provider="pi"] { border-left-color: var(--pi); }
@@ -193,6 +195,7 @@
       var(--cursorp),
       var(--antigravity),
       var(--kiro),
+      var(--grok),
       var(--opencode),
       var(--kilo),
       var(--pi),
@@ -225,6 +228,7 @@
   .provider-badge[data-p="auggie"] { background: rgba(34,211,238,0.18); color: var(--auggie); }
   .provider-badge[data-p="junie"] { background: rgba(251,191,36,0.18); color: var(--junie); }
   .provider-badge[data-p="kiro"] { background: rgba(45,212,191,0.18); color: var(--kiro); }
+  .provider-badge[data-p="grok"] { background: rgba(229,231,235,0.18); color: var(--grok); }
   .provider-badge[data-p="ollama"] { background: rgba(148,163,184,0.18); color: var(--ollama); }
   .provider-badge[data-p="openclaw"] { background: rgba(248,113,113,0.18); color: var(--openclaw); }
   .instance-badge {
@@ -1102,6 +1106,7 @@
             <option value="kilo">kilo</option>
             <option value="auggie">auggie</option>
             <option value="kiro">kiro</option>
+            <option value="grok">grok</option>
           </select>
         </div>
         <div class="runtime-field" id="instanceGroup">
@@ -1224,7 +1229,7 @@ if (PLATFORM_RUNTIME_PROXY && !INJECTED_RUNTIME_API_BASE) {
 const API_BASE = INJECTED_RUNTIME_API_BASE
   ? INJECTED_RUNTIME_API_BASE.replace(/\/+$/, '')
   : window.location.origin;
-const PROVIDER_ORDER = ['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'opencode', 'kilo', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'ollama', 'openclaw'];
+const PROVIDER_ORDER = ['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'opencode', 'kilo', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'grok', 'ollama', 'openclaw'];
 const CLI_RUNTIME_ORDER = ['native', 'wsl', 'docker'];
 let currentSessionId = null;
 let isStreaming = false;

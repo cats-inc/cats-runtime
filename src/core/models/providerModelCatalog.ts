@@ -207,6 +207,7 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'gpt-5.2', label: 'gpt-5.2' },
   ],
   antigravity: [],
+  grok: [],
   copilot: [
     { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
     { id: 'claude-opus-4.6', label: 'claude-opus-4.6' },
@@ -605,6 +606,7 @@ function supportsCuratedStaticCliCatalog(providerName: string): boolean {
   return providerName === 'claude'
     || providerName === 'codex'
     || providerName === 'antigravity'
+    || providerName === 'grok'
     || providerName === 'kilo'
     || providerName === 'kiro'
     || providerName === 'junie'
@@ -1513,6 +1515,12 @@ export class ProviderModelCatalogService {
     if (target.backend === 'cli' && target.providerName === 'antigravity' && staticModels.length === 0) {
       warnings.push(
         'Antigravity CLI model ids are not verified by a live agy model-list probe yet; '
+        + 'serving no bundled static model ids until that contract is proven.',
+      );
+    }
+    if (target.backend === 'cli' && target.providerName === 'grok' && staticModels.length === 0) {
+      warnings.push(
+        'Grok CLI model ids are not verified by a live model-list probe yet; '
         + 'serving no bundled static model ids until that contract is proven.',
       );
     }

@@ -295,6 +295,48 @@ const junieCuratedAdvancedEntries = [
 ];
 
 describe('ProviderModelCatalogService', () => {
+  it('keeps the refusal-only Grok catalog empty until model ids are verified', () => {
+    const base = createCatalogConfig();
+    const config = {
+      ...base,
+      providerDefaultTargets: {
+        ...base.providerDefaultTargets,
+        grok: { backend: 'cli', instance: 'native' },
+      },
+      providerInstances: {
+        ...base.providerInstances,
+        grok: {
+          native: {
+            id: 'native',
+            providerName: 'grok',
+            commandConfig: {
+              path: 'grok',
+              runner: 'auto',
+              runtime: { mode: 'native' },
+            },
+          },
+        },
+      },
+      providerCommands: {
+        ...base.providerCommands,
+        grok: {
+          path: 'grok',
+          runner: 'auto',
+          runtime: { mode: 'native' },
+        },
+      },
+    } as const;
+
+    const catalog = new ProviderModelCatalogService(config as never).getImmediateCatalog('grok');
+
+    expect(catalog.models).toEqual([]);
+    expect(catalog.defaultModel).toBeNull();
+    expect(catalog.warnings).toEqual([
+      'Grok CLI model ids are not verified by a live model-list probe yet; '
+      + 'serving no bundled static model ids until that contract is proven.',
+    ]);
+  });
+
   it('marks running Ollama models, injects missing configured defaults, and caches warnings', async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input) => {
       const url = typeof input === 'string' ? input : input.url;

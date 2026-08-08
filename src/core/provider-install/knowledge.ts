@@ -54,6 +54,33 @@ function createLocalBinPathHints(
   };
 }
 
+function createGrokBinPathHints(): Partial<Record<ProviderExecutionPlatform, ProviderPathHint>> {
+  return {
+    windows: {
+      expectedPath: '~/.grok/bin/grok.exe',
+      directoryHint: '~/.grok/bin',
+      exportCommand: 'setx PATH "%USERPROFILE%\\.grok\\bin;%PATH%"',
+      reloadHint: 'Open a new terminal window after installing Grok CLI.',
+    },
+    macos: {
+      expectedPath: '~/.grok/bin/grok',
+      directoryHint: '~/.grok/bin',
+      exportCommand: 'export PATH="$HOME/.grok/bin:$PATH"',
+      shellRcPath: '~/.zshrc',
+      persistenceEntry: '.grok/bin',
+      reloadHint: 'Run source ~/.zshrc or source ~/.bashrc before invoking grok.',
+    },
+    linux: {
+      expectedPath: '~/.grok/bin/grok',
+      directoryHint: '~/.grok/bin',
+      exportCommand: 'export PATH="$HOME/.grok/bin:$PATH"',
+      shellRcPath: '~/.bashrc',
+      persistenceEntry: '.grok/bin',
+      reloadHint: 'Run source ~/.bashrc before invoking grok.',
+    },
+  };
+}
+
 function createNpmPathHints(
   binaryName: string,
 ): Partial<Record<ProviderExecutionPlatform, ProviderPathHint>> {
@@ -524,6 +551,44 @@ const INSTALL_KNOWLEDGE: Record<ProviderName, ProviderInstallKnowledge> = {
         docsUrl: 'https://antigravity.google/cli',
         notes: ['Antigravity installs agy into ~/.local/bin on macOS and Linux.'],
         windowsNotes: ['Antigravity installs agy.exe into %LOCALAPPDATA%\\agy\\bin.'],
+      },
+    ),
+  },
+  grok: {
+    provider: 'grok',
+    familyLabel: 'Grok CLI',
+    installPack: 'native-cli',
+    binaryName: 'grok',
+    defaultDocsUrl: 'https://x.ai/cli',
+    check: {
+      versionArgs: ['--version'],
+      helpArgs: ['--help'],
+      prerequisites: createNativeInstallerPrerequisites('Grok CLI'),
+      expectedPaths: {
+        windows: '~/.grok/bin/grok.exe',
+        macos: '~/.grok/bin/grok',
+        linux: '~/.grok/bin/grok',
+      },
+      pathHints: createGrokBinPathHints(),
+    },
+    auth: {
+      requiredAfterInstall: true,
+      envVars: ['XAI_API_KEY'],
+      interactive: true,
+      docsUrl: 'https://x.ai/cli',
+      hint: 'Run grok login to create ~/.grok/auth.json, or set XAI_API_KEY.',
+      errorPatterns: [...GENERIC_AUTH_ERROR_PATTERNS, 'xai_api_key'],
+    },
+    platforms: createNativeInstall(
+      'grok-cli',
+      'irm https://x.ai/cli/install.ps1 | iex',
+      'curl -fsSL https://x.ai/cli/install.sh | bash',
+      {
+        docsUrl: 'https://x.ai/cli',
+        notes: [
+          'Grok installs into ~/.grok/bin.',
+          'The installer also creates an agent alias; Cats intentionally detects only grok.',
+        ],
       },
     ),
   },

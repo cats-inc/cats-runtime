@@ -3,6 +3,9 @@
 Date: 2026-08-07
 Status: Proposed
 
+Implementation note: the User approved the Grok-only subset on 2026-08-08.
+The broader Devin, Cline, and Aider decision remains proposed.
+
 ## Context
 
 `environment-bootstrap` (the upstream installer suite this project mirrors) added four AI coding CLIs to its supported tool set between 2026-08-04 and 2026-08-05:
@@ -149,4 +152,4 @@ The alternative — hold Devin out until someone probes it — leaves upstream i
 ---
 
 *Proposal prepared: 2026-08-07*
-*Decision status: Pending User approval*
+*Decision status: Grok subset approved 2026-08-08; remaining providers pending User approval*

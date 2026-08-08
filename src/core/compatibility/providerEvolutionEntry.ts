@@ -27,6 +27,7 @@ import { CodexProvider } from '../../backends/cli/providers/codex.js';
 import { CopilotProvider } from '../../backends/cli/providers/copilot.js';
 import { AuggieProvider } from '../../backends/cli/providers/auggie.js';
 import { AntigravityProvider } from '../../backends/cli/providers/antigravity.js';
+import { GrokProvider } from '../../backends/cli/providers/grok.js';
 import { CursorProvider } from '../../backends/cli/providers/cursor.js';
 import { GooseProvider } from '../../backends/cli/providers/goose.js';
 import { JunieProvider } from '../../backends/cli/providers/junie.js';
@@ -70,6 +71,7 @@ const SUPPORTED_CLI_PROBE_PROVIDERS = new Set<ProviderName>([
   'pi',
   'goose',
   'antigravity',
+  'grok',
   'claude',
   'junie',
   'kilo',
@@ -511,6 +513,8 @@ function createProbeProvider(
       return { provider: new CodexProvider(compatibilityProfile, observer) };
     case 'antigravity':
       return { provider: new AntigravityProvider() };
+    case 'grok':
+      return { provider: new GrokProvider() };
     case 'copilot':
       return { provider: new CopilotProvider(compatibilityProfile, observer) };
     case 'cursor':

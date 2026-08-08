@@ -233,6 +233,25 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       'Only shallow line-oriented text streaming is currently available.',
     ],
   },
+  grok: {
+    normalizedStream: {
+      text: { mode: 'unknown', stepwise: false },
+      toolUse: 'unknown',
+      toolResult: 'unknown',
+      progress: 'unknown',
+      reasoning: 'unknown',
+    },
+    transcript: {
+      contentBlocks: 'unknown',
+    },
+    presentation: {
+      recommended: 'unknown',
+    },
+    notes: [
+      'Grok CLI subprocess and streaming behavior have not been probed yet.',
+      'Treat Grok execution semantics as unknown until a verified compatibility profile exists.',
+    ],
+  },
   auggie: {
     normalizedStream: {
       text: { mode: 'final', stepwise: false },

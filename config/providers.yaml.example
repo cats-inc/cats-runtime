@@ -78,6 +78,10 @@ routing:
       default_target:
         backend: cli
         instance: native
+    grok:
+      default_target:
+        backend: cli
+        instance: native
     ollama:
       default_target:
         backend: local
@@ -236,6 +240,13 @@ backends:
             #   Windows: ~/AppData/Local/kiro-cli/data.sqlite3
             #   macOS:   ~/Library/Application Support/kiro-cli/data.sqlite3
             #   Linux:   ~/.local/share/kiro-cli/data.sqlite3
+
+      grok:
+        instances:
+          native:
+            environment: native
+            command: grok
+            runner: auto
 
   api:
     providers:

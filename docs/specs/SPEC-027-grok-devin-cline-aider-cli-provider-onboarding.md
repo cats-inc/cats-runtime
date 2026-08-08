@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft — implementation blocked pending User approval |
+| **Status** | In Progress — Grok slice implemented; Devin, Cline, and Aider pending User approval |
 | **Owner** | User |
 | **Reviewer** | User |
 
@@ -190,7 +190,7 @@ All four support `--version` and `--help` per the upstream check scripts, which 
 
 ## Proposed Decisions
 
-> **Proposed by Claude on 2026-08-07, pending User review.** These were open questions in the first draft. They are concrete proposals for review, not approved decisions, and implementation remains blocked until the reviewer confirms or replaces them.
+> **Proposed by Claude on 2026-08-07.** The User approved the Grok-only implementation slice on 2026-08-08, including the Grok-specific effects of these decisions. The remaining Devin, Cline, and Aider proposals still require User review.
 
 ### D1 — Badge palette
 

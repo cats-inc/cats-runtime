@@ -4,9 +4,9 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft — implementation blocked pending User approval |
+| **Status** | In Progress — Grok slice implemented; Devin, Cline, and Aider pending User approval |
 | **Owner** | User |
-| **Assigned To** | Unassigned |
+| **Assigned To** | Codex |
 | **Reviewer** | User |
 
 ## Related Spec
@@ -72,7 +72,7 @@ Live probe questions (SPEC-027 Probe Items; gate execution adapters, not this pl
 - [ ] **P4** — Capture the exact upstream Cline allowlist and determine how the helper feature-detects npm's global `allow-scripts` support. Documentation and compatibility coverage only; SPEC-027 D5 already defines the policy.
 - [ ] Record findings in `docs/research/2026-08-07-grok-devin-cline-aider-cli-probe.md`, marking unanswered questions as deferred rather than guessing.
 
-The badge palette is no longer a technical probe item: SPEC-027 D1 proposes candidate values. The overall plan remains blocked until the User approves that proposal and the other decisions.
+The badge palette is no longer a technical probe item: SPEC-027 D1 proposes candidate values. The User approved the Grok token and Grok-only slice on 2026-08-08; the corresponding choices for Devin, Cline, and Aider remain blocked pending approval.
 
 **Deliverables**: Research note answering every SPEC-027 Probe Item that evidence supports; explicit deferrals for the rest.
 
@@ -225,6 +225,7 @@ The runtime owns these install/check surfaces. Do not wait for or mirror a platf
 |------|--------|
 | 2026-08-07 | Plan created alongside ADR-033 and SPEC-027, after auditing `environment-bootstrap` commits `cb5efc7`, `d131535`, `216ef96`, `54992d6`, `05be416`, `bef3411`, `0d1831d`, `cfe7785`. Pi npm package drift found during the same audit and folded into Phase 3. |
 | 2026-08-07 | SPEC-027 open questions rewritten as Proposed Decisions D1–D5 pending User approval, so implementation remains blocked. Review corrections use the official Grok `XAI_API_KEY`, treat Aider keys as evidence rather than readiness, keep Cline Windows install unsupported, and separate runtime setup visibility from the platform product execution catalog. |
+| 2026-08-08 | User approved implementation starting with Grok. The Grok install/check taxonomy, native config, refusal adapter, conservative capabilities, empty bundled model catalog, dashboard/playground/setup surfaces, tests, setup guide, and read-only version/help probe landed as the first slice. Devin, Cline, Aider, and the Pi rename remain pending. |
 
 ---
 

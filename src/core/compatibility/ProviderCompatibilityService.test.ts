@@ -116,6 +116,53 @@ describe('ProviderCompatibilityService', () => {
     expect(assessment.evidence).toBeUndefined();
   });
 
+  it('detects Grok only from the grok binary and never probes the generic agent alias', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-grok-detection-'));
+    tempDirs.push(root);
+    const runner = {
+      run: vi.fn(async () => ({
+        exitCode: null,
+        stdout: '',
+        stderr: '',
+        timedOut: false,
+        durationMs: 5,
+        error: 'spawn ENOENT',
+      })),
+    };
+    const lookupCommand = vi.fn(async (command: string) => ({
+      available: command === 'grok',
+      resolvedPath: command === 'grok' ? '/runtime/bin/grok' : undefined,
+      timedOut: false,
+    }));
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner,
+      installCheckRunner: createInstallCheckRunner({ lookupCommand }),
+      now: () => Date.parse('2026-08-08T00:00:00.000Z'),
+    });
+    const target = createCliTarget('grok');
+    target.cliInstance!.commandConfig.path = 'grok';
+
+    const detected = await service.assessCliTarget(target);
+    expect(detected.setup.command.status).toBe('ready');
+    expect(detected.setup.command.resolvedCommand).toBe('/runtime/bin/grok');
+    expect(lookupCommand.mock.calls.map(([command]) => command)).not.toContain('agent');
+
+    lookupCommand.mockImplementation(async (command: string) => ({
+      available: command === 'agent',
+      resolvedPath: command === 'agent' ? '/runtime/bin/agent' : undefined,
+      timedOut: false,
+    }));
+    const unrelatedAlias = await service.assessCliTarget(
+      createCliTarget('grok', 'agent-only'),
+      { force: true },
+    );
+    expect(unrelatedAlias.setup.command.status).toBe('missing_install');
+    expect(lookupCommand.mock.calls.map(([command]) => command)).not.toContain('agent');
+  });
+
   it('uses runtime-specific probe timeouts for compatibility and install checks', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-timeouts-'));
     tempDirs.push(root);

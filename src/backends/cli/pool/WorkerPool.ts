@@ -7,11 +7,18 @@ import { KiroNativeSessionService } from '../kiro/KiroNativeSessionService.js';
 import { KiloNativeSessionService } from '../kilo/KiloNativeSessionService.js';
 import { GooseNativeSessionService } from '../goose/GooseNativeSessionService.js';
 import { OpencodeNativeSessionService } from '../opencode/OpencodeNativeSessionService.js';
-import type { Provider, ProviderCapabilities, ProviderName, ProviderSpawnOptions } from '../providers/types.js';
+import {
+  KNOWN_PROVIDERS,
+  type Provider,
+  type ProviderCapabilities,
+  type ProviderName,
+  type ProviderSpawnOptions,
+} from '../providers/types.js';
 import type { CompatibilityProfileSelection } from '../../../core/compatibility/types.js';
 import type { ProviderCompatibilityService } from '../../../core/compatibility/ProviderCompatibilityService.js';
 import { AuggieProvider } from '../providers/auggie.js';
 import { AntigravityProvider } from '../providers/antigravity.js';
+import { GrokProvider } from '../providers/grok.js';
 import { ClaudeProvider } from '../providers/claude.js';
 import { CodexProvider } from '../providers/codex.js';
 import { CopilotProvider } from '../providers/copilot.js';
@@ -101,6 +108,11 @@ export class WorkerPool {
           provider: new AntigravityProvider(),
           commandConfig: instance.commandConfig,
         };
+      case 'grok':
+        return {
+          provider: new GrokProvider(),
+          commandConfig: instance.commandConfig,
+        };
       case 'claude':
         return {
           provider: new ClaudeProvider(compatibilityProfile),
@@ -154,7 +166,7 @@ export class WorkerPool {
           commandConfig: instance.commandConfig,
         };
       default:
-        throw new Error(`Unknown provider: '${name}'. Valid: claude, codex, antigravity, cursor, copilot, opencode, kilo, goose, pi, auggie, junie, kiro`);
+        throw new Error(`Unknown provider: '${name}'. Valid: ${KNOWN_PROVIDERS.join(', ')}`);
     }
   }
 

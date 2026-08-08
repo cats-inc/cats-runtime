@@ -46,7 +46,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
-| [PLAN-034](./PLAN-034-grok-devin-cline-aider-cli-provider-onboarding.md) | Grok, Devin, Cline, and Aider CLI Provider Onboarding | Draft — User approval pending | [SPEC-027](../specs/SPEC-027-grok-devin-cline-aider-cli-provider-onboarding.md), [ADR-033](../decisions/033-adopt-grok-devin-cline-aider-as-cli-provider-families.md) |
+| [PLAN-034](./PLAN-034-grok-devin-cline-aider-cli-provider-onboarding.md) | Grok, Devin, Cline, and Aider CLI Provider Onboarding | In Progress — Grok slice implemented | [SPEC-027](../specs/SPEC-027-grok-devin-cline-aider-cli-provider-onboarding.md), [ADR-033](../decisions/033-adopt-grok-devin-cline-aider-as-cli-provider-families.md) |
 | [PLAN-033](./PLAN-033-replace-gemini-cli-with-antigravity-cli.md) | Replace Gemini CLI with Antigravity CLI | Draft | [SPEC-026](../specs/SPEC-026-antigravity-cli-provider-replacing-gemini.md), [ADR-032](../decisions/032-replace-gemini-cli-with-antigravity-cli.md) |
 | [PLAN-032](./PLAN-032-acp-agent-adapters-and-runtime-facade.md) | ACP Agent Adapters and Runtime ACP Facade | In Progress (Phase 4 Runtime HTTP/Stdio Facades Landed; Phase 5 Layering Baseline Landed; config/diagnostics follow-through continues) | [SPEC-025](../specs/SPEC-025-acp-agent-adapters-and-runtime-facade.md), [ADR-031](../decisions/031-keep-acp-inside-agent-backend-and-model-runtime-acp-as-a-separate-facade.md), [ADR-026](../decisions/026-model-a2a-as-an-agent-backend-adapter.md) |
 | [PLAN-031](./PLAN-031-align-runtime-build-output-under-build-runtime.md) | Align Runtime Build Output Under `build/runtime` | Completed | N/A |
@@ -107,4 +107,4 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 ---
 
 *See also: [specs/](../specs/) for feature specifications*
-*Last updated: 2026-08-07 (PLAN-034 added: Grok, Devin, Cline, and Aider CLI provider onboarding.)*
+*Last updated: 2026-08-08 (PLAN-034 Grok slice implemented; remaining providers stay approval-gated.)*
