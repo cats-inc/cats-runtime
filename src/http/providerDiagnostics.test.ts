@@ -162,6 +162,7 @@ describe('provider diagnostics HTTP contract', () => {
         kilo: {},
         opencode: {},
         pi: {},
+        grok: {},
       },
     } as unknown as CliRuntimeConfig;
 

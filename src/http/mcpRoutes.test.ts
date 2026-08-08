@@ -197,6 +197,7 @@ describe('runtime MCP facade', () => {
             commandConfig: { path: 'claude', runner: 'auto', runtime: { mode: 'native' } },
           },
         },
+        grok: {},
       },
       externalSessionLiveWindowMs: 0,
       maxSessions: 10,
