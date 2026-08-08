@@ -253,6 +253,26 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       'Execution is pinned to the exact fixture-backed 1.0.0 compatibility profile.',
     ],
   },
+  cline: {
+    normalizedStream: {
+      text: { mode: 'unknown', stepwise: false },
+      toolUse: 'unknown',
+      toolResult: 'unknown',
+      progress: 'unknown',
+      reasoning: 'none',
+    },
+    transcript: {
+      contentBlocks: 'unknown',
+    },
+    presentation: {
+      recommended: 'unknown',
+    },
+    notes: [
+      'Cline 3.0.51 --json emits a typed NDJSON stream with native tool and usage events.',
+      'The parser is not wired yet, so the runtime still passes lines through as raw.',
+      'Capabilities stay unknown until the verified adapter lands.',
+    ],
+  },
   auggie: {
     normalizedStream: {
       text: { mode: 'final', stepwise: false },

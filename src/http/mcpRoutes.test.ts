@@ -198,6 +198,7 @@ describe('runtime MCP facade', () => {
           },
         },
         grok: {},
+        cline: {},
       },
       externalSessionLiveWindowMs: 0,
       maxSessions: 10,

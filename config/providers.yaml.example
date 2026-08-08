@@ -82,6 +82,10 @@ routing:
       default_target:
         backend: cli
         instance: native
+    cline:
+      default_target:
+        backend: cli
+        instance: native
     ollama:
       default_target:
         backend: local
@@ -246,6 +250,13 @@ backends:
           native:
             environment: native
             command: grok
+            runner: auto
+
+      cline:
+        instances:
+          native:
+            environment: native
+            command: cline
             runner: auto
 
   api:

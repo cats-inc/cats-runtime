@@ -44,6 +44,7 @@ export const PROVIDER_BADGE_CSS = `
 .provider-badge[data-p="junie"]    { background: rgba(251,191,36,0.18);  color: var(--junie, #fbbf24); }
 .provider-badge[data-p="kiro"]     { background: rgba(45,212,191,0.18);  color: var(--kiro, #2dd4bf); }
 .provider-badge[data-p="grok"]     { background: rgba(229,231,235,0.18); color: var(--grok, #e5e7eb); }
+.provider-badge[data-p="cline"]    { background: rgba(232,121,249,0.18); color: var(--cline, #e879f9); }
 .provider-badge[data-p="ollama"]   { background: rgba(148,163,184,0.18); color: var(--ollama, #94a3b8); }
 .provider-badge[data-p="openclaw"] { background: rgba(248,113,113,0.18); color: var(--openclaw, #f87171); }
 .status-badge {

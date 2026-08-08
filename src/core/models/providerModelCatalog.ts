@@ -210,6 +210,10 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
   grok: [
     { id: 'grok-4.5', label: 'grok-4.5', default: true },
   ],
+  // Cline exposes no model-enumeration command; the only observed id is
+  // whatever the signed-in account has configured. Left empty rather than
+  // bundling a one-account sample as a catalog.
+  cline: [],
   copilot: [
     { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
     { id: 'claude-opus-4.6', label: 'claude-opus-4.6' },

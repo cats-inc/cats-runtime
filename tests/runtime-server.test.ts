@@ -261,7 +261,7 @@ describe('runtime server', () => {
       expect(html.indexOf('<option value="copilot">copilot</option>'))
         .toBeLessThan(html.indexOf('<option value="opencode">opencode</option>'));
       expect(html).toContain(
-        "const PROVIDER_ORDER = ['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'opencode', 'kilo', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'grok', 'ollama', 'openclaw'];",
+        "const PROVIDER_ORDER = ['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'opencode', 'kilo', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'grok', 'cline', 'ollama', 'openclaw'];",
       );
       expect(html.indexOf('<option value="kiro">kiro</option>'))
         .toBeLessThan(html.indexOf('<option value="grok">grok</option>'));

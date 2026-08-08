@@ -237,13 +237,16 @@ function createGenericNpmKnowledge(
     docsUrl?: string;
     envVars?: string[];
     authPatterns?: string[];
+    /** Defaults to the provider id; set it when the shipped binary differs. */
+    binaryName?: string;
   } = {},
 ): ProviderInstallKnowledge {
+  const binaryName = options.binaryName ?? provider;
   return {
     provider,
     familyLabel,
     installPack: 'npm-global',
-    binaryName: provider === 'opencode' ? 'opencode' : provider,
+    binaryName,
     defaultDocsUrl: options.docsUrl,
     check: {
       versionArgs: ['--version'],
@@ -254,7 +257,7 @@ function createGenericNpmKnowledge(
         macos: '~/.npm-global',
         linux: '~/.npm-global',
       },
-      pathHints: createNpmPathHints(provider === 'opencode' ? 'opencode' : provider),
+      pathHints: createNpmPathHints(binaryName),
     },
     auth: {
       requiredAfterInstall: true,
@@ -624,6 +627,12 @@ const INSTALL_KNOWLEDGE: Record<ProviderName, ProviderInstallKnowledge> = {
     'Pi Coding Agent CLI',
     '@mariozechner/pi-coding-agent',
     'Complete the Pi Coding Agent CLI authentication flow after install.',
+  ),
+  cline: createGenericNpmKnowledge(
+    'cline',
+    'Cline CLI',
+    'cline',
+    'Run cline auth to sign in; credentials are stored under ~/.cline.',
   ),
 };
 

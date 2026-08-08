@@ -19,6 +19,7 @@ import type { ProviderCompatibilityService } from '../../../core/compatibility/P
 import { AuggieProvider } from '../providers/auggie.js';
 import { AntigravityProvider } from '../providers/antigravity.js';
 import { GrokProvider } from '../providers/grok.js';
+import { ClineProvider } from '../providers/cline.js';
 import { ClaudeProvider } from '../providers/claude.js';
 import { CodexProvider } from '../providers/codex.js';
 import { CopilotProvider } from '../providers/copilot.js';
@@ -111,6 +112,11 @@ export class WorkerPool {
       case 'grok':
         return {
           provider: new GrokProvider(compatibilityProfile),
+          commandConfig: instance.commandConfig,
+        };
+      case 'cline':
+        return {
+          provider: new ClineProvider(),
           commandConfig: instance.commandConfig,
         };
       case 'claude':

@@ -61,4 +61,41 @@ describe('buildProviderInstallCatalogView', () => {
       'The installer also creates an agent alias; Cats intentionally detects only grok.',
     );
   });
+
+  it.each([
+    ['win32', 'windows'],
+    ['darwin', 'macos'],
+    ['linux', 'linux'],
+  ] as const)('describes the Cline npm installer on %s', (hostPlatform, executionPlatform) => {
+    const view = buildProviderInstallCatalogView('cline', { mode: 'native' }, hostPlatform);
+
+    expect(view).toMatchObject({
+      familyLabel: 'Cline CLI',
+      installPack: 'npm-global',
+      executionPlatform,
+      binaryName: 'cline',
+      install: {
+        installerId: 'cline',
+        method: 'npm_global',
+        command: 'npm install -g cline',
+      },
+      auth: {
+        envVars: [],
+        interactive: true,
+      },
+      npm: {
+        packageName: 'cline',
+      },
+    });
+    expect(view.auth.hint).toContain('cline auth');
+  });
+
+  it('derives the npm binary name from the provider id unless overridden', () => {
+    // Guards the createGenericNpmKnowledge refactor that replaced the hardcoded
+    // `provider === 'opencode'` check with an explicit binaryName option.
+    expect(buildProviderInstallCatalogView('opencode', { mode: 'native' }, 'linux').binaryName)
+      .toBe('opencode');
+    expect(buildProviderInstallCatalogView('cline', { mode: 'native' }, 'linux').binaryName)
+      .toBe('cline');
+  });
 });

@@ -48,6 +48,7 @@ describe('provider catalog ordering', () => {
       'junie',
       'kiro',
       'grok',
+      'cline',
       'ollama',
       'openclaw',
     ]);
@@ -65,6 +66,7 @@ describe('provider catalog ordering', () => {
       'junie',
       'kiro',
       'grok',
+      'cline',
       'ollama',
       'openclaw',
     ]);
