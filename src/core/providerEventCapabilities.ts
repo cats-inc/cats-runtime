@@ -255,22 +255,24 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
   },
   cline: {
     normalizedStream: {
-      text: { mode: 'unknown', stepwise: false },
-      toolUse: 'unknown',
-      toolResult: 'unknown',
-      progress: 'unknown',
+      text: { mode: 'chunk', stepwise: true },
+      toolUse: 'native',
+      toolResult: 'native',
+      progress: 'derived',
       reasoning: 'none',
     },
     transcript: {
-      contentBlocks: 'unknown',
+      contentBlocks: 'none',
     },
     presentation: {
-      recommended: 'unknown',
+      recommended: 'content_blocks',
     },
     notes: [
-      'Cline 3.0.51 --json emits a typed NDJSON stream with native tool and usage events.',
-      'The parser is not wired yet, so the runtime still passes lines through as raw.',
-      'Capabilities stay unknown until the verified adapter lands.',
+      'Cline 3.0.51 --json streams incremental text deltas on content_start.',
+      'Tool calls and results are native; runtime progress is derived from them.',
+      'The stream repeats final text three more times (content_end, done, run_result); only the deltas are emitted.',
+      'Per-iteration usage events are cumulative, so usage is taken from run_result.aggregateUsage alone.',
+      'No reasoning channel was observed, and the stream carries no resumable session id.',
     ],
   },
   auggie: {

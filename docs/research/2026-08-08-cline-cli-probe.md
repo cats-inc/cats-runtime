@@ -107,7 +107,8 @@ Isolated and confirmed:
 - Prompt before `--id`, and piped stdin instead of a positional prompt → both fail.
 
 The failure is triggered by the presence of `--id` and is independent of whether the id is
-valid, so it is an upstream argument-handling defect rather than a lookup miss. Therefore
+valid, so it is an upstream argument-handling defect rather than a lookup miss. The process
+also exits `1`, so the runtime sees a hard failure rather than an empty stream. Therefore
 `ClineProvider.capabilities.resume` is `false` at 3.0.51, and must stay false until a
 version is probed where `--id` and `--json` compose.
 
@@ -130,6 +131,26 @@ There is no model-enumeration subcommand. The only id observed is
 a catalog. The runtime therefore bundles **no** Cline model ids and exposes only the
 `cline-default` sentinel. `-m/--model` and `-P/--provider` accept ids, so a user-curated
 catalog remains possible.
+
+## Captured fixtures
+
+Stored under `docs/research/fixtures/cline-3.0.51/`, redacted only by replacing the capture
+host's absolute workspace path with `/workspace`:
+
+- `text.success.redacted.ndjson` — 10 lines, text-only turn.
+- `tool-use.success.redacted.ndjson` — 17 lines, one `read_files` round trip then a text answer.
+- `resume-rejected.error.redacted.ndjson` — 1 line, the `--id` + `--json` rejection above.
+
+`src/backends/cli/providers/cline.fixture.test.ts` pins the parser against these. The tests
+assert the traps directly rather than only the happy path: that the three redundant copies
+of the final text exist in the fixture and that exactly one text stream and one result come
+out; that the two cumulative `usage` events do not contribute to the reported total; and
+that no metadata line leaks through as a `raw` event.
+
+Usage reconciliation, verified against the tool fixture: `aggregateUsage.inputTokens` 15906
+with `cacheReadTokens` 7806 and `cacheWriteTokens` 0 yields 8100 fresh prompt tokens, which
+matches iteration 1's 7808 plus iteration 2's 292. Cline's `inputTokens` therefore already
+includes cache reads, and the runtime derives `promptInputTokens` by subtraction.
 
 ## Not probed
 

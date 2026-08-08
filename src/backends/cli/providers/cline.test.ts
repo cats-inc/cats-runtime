@@ -22,13 +22,13 @@ describe('ClineProvider', () => {
     });
   });
 
-  it('passes stdout lines through as raw events while unwired', () => {
+  it('ignores blank lines and passes undecodable output through as raw', () => {
     const provider = new ClineProvider();
 
     expect(provider.parseStreamLine('  ')).toBeNull();
-    expect(provider.parseStreamLine('{"type":"run_result"}')).toEqual({
+    expect(provider.parseStreamLine('not json at all')).toEqual({
       type: 'raw',
-      text: '{"type":"run_result"}',
+      text: 'not json at all',
     });
   });
 });
