@@ -48,7 +48,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 | Spec | Title | Status | Related Plan |
 |------|-------|--------|--------------|
-| [SPEC-027](./SPEC-027-grok-devin-cline-aider-cli-provider-onboarding.md) | Grok, Devin, Cline, and Aider CLI Provider Onboarding | Draft | [PLAN-034](../plans/PLAN-034-grok-devin-cline-aider-cli-provider-onboarding.md), [ADR-033](../decisions/033-adopt-grok-devin-cline-aider-as-cli-provider-families.md) |
+| [SPEC-027](./SPEC-027-grok-devin-cline-aider-cli-provider-onboarding.md) | Grok, Devin, Cline, and Aider CLI Provider Onboarding | Draft — User approval pending | [PLAN-034](../plans/PLAN-034-grok-devin-cline-aider-cli-provider-onboarding.md), [ADR-033](../decisions/033-adopt-grok-devin-cline-aider-as-cli-provider-families.md) |
 | [SPEC-026](./SPEC-026-antigravity-cli-provider-replacing-gemini.md) | Antigravity CLI Provider Replacing Gemini CLI | Draft | [PLAN-033](../plans/PLAN-033-replace-gemini-cli-with-antigravity-cli.md), [ADR-032](../decisions/032-replace-gemini-cli-with-antigravity-cli.md) |
 | [SPEC-025](./SPEC-025-acp-agent-adapters-and-runtime-facade.md) | ACP Agent Adapters and Runtime ACP Facade | In Progress | [PLAN-032](../plans/PLAN-032-acp-agent-adapters-and-runtime-facade.md) |
 | [SPEC-024](./SPEC-024-curated-cli-catalog-pack-and-evidence-overlay.md) | Curated CLI Catalog Input and Runtime Evidence Overlay | Draft | TBD |
