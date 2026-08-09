@@ -239,6 +239,36 @@ safe — `cline --json "config is a word. Reply OK."` began a normal agent run r
 single argv element. The residual risk is a prompt that is exactly one bare subcommand word.
 The adapter places the prompt last, behind valued flags, so it is never the first argument.
 
+## Stream split — `error` lines go to stderr, not stdout
+
+**This corrects the fixtures and one parser decision.** Every capture in this note was
+taken with `> file 2>&1`, which merges the two streams and made all lines look like stdout.
+An end-to-end run through the runtime's own spawn path separated them:
+
+- **stdout**: `hook_event`, `agent_event` (including `done`), `run_result`
+- **stderr**: `{"type":"error", …}` — including the actual cause, e.g.
+  `Insufficient balance. Your Cline Credits balance is $-0.11`
+
+`WorkerProcess` feeds only stdout through `parseStreamLine`; stderr is drained separately
+into `classifyLaunchFailure`. So a parser that waits for the trailing `error` line never
+receives it.
+
+The original adapter deliberately ignored a non-completed `run_result` in order to "yield to
+the trailing terminal line with the better message". Against the real CLI that produced
+**no terminal event at all** — the turn had to fall through to the runtime's turn-timeout
+before reporting anything, and the real reason was never surfaced. Verified directly:
+normalized output was `[]` for a run whose stdout clearly said `finishReason: "error"`.
+
+A non-completed `run_result` now terminates the turn itself, using its own `text`, which
+carries the cause on the failing path. `classifyLaunchFailure` still matches the stderr
+patterns independently; whichever fires first yields a usable message. Re-verified against
+the live CLI: the normalized stream is now `["error"]` with
+`Cline run ended without completing (finishReason: error). Insufficient balance…`.
+
+The stored fixtures keep their merged form — they remain valid NDJSON samples for parser
+tests — but a test now replays the balance fixture with the `error` lines filtered out, to
+pin that a terminal event is produced from stdout alone.
+
 ## Execution status
 
 Execution is enabled for exactly 3.0.51 behind the compatibility profile
@@ -246,11 +276,22 @@ Execution is enabled for exactly 3.0.51 behind the compatibility profile
 `--json`, `--cwd` (confirmed via the history record), `--auto-approve` in both states,
 `--model`, and the positional prompt.
 
-**Not verified end to end.** The probe account reached a zero credit balance before a full
-turn could be driven through `WorkerPool` with the exact argument vector the adapter builds.
-The individual flags are live-verified and the parser is fixture-backed, but the assembled
-invocation has not completed a real turn. One authenticated end-to-end run is the remaining
-check; the exact-version profile gate is what keeps the blast radius to 3.0.51 until then.
+**Assembled invocation verified; a successful authenticated turn is still outstanding.**
+
+The account remains at a zero balance, so no turn can reach a model. What *was* verified end
+to end, by driving the adapter's argv through `buildProcessSpawnConfig` into the real binary:
+
+- The adapter's exact argv is accepted by cline 3.0.51. Argument parsing happens before the
+  model call, so a run that reaches `agent_start` and `iteration_start` proves acceptance
+  even without credit. It does.
+- The runtime's Windows spawn config resolves correctly (`cmd.exe` proxy, `shell: false`).
+- Every stdout line the real CLI produced was consumed by the parser with no `raw` leaks,
+  and the run terminated with a normalized error carrying the real cause.
+
+What remains untested is only the success path with live model output: streamed text deltas,
+tool round trips, and `run_result` usage on a completed turn. Those are fixture-backed from
+authenticated captures taken before the balance ran out, but have not been replayed through
+`WorkerPool` end to end. The exact-version profile gate keeps the blast radius at 3.0.51.
 
 ## Not probed
 

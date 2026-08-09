@@ -140,27 +140,42 @@ describe('Cline 3.0.51 authenticated stream fixtures', () => {
       .not.toContain('tools are blocked');
   });
 
-  it('surfaces run_aborted as the single terminal error, not a bare finishReason', () => {
+  it('terminates an aborted run from run_result rather than waiting for a stderr line', () => {
     const events = normalize('tool-denied.aborted.redacted.ndjson');
     const terminal = events.filter((event) => event.type === 'error' || event.type === 'result');
 
-    // The failed run_result must yield to the trailing run_aborted line, which
-    // carries the specific cause. Two terminal events would let the generic one
-    // win, since the runtime finishes on whichever arrives first.
-    expect(terminal).toHaveLength(1);
+    // run_result is on stdout; the trailing `error` line is on stderr and never
+    // reaches this parser. Terminating here is what keeps a failed turn from
+    // degrading into a turn-timeout.
+    expect(terminal.length).toBeGreaterThan(0);
     expect(terminal[0].type).toBe('error');
-    expect(terminal[0].text).toContain('aborted by another client');
-    expect(terminal[0].text).toContain('external_abort');
+    expect(terminal[0].text).toContain('finishReason: aborted');
+    expect(events.some((event) => event.type === 'result')).toBe(false);
   });
 
-  it('reports a provider refusal from the trailing error, not as a successful result', () => {
+  it('reports a provider refusal from run_result text, not as a successful result', () => {
     const events = normalize('provider-error.balance.redacted.ndjson');
     const terminal = events.filter((event) => event.type === 'error' || event.type === 'result');
 
-    // run_result arrives first with finishReason "error" and zero usage; taking
-    // it at face value would report a clean turn that cost nothing.
+    // run_result carries finishReason "error" and zero usage; taking it at face
+    // value would report a clean turn that cost nothing.
     expect(terminal.every((event) => event.type === 'error')).toBe(true);
     expect(terminal.some((event) => event.text?.includes('Insufficient balance'))).toBe(true);
     expect(events.some((event) => event.type === 'result')).toBe(false);
+  });
+
+  it('emits a terminal event from stdout alone, without the stderr error lines', () => {
+    // Regression guard for the stream split found by the end-to-end run: the
+    // fixtures were captured with `2>&1`, so they merge stderr into stdout. A
+    // parser that depends on those `error` lines produces no terminal event at
+    // all in the real runtime, which only feeds stdout to parseStreamLine.
+    const stdoutOnly = readFixtureLines('provider-error.balance.redacted.ndjson')
+      .filter((line) => JSON.parse(line).type !== 'error');
+    const provider = new ClineProvider();
+    const events = stdoutOnly.flatMap((line) => asEvents(provider.parseStreamLine(line)));
+
+    expect(events.some((event) => event.type === 'error')).toBe(true);
+    expect(events.find((event) => event.type === 'error')?.text)
+      .toContain('Insufficient balance');
   });
 });

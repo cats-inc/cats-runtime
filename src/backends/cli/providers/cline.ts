@@ -423,21 +423,30 @@ export class ClineProvider implements Provider {
   }
 
   private parseRunResult(line: ClineStreamLine): StreamEvent | null {
-    // run_result arrives *before* the trailing error / run_aborted line, and the
-    // runtime treats the first result-or-error as terminal. Emitting a result
-    // for a failed run would swallow the real reason and report the turn as
-    // successful; emitting an error here would win over the trailing line and
-    // report the generic finishReason instead of the specific cause. Both
-    // observed failure modes carry a trailing terminal line with the better
-    // message ("Insufficient balance…", "aborted by another client"), so this
-    // yields to it. If a future version omits that line the turn terminates on
-    // process exit, the same path SIGTERM already relies on.
+    // A non-completed run must terminate the turn here.
+    //
+    // An earlier version yielded to the trailing `{"type":"error"}` line on the
+    // assumption that it carried a better message. An end-to-end run against
+    // the real CLI disproved that: Cline writes `run_*` lines to stdout but
+    // `error` lines to **stderr**, and the runtime only feeds stdout through
+    // parseStreamLine. The trailing line therefore never reaches this parser,
+    // so yielding produced no terminal event at all and the turn degraded to a
+    // turn-timeout instead of reporting the real cause. The original fixtures
+    // hid this because they were captured with `2>&1`.
+    //
+    // run_result.text carries the cause on the failing path (verified:
+    // "Insufficient balance. Your Cline Credits balance is $-0.11"), so it is
+    // used directly. stderr is still classified separately by
+    // classifyLaunchFailure; whichever terminates first gives a usable message.
     if (line.finishReason !== 'completed') {
-      return observeIgnored(this.evolutionObserver, {
+      return observeNormalized(this.evolutionObserver, {
         rawEventType: `run_result:${String(line.finishReason)}`,
-        reason: 'superseded_by_trailing_terminal_line',
         rawSample: line,
-      }, null);
+      }, {
+        type: 'error',
+        text: buildFailedRunMessage(line),
+        raw: line,
+      } satisfies ErrorStreamEvent);
     }
 
     // No session id is emitted anywhere in the stream. `taskId` (conv_*) is not
@@ -521,6 +530,13 @@ function normalizeClineModelId(model?: string): string | undefined {
     return undefined;
   }
   return trimmed;
+}
+
+function buildFailedRunMessage(line: ClineStreamLine): string {
+  const reason = typeof line.finishReason === 'string' ? line.finishReason : 'unknown';
+  const detail = typeof line.text === 'string' && line.text.trim() ? line.text.trim() : '';
+  const head = `Cline run ended without completing (finishReason: ${reason})`;
+  return detail ? `${head}. ${detail}` : `${head}.`;
 }
 
 function buildAbortMessage(line: ClineStreamLine): string {
