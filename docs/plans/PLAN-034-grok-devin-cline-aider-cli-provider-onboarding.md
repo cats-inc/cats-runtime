@@ -9,6 +9,12 @@
 | **Assigned To** | Codex |
 | **Reviewer** | User |
 
+## Follow-up
+
+The success-path half of the Cline end-to-end verification is deferred to
+[PLAN-035](./PLAN-035-cline-success-path-end-to-end-verification.md), which is blocked on
+Cline account credit. Everything else in this plan has landed.
+
 ## Related Spec
 
 [SPEC-027: Grok, Devin, Cline, and Aider CLI Provider Onboarding](../specs/SPEC-027-grok-devin-cline-aider-cli-provider-onboarding.md)
