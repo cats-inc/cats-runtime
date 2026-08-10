@@ -91,7 +91,7 @@ later passes:
 - deeper API/local live-probe and model-discovery follow-ons
 - fuller project-specific security hardening and MCP host-configuration coverage beyond the current baseline docs
 - a live A2A server/Agent Card surface; the current A2A files are still pilot-owned examples rather than active endpoints
-- `cats`-side follow-through so the first-wave pilot exists in both flagship repos instead of `cats-runtime` alone
+- `cats`-side follow-through so the first-wave pilot exists in both main repos instead of `cats-runtime` alone
 
 ## Document Standards
 
