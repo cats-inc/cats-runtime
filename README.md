@@ -43,9 +43,9 @@ Current capabilities:
   hosts can inspect normalized text/tool/progress/block posture without
   hard-coding provider behavior
 - provider-side ACP support under the existing `agent` backend family,
-  including all 12 current CLI ACP provider families with runtime-owned tier
-  metadata for Claude, Codex, Antigravity, Cursor, Copilot, OpenCode, Kilo, Goose,
-  Pi, Auggie, Junie, and Kiro
+  including all 13 current CLI ACP provider families with runtime-owned tier
+  metadata for Claude, Codex, Antigravity, Cursor, Copilot, Devin, OpenCode, Kilo,
+  Goose, Pi, Auggie, Junie, and Kiro
 - a bounded runtime-owned ACP facade on `POST /acp` plus a direct stdio ACP
   carrier for prompt-turn capable IDE/client integration
 
