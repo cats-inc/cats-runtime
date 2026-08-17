@@ -11,7 +11,7 @@ Action Items:
 - Separate observed candidates from capability-specific accepted evidence and baselines
 - Add a scheduled watcher that reports version or upstream-artifact drift without treating observation as verification
 - Persist per-source success across runs, publish a scheduler heartbeat, and monitor that heartbeat from an independent scheduler
-- Deliver release observation to runtime only through a reviewed, versioned snapshot; CI artifacts and issues are not runtime inputs
+- Keep CI artifacts and issues out of every runtime read path, and let the L5 knowledge pack — not a release-bundled snapshot — be the channel that eventually carries observation to an installation
 - Make catalog staleness visible in `setup`/`diagnostics` instead of silently serving stale truth, and separately correct the curated catalog entry already known to be wrong
 - Audit which provider/platform/channel targets can be installed safely on CI runners before committing to surface baselines
 
@@ -248,24 +248,36 @@ A daily GitHub Actions cron that, per provider:
 - reports `feed_error` and `not_automated` as explicit non-current coverage states
 - reads schema-validated operational state from a pinned GitHub issue, preserves each source's
   `lastSuccessfulObservationAt` across failed runs, and updates only successful timestamps
-- publishes `lastRunAt` as a scheduler heartbeat; a monitor on a different scheduling host alerts
-  when it crosses the threshold, because a GitHub Actions cron cannot detect that it never started
-- renders a deterministic observation-snapshot candidate with schema version, source identity,
-  observed value, observation time, report/run provenance, and checksum
+- publishes `lastRunAt` as a scheduler heartbeat, because a GitHub Actions cron cannot detect that
+  it never started
 
 No CLI installs, no credentials, no user machines. This single job converts "silently four
 months behind" into "a daily report". The pinned issue is operational state, not provider truth:
 run-scoped workflow artifacts remain the evidence bundle, and invalid issue state fails loudly.
-Until the independent heartbeat monitor is configured and its alert path is tested, scheduler
-liveness is `unknown` rather than covered.
+An orphan branch would serve the same purpose with better write semantics and no bootstrap
+ceremony; the issue is chosen for human visibility, which makes an explicit init/recovery path a
+requirement rather than a nicety.
 
-The report and issue do not flow directly into runtime reads. An explicit maintainer command
-validates a chosen report and renders a deterministic update to a compiled TypeScript snapshot
-under `src/core/provider-registry/`. That source diff receives ordinary human review and merge;
-the runtime then exposes the bundled snapshot value and age. Reviewing the snapshot confirms that
-the observation and provenance were delivered intact — it does not accept release, surface,
-catalog, or wire compatibility. This release-bundled bridge is deliberately narrower than L5;
-near-real-time runtime refresh still requires the integrity-checked knowledge-pack channel.
+Monitoring that heartbeat needs a host that is not the watcher's own scheduler. A purpose-built
+dead-man's-switch service is the right tool; an agent-hosted schedule is a fallback, since it is
+another scheduler with the same failure mode and no monitor above it. There is also a free interim:
+an existing event-triggered workflow can warn when the heartbeat is stale. That is not a true
+dead-man's switch — it needs repository activity to fire — but it costs nothing and keeps scheduler
+liveness from sitting at `unknown` indefinitely.
+
+**The report does not flow into runtime reads, and this note deliberately does not build a channel
+for it.** The rule is firm: a running installation must never read workflow artifacts or mutable
+issue text. The tempting next step — import the report into a reviewed snapshot compiled into the
+runtime — was considered and deferred, because its freshness is bounded by the release cadence.
+For an infrequently released runtime the bundled value is usually old enough that the honest report
+is "too old to know", so the mechanism mostly ships a caveat, and it needs an import command,
+checksum validation, a snapshot module, and a recurring review ritual to do it.
+
+Meanwhile the party who actually acts on drift is the maintainer, who has the report already. And
+the runtime's genuinely useful freshness comparisons — local fingerprint versus accepted reference,
+and catalog `version`/`lastUpdated` — need no observation feed at all. So the runtime reports
+"latest upstream" as `not_automated`, and L5 knowledge-pack delivery provides the integrity-checked,
+rollback-capable channel that makes runtime-visible observation worth its machinery.
 
 ### L2 — Contract probe: isolated light probes with committed baselines
 
@@ -369,8 +381,10 @@ with no independently observable liveness signal is not coverage.
 
 Rule: **CI owns deterministic detection and gating; agent-hosted schedules may own recurring
 judgment-heavy collection, independent liveness monitoring, and candidate preparation, and
-everything they observe is written back through the same evidence/PR path.** One reviewed runtime
-snapshot and one acceptance model regardless of who observed it.
+everything they observe is written back through the same evidence/PR path.** One acceptance model
+regardless of who observed it. Note that an agent-hosted schedule used as a liveness monitor is
+only a fallback: it is another scheduler with the same never-ran failure mode, so a purpose-built
+dead-man's-switch service remains the right tool for that particular job.
 
 For maintainer-side scheduling that needs repo-native tests and branch or pull-request preparation,
 Claude Code cloud is the preferred default when it is available and permitted for this repository.
@@ -423,12 +437,12 @@ Ordered by value over cost:
    TypeScript so it needs no packaging change, and derived from `check.npmPackage` so no second
    feed table exists.
 2. **L1 watcher and liveness.** One script and scheduled workflow that produce observed candidates,
-   preserve durable per-source success state, publish a heartbeat checked by an independent
-   scheduler, and render a reviewed observation-snapshot candidate without mutating acceptance.
+   preserve durable per-source success state, and publish a heartbeat checked outside that
+   scheduler — all maintainer-facing, without mutating acceptance and without a runtime consumer.
 3. **Multi-dimensional staleness visibility, plus the stale-catalog correction.** Warnings and
-   provenance only for the runtime contract, sourced from the bundled reviewed snapshot with its
-   age exposed; do not degrade on exact version mismatch. Separately, fix the Claude curated entry
-   as content.
+   provenance only, derived from compiled accepted references and local fingerprints, with "latest
+   upstream" reported as `not_automated`; do not degrade on exact version mismatch. Separately, fix
+   the Claude curated entry as content.
 4. **L2 canonicalized help/argv baselines and CI diff**, for the subset that installs safely on the
    relevant runner OS.
 5. **Accepted-baseline promotion, the candidate/rejected evidence store, and capability-specific
@@ -460,11 +474,12 @@ the registry refactor stays at step 7 where baselines protect it.
 - **Feed coordinates themselves drift** (a package gets renamed or a repo moves). A feed that
   fails to resolve must report loudly rather than silently reporting "no drift".
 - **The primary scheduler cannot report that it never started.** Its `lastRunAt` heartbeat is
-  checked from a different scheduling host; until that monitor is active, scheduler health remains
-  `unknown`.
-- **Ephemeral CI output is not a runtime data channel.** A deterministic report is imported into a
-  reviewed, versioned TypeScript snapshot before runtime freshness can consume it. Snapshot age is
-  visible, and near-real-time refresh remains L5 scope.
+  checked from a host that is not that scheduler; an in-repo check on an event-triggered workflow
+  covers the interim, and scheduler health stays `unknown` until an alert path is tested.
+- **Ephemeral CI output is not a runtime data channel.** No runtime read path consumes watcher
+  output; the runtime reports what it can verify locally and marks the rest `not_automated`.
+  Runtime-visible observation arrives with the L5 knowledge pack, not with a release-bundled
+  snapshot whose value is usually already stale.
 - **One observation can be account- or region-specific.** Interactive model evidence carries its
   scope and stays candidate evidence until review determines whether it is safe to generalize.
 - **A runtime-loaded data tree can silently miss packaging.** `package.json` `files` is an
