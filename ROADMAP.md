@@ -1416,10 +1416,46 @@ always-on self-adapting parser system.
   collector across future agent/A2A transports
 - refine semantic-drift heuristics and broaden operator workflows around the
   now-landed retained review update path for classifications / highlights /
-  references without introducing automatic release-note scraping
+  references without making the runtime itself scrape release notes as an
+  evidence source, per ADR-025 rule 3
 - keep the redacted compatibility evidence bundles inspectable through the same
   non-server retained-artifact tooling family instead of adding a new route by
   default
+- close the upstream-signal gap described below through maintainer-side CI, not
+  through runtime behavior
+
+#### Remaining Gap: No Upstream Signal
+
+Everything landed above answers "what did this machine observe from an already
+installed CLI". None of it answers "did upstream ship a new version". No code in
+`cats-runtime`, `cats-platform`, or `cats-one` reads any release feed, and
+`.github/workflows/` has no scheduled job, so the practical detection event is
+still "a user's CLI auto-updated and something degraded".
+
+The cost is already visible in shipped data: `config/curated-model-catalogs.yaml.example`
+still declares `cli: Claude`, `version: 2.1.112`, `last_updated: 2026-04-17` and
+names a superseded model generation, with no runtime surface reporting that it is
+stale — which is precisely the untruthful-metadata outcome ADR-029 set out to
+prevent.
+
+ADR-034 closes this by splitting drift into tiers along the existing
+`CompatibilityProbeMode = 'light' | 'live'` boundary:
+
+- release tier (upstream version exists) and surface tier (`--help` flags moved)
+  become automated, because they need no credentials and no provider quota
+- the wire tier stays manual-first exactly as this work package already has it,
+  and no automation may mutate parsers or promote capabilities
+
+The boundary matters for this work package: the CI watcher reads changelogs as
+maintainer-side context and reports to maintainers. The runtime's own evidence
+collector still produces only runtime-observed evidence, so ADR-025 rule 3 and
+the deferred scope below both remain intact.
+
+PLAN-036 carries the first two slices — release-feed declaration plus a daily
+watch job, then staleness/provenance visibility on `setup` and `diagnostics`
+wired to ADR-029's degradation rule. Seven providers already carry a resolvable
+feed coordinate through `check.npmPackage`; the other nine need one declared,
+and `claude` currently has no version feed at all.
 
 #### Deferred Scope
 
@@ -1436,13 +1472,19 @@ always-on self-adapting parser system.
 - `src/backends/cli/goose/parser.ts`
 - `src/backends/cli/pi/parser.ts`
 - `src/backends/agent/*`
+- `src/core/provider-install/*` (release-feed declaration, PLAN-036)
+- `src/core/models/*` (catalog freshness and provenance, PLAN-036)
+- `scripts/` and `.github/workflows/` (maintainer-side watch job, PLAN-036)
 
 #### References
 
 - `docs/specs/SPEC-021-provider-evolution-evidence-and-capability-probes.md`
 - `docs/plans/PLAN-021-provider-evolution-evidence-and-capability-probes.md`
+- `docs/plans/PLAN-036-provider-upstream-drift-watch-and-staleness-surfacing.md`
 - `docs/decisions/025-keep-provider-evolution-detection-manual-first-and-evidence-driven.md`
 - `docs/decisions/026-model-a2a-as-an-agent-backend-adapter.md`
+- `docs/decisions/034-automate-light-tier-provider-drift-detection-and-keep-live-probes-manual.md`
+- `docs/research/2026-08-17-provider-upstream-drift-automation.md`
 
 ---
 ### OPT-14: MCP Proxy Hardening and CLI Convergence
