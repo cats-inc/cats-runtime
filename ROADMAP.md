@@ -1439,28 +1439,41 @@ stale — which is precisely the untruthful-metadata outcome ADR-029 set out to
 prevent.
 
 ADR-034 closes this by splitting drift into tiers along the existing
-`CompatibilityProbeMode = 'light' | 'live'` boundary:
+`CompatibilityProbeMode = 'light' | 'live'` boundary and separating
+upstream observation from reviewed acceptance:
 
-- release tier (upstream version exists) and surface tier (`--help` flags moved)
+- release tier (upstream version or artifact change exists) and eligible
+  surface tier (normalized command grammar or Cats argv contracts moved)
   become automated, because they need no credentials and no provider quota
 - the wire tier stays manual-first exactly as this work package already has it,
   and no automation may mutate parsers or promote capabilities
+- release, surface, catalog, and wire evidence keep independent candidate / accepted /
+  rejected state; an exact CLI-version mismatch is not by itself a catalog
+  degradation signal
 
 The boundary matters for this work package: the CI watcher reads changelogs as
 maintainer-side context and reports to maintainers. The runtime's own evidence
 collector still produces only runtime-observed evidence, so ADR-025 rule 3 and
 the deferred scope below both remain intact.
 
-PLAN-036 carries the first two slices — release-feed declaration plus a daily
-watch job, then staleness/provenance visibility on `setup` and `diagnostics`
-wired to ADR-029's degradation rule. Seven providers already carry a resolvable
-feed coordinate through `check.npmPackage`; the other nine need one declared,
-and `claude` currently has no version feed at all.
+PLAN-036 carries the first three slices. It first adds a minimal canonical
+automation registry and honest per-tier coverage matrix for all 16 provider
+families, including channel/platform-scoped release sources and
+capability-specific acceptance. It then adds a daily observation job and
+warning-only, multi-dimensional freshness/provenance on `setup` and
+`diagnostics`. Seven providers already carry an npm coordinate; the registry
+must migrate or derive those values rather than copy them into a second table.
+Providers with no deterministic release source remain visibly
+`not_automated`, with installer/document fingerprints and scheduled desktop
+agents available as weaker collection paths.
 
 #### Deferred Scope
 
 - do not add always-on background probing on user machines
 - do not auto-modify parsers based on collected evidence
+- do not promote failed, unreviewed, or rejected probe artifacts as baselines
+- do not degrade advanced metadata solely because an installed CLI version
+  differs from an accepted release reference
 - do not force CLI-only assumptions into the shared collector
 - do not add a dedicated host-facing probe route or dashboard workflow until
   the manual-first CLI/internal flow proves stable
@@ -1472,7 +1485,9 @@ and `claude` currently has no version feed at all.
 - `src/backends/cli/goose/parser.ts`
 - `src/backends/cli/pi/parser.ts`
 - `src/backends/agent/*`
-- `src/core/provider-install/*` (release-feed declaration, PLAN-036)
+- `providers/*` and `src/core/provider-registry/*` (automation registry,
+  observation, coverage, and acceptance, PLAN-036)
+- `src/core/provider-install/*` (canonical coordinate consumption, PLAN-036)
 - `src/core/models/*` (catalog freshness and provenance, PLAN-036)
 - `scripts/` and `.github/workflows/` (maintainer-side watch job, PLAN-036)
 

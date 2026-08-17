@@ -1,22 +1,29 @@
 # Provider Upstream Drift Automation
 
 Date: 2026-08-17
-Topic: Automating how `cats-runtime` follows version updates across its 16 supported CLI providers
+Topic: Automating how `cats-runtime` follows upstream changes across its 16 registered CLI provider families
 Source: Internal architecture research over `src/core/compatibility/**`, `src/core/models/**`, `src/core/provider-install/**`, `src/backends/cli/providers/**`, `config/*.yaml.example`, and the repo's existing CI workflows
-Summary: The runtime can already fingerprint an installed CLI (`--version`, `--help`, live probe), collect evolution evidence, and compare against a retained baseline. What it cannot do is learn that an upstream CLI released a new version, because nothing in any of the three repos reads a release feed. Every drift signal today requires the CLI to already be installed on a machine and a human to remember to probe it, and every fix requires editing hand-written TypeScript and cutting a runtime release. This note proposes a four-tier "provider knowledge supply chain" that automates the cheap deterministic tiers in CI, keeps quota-consuming live probes manual per ADR-025, and treats desktop agent features (ChatGPT Work / Claude Cowork) as an optional human-context collector rather than as the scheduler or the gate.
-Relevance: The runtime supports 16 independently versioned CLI providers whose release cadence is roughly weekly. Without an upstream signal the runtime is structurally guaranteed to lag, and the lag is currently invisible to both maintainers and users.
+Summary: The runtime can already fingerprint an installed CLI (`--version`, `--help`, live probe), collect evolution evidence, and compare against a retained baseline. What it cannot do is learn that an upstream CLI released a new version, because nothing in any of the three repos reads a release feed. Every drift signal today requires the CLI to already be installed on a machine and a human to remember to probe it, and every fix requires editing hand-written TypeScript and cutting a runtime release. This note proposes a six-layer "provider knowledge supply chain" that automates the cheap deterministic tiers in CI, keeps quota-consuming live probes manual-first per ADR-025, and uses desktop agent features (ChatGPT Work / Claude Cowork) as optional scheduled collectors and candidate-PR authors while deterministic validation and merge gating stay in CI.
+Relevance: The runtime tracks 16 independently versioned CLI provider families with different execution and probe coverage. Without an upstream signal the runtime is structurally guaranteed to lag, and the lag is currently invisible to both maintainers and users.
 Action Items:
 - Record the automation boundary (light tier automated, live tier manual) in an ADR
-- Add release-feed coordinates for every provider and a scheduled watcher that reports version drift
+- Add a minimal canonical provider registry with automation coverage and channel/platform-scoped release signals
+- Separate observed candidates from capability-specific accepted evidence and baselines
+- Add a scheduled watcher that reports version or upstream-artifact drift without treating observation as verification
 - Make catalog staleness visible in `setup`/`diagnostics` instead of silently serving stale truth
-- Audit which providers can be installed in a CI container before committing to help-surface baselines
+- Audit which provider/platform/channel targets can be installed safely on CI runners before committing to surface baselines
 
 ## Problem
 
-`cats-runtime` integrates 16 CLI provider families (`src/backends/cli/providers/types.ts:24`):
+`cats-runtime` registers 16 CLI provider families (`src/backends/cli/providers/types.ts:24`):
 
 `claude`, `codex`, `antigravity`, `cursor`, `copilot`, `opencode`, `kilo`, `goose`, `pi`,
 `auggie`, `junie`, `kiro`, `grok`, `cline`, `devin`, `aider`
+
+These families do not all have the same support level. Some are install-only, some refuse CLI
+execution because no safe machine-readable contract exists, and the provider-evolution entrypoint
+does not cover all 16. Automation therefore needs a per-tier coverage matrix rather than a single
+boolean meaning "supported".
 
 Each ships on its own schedule and can change:
 
@@ -84,18 +91,21 @@ observation of an already-installed CLI**.
 - **Knowledge is compiled into TypeScript.** Correcting one model id requires a runtime
   release. Against 16 providers on roughly weekly cadence, release-coupled knowledge can never
   keep up.
-- **No committed golden baseline.** Because baselines live in local artifacts, there is no
-  mechanism that turns "upstream changed its `--help`" into a red CI check.
+- **No accepted-baseline state.** Because baselines live in local artifacts, there is no
+  mechanism that turns "upstream changed its `--help`" into a red CI check, and the latest
+  matching wire artifact can become the next comparison baseline without an explicit accepted
+  promotion step.
 
 ## Five Drift Classes
 
 One mechanism cannot cover these; they differ in signal source, cost, and automatability.
 
-### 1. Release drift — a new upstream version exists
+### 1. Release drift — a new upstream release or artifact change exists
 
-- Signal: npm dist-tags, GitHub releases/tags, PyPI, native installer version endpoints
+- Signal: npm dist-tags, GitHub releases/tags, PyPI, native installer version endpoints, or weak
+  HTTP artifact fingerprints (ETag, Last-Modified, SHA-256) when no version endpoint exists
 - Cost: near zero; no install, no auth, no quota
-- Automatable: fully
+- Automatable: fully where a deterministic signal exists; otherwise weak-signal or manual
 
 Feed coordinates are already partly in-repo. Seven providers carry `check.npmPackage` today via
 `createGenericNpmKnowledge`:
@@ -110,19 +120,23 @@ Feed coordinates are already partly in-repo. Seven providers carry `check.npmPac
 
 The other nine (`claude`, `cursor`, `goose`, `junie`, `kiro`, `antigravity`, `grok`, `aider`,
 `devin`) use native installers or other channels and currently declare only a `defaultDocsUrl`.
-They need an explicit feed coordinate added — for example `aider` resolves to `aider-chat` on
-PyPI via the uv installer, and `claude` installs from `claude.ai/install.sh` with no version
-feed declared at all.
+They need explicit source declarations — for example `aider` resolves to `aider-chat` on PyPI via
+the uv installer, while a provider with only an installer script may need an artifact fingerprint
+until a semantic version endpoint is available. A provider with no deterministic signal must be
+reported as `not_automated`, not silently treated as current.
 
-### 2. Surface drift — flags and subcommands renamed or removed
+### 2. Surface drift — command grammar or argv contracts changed
 
-- Signal: `--help` text diff against a committed golden file
+- Signal: normalized command grammar and Cats argv-contract checks derived from `--help`
 - Cost: requires the CLI installed, but no auth and no quota; deterministic
-- Automatable: fully, for providers installable in a container
+- Automatable: fully, for provider/platform/channel targets safely installable on a CI runner
 
-This is the sweet spot. `helpTokens` in `compatibility/knowledge.ts` already declares exactly
-which flags the runtime depends on per provider, so "a flag we pass disappeared from `--help`"
-is a mechanical check with a precise failure condition.
+This is the sweet spot, but token presence alone is not the contract. A flag can remain visible
+while moving to another subcommand, changing its accepted values, or becoming incompatible with
+another flag. `helpTokens` in `compatibility/knowledge.ts` are useful seed assertions; the stable
+CI contract should be a normalized command schema plus tests of the argv profiles Cats actually
+emits. Raw help text remains evidence and should be normalized for ANSI, wrapping, ordering, and
+terminal-width noise. Baselines are scoped by platform and distribution channel.
 
 ### 3. Wire drift — stream event types and payload shapes
 
@@ -131,6 +145,10 @@ is a mechanical check with a precise failure condition.
 - Automatable: no — keep manual/opt-in
 
 This is the class ADR-025 deliberately kept manual, and that judgment still holds.
+Manual-first does not mean "latest artifact wins": failed, unreviewed, and rejected probe
+artifacts must remain candidates. Only an explicitly accepted artifact pointer may become the
+next wire baseline. A small credentialed self-hosted canary set remains an opt-in extension after
+that promotion rule exists.
 
 ### 4. Model catalog drift — model list, labels, option sets
 
@@ -140,8 +158,11 @@ This is the class ADR-025 deliberately kept manual, and that judgment still hold
 - Automatable: partially — some providers expose `models` subcommands (OpenCode already has a
   runtime-owned `opencode models` seam); the rest need a human or a desktop agent
 
-This is simultaneously the fastest-moving class and the most user-visible one, and it is the
-only class where CI genuinely cannot reach the source.
+This is simultaneously the fastest-moving class and the most user-visible one. It is also not
+reliably coupled to CLI releases: server-side availability, account entitlements, region, and
+rollout cohort can change while the local CLI version stays fixed. Dynamic target-specific model
+entries therefore remain separate from repo-owned verified advanced controls. An interactive
+picker observation is candidate evidence with scope, not automatically global catalog truth.
 
 ### 5. Install/auth drift — install command, binary path, login flow
 
@@ -151,18 +172,24 @@ only class where CI genuinely cannot reach the source.
 
 ## Proposed Shape: A Provider Knowledge Supply Chain
 
-Six layers with distinct owners and cadences. L1 and L2 are what the repo is missing.
+Six layers with distinct owners and cadences. The repo is missing the canonical L0 automation
+slice plus scheduled L1 and accepted L2 contracts.
 
 ### L0 — Registry: one declarative, machine-diffable file per provider
 
-Move the version-sensitive facts out of hand-written TypeScript into
-`providers/<name>/manifest.yaml`, holding:
+Start with the automation and acceptance subset in `providers/<name>/manifest.yaml`, then migrate
+the remaining version-sensitive facts out of hand-written TypeScript behind the same loader. Each
+manifest holds:
 
-- release-feed coordinates (npm package, GitHub repo, PyPI project, installer version URL)
+- support tier and automation coverage for release, install, surface, model, wire, and execution
+- release sources as an array, including channel, platform, version scheme, prerelease policy,
+  and npm/GitHub/PyPI/installer/HTTP-artifact coordinates
 - install commands and path hints
 - argv profiles and `helpTokens`
 - the model / option catalog
-- provenance: `observedVersion`, `verifiedAt`, `verifiedBy`, `evidenceRefs`
+- capability-specific acceptance and provenance: an accepted version range or baseline pointer,
+  `verifiedAt`, `verifiedBy`, and `evidenceRefs`; candidate/rejected evidence stays alongside the
+  accepted pointer until review promotes or closes it
 
 Rationale: automation cannot safely edit a 1490-line TypeScript module, but it can safely
 replace a YAML block, and CI can schema-validate the result. There is precedent —
@@ -171,30 +198,36 @@ replace a YAML block, and CI can schema-validate the result. There is precedent 
 `evidenceRefs`. The TypeScript becomes a typed loader over the registry rather than the
 registry itself.
 
-This is a refactor, so it should land *after* baselines exist to protect it, not before.
+The full knowledge migration is a refactor and still lands after surface baselines protect it.
+The minimal automation registry lands first so the watcher does not introduce another flat table
+that duplicates the seven existing npm package coordinates. Existing install knowledge must
+consume or derive the migrated coordinate during this first slice.
 
 ### L1 — Watcher: cheap remote scheduled check
 
 A daily GitHub Actions cron that, per provider:
 
 - resolves the latest version from the declared feed
-- compares it against the recorded `observedVersion`
+- records it as `latestObservedVersion` in the generated report and compares it against the
+  capability-specific accepted release reference without mutating that acceptance
 - fetches the changelog delta between the two versions when the upstream publishes one
 - emits a `provider-watch-report.json` and opens or updates one issue per drifting provider,
   risk-tagged by keyword scan (`breaking`, `--`, `output-format`, `model`, `deprecat`,
   `rename`)
+- reports `feed_error` and `not_automated` as explicit non-current coverage states
 
 No CLI installs, no credentials, no user machines. This single job converts "silently four
 months behind" into "a daily report".
 
-### L2 — Contract probe: containerized light probes with committed baselines
+### L2 — Contract probe: isolated light probes with committed baselines
 
-A CI matrix that installs the pinned and latest versions in a container and runs light probes
-only (`--version`, `--help`, `<subcommand> --help`, `models --help`), writing raw stdout to
-`providers/<name>/baselines/<version>/`. CI diffs against the committed baseline:
+A CI matrix that installs pinned and candidate versions for eligible platform/channel targets and
+runs light probes only (`--version`, `--help`, `<subcommand> --help`, `models --help`). It retains
+raw stdout as evidence and derives normalized command-schema candidates. CI compares against an
+explicit accepted baseline:
 
-- a flag the runtime passes disappeared from `--help` → hard failure
-- new flags appeared → informational
+- an argv profile Cats emits is no longer represented by the command grammar → hard failure
+- new flags or grammar branches appeared → informational candidate
 - model listing changed → catalog patch candidate
 
 Coverage will be partial. Some of the 16 cannot be installed unattended in a container (paid
@@ -203,9 +236,11 @@ that needs a per-provider audit; it must not be assumed.
 
 ### L3 — Wire probe: existing evolution probe, unchanged policy
 
-Keep `providerEvolutionProbe` manual-first. Add only two capabilities:
+Keep `providerEvolutionProbe` manual-first. Add three capabilities:
 
 - emit baselines in a committable form so wire-level drift can also become a reviewable diff
+- promote a reviewed artifact explicitly; failed, unreviewed, and rejected artifacts cannot
+  replace the accepted pointer
 - allow a self-hosted runner holding real credentials to run the top few providers on a
   schedule, as an explicit opt-in rather than a default
 
@@ -213,8 +248,11 @@ Keep `providerEvolutionProbe` manual-first. Add only two capabilities:
 
 A job that consumes the L1/L2 report and produces a pull request:
 
-- model catalog drift → update the manifest's model block, bump `observedVersion` / `verifiedAt`
-- flag drift → propose the argv profile change plus the adapter fixture update
+- model catalog drift → record scoped candidate evidence (`observedCliVersion`, observation time,
+  target/account/region scope where known) and propose a model-block change without moving the
+  accepted catalog pointer
+- flag drift → propose the argv profile change plus the adapter fixture update as a surface
+  candidate, without moving the accepted surface baseline
 - anything touching parser code → open an issue with the evidence bundle and stop
 
 Gate: schema validation, `npm run typecheck`, and the provider's fixture tests must pass, and a
@@ -245,77 +283,94 @@ explicitly that it was never about the release and surface tiers.
 
 ## Where Desktop Agent Features Fit
 
-ChatGPT Desktop "Work" and Claude Desktop "Cowork" were considered as the automation host.
+ChatGPT Work and Claude Cowork were considered as automation hosts. Both products now support
+recurring scheduled work; depending on local or cloud execution mode they can use connected
+tools, skills/plugins, local project context, or remote context. See the current
+[ChatGPT scheduled-tasks documentation](https://learn.chatgpt.com/docs/automations),
+[ChatGPT Work overview](https://learn.chatgpt.com/docs/get-started-with-work), and
+[Claude Cowork scheduled-tasks documentation](https://support.claude.com/en/articles/13854387-schedule-recurring-tasks-in-claude-cowork).
 Assessment:
 
-- **Good fit — changelog and doc reading.** A weekly task that reads 16 upstream changelogs and
-  vendor model docs and diffs them against the registry. This is ordinary
-  browse-and-summarize work, needs no repo credentials, and covers drift class 5 where
-  interpretation matters more than determinism.
+- **Good fit — scheduled changelog and doc reading.** A weekly task that reads 16 upstream
+  changelogs and vendor model docs and diffs them against the registry. This is ordinary
+  browse-and-summarize work and covers drift class 5 where interpretation matters more than
+  determinism.
 - **Good fit — the interactive picker problem.** Drift class 4 is the one CI structurally
   cannot reach, because the model list and effort options live inside a TUI picker. An agent
   with desktop/terminal access can drive the picker and transcribe it. This is the strongest
   argument for using these features at all.
-- **Poor fit — scheduler or gate.** Non-deterministic, no repo-visible audit trail, no CI
-  guarantee, and dependent on a consumer app's session staying signed in. Invariants must not
-  live there.
+- **Good fit — candidate issue or PR preparation.** Scheduled desktop-agent tasks can package
+  observations, evidence links, and proposed declarative changes for review. Local availability
+  and authentication remain operational dependencies, so missed runs must be visible.
+- **Poor fit — deterministic merge gate.** Agent interpretation is non-deterministic and does
+  not replace schema validation, fixtures, branch protection, or repo-visible CI status.
 
-Rule: **CI owns detection and gating; desktop agent features are an optional human-context
-collector, and everything they observe is written back through a PR into the same
-`providers/<name>/manifest.yaml`.** One source of truth regardless of who observed it.
+Rule: **CI owns deterministic detection and gating; desktop agent features may own recurring
+judgment-heavy collection and candidate preparation, and everything they observe is written back
+through the same evidence/PR path into `providers/<name>/manifest.yaml`.** One source of truth
+regardless of who observed it.
 
-Separately worth naming: for maintainer-side scheduling, a Claude Code scheduled cloud routine
-against this repo fits better than either desktop feature, because it can open PRs and run
-tests and is already in the project's toolchain. `src/core/wakeup/cron.ts` is *not* the right
-host — that is product-facing session wakeup substrate, not maintenance CI.
+`src/core/wakeup/cron.ts` is *not* the right host for any of these schedules — that is
+product-facing session wakeup substrate, not maintenance CI.
 
-## Runtime-Side Degradation Is Still Required
+## Runtime-Side Degradation Requires a Separate Evidence Gate
 
 Repo automation shortens the window between an upstream release and runtime support. It cannot
 eliminate it, and users will hit the window.
 
 ADR-029 rule 2 already says unverified targets must degrade to conservative entry-only catalogs
-instead of publishing guessed metadata. Today nothing feeds that rule a notion of "verified for
-which version". With L1's `observedVersion` recorded per provider, the runtime can:
+instead of publishing guessed metadata. Today nothing feeds that rule capability-specific
+applicability. A single exact CLI-version comparison is not sufficient: model availability can
+move without a CLI release, while an unrelated patch release need not invalidate advanced
+controls. With multi-dimensional acceptance, the runtime can:
 
-- compare the locally fingerprinted version against the verified version in the manifest
-- degrade advanced metadata to entry-only when they do not match
-- surface the delta as a warning on `setup` and `diagnostics`, alongside the existing
-  `ProviderAdvancedCatalogSupport.provenance`
+- show release, surface, catalog, and wire freshness independently
+- compare locally fingerprinted versions against accepted ranges or scoped baselines where that
+  dimension actually depends on a CLI version
+- keep dynamic, target-specific model entries separate from verified advanced controls
+- surface candidate/unverified states as warnings on `setup` and `diagnostics`, alongside the
+  existing `ProviderAdvancedCatalogSupport.provenance`
+- apply future entry-only degradation only when catalog/advanced evidence is missing or
+  inapplicable for the target, under a separately specified and tested gate
 
 `CuratedModelCatalogEntry` already parses `version` and `lastUpdated` from the YAML
-(`curatedModelCatalog.ts`), so the data needed for a staleness warning is loaded and simply
-never compared against anything. That makes the visible-staleness slice unusually cheap.
+(`curatedModelCatalog.ts`), so the catalog-observation part of a staleness warning is loaded and
+simply never compared against anything. The other dimensions still require the registry and
+accepted evidence contract.
 
 ## Recommended Sequencing
 
 Ordered by value over cost:
 
-1. **L1 watcher.** Feed coordinates for 16 providers, one script, one scheduled workflow. Purely
-   additive, touches no runtime contract.
-2. **Staleness visibility.** Wire the recorded upstream version and the already-parsed
-   `version`/`lastUpdated` into `setup`/`diagnostics` provenance and warnings, and honor
-   ADR-029 rule 2 against it.
-3. **L2 help baselines and CI diff**, for the subset that installs unattended in a container.
-4. **L0 registry consolidation** — the refactor, protected by the baselines from step 3.
-5. **L4 agent triage into candidate PRs.**
-6. **L5 knowledge pack delivery.**
+1. **Minimal L0 registry and coverage matrix.** Canonical release sources, channel/platform
+   scope, automation coverage, and per-capability acceptance; no duplicated flat feed table.
+2. **L1 watcher.** One script and scheduled workflow that produce observed candidates and explicit
+   coverage/error states without mutating acceptance.
+3. **Multi-dimensional staleness visibility.** Add warnings and provenance only; do not degrade
+   on exact version mismatch.
+4. **L2 normalized help/argv baselines and CI diff**, for the subset that installs safely on the
+   relevant runner OS.
+5. **Accepted-baseline promotion and capability-specific degradation**, with their own SPEC.
+6. **L4 agent triage into candidate PRs.**
+7. **Full L0 knowledge consolidation and L5 knowledge-pack delivery.**
 
-Steps 1 and 2 are specified in PLAN-036. Steps 3–6 need their own SPEC before implementation.
+Steps 1–3 are specified in PLAN-036. Steps 4–7 need their own SPEC before implementation.
 
 ## Risks
 
 - **Automated catalog edits could ship a bad model id to users.** Mitigated by three
   independent gates: candidate PR with human merge, fixture tests, and a rollback-capable
   knowledge pack.
-- **Installing 16 upstream CLIs in CI is a supply-chain and rate-limit surface.** Mitigated by
-  containerized runs, pinned versions, `--help`-only invocation, and never injecting
-  credentials into that job.
-- **Upstream changelog quality is inconsistent** and several providers publish none. The watcher
-  must be useful from the version string alone; changelog text is an enhancement, not a
-  precondition.
+- **Installing eligible upstream CLIs in CI is a supply-chain and rate-limit surface.** Mitigated
+  by isolated OS-appropriate runners, pinned versions, `--help`-only invocation, and never
+  injecting credentials into that job.
+- **Upstream changelog and version-feed quality is inconsistent** and several providers publish
+  neither. The watcher must expose `not_automated` coverage and may use HTTP artifact fingerprints
+  as weak signals; changelog text is an enhancement, not a precondition.
 - **Feed coordinates themselves drift** (a package gets renamed or a repo moves). A feed that
   fails to resolve must report loudly rather than silently reporting "no drift".
+- **One observation can be account- or region-specific.** Interactive model evidence carries its
+  scope and stays candidate evidence until review determines whether it is safe to generalize.
 
 ## Relationship to Existing Decisions
 
@@ -331,8 +386,8 @@ Steps 1 and 2 are specified in PLAN-036. Steps 3–6 need their own SPEC before 
 
 ## Recommended Next Step
 
-Accept ADR-034 to fix the automation boundary, then execute PLAN-036 Phase 1 (release-feed
-coordinates plus the scheduled watcher) as the first landing slice.
+Accept ADR-034 after review, then execute PLAN-036 Phase 0 (minimal registry, coverage matrix, and
+acceptance contract) before adding the scheduled watcher.
 
 ## Related
 
