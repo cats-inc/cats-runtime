@@ -7,10 +7,10 @@ Summary: The runtime can already fingerprint an installed CLI (`--version`, `--h
 Relevance: The runtime tracks 16 independently versioned CLI provider families with different execution and probe coverage. Without an upstream signal the runtime is structurally guaranteed to lag, and the lag is currently invisible to both maintainers and users.
 Action Items:
 - Record the automation boundary (light tier automated, live tier manual) in an ADR
-- Add a minimal canonical provider registry with automation coverage and channel/platform-scoped release signals
+- Add canonical release sources plus an automation coverage matrix, in compiled TypeScript so the first slice moves no packaging contract, deriving npm coordinates from `check.npmPackage`
 - Separate observed candidates from capability-specific accepted evidence and baselines
 - Add a scheduled watcher that reports version or upstream-artifact drift without treating observation as verification
-- Make catalog staleness visible in `setup`/`diagnostics` instead of silently serving stale truth
+- Make catalog staleness visible in `setup`/`diagnostics` instead of silently serving stale truth, and separately correct the curated catalog entry already known to be wrong
 - Audit which provider/platform/channel targets can be installed safely on CI runners before committing to surface baselines
 
 ## Problem
@@ -125,18 +125,25 @@ the uv installer, while a provider with only an installer script may need an art
 until a semantic version endpoint is available. A provider with no deterministic signal must be
 reported as `not_automated`, not silently treated as current.
 
-### 2. Surface drift — command grammar or argv contracts changed
+### 2. Surface drift — help surfaces or argv contracts changed
 
-- Signal: normalized command grammar and Cats argv-contract checks derived from `--help`
+- Signal: canonicalized `--help` output plus Cats argv-contract checks
 - Cost: requires the CLI installed, but no auth and no quota; deterministic
 - Automatable: fully, for provider/platform/channel targets safely installable on a CI runner
 
 This is the sweet spot, but token presence alone is not the contract. A flag can remain visible
 while moving to another subcommand, changing its accepted values, or becoming incompatible with
 another flag. `helpTokens` in `compatibility/knowledge.ts` are useful seed assertions; the stable
-CI contract should be a normalized command schema plus tests of the argv profiles Cats actually
-emits. Raw help text remains evidence and should be normalized for ANSI, wrapping, ordering, and
-terminal-width noise. Baselines are scoped by platform and distribution channel.
+CI contract is canonicalized help text plus tests of the argv profiles Cats actually emits.
+
+Canonicalization is the right layer, and it is not the same as grammar extraction. Raw `--help`
+diffs are genuinely too noisy for CI — ANSI codes, wrapping, ordering, and terminal width all
+churn — but the fix for that is to remove the noise deterministically: strip ANSI, pin `COLUMNS`,
+normalize wrapping and ordering. Canonicalized text keeps the property that matters, which is no
+false negatives. Extracting a command grammar instead means writing and maintaining a help parser
+per CLI across 16 heterogeneous tools, and a bug in that parser hides exactly the upstream change
+the check exists to catch. Derive grammar for readability if it helps a reviewer; diff the
+canonical text. Baselines are scoped by platform and distribution channel.
 
 ### 3. Wire drift — stream event types and payload shapes
 
@@ -175,11 +182,10 @@ picker observation is candidate evidence with scope, not automatically global ca
 Six layers with distinct owners and cadences. The repo is missing the canonical L0 automation
 slice plus scheduled L1 and accepted L2 contracts.
 
-### L0 — Registry: one declarative, machine-diffable file per provider
+### L0 — Registry: one declarative, machine-diffable declaration per provider
 
-Start with the automation and acceptance subset in `providers/<name>/manifest.yaml`, then migrate
-the remaining version-sensitive facts out of hand-written TypeScript behind the same loader. Each
-manifest holds:
+Start with the release-source and coverage subset, then migrate the remaining version-sensitive
+facts behind the same loader. Together the two stages hold:
 
 - support tier and automation coverage for release, install, surface, model, wire, and execution
 - release sources as an array, including channel, platform, version scheme, prerelease policy,
@@ -191,17 +197,36 @@ manifest holds:
   `verifiedAt`, `verifiedBy`, and `evidenceRefs`; candidate/rejected evidence stays alongside the
   accepted pointer until review promotes or closes it
 
-Rationale: automation cannot safely edit a 1490-line TypeScript module, but it can safely
-replace a YAML block, and CI can schema-validate the result. There is precedent —
-`curatedModelCatalog.ts` is already a YAML loader with a `schema_version` gate, and
-`ProviderAdvancedCatalogSupport.provenance` already carries `manifestId` / `manifestVersion` /
-`evidenceRefs`. The TypeScript becomes a typed loader over the registry rather than the
-registry itself.
+Rationale: automation cannot safely edit a 1490-line TypeScript module, but it can safely replace
+a declaration block, and CI can validate the result. What matters is that the target has no logic
+in it — a flat source table is machine-editable whether it is YAML or TypeScript; the 1490-line
+module is not, in either format.
 
-The full knowledge migration is a refactor and still lands after surface baselines protect it.
-The minimal automation registry lands first so the watcher does not introduce another flat table
-that duplicates the seven existing npm package coordinates. Existing install knowledge must
-consume or derive the migrated coordinate during this first slice.
+**Storage format is a packaging decision here, not a style one.** `npm run build` is
+`clean:build` + `build:ui` + `tsc`, and `scripts/build-runtime-artifacts.mjs` copies no assets at
+all. `package.json` `files` is an allowlist, and `tests/package-contract.test.ts` asserts it with
+`toEqual`. So a runtime-loaded YAML tree needs four things the repo does not have yet: a build copy
+step, a `files` entry, a `package-contract` update, and — for a root `providers/` directory — an
+`AGENTS.md` Project Structure Convention entry, since neither the Required nor the Optional list
+includes one. Compiled TypeScript needs none of them.
+
+Note also which precedent applies. `curatedModelCatalog.ts` is a YAML loader with a
+`schema_version` gate, but it reads a *user-overridable* file from the runtime config tree with a
+bundled `config/*.yaml.example` fallback — which is exactly why those three examples appear in
+`files`. The registry is repo-owned truth, not user config, so it does not inherit that delivery
+mechanism.
+
+Therefore: the first slice declares release sources and coverage in TypeScript under
+`src/core/provider-registry/`, which ships inside `build/runtime` and moves no packaging contract.
+The YAML registry arrives with the knowledge migration, after surface baselines protect the
+refactor, and it carries the four packaging items above as part of its own scope.
+
+Either way the watcher must not introduce a second table for the seven existing npm coordinates:
+`check.npmPackage` in `provider-install/knowledge.ts` stays the single handwritten home and the
+registry derives from it, guarded by a reconciliation test.
+
+`ProviderAdvancedCatalogSupport.provenance` already carries `manifestId` / `manifestVersion` /
+`evidenceRefs`, so the provenance vocabulary is partly in place regardless of format.
 
 ### L1 — Watcher: cheap remote scheduled check
 
@@ -215,6 +240,9 @@ A daily GitHub Actions cron that, per provider:
   risk-tagged by keyword scan (`breaking`, `--`, `output-format`, `model`, `deprecat`,
   `rename`)
 - reports `feed_error` and `not_automated` as explicit non-current coverage states
+- records `lastObservedAt` per source and flags anything past a staleness threshold, so a feed that
+  quietly stopped resolving — or later, a scheduled collection run that quietly never happened —
+  cannot read as a passing check
 
 No CLI installs, no credentials, no user machines. This single job converts "silently four
 months behind" into "a daily report".
@@ -223,11 +251,12 @@ months behind" into "a daily report".
 
 A CI matrix that installs pinned and candidate versions for eligible platform/channel targets and
 runs light probes only (`--version`, `--help`, `<subcommand> --help`, `models --help`). It retains
-raw stdout as evidence and derives normalized command-schema candidates. CI compares against an
-explicit accepted baseline:
+raw stdout as evidence and commits the canonicalized form as the comparison baseline. CI compares
+against an explicit accepted baseline:
 
-- an argv profile Cats emits is no longer represented by the command grammar → hard failure
-- new flags or grammar branches appeared → informational candidate
+- an argv profile Cats emits no longer round-trips against the canonical help surface → hard
+  failure
+- canonical help text changed in any other way → informational candidate
 - model listing changed → catalog patch candidate
 
 Coverage will be partial. Some of the 16 cannot be installed unattended in a container (paid
@@ -300,15 +329,27 @@ Assessment:
   with desktop/terminal access can drive the picker and transcribe it. This is the strongest
   argument for using these features at all.
 - **Good fit — candidate issue or PR preparation.** Scheduled desktop-agent tasks can package
-  observations, evidence links, and proposed declarative changes for review. Local availability
-  and authentication remain operational dependencies, so missed runs must be visible.
+  observations, evidence links, and proposed declarative changes for review.
 - **Poor fit — deterministic merge gate.** Agent interpretation is non-deterministic and does
   not replace schema validation, fixtures, branch protection, or repo-visible CI status.
 
+There is one operational caveat that must not be waved through. A desktop-agent schedule depends on
+local availability and a signed-in session, and its failure mode is a run that simply never
+happens. That is the same failure mode this note works hard to eliminate for feeds — reporting "no
+drift" when the truth is "no signal". So a scheduled collector needs the same treatment as a feed:
+record when it last successfully delivered, and flag it past a threshold. A collector with no
+liveness signal is not coverage.
+
 Rule: **CI owns deterministic detection and gating; desktop agent features may own recurring
 judgment-heavy collection and candidate preparation, and everything they observe is written back
-through the same evidence/PR path into `providers/<name>/manifest.yaml`.** One source of truth
-regardless of who observed it.
+through the same evidence/PR path into the registry.** One source of truth regardless of who
+observed it.
+
+For maintainer-side scheduling that needs to open pull requests and run tests, a Claude Code
+scheduled cloud routine against this repo fits better than either desktop product: it can do both,
+its runs are repo-visible, and it already lives in the project's toolchain. Reach for Work or
+Cowork for the parts that genuinely need a logged-in human context — vendor docs behind a login, an
+interactive TUI picker — and not as the default scheduler.
 
 `src/core/wakeup/cron.ts` is *not* the right host for any of these schedules — that is
 product-facing session wakeup substrate, not maintenance CI.
@@ -338,23 +379,43 @@ controls. With multi-dimensional acceptance, the runtime can:
 simply never compared against anything. The other dimensions still require the registry and
 accepted evidence contract.
 
+One thing this reasoning must not be allowed to imply. Concluding that version inequality is the
+wrong degradation trigger is correct, but it says nothing about the datum that motivated the whole
+investigation. The Claude curated entry is not merely *unverified against a new CLI* — it is known
+to be wrong, four months old, and naming a superseded model generation. Correcting it is reviewed
+content work, independent of any degradation gate, and it should not wait behind a deferred SPEC.
+Deferring the automatic behavior is a design judgment; continuing to ship data we already know is
+wrong is not.
+
 ## Recommended Sequencing
 
 Ordered by value over cost:
 
-1. **Minimal L0 registry and coverage matrix.** Canonical release sources, channel/platform
-   scope, automation coverage, and per-capability acceptance; no duplicated flat feed table.
-2. **L1 watcher.** One script and scheduled workflow that produce observed candidates and explicit
-   coverage/error states without mutating acceptance.
-3. **Multi-dimensional staleness visibility.** Add warnings and provenance only; do not degrade
-   on exact version mismatch.
-4. **L2 normalized help/argv baselines and CI diff**, for the subset that installs safely on the
+1. **Release sources and coverage matrix.** Canonical release sources with channel/platform scope,
+   honest per-capability coverage, and optional accepted references; declared in compiled
+   TypeScript so it needs no packaging change, and derived from `check.npmPackage` so no second
+   feed table exists.
+2. **L1 watcher.** One script and scheduled workflow that produce observed candidates plus explicit
+   coverage, error, and stale-observation states without mutating acceptance.
+3. **Multi-dimensional staleness visibility, plus the stale-catalog correction.** Warnings and
+   provenance only for the runtime contract; do not degrade on exact version mismatch. Separately,
+   fix the Claude curated entry as content.
+4. **L2 canonicalized help/argv baselines and CI diff**, for the subset that installs safely on the
    relevant runner OS.
-5. **Accepted-baseline promotion and capability-specific degradation**, with their own SPEC.
+5. **Accepted-baseline promotion, the candidate/rejected evidence store, and capability-specific
+   degradation**, with their own SPEC.
 6. **L4 agent triage into candidate PRs.**
-7. **Full L0 knowledge consolidation and L5 knowledge-pack delivery.**
+7. **Full L0 knowledge consolidation — including its packaging work — and L5 knowledge-pack
+   delivery.**
 
 Steps 1–3 are specified in PLAN-036. Steps 4–7 need their own SPEC before implementation.
+
+Note what moved between drafts here, because the ordering principle is easy to lose. An earlier
+revision put the complete YAML registry — schema gate, loader, per-capability candidate/rejected
+records, knowledge migration — at step 1, ahead of any upstream signal existing. That inverts
+value over cost: the justification was avoiding a duplicated table of seven npm package names, and
+the proportionate fix for that is to read `check.npmPackage` directly. Step 1 is a source table;
+the registry refactor stays at step 7 where baselines protect it.
 
 ## Risks
 
@@ -371,6 +432,16 @@ Steps 1–3 are specified in PLAN-036. Steps 4–7 need their own SPEC before im
   fails to resolve must report loudly rather than silently reporting "no drift".
 - **One observation can be account- or region-specific.** Interactive model evidence carries its
   scope and stays candidate evidence until review determines whether it is safe to generalize.
+- **A runtime-loaded data tree can silently miss packaging.** `package.json` `files` is an
+  allowlist asserted by `tests/package-contract.test.ts`, and the build copies no assets, so a new
+  YAML tree either ships broken or breaks that test. The first slice avoids this by staying in
+  compiled TypeScript; the later registry slice must carry the packaging checklist as scope.
+- **Deferring the degradation gate can quietly become "ship the wrong data".** The correct
+  conclusion that CLI-version inequality is a bad trigger does not extend to data already known to
+  be wrong. Content corrections stay on their own track, independent of the gate.
+- **Rigor can invert the sequencing.** Every guarantee above is worth having, but adding them all
+  before the first signal exists delays the report that motivated the work. Model the distinctions
+  early as typed fields; build the enforcement machinery once there is something to enforce against.
 
 ## Relationship to Existing Decisions
 
@@ -386,15 +457,16 @@ Steps 1–3 are specified in PLAN-036. Steps 4–7 need their own SPEC before im
 
 ## Recommended Next Step
 
-Accept ADR-034 after review, then execute PLAN-036 Phase 0 (minimal registry, coverage matrix, and
-acceptance contract) before adding the scheduled watcher.
+Accept ADR-034 after review, then execute PLAN-036 Phase 0 (release sources plus the coverage
+matrix, in compiled TypeScript, derived from `check.npmPackage`) before adding the scheduled
+watcher.
 
 ## Related
 
 - [ADR-013 Extend provider manifests with install and check metadata](../decisions/013-extend-provider-manifests-with-install-and-check-metadata.md)
 - [ADR-025 Keep provider evolution detection manual-first and evidence-driven](../decisions/025-keep-provider-evolution-detection-manual-first-and-evidence-driven.md)
 - [ADR-029 Keep advanced provider catalogs verified and manual-refresh](../decisions/029-keep-advanced-provider-catalogs-verified-and-manual-refresh.md)
-- [ADR-034 Automate light-tier provider drift detection and keep live probes manual](../decisions/034-automate-light-tier-provider-drift-detection-and-keep-live-probes-manual.md)
+- [ADR-034 Automate light-tier provider drift detection, keep live probes manual-first, and separate observation from acceptance](../decisions/034-automate-light-tier-provider-drift-and-separate-observation-from-acceptance.md)
 - [PLAN-036 Provider upstream drift watch and staleness surfacing](../plans/PLAN-036-provider-upstream-drift-watch-and-staleness-surfacing.md)
 - [2026-03-27 Provider Evolution Evidence Framework](./2026-03-27-provider-evolution-evidence-framework.md)
 - [2026-04-07 Advanced Provider Manifest Baseline](./2026-04-07-advanced-provider-manifest-baseline.md)

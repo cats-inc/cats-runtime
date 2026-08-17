@@ -46,7 +46,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
-| [PLAN-036](./PLAN-036-provider-upstream-drift-watch-and-staleness-surfacing.md) | Provider Upstream Drift Watch and Staleness Surfacing | Draft | [ADR-034](../decisions/034-automate-light-tier-provider-drift-detection-and-keep-live-probes-manual.md), [ADR-029](../decisions/029-keep-advanced-provider-catalogs-verified-and-manual-refresh.md) |
+| [PLAN-036](./PLAN-036-provider-upstream-drift-watch-and-staleness-surfacing.md) | Provider Upstream Drift Watch and Staleness Surfacing | Draft | [ADR-034](../decisions/034-automate-light-tier-provider-drift-and-separate-observation-from-acceptance.md), [ADR-029](../decisions/029-keep-advanced-provider-catalogs-verified-and-manual-refresh.md) |
 | [PLAN-035](./PLAN-035-cline-success-path-end-to-end-verification.md) | Cline Success-Path End-to-End Verification | Blocked — waiting on Cline account credit | [SPEC-027](../specs/SPEC-027-grok-devin-cline-aider-cli-provider-onboarding.md) |
 | [PLAN-034](./PLAN-034-grok-devin-cline-aider-cli-provider-onboarding.md) | Grok, Devin, Cline, and Aider CLI Provider Onboarding | In Progress — Grok, Cline, Devin, and Aider landed; success-path verification deferred to PLAN-035 | [SPEC-027](../specs/SPEC-027-grok-devin-cline-aider-cli-provider-onboarding.md), [ADR-033](../decisions/033-adopt-grok-devin-cline-aider-as-cli-provider-families.md) |
 | [PLAN-033](./PLAN-033-replace-gemini-cli-with-antigravity-cli.md) | Replace Gemini CLI with Antigravity CLI | Draft | [SPEC-026](../specs/SPEC-026-antigravity-cli-provider-replacing-gemini.md), [ADR-032](../decisions/032-replace-gemini-cli-with-antigravity-cli.md) |

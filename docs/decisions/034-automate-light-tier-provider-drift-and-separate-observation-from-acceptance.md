@@ -1,4 +1,4 @@
-# ADR-034: Automate light-tier provider drift detection and keep live probes manual
+# ADR-034: Automate light-tier provider drift detection, keep live probes manual-first, and separate observation from acceptance
 
 ## Status
 
@@ -52,13 +52,21 @@ knowledge.
 
 Specifically:
 
-1. **A minimal provider automation registry lands before the watcher.** Each provider has one
-   declarative manifest with its support tier, automation coverage, release sources, platform and
-   channel scope, version scheme, and evidence provenance. Release sources are an array because
-   one provider may ship through different stable/prerelease or platform-specific channels. The
-   manifest becomes canonical for coordinates already represented by install knowledge; the
-   implementation must consume or derive those values instead of copying them into a second flat
-   table.
+1. **A canonical release-source and coverage declaration lands before the watcher.** Each provider
+   declares its release sources and its honest per-capability automation coverage, with a required
+   reason for anything not automated. Release sources are an array because one provider may ship
+   through different stable/prerelease or platform-specific channels. Coordinates already
+   represented by install knowledge keep exactly one handwritten home; the declaration derives from
+   them instead of copying them into a second flat table.
+
+   The declaration's storage format is a packaging decision, not a stylistic one. `npm run build`
+   is `clean:build` + `build:ui` + `tsc` and copies no assets, `package.json` `files` is an
+   allowlist, and `tests/package-contract.test.ts` asserts that allowlist with `toEqual`. A
+   runtime-loaded YAML tree therefore requires a build copy step, a `files` entry, a
+   `package-contract` update, and — at the repo root — an `AGENTS.md` Project Structure Convention
+   entry. The first slice therefore declares in compiled TypeScript, which requires none of those,
+   and the YAML registry arrives with the knowledge consolidation in decision 8, carrying that
+   packaging work explicitly.
 2. **Release observation is automated wherever a deterministic signal exists.** A scheduled CI
    job resolves npm, GitHub, PyPI, installer-version, or HTTP-artifact signals and reports the
    latest observed state. Providers with no resolvable signal remain explicit as
@@ -69,13 +77,24 @@ Specifically:
    not verified provider knowledge. Release, surface, catalog, and wire knowledge each carry
    their own accepted evidence and may progress through `candidate`, `accepted`, or `rejected`
    independently. The accepted pointer remains active while a candidate is reviewed; observation
-   never overwrites it. A single `verifiedVersion` must not stand in for all four dimensions.
+   never overwrites it. A single `verifiedVersion` must not stand in for all four dimensions. An
+   unset accepted reference is a reportable "not yet accepted" state, never "current".
+
+   Absence of a signal is likewise never coverage: every source records its last successful
+   observation against a staleness threshold, so a silently broken feed or a silently missed
+   scheduled collection cannot read as a healthy check.
 4. **Surface-tier detection becomes automated where it is safely installable.** For eligible
-   provider/platform/channel combinations, CI captures normalized command grammar from
-   `--version`, `--help`, `<subcommand> --help`, and model-list help surfaces. It validates the
-   argv profiles Cats actually emits, not only the presence of `helpTokens`, and stores candidate
-   snapshots separately from accepted baselines. Raw help output may be retained as evidence but
-   is not itself the stable comparison contract.
+   provider/platform/channel combinations, CI captures `--version`, `--help`,
+   `<subcommand> --help`, and model-list help surfaces, and validates the argv profiles Cats
+   actually emits rather than only the presence of `helpTokens`. Candidate snapshots are stored
+   separately from accepted baselines.
+
+   The comparison contract is **canonicalized** help output — ANSI stripped, terminal width
+   pinned, wrapping and ordering normalized — not an extracted command grammar. Canonicalization
+   removes the CI flakiness without discarding information, so it keeps the property that matters:
+   no false negatives. A grammar extractor is a 16-CLI parser project whose own bugs would mask
+   exactly the upstream changes this decision exists to catch. Derived grammar may be published as
+   readable enrichment alongside the canonical text; it does not become the diff target.
 5. **Wire-tier detection stays manual-first, per ADR-025.** Live probes and
    `providerEvolutionProbe` runs remain explicit, operator-initiated actions. A credentialed
    self-hosted scheduled run is permitted only as an explicit opt-in, never as a default, and
@@ -92,17 +111,30 @@ Specifically:
    currently spread across `compatibility/knowledge.ts`, `provider-install/knowledge.ts`,
    `models/curatedModelCatalog.ts`, and `models/providerAdvancedKnowledge.ts` move behind
    per-provider manifests carrying capability-specific acceptance and provenance. TypeScript
-   becomes a typed loader over that registry as the consolidation progresses.
+   becomes a typed loader over that registry as the consolidation progresses. That consolidation
+   owns the packaging work named in decision 1, and it must not treat `config/*.yaml.example` as
+   its precedent: those are user-overridable templates resolved through
+   `resolveRuntimeCuratedModelCatalogPath`, whereas the registry is repo-owned truth.
 9. **Staleness is multi-dimensional and visible before it changes behavior.** Release,
    surface, catalog, and wire freshness are reported independently on `setup` and `diagnostics`.
    An installed CLI version differing from the latest accepted version is a warning, not by
    itself proof that advanced metadata is invalid. Any future entry-only degradation under
    ADR-029 rule 2 must be based on missing or inapplicable catalog/advanced evidence for that
    target, not on exact CLI-version inequality, and requires a separate specified gate.
+
+    Deferring that gate does not license shipping data already known to be wrong. Content the
+    watcher exposes as stale — starting with the four-month-old Claude curated catalog entry — is
+    corrected as reviewed content regardless of when the degradation gate lands.
 10. **Detection and merge gating live in CI; desktop agents may schedule collection.** ChatGPT
     Work and Claude Cowork may run recurring changelog, documentation, interactive-picker, or
     candidate-PR workflows. Their observations enter the same evidence and candidate-PR path;
-    deterministic validation and merge invariants remain repo-visible CI checks.
+    deterministic validation and merge invariants remain repo-visible CI checks, and a missed
+    collection run must surface through the staleness threshold in decision 3 rather than pass as
+    coverage.
+
+    Where maintainer-side scheduling needs to open pull requests and run tests, a Claude Code
+    scheduled cloud routine against this repo is the better-fit host than either desktop product,
+    because it already lives in the project's toolchain.
 
 ## Consequences
 
@@ -112,8 +144,10 @@ Specifically:
   when a user's machine breaks; uncovered providers remain visibly `not_automated`
 - The cheapest and highest-frequency drift classes get covered first, with no credential or
   quota exposure
-- Cats argv profiles and normalized help grammar become enforced contracts
-- Candidate observations cannot silently become accepted baselines
+- Cats argv profiles and canonicalized help surfaces become enforced contracts
+- Candidate observations cannot silently become accepted baselines, and a broken or missed check
+  cannot masquerade as a passing one
+- The first slice ships inside the existing compiled artifact, so it moves no packaging contract
 - ADR-029's degradation rule can be enforced against catalog-specific evidence without treating
   every CLI version change as a capability regression
 - Declarative knowledge is safely machine-editable, which is the precondition for any further
@@ -127,7 +161,11 @@ Specifically:
   contained
 - Coverage is deliberately partial and platform-specific: providers without a deterministic feed
   or safe unattended install stay visibly manual at the affected tier
-- Consolidating four knowledge sources into a registry is a real refactor with migration risk
+- Consolidating four knowledge sources into a registry is a real refactor with migration risk, and
+  it carries packaging work (build copy step, `files` allowlist, `package-contract`, structure
+  convention) that the first slice deliberately avoids rather than solves
+- Capability-specific degradation is deferred to its own SPEC, so ADR-029 rule 2 stays
+  under-enforced in the interim and only warnings cover the gap
 - Maintainers still review every candidate PR; toil is reduced, not eliminated
 
 ### Neutral
@@ -188,5 +226,5 @@ Specifically:
 ---
 
 *Proposed: 2026-08-17*
-*Revised: 2026-08-17 after Codex review*
+*Revised: 2026-08-17 after Codex review, then after a follow-up review pass that fixed the storage/packaging decision, made canonicalized help the diff target, and restored the stale-data correction*
 *Decision makers: user + Claude + Codex*

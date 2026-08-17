@@ -1443,7 +1443,7 @@ ADR-034 closes this by splitting drift into tiers along the existing
 upstream observation from reviewed acceptance:
 
 - release tier (upstream version or artifact change exists) and eligible
-  surface tier (normalized command grammar or Cats argv contracts moved)
+  surface tier (canonicalized help surfaces or Cats argv contracts moved)
   become automated, because they need no credentials and no provider quota
 - the wire tier stays manual-first exactly as this work package already has it,
   and no automation may mutate parsers or promote capabilities
@@ -1456,16 +1456,22 @@ maintainer-side context and reports to maintainers. The runtime's own evidence
 collector still produces only runtime-observed evidence, so ADR-025 rule 3 and
 the deferred scope below both remain intact.
 
-PLAN-036 carries the first three slices. It first adds a minimal canonical
-automation registry and honest per-tier coverage matrix for all 16 provider
-families, including channel/platform-scoped release sources and
-capability-specific acceptance. It then adds a daily observation job and
-warning-only, multi-dimensional freshness/provenance on `setup` and
-`diagnostics`. Seven providers already carry an npm coordinate; the registry
-must migrate or derive those values rather than copy them into a second table.
-Providers with no deterministic release source remain visibly
-`not_automated`, with installer/document fingerprints and scheduled desktop
-agents available as weaker collection paths.
+PLAN-036 carries the first three slices. It first adds canonical
+channel/platform-scoped release sources plus an honest per-capability coverage
+matrix for all 16 provider families, declared in compiled TypeScript under
+`src/core/provider-registry/` so the slice moves no packaging contract — a
+runtime-loaded YAML tree would need a build copy step, a `package.json` `files`
+entry, a `tests/package-contract.test.ts` update, and a structure-convention
+entry, and that cost belongs to the later knowledge-consolidation slice. It then
+adds a daily observation job and warning-only, multi-dimensional
+freshness/provenance on `setup` and `diagnostics`, plus a content correction of
+the stale Claude curated entry, which does not wait on the deferred degradation
+gate. Seven providers already carry an npm coordinate in `check.npmPackage`; the
+registry derives from it rather than restating it. Providers with no
+deterministic release source remain visibly `not_automated`, with
+installer/document fingerprints and scheduled desktop agents available as weaker
+collection paths — each carrying a last-observed timestamp so a missed run cannot
+read as coverage.
 
 #### Deferred Scope
 
@@ -1474,6 +1480,10 @@ agents available as weaker collection paths.
 - do not promote failed, unreviewed, or rejected probe artifacts as baselines
 - do not degrade advanced metadata solely because an installed CLI version
   differs from an accepted release reference
+- do not let a deferred degradation gate become a reason to keep shipping
+  curated data already known to be wrong
+- do not report absence of a signal as coverage; every source and scheduled
+  collector carries a last-observed timestamp and a staleness threshold
 - do not force CLI-only assumptions into the shared collector
 - do not add a dedicated host-facing probe route or dashboard workflow until
   the manual-first CLI/internal flow proves stable
@@ -1485,9 +1495,9 @@ agents available as weaker collection paths.
 - `src/backends/cli/goose/parser.ts`
 - `src/backends/cli/pi/parser.ts`
 - `src/backends/agent/*`
-- `providers/*` and `src/core/provider-registry/*` (automation registry,
-  observation, coverage, and acceptance, PLAN-036)
-- `src/core/provider-install/*` (canonical coordinate consumption, PLAN-036)
+- `src/core/provider-registry/*` (release sources, coverage, observation, and
+  accepted references, PLAN-036)
+- `src/core/provider-install/*` (canonical coordinate derivation, PLAN-036)
 - `src/core/models/*` (catalog freshness and provenance, PLAN-036)
 - `scripts/` and `.github/workflows/` (maintainer-side watch job, PLAN-036)
 
@@ -1498,7 +1508,7 @@ agents available as weaker collection paths.
 - `docs/plans/PLAN-036-provider-upstream-drift-watch-and-staleness-surfacing.md`
 - `docs/decisions/025-keep-provider-evolution-detection-manual-first-and-evidence-driven.md`
 - `docs/decisions/026-model-a2a-as-an-agent-backend-adapter.md`
-- `docs/decisions/034-automate-light-tier-provider-drift-detection-and-keep-live-probes-manual.md`
+- `docs/decisions/034-automate-light-tier-provider-drift-and-separate-observation-from-acceptance.md`
 - `docs/research/2026-08-17-provider-upstream-drift-automation.md`
 
 ---

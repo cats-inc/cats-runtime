@@ -38,7 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
-| [034-automate-light-tier-provider-drift-detection-and-keep-live-probes-manual](./034-automate-light-tier-provider-drift-detection-and-keep-live-probes-manual.md) | Automate light-tier provider drift detection and keep live probes manual | Proposed | 2026-08-17 |
+| [034-automate-light-tier-provider-drift-and-separate-observation-from-acceptance](./034-automate-light-tier-provider-drift-and-separate-observation-from-acceptance.md) | Automate light-tier provider drift detection, keep live probes manual-first, and separate observation from acceptance | Proposed | 2026-08-17 |
 | [033-adopt-grok-devin-cline-aider-as-cli-provider-families](./033-adopt-grok-devin-cline-aider-as-cli-provider-families.md) | Adopt Grok, Devin, Cline, and Aider as CLI provider families, install-tier first | Proposed | 2026-08-07 |
 | [032-replace-gemini-cli-with-antigravity-cli](./032-replace-gemini-cli-with-antigravity-cli.md) | Replace Gemini CLI with Antigravity CLI as the Google-family provider | Proposed | 2026-05-24 |
 | [031-keep-acp-inside-agent-backend-and-model-runtime-acp-as-a-separate-facade](./031-keep-acp-inside-agent-backend-and-model-runtime-acp-as-a-separate-facade.md) | Keep ACP inside the `agent` backend family and model runtime ACP as a separate facade | Proposed | 2026-04-15 |
@@ -83,6 +83,6 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 ---
 
-*Last updated: 2026-08-17 (ADR-034 provider upstream drift automation boundary proposed.)*
+*Last updated: 2026-08-17 (ADR-034 provider upstream drift automation boundary proposed, then revised and renamed to cover the observation/acceptance split.)*
 
 *See also: [AGENTS.md](../../../AGENTS.md) for decision-making protocols*
