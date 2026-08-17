@@ -3,13 +3,15 @@
 Date: 2026-08-17
 Topic: Automating how `cats-runtime` follows upstream changes across its 16 registered CLI provider families
 Source: Internal architecture research over `src/core/compatibility/**`, `src/core/models/**`, `src/core/provider-install/**`, `src/backends/cli/providers/**`, `config/*.yaml.example`, and the repo's existing CI workflows
-Summary: The runtime can already fingerprint an installed CLI (`--version`, `--help`, live probe), collect evolution evidence, and compare against a retained baseline. What it cannot do is learn that an upstream CLI released a new version, because nothing in any of the three repos reads a release feed. Every drift signal today requires the CLI to already be installed on a machine and a human to remember to probe it, and every fix requires editing hand-written TypeScript and cutting a runtime release. This note proposes a six-layer "provider knowledge supply chain" that automates the cheap deterministic tiers in CI, keeps quota-consuming live probes manual-first per ADR-025, and uses desktop agent features (ChatGPT Work / Claude Cowork) as optional scheduled collectors and candidate-PR authors while deterministic validation and merge gating stay in CI.
+Summary: The runtime can already fingerprint an installed CLI (`--version`, `--help`, live probe), collect evolution evidence, and compare against a retained baseline. What it cannot do is learn that an upstream CLI released a new version, because nothing in any of the three repos reads a release feed. Every drift signal today requires the CLI to already be installed on a machine and a human to remember to probe it, and every fix requires editing hand-written TypeScript and cutting a runtime release. This note proposes a six-layer "provider knowledge supply chain" that automates the cheap deterministic tiers in CI, keeps quota-consuming live probes manual-first per ADR-025, and uses agent-hosted schedules (ChatGPT Work, Claude Cowork, or Claude Code cloud) as optional collectors, liveness monitors, and candidate-PR authors while deterministic validation and merge gating stay in CI.
 Relevance: The runtime tracks 16 independently versioned CLI provider families with different execution and probe coverage. Without an upstream signal the runtime is structurally guaranteed to lag, and the lag is currently invisible to both maintainers and users.
 Action Items:
 - Record the automation boundary (light tier automated, live tier manual) in an ADR
 - Add canonical release sources plus an automation coverage matrix, in compiled TypeScript so the first slice moves no packaging contract, deriving npm coordinates from `check.npmPackage`
 - Separate observed candidates from capability-specific accepted evidence and baselines
 - Add a scheduled watcher that reports version or upstream-artifact drift without treating observation as verification
+- Persist per-source success across runs, publish a scheduler heartbeat, and monitor that heartbeat from an independent scheduler
+- Deliver release observation to runtime only through a reviewed, versioned snapshot; CI artifacts and issues are not runtime inputs
 - Make catalog staleness visible in `setup`/`diagnostics` instead of silently serving stale truth, and separately correct the curated catalog entry already known to be wrong
 - Audit which provider/platform/channel targets can be installed safely on CI runners before committing to surface baselines
 
@@ -137,13 +139,17 @@ another flag. `helpTokens` in `compatibility/knowledge.ts` are useful seed asser
 CI contract is canonicalized help text plus tests of the argv profiles Cats actually emits.
 
 Canonicalization is the right layer, and it is not the same as grammar extraction. Raw `--help`
-diffs are genuinely too noisy for CI — ANSI codes, wrapping, ordering, and terminal width all
-churn — but the fix for that is to remove the noise deterministically: strip ANSI, pin `COLUMNS`,
-normalize wrapping and ordering. Canonicalized text keeps the property that matters, which is no
-false negatives. Extracting a command grammar instead means writing and maintaining a help parser
-per CLI across 16 heterogeneous tools, and a bug in that parser hides exactly the upstream change
-the check exists to catch. Derive grammar for readability if it helps a reviewer; diff the
-canonical text. Baselines are scoped by platform and distribution channel.
+diffs are genuinely too noisy for CI because ANSI codes, line endings, trailing whitespace, and
+terminal width can churn. Remove only that presentation noise deterministically: strip ANSI,
+normalize line endings, trim trailing whitespace, and pin `COLUMNS`. Preserve command, option,
+accepted-value, and paragraph order, and do not aggressively unwrap or reflow content; ordering can
+itself be meaningful evidence. Canonicalization reduces false positives but cannot promise zero
+false negatives. Retain raw stdout beside the canonical diff, and make explicit provider-specific
+argv contract assertions the hard gate. Extracting a command grammar instead means writing and
+maintaining a help parser per CLI across 16 heterogeneous tools, and a bug in that parser can hide
+exactly the upstream change the check exists to catch. Derive grammar for readability if it helps a
+reviewer; diff the conservative canonical text. Baselines are scoped by platform and distribution
+channel.
 
 ### 3. Wire drift — stream event types and payload shapes
 
@@ -240,12 +246,26 @@ A daily GitHub Actions cron that, per provider:
   risk-tagged by keyword scan (`breaking`, `--`, `output-format`, `model`, `deprecat`,
   `rename`)
 - reports `feed_error` and `not_automated` as explicit non-current coverage states
-- records `lastObservedAt` per source and flags anything past a staleness threshold, so a feed that
-  quietly stopped resolving — or later, a scheduled collection run that quietly never happened —
-  cannot read as a passing check
+- reads schema-validated operational state from a pinned GitHub issue, preserves each source's
+  `lastSuccessfulObservationAt` across failed runs, and updates only successful timestamps
+- publishes `lastRunAt` as a scheduler heartbeat; a monitor on a different scheduling host alerts
+  when it crosses the threshold, because a GitHub Actions cron cannot detect that it never started
+- renders a deterministic observation-snapshot candidate with schema version, source identity,
+  observed value, observation time, report/run provenance, and checksum
 
 No CLI installs, no credentials, no user machines. This single job converts "silently four
-months behind" into "a daily report".
+months behind" into "a daily report". The pinned issue is operational state, not provider truth:
+run-scoped workflow artifacts remain the evidence bundle, and invalid issue state fails loudly.
+Until the independent heartbeat monitor is configured and its alert path is tested, scheduler
+liveness is `unknown` rather than covered.
+
+The report and issue do not flow directly into runtime reads. An explicit maintainer command
+validates a chosen report and renders a deterministic update to a compiled TypeScript snapshot
+under `src/core/provider-registry/`. That source diff receives ordinary human review and merge;
+the runtime then exposes the bundled snapshot value and age. Reviewing the snapshot confirms that
+the observation and provenance were delivered intact — it does not accept release, surface,
+catalog, or wire compatibility. This release-bundled bridge is deliberately narrower than L5;
+near-real-time runtime refresh still requires the integrity-checked knowledge-pack channel.
 
 ### L2 — Contract probe: isolated light probes with committed baselines
 
@@ -254,7 +274,7 @@ runs light probes only (`--version`, `--help`, `<subcommand> --help`, `models --
 raw stdout as evidence and commits the canonicalized form as the comparison baseline. CI compares
 against an explicit accepted baseline:
 
-- an argv profile Cats emits no longer round-trips against the canonical help surface → hard
+- an explicit provider-specific argv contract assertion fails for a command Cats emits → hard
   failure
 - canonical help text changed in any other way → informational candidate
 - model listing changed → catalog patch candidate
@@ -310,14 +330,20 @@ Framing the automation this way means ADR-025 does not need to be reversed. It n
 narrowed: the manual-first rule was written about the wire tier, and it should be stated
 explicitly that it was never about the release and surface tiers.
 
-## Where Desktop Agent Features Fit
+## Where Agent-Hosted Scheduled Work Fits
 
-ChatGPT Work and Claude Cowork were considered as automation hosts. Both products now support
-recurring scheduled work; depending on local or cloud execution mode they can use connected
-tools, skills/plugins, local project context, or remote context. See the current
+ChatGPT Work, Claude Cowork, and Claude Code cloud were considered as automation hosts. Their
+execution modes must not be conflated. ChatGPT desktop scheduled tasks can use a local project but
+need the computer on and app running; ChatGPT web scheduled tasks run remotely with uploaded or
+connected context. Claude Cowork supports remote scheduled tasks that continue when the computer
+sleeps or the desktop app closes; a Cowork task explicitly requiring local files or apps instead
+runs locally and inherits that machine dependency. Claude Code cloud jobs keep running with the
+laptop closed, and Claude Code on the web can work against a GitHub repository and prepare
+reviewable changes. See the current
 [ChatGPT scheduled-tasks documentation](https://learn.chatgpt.com/docs/automations),
-[ChatGPT Work overview](https://learn.chatgpt.com/docs/get-started-with-work), and
-[Claude Cowork scheduled-tasks documentation](https://support.claude.com/en/articles/13854387-schedule-recurring-tasks-in-claude-cowork).
+[Claude Cowork scheduled-tasks documentation](https://support.claude.com/en/articles/13854387-schedule-recurring-tasks-in-claude-cowork),
+[Claude Code scheduling documentation](https://support.claude.com/en/articles/14554000-claude-code-power-user-tips),
+and [Claude Code on the web](https://support.claude.com/en/articles/12618689-claude-code-on-the-web).
 Assessment:
 
 - **Good fit — scheduled changelog and doc reading.** A weekly task that reads 16 upstream
@@ -328,28 +354,29 @@ Assessment:
   cannot reach, because the model list and effort options live inside a TUI picker. An agent
   with desktop/terminal access can drive the picker and transcribe it. This is the strongest
   argument for using these features at all.
-- **Good fit — candidate issue or PR preparation.** Scheduled desktop-agent tasks can package
+- **Good fit — candidate issue or PR preparation.** Scheduled agent tasks can package
   observations, evidence links, and proposed declarative changes for review.
 - **Poor fit — deterministic merge gate.** Agent interpretation is non-deterministic and does
   not replace schema validation, fixtures, branch protection, or repo-visible CI status.
 
-There is one operational caveat that must not be waved through. A desktop-agent schedule depends on
-local availability and a signed-in session, and its failure mode is a run that simply never
-happens. That is the same failure mode this note works hard to eliminate for feeds — reporting "no
-drift" when the truth is "no signal". So a scheduled collector needs the same treatment as a feed:
-record when it last successfully delivered, and flag it past a threshold. A collector with no
-liveness signal is not coverage.
+There is one operational caveat that must not be waved through. Local schedules depend on their
+machine and app; remote schedules depend on product availability, workspace policy, connected-tool
+authorization, and the vendor's scheduler. Either mode can fail by simply not running. That is the
+same failure mode this note works hard to eliminate for feeds — reporting "no drift" when the truth
+is "no signal". Every collector therefore writes a delivery receipt into shared operational state,
+and a separately hosted monitor checks the primary scheduler heartbeat. A collector or scheduler
+with no independently observable liveness signal is not coverage.
 
-Rule: **CI owns deterministic detection and gating; desktop agent features may own recurring
-judgment-heavy collection and candidate preparation, and everything they observe is written back
-through the same evidence/PR path into the registry.** One source of truth regardless of who
-observed it.
+Rule: **CI owns deterministic detection and gating; agent-hosted schedules may own recurring
+judgment-heavy collection, independent liveness monitoring, and candidate preparation, and
+everything they observe is written back through the same evidence/PR path.** One reviewed runtime
+snapshot and one acceptance model regardless of who observed it.
 
-For maintainer-side scheduling that needs to open pull requests and run tests, a Claude Code
-scheduled cloud routine against this repo fits better than either desktop product: it can do both,
-its runs are repo-visible, and it already lives in the project's toolchain. Reach for Work or
-Cowork for the parts that genuinely need a logged-in human context — vendor docs behind a login, an
-interactive TUI picker — and not as the default scheduler.
+For maintainer-side scheduling that needs repo-native tests and branch or pull-request preparation,
+Claude Code cloud is the preferred default when it is available and permitted for this repository.
+That is a project deployment preference, not a universal product ranking. Reach for ChatGPT Work or
+Claude Cowork when connected tools, account-scoped documents, or other remote context are the
+deciding requirement; use a local task only for a flow that truly needs the local checkout or TUI.
 
 `src/core/wakeup/cron.ts` is *not* the right host for any of these schedules — that is
 product-facing session wakeup substrate, not maintenance CI.
@@ -395,11 +422,13 @@ Ordered by value over cost:
    honest per-capability coverage, and optional accepted references; declared in compiled
    TypeScript so it needs no packaging change, and derived from `check.npmPackage` so no second
    feed table exists.
-2. **L1 watcher.** One script and scheduled workflow that produce observed candidates plus explicit
-   coverage, error, and stale-observation states without mutating acceptance.
+2. **L1 watcher and liveness.** One script and scheduled workflow that produce observed candidates,
+   preserve durable per-source success state, publish a heartbeat checked by an independent
+   scheduler, and render a reviewed observation-snapshot candidate without mutating acceptance.
 3. **Multi-dimensional staleness visibility, plus the stale-catalog correction.** Warnings and
-   provenance only for the runtime contract; do not degrade on exact version mismatch. Separately,
-   fix the Claude curated entry as content.
+   provenance only for the runtime contract, sourced from the bundled reviewed snapshot with its
+   age exposed; do not degrade on exact version mismatch. Separately, fix the Claude curated entry
+   as content.
 4. **L2 canonicalized help/argv baselines and CI diff**, for the subset that installs safely on the
    relevant runner OS.
 5. **Accepted-baseline promotion, the candidate/rejected evidence store, and capability-specific
@@ -430,6 +459,12 @@ the registry refactor stays at step 7 where baselines protect it.
   as weak signals; changelog text is an enhancement, not a precondition.
 - **Feed coordinates themselves drift** (a package gets renamed or a repo moves). A feed that
   fails to resolve must report loudly rather than silently reporting "no drift".
+- **The primary scheduler cannot report that it never started.** Its `lastRunAt` heartbeat is
+  checked from a different scheduling host; until that monitor is active, scheduler health remains
+  `unknown`.
+- **Ephemeral CI output is not a runtime data channel.** A deterministic report is imported into a
+  reviewed, versioned TypeScript snapshot before runtime freshness can consume it. Snapshot age is
+  visible, and near-real-time refresh remains L5 scope.
 - **One observation can be account- or region-specific.** Interactive model evidence carries its
   scope and stays candidate evidence until review determines whether it is safe to generalize.
 - **A runtime-loaded data tree can silently miss packaging.** `package.json` `files` is an
@@ -472,3 +507,9 @@ watcher.
 - [2026-04-07 Advanced Provider Manifest Baseline](./2026-04-07-advanced-provider-manifest-baseline.md)
 - [SPEC-021 Provider evolution evidence and capability probes](../specs/SPEC-021-provider-evolution-evidence-and-capability-probes.md)
 - [SPEC-023 Verified advanced provider catalogs and manual-refresh discovery](../specs/SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md)
+
+---
+
+*Revised: 2026-08-18 after follow-up review added durable watcher state, independent scheduler
+heartbeat monitoring, reviewed runtime observation delivery, conservative help canonicalization,
+and execution-mode-aware agent scheduling.*

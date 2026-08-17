@@ -33,17 +33,22 @@ does not create a second provider-truth table:
   install knowledge, not copied. Declared in TypeScript so it ships with the compiled runtime and
   needs no packaging change.
 - **Phase 1 — Release watch.** Run a scheduled CI job that resolves the latest observable upstream
-  state and reports it as a candidate relative to accepted evidence. No CLI installs, credentials,
-  acceptance mutation, or user machines.
+  state and reports it as a candidate relative to accepted evidence. Persist per-source success
+  times and a scheduler heartbeat outside the product branch, and render a deterministic reviewed
+  observation-snapshot candidate. No CLI installs, credentials, acceptance mutation, or user
+  machines.
 - **Phase 2 — Multi-dimensional staleness visibility.** Add release, surface, catalog, and wire
   freshness to runtime provenance so `setup` and `diagnostics` expose what is current, candidate,
-  unverified, unavailable, or outside accepted scope. Warning-only, plus one concrete correction of
-  the curated catalog data that Phase 1 exposes as stale.
+  unverified, unavailable, stale, or outside accepted scope. The release dimension reads only the
+  reviewed snapshot compiled into the runtime, never a CI artifact or issue directly. Warning-only,
+  plus one concrete correction of the curated catalog data that Phase 1 exposes as stale.
 
 The plan intentionally distinguishes three things:
 
 - **source declaration** — where an upstream signal can be read
 - **observation** — what the latest watcher or probe saw
+- **reviewed observation delivery** — which versioned observation snapshot is safe to ship as
+  runtime provenance without implying compatibility acceptance
 - **acceptance** — what Cats maintainers have reviewed and approved for a specific capability
 
 A newly observed upstream version is not automatically accepted provider knowledge. Phase 0 models
@@ -116,31 +121,56 @@ runtime behavior change yet.
       `manual`; it is never omitted and never reported as up to date.
 - [ ] Task 1.5: Add advisory changelog risk tagging (`breaking`, `--`, `output-format`, `model`,
       `deprecat`, `rename`). Keyword output is triage context only and never a compatibility gate.
-- [ ] Task 1.6: Record `lastObservedAt` per source in the report and flag any source whose last
-      successful observation is older than a declared threshold. This is what keeps a silently
-      broken feed — or later, a silently missed desktop-agent collection run — from reading as
-      successful coverage.
-- [ ] Task 1.7: Add `scripts/check-provider-releases.mjs` as the thin IO shell over pure logic,
-      emitting `provider-watch-report.json` plus a human-readable summary, and add
-      `npm run watch:providers`.
-- [ ] Task 1.8: Add `.github/workflows/provider-release-watch.yml` with a daily cron and
-      `workflow_dispatch`. It uploads the report and opens or updates one issue per drifting,
-      errored, stale-observation, or newly uncovered provider. It does not edit declarations or
-      accepted references.
-- [ ] Task 1.9: Add offline fixture tests for every resolver, version scheme, channel/prerelease
-      policy, classification, artifact fingerprint, staleness threshold, and risk tag. Tests never
-      call live feeds.
+- [ ] Task 1.6: Separate the current run's `observedAt` from durable
+      `lastSuccessfulObservationAt` per source. On `feed_error`, retain the prior success time and
+      flag it once it exceeds the declared threshold; never replace it with the failure time.
+- [ ] Task 1.7: Add `scripts/check-provider-releases.ts` as the thin IO shell over pure TypeScript
+      logic. It emits `provider-watch-report.json`, a human-readable summary, and a deterministic
+      observation-snapshot candidate. Add `npm run watch:providers` as
+      `tsx scripts/check-provider-releases.ts`; the script supports `--help` and does not depend on
+      a pre-existing or possibly stale `build/runtime` tree.
+- [ ] Task 1.8: Reserve one pinned GitHub issue as schema-validated operational state. Its
+      machine-owned block records `lastRunAt`, workflow run identity, and each source or collector's
+      `lastSuccessfulObservationAt`; run-scoped workflow artifacts remain the evidence bundle. The
+      workflow reads the prior block before resolution, updates only successful source timestamps,
+      fails loudly on invalid state, and never treats this issue as runtime or acceptance data.
+- [ ] Task 1.9: Add `.github/workflows/provider-release-watch.yml` with a daily cron and
+      `workflow_dispatch`. It uploads the report, updates the operational-state issue, and opens or
+      updates one separate issue per drifting, errored, stale-observation, or newly uncovered
+      provider. Use a single-flight concurrency group so overlapping cron and dispatch runs cannot
+      race the durable state, with workflow-token permissions limited to `contents: read` and
+      `issues: write`. It does not edit declarations, reviewed snapshots, or accepted references.
+- [ ] Task 1.10: Configure an independently hosted heartbeat monitor that reads the published
+      `lastRunAt` and alerts when it is older than the scheduler threshold. The monitor may be a
+      Claude Code cloud job, a ChatGPT web scheduled task, a Claude Cowork remote task, or an
+      uptime service, but it must not depend on the same GitHub Actions cron. Until this monitor is
+      active and its alert path is tested, scheduler liveness is reported as `unknown`.
+- [ ] Task 1.11: Add `scripts/import-provider-observations.ts` and
+      `src/core/provider-registry/reviewedObservations.ts`. The import command validates the report
+      schema, report checksum, source identities, and monotonic observation times, then renders a
+      deterministic TypeScript diff for human review. Add the `snapshot:providers` package script
+      using `tsx`; invoke it as `npm run snapshot:providers -- --report <path>`. Require an explicit
+      report path and support `--help` and `--dry-run`. Import never moves an accepted reference.
+      The merged TypeScript snapshot is the sole Phase 2 runtime input; near-real-time refresh
+      remains deferred to L5 knowledge-pack delivery.
+- [ ] Task 1.12: Add offline fixture tests for every resolver, version scheme, channel/prerelease
+      policy, classification, artifact fingerprint, durable-state transition, snapshot import,
+      staleness threshold, and risk tag. Tests never call live feeds.
 
-**Deliverables**: A daily candidate report for every provider/source combination. Automated
-coverage, errors, stale observations, and manual gaps are all visible. Nothing observed by this
-phase becomes accepted automatically.
+**Deliverables**: A daily candidate report for every provider/source combination, durable
+per-source success state, an independently monitored scheduler heartbeat, and a deterministic
+reviewed-snapshot import path. Automated coverage, errors, stale observations, scheduler outages,
+and manual gaps are visible. Nothing observed or imported by this phase becomes compatibility
+acceptance automatically.
 
 ### Phase 2: Multi-dimensional staleness visibility
 
 - [ ] Task 2.1: Add a freshness read model with independent `release`, `surface`, `catalog`, and
       `wire` dimensions. Each reports an applicable state such as `accepted`, `candidate`,
-      `outside_accepted_scope`, `unverified`, `not_automated`, `not_applicable`, `unknown`, or
-      `feed_error`, plus evidence/provenance references.
+      `outside_accepted_scope`, `unverified`, `stale_observation`, `not_automated`,
+      `not_applicable`, `unknown`, or `feed_error`, plus evidence/provenance references. Release
+      freshness is derived from the bundled reviewed observation snapshot, its age, and the
+      capability-specific accepted release reference; it never fetches CI state at runtime.
 - [ ] Task 2.2: Use `CompatibilityVersionFingerprint` only for CLI-backed dimensions whose
       accepted scope actually depends on the local CLI version. API, agent, local, and desktop
       targets must not be degraded or marked stale merely because they have no CLI fingerprint.
@@ -152,7 +182,9 @@ phase becomes accepted automatically.
       This is additive to the existing shape; do not introduce a parallel provenance object.
 - [ ] Task 2.5: Surface the dimensions and actionable warnings on
       `GET /diagnostics/providers`, `GET /providers/{provider}/models/advanced`,
-      `GET /setup-state`, and the provider-setup page.
+      `GET /setup-state`, and the provider-setup page. Include the reviewed snapshot's observation
+      time and bundled-at/runtime version so users can distinguish "no drift" from "snapshot too
+      old to know".
 - [ ] Task 2.6: Keep the runtime contract warning-only. Add an explicit regression assertion that
       exact CLI version inequality alone does not strip entries, presets, controls, defaults, or
       capability claims. Capability-specific entry-only degradation requires a later SPEC and an
@@ -165,9 +197,10 @@ phase becomes accepted automatically.
       any other dimension. Audit the remaining catalog entries for the same staleness and file
       whatever cannot be re-observed in this pass.
 - [ ] Task 2.8: Update `docs/api.md` for the additive provenance payload.
-- [ ] Task 2.9: Add unit and route tests for the freshness matrix, non-CLI targets, semver ranges,
-      opaque versions, a CLI patch release with unchanged accepted catalog evidence, and a model
-      catalog candidate that changes without a CLI release.
+- [ ] Task 2.9: Add unit and route tests for the freshness matrix, stale or absent reviewed
+      snapshots, non-CLI targets, semver ranges, opaque versions, a CLI patch release with
+      unchanged accepted catalog evidence, and a model catalog candidate that changes without a
+      CLI release.
 
 **Deliverables**: Users and maintainers can see which knowledge dimension is current or uncertain
 without a coarse version mismatch unexpectedly removing working controls, and the one catalog entry
@@ -184,9 +217,13 @@ already known to be wrong is corrected rather than only annotated.
 | `src/core/provider-install/knowledge.test.ts` | Modify | Guard registry/install coordinate reconciliation |
 | `src/core/provider-registry/releaseObservation.ts` | Create | Pure version/fingerprint comparison, staleness threshold, risk tagging |
 | `src/core/provider-registry/releaseObservation.test.ts` | Create | Offline resolver-output and classification fixtures |
-| `scripts/check-provider-releases.mjs` | Create | IO shell: resolve sources and emit report/summary |
-| `.github/workflows/provider-release-watch.yml` | Create | Daily cron, dispatch, artifact upload, and issue reconciliation |
-| `package.json` | Modify | Add `watch:providers` script |
+| `src/core/provider-registry/reviewedObservations.ts` | Create | Reviewed, versioned runtime observation snapshot; observation only, never acceptance |
+| `src/core/provider-registry/reviewedObservations.test.ts` | Create | Snapshot schema, provenance, age, and acceptance-separation tests |
+| `scripts/check-provider-releases.ts` | Create | `tsx` IO shell: resolve sources and emit report, summary, and snapshot candidate |
+| `scripts/import-provider-observations.ts` | Create | Validate a report and render the reviewed TypeScript snapshot diff |
+| `.github/workflows/provider-release-watch.yml` | Create | Daily cron, dispatch, artifact upload, operational state, and issue reconciliation |
+| `package.json` | Modify | Add `watch:providers` and `snapshot:providers` scripts using `tsx` |
+| `docs/deployment.md` | Modify | Document operational-state issue, independent heartbeat monitor, ownership, and recovery |
 | `src/core/models/catalogFreshness.ts` | Create | Multi-dimensional freshness read model |
 | `src/core/models/catalogFreshness.test.ts` | Create | Freshness, scope, backend, and non-degradation matrix |
 | `src/core/models/providerAdvancedCatalog.ts` | Modify | Extend existing provenance with freshness dimensions |
@@ -222,26 +259,34 @@ requires `npm run build:ui` and committing the regenerated `public/*.html` and
 - **No duplicate npm source table.** Package coordinates keep exactly one handwritten home in
   install knowledge; the registry derives from it, and a reconciliation test prevents a future
   rename from updating one and not the other.
-- **Observation is not acceptance.** Scheduled jobs write reports and issues. Only reviewed
-  changes may set or move a capability's accepted reference. Phase 0 provides the fields; the
-  candidate/rejected store and promotion workflow are a later slice.
+- **Observation delivery is not acceptance.** Scheduled jobs write reports, operational state, and
+  issues. A reviewed snapshot may enter the runtime as provenance, but it cannot set or move a
+  capability's accepted reference. Phase 0 provides the fields; the candidate/rejected store and
+  promotion workflow are a later slice.
 - **Version comparison is source-aware.** Semver, numeric vendor versions, opaque labels,
   prerelease channels, and HTTP artifact changes do not share one comparison rule.
-- **Pure logic is separated from IO.** Classification is unit-testable offline; only the thin
-  script performs network calls.
+- **Pure logic is separated from IO, with an explicit execution path.** Classification is
+  unit-testable offline; only the thin `tsx` script performs network calls. Using the repo's
+  existing `tsx` development dependency lets the script import source TypeScript directly and
+  avoids an undocumented dependency on a prebuilt `build/runtime` tree.
 - **The watcher opens issues, not pull requests.** Automated candidate PRs are the L4 slice and
   require their own gates.
 - **Warning precedes behavior change, but the known-bad datum still gets fixed.** The runtime
   contract stays warning-only; Task 2.7 is a content correction, not a behavior change, so
   deferring degradation does not mean shipping data we already know is wrong.
-- **Absence of signal is never coverage.** Every non-`automated` capability carries a reason, and
-  every source carries `lastObservedAt` with a staleness threshold. This applies equally to feeds
-  and to scheduled desktop-agent collection.
-- **Desktop agents are optional scheduled collectors.** ChatGPT Work or Claude Cowork may collect
-  changelog, documentation, and interactive-picker evidence or prepare candidate changes. CI
-  remains the deterministic gate. For maintainer-side scheduling that must open PRs and run tests,
-  a Claude Code scheduled cloud routine against this repo is the better-fit host, because it is
-  already in the project's toolchain.
+- **Absence of signal is never coverage.** Every non-`automated` capability carries a reason;
+  durable operational state preserves each source or collector's last success across failures;
+  and a scheduler heartbeat is checked outside the scheduler it monitors. A source, collector, or
+  scheduler without that liveness path is `unknown`, not current.
+- **Runtime observation input is reviewed and release-bundled.** Phase 2 reads the compiled
+  snapshot, never mutable GitHub state. Diagnostics expose snapshot age. L5 later replaces this
+  release-coupled delivery with an integrity-checked, rollback-capable knowledge pack.
+- **Agent-hosted schedules are optional collectors and monitors.** ChatGPT Work, Claude Cowork, or
+  Claude Code cloud may collect changelog, documentation, and interactive-picker evidence or
+  prepare candidate changes. CI remains the deterministic gate. Claude Code cloud is the preferred
+  default for repo-native tests and PR preparation when available; Work or Cowork may be preferable
+  for connected or account-scoped context. Each deployment records local versus remote execution
+  and proves its own delivery receipt.
 
 ## Testing Strategy
 
@@ -252,11 +297,15 @@ requires `npm run build:ui` and committing the regenerated `public/*.html` and
 - **Integration tests**: provider diagnostics, advanced catalog, setup state, and provider-setup
   page carry additive freshness; a version-only mismatch remains warning-only
 - **Workflow tests**: fixture-fed watcher output, stable issue identity, transition from drift to
-  resolved state, `feed_error`, `not_automated`, and stale-observation flagging; no workflow test
-  calls a live feed
+  resolved state, prior-success preservation across `feed_error`, invalid durable-state handling,
+  `not_automated`, stale-observation flagging, deterministic snapshot rendering, and a simulated
+  stale scheduler heartbeat; no workflow test calls a live feed
 - **Manual testing**:
   - run `npm run watch:providers` against live sources and inspect per-source scope
   - trigger `workflow_dispatch` and confirm the report artifact and issue reconciliation
+  - stop or delay a test heartbeat and confirm the independent monitor alerts after the threshold
+  - import a report snapshot, inspect the deterministic TypeScript diff, and confirm it changes no
+    accepted reference
   - compare a locally installed CLI outside an accepted surface range and confirm warnings
   - confirm API/agent/local targets without a CLI fingerprint are not falsely marked stale
   - run `npm run release:check` after Phase 0 to confirm no packaging contract moved
@@ -267,8 +316,10 @@ requires `npm run build:ui` and committing the regenerated `public/*.html` and
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| A source silently stops resolving and the watcher reports no drift | High | `feed_error` is first-class, `lastObservedAt` has a staleness threshold, and the workflow reports both loudly |
-| A provider has no deterministic release signal | Medium | Explicit `manual`/`not_automated` coverage with a required reason, plus optional artifact fingerprint and desktop-agent collection |
+| A source silently stops resolving and the watcher reports no drift | High | `feed_error` is first-class; durable state preserves the prior `lastSuccessfulObservationAt`; the workflow reports both loudly |
+| The GitHub Actions schedule never starts, so it cannot report its own failure | High | Publish `lastRunAt` and require an independently hosted monitor; report scheduler coverage as `unknown` until its alert path is tested |
+| A CI artifact or mutable issue is mistaken for runtime truth | High | Phase 2 reads only the reviewed, versioned TypeScript snapshot with report provenance and checksum |
+| A provider has no deterministic release signal | Medium | Explicit `manual`/`not_automated` coverage with a required reason, plus optional artifact fingerprint and agent-hosted collection |
 | Stable, beta, or OS-specific releases are compared as one stream | High | Source arrays carry channel, platform, version scheme, and prerelease policy |
 | A newly observed version is mistaken for verified compatibility | High | Observation and per-capability accepted references are separate contracts, and observation cannot write them |
 | Exact version mismatch strips working controls | High | The runtime contract stays warning-only; regression test forbids version-only degradation |
@@ -286,9 +337,10 @@ requires `npm run build:ui` and committing the regenerated `public/*.html` and
 | 2026-08-17 | Plan created from ADR-034 and the provider upstream drift research note |
 | 2026-08-17 | Review revision: added minimal registry first, per-capability acceptance, coverage matrix, multi-dimensional warning-only freshness, normalized future surface contracts, and scheduled desktop-agent collection |
 | 2026-08-17 | Second review pass: Phase 0 reduced to a compiled-TypeScript source/coverage table after the YAML tree was found to need unlisted packaging work; candidate/rejected store deferred; observation staleness threshold added; stale-catalog correction restored as a deliverable |
+| 2026-08-18 | Third review pass: added durable per-source state, an independent scheduler heartbeat, reviewed observation-snapshot delivery into runtime, conservative canonicalization, explicit `tsx` script execution, and execution-mode-aware agent scheduling |
 
 ---
 
 *Created: 2026-08-17*
-*Revised: 2026-08-17 after Codex review, then after a follow-up review pass*
+*Revised: 2026-08-18 after a third review pass closed the runtime-delivery and scheduler-liveness gaps*
 *Author: Claude + Codex*

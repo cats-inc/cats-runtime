@@ -6,7 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
-| [2026-08-17-provider-upstream-drift-automation](./2026-08-17-provider-upstream-drift-automation.md) | Provider upstream drift automation | Why every drift signal today requires an already-installed CLI and a manual probe, the five drift classes and their differing automatability, a six-layer provider knowledge supply chain, and where desktop agent features (ChatGPT Work / Claude Cowork) legitimately fit |
+| [2026-08-17-provider-upstream-drift-automation](./2026-08-17-provider-upstream-drift-automation.md) | Provider upstream drift automation | Why every drift signal today requires an already-installed CLI and a manual probe; the five drift classes; reviewed runtime observation delivery; durable watcher liveness; and where ChatGPT Work, Claude Cowork, and Claude Code cloud schedules fit |
 | [2026-08-08-grok-cli-install-tier-probe](./2026-08-08-grok-cli-install-tier-probe.md) | Grok CLI install and authenticated lifecycle probe | Complete isolated Grok 1.0.0 success, model, tool, permission, error, cancellation, resume, and fork evidence; exact-version native adapter approved |
 | [2026-05-24-antigravity-cli-probe](./2026-05-24-antigravity-cli-probe.md) | Antigravity CLI Phase 0 probe | Local environment-bootstrap installer contract, official Antigravity CLI docs, skills/plugin behavior, model display names, and remaining live-probe gaps before replacing Gemini CLI |
 | [2026-04-15-acp-agent-backend-and-runtime-facade-alignment](./2026-04-15-acp-agent-backend-and-runtime-facade-alignment.md) | ACP agent backend and runtime facade alignment | Why ACP should land as `agent/acp` for provider targets, why IDE-facing ACP must stay a separate runtime facade, and how ACP complements A2A |
@@ -42,4 +42,4 @@ Action Items:
 
 ---
 
-*Last updated: 2026-08-17*
+*Last updated: 2026-08-18*

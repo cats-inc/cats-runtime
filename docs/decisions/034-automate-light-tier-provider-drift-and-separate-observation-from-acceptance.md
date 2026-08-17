@@ -80,21 +80,37 @@ Specifically:
    never overwrites it. A single `verifiedVersion` must not stand in for all four dimensions. An
    unset accepted reference is a reportable "not yet accepted" state, never "current".
 
-   Absence of a signal is likewise never coverage: every source records its last successful
-   observation against a staleness threshold, so a silently broken feed or a silently missed
-   scheduled collection cannot read as a healthy check.
+   Absence of a signal is likewise never coverage. Operational watcher state persists the last
+   successful observation for every source across runs; a failed resolution preserves the prior
+   success time instead of replacing it with the failure time. The watcher also publishes a
+   scheduler heartbeat. Per-source staleness detects broken feeds, while an independently hosted
+   monitor checks the scheduler heartbeat so a GitHub Actions cron that never ran cannot certify
+   itself as healthy. Until that independent monitor exists, missed-run detection is explicitly
+   `unknown`, not covered.
+
+   CI artifacts and issues are not runtime inputs. The watcher additionally renders a deterministic,
+   versioned observation-snapshot candidate containing source status, observed value, observation
+   time, report provenance, and checksum. An explicit maintainer command imports that candidate into
+   a reviewed TypeScript snapshot under `src/core/provider-registry/`; only the merged snapshot is
+   compiled into the runtime and consumed by freshness reporting. Reviewing this snapshot confirms
+   provenance and delivery, not compatibility acceptance. Until the later knowledge-pack delivery
+   slice lands, runtime release freshness is therefore only as current as its bundled reviewed
+   snapshot and runtime release date.
 4. **Surface-tier detection becomes automated where it is safely installable.** For eligible
    provider/platform/channel combinations, CI captures `--version`, `--help`,
    `<subcommand> --help`, and model-list help surfaces, and validates the argv profiles Cats
    actually emits rather than only the presence of `helpTokens`. Candidate snapshots are stored
    separately from accepted baselines.
 
-   The comparison contract is **canonicalized** help output — ANSI stripped, terminal width
-   pinned, wrapping and ordering normalized — not an extracted command grammar. Canonicalization
-   removes the CI flakiness without discarding information, so it keeps the property that matters:
-   no false negatives. A grammar extractor is a 16-CLI parser project whose own bugs would mask
-   exactly the upstream changes this decision exists to catch. Derived grammar may be published as
-   readable enrichment alongside the canonical text; it does not become the diff target.
+   The comparison contract is **conservatively canonicalized** help output — ANSI stripped, line
+   endings normalized, trailing whitespace removed, and terminal width pinned — not an extracted
+   command grammar. Commands, options, accepted-value lists, and paragraphs retain their original
+   order, and the canonicalizer does not aggressively unwrap or reflow content. Canonicalization
+   reduces presentation-only false positives; it does not claim zero false negatives. Raw stdout is
+   retained beside the canonical diff, and explicit provider-specific argv contract assertions are
+   the hard gate. A grammar extractor is a 16-CLI parser project whose own bugs could mask exactly
+   the upstream changes this decision exists to catch. Derived grammar may be published as readable
+   enrichment alongside the canonical text; it does not become the diff target.
 5. **Wire-tier detection stays manual-first, per ADR-025.** Live probes and
    `providerEvolutionProbe` runs remain explicit, operator-initiated actions. A credentialed
    self-hosted scheduled run is permitted only as an explicit opt-in, never as a default, and
@@ -125,16 +141,21 @@ Specifically:
     Deferring that gate does not license shipping data already known to be wrong. Content the
     watcher exposes as stale — starting with the four-month-old Claude curated catalog entry — is
     corrected as reviewed content regardless of when the degradation gate lands.
-10. **Detection and merge gating live in CI; desktop agents may schedule collection.** ChatGPT
-    Work and Claude Cowork may run recurring changelog, documentation, interactive-picker, or
-    candidate-PR workflows. Their observations enter the same evidence and candidate-PR path;
-    deterministic validation and merge invariants remain repo-visible CI checks, and a missed
-    collection run must surface through the staleness threshold in decision 3 rather than pass as
-    coverage.
+10. **Detection and merge gating live in CI; agent-hosted schedules may collect and prepare.**
+    ChatGPT Work scheduled tasks, Claude Cowork scheduled tasks, and Claude Code cloud jobs may run
+    recurring changelog, documentation, interactive-picker, or candidate-PR workflows. Their
+    observations enter the same evidence and candidate path; deterministic validation and merge
+    invariants remain repo-visible CI checks. Every collector declares whether it runs locally or
+    remotely and publishes a delivery receipt into the shared operational state. Local schedules
+    are covered only while their required machine and app are available; remote schedules are not
+    described as desktop-dependent.
 
-    Where maintainer-side scheduling needs to open pull requests and run tests, a Claude Code
-    scheduled cloud routine against this repo is the better-fit host than either desktop product,
-    because it already lives in the project's toolchain.
+    Claude Code cloud is the preferred default when this project's repo-native workflow needs to
+    run tests and prepare a branch or pull request and that service is available and permitted.
+    ChatGPT Work or Claude Cowork may be the better host when connected tools, account-scoped
+    documents, or interactive context are the deciding requirement. Host choice is an operational
+    deployment decision, never part of the correctness boundary. A missed collector run is detected
+    through decision 3's durable receipt and independent scheduler-heartbeat checks.
 
 ## Consequences
 
@@ -147,6 +168,8 @@ Specifically:
 - Cats argv profiles and canonicalized help surfaces become enforced contracts
 - Candidate observations cannot silently become accepted baselines, and a broken or missed check
   cannot masquerade as a passing one
+- Runtime freshness has an explicit, reviewed input instead of implicitly depending on ephemeral
+  CI artifacts or mutable issue text
 - The first slice ships inside the existing compiled artifact, so it moves no packaging contract
 - ADR-029's degradation rule can be enforced against catalog-specific evidence without treating
   every CLI version change as a capability regression
@@ -166,6 +189,8 @@ Specifically:
   convention) that the first slice deliberately avoids rather than solves
 - Capability-specific degradation is deferred to its own SPEC, so ADR-029 rule 2 stays
   under-enforced in the interim and only warnings cover the gap
+- Until knowledge-pack delivery lands, users receive the latest reviewed observation snapshot only
+  when they update the runtime; diagnostics must expose that snapshot age
 - Maintainers still review every candidate PR; toil is reduced, not eliminated
 
 ### Neutral
@@ -173,7 +198,7 @@ Specifically:
 - ADR-025 is narrowed rather than reversed; its manual-first rule continues to govern the wire
   tier
 - ADR-029's non-probing read paths are unchanged; nothing here makes routine reads hit upstream
-- Interactive-picker model catalogs remain review-sourced even when a scheduled desktop agent
+- Interactive-picker model catalogs remain review-sourced even when an agent-hosted schedule
   performs the collection
 
 ## Alternatives Considered
@@ -194,13 +219,14 @@ Specifically:
 - **Why rejected**: same reasoning ADR-025 already accepted; nothing has changed to make this
   safe
 
-### Alternative 3: Host the automation in a desktop agent app (ChatGPT Work / Claude Cowork)
+### Alternative 3: Host the automation entirely in an agent-scheduled task
 
-- **Pros**: current desktop-agent products can schedule recurring work, use local or connected
-  context, read vendor docs behind a login, drive interactive TUI pickers, and prepare reviewable
-  changes
+- **Pros**: current agent products can schedule recurring work, use local or connected context,
+  read vendor docs behind a login, drive interactive TUI pickers where local execution is
+  available, and prepare reviewable changes
 - **Cons**: agent interpretation remains non-deterministic, local-resource availability varies by
-  execution mode, and the products do not replace repo-owned validation and branch protection
+  execution mode, remote availability is subject to product and workspace policy, and no agent host
+  replaces repo-owned validation and branch protection
 - **Why rejected as the gate**: correctness invariants must remain deterministic and repo-visible.
   Accepted instead under decision 10 as a scheduled secondary collector and candidate-PR author
 
@@ -226,5 +252,5 @@ Specifically:
 ---
 
 *Proposed: 2026-08-17*
-*Revised: 2026-08-17 after Codex review, then after a follow-up review pass that fixed the storage/packaging decision, made canonicalized help the diff target, and restored the stale-data correction*
+*Revised: 2026-08-18 after follow-up review added a reviewed runtime observation snapshot, durable source state and an independent scheduler heartbeat, conservative help canonicalization, and execution-mode-aware agent scheduling*
 *Decision makers: user + Claude + Codex*

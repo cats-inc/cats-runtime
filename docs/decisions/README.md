@@ -83,6 +83,6 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 ---
 
-*Last updated: 2026-08-17 (ADR-034 provider upstream drift automation boundary proposed, then revised and renamed to cover the observation/acceptance split.)*
+*Last updated: 2026-08-18 (ADR-034 revised with reviewed runtime observation delivery, durable watcher liveness, and execution-mode-aware agent scheduling.)*
 
-*See also: [AGENTS.md](../../../AGENTS.md) for decision-making protocols*
+*See also: [AGENTS.md](../../AGENTS.md) for decision-making protocols*

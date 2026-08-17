@@ -109,4 +109,4 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 ---
 
 *See also: [specs/](../specs/) for feature specifications*
-*Last updated: 2026-08-09 (PLAN-035 added: the Cline success-path verification deferred from PLAN-034.)*
+*Last updated: 2026-08-18 (PLAN-036 revised with reviewed runtime observation delivery and durable scheduler liveness.)*

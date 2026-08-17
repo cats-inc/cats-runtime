@@ -1469,9 +1469,17 @@ the stale Claude curated entry, which does not wait on the deferred degradation
 gate. Seven providers already carry an npm coordinate in `check.npmPackage`; the
 registry derives from it rather than restating it. Providers with no
 deterministic release source remain visibly `not_automated`, with
-installer/document fingerprints and scheduled desktop agents available as weaker
-collection paths — each carrying a last-observed timestamp so a missed run cannot
-read as coverage.
+installer/document fingerprints and agent-hosted schedules available as weaker
+collection paths. Per-source success time persists across failed runs, and the
+primary scheduler publishes a heartbeat checked from a different scheduling host
+so a cron that never starts cannot certify itself as healthy.
+
+The CI report and mutable issue state are not runtime inputs. A maintainer imports
+a deterministic, checksummed report into a reviewed TypeScript observation
+snapshot that ships in `build/runtime`; `setup` and `diagnostics` expose both its
+observed value and age. This review confirms observation provenance, not
+compatibility acceptance. Runtime freshness remains release-bundled until the
+later integrity-checked knowledge-pack delivery slice lands.
 
 #### Deferred Scope
 
@@ -1483,7 +1491,10 @@ read as coverage.
 - do not let a deferred degradation gate become a reason to keep shipping
   curated data already known to be wrong
 - do not report absence of a signal as coverage; every source and scheduled
-  collector carries a last-observed timestamp and a staleness threshold
+  collector has durable last-success state, and the primary scheduler heartbeat
+  is monitored independently
+- do not read CI artifacts or mutable issue text directly from runtime; only a
+  reviewed, versioned observation snapshot may enter runtime provenance
 - do not force CLI-only assumptions into the shared collector
 - do not add a dedicated host-facing probe route or dashboard workflow until
   the manual-first CLI/internal flow proves stable
@@ -1496,10 +1507,12 @@ read as coverage.
 - `src/backends/cli/pi/parser.ts`
 - `src/backends/agent/*`
 - `src/core/provider-registry/*` (release sources, coverage, observation, and
-  accepted references, PLAN-036)
+  reviewed observation snapshots plus accepted references, PLAN-036)
 - `src/core/provider-install/*` (canonical coordinate derivation, PLAN-036)
 - `src/core/models/*` (catalog freshness and provenance, PLAN-036)
 - `scripts/` and `.github/workflows/` (maintainer-side watch job, PLAN-036)
+- `docs/deployment.md` (watcher state, heartbeat ownership, and recovery,
+  PLAN-036)
 
 #### References
 
