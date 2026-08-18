@@ -1470,28 +1470,38 @@ gate. Seven providers already carry an npm coordinate in `check.npmPackage`; the
 registry derives from it rather than restating it. Providers with no
 deterministic release source remain visibly `not_automated`, with
 installer/document fingerprints and agent-hosted schedules available as weaker
-collection paths. Per-source success time persists across failed runs, and the
-primary scheduler publishes a heartbeat checked from somewhere that is not that
-scheduler, so a cron that never starts cannot certify itself as healthy — with an
-in-repo check on the existing preflight workflow as the free interim and a
-dead-man's-switch service as the durable answer.
+collection paths. Per-source success time persists across failed runs. Scheduler
+state records start, completion, successful completion, and status separately;
+an independent monitor watches `lastSuccessfulRunAt` plus stuck `running` state,
+so a cron that never starts or crashes after startup cannot certify itself as
+healthy — with an in-repo check on the existing preflight workflow as the free
+interim and a dead-man's-switch service as the durable answer.
 
 The CI report and mutable issue state are not runtime inputs. A maintainer imports
-a deterministic, checksummed report into a reviewed TypeScript observation
-snapshot that ships in `build/runtime`; `setup` and `diagnostics` expose both its
-observed value and age. This review confirms observation provenance, not
-compatibility acceptance. The accepted limitation is recorded rather than
-glossed: snapshot freshness is bounded by the release cadence, so between
-releases the honest state is often "too old to know", which is why age is
-reported first-class. The integrity-checked knowledge-pack delivery slice
-supersedes this bridge rather than extending it.
+an explicit, policy-matching successful Actions run: the importer verifies the
+API-reported artifact digest before validating the report's canonical checksum
+and rendering a reviewed TypeScript observation snapshot that records the run,
+artifact, and report provenance and ships in `build/runtime`. A local report can
+only produce an explicitly untrusted dry run. `setup` and `diagnostics` expose
+both the reviewed observation and its age. This review confirms delivery from
+the recorded run, not compatibility acceptance. The accepted limitation is
+recorded rather than glossed: snapshot freshness is bounded by the release
+cadence, so between releases the honest state is often "too old to know", which
+is why age is reported first-class. The integrity-checked knowledge-pack
+delivery slice supersedes this bridge rather than extending it.
 
 Operational state lives in a pinned issue rather than an orphan branch, decided
-on token scope: writing a ref needs `contents: write`, which GitHub cannot
-restrict to one branch, and this repo commits straight to `main` so branch
-protection cannot backstop it. The issue keeps the watcher on `contents: read`,
-making "cannot edit declarations or accepted references" structural. That choice
-flips once L4 candidate PRs require write access anyway.
+on token scope and deployment cost: writing a ref needs `contents: write`, which
+workflow permissions cannot restrict to one branch. A branch ruleset plus a
+dedicated GitHub App/bypass actor could backstop a state ref, but the first slice
+does not add that configuration and credential lifecycle. The issue keeps the
+ordinary watcher on `contents: read`, making "cannot edit declarations or
+accepted references" structural. An idempotent local-admin `--init-state`
+command, authenticated separately with Variables/Issues write permission,
+creates or recovers the issue and repository variable and verifies both before
+success; the scheduled token stays least-privileged. The storage choice flips
+once L4 candidate PRs require write access anyway or a dedicated App/ruleset is
+adopted.
 
 #### Deferred Scope
 

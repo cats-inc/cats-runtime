@@ -82,22 +82,40 @@ Specifically:
 
    Absence of a signal is likewise never coverage. Operational watcher state persists the last
    successful observation for every source across runs; a failed resolution preserves the prior
-   success time instead of replacing it with the failure time. The watcher also publishes a
-   scheduler heartbeat. Per-source staleness detects broken feeds, while a monitor that does not
-   share the watcher's scheduler checks that heartbeat, so a GitHub Actions cron that never ran
-   cannot certify itself as healthy. The durable answer is a purpose-built dead-man's-switch
-   service with a named owner; an agent-hosted schedule is a fallback, because it is itself a
-   scheduler with the same never-ran failure mode and no monitor of its own. An in-repo check on an
-   existing event-triggered workflow is a valid interim, since it costs nothing and catches a dead
-   cron whenever the repository sees activity. Until an alert path is tested, missed-run detection
-   is explicitly `unknown`, not covered.
+   success time instead of replacing it with the failure time. The watcher also publishes separate
+   start, completion, successful-completion, and status fields. Per-source staleness detects broken
+   feeds, while a monitor that does not share the watcher's scheduler checks
+   `lastSuccessfulRunAt` and stuck `running` state, so a GitHub Actions cron that never ran or
+   crashed after startup cannot certify itself as healthy. After the report artifact and issue
+   reconciliation are published, the final durable-state write commits successful completion. The
+   durable answer is a purpose-built dead-man's-switch service with a named owner; an agent-hosted
+   schedule is a fallback, because it is itself a scheduler with the same never-ran failure mode
+   and no monitor of its own. An in-repo check on an existing event-triggered workflow is a valid
+   interim, since it costs nothing and catches a dead cron whenever the repository sees activity.
+   Until an alert path is tested, missed-run detection is explicitly `unknown`, not covered.
+
+   Durable operational state lives in a pinned issue whose number is stored in a repository
+   variable. The ordinary watcher has `contents: read` and `issues: write`, so it structurally
+   cannot edit declarations or accepted references. Bootstrap and deleted-issue recovery are a
+   separate, idempotent local-admin command with Variables/Issues write permission. It creates or
+   reuses the sole issue carrying a reserved state label, refuses ambiguous duplicates, updates the
+   repository variable, and verifies both before success. An orphan state branch remains the better
+   state primitive, and a branch ruleset plus a dedicated GitHub App/bypass actor could protect it.
+   This slice chooses the issue to avoid adding that configuration and credential lifecycle.
+   Reconsider the branch when L4 already needs repo write access or when the dedicated App/ruleset
+   exists.
 
    CI artifacts and issues are not runtime inputs. The watcher additionally renders a
    deterministic, versioned observation-snapshot candidate containing source status, observed
-   value, observation time, report provenance, and checksum. An explicit maintainer command imports
-   that candidate into a reviewed TypeScript snapshot under `src/core/provider-registry/`; only the
-   merged snapshot is compiled into the runtime and consumed by freshness reporting. Reviewing this
-   snapshot confirms provenance and delivery, not compatibility acceptance.
+   value, observation time, run/artifact provenance, and a canonical report checksum. The checksum
+   detects corruption; it does not authenticate a report that arrived beside its own checksum. The
+   production maintainer command therefore starts from an explicit GitHub Actions run, verifies the
+   repository, workflow, successful conclusion, ref/head SHA, run attempt, artifact identity, and
+   API-reported SHA-256 artifact digest before it imports the report into a reviewed TypeScript
+   snapshot under `src/core/provider-registry/`. Only the merged snapshot is compiled into the
+   runtime and consumed by freshness reporting. Reviewing this snapshot confirms delivery from the
+   recorded trusted run, not compatibility acceptance. An arbitrary local report can be rendered
+   only in an explicitly untrusted dry-run mode and cannot update the snapshot.
 
    The accepted limitation is recorded rather than glossed: snapshot freshness is bounded by the
    runtime release cadence, so between releases an installation will often be reporting an
@@ -258,9 +276,13 @@ Specifically:
 - [SPEC-021: Provider evolution evidence and capability probes](../specs/SPEC-021-provider-evolution-evidence-and-capability-probes.md)
 - [SPEC-023: Verified advanced provider catalogs and manual-refresh discovery](../specs/SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md)
 - [PLAN-036: Provider upstream drift watch and staleness surfacing](../plans/PLAN-036-provider-upstream-drift-watch-and-staleness-surfacing.md)
+- [GitHub Actions variables REST endpoints](https://docs.github.com/en/rest/actions/variables)
+- [GitHub Actions workflow-token permissions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions)
+- [GitHub Actions artifacts REST endpoints](https://docs.github.com/en/rest/actions/artifacts)
+- [GitHub repository rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)
 
 ---
 
 *Proposed: 2026-08-17*
-*Revised: 2026-08-18 after follow-up review added a reviewed runtime observation snapshot, durable source state, an independent scheduler heartbeat, conservative help canonicalization, and execution-mode-aware agent scheduling; a fourth pass kept the snapshot bridge on the owner's call and recorded its release-bounded freshness as an accepted limitation*
+*Revised: 2026-08-18 after follow-up review added a reviewed runtime observation snapshot, durable source state, an independent scheduler heartbeat, conservative help canonicalization, and execution-mode-aware agent scheduling; a fourth pass kept the snapshot bridge on the owner's call and recorded its release-bounded freshness as an accepted limitation; a fifth pass anchored snapshot provenance in a verified Actions run/artifact, defined heartbeat success semantics, and made state bootstrap an explicitly privileged local-admin operation*
 *Decision makers: user + Claude + Codex*

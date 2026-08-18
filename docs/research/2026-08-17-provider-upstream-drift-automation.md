@@ -248,19 +248,27 @@ A daily GitHub Actions cron that, per provider:
 - reports `feed_error` and `not_automated` as explicit non-current coverage states
 - reads schema-validated operational state from a pinned GitHub issue, preserves each source's
   `lastSuccessfulObservationAt` across failed runs, and updates only successful timestamps
-- publishes `lastRunAt` as a scheduler heartbeat, because a GitHub Actions cron cannot detect that
-  it never started
+- publishes `lastStartedAt`, `lastCompletedAt`, `lastSuccessfulRunAt`, and `lastRunStatus`; the
+  liveness monitor watches successful completion and stuck `running` state, because startup alone
+  cannot prove that a GitHub Actions cron completed its delivery work
 - renders a deterministic observation-snapshot candidate with schema version, source identity,
-  observed value, observation time, report/run provenance, and checksum
+  observed value, observation time, report/run provenance, and a canonical report checksum
 
-No CLI installs, no credentials, no user machines. This single job converts "silently four
-months behind" into "a daily report". The pinned issue is operational state, not provider truth:
-run-scoped workflow artifacts remain the evidence bundle, and invalid issue state fails loudly.
+No CLI installs, upstream/provider credentials, or user machines; the only credential is the
+least-privileged repo-scoped workflow token. This single job converts "silently four months behind"
+into "a daily report". The pinned issue is operational state, not provider truth: run-scoped
+workflow artifacts remain the evidence bundle, and invalid issue state fails loudly.
 An orphan branch has better write semantics and needs no bootstrap ceremony, but writing a ref
-requires `contents: write`, which GitHub cannot scope to a single branch — so the issue is what
-keeps the watcher on `contents: read` and structurally unable to edit declarations or accepted
-references. That trade is why an explicit init/recovery path is a requirement here rather than a
-nicety, and it flips once L4 candidate PRs give the watcher write access anyway.
+requires `contents: write`, which GitHub cannot scope to a single branch through workflow-token
+permissions. A branch ruleset plus a dedicated GitHub App/bypass actor could make that safe, but it
+adds repository configuration and a credential lifecycle. The pinned issue avoids those moving
+parts and keeps the ordinary watcher on `contents: read`, structurally unable to edit declarations
+or accepted references. Its issue number lives in a repository variable, so initialization and
+deleted-issue recovery are an idempotent local-admin command with Variables/Issues write permission;
+the scheduled token is not elevated. The command creates or reuses the sole issue with the reserved
+state label, refuses ambiguous duplicates, updates the variable, and reads both back before success.
+This trade flips once L4 candidate PRs give the watcher write access anyway, or once the repository
+adopts the dedicated App/ruleset.
 
 Monitoring that heartbeat needs a host that is not the watcher's own scheduler. A purpose-built
 dead-man's-switch service is the right tool; an agent-hosted schedule is a fallback, since it is
@@ -270,18 +278,25 @@ dead-man's switch — it needs repository activity to fire — but it costs noth
 liveness from sitting at `unknown` indefinitely.
 
 **The report and issue do not flow directly into runtime reads.** A running installation must never
-read workflow artifacts or mutable issue text. Instead an explicit maintainer command validates a
-chosen report and renders a deterministic update to a compiled TypeScript snapshot under
-`src/core/provider-registry/`. That source diff receives ordinary human review and merge; the
-runtime then exposes the bundled snapshot value and age. Reviewing the snapshot confirms that the
-observation and provenance were delivered intact — it does not accept release, surface, catalog, or
-wire compatibility.
+read workflow artifacts or mutable issue text. Instead the production maintainer command accepts a
+GitHub Actions run ID, verifies that it belongs to the expected repository/workflow/ref, completed
+successfully, and has the recorded head SHA/run attempt, then downloads exactly one named artifact
+and compares it with the API-reported SHA-256 artifact digest before extraction. It also validates
+the stable/canonical JSON report checksum with the checksum field omitted, source identities, and
+observation times. The artifact digest and trusted run metadata anchor delivery provenance; the
+embedded checksum is only a corruption guard. The command then renders a deterministic update to a
+compiled TypeScript snapshot under `src/core/provider-registry/`, recording both sets of metadata.
+That source diff receives ordinary human review and merge; the runtime exposes the bundled snapshot
+value and age. Reviewing the snapshot confirms delivery from the recorded run — it does not accept
+release, surface, catalog, or wire compatibility. A local report is usable only for an explicitly
+untrusted dry run and cannot write the reviewed snapshot.
 
 The cost of this bridge is real and should stay visible rather than be discovered later. Snapshot
 freshness is bounded by the runtime release cadence, so between releases an installation often has
-nothing better to say than "too old to know", and the bridge itself costs an import command,
-checksum validation, a snapshot module, and a recurring review step. It is worth it only because it
-establishes the reviewed-delivery contract that L5 then upgrades: the knowledge-pack channel is
+nothing better to say than "too old to know", and the bridge itself costs a trusted-run import
+command, artifact/report integrity validation, a snapshot module, and a recurring review step. It
+is worth it only because it establishes the reviewed-delivery contract that L5 then upgrades: the
+knowledge-pack channel is
 integrity-checked, rollback-capable, and refreshes without a release. Until then, snapshot age must
 be reported as a first-class state, never smoothed into "no drift".
 
@@ -479,13 +494,15 @@ the registry refactor stays at step 7 where baselines protect it.
   as weak signals; changelog text is an enhancement, not a precondition.
 - **Feed coordinates themselves drift** (a package gets renamed or a repo moves). A feed that
   fails to resolve must report loudly rather than silently reporting "no drift".
-- **The primary scheduler cannot report that it never started.** Its `lastRunAt` heartbeat is
-  checked from a host that is not that scheduler; an in-repo check on an event-triggered workflow
-  covers the interim, and scheduler health stays `unknown` until an alert path is tested.
-- **Ephemeral CI output is not a runtime data channel.** A deterministic report is imported into a
-  reviewed, versioned TypeScript snapshot before runtime freshness can consume it. That snapshot is
-  release-bundled, so its age must be reported as a first-class state; near-real-time refresh
-  remains L5 scope.
+- **The primary scheduler cannot report that it never started, and startup is not completion.** A
+  host that is not that scheduler checks `lastSuccessfulRunAt` plus stuck `running` state; an
+  in-repo check on an event-triggered workflow covers the interim, and scheduler health stays
+  `unknown` until an alert path is tested.
+- **Ephemeral CI output is not a runtime data channel, and a self-contained checksum is not a trust
+  anchor.** Production import verifies the expected successful Actions run and API-reported
+  artifact digest before validating the canonical report checksum and rendering a reviewed,
+  versioned TypeScript snapshot. That snapshot is release-bundled, so its age must be reported as a
+  first-class state; near-real-time refresh remains L5 scope.
 - **One observation can be account- or region-specific.** Interactive model evidence carries its
   scope and stays candidate evidence until review determines whether it is safe to generalize.
 - **A runtime-loaded data tree can silently miss packaging.** `package.json` `files` is an
