@@ -92,18 +92,19 @@ Specifically:
    cron whenever the repository sees activity. Until an alert path is tested, missed-run detection
    is explicitly `unknown`, not covered.
 
-   CI artifacts and issues are not runtime inputs. Watcher output is maintainer-facing: reports,
-   operational state, and issues. The runtime derives freshness from compiled accepted references
-   and local fingerprints, and reports "latest upstream version" as `not_automated` rather than
-   inventing a channel for it.
+   CI artifacts and issues are not runtime inputs. The watcher additionally renders a
+   deterministic, versioned observation-snapshot candidate containing source status, observed
+   value, observation time, report provenance, and checksum. An explicit maintainer command imports
+   that candidate into a reviewed TypeScript snapshot under `src/core/provider-registry/`; only the
+   merged snapshot is compiled into the runtime and consumed by freshness reporting. Reviewing this
+   snapshot confirms provenance and delivery, not compatibility acceptance.
 
-   A reviewed observation snapshot compiled into the runtime was considered as that channel and
-   deliberately deferred. Its freshness would be bounded by the runtime release cadence, so for an
-   infrequently released runtime the honest report is usually "too old to know" — the mechanism
-   mostly delivers a caveat, while the maintainer who actually consumes drift information already
-   has the report. Runtime-visible observation therefore waits for the knowledge-pack channel in
-   the later delivery slice, which is integrity-checked and rollback-capable and can refresh
-   independently of a release.
+   The accepted limitation is recorded rather than glossed: snapshot freshness is bounded by the
+   runtime release cadence, so between releases an installation will often be reporting an
+   observation old enough that the only honest state is "too old to know". That is why snapshot age
+   is a first-class reported state rather than a footnote, and why the later knowledge-pack
+   delivery slice — integrity-checked, rollback-capable, and refreshable without a release —
+   supersedes this bridge rather than merely extending it.
 4. **Surface-tier detection becomes automated where it is safely installable.** For eligible
    provider/platform/channel combinations, CI captures `--version`, `--help`,
    `<subcommand> --help`, and model-list help surfaces, and validates the argv profiles Cats
@@ -197,9 +198,9 @@ Specifically:
   convention) that the first slice deliberately avoids rather than solves
 - Capability-specific degradation is deferred to its own SPEC, so ADR-029 rule 2 stays
   under-enforced in the interim and only warnings cover the gap
-- Until knowledge-pack delivery lands, an installation cannot report how far upstream has moved at
-  all; it can only report what has been accepted and when, and must say so plainly rather than
-  implying currency
+- Until knowledge-pack delivery lands, users receive the latest reviewed observation snapshot only
+  when they update the runtime, so between releases the reported observation is frequently stale;
+  diagnostics must expose that snapshot age rather than imply currency
 - Maintainers still review every candidate PR; toil is reduced, not eliminated
 
 ### Neutral
@@ -261,5 +262,5 @@ Specifically:
 ---
 
 *Proposed: 2026-08-17*
-*Revised: 2026-08-18 after follow-up review added durable source state, an independent scheduler heartbeat, conservative help canonicalization, and execution-mode-aware agent scheduling; a fourth pass then kept the "CI output is never a runtime input" rule while deferring its delivery mechanism to the knowledge-pack slice*
+*Revised: 2026-08-18 after follow-up review added a reviewed runtime observation snapshot, durable source state, an independent scheduler heartbeat, conservative help canonicalization, and execution-mode-aware agent scheduling; a fourth pass kept the snapshot bridge on the owner's call and recorded its release-bounded freshness as an accepted limitation*
 *Decision makers: user + Claude + Codex*

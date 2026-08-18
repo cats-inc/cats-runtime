@@ -1476,15 +1476,22 @@ scheduler, so a cron that never starts cannot certify itself as healthy — with
 in-repo check on the existing preflight workflow as the free interim and a
 dead-man's-switch service as the durable answer.
 
-The CI report and mutable issue state are not runtime inputs, and this slice
-builds no channel to make them one. `setup` and `diagnostics` report what the
-installation can verify — accepted references with `verifiedAt`, local
-fingerprints, catalog observation — and mark "latest upstream version" as
-`not_automated`. A reviewed snapshot bundled into the runtime was considered and
-deferred: its freshness would be bounded by the release cadence, so it would
-usually report "too old to know" while still costing an import command, checksum
-validation, a snapshot module, and a review ritual. Runtime-visible observation
-waits for the integrity-checked knowledge-pack delivery slice.
+The CI report and mutable issue state are not runtime inputs. A maintainer imports
+a deterministic, checksummed report into a reviewed TypeScript observation
+snapshot that ships in `build/runtime`; `setup` and `diagnostics` expose both its
+observed value and age. This review confirms observation provenance, not
+compatibility acceptance. The accepted limitation is recorded rather than
+glossed: snapshot freshness is bounded by the release cadence, so between
+releases the honest state is often "too old to know", which is why age is
+reported first-class. The integrity-checked knowledge-pack delivery slice
+supersedes this bridge rather than extending it.
+
+Operational state lives in a pinned issue rather than an orphan branch, decided
+on token scope: writing a ref needs `contents: write`, which GitHub cannot
+restrict to one branch, and this repo commits straight to `main` so branch
+protection cannot backstop it. The issue keeps the watcher on `contents: read`,
+making "cannot edit declarations or accepted references" structural. That choice
+flips once L4 candidate PRs require write access anyway.
 
 #### Deferred Scope
 
@@ -1498,9 +1505,9 @@ waits for the integrity-checked knowledge-pack delivery slice.
 - do not report absence of a signal as coverage; every source and scheduled
   collector has durable last-success state, and the primary scheduler heartbeat
   is monitored independently
-- do not read CI artifacts or mutable issue text from runtime, and do not add a
-  release-bundled substitute for them; the knowledge-pack channel is where
-  runtime-visible observation belongs
+- do not read CI artifacts or mutable issue text directly from runtime; only a
+  reviewed, versioned observation snapshot may enter runtime provenance, and its
+  age must be reported rather than implied current
 - do not force CLI-only assumptions into the shared collector
 - do not add a dedicated host-facing probe route or dashboard workflow until
   the manual-first CLI/internal flow proves stable
@@ -1513,7 +1520,7 @@ waits for the integrity-checked knowledge-pack delivery slice.
 - `src/backends/cli/pi/parser.ts`
 - `src/backends/agent/*`
 - `src/core/provider-registry/*` (release sources, coverage, observation logic,
-  and accepted references, PLAN-036)
+  reviewed observation snapshots, and accepted references, PLAN-036)
 - `src/core/provider-install/*` (canonical coordinate derivation, PLAN-036)
 - `src/core/models/*` (catalog freshness and provenance, PLAN-036)
 - `scripts/` and `.github/workflows/` (maintainer-side watch job plus the

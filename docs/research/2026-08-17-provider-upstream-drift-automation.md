@@ -11,7 +11,7 @@ Action Items:
 - Separate observed candidates from capability-specific accepted evidence and baselines
 - Add a scheduled watcher that reports version or upstream-artifact drift without treating observation as verification
 - Persist per-source success across runs, publish a scheduler heartbeat, and monitor that heartbeat from an independent scheduler
-- Keep CI artifacts and issues out of every runtime read path, and let the L5 knowledge pack — not a release-bundled snapshot — be the channel that eventually carries observation to an installation
+- Deliver release observation to runtime only through a reviewed, versioned snapshot; CI artifacts and issues are not runtime inputs, and the snapshot's release-bounded freshness must be reported, not hidden
 - Make catalog staleness visible in `setup`/`diagnostics` instead of silently serving stale truth, and separately correct the curated catalog entry already known to be wrong
 - Audit which provider/platform/channel targets can be installed safely on CI runners before committing to surface baselines
 
@@ -250,13 +250,17 @@ A daily GitHub Actions cron that, per provider:
   `lastSuccessfulObservationAt` across failed runs, and updates only successful timestamps
 - publishes `lastRunAt` as a scheduler heartbeat, because a GitHub Actions cron cannot detect that
   it never started
+- renders a deterministic observation-snapshot candidate with schema version, source identity,
+  observed value, observation time, report/run provenance, and checksum
 
 No CLI installs, no credentials, no user machines. This single job converts "silently four
 months behind" into "a daily report". The pinned issue is operational state, not provider truth:
 run-scoped workflow artifacts remain the evidence bundle, and invalid issue state fails loudly.
-An orphan branch would serve the same purpose with better write semantics and no bootstrap
-ceremony; the issue is chosen for human visibility, which makes an explicit init/recovery path a
-requirement rather than a nicety.
+An orphan branch has better write semantics and needs no bootstrap ceremony, but writing a ref
+requires `contents: write`, which GitHub cannot scope to a single branch — so the issue is what
+keeps the watcher on `contents: read` and structurally unable to edit declarations or accepted
+references. That trade is why an explicit init/recovery path is a requirement here rather than a
+nicety, and it flips once L4 candidate PRs give the watcher write access anyway.
 
 Monitoring that heartbeat needs a host that is not the watcher's own scheduler. A purpose-built
 dead-man's-switch service is the right tool; an agent-hosted schedule is a fallback, since it is
@@ -265,19 +269,21 @@ an existing event-triggered workflow can warn when the heartbeat is stale. That 
 dead-man's switch — it needs repository activity to fire — but it costs nothing and keeps scheduler
 liveness from sitting at `unknown` indefinitely.
 
-**The report does not flow into runtime reads, and this note deliberately does not build a channel
-for it.** The rule is firm: a running installation must never read workflow artifacts or mutable
-issue text. The tempting next step — import the report into a reviewed snapshot compiled into the
-runtime — was considered and deferred, because its freshness is bounded by the release cadence.
-For an infrequently released runtime the bundled value is usually old enough that the honest report
-is "too old to know", so the mechanism mostly ships a caveat, and it needs an import command,
-checksum validation, a snapshot module, and a recurring review ritual to do it.
+**The report and issue do not flow directly into runtime reads.** A running installation must never
+read workflow artifacts or mutable issue text. Instead an explicit maintainer command validates a
+chosen report and renders a deterministic update to a compiled TypeScript snapshot under
+`src/core/provider-registry/`. That source diff receives ordinary human review and merge; the
+runtime then exposes the bundled snapshot value and age. Reviewing the snapshot confirms that the
+observation and provenance were delivered intact — it does not accept release, surface, catalog, or
+wire compatibility.
 
-Meanwhile the party who actually acts on drift is the maintainer, who has the report already. And
-the runtime's genuinely useful freshness comparisons — local fingerprint versus accepted reference,
-and catalog `version`/`lastUpdated` — need no observation feed at all. So the runtime reports
-"latest upstream" as `not_automated`, and L5 knowledge-pack delivery provides the integrity-checked,
-rollback-capable channel that makes runtime-visible observation worth its machinery.
+The cost of this bridge is real and should stay visible rather than be discovered later. Snapshot
+freshness is bounded by the runtime release cadence, so between releases an installation often has
+nothing better to say than "too old to know", and the bridge itself costs an import command,
+checksum validation, a snapshot module, and a recurring review step. It is worth it only because it
+establishes the reviewed-delivery contract that L5 then upgrades: the knowledge-pack channel is
+integrity-checked, rollback-capable, and refreshes without a release. Until then, snapshot age must
+be reported as a first-class state, never smoothed into "no drift".
 
 ### L2 — Contract probe: isolated light probes with committed baselines
 
@@ -437,12 +443,12 @@ Ordered by value over cost:
    TypeScript so it needs no packaging change, and derived from `check.npmPackage` so no second
    feed table exists.
 2. **L1 watcher and liveness.** One script and scheduled workflow that produce observed candidates,
-   preserve durable per-source success state, and publish a heartbeat checked outside that
-   scheduler — all maintainer-facing, without mutating acceptance and without a runtime consumer.
+   preserve durable per-source success state, publish a heartbeat checked outside that scheduler,
+   and render a reviewed observation-snapshot candidate without mutating acceptance.
 3. **Multi-dimensional staleness visibility, plus the stale-catalog correction.** Warnings and
-   provenance only, derived from compiled accepted references and local fingerprints, with "latest
-   upstream" reported as `not_automated`; do not degrade on exact version mismatch. Separately, fix
-   the Claude curated entry as content.
+   provenance only for the runtime contract, sourced from the bundled reviewed snapshot with its
+   age exposed; do not degrade on exact version mismatch. Separately, fix the Claude curated entry
+   as content.
 4. **L2 canonicalized help/argv baselines and CI diff**, for the subset that installs safely on the
    relevant runner OS.
 5. **Accepted-baseline promotion, the candidate/rejected evidence store, and capability-specific
@@ -476,10 +482,10 @@ the registry refactor stays at step 7 where baselines protect it.
 - **The primary scheduler cannot report that it never started.** Its `lastRunAt` heartbeat is
   checked from a host that is not that scheduler; an in-repo check on an event-triggered workflow
   covers the interim, and scheduler health stays `unknown` until an alert path is tested.
-- **Ephemeral CI output is not a runtime data channel.** No runtime read path consumes watcher
-  output; the runtime reports what it can verify locally and marks the rest `not_automated`.
-  Runtime-visible observation arrives with the L5 knowledge pack, not with a release-bundled
-  snapshot whose value is usually already stale.
+- **Ephemeral CI output is not a runtime data channel.** A deterministic report is imported into a
+  reviewed, versioned TypeScript snapshot before runtime freshness can consume it. That snapshot is
+  release-bundled, so its age must be reported as a first-class state; near-real-time refresh
+  remains L5 scope.
 - **One observation can be account- or region-specific.** Interactive model evidence carries its
   scope and stays candidate evidence until review determines whether it is safe to generalize.
 - **A runtime-loaded data tree can silently miss packaging.** `package.json` `files` is an
