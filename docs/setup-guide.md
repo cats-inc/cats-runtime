@@ -34,7 +34,10 @@ limits are inherent to both versions rather than to Cats: sessions cannot be
 resumed, because passing `--id` alongside `--json` fails and the stream never
 emits a resumable id; and the runtime's `whitelist` permission mode is
 unavailable, because `--auto-approve` is a global boolean with no per-tool form.
-Use `skip` to auto-approve tools or `default` to deny them all.
+Use `skip` to auto-approve tools or `default` to deny them all. On 3.0.57 a
+denied tool no longer aborts the turn as it did on 3.0.51: the tool is still
+refused and the `tool_result` carries `isError`, but the agent answers without
+it and the turn ends with a normal result.
 
 Devin installs with `irm https://static.devin.ai/cli/setup.ps1 | iex` on Windows
 (PowerShell only; the installed binary works from any shell) or

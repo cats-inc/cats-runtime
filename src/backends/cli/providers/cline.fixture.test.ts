@@ -213,6 +213,21 @@ describe('Cline 3.0.57 authenticated stream fixtures', () => {
     expect(toolProgress[0].metadata?.native?.stream).toBe('stdout');
   });
 
+  it('flags a denied tool but no longer aborts the run, as 3.0.51 did', () => {
+    // 3.0.51 ended a denied turn with run_result.finishReason 'aborted'. 3.0.57
+    // refuses the tool the same way and then lets the agent answer without it,
+    // so the turn ends with a normal result carrying an errored tool_result.
+    const events = normalize357('tool-denied.completed.redacted.ndjson');
+    const toolResults = events.filter((event) => event.type === 'tool_result');
+
+    expect(toolResults).toHaveLength(1);
+    expect(toolResults[0].isError).toBe(true);
+    expect(toolResults[0].text).toContain('Tool approval requires an interactive session');
+    expect(events.some((event) => event.type === 'raw')).toBe(false);
+    expect(events.filter((event) => event.type === 'result')).toHaveLength(1);
+    expect(events.some((event) => event.type === 'error')).toBe(false);
+  });
+
   it('drops the empty chunks each tool stream opens with', () => {
     // Two of the three content_update events carry chunk: "" before the command
     // writes anything; emitting those would be pure noise on the host side.

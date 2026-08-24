@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Blocked — waiting on Cline account credit |
+| **Status** | Completed — verified 2026-08-24 on Cline 3.0.57 (see Verification Result) |
 | **Owner** | User |
 | **Assigned To** | Unassigned |
 | **Reviewer** | User |
@@ -106,6 +106,75 @@ The exact-version compatibility profile is the containment: only 3.0.51 can exec
 If the success path disagrees with the fixtures, prefer narrowing
 `ClineProvider.capabilities` or reverting execution to a refusal over patching the parser to
 match a single observed run. Capture the divergence as a new fixture first.
+
+## Verification Result
+
+Verified 2026-08-24. The account has credit again, so the deferred success path was
+finally driven end to end.
+
+**Read this first: the verification ran on Cline 3.0.57, not 3.0.51.** The two versions
+were both admitted to the compatibility baseline that day, and 3.0.57 is what is installed
+here. Where its behavior differs from what this plan encoded, the difference is called out
+below rather than papered over.
+
+### How it ran
+
+Not through the hand-assembled snippet in the Procedure section. The runtime's own
+provider-evolution entrypoint drives the same adapter, spawn config, and parser:
+
+```
+cats-runtime --probe-provider-evolution --probe-provider cline --probe-profile manual_tool
+```
+
+`manual_tool` was added for this: `manual_smoke` puts its tool prompt on turn two, and
+Cline declares `resume: false`, so turn two fails at any version and the tool path was
+unreachable. The single-turn profile folds text and tool observation into turn one.
+
+### Success path — verified
+
+From the probe artifact (`permissionMode: 'skip'`, one turn, 35 events):
+
+- Streamed text deltas arrived as incremental `text` events — 8 of them, not one block.
+- A live tool round trip produced paired `tool_use` / `tool_result`, one each.
+- `run_result` reported `finishReason: "completed"` and produced exactly one `result`.
+- **No `raw` events**: raw passthrough 0, unknown 0, schema failures 0.
+
+Usage reconciles against the captured stream
+(`docs/research/fixtures/cline-3.0.57/tool-use.success.redacted.ndjson`):
+`run_result.aggregateUsage` is `{ inputTokens: 9469, outputTokens: 88 }`, matching the
+running totals on the last per-iteration `usage` event (`totalInputTokens` 9469,
+`totalOutputTokens` 88). The adapter ignores those cumulative events and reads
+`aggregateUsage`, so nothing is double counted.
+
+### Denied tools — verified, with one behavior change
+
+Run with the runtime's own `default` mode argv (`--auto-approve false`), captured at
+`docs/research/fixtures/cline-3.0.57/tool-denied.completed.redacted.ndjson`:
+
+- The tool **is** refused. `tool_result` carries `isError: true` and the text
+  `Tool approval requires an interactive session, but this session is non-interactive.`
+  Nothing ran, and nothing was written to disk.
+- No `raw` events.
+- **The turn no longer aborts.** 3.0.51 returned `finishReason: "aborted"` and this plan's
+  pass criteria expected a terminal error. 3.0.57 returns `completed`: the agent answers
+  without the tool and the adapter emits a normal `result` alongside the errored
+  `tool_result`. Hosts that treated a denied tool as a failed turn will see a successful
+  turn carrying a flagged tool error instead.
+
+A separate check worth recording, because it is easy to get wrong when reproducing this by
+hand: omitting `--auto-approve` entirely is **not** the same as `--auto-approve false`. With
+the flag omitted, 3.0.57 executed `run_commands` and created a file through the `editor`
+tool without approval. The runtime always passes the explicit `false`
+(`appendClinePermissionArgs`), so its `default` mode still denies — but a hand-run
+reproduction that drops the flag will look like a permission hole that the runtime does not
+have.
+
+### Not covered
+
+- The contract change found alongside this: 3.0.57 streams tool output through
+  `content_update`, which the 3.0.51 parser dropped as unknown. Handled separately in
+  `docs/research/2026-08-24-grok-cline-version-drift-probe.md`.
+- Multi-turn behavior. Cline still cannot resume, so a runtime session is one turn.
 
 ## Related
 

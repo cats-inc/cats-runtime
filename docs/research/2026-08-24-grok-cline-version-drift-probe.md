@@ -126,11 +126,21 @@ The adapter now handles `content_update`:
 - every other content type stays unknown, so the next shape change surfaces the
   same way this one did
 
-A fresh capture is recorded at
-`docs/research/fixtures/cline-3.0.57/tool-use.success.redacted.ndjson`, covering
-the full tool lifecycle: `content_start:tool`, three `content_update:tool`, and
-`content_end:tool`. The 3.0.51 fixtures still parse unchanged against the same
-adapter.
+Fresh captures are recorded under `docs/research/fixtures/cline-3.0.57/`:
+`tool-use.success.redacted.ndjson` covers the full tool lifecycle
+(`content_start:tool`, three `content_update:tool`, `content_end:tool`), and
+`tool-denied.completed.redacted.ndjson` covers the refusal path. The 3.0.51
+fixtures still parse unchanged against the same adapter.
+
+A second behavior change surfaced while closing out PLAN-035: a denied tool no
+longer aborts the run. 3.0.51 returned `finishReason: "aborted"`; 3.0.57 refuses
+the tool the same way — `tool_result.isError` with "Tool approval requires an
+interactive session" — and then lets the agent answer without it, ending in a
+normal `result`. Nothing executes either way, so this is a host-visible contract
+change rather than a permission hole. Note that omitting `--auto-approve`
+entirely is not the same as passing `false`: without the flag, 3.0.57 ran
+`run_commands` and created a file unprompted. The runtime always passes the
+explicit `false`.
 
 Re-probing 3.0.57 with `manual_tool` after the fix:
 
