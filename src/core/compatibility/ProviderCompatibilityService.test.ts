@@ -232,6 +232,48 @@ describe('ProviderCompatibilityService', () => {
     await assessTimeout('docker-dev', { mode: 'docker', container: 'cats-cli-dev', environmentId: 'docker-dev' }, 23000);
   });
 
+  it('raises the probe timeout to a slow CLI floor without lowering larger runtime budgets', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-slow-cli-'));
+    tempDirs.push(root);
+    const runner = {
+      run: vi.fn(async () => ({
+        exitCode: 0,
+        stdout: 'aider 0.86.2\n',
+        stderr: '',
+        timedOut: false,
+        durationMs: 8300,
+      })),
+    };
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+      compatibilityProbeTimeoutMs: 10000,
+      compatibilityProbeDockerTimeoutMs: 45000,
+    }, {
+      runner,
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-08-24T00:00:00.000Z'),
+    });
+
+    await service.assessCliTarget(createCliTarget('aider'), { force: true });
+    expect(runner.run.mock.calls.every((call) => call[4] === 30_000)).toBe(true);
+
+    runner.run.mockClear();
+    await service.assessCliTarget(
+      createCliTarget('aider', 'docker-dev', {
+        mode: 'docker',
+        container: 'cats-cli-dev',
+        environmentId: 'docker-dev',
+      }),
+      { force: true },
+    );
+    expect(runner.run.mock.calls.every((call) => call[4] === 45_000)).toBe(true);
+
+    runner.run.mockClear();
+    await service.assessCliTarget(createCliTarget('claude'), { force: true });
+    expect(runner.run.mock.calls.every((call) => call[4] === 10_000)).toBe(true);
+  });
+
   const shellFallbackIt = process.platform === 'win32' ? it.skip : it;
 
   shellFallbackIt('retries native compatibility probes through a shell when direct spawn exits without output', async () => {
@@ -921,7 +963,44 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
     expect(assessment.setup.version).toMatchObject({
       status: 'ready',
       detected: '1.0.0',
-      supportedRange: '1.0.0',
+      supportedRange: '1.0.0, 1.0.5',
+    });
+  });
+
+  it('selects the exact streaming-json profile for probed Grok 1.0.5', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-grok-105-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
+          exitCode: 0,
+          stdout: args[0] === '--version'
+            ? 'grok 1.0.5 (5115b46bc9)\n'
+            : 'Usage: grok --single --output-format streaming-json --resume '
+              + '--fork-session --tools --permission-mode\n',
+          stderr: '',
+          timedOut: false,
+          durationMs: 4,
+        })),
+      },
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-08-24T00:00:00.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('grok'));
+
+    expect(assessment.classification).toBe('ready');
+    expect(assessment.profile).toMatchObject({
+      id: 'grok-cli-streaming-json-1.0.0',
+      confidence: 'exact',
+      parserId: 'grok-native-streaming-json',
+    });
+    expect(assessment.setup.version).toMatchObject({
+      status: 'ready',
+      detected: '1.0.5',
     });
   });
 
@@ -958,7 +1037,7 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
     expect(assessment.setup.version).toMatchObject({
       status: 'unsupported',
       detected: '1.0.1',
-      supportedRange: '1.0.0',
+      supportedRange: '1.0.0, 1.0.5',
     });
   });
 

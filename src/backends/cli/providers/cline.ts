@@ -54,6 +54,7 @@ interface ClineAgentEvent {
   toolName?: unknown;
   input?: unknown;
   output?: unknown;
+  update?: unknown;
   error?: unknown;
   iteration?: unknown;
 }
@@ -266,6 +267,21 @@ export class ClineProvider implements Provider {
         }
         return this.parseTextDelta(event);
 
+      case 'content_update':
+        // 3.0.57 streams tool output between the content_start call and the
+        // content_end result. Only the tool form has been observed, so other
+        // content types stay unknown rather than being guessed at.
+        if (event.contentType === 'tool') {
+          return this.parseToolOutputChunk(event);
+        }
+        return observeUnknown(this.evolutionObserver, {
+          rawEventType: `content_update:${String(event.contentType ?? 'unknown')}`,
+          rawSample: event,
+        }, {
+          type: 'raw',
+          raw: event,
+        } satisfies RawStreamEvent);
+
       case 'content_end':
         // For text and reasoning this repeats the whole block the deltas
         // already streamed, so emitting it would duplicate the message. Only
@@ -385,6 +401,42 @@ export class ClineProvider implements Provider {
         raw: event,
       } satisfies ToolUseStreamEvent,
     ]);
+  }
+
+  private parseToolOutputChunk(event: ClineAgentEvent): StreamEvent | null {
+    const update = asRecord(event.update);
+    const chunk = typeof update?.chunk === 'string' ? update.chunk : '';
+    if (!chunk.trim()) {
+      // Each stream opens with empty chunks before the command writes anything.
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: 'content_update:tool',
+        reason: 'empty_tool_output_chunk',
+        rawSample: event,
+      }, null);
+    }
+
+    const toolName = typeof event.toolName === 'string' ? event.toolName : 'unknown';
+    const toolId = typeof event.toolCallId === 'string' ? event.toolCallId : undefined;
+    const stream = typeof update?.stream === 'string' ? update.stream : undefined;
+
+    return observeNormalized(this.evolutionObserver, {
+      rawEventType: 'content_update:tool',
+      rawSample: event,
+    }, createRuntimeProgressEvent({
+      text: chunk.trim(),
+      provider: 'cline',
+      backend: 'cli',
+      kind: 'tool',
+      status: 'running',
+      source: 'provider',
+      native: {
+        sourceEvent: 'content_update',
+        toolName,
+        ...(toolId ? { toolId } : {}),
+        ...(stream ? { stream } : {}),
+      },
+      raw: event,
+    }));
   }
 
   private parseToolResult(event: ClineAgentEvent): StreamEvent[] {

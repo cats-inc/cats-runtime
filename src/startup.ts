@@ -844,7 +844,7 @@ export function getRuntimeHelpText(): string {
     '  --probe-parser <parserId>',
     '  --probe-runtime <native|wsl|docker>',
     '  --probe-transport <cli|agent|api|unknown>',
-    '  --probe-profile <manual_smoke|manual_text>',
+    '  --probe-profile <manual_smoke|manual_text|manual_tool>',
     '  --probe-model <model>',
     '  --probe-review-summary <text>',
     '  --probe-highlight <text>',

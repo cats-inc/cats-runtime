@@ -199,9 +199,17 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
-async function removeRuntimeTempEntry(entryPath: string): Promise<boolean> {
+export async function removeRuntimeTempEntry(entryPath: string): Promise<boolean> {
   try {
-    await rm(entryPath, { recursive: true, force: true });
+    // Windows keeps handles open for a short window after a spawned CLI exits,
+    // so an immediate rm races the provider and throws EBUSY. rm retries that
+    // class of error itself with a linear backoff when given these options.
+    await rm(entryPath, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 100,
+    });
     return true;
   } catch {
     return false;

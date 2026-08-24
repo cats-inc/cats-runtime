@@ -383,7 +383,11 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       protocolFamily: 'streaming-json',
       parserId: 'grok-native-streaming-json',
       spawnBaseArgs: [...GROK_STREAMING_JSON_BASE_ARGS],
-      supportedVersions: ['1.0.0'],
+      // 1.0.0 is the fixture-recorded baseline. 1.0.5 was admitted after a
+      // manual_smoke evolution probe replayed through this same parser with no
+      // unknown event type, schema failure, or raw passthrough
+      // (docs/research/2026-08-24-grok-cline-version-drift-probe.md).
+      supportedVersions: ['1.0.0', '1.0.5'],
       helpTokens: [
         '--single',
         'streaming-json',
@@ -416,7 +420,12 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       // Pinned exactly. The contract this parser encodes was read off 3.0.51
       // fixtures, including quirks (reasoning field name, object-shaped failed
       // tool output, cumulative usage) that a minor bump could silently change.
-      supportedVersions: ['3.0.51'],
+      // 3.0.57 was admitted only after a manual_tool probe found the one thing
+      // that did change — tool output now streams through content_update — and
+      // the adapter learned to normalize it
+      // (docs/research/fixtures/cline-3.0.57/, and the research note at
+      // docs/research/2026-08-24-grok-cline-version-drift-probe.md).
+      supportedVersions: ['3.0.51', '3.0.57'],
       helpTokens: ['--json', '--auto-approve', '--thinking', '--acp'],
       liveProbeArgs: ['--help'],
       liveProbeTokens: ['--json', '--auto-approve'],

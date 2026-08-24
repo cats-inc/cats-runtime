@@ -179,3 +179,52 @@ describe('Cline 3.0.51 authenticated stream fixtures', () => {
       .toContain('Insufficient balance');
   });
 });
+
+describe('Cline 3.0.57 authenticated stream fixtures', () => {
+  const fixture357Root = new URL(
+    '../../../../docs/research/fixtures/cline-3.0.57/',
+    import.meta.url,
+  );
+
+  function normalize357(name: string): StreamEvent[] {
+    const provider = new ClineProvider();
+    return readFileSync(fileURLToPath(new URL(name, fixture357Root)), 'utf8')
+      .trim()
+      .split(/\r?\n/)
+      .flatMap((line) => asEvents(provider.parseStreamLine(line)));
+  }
+
+  it('streams tool output through content_update instead of dropping it as raw', () => {
+    // 3.0.57 added content_update between the content_start call and the
+    // content_end result. The 3.0.51 parser had no case for it, so tool output
+    // arrived as unhandled raw events and never reached hosts.
+    const events = normalize357('tool-use.success.redacted.ndjson');
+
+    expect(events.some((event) => event.type === 'raw')).toBe(false);
+    expect(events.filter((event) => event.type === 'tool_use')).toHaveLength(1);
+    expect(events.filter((event) => event.type === 'tool_result')).toHaveLength(1);
+
+    const toolProgress = events.filter((event) => (
+      event.type === 'progress'
+      && event.metadata?.native?.sourceEvent === 'content_update'
+    ));
+    expect(toolProgress).toHaveLength(1);
+    expect(toolProgress[0].text).toContain('probe-note.txt');
+    expect(toolProgress[0].metadata?.native?.stream).toBe('stdout');
+  });
+
+  it('drops the empty chunks each tool stream opens with', () => {
+    // Two of the three content_update events carry chunk: "" before the command
+    // writes anything; emitting those would be pure noise on the host side.
+    const raw = readFileSync(
+      fileURLToPath(new URL('tool-use.success.redacted.ndjson', fixture357Root)),
+      'utf8',
+    )
+      .trim()
+      .split(/\r?\n/)
+      .map((line) => JSON.parse(line));
+    const updates = raw.filter((line) => line.event?.type === 'content_update');
+    expect(updates).toHaveLength(3);
+    expect(updates.filter((line) => line.event.update?.chunk === '')).toHaveLength(2);
+  });
+});

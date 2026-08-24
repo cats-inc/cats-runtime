@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, utimesSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -7,6 +7,7 @@ import {
   cleanupStaleRuntimeTempDirs,
   DEFAULT_STALE_RUNTIME_TEMP_MAX_AGE_MS,
   formatRuntimeTempCleanupSummary,
+  removeRuntimeTempEntry,
 } from './runtimeTempDirs.js';
 
 const createdRoots: string[] = [];
@@ -116,5 +117,23 @@ describe('cleanupStaleRuntimeTempDirs', () => {
     expect(summary).toContain('/tmp/cats-runtime-tests');
     expect(summary).toContain('cats-runtime-peer-2');
     expect(summary).toContain('cats-runtime-python-1');
+  });
+});
+
+describe('removeRuntimeTempEntry', () => {
+  it('removes a nested temp workspace and reports success', async () => {
+    const root = createRoot();
+    const workspace = join(root, 'cats-runtime-provider-evolution-abc');
+    mkdirSync(join(workspace, 'nested'), { recursive: true });
+    writeFileSync(join(workspace, 'nested', 'probe-note.txt'), 'probe', 'utf8');
+
+    await expect(removeRuntimeTempEntry(workspace)).resolves.toBe(true);
+    expect(existsSync(workspace)).toBe(false);
+  });
+
+  it('treats an already-removed workspace as removed instead of throwing', async () => {
+    const root = createRoot();
+
+    await expect(removeRuntimeTempEntry(join(root, 'never-created'))).resolves.toBe(true);
   });
 });

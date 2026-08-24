@@ -226,6 +226,23 @@ export const PROVIDER_EVOLUTION_PROBE_PROFILES: Record<string, ProviderEvolution
       },
     ],
   },
+  manual_tool: {
+    id: 'manual_tool',
+    label: 'Manual Tool Probe',
+    description:
+      'Single-turn text and tool probe for providers that cannot carry a second turn.',
+    turns: [
+      {
+        id: 'text-and-tool',
+        summary: 'Short deterministic text response plus one workspace inspection tool call',
+        prompt:
+          'Inspect the current directory with one safe tool if tool use is available, and '
+          + 'mention the file named "probe-note.txt" in your answer. Then reply with exactly '
+          + 'three lines: alpha, beta, gamma. If tools are unavailable, say so briefly and '
+          + 'still reply with those three lines.',
+      },
+    ],
+  },
   manual_smoke: {
     id: 'manual_smoke',
     label: 'Manual Smoke Probe',

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AuggieSessionService } from '../../backends/cli/auggie/AuggieSessionService.js';
@@ -41,6 +41,7 @@ import {
   loadConfig,
   type RuntimeConfig,
 } from '../config.js';
+import { removeRuntimeTempEntry } from '../runtimeTempDirs.js';
 import { ProviderCompatibilityService } from './ProviderCompatibilityService.js';
 import type {
   ProviderEvolutionEvidenceObserver,
@@ -410,7 +411,7 @@ async function runCliProbeProfile(
   } finally {
     worker.kill();
     await providerHandle.dispose?.(workspaceRoot);
-    await rm(workspaceRoot, { recursive: true, force: true });
+    await discardProbeWorkspace(workspaceRoot);
   }
 }
 
@@ -489,8 +490,27 @@ async function runAgentProbeProfile(
       error: error instanceof Error ? error.message : String(error),
     };
   } finally {
-    await rm(workspaceRoot, { recursive: true, force: true });
+    await discardProbeWorkspace(workspaceRoot);
   }
+}
+
+/**
+ * Removes a probe workspace without letting cleanup replace the probe result.
+ *
+ * The result of a probe is the observation it captured; a workspace that
+ * outlives it is recoverable through `--cleanup-temp-dirs`, which sweeps the
+ * same prefix. Throwing from `finally` discards a completed run, so cleanup
+ * failure is reported and swallowed instead.
+ */
+async function discardProbeWorkspace(workspaceRoot: string): Promise<void> {
+  if (await removeRuntimeTempEntry(workspaceRoot)) {
+    return;
+  }
+
+  console.warn(
+    `[provider-evolution] Could not remove probe workspace ${workspaceRoot}. `
+    + 'Run cats-runtime --cleanup-temp-dirs to sweep it later.',
+  );
 }
 
 function createProbeProvider(

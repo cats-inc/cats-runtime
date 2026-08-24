@@ -13,14 +13,24 @@ Grok CLI installs with `irm https://x.ai/cli/install.ps1 | iex` on Windows or
 `curl -fsSL https://x.ai/cli/install.sh | bash` on macOS/Linux. Its binary is
 under `~/.grok/bin`; authenticate with `grok login` (which writes
 `~/.grok/auth.json`) or `XAI_API_KEY`. Cats detects only the `grok` binary, not
-the installer's generic `agent` alias. Grok 1.0.0 can execute through the
-fixture-backed native adapter with model `grok-4.5`; other CLI versions are
-refused until their lifecycle contract is probed.
+the installer's generic `agent` alias. Grok 1.0.0 and 1.0.5 can execute through
+the fixture-backed native adapter with model `grok-4.5`; other CLI versions are
+refused until their lifecycle contract is probed. 1.0.5 was admitted on
+2026-08-24 after a `manual_smoke` provider-evolution probe emitted 156 events
+across text, tool use, tool result, progress, and final result with no unknown
+event type, schema failure, or raw passthrough. That probe does not cover the
+error, cancellation, resume, fork, or permission-mode paths the 1.0.0 fixtures
+under `docs/research/fixtures/grok-1.0.0/` record.
 
 Cline installs with `npm install -g cline` and authenticates with `cline auth`,
-which stores credentials under `~/.cline`. Cline 3.0.51 executes through the
-fixture-backed JSON adapter; other versions are refused until re-probed. Two
-limits are inherent to that version rather than to Cats: sessions cannot be
+which stores credentials under `~/.cline`. Cline 3.0.51 and 3.0.57 execute
+through the fixture-backed JSON adapter; other versions are refused until
+re-probed. 3.0.57 was admitted on 2026-08-24 after a `manual_tool` probe reached
+the tool path and found the one contract change it introduced: tool output now
+streams through `content_update` events between the call and the result, which
+the adapter normalizes into tool progress
+(`docs/research/fixtures/cline-3.0.57/`). Two
+limits are inherent to both versions rather than to Cats: sessions cannot be
 resumed, because passing `--id` alongside `--json` fails and the stream never
 emits a resumable id; and the runtime's `whitelist` permission mode is
 unavailable, because `--auto-approve` is a global boolean with no per-tool form.
@@ -47,7 +57,10 @@ it: version 0.86.2 has no machine-readable output, no ACP or server mode, exits
 is pointed at. Aider also reads credentials from several places — environment,
 `.env`, `.aider.conf.yml`, and its own `~/.aider/oauth-keys.env` written by a
 first-run OpenRouter sign-in — so Cats reports the credential names it can see
-as evidence rather than claiming Aider is ready or unready. Uninstall with
+as evidence rather than claiming Aider is ready or unready. Its Python startup
+also makes it the slowest CLI to probe — roughly 8 s for the concurrent
+version/help pair — so it declares a 30 s `check.minProbeTimeoutMs` floor
+instead of timing out under the runtime-wide budget. Uninstall with
 `uv tool uninstall aider-chat`; deleting `~/.local/bin/aider` only removes the
 shim.
 
@@ -120,7 +133,7 @@ Supported startup flags:
 - `--probe-provider <provider>` — required with `--probe-provider-evolution`
 - `--probe-instance <instance>` — optional instance override for the selected provider
 - `--probe-runtime <native|wsl|docker>` — optional retained-artifact runtime filter for compatibility evidence and provider-evolution list/read flows
-- `--probe-profile <manual_smoke|manual_text>` — optional probe profile override
+- `--probe-profile <manual_smoke|manual_text|manual_tool>` — optional probe profile override. `manual_smoke` (default) splits text and tool observation across two turns; `manual_tool` folds both into one turn for providers that cannot carry a second turn, such as Cline, which declares `resume: false`
 - `--probe-model <model>` — optional model override for the probe run
 - `--refresh-setup-scan` — refresh the shared setup scan before generating the setup diagnostic report
 - `--startup-mode <standalone|app-managed>`

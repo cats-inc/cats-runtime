@@ -640,6 +640,12 @@ const INSTALL_KNOWLEDGE: Record<ProviderName, ProviderInstallKnowledge> = {
     check: {
       versionArgs: ['--version'],
       helpArgs: ['--help'],
+      // Aider pays a Python interpreter startup on every invocation. Measured on
+      // 0.86.2: ~4.9s for --version alone and ~8.3s when the version and help
+      // probes run concurrently, which is what the compatibility service does.
+      // Under the default 10s budget a full provider scan times out both probes,
+      // and an installed, working CLI is reported as probe_failed with no version.
+      minProbeTimeoutMs: 30_000,
       prerequisites: createNativeInstallerPrerequisites('Aider'),
       expectedPaths: {
         windows: '~/.local/bin/aider.exe',

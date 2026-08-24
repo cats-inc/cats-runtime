@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentAdapter } from '../../backends/agent/types.js';
+import { removeRuntimeTempEntry } from '../runtimeTempDirs.js';
 import { buildAgentAdapter } from '../../backends/agent/adapters/registry.js';
 import {
   generateProviderEvolutionProbeArtifact,
@@ -21,6 +22,18 @@ import {
 vi.mock('../../backends/agent/adapters/registry.js', () => ({
   buildAgentAdapter: vi.fn(),
 }));
+
+// A probe workspace that refuses to be removed is only reproducible through the
+// filesystem on Windows, so the failing branch is driven from the seam instead.
+vi.mock('../runtimeTempDirs.js', async () => {
+  const actual = await vi.importActual<typeof import('../runtimeTempDirs.js')>(
+    '../runtimeTempDirs.js',
+  );
+  return {
+    ...actual,
+    removeRuntimeTempEntry: vi.fn(actual.removeRuntimeTempEntry),
+  };
+});
 
 describe('provider evolution entry summaries', () => {
   beforeEach(() => {
@@ -268,6 +281,74 @@ backends:
         ],
       });
     } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps a completed probe result when the workspace cannot be removed', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-provider-evolution-stuck-'));
+    const paths = createRuntimeTestPaths(root);
+    ensureRuntimeTestDirs(paths);
+    writeFileSync(paths.configPath, `
+version: 1
+routing:
+  providers:
+    claude:
+      default_target:
+        backend: agent
+        instance: sdk
+backends:
+  agent:
+    providers:
+      claude:
+        default_instance: sdk
+        transport: agent_sdk_bridge
+        base_url: http://agent-sdk.test
+        instances:
+          sdk:
+            model: sonnet
+`.trimStart(), 'utf8');
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      ...createRuntimeTestEnv(root),
+      CATS_RUNTIME_HOST: '127.0.0.1',
+      CATS_RUNTIME_PORT: '3110',
+    };
+
+    const adapter = {
+      kind: 'agent_sdk_bridge',
+      inspect: () => ({
+        adapter: 'agent_sdk_bridge',
+        transport: { protocol: 'agent_sdk_http_v1' },
+      }),
+      async *invoke() {
+        yield {
+          type: 'result',
+          providerSessionId: 'bridge-session-1',
+          summary: 'probe-complete',
+        };
+      },
+    } as unknown as AgentAdapter;
+    vi.mocked(buildAgentAdapter).mockReturnValue(adapter);
+    vi.mocked(removeRuntimeTempEntry).mockResolvedValueOnce(false);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      const result = await generateProviderEvolutionProbeArtifact({
+        probeProviderEvolution: true,
+        probeProvider: 'claude',
+        probeInstance: 'agent/sdk',
+        probeProfile: 'manual_text',
+      }, env);
+
+      expect(result.artifact.execution.status).toBe('completed');
+      expect(result.artifact.execution.turnsCompleted).toBe(1);
+      expect(result.artifact.execution.error).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('Could not remove probe workspace'),
+      );
+    } finally {
+      warn.mockRestore();
       rmSync(root, { recursive: true, force: true });
     }
   });

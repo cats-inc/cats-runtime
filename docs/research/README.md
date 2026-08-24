@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-08-24-grok-cline-version-drift-probe](./2026-08-24-grok-cline-version-drift-probe.md) | Grok 1.0.5 and Cline 3.0.57 version drift probe | Why the version whitelist refuses newer CLIs and blocks the probe that would clear them; the evidence admitting Grok 1.0.5; the single-turn `manual_tool` profile that reached Cline's tool path and found `content_update` drift; and the probe-timeout and workspace-cleanup defects found on the way |
 | [2026-08-17-provider-upstream-drift-automation](./2026-08-17-provider-upstream-drift-automation.md) | Provider upstream drift automation | Why every drift signal today requires an already-installed CLI and a manual probe; the five drift classes; reviewed runtime observation delivery; durable watcher liveness; and where ChatGPT Work, Claude Cowork, and Claude Code cloud schedules fit |
 | [2026-08-08-grok-cli-install-tier-probe](./2026-08-08-grok-cli-install-tier-probe.md) | Grok CLI install and authenticated lifecycle probe | Complete isolated Grok 1.0.0 success, model, tool, permission, error, cancellation, resume, and fork evidence; exact-version native adapter approved |
 | [2026-05-24-antigravity-cli-probe](./2026-05-24-antigravity-cli-probe.md) | Antigravity CLI Phase 0 probe | Local environment-bootstrap installer contract, official Antigravity CLI docs, skills/plugin behavior, model display names, and remaining live-probe gaps before replacing Gemini CLI |

@@ -154,14 +154,19 @@ export class ProviderCompatibilityService {
     this.now = options.now || (() => Date.now());
   }
 
-  private resolveProbeTimeoutMs(runtimeMode: RuntimeMode): number {
-    if (runtimeMode === 'wsl') {
-      return this.probeTimeoutWslMs;
-    }
-    if (runtimeMode === 'docker') {
-      return this.probeTimeoutDockerMs;
-    }
-    return this.probeTimeoutMs;
+  private resolveProbeTimeoutMs(
+    runtimeMode: RuntimeMode,
+    providerName: ProviderName,
+  ): number {
+    const runtimeTimeoutMs = runtimeMode === 'wsl'
+      ? this.probeTimeoutWslMs
+      : runtimeMode === 'docker'
+        ? this.probeTimeoutDockerMs
+        : this.probeTimeoutMs;
+    const providerFloorMs = getProviderInstallKnowledge(providerName).check.minProbeTimeoutMs;
+    return providerFloorMs
+      ? Math.max(runtimeTimeoutMs, providerFloorMs)
+      : runtimeTimeoutMs;
   }
 
   getEvidenceDir(): string {
@@ -382,7 +387,10 @@ export class ProviderCompatibilityService {
     const checkedAt = new Date(nowMs).toISOString();
     const baseCacheState = this.buildCacheState(nowMs, false);
     const healthOnly = options.purpose === 'health';
-    const probeTimeoutMs = this.resolveProbeTimeoutMs(instance.commandConfig.runtime.mode);
+    const probeTimeoutMs = this.resolveProbeTimeoutMs(
+      instance.commandConfig.runtime.mode,
+      providerName as ProviderName,
+    );
     const versionProbePromise = versionArgs.length
       ? this.runner.run(
         providerName,
@@ -913,7 +921,7 @@ export class ProviderCompatibilityService {
       input.instance.commandConfig,
       input.profile.liveProbeArgs,
       input.probeCwd,
-      this.resolveProbeTimeoutMs(input.instance.commandConfig.runtime.mode),
+      this.resolveProbeTimeoutMs(input.instance.commandConfig.runtime.mode, input.providerName),
     );
     return toProbeRecord('live', input.profile.liveProbeArgs, result);
   }

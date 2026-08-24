@@ -68,6 +68,12 @@ export interface ProviderAuthMetadata {
 export interface ProviderCheckMetadata {
   versionArgs?: string[];
   helpArgs?: string[];
+  /**
+   * Floor for the compatibility probe timeout, for CLIs whose startup cost
+   * exceeds the runtime-wide budget. Raises the resolved timeout; never lowers
+   * the larger WSL/Docker budgets.
+   */
+  minProbeTimeoutMs?: number;
   expectedPaths?: Partial<Record<ProviderExecutionPlatform, string>>;
   pathHints?: Partial<Record<ProviderExecutionPlatform, ProviderPathHint>>;
   prerequisites?: Partial<Record<ProviderExecutionPlatform, ProviderPrerequisiteMetadata[]>>;

@@ -6,6 +6,7 @@ import {
   compareProviderEvolutionSnapshots,
   deriveProviderEvolutionCapabilitySnapshot,
   formatProviderEvolutionProbeEntrySummary,
+  getProviderEvolutionProbeProfile,
   ProviderEvolutionProbeService,
   PROVIDER_EVOLUTION_PROBE_PROFILES,
   summarizeProviderEvolutionProbeArtifact,
@@ -560,5 +561,30 @@ describe('ProviderEvolutionProbeService', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('provider evolution probe profiles', () => {
+  it('keeps manual_smoke as the default and splits text from tool observation', () => {
+    const profile = getProviderEvolutionProbeProfile(undefined);
+
+    expect(profile.id).toBe('manual_smoke');
+    expect(profile.turns).toHaveLength(2);
+    expect(profile.turns[1].prompt).toContain('probe-note.txt');
+  });
+
+  it('exposes a single-turn tool profile for providers that cannot carry a second turn', () => {
+    const profile = getProviderEvolutionProbeProfile('manual_tool');
+
+    expect(profile.id).toBe('manual_tool');
+    expect(profile.turns).toHaveLength(1);
+    // Both signals have to ride the first turn: a provider like Cline declares
+    // resume: false, so turn two never reaches the model.
+    expect(profile.turns[0].prompt).toContain('probe-note.txt');
+    expect(profile.turns[0].prompt).toContain('alpha, beta, gamma');
+  });
+
+  it('falls back to manual_smoke for an unknown profile id', () => {
+    expect(getProviderEvolutionProbeProfile('nope').id).toBe('manual_smoke');
   });
 });
