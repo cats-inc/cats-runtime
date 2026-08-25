@@ -379,11 +379,13 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
 
       const assessment = await service.assessCliTarget(target);
       // What this test is actually about: the direct spawn exited without
-      // output, and the shell retry recovered enough to parse a version.
+      // output, and the shell retry recovered enough to parse a version. The
+      // fake help omits the expected feature markers, so diagnostics remain
+      // degraded while execution keeps using the best-fit adapter.
       expect(assessment.fingerprint.version.normalized).toBe('1.0.0');
       expect(assessment.setup.command.status).toBe('ready');
-      expect(assessment.classification).toBe('ready');
-      expect(assessment.profile.id).toBe('antigravity-cli-stream-json-1.1.20');
+      expect(assessment.classification).toBe('degraded');
+      expect(assessment.profile.id).toBe('antigravity-cli-stream-json-best-fit');
     } finally {
       if (originalHome === undefined) {
         delete process.env.HOME;
