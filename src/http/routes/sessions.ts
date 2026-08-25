@@ -100,6 +100,7 @@ import {
 } from '../../core/runtime/sessionCompaction.js';
 import {
   runManualSessionDiscovery,
+  type AgentSessionDiscoveryTarget,
   type ManualSessionDiscoveryTarget,
 } from '../../core/runtime/manualSessionDiscovery.js';
 import type { ProviderModelSelection } from '../../core/models/providerSelectionResolution.js';
@@ -361,6 +362,28 @@ function serializeSessions(
       ...(lineage ? { lineage } : {}),
     };
   });
+}
+
+/**
+ * Every configured provider whose default target is agent-backed.
+ *
+ * The scan asks each one whether it can enumerate rather than keeping a list of
+ * agents that can, so a newly capable agent needs no change here.
+ */
+function listAgentSessionDiscoveryTargets(ctx: AppContext): AgentSessionDiscoveryTarget[] {
+  const targets: AgentSessionDiscoveryTarget[] = [];
+  for (const providerName of listConfiguredProviders(ctx.config)) {
+    try {
+      const target = resolveProviderTarget(ctx.config, providerName);
+      if (target.backend === 'agent' && target.remoteInstance) {
+        targets.push({ provider: target.providerName, instanceId: target.instanceId });
+      }
+    } catch {
+      // A provider that cannot resolve a default target has nothing to scan.
+    }
+  }
+
+  return targets;
 }
 
 async function listManualDiscoverySessions(
@@ -3120,21 +3143,35 @@ sessionRoutes.get('/sessions', (c) => {
   });
 });
 
-/** POST /sessions/discover — manually scan configured WSL/Docker session targets */
+/**
+ * POST /sessions/discover — manually scan every session source the runtime can
+ * reach: configured WSL/Docker CLI targets, plus agent targets that advertise
+ * session enumeration.
+ */
 sessionRoutes.post('/sessions/discover', async (c) => {
   const ctx = c.get('ctx');
+  const agentBackend = ctx.agentBackend;
   const result = await runManualSessionDiscovery({
     config: ctx.config,
     registry: ctx.registry,
     runner: {
       listSessions: (target) => listManualDiscoverySessions(ctx, target),
     },
+    ...(agentBackend ? {
+      agentRunner: {
+        listTargets: () => listAgentSessionDiscoveryTargets(ctx),
+        listSessions: (target) => agentBackend.listSessions(
+          resolveProviderTarget(ctx.config, target.provider, target.instanceId),
+        ),
+      },
+    } : {}),
   });
 
   return c.json({
     status: result.summary.status,
     summary: result.summary,
     targets: result.targets,
+    agentTargets: result.agentTargets,
   });
 });
 

@@ -184,3 +184,102 @@ describe('manualSessionDiscovery', () => {
     expect(registry.list({ provider: 'cursor' })).toHaveLength(0);
   });
 });
+
+describe('runManualSessionDiscovery with agent targets', () => {
+  it('imports agent sessions alongside CLI targets and counts both', async () => {
+    const registry = new SessionRegistry(
+      undefined,
+      undefined,
+      createConfig().providerDefaultInstances,
+    );
+
+    const result = await runManualSessionDiscovery({
+      config: createConfig(),
+      registry,
+      runner: { listSessions: async () => [] },
+      agentRunner: {
+        listTargets: () => [{ provider: 'devin', instanceId: 'acp' }],
+        listSessions: async () => ({
+          supported: true,
+          summary: "ACP target 'devin/acp' reported 2 session(s).",
+          sessions: [
+            {
+              providerSessionId: 'sage-origin',
+              cwd: '/workspace',
+              summary: 'History of Terminal Emulators',
+              lastActivity: '2026-08-08T15:56:14+00:00',
+            },
+            { providerSessionId: 'swanky-fighter' },
+          ],
+        }),
+      },
+    });
+
+    expect(result.agentTargets).toEqual([{
+      provider: 'devin',
+      instanceId: 'acp',
+      status: 'scanned',
+      discoveredCount: 2,
+      importedCount: 2,
+      message: "ACP target 'devin/acp' reported 2 session(s).",
+    }]);
+    expect(result.summary.discoveredCount).toBe(2);
+    expect(result.summary.importedCount).toBe(2);
+    expect(registry.list({ provider: 'devin' })).toHaveLength(2);
+  });
+
+  it('keeps a scan green when an agent cannot enumerate', async () => {
+    const registry = new SessionRegistry(
+      undefined,
+      undefined,
+      createConfig().providerDefaultInstances,
+    );
+
+    const result = await runManualSessionDiscovery({
+      config: createConfig(),
+      registry,
+      runner: { listSessions: async () => [] },
+      agentRunner: {
+        listTargets: () => [{ provider: 'openclaw', instanceId: 'gateway' }],
+        listSessions: async () => ({
+          supported: false,
+          summary: "ACP target 'openclaw/gateway' does not advertise session enumeration.",
+          sessions: [],
+        }),
+      },
+    });
+
+    // Not a capability every agent has, so it must not read as an error.
+    expect(result.agentTargets[0].status).toBe('unsupported');
+    expect(result.summary.failedTargets).toBe(0);
+    expect(result.summary.status).toBe('completed');
+  });
+
+  it('reports an agent that throws without losing the CLI results', async () => {
+    const registry = new SessionRegistry(
+      undefined,
+      undefined,
+      createConfig().providerDefaultInstances,
+    );
+
+    const result = await runManualSessionDiscovery({
+      config: createConfig(),
+      registry,
+      runner: { listSessions: async () => [] },
+      agentRunner: {
+        listTargets: () => [{ provider: 'devin', instanceId: 'acp' }],
+        listSessions: async () => {
+          throw new Error('spawn devin ENOENT');
+        },
+      },
+    });
+
+    expect(result.agentTargets[0]).toMatchObject({
+      status: 'failed',
+      message: 'spawn devin ENOENT',
+    });
+    expect(result.summary.failedTargets).toBe(1);
+    expect(result.summary.status).toBe('completed_with_errors');
+    expect(result.targets.every((target) => target.status === 'scanned')).toBe(true);
+  });
+});

@@ -1467,6 +1467,14 @@ function manualSessionDiscoveryTargets() {
   ));
 }
 
+function agentSessionDiscoveryTargets() {
+  if (!providerCatalog?.providers) return [];
+
+  return configuredProviderNames().filter((providerName) => (
+    providerMeta(providerName)?.defaultBackend === 'agent'
+  ));
+}
+
 function summarizeCliRuntimes(entries) {
   if (!entries.length) return 'No CLI runtimes configured';
 
@@ -2778,8 +2786,8 @@ function summarizeManualSessionDiscovery(result) {
   if ((summary.totalTargets || 0) === 0) {
     return {
       state: 'idle',
-      text: 'No WSL/Docker targets configured.',
-      title: 'No configured CLI provider instances use WSL or Docker runtime mode.',
+      text: 'No scannable session targets configured.',
+      title: 'No CLI instance uses WSL or Docker runtime mode, and no agent-backed provider is configured.',
     };
   }
 
@@ -2790,6 +2798,11 @@ function summarizeManualSessionDiscovery(result) {
     `Discovered sessions: ${discovered}`,
     `Imported new sessions: ${imported}`,
   ];
+  for (const target of result?.agentTargets || []) {
+    titleLines.push(
+      `${target.provider}@${target.instanceId} (agent) - ${target.status}: ${target.message}`,
+    );
+  }
   for (const target of result?.targets || []) {
     const runtimeParts = [target.runtime?.mode];
     if (target.runtime?.distro) runtimeParts.push(target.runtime.distro);
@@ -2808,15 +2821,16 @@ function summarizeManualSessionDiscovery(result) {
 async function manualScanSessions() {
   if (sessionScanInFlight) return;
 
-  const targetCount = manualSessionDiscoveryTargets().length;
+  const targetCount = manualSessionDiscoveryTargets().length
+    + agentSessionDiscoveryTargets().length;
   setSessionScanBusy(true);
   renderSessionScanStatus({
     visible: true,
     running: true,
     state: 'running',
     text: targetCount > 0
-      ? `Scanning ${targetCount} WSL/Docker target(s)...`
-      : 'Scanning WSL/Docker session targets...',
+      ? `Scanning ${targetCount} session target(s)...`
+      : 'Scanning session targets...',
     title: '',
   });
 

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { resolveProviderTarget } from '../../core/providerCatalog.js';
+import { importAgentSessions } from '../../core/runtime/manualSessionDiscovery.js';
 import type { AppContext } from '../app.js';
 
 export const agentSessionRoutes = new Hono();
@@ -55,21 +56,15 @@ agentSessionRoutes.post('/agent/sessions/discover', async (c) => {
         summary: catalog.summary,
         discovered: 0,
         imported: 0,
-        sessions: [],
       });
     }
 
-    const imported = catalog.sessions
-      .map((session) => ctx.registry.upsertDiscovered(session.providerSessionId, {
-        providerName: target.providerName,
-        providerBackend: 'agent',
-        providerInstanceId: target.instanceId,
-        cwd: session.cwd || '',
-        ...(body.group ? { group: body.group } : {}),
-        ...(session.summary ? { summary: session.summary } : {}),
-        ...(session.lastActivity ? { lastActivity: session.lastActivity } : {}),
-      }))
-      .filter((session): session is NonNullable<typeof session> => Boolean(session));
+    const imported = importAgentSessions(
+      ctx.registry,
+      { provider: target.providerName, instanceId: target.instanceId },
+      catalog.sessions,
+      body.group,
+    );
 
     return c.json({
       provider: target.providerName,
@@ -78,8 +73,7 @@ agentSessionRoutes.post('/agent/sessions/discover', async (c) => {
       supported: true,
       summary: catalog.summary,
       discovered: catalog.sessions.length,
-      imported: imported.length,
-      sessions: imported,
+      imported,
     });
   } catch (error) {
     return c.json({

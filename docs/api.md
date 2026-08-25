@@ -2085,11 +2085,16 @@ can opt in with `?branching=full`. Detail surfaces such as
 `POST /sessions/{id}/fork` responses still include full capability truth.
 Other `branching` query values are ignored.
 
-`POST /sessions/discover` is the runtime-owned manual session scan entry for
-configured WSL- and Docker-backed CLI targets. It scans the configured
-`cursor`, `goose`, `kiro`, `kilo`, and `opencode` CLI instances whose runtime
-mode is currently `wsl` or `docker`, imports any discovered sessions into the
-embedded registry, and returns a bounded per-target summary:
+`POST /sessions/discover` is the runtime-owned manual session scan entry. It
+covers two kinds of target and imports whatever it finds into the embedded
+registry:
+
+- the configured `cursor`, `goose`, `kiro`, `kilo`, and `opencode` CLI instances
+  whose runtime mode is currently `wsl` or `docker`
+- every configured provider whose default target is agent-backed, asked over
+  ACP whether it can enumerate its own sessions
+
+It returns a bounded per-target summary:
 
 - `status`: `idle`, `completed`, `completed_with_errors`, or `failed`
 - `summary.totalTargets`: how many configured WSL/Docker targets were scanned
@@ -2098,9 +2103,17 @@ embedded registry, and returns a bounded per-target summary:
 - `summary.discoveredCount`: total sessions returned by successful scans
 - `summary.importedCount`: newly imported registry sessions
 - `summary.syncedCount`: sessions merged into the registry across successful targets
-- `targets[]`: per-target result entries including `provider`, `instanceId`,
-  runtime metadata (`mode`, optional `distro`, optional `container`), bounded
-  counts, and an operator-facing `message`
+- `targets[]`: per-target result entries for the CLI side, including `provider`,
+  `instanceId`, runtime metadata (`mode`, optional `distro`, optional
+  `container`), bounded counts, and an operator-facing `message`
+- `agentTargets[]`: the agent side, with `provider`, `instanceId`, bounded
+  counts, a `message`, and a `status` of `scanned`, `unsupported`, or `failed`.
+  `unsupported` means the agent does not advertise session enumeration; it
+  counts as scanned rather than failed, so one incapable agent does not turn a
+  mixed scan red.
+
+Use `POST /agent/sessions/discover` instead when you want a single agent target
+rather than a sweep.
 
 The route does not permanently override background discovery policy. Manual
 scan may wake WSL or Docker targets during the request, but later background

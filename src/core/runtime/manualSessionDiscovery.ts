@@ -8,6 +8,7 @@ import {
   type NativeSessionSummary,
 } from '../../backends/cli/discovery/nativeDiscovery.js';
 import { listConfiguredProviders } from '../providerCatalog.js';
+import type { AgentAdapterSessionCatalog } from '../../backends/agent/types.js';
 
 const MANUAL_SESSION_DISCOVERY_PROVIDERS = [
   'cursor',
@@ -51,13 +52,62 @@ export interface ManualSessionDiscoverySummary {
   syncedCount: number;
 }
 
+export interface AgentSessionDiscoveryTarget {
+  provider: string;
+  instanceId: string;
+}
+
+export interface AgentSessionDiscoveryTargetResult extends AgentSessionDiscoveryTarget {
+  /**
+   * `unsupported` is a normal outcome, not a failure: session enumeration is an
+   * optional agent capability, so an agent without it must not turn a whole
+   * scan red.
+   */
+  status: 'scanned' | 'unsupported' | 'failed';
+  discoveredCount: number;
+  importedCount: number;
+  message: string;
+}
+
 export interface ManualSessionDiscoveryResult {
   summary: ManualSessionDiscoverySummary;
   targets: ManualSessionDiscoveryTargetResult[];
+  agentTargets: AgentSessionDiscoveryTargetResult[];
 }
 
 export interface ManualSessionDiscoveryRunner {
   listSessions(target: ManualSessionDiscoveryTarget): Promise<NativeSessionSummary[]>;
+}
+
+export interface AgentSessionDiscoveryRunner {
+  listTargets(): AgentSessionDiscoveryTarget[];
+  listSessions(target: AgentSessionDiscoveryTarget): Promise<AgentAdapterSessionCatalog>;
+}
+
+/**
+ * Registers sessions an agent reported as already its own.
+ *
+ * Shared by the manual scan and the single-target discovery route so both write
+ * the same registry shape; a second mapping would drift from this one.
+ */
+export function importAgentSessions(
+  registry: SessionRegistry,
+  target: AgentSessionDiscoveryTarget,
+  sessions: AgentAdapterSessionCatalog['sessions'],
+  group?: string,
+): number {
+  return sessions
+    .map((session) => registry.upsertDiscovered(session.providerSessionId, {
+      providerName: target.provider,
+      providerBackend: 'agent',
+      providerInstanceId: target.instanceId,
+      cwd: session.cwd || '',
+      ...(group ? { group } : {}),
+      ...(session.summary ? { summary: session.summary } : {}),
+      ...(session.lastActivity ? { lastActivity: session.lastActivity } : {}),
+    }))
+    .filter(Boolean)
+    .length;
 }
 
 type ManualSessionDiscoveryConfig = Pick<
@@ -114,10 +164,55 @@ export function listManualSessionDiscoveryTargets(
     ));
 }
 
+async function runAgentSessionDiscovery(
+  registry: SessionRegistry,
+  runner: AgentSessionDiscoveryRunner | undefined,
+): Promise<AgentSessionDiscoveryTargetResult[]> {
+  if (!runner) {
+    return [];
+  }
+
+  const results: AgentSessionDiscoveryTargetResult[] = [];
+  for (const target of runner.listTargets()) {
+    try {
+      const catalog = await runner.listSessions(target);
+      if (!catalog.supported) {
+        results.push({
+          ...target,
+          status: 'unsupported',
+          discoveredCount: 0,
+          importedCount: 0,
+          message: catalog.summary,
+        });
+        continue;
+      }
+
+      results.push({
+        ...target,
+        status: 'scanned',
+        discoveredCount: catalog.sessions.length,
+        importedCount: importAgentSessions(registry, target, catalog.sessions),
+        message: catalog.summary,
+      });
+    } catch (error) {
+      results.push({
+        ...target,
+        status: 'failed',
+        discoveredCount: 0,
+        importedCount: 0,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return results;
+}
+
 export async function runManualSessionDiscovery(input: {
   config: ManualSessionDiscoveryConfig;
   registry: SessionRegistry;
   runner: ManualSessionDiscoveryRunner;
+  agentRunner?: AgentSessionDiscoveryRunner;
 }): Promise<ManualSessionDiscoveryResult> {
   const targets = listManualSessionDiscoveryTargets(input.config);
   const results: ManualSessionDiscoveryTargetResult[] = [];
@@ -153,22 +248,31 @@ export async function runManualSessionDiscovery(input: {
     }
   }
 
-  const scannedTargets = results.filter((result) => result.status === 'scanned').length;
-  const failedTargets = results.filter((result) => result.status === 'failed').length;
-  const discoveredCount = results.reduce((sum, result) => sum + result.discoveredCount, 0);
-  const importedCount = results.reduce((sum, result) => sum + result.importedCount, 0);
+  const agentResults = await runAgentSessionDiscovery(input.registry, input.agentRunner);
+
+  // An agent that does not advertise enumeration counts as a scanned target
+  // rather than a failed one, so a mixed scan still reads as completed.
+  const scannedTargets = results.filter((result) => result.status === 'scanned').length
+    + agentResults.filter((result) => result.status !== 'failed').length;
+  const failedTargets = results.filter((result) => result.status === 'failed').length
+    + agentResults.filter((result) => result.status === 'failed').length;
+  const totalTargets = targets.length + agentResults.length;
+  const discoveredCount = results.reduce((sum, result) => sum + result.discoveredCount, 0)
+    + agentResults.reduce((sum, result) => sum + result.discoveredCount, 0);
+  const importedCount = results.reduce((sum, result) => sum + result.importedCount, 0)
+    + agentResults.reduce((sum, result) => sum + result.importedCount, 0);
   const syncedCount = results.reduce((sum, result) => sum + result.syncedCount, 0);
 
   return {
     summary: {
-      status: targets.length === 0
+      status: totalTargets === 0
         ? 'idle'
         : failedTargets === 0
           ? 'completed'
           : scannedTargets > 0
             ? 'completed_with_errors'
             : 'failed',
-      totalTargets: targets.length,
+      totalTargets,
       scannedTargets,
       failedTargets,
       discoveredCount,
@@ -176,5 +280,6 @@ export async function runManualSessionDiscovery(input: {
       syncedCount,
     },
     targets: results,
+    agentTargets: agentResults,
   };
 }
