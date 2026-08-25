@@ -25,6 +25,10 @@ import {
 } from '../providerServices.js';
 import { buildSessionProviderTargetSummary } from '../sessionProviderTarget.js';
 import type { PiMessagePart, PiStreamEvent } from '../../backends/cli/pi/parser.js';
+import {
+  loadClineSessionHistory,
+  loadGrokSessionHistory,
+} from '../../backends/cli/discovery/NativeFileHistory.js';
 
 export const historyRoutes = new Hono();
 
@@ -44,6 +48,8 @@ interface HistoryTranscriptMetadata {
     | 'auggie_native'
     | 'opencode_native'
     | 'generic_jsonl'
+    | 'cline_native'
+    | 'grok_native'
     | 'pi_native'
     | 'none';
   sources?: HistoryTranscriptSourceMetadata[];
@@ -436,6 +442,46 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
 
   for (const filePath of paths) {
     const ownership = filePath === session.providerSourcePath ? 'provider' : 'runtime';
+    if (session.providerName === 'cline' && filePath === session.providerSourcePath) {
+      const messageCountBefore = messages.length;
+      try {
+        messages.push(...await loadClineSessionHistory(filePath));
+        transcript = {
+          ownership: 'provider',
+          source: 'json',
+          parser: 'cline_native',
+        };
+        transcriptSources.push(buildTranscriptSource(filePath, messages.length - messageCountBefore, {
+          ownership: 'provider',
+          source: 'json',
+          parser: 'cline_native',
+        }));
+        continue;
+      } catch {
+        // Fall through for old registry entries that still point at metadata.
+      }
+    }
+
+    if (session.providerName === 'grok' && filePath === session.providerSourcePath) {
+      const messageCountBefore = messages.length;
+      try {
+        messages.push(...await loadGrokSessionHistory(filePath));
+        transcript = {
+          ownership: 'provider',
+          source: 'jsonl',
+          parser: 'grok_native',
+        };
+        transcriptSources.push(buildTranscriptSource(filePath, messages.length - messageCountBefore, {
+          ownership: 'provider',
+          source: 'jsonl',
+          parser: 'grok_native',
+        }));
+        continue;
+      } catch {
+        // Fall through for old registry entries that still point at summary.json.
+      }
+    }
+
     if (session.providerName === 'pi' && filePath === session.providerSourcePath) {
       const messageCountBefore = messages.length;
       try {

@@ -138,15 +138,22 @@ export class AgentBackendManager {
   async close(
     sessionId: string,
     reason: ManagedExecutionLifecycleReason = 'close',
+    detachedTarget?: ProviderTargetDescriptor,
   ): Promise<void> {
     const handle = this.handles.get(sessionId);
     if (!handle) {
+      if (reason === 'delete' && detachedTarget) {
+        await this.closeRemoteSession(sessionId, detachedTarget, reason);
+      }
       return;
     }
 
     try {
       await handle.close(reason);
     } catch (error) {
+      if (reason === 'delete') {
+        throw error;
+      }
       // Remote cleanup can fail after the local handle has already detached.
       // At that point the runtime-facing close operation is complete.
       if (!this.handles.has(sessionId)) {
@@ -410,6 +417,15 @@ export class AgentBackendManager {
       return;
     }
 
-    await adapter.close(sessionId, instance, session.providerState, reason);
+    const providerState = session.providerSessionId
+      ? {
+          ...(session.providerState || {}),
+          agentSession: {
+            ...(session.providerState?.agentSession || {}),
+            providerSessionId: session.providerSessionId,
+          },
+        }
+      : session.providerState;
+    await adapter.close(sessionId, instance, providerState, reason);
   }
 }

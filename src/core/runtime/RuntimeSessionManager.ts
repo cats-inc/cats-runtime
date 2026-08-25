@@ -437,7 +437,19 @@ export class RuntimeSessionManager {
 
     switch (session.providerBackend) {
       case 'agent':
-        await this.agentBackend?.close(session.id, reason);
+        await this.agentBackend?.close(
+          session.id,
+          reason,
+          reason === 'delete'
+            && session.providerInstanceId
+            && !this.agentBackend?.get(session.id)
+            ? resolveProviderTarget(
+                this.config,
+                session.providerName,
+                `agent/${session.providerInstanceId}`,
+              )
+            : undefined,
+        );
         break;
       case 'api':
       case 'local':

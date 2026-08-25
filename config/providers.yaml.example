@@ -259,8 +259,8 @@ backends:
             environment: native
             command: grok
             runner: auto
-            # Grok groups sessions by URL-encoded working directory; set GROK_HOME
-            # instead if you relocate the whole Grok home.
+            # Grok groups sessions by URL-encoded working directory. Remove this
+            # explicit override to derive the path from GROK_HOME automatically.
             sessions_dir: ~/.grok/sessions
 
       cline:

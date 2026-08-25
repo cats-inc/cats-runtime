@@ -4441,6 +4441,135 @@ describe('agent session discovery', () => {
     }
   });
 
+  it('deletes an imported ACP session without first attaching a runtime handle', async () => {
+    const { config, env, cleanup } = createAcpStdioConfigRoot();
+    const methods: string[] = [];
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        acpProcessSpawner: () => {
+          const process = new FakeAcpProcess();
+          startFakeAcpServer(process, (message) => {
+            methods.push(String(message.method));
+            if (message.method === 'initialize') {
+              process.stdout.write(`${JSON.stringify({
+                jsonrpc: '2.0',
+                id: message.id,
+                result: {
+                  protocolVersion: 1,
+                  agentCapabilities: {
+                    loadSession: true,
+                    sessionCapabilities: { list: {}, delete: {} },
+                  },
+                },
+              })}\n`);
+              return;
+            }
+            if (message.method === 'session/list') {
+              process.stdout.write(`${JSON.stringify({
+                jsonrpc: '2.0',
+                id: message.id,
+                result: { sessions: [{ sessionId: 'imported-session', cwd: '/workspace' }] },
+              })}\n`);
+              return;
+            }
+            if (message.method === 'session/delete') {
+              process.stdout.write(`${JSON.stringify({
+                jsonrpc: '2.0',
+                id: message.id,
+                result: { deleted: true },
+              })}\n`);
+            }
+          });
+          return process;
+        },
+      },
+    });
+
+    try {
+      const discoverResponse = await runtime.app.request('/agent/sessions/discover', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ provider: 'devin' }),
+      });
+      expect(discoverResponse.status).toBe(200);
+      const [session] = runtime.context.registry.list({ provider: 'devin' });
+      expect(runtime.context.runtime?.isAttached(session.id)).toBe(false);
+
+      const deleteResponse = await runtime.app.request(`/sessions/${session.id}`, {
+        method: 'DELETE',
+      });
+      expect(deleteResponse.status).toBe(200);
+      expect(runtime.context.registry.get(session.id)).toBeUndefined();
+      expect(methods).toContain('session/delete');
+    } finally {
+      await runtime.close();
+      await cleanup();
+    }
+  });
+
+  it('retains an imported ACP session when remote deletion fails', async () => {
+    const { config, env, cleanup } = createAcpStdioConfigRoot();
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        acpProcessSpawner: () => {
+          const process = new FakeAcpProcess();
+          startFakeAcpServer(process, (message) => {
+            if (message.method === 'initialize') {
+              process.stdout.write(`${JSON.stringify({
+                jsonrpc: '2.0',
+                id: message.id,
+                result: {
+                  protocolVersion: 1,
+                  agentCapabilities: {
+                    loadSession: true,
+                    sessionCapabilities: { list: {}, delete: {} },
+                  },
+                },
+              })}\n`);
+              return;
+            }
+            if (message.method === 'session/list') {
+              process.stdout.write(`${JSON.stringify({
+                jsonrpc: '2.0',
+                id: message.id,
+                result: { sessions: [{ sessionId: 'retained-session', cwd: '/workspace' }] },
+              })}\n`);
+              return;
+            }
+            if (message.method === 'session/delete') {
+              process.stdout.write(`${JSON.stringify({
+                jsonrpc: '2.0',
+                id: message.id,
+                error: { code: -32603, message: 'delete refused' },
+              })}\n`);
+            }
+          });
+          return process;
+        },
+      },
+    });
+
+    try {
+      await runtime.app.request('/agent/sessions/discover', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ provider: 'devin' }),
+      });
+      const [session] = runtime.context.registry.list({ provider: 'devin' });
+
+      const deleteResponse = await runtime.app.request(`/sessions/${session.id}`, {
+        method: 'DELETE',
+      });
+      expect(deleteResponse.status).toBe(500);
+      expect(runtime.context.registry.get(session.id)).toBeDefined();
+    } finally {
+      await runtime.close();
+      await cleanup();
+    }
+  });
+
   it('refuses a CLI-backed provider instead of pretending it has an agent to ask', async () => {
     const { config, env, cleanup } = createAcpStdioConfigRoot();
     const runtime = createRuntimeServer(config, { agentBackend: { env } });

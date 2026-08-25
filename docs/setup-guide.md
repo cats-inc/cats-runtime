@@ -26,7 +26,8 @@ Grok writes every conversation to `~/.grok/sessions/<encoded-cwd>/<session-id>/`
 keyed by URL-encoded working directory, with `summary.json` as the index entry
 the runtime reads. Sessions appear on the dashboard without any extra step.
 Override the location with `sessions_dir` on the instance or
-`GROK_SESSIONS_DIR`; to relocate the whole Grok home, use Grok's own `GROK_HOME`.
+`GROK_SESSIONS_DIR`. When neither override is present, the runtime derives the
+sessions directory from Grok's own `GROK_HOME`.
 
 Cline installs with `npm install -g cline` and authenticates with `cline auth`,
 which stores credentials under `~/.cline`. Cline 3.0.51 and 3.0.57 execute

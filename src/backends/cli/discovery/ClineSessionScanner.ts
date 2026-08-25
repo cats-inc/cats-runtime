@@ -44,13 +44,15 @@ export class ClineSessionScanner {
 
       const metadata = asRecord(meta.metadata);
       const cwd = readString(meta.cwd) || readString(meta.workspace_root) || '';
+      const messagesPath = join(sessionDir, `${entry}.messages.json`);
+      const messages = await readJsonFile(messagesPath);
       discovered.push({
         providerSessionId,
         projectPath: sessionDir,
-        sourcePath: metaPath,
+        sourcePath: messages ? messagesPath : metaPath,
         cwd,
         summary: readString(metadata?.title) || readString(meta.prompt),
-        messageCount: await countMessages(join(sessionDir, `${entry}.messages.json`)),
+        messageCount: Array.isArray(messages?.messages) ? messages.messages.length : undefined,
         lastActivity: readString(meta.ended_at) || readString(meta.started_at),
         model: readString(meta.model),
       });
@@ -58,12 +60,6 @@ export class ClineSessionScanner {
 
     return discovered;
   }
-}
-
-async function countMessages(path: string): Promise<number | undefined> {
-  const parsed = await readJsonFile(path);
-  const messages = parsed?.messages;
-  return Array.isArray(messages) ? messages.length : undefined;
 }
 
 async function readJsonFile(path: string): Promise<Record<string, unknown> | null> {

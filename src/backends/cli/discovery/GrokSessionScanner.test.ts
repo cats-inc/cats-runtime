@@ -46,11 +46,12 @@ describe('GrokSessionScanner', () => {
       num_chat_messages: 12,
       current_model_id: 'grok-4.6',
     });
+    writeFileSync(join(sessionDir, 'chat_history.jsonl'), '{"type":"user","content":"hello"}\n');
 
     await expect(new GrokSessionScanner(tmpDir).scan()).resolves.toEqual([{
       providerSessionId: '01a03519-0a6a-7822-82c4-97321b40491b',
       projectPath: join(tmpDir, group),
-      sourcePath: join(sessionDir, 'summary.json'),
+      sourcePath: join(sessionDir, 'chat_history.jsonl'),
       cwd: 'C:\\repo',
       // The generated title wins: it is regenerated from the whole conversation,
       // while session_summary can still reflect a vague first prompt.

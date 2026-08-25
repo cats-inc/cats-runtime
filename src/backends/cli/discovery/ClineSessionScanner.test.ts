@@ -56,7 +56,7 @@ describe('ClineSessionScanner', () => {
     await expect(new ClineSessionScanner(tmpDir).scan()).resolves.toEqual([{
       providerSessionId: '1786189291153_wyis2',
       projectPath: sessionDir,
-      sourcePath: join(sessionDir, '1786189291153_wyis2.json'),
+      sourcePath: join(sessionDir, '1786189291153_wyis2.messages.json'),
       cwd: 'C:\\repo',
       summary: 'reply with the single word OK',
       messageCount: 2,

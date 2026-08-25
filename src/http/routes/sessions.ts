@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { Hono } from 'hono';
 import {
   getRuntimeBrowserService,
@@ -57,6 +57,8 @@ import {
 import {
   PiSessionScanner,
 } from '../../backends/cli/discovery/PiSessionScanner.js';
+import { ClineSessionScanner } from '../../backends/cli/discovery/ClineSessionScanner.js';
+import { GrokSessionScanner } from '../../backends/cli/discovery/GrokSessionScanner.js';
 import {
   resolveFileBackedProviderPath,
 } from '../../backends/cli/providerPaths.js';
@@ -2051,7 +2053,9 @@ function tracksProviderDiscoveryState(session: SessionInfo): boolean {
       || session.providerName === 'codex'
       || session.providerName === 'copilot'
       || session.providerName === 'pi'
-      || session.providerName === 'junie'),
+      || session.providerName === 'junie'
+      || session.providerName === 'cline'
+      || session.providerName === 'grok'),
   );
 }
 
@@ -2065,6 +2069,14 @@ function collectProviderDiscoveryArtifactPaths(ctx: AppContext, session: Session
     if (!sourcePath) continue;
     if (sourcePath.startsWith(ctx.config.sessionBaseDir)) continue;
 
+    if (session.providerName === 'cline' || session.providerName === 'grok') {
+      const sessionDir = dirname(sourcePath);
+      if (isProviderSessionDirectory(ctx, session, sessionDir)) {
+        artifactPaths.add(sessionDir);
+      }
+      continue;
+    }
+
     if (session.providerName === 'copilot' && basename(sourcePath) === 'workspace.yaml') {
       artifactPaths.add(sourcePath);
       artifactPaths.add(join(dirname(sourcePath), 'events.jsonl'));
@@ -2075,6 +2087,30 @@ function collectProviderDiscoveryArtifactPaths(ctx: AppContext, session: Session
   }
 
   return Array.from(artifactPaths);
+}
+
+function isProviderSessionDirectory(
+  ctx: AppContext,
+  session: SessionInfo,
+  sessionDir: string,
+): boolean {
+  if (!session.providerSessionId || basename(sessionDir) !== session.providerSessionId) {
+    return false;
+  }
+
+  try {
+    const providerRoot = resolveFileBackedProviderPath(
+      ctx.config,
+      session.providerName as 'cline' | 'grok',
+      session.providerInstanceId,
+    );
+    const pathFromRoot = relative(resolve(providerRoot), resolve(sessionDir));
+    return pathFromRoot !== ''
+      && !pathFromRoot.startsWith('..')
+      && !isAbsolute(pathFromRoot);
+  } catch {
+    return false;
+  }
 }
 
 type DiscoveredSessionArtifact = {
@@ -2202,6 +2238,20 @@ async function scanProviderDiscoveryArtifactsForDelete(
         return {
           items: await new PiSessionScanner(
             resolveFileBackedProviderPath(ctx.config, 'pi', session.providerInstanceId),
+          ).scan(),
+          scanFailed: false,
+        };
+      case 'cline':
+        return {
+          items: await new ClineSessionScanner(
+            resolveFileBackedProviderPath(ctx.config, 'cline', session.providerInstanceId),
+          ).scan(),
+          scanFailed: false,
+        };
+      case 'grok':
+        return {
+          items: await new GrokSessionScanner(
+            resolveFileBackedProviderPath(ctx.config, 'grok', session.providerInstanceId),
           ).scan(),
           scanFailed: false,
         };
@@ -3941,7 +3991,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   let resolvedCleanupPolicy: WorktreeCleanupPolicy | undefined;
 
   const attachedExecution = runtime.get(id);
-  if (attachedExecution?.active) {
+  if (attachedExecution?.active || session.providerBackend === 'agent') {
     try {
       await runtime.close(session, 'delete');
       ctx.registry.updateStatus(id, 'closed');

@@ -96,8 +96,19 @@ export function importAgentSessions(
   sessions: AgentAdapterSessionCatalog['sessions'],
   group?: string,
 ): number {
-  return sessions
-    .map((session) => registry.upsertDiscovered(session.providerSessionId, {
+  const known = new Set(
+    registry.list({ provider: target.provider })
+      .filter((session) => (
+        session.providerBackend === 'agent'
+        && (session.providerInstanceId || 'default') === (target.instanceId || 'default')
+      ))
+      .map((session) => session.providerSessionId)
+      .filter((sessionId): sessionId is string => Boolean(sessionId)),
+  );
+  const newlyImported = new Set<string>();
+
+  for (const session of sessions) {
+    const tracked = registry.upsertDiscovered(session.providerSessionId, {
       providerName: target.provider,
       providerBackend: 'agent',
       providerInstanceId: target.instanceId,
@@ -105,9 +116,20 @@ export function importAgentSessions(
       ...(group ? { group } : {}),
       ...(session.summary ? { summary: session.summary } : {}),
       ...(session.lastActivity ? { lastActivity: session.lastActivity } : {}),
-    }))
-    .filter(Boolean)
-    .length;
+    });
+    if (tracked && !known.has(session.providerSessionId)) {
+      newlyImported.add(session.providerSessionId);
+    }
+  }
+
+  registry.pruneMissingDiscovered(
+    target.provider,
+    sessions.map((session) => session.providerSessionId),
+    'agent',
+    target.instanceId,
+  );
+
+  return newlyImported.size;
 }
 
 type ManualSessionDiscoveryConfig = Pick<

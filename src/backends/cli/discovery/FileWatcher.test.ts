@@ -74,4 +74,28 @@ describe('FileWatcher', () => {
       warnSpy.mockRestore();
     }
   });
+
+  it('emits discovered only for provider sessions that are new to the registry', async () => {
+    const scanner: SessionScannerLike = {
+      scan: async () => [{
+        providerSessionId: 'pi-existing-after-first-scan',
+        projectPath: watchDir,
+        sourcePath: join(watchDir, 'session.jsonl'),
+        cwd: '/tmp/project',
+      }],
+    };
+    const counts: number[] = [];
+
+    const firstWatcher = new FileWatcher(watchDir, scanner, 'pi', registry, 'native');
+    firstWatcher.on('discovered', ({ count }) => counts.push(count));
+    await firstWatcher.start();
+    firstWatcher.stop();
+
+    const secondWatcher = new FileWatcher(watchDir, scanner, 'pi', registry, 'native');
+    secondWatcher.on('discovered', ({ count }) => counts.push(count));
+    await secondWatcher.start();
+    secondWatcher.stop();
+
+    expect(counts).toEqual([1]);
+  });
 });

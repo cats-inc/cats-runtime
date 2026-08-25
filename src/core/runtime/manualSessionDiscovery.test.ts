@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
 import {
+  importAgentSessions,
   listManualSessionDiscoveryTargets,
   runManualSessionDiscovery,
   type ManualSessionDiscoveryTarget,
@@ -186,6 +187,24 @@ describe('manualSessionDiscovery', () => {
 });
 
 describe('runManualSessionDiscovery with agent targets', () => {
+  it('counts only new agent sessions and prunes stale discovered records', () => {
+    const registry = new SessionRegistry();
+    registry.upsertDiscovered('stale-session', {
+      providerName: 'devin',
+      providerBackend: 'agent',
+      providerInstanceId: 'acp',
+      cwd: '/workspace/stale',
+    });
+
+    const target = { provider: 'devin', instanceId: 'acp' };
+    const sessions = [{ providerSessionId: 'current-session', cwd: '/workspace/current' }];
+
+    expect(importAgentSessions(registry, target, sessions)).toBe(1);
+    expect(importAgentSessions(registry, target, sessions)).toBe(0);
+    expect(registry.list({ provider: 'devin' }).map((session) => session.providerSessionId))
+      .toEqual(['current-session']);
+  });
+
   it('imports agent sessions alongside CLI targets and counts both', async () => {
     const registry = new SessionRegistry(
       undefined,

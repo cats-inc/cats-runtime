@@ -26,6 +26,8 @@ describe('file-discovered session deletion', () => {
   let codexSessionsDir: string;
   let copilotSessionsDir: string;
   let junieSessionsDir: string;
+  let clineSessionsDir: string;
+  let grokSessionsDir: string;
   let sessionBaseDir: string;
 
   const makeConfig = (): CliRuntimeConfig => ({
@@ -48,6 +50,8 @@ describe('file-discovered session deletion', () => {
     claudeProjectsDir,
     codexSessionsDir,
     copilotSessionsDir,
+    clineSessionsDir,
+    grokSessionsDir,
     cursorChatsDir: '~/.cursor/chats',
     cursorRuntime: {
       mode: 'wsl',
@@ -70,6 +74,8 @@ describe('file-discovered session deletion', () => {
       antigravity: { path: 'agy', runner: 'auto', runtime: { mode: 'native' } },
       kiro: { path: 'kiro-cli', runner: 'auto', runtime: { mode: 'native' } },
       opencode: { path: 'opencode', runner: 'auto', runtime: { mode: 'native' } },
+      cline: { path: 'cline', runner: 'auto', runtime: { mode: 'native' } },
+      grok: { path: 'grok', runner: 'auto', runtime: { mode: 'native' } },
     },
   });
 
@@ -78,11 +84,15 @@ describe('file-discovered session deletion', () => {
     codexSessionsDir = join(tmpdir(), `codex-delete-test-${Date.now()}`);
     copilotSessionsDir = join(tmpdir(), `copilot-delete-test-${Date.now()}`);
     junieSessionsDir = join(tmpdir(), `junie-delete-test-${Date.now()}`);
+    clineSessionsDir = join(tmpdir(), `cline-delete-test-${Date.now()}`);
+    grokSessionsDir = join(tmpdir(), `grok-delete-test-${Date.now()}`);
     sessionBaseDir = join(tmpdir(), `cats-runtime-delete-test-${Date.now()}`, 'sessions');
     mkdirSync(claudeProjectsDir, { recursive: true });
     mkdirSync(codexSessionsDir, { recursive: true });
     mkdirSync(copilotSessionsDir, { recursive: true });
     mkdirSync(junieSessionsDir, { recursive: true });
+    mkdirSync(clineSessionsDir, { recursive: true });
+    mkdirSync(grokSessionsDir, { recursive: true });
     mkdirSync(sessionBaseDir, { recursive: true });
 
     registry = new SessionRegistry(undefined, sessionBaseDir);
@@ -148,6 +158,8 @@ describe('file-discovered session deletion', () => {
     rmSync(codexSessionsDir, { recursive: true, force: true });
     rmSync(copilotSessionsDir, { recursive: true, force: true });
     rmSync(junieSessionsDir, { recursive: true, force: true });
+    rmSync(clineSessionsDir, { recursive: true, force: true });
+    rmSync(grokSessionsDir, { recursive: true, force: true });
     rmSync(sessionBaseDir, { recursive: true, force: true });
   });
 
@@ -532,5 +544,70 @@ describe('file-discovered session deletion', () => {
     const discovered = await new JunieSessionScanner(junieSessionsDir).scan();
     expect(discovered.some((item) => item.providerSessionId === 'junie-delete')).toBe(false);
     expect(discovered.some((item) => item.providerSessionId === 'junie-keep')).toBe(true);
+  });
+
+  it('deletes complete Cline and Grok provider session directories', async () => {
+    const clineId = 'cline-delete';
+    const clineDir = join(clineSessionsDir, clineId);
+    const clineHistoryPath = join(clineDir, `${clineId}.messages.json`);
+    mkdirSync(clineDir, { recursive: true });
+    writeFileSync(join(clineDir, `${clineId}.json`), JSON.stringify({
+      session_id: clineId,
+      cwd: 'C:/repo',
+    }));
+    writeFileSync(clineHistoryPath, JSON.stringify({
+      messages: [{ role: 'user', content: [{ type: 'text', text: 'delete me' }] }],
+    }));
+
+    const clineSession = registry.upsertDiscovered(clineId, {
+      providerName: 'cline',
+      providerBackend: 'cli',
+      providerInstanceId: 'native',
+      cwd: 'C:/repo',
+      sourcePath: clineHistoryPath,
+      messageCount: 1,
+    });
+    const clineHistoryResponse = await app.request(`/sessions/${clineSession!.id}/history`);
+    expect(clineHistoryResponse.status).toBe(200);
+    await expect(clineHistoryResponse.json()).resolves.toEqual(expect.objectContaining({
+      messages: [{ role: 'user', text: 'delete me' }],
+      transcript: expect.objectContaining({ parser: 'cline_native' }),
+    }));
+    const clineResponse = await app.request(`/sessions/${clineSession!.id}`, {
+      method: 'DELETE',
+    });
+    expect(clineResponse.status).toBe(200);
+    expect(existsSync(clineDir)).toBe(false);
+
+    const grokId = 'grok-delete';
+    const grokDir = join(grokSessionsDir, 'C%3A%2Frepo', grokId);
+    const grokHistoryPath = join(grokDir, 'chat_history.jsonl');
+    mkdirSync(grokDir, { recursive: true });
+    writeFileSync(join(grokDir, 'summary.json'), JSON.stringify({
+      info: { id: grokId, cwd: 'C:/repo' },
+      num_messages: 1,
+    }));
+    writeFileSync(grokHistoryPath, '{"type":"user","content":"delete me"}\n');
+    writeFileSync(join(grokDir, 'events.jsonl'), '{}\n');
+
+    const grokSession = registry.upsertDiscovered(grokId, {
+      providerName: 'grok',
+      providerBackend: 'cli',
+      providerInstanceId: 'native',
+      cwd: 'C:/repo',
+      sourcePath: grokHistoryPath,
+      messageCount: 1,
+    });
+    const grokHistoryResponse = await app.request(`/sessions/${grokSession!.id}/history`);
+    expect(grokHistoryResponse.status).toBe(200);
+    await expect(grokHistoryResponse.json()).resolves.toEqual(expect.objectContaining({
+      messages: [{ role: 'user', text: 'delete me' }],
+      transcript: expect.objectContaining({ parser: 'grok_native' }),
+    }));
+    const grokResponse = await app.request(`/sessions/${grokSession!.id}`, {
+      method: 'DELETE',
+    });
+    expect(grokResponse.status).toBe(200);
+    expect(existsSync(grokDir)).toBe(false);
   });
 });

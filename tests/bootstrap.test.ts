@@ -356,7 +356,7 @@ describe('bootstrap mode server', () => {
     }
   });
 
-  it('session routes return 409 in bootstrap mode', async () => {
+  it('session and agent discovery routes return 409 in bootstrap mode', async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
@@ -369,6 +369,15 @@ describe('bootstrap mode server', () => {
         expect(response.status).toBe(409);
         const body = await response.json() as Record<string, unknown>;
         expect(body.error).toBe('runtime_bootstrap_required');
+
+        const agentResponse = await runtime.app.request('/agent/sessions/discover', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ provider: 'devin' }),
+        });
+        expect(agentResponse.status).toBe(409);
+        const agentBody = await agentResponse.json() as Record<string, unknown>;
+        expect(agentBody.error).toBe('runtime_bootstrap_required');
       } finally {
         await runtime.close();
       }

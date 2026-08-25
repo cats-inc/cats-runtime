@@ -328,8 +328,10 @@ export function defaultClineSessionsDir(): string {
   return '~/.cline/data/sessions';
 }
 
-export function defaultGrokSessionsDir(): string {
-  return '~/.grok/sessions';
+export function defaultGrokSessionsDir(grokHome?: string): string {
+  return grokHome?.trim()
+    ? join(grokHome.trim(), 'sessions')
+    : '~/.grok/sessions';
 }
 
 export function defaultOpencodeServerHost(): string {
@@ -751,7 +753,7 @@ function buildLegacyRuntimeShape(
         id: 'native',
         providerName: 'grok',
         commandConfig: providerCommands.grok,
-        grokSessionsDir: env.GROK_SESSIONS_DIR || defaultGrokSessionsDir(),
+        grokSessionsDir: env.GROK_SESSIONS_DIR || defaultGrokSessionsDir(env.GROK_HOME),
       },
     },
     cline: {
@@ -864,7 +866,7 @@ function buildLegacyRuntimeShape(
     opencodeServerStartupTimeoutMs,
     piSessionsDir: env.PI_SESSIONS_DIR || defaultPiSessionsDir(),
     clineSessionsDir: env.CLINE_SESSIONS_DIR || defaultClineSessionsDir(),
-    grokSessionsDir: env.GROK_SESSIONS_DIR || defaultGrokSessionsDir(),
+    grokSessionsDir: env.GROK_SESSIONS_DIR || defaultGrokSessionsDir(env.GROK_HOME),
     providerDefaultTargets,
     remoteProviderCatalog: {
       api: {},

@@ -38,7 +38,8 @@ export class GrokSessionScanner {
           continue;
         }
 
-        const summary = await readJsonFile(join(sessionDir, 'summary.json'));
+        const summaryPath = join(sessionDir, 'summary.json');
+        const summary = await readJsonFile(summaryPath);
         const info = asRecord(summary?.info);
         const providerSessionId = readString(info?.id);
         if (!providerSessionId) {
@@ -49,10 +50,11 @@ export class GrokSessionScanner {
           groupCwd = await resolveGroupCwd(groupPath, groupName);
         }
 
+        const historyPath = join(sessionDir, 'chat_history.jsonl');
         discovered.push({
           providerSessionId,
           projectPath: groupPath,
-          sourcePath: join(sessionDir, 'summary.json'),
+          sourcePath: await isFile(historyPath) ? historyPath : summaryPath,
           cwd: readString(info?.cwd) || groupCwd || '',
           summary: readString(summary?.generated_title)
             || readString(summary?.session_summary),
@@ -128,6 +130,14 @@ async function safeReaddir(path: string): Promise<string[]> {
 async function isDirectory(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+async function isFile(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
   } catch {
     return false;
   }

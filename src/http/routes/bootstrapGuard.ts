@@ -3,6 +3,7 @@ import type { AppContext } from '../app.js';
 
 const GUARDED_PREFIXES = [
   '/sessions',
+  '/agent',
   '/messages',
   '/mcp',
   '/observe',

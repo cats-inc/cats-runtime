@@ -557,4 +557,95 @@ describe('AgentBackendManager', () => {
     ]);
     expect(manager.get(session.id)).toBeUndefined();
   });
+
+  it('deletes a detached discovered session using its registry provider id', async () => {
+    const registry = new SessionRegistry();
+    const session = registry.upsertDiscovered('remote-session', {
+      providerName: 'devin',
+      providerBackend: 'agent',
+      providerInstanceId: 'acp',
+      cwd: '/repo',
+    });
+    expect(session).not.toBeNull();
+
+    const close = vi.fn<NonNullable<AgentAdapter['close']>>(async () => {});
+    vi.mocked(buildAgentAdapter).mockReturnValue({
+      kind: 'test-adapter',
+      async *invoke() {
+        yield { type: 'result', sessionId: 'unused' };
+      },
+      close,
+    });
+
+    const manager = new AgentBackendManager(
+      { sessionBaseDir: '/tmp/cats-runtime-tests' },
+      registry,
+    );
+    const target: ProviderTargetDescriptor = {
+      providerName: 'devin',
+      backend: 'agent',
+      instanceId: 'acp',
+      defaultTarget: true,
+      remoteInstance: {
+        id: 'acp',
+        providerName: 'devin',
+        backend: 'agent',
+        transport: 'acp_stdio',
+        command: 'devin-acp',
+      },
+    };
+
+    await manager.close(session!.id, 'delete', target);
+
+    expect(close).toHaveBeenCalledWith(
+      session!.id,
+      target.remoteInstance,
+      { agentSession: { providerSessionId: 'remote-session' } },
+      'delete',
+    );
+  });
+
+  it('propagates remote delete failures after detaching the local handle', async () => {
+    const registry = new SessionRegistry();
+    const session = registry.create({
+      id: 'agent-delete-failure',
+      providerName: 'devin',
+      providerBackend: 'agent',
+      providerInstanceId: 'acp',
+      cwd: '/repo',
+    });
+    registry.setProviderSessionId(session.id, 'remote-session');
+
+    vi.mocked(buildAgentAdapter).mockReturnValue({
+      kind: 'test-adapter',
+      async *invoke() {
+        yield { type: 'result', sessionId: 'unused' };
+      },
+      close: async () => {
+        throw new Error('remote delete failed');
+      },
+    });
+
+    const manager = new AgentBackendManager(
+      { sessionBaseDir: '/tmp/cats-runtime-tests' },
+      registry,
+    );
+    const target: ProviderTargetDescriptor = {
+      providerName: 'devin',
+      backend: 'agent',
+      instanceId: 'acp',
+      defaultTarget: true,
+      remoteInstance: {
+        id: 'acp',
+        providerName: 'devin',
+        backend: 'agent',
+        transport: 'acp_stdio',
+        command: 'devin-acp',
+      },
+    };
+    manager.spawn(session.id, target);
+
+    await expect(manager.close(session.id, 'delete')).rejects.toThrow('remote delete failed');
+    expect(manager.get(session.id)).toBeUndefined();
+  });
 });

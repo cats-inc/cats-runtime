@@ -319,6 +319,21 @@ describe('config platform defaults', () => {
     });
   });
 
+  it('derives the Grok sessions directory from GROK_HOME unless explicitly overridden', () => {
+    const fromHome = loadConfigWithoutProviderFile({
+      GROK_HOME: '/custom/grok-home',
+    });
+    expect(fromHome.grokSessionsDir).toBe(join('/custom/grok-home', 'sessions'));
+    expect(resolveProviderInstance(fromHome, 'grok').grokSessionsDir)
+      .toBe(join('/custom/grok-home', 'sessions'));
+
+    const explicit = loadConfigWithoutProviderFile({
+      GROK_HOME: '/custom/grok-home',
+      GROK_SESSIONS_DIR: '/explicit/grok-sessions',
+    });
+    expect(explicit.grokSessionsDir).toBe('/explicit/grok-sessions');
+  });
+
   it('derives the Kiro database path from the configured runtime mode', () => {
     const nativeConfig = loadConfigWithoutProviderFile({
       KIRO_RUNTIME: 'native',

@@ -107,10 +107,20 @@ export class FileWatcher extends EventEmitter<FileWatcherEvents> {
 
   private async scanAndMerge(): Promise<void> {
     const discovered = await this.scanner.scan();
-    let newCount = 0;
+    const newlyImported = new Set<string>();
 
     const liveStatuses = new Set(['initializing', 'ready', 'busy']);
     const allSessions = this.registry.list();
+    const knownProviderSessionIds = new Set(
+      allSessions
+        .filter((session) => (
+          session.providerName === this.providerName
+          && (session.providerInstanceId || 'default')
+            === (this.providerInstanceId || 'default')
+        ))
+        .map((session) => session.providerSessionId)
+        .filter((sessionId): sessionId is string => Boolean(sessionId)),
+    );
 
     for (const d of discovered) {
       // Skip sessions that have an active worker
@@ -134,7 +144,9 @@ export class FileWatcher extends EventEmitter<FileWatcherEvents> {
         model: d.model,
       });
 
-      if (session) newCount++;
+      if (session && !knownProviderSessionIds.has(d.providerSessionId)) {
+        newlyImported.add(d.providerSessionId);
+      }
     }
 
     this.registry.pruneMissingDiscovered(
@@ -144,8 +156,8 @@ export class FileWatcher extends EventEmitter<FileWatcherEvents> {
       this.providerInstanceId,
     );
 
-    if (newCount > 0) {
-      this.emit('discovered', { count: newCount });
+    if (newlyImported.size > 0) {
+      this.emit('discovered', { count: newlyImported.size });
     }
   }
 }
