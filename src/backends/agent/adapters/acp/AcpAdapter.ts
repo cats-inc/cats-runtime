@@ -4,6 +4,7 @@ import type {
   AgentAcpHostMcpServer,
   AgentAdapterProbeCheck,
   AgentAdapterInspection,
+  AgentAdapterProbeOptions,
   AgentAdapterProbeResult,
   AgentAdapterDiscoveredSession,
   AgentAdapterSessionCatalog,
@@ -410,7 +411,9 @@ function resolveBootstrapMcpServers(input: AgentInvokeInput): AgentAcpHostMcpSer
 }
 
 function resolveBootstrapTimeoutMs(instance: RemoteProviderInstanceConfig): number {
-  return instance.startupTimeoutMs ?? DEFAULT_ACP_STDIN_PROBE_TIMEOUT_MS;
+  return instance.startupTimeoutMs
+    ?? resolveAcpProviderProfile(instance)?.defaultStartupTimeoutMs
+    ?? DEFAULT_ACP_STDIN_PROBE_TIMEOUT_MS;
 }
 
 /**
@@ -1659,7 +1662,10 @@ export class AcpAdapter implements AgentAdapter {
 
   constructor(private readonly options: AgentBackendOptions = {}) {}
 
-  async probe(instance: RemoteProviderInstanceConfig): Promise<AgentAdapterProbeResult> {
+  async probe(
+    instance: RemoteProviderInstanceConfig,
+    options: AgentAdapterProbeOptions = {},
+  ): Promise<AgentAdapterProbeResult> {
     const checkedAt = new Date().toISOString();
     const command = instance.command?.trim();
     const profile = resolveAcpProviderProfile(instance);
@@ -1746,7 +1752,10 @@ export class AcpAdapter implements AgentAdapter {
       hasOutput: combinedOutput.length > 0,
     };
 
-    if (status === 'ok') {
+    // Light health polling proves that the configured command is launchable
+    // without creating a provider-owned session every few seconds. Explicit
+    // live diagnostics additionally perform ACP initialize/session bootstrap.
+    if (status === 'ok' && options.mode !== 'light') {
       const cwd = resolveBootstrapCwd(instance.cwd, process.cwd());
       if (!cwd) {
         status = 'unavailable';

@@ -18,7 +18,13 @@ Bootstrap routing amendment (2026-08-26): Devin remains a CLI provider family
 for install, version, path, and auth discovery, but generated execution config
 must not create its non-executable `cli/native` target. Selecting Devin during
 bootstrap creates only `agent/acp` (`devin acp`) and routes Devin there by
-default. Setup scanning remains independent of configured execution targets.
+default. Selecting Aider keeps it in setup discovery but does not create any
+execution target because its CLI has no machine-readable contract. Setup
+scanning remains independent of configured execution targets.
+
+Diagnostics amendment (2026-08-26): recurring light health checks must not
+create provider-owned ACP sessions. They verify the launch command only;
+explicit `probe=live` diagnostics own initialize and session bootstrap.
 
 ## Context
 
@@ -63,7 +69,8 @@ Specifically:
 9. **Quick/Full pack membership stays upstream metadata.** The runtime treats the supported platform/provider pairs as installable; pack membership (`native_cli_pack`) is carried by `cats-platform` setup-asset metadata, matching how the existing twelve are handled. Cline is installable through packaged setup on macOS and Linux only until its official Windows support or a reviewed Windows execution probe exists.
 10. **The Pi package rename is corrected in the same slice.** `src/core/provider-install/knowledge.ts` moves to `@earendil-works/pi-coding-agent`. This is not scope creep: it is the same "runtime provider knowledge drifted from the upstream installer suite" defect the rest of this ADR exists to fix, and leaving it means Pi upgrades silently no-op forever.
 11. **Install visibility and product executability remain separate.** The runtime dashboard, diagnostics, and provider-setup surfaces may list all four, but `cats-platform` adds a provider to its shared execution catalog only with a working runtime adapter. Grok and Cline qualify through their native adapters, Devin qualifies through ACP, and Aider does not.
-12. **Generated config exposes only executable Devin targets.** Bootstrap still probes the installed `devin` binary directly for setup evidence, but writes only `backends.agent.providers.devin.instances.acp` with `args: ['acp']`; it does not write a detect-only `backends.cli.providers.devin` block. Routing defaults to `agent/acp`.
+12. **Generated config exposes only executable targets.** Bootstrap still probes the installed `devin` and `aider` binaries directly for setup evidence. It writes only `backends.agent.providers.devin.instances.acp` with `args: ['acp']` for Devin and routes there by default; it writes no detect-only `backends.cli.providers.devin` block. Aider has no verified execution surface, so generated config writes no Aider target at all.
+13. **Light ACP health is non-mutating.** Dashboard polling may verify that the configured ACP launch command exists and accepts a bounded help probe, but only an explicit live diagnostic may perform ACP initialize and create a bootstrap session.
 
 This project has not shipped a stable release. Per the pre-release policy in `AGENTS.md`, no aliases, shims, or deprecation windows are owed for any of the above.
 

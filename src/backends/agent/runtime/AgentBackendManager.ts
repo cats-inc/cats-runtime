@@ -20,6 +20,7 @@ import type {
   AgentBackendStatus,
   AgentAdapter,
   AgentAdapterInspection,
+  AgentAdapterProbeOptions,
 } from '../types.js';
 import { AGENT_PROVIDER_CAPABILITIES } from '../types.js';
 
@@ -251,6 +252,7 @@ export class AgentBackendManager {
     target: ProviderTargetDescriptor,
     runProbe = true,
     timeoutMs?: number,
+    options: AgentAdapterProbeOptions = {},
   ): Promise<{
       kind: string;
       supported: boolean;
@@ -276,7 +278,7 @@ export class AgentBackendManager {
       kind: adapter.kind,
       supported: true,
       result: await withTimeout(
-        adapter.probe(instance),
+        adapter.probe(instance, options),
         timeoutMs,
         `Timed out while probing agent adapter '${adapter.kind}' for `
         + `${target.providerName}/${target.instanceId}`,

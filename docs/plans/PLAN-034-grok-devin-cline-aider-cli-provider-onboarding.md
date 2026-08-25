@@ -127,12 +127,13 @@ Grok execution follow-up (completed 2026-08-08):
 - [ ] Add `grokPath`, `devinPath`, `clinePath`, `aiderPath` to `src/backends/cli/config.ts`, with `GROK_PATH` / `DEVIN_PATH` / `CLINE_PATH` / `AIDER_PATH` overrides defaulting to the bare binary names.
 - [ ] Add `native` to `defaultProviderRuntimeMode` for all four.
 - [ ] Add the four to `readProviderCommandConfig` wiring, instance-map construction, and the clone helpers.
-- [ ] Add routing defaults and `backends.cli.providers.<id>.instances.native` blocks to `config/providers.yaml.example`.
+- [ ] Add executable routing defaults to `config/providers.yaml.example`; keep install-only providers out of the execution graph.
 - [ ] Leave `.env.example` unchanged. Per SPEC-027 D2, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, and `OPENROUTER_API_KEY` stay out; they are CLI-consumed, not runtime-consumed.
 
-**Deliverables**: A fresh `providers.yaml` bootstrap keeps CLI targets for Grok,
-Cline, and Aider, but configures Devin only as the executable `agent/acp`
-target; setup discovery continues to probe the Devin CLI independently.
+**Deliverables**: A fresh `providers.yaml` bootstrap keeps CLI targets for Grok
+and Cline, configures Devin only as the executable `agent/acp` target, and omits
+an Aider execution target; setup discovery continues to probe both Devin and
+Aider independently.
 
 ### Phase 6: Routes and UI
 

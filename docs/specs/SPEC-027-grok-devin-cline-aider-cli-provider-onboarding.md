@@ -29,7 +29,7 @@ It is the runtime counterpart to `cats-platform` SPEC-112, which owns packaged i
 - Model Devin's stripped `devin setup` step as an explicit post-install manual action, so presence never implies auth readiness and completion is not guessed.
 - Probe only the `grok` binary, never its `agent` alias.
 - Promote providers to native execution after probing their contracts; fixture versions record provenance, while later versions use the best-known adapter without an exact-version gate.
-- Extend `config/providers.yaml.example` and generated bootstrap with executable defaults: Grok, Cline, and Aider keep their CLI-family config, while Devin gets only `agent/acp` and routes there by default.
+- Extend `config/providers.yaml.example` and generated bootstrap with executable defaults: Grok and Cline keep their CLI-family config, Devin gets only `agent/acp` and routes there by default, and install-only Aider gets no execution target.
 - Surface all four in the dashboard, playground, and provider-setup with distinct badge tokens; expose only the live-enumerated `grok-4.5` id for Grok and no fabricated ids for the remaining providers.
 - Correct the Pi npm package name to `@earendil-works/pi-coding-agent`, matching upstream `cfe7785`.
 
@@ -118,7 +118,7 @@ Separately, `provider-install/knowledge.ts` installs Pi from `@mariozechner/pi-c
 
 17. `src/backends/cli/config.ts` shall add `grokPath`, `devinPath`, `clinePath`, `aiderPath`, defaulting to the bare binary names and overridable via `GROK_PATH`, `DEVIN_PATH`, `CLINE_PATH`, `AIDER_PATH`.
 18. Default runtime mode for all four shall be `native`.
-19. `config/providers.yaml.example` shall give Grok, Cline, and Aider `backends.cli.providers.<id>.instances.native` blocks. Devin shall instead have only `backends.agent.providers.devin.instances.acp`, launch the detected `devin` command with `args: ['acp']`, and route to `agent/acp` by default.
+19. `config/providers.yaml.example` shall give Grok and Cline `backends.cli.providers.<id>.instances.native` blocks. Devin shall instead have only `backends.agent.providers.devin.instances.acp`, launch the detected `devin` command with `args: ['acp']`, and route to `agent/acp` by default. Aider shall remain setup-visible but have no generated execution target until a machine-readable contract is verified.
 
 #### Surfaces
 
@@ -154,7 +154,7 @@ Separately, `provider-install/knowledge.ts` installs Pi from `@mariozechner/pi-c
 - [ ] Aider setup summaries report only detected variable names from an injected test environment, never values; an empty detection list is not treated as missing auth.
 - [ ] Devin's catalog view carries the `devin setup` manual step.
 - [ ] Starting Grok parses the authenticated native stream, tools, errors, cancellation, resume, and fork across fixture and forward-drift versions; Cline follows the same best-known-adapter policy, while providers with no machine-readable execution contract retain their evidence-based refusal.
-- [ ] Bootstrapping a fresh `providers.yaml` produces `cli/native` for Grok, Cline, and Aider, but only executable `agent/acp` for Devin.
+- [ ] Bootstrapping a fresh `providers.yaml` produces `cli/native` for Grok and Cline, only executable `agent/acp` for Devin, and no execution target for install-only Aider.
 - [ ] Dashboard and playground render all four with distinct badges, verified `grok-4.5`, and no fabricated model ids.
 - [ ] Pi's install knowledge names `@earendil-works/pi-coding-agent`.
 - [ ] `npm test` passes.

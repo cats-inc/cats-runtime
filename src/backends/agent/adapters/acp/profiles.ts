@@ -26,8 +26,10 @@ export interface AcpProviderProfile {
   summary: string;
   clientCapabilityMeta?: Record<string, unknown>;
   sessionModes?: AcpSessionModeMapping;
+  defaultStartupTimeoutMs?: number;
   probe: {
     helpArgs: string[];
+    includeConfiguredArgs?: boolean;
   };
 }
 
@@ -192,9 +194,13 @@ const DEVIN_ACP_PROFILE: AcpProviderProfile = {
     // never both permit and constrain an edit tool.
     whitelist: null,
   },
+  defaultStartupTimeoutMs: 15_000,
   probe: {
-    // Devin serves ACP from a subcommand, so its help lives behind `acp`.
-    helpArgs: ['acp', '--help'],
+    // `devin acp --help` starts the stdio server instead of printing help and
+    // exiting. Probe the parent CLI without the configured `acp` argument,
+    // then verify the real subcommand through ACP initialize/session bootstrap.
+    helpArgs: ['--help'],
+    includeConfiguredArgs: false,
   },
 };
 
@@ -399,6 +405,10 @@ export function buildAcpHelpProbeArgs(
   instance: RemoteProviderInstanceConfig,
   profile: AcpProviderProfile | undefined,
 ): string[] {
+  if (profile?.probe.includeConfiguredArgs === false) {
+    return [...profile.probe.helpArgs];
+  }
+
   const configuredArgs = instance.args ? [...instance.args] : [];
   if (hasHelpFlag(configuredArgs)) {
     return configuredArgs;

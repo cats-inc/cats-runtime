@@ -181,6 +181,7 @@ describe('BootstrapService', () => {
         transport: 'acp_stdio',
         command: devinPath,
         args: ['acp'],
+        startupTimeoutMs: 15_000,
       }));
       expect(generated.providerDefaultTargets?.devin).toEqual({
         backend: 'agent',
@@ -191,6 +192,43 @@ describe('BootstrapService', () => {
       expect(yaml).not.toContain('cli:\n    providers:\n      devin:');
       expect(yaml).toContain('backend: agent');
       expect(yaml).toContain('transport: acp_stdio');
+      expect(yaml).toContain('startup_timeout_ms: 15000');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('keeps install-only Aider out of generated execution targets', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const aiderPath = join(root, 'bin', 'aider.exe');
+      const env = {
+        ...createTestEnv(root),
+        AIDER_PATH: aiderPath,
+      };
+      ensureDirs(env);
+      const compatibility = {
+        assessCliTarget: async (target: { providerName: ProviderName; cliInstance?: { commandConfig: { path: string } } }) => (
+          createAssessment(target.providerName, target.cliInstance?.commandConfig.path || target.providerName)
+        ),
+      } as unknown as ProviderCompatibilityService;
+
+      const bootstrap = new BootstrapService({
+        dataDir: createRuntimeTestPaths(root).dataDir,
+        configPath: createRuntimeTestPaths(root).configPath,
+        config: loadConfig(env),
+        compatibility,
+      });
+
+      await bootstrap.scan();
+      await bootstrap.applyConfig(['aider']);
+
+      const generated = loadConfig(env);
+      expect(generated.providerInstances?.aider).toEqual({});
+      expect(generated.providerDefaultTargets?.aider).toBeUndefined();
+
+      const yaml = readFileSync(createRuntimeTestPaths(root).configPath, 'utf8');
+      expect(yaml).not.toContain('aider:');
     } finally {
       cleanup();
     }

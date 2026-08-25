@@ -122,6 +122,13 @@ import the sessions Devin already owns — `sessionId`, `cwd`, `title`, and
 deleting one of those runtime sessions also deletes it inside Devin, rather than
 only dropping the local record.
 
+The generated ACP target uses a 15-second startup timeout. Devin 3000.5.20 on
+Windows can take more than five seconds to finish `session/new`; the shorter
+generic timeout misclassifies a working target as unavailable.
+Dashboard light health runs only the bounded command probe and does not create
+Devin sessions. Use provider diagnostics with `probe=live` when an actual ACP
+initialize/session bootstrap check is needed.
+
 Aider installs with `irm https://aider.chat/install.ps1 | iex` on Windows or
 `curl -LsSf https://aider.chat/install.sh | sh` on macOS/Linux, into
 `~/.local/bin`. Cats detects and installs Aider but cannot run sessions through
@@ -136,6 +143,10 @@ version/help pair — so it declares a 30 s `check.minProbeTimeoutMs` floor
 instead of timing out under the runtime-wide budget. Uninstall with
 `uv tool uninstall aider-chat`; deleting `~/.local/bin/aider` only removes the
 shim.
+
+Fresh bootstrap config therefore keeps Aider in setup discovery but does not
+create a `cli/native` execution target. It should not contribute a degraded
+provider-health result until an executable adapter contract is verified.
 
 The runtime pins Devin's session mode to match its own permission mode, because
 Devin's default (`accept-edits`) writes files without asking: `skip` runs as

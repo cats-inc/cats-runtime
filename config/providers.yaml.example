@@ -90,10 +90,6 @@ routing:
       default_target:
         backend: agent
         instance: acp
-    aider:
-      default_target:
-        backend: cli
-        instance: native
     ollama:
       default_target:
         backend: local
@@ -277,13 +273,6 @@ backends:
             # trace a host gets of a finished run.
             sessions_dir: ~/.cline/data/sessions
 
-      aider:
-        instances:
-          native:
-            environment: native
-            command: aider
-            runner: auto
-
   api:
     providers:
       claude:
@@ -363,3 +352,6 @@ backends:
           acp:
             command: devin
             args: ['acp']
+            # Devin's Windows ACP session bootstrap can exceed the generic
+            # five-second stdio timeout even when the target is healthy.
+            startup_timeout_ms: 15000

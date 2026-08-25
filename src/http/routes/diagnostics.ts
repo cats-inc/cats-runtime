@@ -1240,8 +1240,11 @@ async function diagnoseAgentTarget(
           target,
           shouldProbeLive,
           DEFAULT_RUNTIME_AGENT_PROBE_TIMEOUT_MS,
+          { mode: probeMode },
         )
-      : await probeRuntimeAgentInstance(instance, shouldProbeLive);
+      : await probeRuntimeAgentInstance(instance, shouldProbeLive, {
+          probe: { mode: probeMode },
+        });
     if (!probe.supported) {
       checks.push(
         createCheck(

@@ -180,6 +180,10 @@ export interface AgentAdapterProbeResult {
   checks?: AgentAdapterProbeCheck[];
 }
 
+export interface AgentAdapterProbeOptions {
+  mode?: 'light' | 'live';
+}
+
 export interface AgentAdapterToolCatalogEntry {
   name: string;
   title?: string;
@@ -276,7 +280,10 @@ export interface AgentAdapterInspection {
 export interface AgentAdapter {
   readonly kind: string;
   invoke(input: AgentInvokeInput): AsyncGenerator<StreamEvent>;
-  probe?(instance: RemoteProviderInstanceConfig): Promise<AgentAdapterProbeResult>;
+  probe?(
+    instance: RemoteProviderInstanceConfig,
+    options?: AgentAdapterProbeOptions,
+  ): Promise<AgentAdapterProbeResult>;
   listModels?(instance: RemoteProviderInstanceConfig): Promise<Array<{ id: string; label: string }>>;
   listTools?(
     instance: RemoteProviderInstanceConfig,

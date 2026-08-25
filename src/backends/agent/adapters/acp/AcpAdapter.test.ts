@@ -971,6 +971,32 @@ describe('AcpAdapter', () => {
     ]);
   });
 
+  it('keeps light stdio health probes command-only', async () => {
+    const adapter = new AcpAdapter({
+      cliCommandRunner: createSuccessfulProbeRunner(),
+      acpProcessSpawner: () => {
+        throw new Error('Light ACP health probes must not create a session.');
+      },
+    });
+
+    const result = await adapter.probe(createStdioInstance(), { mode: 'light' });
+
+    expect(result.health).toEqual({
+      status: 'ok',
+      checkedAt: expect.any(String),
+      details: "ACP stdio help probe succeeded for 'codex-acp serve --help'.",
+    });
+    expect(result.liveProbe).toEqual(expect.objectContaining({
+      command: 'codex-acp',
+      args: ['serve', '--help'],
+      timedOut: false,
+    }));
+    expect(result.liveProbe).not.toHaveProperty('bootstrapSession');
+    expect(result.checks).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'acp_session_bootstrap' }),
+    ]));
+  });
+
   it('runs a stdio help probe for codex ACP Tier 1 targets', async () => {
     const process = new FakeAcpProcess();
     startFakeServer(process, async (message) => {

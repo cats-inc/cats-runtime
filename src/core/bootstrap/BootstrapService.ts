@@ -127,6 +127,13 @@ function buildMinimalProvidersYaml(
       || config.providerCommands[provider]?.path
       || provider;
 
+    // Aider remains visible to setup for install, version, path, and auth
+    // evidence, but has no machine-readable execution contract. Do not turn a
+    // presence-only provider into a permanently degraded execution target.
+    if (provider === 'aider') {
+      continue;
+    }
+
     // Devin's CLI surface is still probed by setup for install and version
     // evidence, but it cannot produce the structured events required by the
     // CLI execution backend. Its verified execution surface is `devin acp`,
@@ -140,6 +147,7 @@ function buildMinimalProvidersYaml(
           acp: {
             command: commandPath,
             args: ['acp'],
+            startup_timeout_ms: 15_000,
           },
         },
       };

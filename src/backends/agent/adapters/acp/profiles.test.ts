@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
-import { resolveAcpProviderProfile } from './profiles.js';
+import { buildAcpHelpProbeArgs, resolveAcpProviderProfile } from './profiles.js';
 
 function createInstance(
   command: string,
@@ -180,13 +180,21 @@ describe('resolveAcpProviderProfile', () => {
     expect(resolveAcpProviderProfile(instance)).toBeUndefined();
   });
 
-  it('resolves Devin ACP and probes help behind the acp subcommand', () => {
-    const profile = resolveAcpProviderProfile(createInstance('devin', ['acp']));
+  it('resolves Devin ACP but probes help on the parent CLI', () => {
+    const instance = createInstance('devin', ['acp']);
+    const profile = resolveAcpProviderProfile(instance);
 
-    expect(profile).toEqual(expect.objectContaining({ id: 'devin-acp', family: 'devin', tier: 1 }));
-    // Devin has no standalone *-acp binary, so `devin --help` describes the CLI
-    // rather than the ACP server.
-    expect(profile?.probe.helpArgs).toEqual(['acp', '--help']);
+    expect(profile).toEqual(expect.objectContaining({
+      id: 'devin-acp',
+      family: 'devin',
+      tier: 1,
+      defaultStartupTimeoutMs: 15_000,
+    }));
+    expect(profile?.probe).toEqual({
+      helpArgs: ['--help'],
+      includeConfiguredArgs: false,
+    });
+    expect(buildAcpHelpProbeArgs(instance, profile)).toEqual(['--help']);
   });
 
   it('pins Devin session modes so a conservative turn cannot edit un-gated', () => {

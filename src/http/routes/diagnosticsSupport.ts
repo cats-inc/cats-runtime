@@ -6,7 +6,10 @@ import type {
   ProviderRuntimeConfig,
   RemoteProviderInstanceConfig,
 } from '../../backends/cli/config.js';
-import type { AgentAdapterProbeResult } from '../../backends/agent/types.js';
+import type {
+  AgentAdapterProbeOptions,
+  AgentAdapterProbeResult,
+} from '../../backends/agent/types.js';
 import {
   getConfiguredFileBackedProviderPath,
   resolveFileBackedProviderPath,
@@ -28,7 +31,12 @@ const FILE_BACKED_PROVIDER_NAMES = [
 ] as const;
 
 const DEFAULT_RUNTIME_COMMAND_LOOKUP_TIMEOUT_MS = 5000;
-export const DEFAULT_RUNTIME_AGENT_PROBE_TIMEOUT_MS = 5000;
+// ACP diagnostics can perform three sequential bounded operations: a command
+// help check, initialize, and session bootstrap. Devin 3000.5.20 takes about
+// 8.5 seconds for the protocol bootstrap alone on Windows, so the old 5-second
+// outer deadline incorrectly marked a healthy target unavailable before the
+// adapter's own per-operation timeouts could run.
+export const DEFAULT_RUNTIME_AGENT_PROBE_TIMEOUT_MS = 20000;
 
 export type FileBackedProviderName = (typeof FILE_BACKED_PROVIDER_NAMES)[number];
 
@@ -72,9 +80,13 @@ export interface RuntimeAgentProbeResult {
 
 export interface RuntimeAgentProbeOptions {
   timeoutMs?: number;
+  probe?: AgentAdapterProbeOptions;
   adapter?: {
     kind: string;
-    probe?: (instance: RemoteProviderInstanceConfig) => Promise<AgentAdapterProbeResult>;
+    probe?: (
+      instance: RemoteProviderInstanceConfig,
+      options?: AgentAdapterProbeOptions,
+    ) => Promise<AgentAdapterProbeResult>;
   };
 }
 
@@ -292,7 +304,7 @@ export async function probeRuntimeAgentInstance(
     kind: adapter.kind,
     supported: true,
     result: await withTimeout(
-      adapter.probe(instance),
+      adapter.probe(instance, options.probe),
       options.timeoutMs ?? DEFAULT_RUNTIME_AGENT_PROBE_TIMEOUT_MS,
       `Timed out while probing agent adapter '${adapter.kind}' for `
       + `${instance.providerName}/${instance.id}`,
