@@ -154,6 +154,7 @@ export interface ProviderInstanceConfig {
   opencodeServerStartupTimeoutMs?: number;
   piSessionsDir?: string;
   piInstructionsFile?: string;
+  clineSessionsDir?: string;
 }
 
 export interface RuntimeMeteringConfig {
@@ -200,6 +201,7 @@ export interface CliRuntimeConfig {
   kiroDbPath: string;
   kiroRuntime: ProviderRuntimeConfig;
   piSessionsDir: string;
+  clineSessionsDir: string;
   wslDiscoveryPolicy?: WslDiscoveryPolicy;
   dockerDiscoveryPolicy?: DockerDiscoveryPolicy;
   compatibilityProbeTimeoutMs: number;
@@ -239,6 +241,7 @@ interface LegacyRuntimeShape {
   opencodeServerPort: number;
   opencodeServerStartupTimeoutMs: number;
   piSessionsDir: string;
+  clineSessionsDir: string;
   providerDefaultTargets: Record<string, ProviderDefaultTarget>;
   remoteProviderCatalog: RemoteProviderCatalog;
 }
@@ -316,6 +319,10 @@ export function defaultKiroDbPath(
 
 export function defaultPiSessionsDir(): string {
   return '~/.pi/agent/sessions';
+}
+
+export function defaultClineSessionsDir(): string {
+  return '~/.cline/data/sessions';
 }
 
 export function defaultOpencodeServerHost(): string {
@@ -461,6 +468,7 @@ export function loadConfig(
     kiroDbPath: configured.kiroDbPath,
     kiroRuntime: configured.kiroRuntime,
     piSessionsDir: configured.piSessionsDir,
+    clineSessionsDir: configured.clineSessionsDir,
     wslDiscoveryPolicy: parseWslDiscoveryPolicy(
       env.CATS_RUNTIME_WSL_DISCOVERY_POLICY,
       defaultWslDiscoveryPolicy(),
@@ -551,6 +559,7 @@ export function listProviderInstances(
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
+    | 'clineSessionsDir'
   >,
   provider: ProviderName,
 ): ProviderInstanceConfig[] {
@@ -594,6 +603,7 @@ export function resolveProviderInstance(
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
+    | 'clineSessionsDir'
   >,
   provider: ProviderName,
   instanceId?: string,
@@ -738,6 +748,7 @@ function buildLegacyRuntimeShape(
         id: 'native',
         providerName: 'cline',
         commandConfig: providerCommands.cline,
+        clineSessionsDir: env.CLINE_SESSIONS_DIR || defaultClineSessionsDir(),
       },
     },
     devin: {
@@ -841,6 +852,7 @@ function buildLegacyRuntimeShape(
     opencodeServerPort,
     opencodeServerStartupTimeoutMs,
     piSessionsDir: env.PI_SESSIONS_DIR || defaultPiSessionsDir(),
+    clineSessionsDir: env.CLINE_SESSIONS_DIR || defaultClineSessionsDir(),
     providerDefaultTargets,
     remoteProviderCatalog: {
       api: {},
@@ -989,6 +1001,7 @@ function buildLegacyProviderInstance(
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
+    | 'clineSessionsDir'
   >,
 ): ProviderInstanceConfig {
   return {
@@ -1012,6 +1025,7 @@ function buildLegacyProviderInstance(
       ? config.opencodeServerStartupTimeoutMs
       : undefined,
     piSessionsDir: provider === 'pi' ? config.piSessionsDir : undefined,
+    clineSessionsDir: provider === 'cline' ? config.clineSessionsDir : undefined,
   };
 }
 
@@ -1047,6 +1061,7 @@ function applyFileBasedProviderConfig(
   let opencodeServerPort = legacy.opencodeServerPort;
   let opencodeServerStartupTimeoutMs = legacy.opencodeServerStartupTimeoutMs;
   let piSessionsDir = legacy.piSessionsDir;
+  let clineSessionsDir = legacy.clineSessionsDir;
   let piInstructionsFile: string | undefined;
   const rawBackends = asOptionalObject(doc.backends);
   if (doc.backends !== undefined && !rawBackends) {
@@ -1109,6 +1124,11 @@ function applyFileBasedProviderConfig(
           copilotSessionsDir = readString(discovery?.sessions_dir)
             || readString(providerDoc.sessions_dir)
             || copilotSessionsDir;
+          break;
+        case 'cline':
+          clineSessionsDir = readString(discovery?.sessions_dir)
+            || readString(providerDoc.sessions_dir)
+            || clineSessionsDir;
           break;
         case 'pi':
           piSessionsDir = readString(discovery?.sessions_dir)
@@ -1234,6 +1254,11 @@ function applyFileBasedProviderConfig(
               || fallback.piSessionsDir
               || piSessionsDir
             : undefined,
+          clineSessionsDir: provider === 'cline'
+            ? readString(instanceDoc.sessions_dir)
+              || fallback.clineSessionsDir
+              || clineSessionsDir
+            : undefined,
           piInstructionsFile: provider === 'pi'
             ? readString(instanceDoc.instructions_file)
               || readString(instanceDoc.instructionsFile)
@@ -1297,6 +1322,9 @@ function applyFileBasedProviderConfig(
       }
       if (provider === 'pi') {
         piSessionsDir = nextInstances[defaultInstance].piSessionsDir || piSessionsDir;
+      }
+      if (provider === 'cline') {
+        clineSessionsDir = nextInstances[defaultInstance].clineSessionsDir || clineSessionsDir;
       }
     }
 
@@ -1382,6 +1410,9 @@ function applyFileBasedProviderConfig(
     if (provider === 'pi') {
       piSessionsDir = instance.piSessionsDir || piSessionsDir;
     }
+    if (provider === 'cline') {
+      clineSessionsDir = instance.clineSessionsDir || clineSessionsDir;
+    }
   }
 
   return {
@@ -1403,6 +1434,7 @@ function applyFileBasedProviderConfig(
     opencodeServerPort,
     opencodeServerStartupTimeoutMs,
     piSessionsDir,
+    clineSessionsDir,
     providerDefaultTargets,
     remoteProviderCatalog,
   };

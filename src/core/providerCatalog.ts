@@ -122,6 +122,7 @@ export function getProviderDefaultTarget(
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
+    | 'clineSessionsDir'
     | 'remoteProviderCatalog'
   >,
   providerName: string,
@@ -210,6 +211,7 @@ export function listConfiguredProviders(
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
+    | 'clineSessionsDir'
     | 'remoteProviderCatalog'
   >,
 ): string[] {
@@ -257,6 +259,7 @@ export function listProviderCatalog(
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
+    | 'clineSessionsDir'
     | 'remoteProviderCatalog'
   >,
 ): Record<string, ProviderCatalogEntry> {
@@ -335,6 +338,7 @@ export function resolveProviderTarget(
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
+    | 'clineSessionsDir'
     | 'remoteProviderCatalog'
   >,
   providerName: string,

@@ -34,6 +34,12 @@ limits are inherent to both versions rather than to Cats: sessions cannot be
 resumed, because passing `--id` alongside `--json` fails and the stream never
 emits a resumable id; and the runtime's `whitelist` permission mode is
 unavailable, because `--auto-approve` is a global boolean with no per-tool form.
+Cline sessions are discoverable even though they are not resumable: every run
+writes `~/.cline/data/sessions/<id>/<id>.json` plus a messages file, and the
+runtime watches that directory like any other file-backed provider, so finished
+runs appear on the dashboard. Override the location with `sessions_dir` on the
+instance or `CLINE_SESSIONS_DIR`.
+
 Use `skip` to auto-approve tools or `default` to deny them all. On 3.0.57 a
 denied tool no longer aborts the turn as it did on 3.0.51: the tool is still
 refused and the `tool_result` carries `isError`, but the agent answers without
@@ -754,7 +760,8 @@ Currently supported agent transports are:
 
 Path semantics matter:
 
-- File-backed providers (`claude`, `codex`, `copilot`, `antigravity`, `auggie`, `pi`) use
+- File-backed providers (`claude`, `codex`, `copilot`, `antigravity`, `auggie`, `pi`,
+  `cline`) use
   host-side discovery paths. `projects_dir` / `sessions_dir` must point to a
   path that the `cats-runtime` host process can read directly.
 - On Windows, if one of those file-backed providers is configured as

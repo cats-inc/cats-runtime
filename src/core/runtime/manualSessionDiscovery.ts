@@ -79,6 +79,7 @@ type ManualSessionDiscoveryConfig = Pick<
   | 'opencodeServerPort'
   | 'opencodeServerStartupTimeoutMs'
   | 'piSessionsDir'
+  | 'clineSessionsDir'
   | 'remoteProviderCatalog'
 >;
 

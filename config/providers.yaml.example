@@ -266,6 +266,9 @@ backends:
             environment: native
             command: cline
             runner: auto
+            # Cline cannot resume through the CLI, so these records are the only
+            # trace a host gets of a finished run.
+            sessions_dir: ~/.cline/data/sessions
 
       devin:
         instances:

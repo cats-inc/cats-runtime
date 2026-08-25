@@ -8,13 +8,14 @@ import {
 
 type FileBackedProviderName = Extract<
   ProviderName,
-  'auggie' | 'claude' | 'codex' | 'copilot' | 'pi'
+  'auggie' | 'claude' | 'cline' | 'codex' | 'copilot' | 'pi'
 >;
 
 type FileBackedInstancePathField = Extract<
   keyof ProviderInstanceConfig,
   | 'auggieSessionsDir'
   | 'claudeProjectsDir'
+  | 'clineSessionsDir'
   | 'codexSessionsDir'
   | 'copilotSessionsDir'
   | 'piSessionsDir'
@@ -24,6 +25,7 @@ type FileBackedConfigPathField = Extract<
   keyof CliRuntimeConfig,
   | 'auggieSessionsDir'
   | 'claudeProjectsDir'
+  | 'clineSessionsDir'
   | 'codexSessionsDir'
   | 'copilotSessionsDir'
   | 'piSessionsDir'
@@ -39,6 +41,11 @@ const FILE_BACKED_PROVIDER_PATHS = {
     instanceField: 'claudeProjectsDir',
     configField: 'claudeProjectsDir',
     configKey: 'projects_dir',
+  },
+  cline: {
+    instanceField: 'clineSessionsDir',
+    configField: 'clineSessionsDir',
+    configKey: 'sessions_dir',
   },
   codex: {
     instanceField: 'codexSessionsDir',

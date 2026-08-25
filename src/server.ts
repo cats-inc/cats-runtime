@@ -21,6 +21,7 @@ import { resolveConfigPath } from './backends/cli/config.js';
 import { AuggieSessionScanner } from './backends/cli/discovery/AuggieSessionScanner.js';
 import { FileWatcher } from './backends/cli/discovery/FileWatcher.js';
 import { SessionScanner } from './backends/cli/discovery/SessionScanner.js';
+import { ClineSessionScanner } from './backends/cli/discovery/ClineSessionScanner.js';
 import { CodexSessionScanner } from './backends/cli/discovery/CodexSessionScanner.js';
 import { CopilotSessionScanner } from './backends/cli/discovery/CopilotSessionScanner.js';
 import { PiSessionScanner } from './backends/cli/discovery/PiSessionScanner.js';
@@ -352,6 +353,24 @@ export function createDiscoveryController(
         resolveFileBackedProviderPath(ctx.config, 'claude', instance.id),
         new SessionScanner(resolveFileBackedProviderPath(ctx.config, 'claude', instance.id)),
         'claude',
+        ctx.registry,
+        instance.id,
+      ),
+    })),
+    ...listProviderInstances(ctx.config, 'cline')
+      .filter((instance) => supportsHostFileBackedProviderDiscovery(ctx.config, 'cline', instance.id))
+      .map((instance) => ({
+      provider: 'cline' as const,
+      instanceId: instance.id,
+      name: instance.id === getProviderDefaultInstanceId(ctx.config, 'cline')
+        ? 'cline'
+        : `cline@${instance.id}`,
+      watchDir: resolveFileBackedProviderPath(ctx.config, 'cline', instance.id),
+      normalizedWatchDir: normalizeFileBackedProviderPath(ctx.config, 'cline', instance.id),
+      createWatcher: () => new FileWatcher(
+        resolveFileBackedProviderPath(ctx.config, 'cline', instance.id),
+        new ClineSessionScanner(resolveFileBackedProviderPath(ctx.config, 'cline', instance.id)),
+        'cline',
         ctx.registry,
         instance.id,
       ),
