@@ -108,7 +108,7 @@ export class WorkerPool {
         };
       case 'antigravity':
         return {
-          provider: new AntigravityProvider(),
+          provider: new AntigravityProvider(compatibilityProfile),
           commandConfig: instance.commandConfig,
         };
       case 'grok':

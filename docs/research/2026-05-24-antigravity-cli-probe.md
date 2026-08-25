@@ -63,6 +63,13 @@ Findings:
 
 ## Open Evidence Gaps
 
+> Superseded on 2026-08-25. Every gap in this section was closed by a live probe
+> of `agy 1.1.20` — see
+> [2026-08-25-antigravity-cli-stream-json-probe](./2026-08-25-antigravity-cli-stream-json-probe.md).
+> `agy` does expose a machine-readable `--output-format stream-json` contract,
+> `agy models` does exist and returns slug ids, and the CLI backend now drives
+> Antigravity directly. Do not cite the gaps below as current evidence.
+
 - `agy` is not installed on this Windows host, so no live `agy --help`,
   `agy --version`, session-storage, or model-selection CLI contract was probed.
 - The official docs identify selectable reasoning-model display names but do

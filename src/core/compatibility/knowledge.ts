@@ -1,5 +1,9 @@
 import type { ProviderName } from '../../backends/cli/providers/types.js';
 import {
+  ANTIGRAVITY_STREAM_JSON_BASE_ARGS,
+  ANTIGRAVITY_STREAM_JSON_PROFILE_ID,
+} from '../../backends/cli/providers/antigravity.js';
+import {
   GROK_STREAMING_JSON_BASE_ARGS,
   GROK_STREAMING_JSON_PROFILE_ID,
 } from '../../backends/cli/providers/grok.js';
@@ -150,6 +154,42 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       spawnBaseArgs: ['app-server'],
       allowUnknownVersion: true,
       liveProbeArgs: ['app-server', '--help'],
+    },
+  ),
+  antigravity: buildKnowledge(
+    'antigravity',
+    'Antigravity CLI',
+    {
+      id: ANTIGRAVITY_STREAM_JSON_PROFILE_ID,
+      label: 'Antigravity CLI 1.1.20 stream-json',
+      provider: 'antigravity',
+      protocolFamily: 'stream-json',
+      parserId: 'antigravity-native-stream-json',
+      spawnBaseArgs: [...ANTIGRAVITY_STREAM_JSON_BASE_ARGS],
+      // Pinned exactly to the version the contract was read off. The parser
+      // encodes quirks a minor bump could silently change: text_delta being a
+      // delta rather than a snapshot, tool calls correlating on step_index
+      // because there is no tool id, successful tool steps carrying no output
+      // payload, and total_tokens excluding cache_read_tokens
+      // (docs/research/2026-08-25-antigravity-cli-stream-json-probe.md).
+      supportedVersions: ['1.1.20'],
+      helpTokens: [
+        'stream-json',
+        '--output-format',
+        '--conversation',
+        '--add-dir',
+        '--disable-slash-commands',
+        '--dangerously-skip-permissions',
+      ],
+      liveProbeArgs: ['--help'],
+      liveProbeTokens: ['stream-json', '--conversation', '--add-dir'],
+    },
+    {
+      id: 'antigravity-cli-unverified',
+      label: 'Antigravity CLI unverified version refusal',
+      provider: 'antigravity',
+      protocolFamily: 'unverified',
+      parserId: 'antigravity-refusal',
     },
   ),
   copilot: buildKnowledge(

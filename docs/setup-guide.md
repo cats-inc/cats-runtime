@@ -53,6 +53,54 @@ denied tool no longer aborts the turn as it did on 3.0.51: the tool is still
 refused and the `tool_result` carries `isError`, but the agent answers without
 it and the turn ends with a normal result.
 
+Antigravity runs through the CLI backend as of 2026-08-25. Version 1.1.20 is
+pinned exactly; other versions are refused until re-probed. Turns are driven with
+`agy -p --output-format stream-json`, whose stdout is pure NDJSON — `init`,
+`step_update`, and `result` envelopes — with human-readable warnings kept on
+stderr. Resume works through `--conversation <id>` and preserves the
+conversation id; there is no fork flag in 1.1.20, so branching is refused rather
+than faked.
+
+Two Antigravity behaviors are worth knowing because Cats works around them.
+First, `agy` reports the process working directory in its `init` event but does
+not treat it as the workspace — left alone it operates inside
+`~/.gemini/antigravity-cli/scratch` — so the runtime always passes
+`--add-dir <cwd>`. Second, `--mode accept-edits` writes files with no permission
+request while still reporting `permission_mode: "request-review"` in the stream,
+so Cats never passes `--mode` at all and treats `init.permission_mode` as
+descriptive only. Permission mode `default` leaves agy in `request-review`,
+which headless auto-denies every tool; `skip` passes
+`--dangerously-skip-permissions`; `whitelist` is refused, because agy's
+allow-rules live in the shared user `settings.json` rather than in per-invocation
+flags. Note that a turn whose only tool was denied still exits 0 and reports
+`status: SUCCESS` with an empty response — the failed tool step carrying
+`isError` is what the caller sees, since the `jetski:` stderr line is only
+classified as a refusal on a turn that streamed nothing at all.
+A rejected turn — an unknown `--model`, for instance — does not arrive on
+stderr: agy reports it on stdout as a `result` envelope with `status: ERROR`,
+an empty conversation id, and the reason in `error`, which the runtime surfaces
+as a terminal error rather than an empty successful answer.
+
+Antigravity sessions are discoverable. Every conversation is a SQLite database
+at `~/.gemini/antigravity-cli/conversations/<conversation_id>.db`, and the
+runtime reads them into the dashboard like any other file-backed provider.
+Override the location with `sessions_dir` on the instance or
+`ANTIGRAVITY_SESSIONS_DIR`. Two caveats: the reader shells out to python, so
+discovery is skipped rather than failed on a host without it; and a conversation
+started without `--add-dir` records no workspace anywhere in its database, so it
+appears with an empty working directory. The runtime always passes `--add-dir`,
+so only conversations created outside Cats can land that way. Note also that
+`conversation_summaries.db` is not the index it looks like — agy only writes it
+for interactive sessions, so print-mode runs never appear there.
+
+Model ids come from `agy models`, which prints `<id>\t<label>` pairs;
+`--model` takes the id (`gemini-3.7-flash-high`), while a rejection lists the
+labels back. Cats bundles those ids but marks none of them default, because agy
+reads its own default from the per-user `settings.json`.
+
+Evidence is in `docs/research/2026-08-25-antigravity-cli-stream-json-probe.md`
+with recorded streams under `docs/research/fixtures/antigravity-1.1.20/`.
+
 Devin installs with `irm https://static.devin.ai/cli/setup.ps1 | iex` on Windows
 (PowerShell only; the installed binary works from any shell) or
 `curl -fsSL https://cli.devin.ai/install.sh | bash` on macOS/Linux. Packaged
@@ -770,10 +818,14 @@ Currently supported agent transports are:
 
 Path semantics matter:
 
-- File-backed providers (`claude`, `codex`, `copilot`, `antigravity`, `auggie`, `pi`,
-  `cline`, `grok`) use
+- File-backed providers (`claude`, `codex`, `copilot`, `auggie`, `pi`,
+  `cline`, `grok`, `antigravity`) use
   host-side discovery paths. `projects_dir` / `sessions_dir` must point to a
   path that the `cats-runtime` host process can read directly.
+  Antigravity is the one whose files are not JSON: each conversation is a SQLite
+  database at `~/.gemini/antigravity-cli/conversations/<conversation_id>.db`, so
+  its scanner shells out to python the same way the Kiro and Cursor services do.
+  Discovery is therefore skipped rather than failed when python is unavailable.
 - On Windows, if one of those file-backed providers is configured as
   `runtime: wsl`, Linux-style paths such as `~/.codex/sessions` or
   `/home/user/.codex/sessions` are accepted. `cats-runtime` translates them to

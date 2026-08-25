@@ -57,6 +57,7 @@ import {
 import {
   PiSessionScanner,
 } from '../../backends/cli/discovery/PiSessionScanner.js';
+import { AntigravitySessionScanner } from '../../backends/cli/discovery/AntigravitySessionScanner.js';
 import { ClineSessionScanner } from '../../backends/cli/discovery/ClineSessionScanner.js';
 import { GrokSessionScanner } from '../../backends/cli/discovery/GrokSessionScanner.js';
 import {
@@ -2252,6 +2253,13 @@ async function scanProviderDiscoveryArtifactsForDelete(
         return {
           items: await new GrokSessionScanner(
             resolveFileBackedProviderPath(ctx.config, 'grok', session.providerInstanceId),
+          ).scan(),
+          scanFailed: false,
+        };
+      case 'antigravity':
+        return {
+          items: await new AntigravitySessionScanner(
+            resolveFileBackedProviderPath(ctx.config, 'antigravity', session.providerInstanceId),
           ).scan(),
           scanFailed: false,
         };

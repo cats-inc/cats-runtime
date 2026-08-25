@@ -4021,23 +4021,32 @@ providers:
     });
   });
 
-  it('GET /providers/antigravity/models omits bundled models until agy model ids are verified', async () => {
+  it('GET /providers/antigravity/models serves the ids agy models enumerated, with no imposed default', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/antigravity/models');
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
+      const body = await response.json();
+      expect(body).toMatchObject({
         provider: 'antigravity',
         backend: 'cli',
         instance: 'native',
-        defaultModel: null,
         source: 'static',
         cache: null,
-        models: [],
-        warnings: [
-          'Antigravity CLI model ids are not verified by a live agy model-list probe yet; '
-          + 'serving no bundled static model ids until that contract is proven.',
-        ],
+        warnings: [],
       });
+      expect(body.models).toHaveLength(14);
+      // `--model` takes the slug, not the display label agy prints back when it
+      // rejects one, so the catalog has to serve ids in that form.
+      expect(body.models[0]).toEqual({
+        id: 'gemini-3.7-flash-high',
+        label: 'Gemini 3.7 Flash (High)',
+      });
+      expect(body.models.map((model: { id: string }) => model.id))
+        .toContain('claude-opus-4-6-thinking');
+      // agy reads its own default from the per-user settings.json, so the
+      // runtime must not pick one on the user's behalf.
+      expect(body.defaultModel).toBeNull();
+      expect(body.models.some((model: { default?: boolean }) => model.default)).toBe(false);
     });
   });
 

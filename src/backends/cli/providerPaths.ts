@@ -8,11 +8,12 @@ import {
 
 type FileBackedProviderName = Extract<
   ProviderName,
-  'auggie' | 'claude' | 'cline' | 'codex' | 'copilot' | 'grok' | 'pi'
+  'antigravity' | 'auggie' | 'claude' | 'cline' | 'codex' | 'copilot' | 'grok' | 'pi'
 >;
 
 type FileBackedInstancePathField = Extract<
   keyof ProviderInstanceConfig,
+  | 'antigravitySessionsDir'
   | 'auggieSessionsDir'
   | 'claudeProjectsDir'
   | 'clineSessionsDir'
@@ -24,6 +25,7 @@ type FileBackedInstancePathField = Extract<
 
 type FileBackedConfigPathField = Extract<
   keyof CliRuntimeConfig,
+  | 'antigravitySessionsDir'
   | 'auggieSessionsDir'
   | 'claudeProjectsDir'
   | 'clineSessionsDir'
@@ -34,6 +36,11 @@ type FileBackedConfigPathField = Extract<
 >;
 
 const FILE_BACKED_PROVIDER_PATHS = {
+  antigravity: {
+    instanceField: 'antigravitySessionsDir',
+    configField: 'antigravitySessionsDir',
+    configKey: 'sessions_dir',
+  },
   auggie: {
     instanceField: 'auggieSessionsDir',
     configField: 'auggieSessionsDir',

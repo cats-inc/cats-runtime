@@ -122,7 +122,9 @@ export function getProviderDefaultTarget(
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
-    | 'clineSessionsDir'
+    | 'antigravitySessionsDir'
+    | 'antigravitySessionsDir'
+  | 'clineSessionsDir'
     | 'grokSessionsDir'
     | 'remoteProviderCatalog'
   >,
@@ -212,7 +214,9 @@ export function listConfiguredProviders(
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
-    | 'clineSessionsDir'
+    | 'antigravitySessionsDir'
+    | 'antigravitySessionsDir'
+  | 'clineSessionsDir'
     | 'grokSessionsDir'
     | 'remoteProviderCatalog'
   >,
@@ -261,7 +265,9 @@ export function listProviderCatalog(
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
-    | 'clineSessionsDir'
+    | 'antigravitySessionsDir'
+    | 'antigravitySessionsDir'
+  | 'clineSessionsDir'
     | 'grokSessionsDir'
     | 'remoteProviderCatalog'
   >,
@@ -341,7 +347,9 @@ export function resolveProviderTarget(
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
-    | 'clineSessionsDir'
+    | 'antigravitySessionsDir'
+    | 'antigravitySessionsDir'
+  | 'clineSessionsDir'
     | 'grokSessionsDir'
     | 'remoteProviderCatalog'
   >,

@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { isWslDistroRunning, type WslDistroInspector } from '../discovery/wslDiscovery.js';
 import type { CommandRunnerOptions } from '../pythonScripts.js';
-import { runPythonJsonScript, type CommandRunner } from '../pythonScripts.js';
+import { runPythonJsonScript, spawnCommandRunner, type CommandRunner } from '../pythonScripts.js';
 import type { RuntimeAdapter } from '../runtime/runtime.js';
 import {
   createRuntimeAdapter,
@@ -63,7 +63,7 @@ export class KiroNativeSessionService {
     this.command = options.command;
     this.dbPath = options.dbPath;
     this.runtime = options.runtime;
-    this.runner = options.runner || defaultCommandRunner;
+    this.runner = options.runner || spawnCommandRunner;
     this.wslInspector = options.wslInspector || isWslDistroRunning;
   }
 
@@ -188,41 +188,6 @@ export function normalizeKiroWorkspacePath(cwd: string): string {
   }).normalizeWorkspace(cwd);
 }
 
-async function defaultCommandRunner(
-  command: string,
-  args: string[],
-  options: CommandRunnerOptions = {},
-): Promise<{
-  code: number;
-  stdout: string;
-  stderr: string;
-}> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      shell: options.shell,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      ...hiddenWindowsSpawnOptions(),
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout.on('data', (chunk: Buffer | string) => {
-      stdout += chunk.toString();
-    });
-    child.stderr.on('data', (chunk: Buffer | string) => {
-      stderr += chunk.toString();
-    });
-    child.on('error', reject);
-    child.on('close', (code) => {
-      resolve({
-        code: code ?? -1,
-        stdout,
-        stderr,
-      });
-    });
-  });
-}
 
 const KIRO_PY_SHARED = String.raw`
 import json

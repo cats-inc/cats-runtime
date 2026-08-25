@@ -206,7 +206,29 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark' },
     { id: 'gpt-5.2', label: 'gpt-5.2' },
   ],
-  antigravity: [],
+  // Enumerated live from `agy models` on 1.1.20, which prints one
+  // `<id>\t<label>` pair per line. The ids are what `--model` accepts; a
+  // rejected id makes agy echo the labels instead, so the two are not
+  // interchangeable on input. No entry is marked default: agy takes its default
+  // from the per-user `settings.json` `model` field, and the runtime omits
+  // `--model` entirely when no model is selected, so claiming one here would
+  // override a user preference the runtime cannot see.
+  antigravity: [
+    { id: 'gemini-3.7-flash-high', label: 'Gemini 3.7 Flash (High)' },
+    { id: 'gemini-3.7-flash-medium', label: 'Gemini 3.7 Flash (Medium)' },
+    { id: 'gemini-3.7-flash-low', label: 'Gemini 3.7 Flash (Low)' },
+    { id: 'gemini-3.6-flash-high', label: 'Gemini 3.6 Flash (High)' },
+    { id: 'gemini-3.6-flash-medium', label: 'Gemini 3.6 Flash (Medium)' },
+    { id: 'gemini-3.6-flash-low', label: 'Gemini 3.6 Flash (Low)' },
+    { id: 'gemini-3.5-flash-high', label: 'Gemini 3.5 Flash (High)' },
+    { id: 'gemini-3.5-flash-medium', label: 'Gemini 3.5 Flash (Medium)' },
+    { id: 'gemini-3.5-flash-low', label: 'Gemini 3.5 Flash (Low)' },
+    { id: 'gemini-3.1-pro-high', label: 'Gemini 3.1 Pro (High)' },
+    { id: 'gemini-3.1-pro-low', label: 'Gemini 3.1 Pro (Low)' },
+    { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (Thinking)' },
+    { id: 'claude-opus-4-6-thinking', label: 'Claude Opus 4.6 (Thinking)' },
+    { id: 'gpt-oss-120b-medium', label: 'GPT-OSS 120B (Medium)' },
+  ],
   grok: [
     { id: 'grok-4.5', label: 'grok-4.5', default: true },
   ],
@@ -1525,12 +1547,6 @@ export class ProviderModelCatalogService {
   ): ProviderModelCatalogResult {
     const curatedModels = buildCuratedStaticCliModels(target, this.config, this.env, warnings);
     const staticModels = curatedModels || getStaticProviderModels(target);
-    if (target.backend === 'cli' && target.providerName === 'antigravity' && staticModels.length === 0) {
-      warnings.push(
-        'Antigravity CLI model ids are not verified by a live agy model-list probe yet; '
-        + 'serving no bundled static model ids until that contract is proven.',
-      );
-    }
     return this.buildCatalog(target, {
       defaultModel,
       source: 'static',

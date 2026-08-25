@@ -21,6 +21,7 @@ import { resolveConfigPath } from './backends/cli/config.js';
 import { AuggieSessionScanner } from './backends/cli/discovery/AuggieSessionScanner.js';
 import { FileWatcher } from './backends/cli/discovery/FileWatcher.js';
 import { SessionScanner } from './backends/cli/discovery/SessionScanner.js';
+import { AntigravitySessionScanner } from './backends/cli/discovery/AntigravitySessionScanner.js';
 import { ClineSessionScanner } from './backends/cli/discovery/ClineSessionScanner.js';
 import { GrokSessionScanner } from './backends/cli/discovery/GrokSessionScanner.js';
 import { CodexSessionScanner } from './backends/cli/discovery/CodexSessionScanner.js';
@@ -372,6 +373,28 @@ export function createDiscoveryController(
         resolveFileBackedProviderPath(ctx.config, 'grok', instance.id),
         new GrokSessionScanner(resolveFileBackedProviderPath(ctx.config, 'grok', instance.id)),
         'grok',
+        ctx.registry,
+        instance.id,
+      ),
+    })),
+    ...listProviderInstances(ctx.config, 'antigravity')
+      .filter((instance) => (
+        supportsHostFileBackedProviderDiscovery(ctx.config, 'antigravity', instance.id)
+      ))
+      .map((instance) => ({
+      provider: 'antigravity' as const,
+      instanceId: instance.id,
+      name: instance.id === getProviderDefaultInstanceId(ctx.config, 'antigravity')
+        ? 'antigravity'
+        : `antigravity@${instance.id}`,
+      watchDir: resolveFileBackedProviderPath(ctx.config, 'antigravity', instance.id),
+      normalizedWatchDir: normalizeFileBackedProviderPath(ctx.config, 'antigravity', instance.id),
+      createWatcher: () => new FileWatcher(
+        resolveFileBackedProviderPath(ctx.config, 'antigravity', instance.id),
+        new AntigravitySessionScanner(
+          resolveFileBackedProviderPath(ctx.config, 'antigravity', instance.id),
+        ),
+        'antigravity',
         ctx.registry,
         instance.id,
       ),

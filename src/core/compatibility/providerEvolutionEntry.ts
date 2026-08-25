@@ -534,7 +534,7 @@ function createProbeProvider(
     case 'codex':
       return { provider: new CodexProvider(compatibilityProfile, observer) };
     case 'antigravity':
-      return { provider: new AntigravityProvider() };
+      return { provider: new AntigravityProvider(compatibilityProfile, observer) };
     case 'grok':
       return { provider: new GrokProvider(compatibilityProfile, observer) };
     case 'cline':

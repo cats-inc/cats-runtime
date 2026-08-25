@@ -1,7 +1,9 @@
+import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
+import { hiddenWindowsSpawnOptions } from '../../core/process/windowsSpawn.js';
 import type { RuntimeAdapter } from './runtime/runtime.js';
 import { quoteForBash } from './runtime/runtime.js';
 
@@ -22,6 +24,35 @@ export type CommandRunner = (
   args: string[],
   options?: CommandRunnerOptions,
 ) => Promise<CommandResult>;
+
+/**
+ * The plain spawn-and-collect runner every python-script caller uses when the
+ * caller does not inject a fake. Callers pass their own runner in tests.
+ */
+export const spawnCommandRunner: CommandRunner = (command, args, options = {}) => (
+  new Promise<CommandResult>((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: options.cwd,
+      shell: options.shell,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      ...hiddenWindowsSpawnOptions(),
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (chunk: Buffer | string) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on('data', (chunk: Buffer | string) => {
+      stderr += chunk.toString();
+    });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      resolve({ code: code ?? -1, stdout, stderr });
+    });
+  })
+);
 
 interface RunPythonJsonScriptOptions {
   runtime: RuntimeAdapter;

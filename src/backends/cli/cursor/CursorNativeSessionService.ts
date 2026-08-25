@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { delimiter, extname, isAbsolute, join } from 'node:path';
 import { isWslDistroRunning, type WslDistroInspector } from '../discovery/wslDiscovery.js';
 import type { CommandRunnerOptions } from '../pythonScripts.js';
-import { runPythonJsonScript, type CommandRunner } from '../pythonScripts.js';
+import { runPythonJsonScript, spawnCommandRunner, type CommandRunner } from '../pythonScripts.js';
 import type { RuntimeAdapter } from '../runtime/runtime.js';
 import {
   createRuntimeAdapter,
@@ -64,7 +64,7 @@ export class CursorNativeSessionService {
     this.command = options.command;
     this.chatsDir = options.chatsDir;
     this.runtime = options.runtime;
-    this.runner = options.runner || defaultCommandRunner;
+    this.runner = options.runner || spawnCommandRunner;
     this.wslInspector = options.wslInspector || isWslDistroRunning;
   }
 
@@ -244,42 +244,6 @@ export function normalizeCursorWorkspacePath(cwd: string): string {
   }).normalizeWorkspace(cwd);
 }
 
-async function defaultCommandRunner(
-  command: string,
-  args: string[],
-  options: CommandRunnerOptions = {},
-): Promise<{
-  code: number;
-  stdout: string;
-  stderr: string;
-}> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      shell: options.shell,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      ...hiddenWindowsSpawnOptions(),
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout.on('data', (chunk: Buffer | string) => {
-      stdout += chunk.toString();
-    });
-    child.stderr.on('data', (chunk: Buffer | string) => {
-      stderr += chunk.toString();
-    });
-    child.on('error', reject);
-    child.on('close', (code) => {
-      resolve({
-        code: code ?? -1,
-        stdout,
-        stderr,
-      });
-    });
-  });
-}
 
 function shouldUseNativeCommandShell(command: string): boolean {
   if (process.platform !== 'win32') {

@@ -151,6 +151,7 @@ type ManualSessionDiscoveryConfig = Pick<
   | 'opencodeServerPort'
   | 'opencodeServerStartupTimeoutMs'
   | 'piSessionsDir'
+  | 'antigravitySessionsDir'
   | 'clineSessionsDir'
   | 'grokSessionsDir'
   | 'remoteProviderCatalog'

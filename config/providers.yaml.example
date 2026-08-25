@@ -170,6 +170,10 @@ backends:
             command: agy
             runner: auto
             timeout_ms: 120000
+            # agy keeps one SQLite database per conversation under this
+            # directory; the runtime reads them to surface finished Antigravity
+            # runs on the dashboard.
+            sessions_dir: ~/.gemini/antigravity-cli/conversations
 
       cursor:
         instances:
