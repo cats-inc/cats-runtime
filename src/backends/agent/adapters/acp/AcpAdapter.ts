@@ -413,18 +413,38 @@ function resolveBootstrapTimeoutMs(instance: RemoteProviderInstanceConfig): numb
   return instance.startupTimeoutMs ?? DEFAULT_ACP_STDIN_PROBE_TIMEOUT_MS;
 }
 
-function supportsCloseSession(agentCapabilities: Record<string, unknown> | undefined): boolean {
+/**
+ * Reads one optional session capability from an `initialize` response.
+ *
+ * Agents disagree on where these live: Devin 3000.5.20 advertises them under
+ * `sessionCapabilities`, while the `session` spelling is also in the wild. Both
+ * are read rather than guessing which is canonical, and each entry may be a
+ * boolean flag or an options bag (Devin sends `delete: {}`).
+ */
+function readAcpSessionCapability(
+  agentCapabilities: Record<string, unknown> | undefined,
+  name: 'close' | 'delete' | 'list',
+): boolean {
   if (!agentCapabilities) {
     return false;
   }
 
-  if (agentCapabilities.closeSession === true) {
+  for (const key of ['sessionCapabilities', 'session'] as const) {
+    const value = parseRecord(agentCapabilities[key])?.[name];
+    if (value === true || parseRecord(value)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function supportsCloseSession(agentCapabilities: Record<string, unknown> | undefined): boolean {
+  if (agentCapabilities?.closeSession === true) {
     return true;
   }
 
-  const sessionCapabilities = parseRecord(agentCapabilities.session);
-  const close = sessionCapabilities?.close;
-  return close === true || Boolean(parseRecord(close));
+  return readAcpSessionCapability(agentCapabilities, 'close');
 }
 
 function resolveBootstrapCwd(...candidates: Array<string | undefined>): string | undefined {
@@ -494,20 +514,6 @@ function parseAvailableCommands(value: unknown): AcpAvailableCommand[] {
       ...(readString(item?.description) ? { description: readString(item?.description) } : {}),
     }];
   });
-}
-
-function supportsAcpSessionList(
-  agentCapabilities: Record<string, unknown> | null | undefined,
-): boolean {
-  const sessionCapabilities = parseRecord(agentCapabilities?.sessionCapabilities);
-  if (!sessionCapabilities) {
-    return false;
-  }
-
-  // Devin 3000.5.20 declares `list: {}` — an options bag, not a flag. A plain
-  // boolean is accepted too so a stricter agent is not refused over shape.
-  const list = sessionCapabilities.list;
-  return list === true || parseRecord(list) !== null;
 }
 
 function parseDiscoveredAcpSessions(value: unknown): AgentAdapterDiscoveredSession[] {
@@ -1858,7 +1864,7 @@ export class AcpAdapter implements AgentAdapter {
       // top-level boolean like loadSession. Calling session/list on an agent
       // that does not declare it answers with method-not-found, so the
       // capability is the gate rather than a try/catch.
-      if (!supportsAcpSessionList(agentCapabilities)) {
+      if (!readAcpSessionCapability(agentCapabilities || undefined, 'list')) {
         return {
           supported: false,
           summary: `ACP target '${instance.providerName}/${instance.id}' does not advertise `
@@ -2315,6 +2321,19 @@ export class AcpAdapter implements AgentAdapter {
         }),
       );
       const agentCapabilities = parseRecord(initializeResult?.agentCapabilities) || undefined;
+
+      // Deleting a runtime session should not leave the agent still holding it.
+      // `session/delete` is the stronger operation, so it stands in for the
+      // close rather than following it.
+      if (reason === 'delete' && readAcpSessionCapability(agentCapabilities, 'delete')) {
+        await client.request('session/delete', {
+          sessionId: providerSessionId,
+        }, {
+          timeoutMs: bootstrapTimeoutMs,
+        });
+        return;
+      }
+
       if (!supportsCloseSession(agentCapabilities)) {
         return;
       }

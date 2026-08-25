@@ -3752,3 +3752,81 @@ describe('AcpAdapter session enumeration', () => {
     expect(methods).not.toContain('session/list');
   });
 });
+
+describe('AcpAdapter session deletion', () => {
+  function startCapabilityAgent(
+    process: FakeAcpProcess,
+    agentCapabilities: Record<string, unknown>,
+    methods: string[],
+  ): void {
+    startFakeServer(process, async (message) => {
+      methods.push(String(message.method));
+      process.stdout.write(`${JSON.stringify({
+        jsonrpc: '2.0',
+        id: message.id,
+        result: message.method === 'initialize'
+          ? { protocolVersion: 1, agentCapabilities }
+          : {},
+      })}\n`);
+    });
+  }
+
+  const state = {
+    agentSession: {
+      providerSessionId: 'acp-session-delete',
+      adapterState: {},
+    },
+  } as never;
+
+  it('deletes the agent-side session when the runtime session is deleted', async () => {
+    const agentProcess = new FakeAcpProcess();
+    const methods: string[] = [];
+    startCapabilityAgent(agentProcess, {
+      sessionCapabilities: { list: {}, delete: {} },
+    }, methods);
+
+    const adapter = new AcpAdapter({ acpProcessSpawner: createSpawner(agentProcess) });
+    await adapter.close('session-1', createStdioInstance(), state, 'delete');
+
+    expect(methods).toContain('session/delete');
+    // delete stands in for the close rather than following it.
+    expect(methods).not.toContain('session/close');
+  });
+
+  it('still only closes when the runtime session is merely closed', async () => {
+    const agentProcess = new FakeAcpProcess();
+    const methods: string[] = [];
+    startCapabilityAgent(agentProcess, {
+      sessionCapabilities: { delete: {}, close: {} },
+    }, methods);
+
+    const adapter = new AcpAdapter({ acpProcessSpawner: createSpawner(agentProcess) });
+    await adapter.close('session-1', createStdioInstance(), state, 'close');
+
+    expect(methods).toContain('session/close');
+    expect(methods).not.toContain('session/delete');
+  });
+
+  it('falls back to close when the agent cannot delete', async () => {
+    const agentProcess = new FakeAcpProcess();
+    const methods: string[] = [];
+    startCapabilityAgent(agentProcess, { session: { close: true } }, methods);
+
+    const adapter = new AcpAdapter({ acpProcessSpawner: createSpawner(agentProcess) });
+    await adapter.close('session-1', createStdioInstance(), state, 'delete');
+
+    expect(methods).toContain('session/close');
+    expect(methods).not.toContain('session/delete');
+  });
+
+  it('asks for nothing when the agent advertises neither', async () => {
+    const agentProcess = new FakeAcpProcess();
+    const methods: string[] = [];
+    startCapabilityAgent(agentProcess, { loadSession: true }, methods);
+
+    const adapter = new AcpAdapter({ acpProcessSpawner: createSpawner(agentProcess) });
+    await adapter.close('session-1', createStdioInstance(), state, 'delete');
+
+    expect(methods).toEqual(['initialize']);
+  });
+});
