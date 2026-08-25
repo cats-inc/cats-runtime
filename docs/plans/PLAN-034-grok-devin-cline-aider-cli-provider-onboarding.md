@@ -130,7 +130,9 @@ Grok execution follow-up (completed 2026-08-08):
 - [ ] Add routing defaults and `backends.cli.providers.<id>.instances.native` blocks to `config/providers.yaml.example`.
 - [ ] Leave `.env.example` unchanged. Per SPEC-027 D2, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, and `OPENROUTER_API_KEY` stay out; they are CLI-consumed, not runtime-consumed.
 
-**Deliverables**: A fresh `providers.yaml` bootstrap produces `cli/native` instances for all four.
+**Deliverables**: A fresh `providers.yaml` bootstrap keeps CLI targets for Grok,
+Cline, and Aider, but configures Devin only as the executable `agent/acp`
+target; setup discovery continues to probe the Devin CLI independently.
 
 ### Phase 6: Routes and UI
 
@@ -246,6 +248,7 @@ The runtime owns these surfaces. Grok is now mirrored into the platform product 
 | 2026-08-08 | Drove `session/prompt` over Devin ACP for a text turn and a tool turn. Every `session/update` type Devin emits is already handled by `AcpAdapter`, and usage is reported in the prompt result — something the CLI backend could not provide. The probe also found a latent runtime bug: `AcpStdioClient.isRequest` required a numeric JSON-RPC id, so Devin's string-UUID `fs/read_text_file` matched no guard and hit `failAll`, tearing down the session on the first file read. JSON-RPC 2.0 allows string ids, so this affected any ACP provider using them, not just Devin. Fixed with a regression test verified to fail against the old guard. |
 | 2026-08-08 | Devin ACP profile landed. A live handshake against `devin acp` confirmed protocol version 1, `loadSession: true`, and four session modes, so `devin-acp` is registered tier 1 with subcommand detection and a working `providers.yaml` block. Correction to the previous entry: the ACP resolver already supported subcommand detection (`opencode acp`, `kilo acp`, `goose acp`, `kiro-cli acp`), so no new machinery was needed. `session/prompt` is not yet driven, so the update stream, tool shapes, usage, and cancellation over ACP remain uncharacterized. |
 | 2026-08-08 | Devin 3000.3.27 install tier landed and P1 resolved: it executes locally, so it stays a CLI family and no ADR-023 reclassification is needed. CLI execution is refused on settled evidence rather than pending a probe — 3000.3.27 has no machine-readable output mode at all, so tool calls, usage, and session identity are unrecoverable from stdout. Its structured surface is `devin acp`, which belongs to the agent backend under ADR-031 and is the natural next slice. |
+| 2026-08-26 | Generated bootstrap and the checked-in example stopped exposing Devin's detect-only `cli/native` target. Selecting Devin now writes only the verified `agent/acp` target and routes to it by default; install/version scanning remains independent of execution config. |
 | 2026-08-08 | Cline 3.0.51 landed across five slices: install tier, the Pi package-rename fix, stream capture with a fixture-backed parser, a denied-tool fix that corrected three parser gaps the success fixtures hid, and execution enablement behind the exact-version profile `cline-cli-json-3.0.51`. Resume is disabled (`--id` fails under `--json`) and `whitelist` permission mode refuses (no per-tool flag exists), per User approval. One authenticated end-to-end run through WorkerPool remains outstanding; the probe account hit a zero credit balance mid-slice. |
 
 ---

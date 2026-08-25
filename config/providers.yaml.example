@@ -88,8 +88,8 @@ routing:
         instance: native
     devin:
       default_target:
-        backend: cli
-        instance: native
+        backend: agent
+        instance: acp
     aider:
       default_target:
         backend: cli
@@ -277,13 +277,6 @@ backends:
             # trace a host gets of a finished run.
             sessions_dir: ~/.cline/data/sessions
 
-      devin:
-        instances:
-          native:
-            environment: native
-            command: devin
-            runner: auto
-
       aider:
         instances:
           native:
@@ -360,9 +353,9 @@ backends:
             model: claude-sonnet-4-20250514
 
       # Devin speaks ACP over stdio from a subcommand of its own binary rather
-      # than a separate *-acp package, so `command` is the CLI and `args` names
-      # the subcommand. This is Devin's only structured surface: the CLI
-      # backend's --print emits plain prose, so `cli/native` stays detect-only.
+      # than a separate *-acp package, so `command` is the installed CLI and
+      # `args` names the subcommand. Setup scans the CLI binary independently;
+      # providers.yaml exposes only Devin's structured, executable ACP target.
       devin:
         default_instance: acp
         transport: acp_stdio

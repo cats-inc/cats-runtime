@@ -14,6 +14,12 @@ provenance, while forward and unknown versions use the best-known adapter.
 Cline has since gained a fixture-backed native adapter, and Devin executes
 through its verified ACP agent profile; Aider remains install-tier only.
 
+Bootstrap routing amendment (2026-08-26): Devin remains a CLI provider family
+for install, version, path, and auth discovery, but generated execution config
+must not create its non-executable `cli/native` target. Selecting Devin during
+bootstrap creates only `agent/acp` (`devin acp`) and routes Devin there by
+default. Setup scanning remains independent of configured execution targets.
+
 ## Context
 
 `environment-bootstrap` (the upstream installer suite this project mirrors) added four AI coding CLIs to its supported tool set between 2026-08-04 and 2026-08-05:
@@ -56,7 +62,8 @@ Specifically:
 8. **Devin's classification is probe-gated, not assumed.** Upstream documents Devin CLI as an interactive terminal coding agent with a Kanban surface for parallel tasks, which reads as a session provider. If a probe shows it only orchestrates remote Devin sessions and does not execute locally, it is reclassified as a management adapter under ADR-023 and removed from `KNOWN_PROVIDERS` in a follow-up ADR. This ADR registers it as a CLI family on the strength of the upstream description and accepts that reversal risk explicitly.
 9. **Quick/Full pack membership stays upstream metadata.** The runtime treats the supported platform/provider pairs as installable; pack membership (`native_cli_pack`) is carried by `cats-platform` setup-asset metadata, matching how the existing twelve are handled. Cline is installable through packaged setup on macOS and Linux only until its official Windows support or a reviewed Windows execution probe exists.
 10. **The Pi package rename is corrected in the same slice.** `src/core/provider-install/knowledge.ts` moves to `@earendil-works/pi-coding-agent`. This is not scope creep: it is the same "runtime provider knowledge drifted from the upstream installer suite" defect the rest of this ADR exists to fix, and leaving it means Pi upgrades silently no-op forever.
-11. **Install visibility and product executability remain separate.** The runtime dashboard, diagnostics, and provider-setup surfaces may list all four, but `cats-platform` adds a provider to its shared execution catalog only with a working runtime adapter. Grok now qualifies; Devin, Cline, and Aider do not.
+11. **Install visibility and product executability remain separate.** The runtime dashboard, diagnostics, and provider-setup surfaces may list all four, but `cats-platform` adds a provider to its shared execution catalog only with a working runtime adapter. Grok and Cline qualify through their native adapters, Devin qualifies through ACP, and Aider does not.
+12. **Generated config exposes only executable Devin targets.** Bootstrap still probes the installed `devin` binary directly for setup evidence, but writes only `backends.agent.providers.devin.instances.acp` with `args: ['acp']`; it does not write a detect-only `backends.cli.providers.devin` block. Routing defaults to `agent/acp`.
 
 This project has not shipped a stable release. Per the pre-release policy in `AGENTS.md`, no aliases, shims, or deprecation windows are owed for any of the above.
 

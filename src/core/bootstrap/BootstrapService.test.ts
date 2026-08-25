@@ -147,6 +147,55 @@ describe('BootstrapService', () => {
     }
   });
 
+  it('writes Devin only as the executable ACP agent target', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const devinPath = join(root, 'bin', 'devin.exe');
+      const env = {
+        ...createTestEnv(root),
+        DEVIN_PATH: devinPath,
+      };
+      ensureDirs(env);
+      const compatibility = {
+        assessCliTarget: async (target: { providerName: ProviderName; cliInstance?: { commandConfig: { path: string } } }) => (
+          createAssessment(target.providerName, target.cliInstance?.commandConfig.path || target.providerName)
+        ),
+      } as unknown as ProviderCompatibilityService;
+
+      const bootstrap = new BootstrapService({
+        dataDir: createRuntimeTestPaths(root).dataDir,
+        configPath: createRuntimeTestPaths(root).configPath,
+        config: loadConfig(env),
+        compatibility,
+      });
+
+      await bootstrap.scan();
+      await bootstrap.applyConfig(['devin']);
+
+      const generated = loadConfig(env);
+      expect(generated.providerInstances?.devin).toEqual({});
+      expect(generated.remoteProviderCatalog?.agent.devin?.acp).toEqual(expect.objectContaining({
+        providerName: 'devin',
+        backend: 'agent',
+        id: 'acp',
+        transport: 'acp_stdio',
+        command: devinPath,
+        args: ['acp'],
+      }));
+      expect(generated.providerDefaultTargets?.devin).toEqual({
+        backend: 'agent',
+        instance: 'acp',
+      });
+
+      const yaml = readFileSync(createRuntimeTestPaths(root).configPath, 'utf8');
+      expect(yaml).not.toContain('cli:\n    providers:\n      devin:');
+      expect(yaml).toContain('backend: agent');
+      expect(yaml).toContain('transport: acp_stdio');
+    } finally {
+      cleanup();
+    }
+  });
+
   it('writes the runtime-aware Kiro database path into generated providers.yaml', async () => {
     const { root, cleanup } = createTestRoot();
     try {

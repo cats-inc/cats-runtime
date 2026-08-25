@@ -118,12 +118,40 @@ function buildMinimalProvidersYaml(
   config: RuntimeConfig,
 ): string {
   const cliProviders: Record<string, unknown> = {};
+  const agentProviders: Record<string, unknown> = {};
+  const routingProviders: Record<string, unknown> = {};
 
   for (const provider of providers) {
     const scanned = scanResult?.providers.find((entry) => entry.provider === provider);
     const commandPath = scanned?.commandPath
       || config.providerCommands[provider]?.path
       || provider;
+
+    // Devin's CLI surface is still probed by setup for install and version
+    // evidence, but it cannot produce the structured events required by the
+    // CLI execution backend. Its verified execution surface is `devin acp`,
+    // so generated config must expose only that agent target instead of
+    // creating a detect-only cli/native target that appears degraded forever.
+    if (provider === 'devin') {
+      agentProviders.devin = {
+        default_instance: 'acp',
+        transport: 'acp_stdio',
+        instances: {
+          acp: {
+            command: commandPath,
+            args: ['acp'],
+          },
+        },
+      };
+      routingProviders.devin = {
+        default_target: {
+          backend: 'agent',
+          instance: 'acp',
+        },
+      };
+      continue;
+    }
+
     const instanceDoc: Record<string, unknown> = {
       command: commandPath,
       runner: 'auto',
@@ -143,13 +171,24 @@ function buildMinimalProvidersYaml(
     };
   }
 
+  const backends: Record<string, unknown> = {};
+  if (Object.keys(cliProviders).length > 0) {
+    backends.cli = {
+      providers: cliProviders,
+    };
+  }
+  if (Object.keys(agentProviders).length > 0) {
+    backends.agent = {
+      providers: agentProviders,
+    };
+  }
+
   const doc: Record<string, unknown> = {
     version: 1,
-    backends: {
-      cli: {
-        providers: cliProviders,
-      },
-    },
+    ...(Object.keys(routingProviders).length > 0
+      ? { routing: { providers: routingProviders } }
+      : {}),
+    backends,
   };
 
   return stringify(doc, {
