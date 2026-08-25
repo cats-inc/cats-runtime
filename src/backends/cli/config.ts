@@ -155,6 +155,7 @@ export interface ProviderInstanceConfig {
   piSessionsDir?: string;
   piInstructionsFile?: string;
   clineSessionsDir?: string;
+  grokSessionsDir?: string;
 }
 
 export interface RuntimeMeteringConfig {
@@ -202,6 +203,7 @@ export interface CliRuntimeConfig {
   kiroRuntime: ProviderRuntimeConfig;
   piSessionsDir: string;
   clineSessionsDir: string;
+  grokSessionsDir: string;
   wslDiscoveryPolicy?: WslDiscoveryPolicy;
   dockerDiscoveryPolicy?: DockerDiscoveryPolicy;
   compatibilityProbeTimeoutMs: number;
@@ -242,6 +244,7 @@ interface LegacyRuntimeShape {
   opencodeServerStartupTimeoutMs: number;
   piSessionsDir: string;
   clineSessionsDir: string;
+  grokSessionsDir: string;
   providerDefaultTargets: Record<string, ProviderDefaultTarget>;
   remoteProviderCatalog: RemoteProviderCatalog;
 }
@@ -323,6 +326,10 @@ export function defaultPiSessionsDir(): string {
 
 export function defaultClineSessionsDir(): string {
   return '~/.cline/data/sessions';
+}
+
+export function defaultGrokSessionsDir(): string {
+  return '~/.grok/sessions';
 }
 
 export function defaultOpencodeServerHost(): string {
@@ -469,6 +476,7 @@ export function loadConfig(
     kiroRuntime: configured.kiroRuntime,
     piSessionsDir: configured.piSessionsDir,
     clineSessionsDir: configured.clineSessionsDir,
+    grokSessionsDir: configured.grokSessionsDir,
     wslDiscoveryPolicy: parseWslDiscoveryPolicy(
       env.CATS_RUNTIME_WSL_DISCOVERY_POLICY,
       defaultWslDiscoveryPolicy(),
@@ -560,6 +568,7 @@ export function listProviderInstances(
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
     | 'clineSessionsDir'
+    | 'grokSessionsDir'
   >,
   provider: ProviderName,
 ): ProviderInstanceConfig[] {
@@ -604,6 +613,7 @@ export function resolveProviderInstance(
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
     | 'clineSessionsDir'
+    | 'grokSessionsDir'
   >,
   provider: ProviderName,
   instanceId?: string,
@@ -741,6 +751,7 @@ function buildLegacyRuntimeShape(
         id: 'native',
         providerName: 'grok',
         commandConfig: providerCommands.grok,
+        grokSessionsDir: env.GROK_SESSIONS_DIR || defaultGrokSessionsDir(),
       },
     },
     cline: {
@@ -853,6 +864,7 @@ function buildLegacyRuntimeShape(
     opencodeServerStartupTimeoutMs,
     piSessionsDir: env.PI_SESSIONS_DIR || defaultPiSessionsDir(),
     clineSessionsDir: env.CLINE_SESSIONS_DIR || defaultClineSessionsDir(),
+    grokSessionsDir: env.GROK_SESSIONS_DIR || defaultGrokSessionsDir(),
     providerDefaultTargets,
     remoteProviderCatalog: {
       api: {},
@@ -1002,6 +1014,7 @@ function buildLegacyProviderInstance(
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
     | 'clineSessionsDir'
+    | 'grokSessionsDir'
   >,
 ): ProviderInstanceConfig {
   return {
@@ -1026,6 +1039,7 @@ function buildLegacyProviderInstance(
       : undefined,
     piSessionsDir: provider === 'pi' ? config.piSessionsDir : undefined,
     clineSessionsDir: provider === 'cline' ? config.clineSessionsDir : undefined,
+    grokSessionsDir: provider === 'grok' ? config.grokSessionsDir : undefined,
   };
 }
 
@@ -1062,6 +1076,7 @@ function applyFileBasedProviderConfig(
   let opencodeServerStartupTimeoutMs = legacy.opencodeServerStartupTimeoutMs;
   let piSessionsDir = legacy.piSessionsDir;
   let clineSessionsDir = legacy.clineSessionsDir;
+  let grokSessionsDir = legacy.grokSessionsDir;
   let piInstructionsFile: string | undefined;
   const rawBackends = asOptionalObject(doc.backends);
   if (doc.backends !== undefined && !rawBackends) {
@@ -1124,6 +1139,11 @@ function applyFileBasedProviderConfig(
           copilotSessionsDir = readString(discovery?.sessions_dir)
             || readString(providerDoc.sessions_dir)
             || copilotSessionsDir;
+          break;
+        case 'grok':
+          grokSessionsDir = readString(discovery?.sessions_dir)
+            || readString(providerDoc.sessions_dir)
+            || grokSessionsDir;
           break;
         case 'cline':
           clineSessionsDir = readString(discovery?.sessions_dir)
@@ -1259,6 +1279,11 @@ function applyFileBasedProviderConfig(
               || fallback.clineSessionsDir
               || clineSessionsDir
             : undefined,
+          grokSessionsDir: provider === 'grok'
+            ? readString(instanceDoc.sessions_dir)
+              || fallback.grokSessionsDir
+              || grokSessionsDir
+            : undefined,
           piInstructionsFile: provider === 'pi'
             ? readString(instanceDoc.instructions_file)
               || readString(instanceDoc.instructionsFile)
@@ -1325,6 +1350,9 @@ function applyFileBasedProviderConfig(
       }
       if (provider === 'cline') {
         clineSessionsDir = nextInstances[defaultInstance].clineSessionsDir || clineSessionsDir;
+      }
+      if (provider === 'grok') {
+        grokSessionsDir = nextInstances[defaultInstance].grokSessionsDir || grokSessionsDir;
       }
     }
 
@@ -1413,6 +1441,9 @@ function applyFileBasedProviderConfig(
     if (provider === 'cline') {
       clineSessionsDir = instance.clineSessionsDir || clineSessionsDir;
     }
+    if (provider === 'grok') {
+      grokSessionsDir = instance.grokSessionsDir || grokSessionsDir;
+    }
   }
 
   return {
@@ -1435,6 +1466,7 @@ function applyFileBasedProviderConfig(
     opencodeServerStartupTimeoutMs,
     piSessionsDir,
     clineSessionsDir,
+    grokSessionsDir,
     providerDefaultTargets,
     remoteProviderCatalog,
   };

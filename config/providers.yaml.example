@@ -259,6 +259,9 @@ backends:
             environment: native
             command: grok
             runner: auto
+            # Grok groups sessions by URL-encoded working directory; set GROK_HOME
+            # instead if you relocate the whole Grok home.
+            sessions_dir: ~/.grok/sessions
 
       cline:
         instances:

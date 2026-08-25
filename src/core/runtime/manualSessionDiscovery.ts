@@ -80,6 +80,7 @@ type ManualSessionDiscoveryConfig = Pick<
   | 'opencodeServerStartupTimeoutMs'
   | 'piSessionsDir'
   | 'clineSessionsDir'
+  | 'grokSessionsDir'
   | 'remoteProviderCatalog'
 >;
 

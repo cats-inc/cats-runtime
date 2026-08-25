@@ -8,7 +8,7 @@ import {
 
 type FileBackedProviderName = Extract<
   ProviderName,
-  'auggie' | 'claude' | 'cline' | 'codex' | 'copilot' | 'pi'
+  'auggie' | 'claude' | 'cline' | 'codex' | 'copilot' | 'grok' | 'pi'
 >;
 
 type FileBackedInstancePathField = Extract<
@@ -18,6 +18,7 @@ type FileBackedInstancePathField = Extract<
   | 'clineSessionsDir'
   | 'codexSessionsDir'
   | 'copilotSessionsDir'
+  | 'grokSessionsDir'
   | 'piSessionsDir'
 >;
 
@@ -28,6 +29,7 @@ type FileBackedConfigPathField = Extract<
   | 'clineSessionsDir'
   | 'codexSessionsDir'
   | 'copilotSessionsDir'
+  | 'grokSessionsDir'
   | 'piSessionsDir'
 >;
 
@@ -55,6 +57,11 @@ const FILE_BACKED_PROVIDER_PATHS = {
   copilot: {
     instanceField: 'copilotSessionsDir',
     configField: 'copilotSessionsDir',
+    configKey: 'sessions_dir',
+  },
+  grok: {
+    instanceField: 'grokSessionsDir',
+    configField: 'grokSessionsDir',
     configKey: 'sessions_dir',
   },
   pi: {

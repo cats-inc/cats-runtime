@@ -123,6 +123,7 @@ export function getProviderDefaultTarget(
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
     | 'clineSessionsDir'
+    | 'grokSessionsDir'
     | 'remoteProviderCatalog'
   >,
   providerName: string,
@@ -212,6 +213,7 @@ export function listConfiguredProviders(
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
     | 'clineSessionsDir'
+    | 'grokSessionsDir'
     | 'remoteProviderCatalog'
   >,
 ): string[] {
@@ -260,6 +262,7 @@ export function listProviderCatalog(
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
     | 'clineSessionsDir'
+    | 'grokSessionsDir'
     | 'remoteProviderCatalog'
   >,
 ): Record<string, ProviderCatalogEntry> {
@@ -339,6 +342,7 @@ export function resolveProviderTarget(
     | 'opencodeServerStartupTimeoutMs'
     | 'piSessionsDir'
     | 'clineSessionsDir'
+    | 'grokSessionsDir'
     | 'remoteProviderCatalog'
   >,
   providerName: string,

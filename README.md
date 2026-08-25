@@ -23,8 +23,8 @@ Current capabilities:
 - a lightweight browser/preview substrate with runtime-owned browser sessions/pages, a pluggable driver seam, and manual browser-page preview registration
 - provider-agnostic `progress` events across Junie, Pi, Goose, Copilot, and API/local transports
 - runtime-hosted local tools for API/local sessions (`list_files`, `read_file`, `write_file`, `grep`, `run_shell`)
-- external session discovery for supported local tools, including Cline runs
-  that the CLI itself cannot resume
+- external session discovery for supported local tools, including Grok and Cline
+  runs — the latter being sessions the CLI itself cannot resume
 - agent-backed session discovery for ACP targets that advertise session
   enumeration, imported through `POST /agent/sessions/discover`
 - file-based provider topology with separated `routing` / `backends` sections

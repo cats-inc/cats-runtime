@@ -22,6 +22,7 @@ import { AuggieSessionScanner } from './backends/cli/discovery/AuggieSessionScan
 import { FileWatcher } from './backends/cli/discovery/FileWatcher.js';
 import { SessionScanner } from './backends/cli/discovery/SessionScanner.js';
 import { ClineSessionScanner } from './backends/cli/discovery/ClineSessionScanner.js';
+import { GrokSessionScanner } from './backends/cli/discovery/GrokSessionScanner.js';
 import { CodexSessionScanner } from './backends/cli/discovery/CodexSessionScanner.js';
 import { CopilotSessionScanner } from './backends/cli/discovery/CopilotSessionScanner.js';
 import { PiSessionScanner } from './backends/cli/discovery/PiSessionScanner.js';
@@ -353,6 +354,24 @@ export function createDiscoveryController(
         resolveFileBackedProviderPath(ctx.config, 'claude', instance.id),
         new SessionScanner(resolveFileBackedProviderPath(ctx.config, 'claude', instance.id)),
         'claude',
+        ctx.registry,
+        instance.id,
+      ),
+    })),
+    ...listProviderInstances(ctx.config, 'grok')
+      .filter((instance) => supportsHostFileBackedProviderDiscovery(ctx.config, 'grok', instance.id))
+      .map((instance) => ({
+      provider: 'grok' as const,
+      instanceId: instance.id,
+      name: instance.id === getProviderDefaultInstanceId(ctx.config, 'grok')
+        ? 'grok'
+        : `grok@${instance.id}`,
+      watchDir: resolveFileBackedProviderPath(ctx.config, 'grok', instance.id),
+      normalizedWatchDir: normalizeFileBackedProviderPath(ctx.config, 'grok', instance.id),
+      createWatcher: () => new FileWatcher(
+        resolveFileBackedProviderPath(ctx.config, 'grok', instance.id),
+        new GrokSessionScanner(resolveFileBackedProviderPath(ctx.config, 'grok', instance.id)),
+        'grok',
         ctx.registry,
         instance.id,
       ),
