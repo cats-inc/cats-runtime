@@ -47,6 +47,7 @@ import { injectSharedUI } from './uiInjector.js';
 import { injectRuntimeShellState, type RuntimeSurface } from './ui/runtimeShell.js';
 import { bootstrapGuard } from './routes/bootstrapGuard.js';
 import { discoveryRoutes } from './routes/discovery.js';
+import { agentSessionRoutes } from './routes/agentSessions.js';
 import { browserRoutes } from './routes/browser.js';
 import { deliveryRoutes } from './routes/delivery.js';
 import { diagnosticsRoutes } from './routes/diagnostics.js';
@@ -392,6 +393,7 @@ export function createRuntimeApp(ctx: AppContext) {
   app.route('/', setupDiagnosticsRoutes);
   app.route('/', setupRoutes);
   app.route('/', discoveryRoutes);
+  app.route('/', agentSessionRoutes);
   app.route('/', browserRoutes);
   app.route('/', deliveryRoutes);
   app.route('/', sessionRoutes);

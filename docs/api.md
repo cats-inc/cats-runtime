@@ -4258,6 +4258,52 @@ When `startIfNeeded` is `false`, the runtime will skip waking a stopped WSL
 distro and return any sessions it can inspect without starting WSL. The default
 remains `true`.
 
+### Agent Session Discovery
+
+```text
+POST /agent/sessions/discover
+```
+
+The agent-backend counterpart to the provider-native routes above. Those read a
+CLI's own on-disk session store; this one asks an ACP agent what sessions it
+already owns. One route serves every agent family rather than one route per
+provider, because the capability is negotiated at the protocol level:
+
+```json
+{
+  "provider": "devin",
+  "instance": "acp",
+  "group": "optional-group"
+}
+```
+
+`instance` defaults to the provider's configured default target, which must
+resolve to the `agent` backend — a CLI-backed provider returns `400` and is
+directed at its own discovery route.
+
+The runtime calls `session/list` only when the agent's `initialize` response
+advertises `agentCapabilities.sessionCapabilities.list`. An agent without it is
+reported rather than probed:
+
+```json
+{
+  "provider": "devin",
+  "backend": "agent",
+  "instance": "acp",
+  "supported": false,
+  "summary": "ACP target 'devin/acp' does not advertise session enumeration.",
+  "discovered": 0,
+  "imported": 0,
+  "sessions": []
+}
+```
+
+When it is supported, each entry is imported into the session registry with
+`providerBackend: "agent"`, mapping the agent's `sessionId`, `cwd`, `title`, and
+`updatedAt` onto the runtime's `providerSessionId`, `cwd`, `summary`, and
+`lastActivity`. Discovery never issues `session/new`, so enumerating sessions
+does not create one. Verified against Devin 3000.5.20.
+
 ## Error Responses
 
 Errors use this format:

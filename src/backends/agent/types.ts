@@ -209,6 +209,26 @@ export interface AgentAdapterToolCatalogRequest {
   sessionKey?: string;
 }
 
+export interface AgentAdapterDiscoveredSession {
+  providerSessionId: string;
+  cwd?: string;
+  summary?: string;
+  lastActivity?: string;
+}
+
+/**
+ * Sessions an agent target already owns, as reported by the agent itself.
+ *
+ * `supported: false` is a normal answer, not a failure: enumeration is an
+ * optional agent capability, and a target that does not advertise it is
+ * reported rather than probed blindly.
+ */
+export interface AgentAdapterSessionCatalog {
+  supported: boolean;
+  summary: string;
+  sessions: AgentAdapterDiscoveredSession[];
+}
+
 export interface AgentAdapterInspection {
   adapter: string;
   family: 'gateway' | 'bridge' | 'protocol' | 'generic';
@@ -262,6 +282,7 @@ export interface AgentAdapter {
     instance: RemoteProviderInstanceConfig,
     request?: AgentAdapterToolCatalogRequest,
   ): Promise<AgentAdapterToolCatalog>;
+  listSessions?(instance: RemoteProviderInstanceConfig): Promise<AgentAdapterSessionCatalog>;
   inspect?(instance: RemoteProviderInstanceConfig): AgentAdapterInspection;
   cancel?(
     sessionId: string,

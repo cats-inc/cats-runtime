@@ -16,6 +16,7 @@ import type {
   AgentAdapterProbeResult,
   AgentAdapterToolCatalog,
   AgentAdapterToolCatalogRequest,
+  AgentAdapterSessionCatalog,
   AgentBackendStatus,
   AgentAdapter,
   AgentAdapterInspection,
@@ -222,6 +223,21 @@ export class AgentBackendManager {
     }
 
     return adapter.listTools(instance, request);
+  }
+
+  async listSessions(
+    target: ProviderTargetDescriptor,
+  ): Promise<AgentAdapterSessionCatalog> {
+    const instance = ensureAgentTarget(target);
+    const adapter = this.buildAdapter(instance);
+    if (!adapter.listSessions) {
+      throw new Error(
+        `Agent adapter '${adapter.kind}' does not support session discovery for `
+        + `${target.providerName}/${target.instanceId}`,
+      );
+    }
+
+    return adapter.listSessions(instance);
   }
 
   async probe(

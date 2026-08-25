@@ -50,7 +50,11 @@ structured surface is the ACP server (`devin acp`), which belongs to the agent
 backend rather than the CLI backend. To run Devin sessions, configure it as an
 ACP agent target — `config/providers.yaml.example` carries a working block. The
 handshake is verified against 3000.3.27: protocol version 1, `loadSession`
-support, and four session modes (Code, Ask, Plan, Bypass Permissions).
+support, and four session modes (Code, Ask, Plan, Bypass Permissions). Re-probed
+on 3000.5.20, which also advertises `sessionCapabilities.list`, so
+`POST /agent/sessions/discover` can import the sessions Devin already owns —
+`sessionId`, `cwd`, `title`, and `updatedAt` — into the dashboard without
+creating a new one.
 
 Aider installs with `irm https://aider.chat/install.ps1 | iex` on Windows or
 `curl -LsSf https://aider.chat/install.sh | sh` on macOS/Linux, into

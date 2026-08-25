@@ -172,7 +172,8 @@ const DEVIN_ACP_PROFILE: AcpProviderProfile = {
   family: 'devin',
   tier: 1,
   summary: 'Tier 1 Devin ACP target served by the devin acp stdio subcommand, verified against '
-    + 'Devin 3000.3.27 (protocolVersion 1, loadSession, four session modes).',
+    + 'Devin 3000.3.27 (protocolVersion 1, loadSession, four session modes) and re-probed on '
+    + '3000.5.20, which additionally advertises sessionCapabilities.list and .delete.',
   // Devin defaults to `accept-edits`, which performs fs/write_text_file without
   // ever issuing session/request_permission. Leaving the mode unset would let a
   // runtime `default` turn edit the workspace un-gated, so the mode is pinned.

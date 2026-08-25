@@ -24,6 +24,8 @@ Current capabilities:
 - provider-agnostic `progress` events across Junie, Pi, Goose, Copilot, and API/local transports
 - runtime-hosted local tools for API/local sessions (`list_files`, `read_file`, `write_file`, `grep`, `run_shell`)
 - external session discovery for supported local tools
+- agent-backed session discovery for ACP targets that advertise session
+  enumeration, imported through `POST /agent/sessions/discover`
 - file-based provider topology with separated `routing` / `backends` sections
 - dashboard-side provider instance selection for session creation
 - embedded multi-agent playground sample at `/playground`

@@ -15,6 +15,11 @@ import {
   createRuntimeTestPaths,
   ensureRuntimeTestDirs,
 } from './support/runtimeTestPaths.js';
+import {
+  createFakeAcpSpawner,
+  FakeAcpProcess,
+  startFakeAcpServer,
+} from './support/fakeAcpProcess.js';
 
 function createAgentConfigRoot(options: { model?: string } = {}) {
   const model = options.model || 'openclaw-coder';
@@ -4296,6 +4301,162 @@ describe('agent backend integration', () => {
     } finally {
       await runtime.close();
       cleanup();
+    }
+  });
+});
+
+function createAcpStdioConfigRoot() {
+  const root = mkdtempSync(join(tmpdir(), 'cats-runtime-acp-stdio-test-'));
+  const paths = createRuntimeTestPaths(root);
+  mkdirSync(paths.configDir, { recursive: true });
+  writeFileSync(paths.configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+routing:
+  providers:
+    devin:
+      default_target:
+        backend: agent
+        instance: acp
+    claude:
+      default_target:
+        backend: cli
+        instance: native
+backends:
+  cli:
+    providers:
+      claude:
+        instances:
+          native:
+            environment: native
+            command: claude
+            runner: auto
+  agent:
+    providers:
+      devin:
+        default_instance: acp
+        transport: acp_stdio
+        instances:
+          acp:
+            command: devin
+            args: ['acp']
+`.trimStart());
+
+  const env = createRuntimeTestEnv(root, {
+    CATS_RUNTIME_HOST: '127.0.0.1',
+    CATS_RUNTIME_PORT: '3110',
+    CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
+    CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
+  });
+
+  ensureRuntimeTestDirs(paths);
+
+  return {
+    root,
+    env,
+    config: loadConfig(env),
+    cleanup: () => cleanupTempDirWithRetries(root),
+  };
+}
+
+describe('agent session discovery', () => {
+  it('imports sessions an ACP agent already owns into the registry', async () => {
+    const { config, env, cleanup } = createAcpStdioConfigRoot();
+    const agentProcess = new FakeAcpProcess();
+    const methods: string[] = [];
+    startFakeAcpServer(agentProcess, (message) => {
+      methods.push(String(message.method));
+      if (message.method === 'initialize') {
+        agentProcess.stdout.write(`${JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: true,
+              sessionCapabilities: { list: {}, delete: {} },
+            },
+          },
+        })}\n`);
+        return;
+      }
+
+      if (message.method === 'session/list') {
+        agentProcess.stdout.write(`${JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessions: [
+              {
+                sessionId: 'sage-origin',
+                cwd: '/workspace',
+                title: 'History of Terminal Emulators',
+                updatedAt: '2026-08-08T15:56:14+00:00',
+              },
+            ],
+          },
+        })}\n`);
+      }
+    });
+
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        acpProcessSpawner: createFakeAcpSpawner(agentProcess),
+      },
+    });
+
+    try {
+      const response = await runtime.app.request('/agent/sessions/discover', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ provider: 'devin' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(expect.objectContaining({
+        provider: 'devin',
+        backend: 'agent',
+        instance: 'acp',
+        supported: true,
+        discovered: 1,
+        imported: 1,
+      }));
+      // The agent owns these sessions already; enumerating them must not open a new one.
+      expect(methods).not.toContain('session/new');
+
+      const sessions = await (await runtime.app.request('/sessions')).json();
+      expect(sessions.sessions).toEqual([expect.objectContaining({
+        providerName: 'devin',
+        providerBackend: 'agent',
+        providerInstanceId: 'acp',
+        providerSessionId: 'sage-origin',
+        summary: 'History of Terminal Emulators',
+      })]);
+    } finally {
+      await runtime.close();
+      await cleanup();
+    }
+  });
+
+  it('refuses a CLI-backed provider instead of pretending it has an agent to ask', async () => {
+    const { config, env, cleanup } = createAcpStdioConfigRoot();
+    const runtime = createRuntimeServer(config, { agentBackend: { env } });
+
+    try {
+      const response = await runtime.app.request('/agent/sessions/discover', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ provider: 'claude' }),
+      });
+
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toContain('not an agent target');
+    } finally {
+      await runtime.close();
+      await cleanup();
     }
   });
 });

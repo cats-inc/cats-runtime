@@ -5,6 +5,8 @@ import type {
   AgentAdapterProbeCheck,
   AgentAdapterInspection,
   AgentAdapterProbeResult,
+  AgentAdapterDiscoveredSession,
+  AgentAdapterSessionCatalog,
   AgentAdapterToolCatalog,
   AgentAdapterToolCatalogRequest,
   AgentBackendOptions,
@@ -492,6 +494,49 @@ function parseAvailableCommands(value: unknown): AcpAvailableCommand[] {
       ...(readString(item?.description) ? { description: readString(item?.description) } : {}),
     }];
   });
+}
+
+function supportsAcpSessionList(
+  agentCapabilities: Record<string, unknown> | null | undefined,
+): boolean {
+  const sessionCapabilities = parseRecord(agentCapabilities?.sessionCapabilities);
+  if (!sessionCapabilities) {
+    return false;
+  }
+
+  // Devin 3000.5.20 declares `list: {}` — an options bag, not a flag. A plain
+  // boolean is accepted too so a stricter agent is not refused over shape.
+  const list = sessionCapabilities.list;
+  return list === true || parseRecord(list) !== null;
+}
+
+function parseDiscoveredAcpSessions(value: unknown): AgentAdapterDiscoveredSession[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const sessions: AgentAdapterDiscoveredSession[] = [];
+  for (const entry of value) {
+    const record = parseRecord(entry);
+    const providerSessionId = typeof record?.sessionId === 'string'
+      ? record.sessionId.trim()
+      : '';
+    if (!providerSessionId) {
+      continue;
+    }
+
+    const cwd = typeof record?.cwd === 'string' ? record.cwd.trim() : '';
+    const title = typeof record?.title === 'string' ? record.title.trim() : '';
+    const updatedAt = typeof record?.updatedAt === 'string' ? record.updatedAt.trim() : '';
+    sessions.push({
+      providerSessionId,
+      ...(cwd ? { cwd } : {}),
+      ...(title ? { summary: title } : {}),
+      ...(updatedAt ? { lastActivity: updatedAt } : {}),
+    });
+  }
+
+  return sessions;
 }
 
 async function runTransientBootstrap(
@@ -1779,6 +1824,63 @@ export class AcpAdapter implements AgentAdapter {
     const env = sanitizeEnv(this.options.env || process.env);
     const { sessionResult } = await runTransientBootstrap(instance, env, this.options, cwd);
     return parseModels(sessionResult?.models);
+  }
+
+  async listSessions(
+    instance: RemoteProviderInstanceConfig,
+  ): Promise<AgentAdapterSessionCatalog> {
+    const command = instance.command?.trim();
+    if (!command) {
+      throw new Error('ACP session discovery currently supports stdio agent commands only.');
+    }
+
+    const cwd = resolveBootstrapCwd(instance.cwd, process.cwd());
+    if (!cwd) {
+      throw new Error('ACP session discovery requires a working directory.');
+    }
+
+    const env = sanitizeEnv(this.options.env || process.env);
+    const client = new AcpStdioClient({
+      command,
+      args: instance.args,
+      cwd,
+      env,
+      spawnProcess: this.options.acpProcessSpawner,
+    });
+    const timeoutMs = resolveBootstrapTimeoutMs(instance);
+
+    try {
+      const initializeResult = parseRecord(
+        await client.request('initialize', buildInitializeParams(instance), { timeoutMs }),
+      );
+      const agentCapabilities = parseRecord(initializeResult?.agentCapabilities);
+      // Enumeration is advertised under sessionCapabilities rather than as a
+      // top-level boolean like loadSession. Calling session/list on an agent
+      // that does not declare it answers with method-not-found, so the
+      // capability is the gate rather than a try/catch.
+      if (!supportsAcpSessionList(agentCapabilities)) {
+        return {
+          supported: false,
+          summary: `ACP target '${instance.providerName}/${instance.id}' does not advertise `
+            + 'session enumeration.',
+          sessions: [],
+        };
+      }
+
+      // No session/new here: enumeration must not create the session it lists.
+      const listResult = parseRecord(
+        await client.request('session/list', {}, { timeoutMs }),
+      );
+      const sessions = parseDiscoveredAcpSessions(listResult?.sessions);
+      return {
+        supported: true,
+        summary: `ACP target '${instance.providerName}/${instance.id}' reported `
+          + `${sessions.length} session(s).`,
+        sessions,
+      };
+    } finally {
+      await client.close();
+    }
   }
 
   async listTools(

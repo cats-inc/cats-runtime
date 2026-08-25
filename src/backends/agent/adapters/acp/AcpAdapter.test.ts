@@ -1,36 +1,21 @@
-import { EventEmitter } from 'node:events';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createInterface } from 'node:readline';
-import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
 import type {
   AgentAcpHostBridge,
   AgentAcpHostContext,
   AgentCliCommandRunner,
-  AgentProcessSpawner,
-  AgentSpawnedProcess,
 } from '../../types.js';
 import type { StreamEvent } from '../../../../core/types.js';
 import { RuntimeAcpHostBridge } from '../../acp/RuntimeAcpHostBridge.js';
 import { AcpAdapter } from './AcpAdapter.js';
-
-class FakeAcpProcess extends EventEmitter implements AgentSpawnedProcess {
-  readonly stdin = new PassThrough();
-  readonly stdout = new PassThrough();
-  readonly stderr = new PassThrough();
-  exitCode: number | null = null;
-  killed = false;
-
-  kill(): boolean {
-    this.killed = true;
-    this.exitCode = 0;
-    this.emit('close', 0, null);
-    return true;
-  }
-}
+import {
+  createFakeAcpSpawner as createSpawner,
+  FakeAcpProcess,
+  startFakeAcpServer as startFakeServer,
+} from '../../../../../tests/support/fakeAcpProcess.js';
 
 const tempRoots: string[] = [];
 
@@ -46,16 +31,6 @@ async function collectEvents(stream: AsyncGenerator<StreamEvent>): Promise<Strea
     events.push(event);
   }
   return events;
-}
-
-function startFakeServer(
-  process: FakeAcpProcess,
-  onMessage: (message: Record<string, unknown>) => void | Promise<void>,
-): void {
-  const rl = createInterface({ input: process.stdin });
-  rl.on('line', (line) => {
-    void onMessage(JSON.parse(line) as Record<string, unknown>);
-  });
 }
 
 function createHttpInstance(): RemoteProviderInstanceConfig {
@@ -297,10 +272,6 @@ function createFailedProbeRunner(): AgentCliCommandRunner {
     timedOut: false,
     durationMs: 17,
   });
-}
-
-function createSpawner(process: FakeAcpProcess): AgentProcessSpawner {
-  return () => process;
 }
 
 function createInvokeInput(
@@ -3690,5 +3661,94 @@ describe('AcpAdapter', () => {
         },
       },
     ]);
+  });
+});
+
+describe('AcpAdapter session enumeration', () => {
+  it('lists sessions an agent already owns without creating one', async () => {
+    const process = new FakeAcpProcess();
+    const methods: string[] = [];
+    startFakeServer(process, async (message) => {
+      methods.push(String(message.method));
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: true,
+              // Devin 3000.5.20 declares this as an options bag, not a flag.
+              sessionCapabilities: { list: {}, delete: {} },
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/list') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessions: [
+              {
+                sessionId: 'sage-origin',
+                cwd: '/workspace',
+                title: 'History of Terminal Emulators',
+                updatedAt: '2026-08-08T15:56:14+00:00',
+              },
+              { sessionId: '   ', title: 'dropped: no id' },
+              { sessionId: 'swanky-fighter' },
+            ],
+          },
+        }) + '\n');
+      }
+    });
+
+    const adapter = new AcpAdapter({ acpProcessSpawner: createSpawner(process) });
+
+    await expect(adapter.listSessions(createStdioInstance())).resolves.toEqual({
+      supported: true,
+      summary: "ACP target 'codex/acp-local' reported 2 session(s).",
+      sessions: [
+        {
+          providerSessionId: 'sage-origin',
+          cwd: '/workspace',
+          summary: 'History of Terminal Emulators',
+          lastActivity: '2026-08-08T15:56:14+00:00',
+        },
+        { providerSessionId: 'swanky-fighter' },
+      ],
+    });
+    // Enumeration must not create the session it is enumerating.
+    expect(methods).not.toContain('session/new');
+  });
+
+  it('reports an agent that does not advertise enumeration instead of probing it', async () => {
+    const process = new FakeAcpProcess();
+    const methods: string[] = [];
+    startFakeServer(process, async (message) => {
+      methods.push(String(message.method));
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: { loadSession: true },
+          },
+        }) + '\n');
+      }
+    });
+
+    const adapter = new AcpAdapter({ acpProcessSpawner: createSpawner(process) });
+
+    await expect(adapter.listSessions(createStdioInstance())).resolves.toEqual({
+      supported: false,
+      summary: "ACP target 'codex/acp-local' does not advertise session enumeration.",
+      sessions: [],
+    });
+    expect(methods).not.toContain('session/list');
   });
 });
