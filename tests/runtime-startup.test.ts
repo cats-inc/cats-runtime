@@ -418,7 +418,7 @@ describe('runtime startup helpers', () => {
     expect(help).toContain('--probe-parser <parserId>');
     expect(help).toContain('--probe-runtime <native|wsl|docker>');
     expect(help).toContain('--probe-transport <cli|agent|api|unknown>');
-    expect(help).toContain('--probe-profile <manual_smoke|manual_text>');
+    expect(help).toContain('--probe-profile <manual_smoke|manual_text|manual_tool>');
     expect(help).toContain('--probe-review-summary <text>');
     expect(help).toContain('--probe-highlight <text>');
     expect(help).toContain('--probe-reference <kind=url>');
