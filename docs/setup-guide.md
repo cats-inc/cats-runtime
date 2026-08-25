@@ -4,7 +4,8 @@
 
 ## Prerequisites
 
-- Node.js 22+
+- Node.js 22.12+
+- npm 12+
 - Installed local CLIs for the providers you want to use (`claude`, `codex`,
   `agy` for Antigravity, `cursor-agent`, `kiro-cli`, `grok`, `cline`, `devin`,
   `aider`, `kilo`, `opencode`, etc.)
