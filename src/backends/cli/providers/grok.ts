@@ -126,7 +126,6 @@ export class GrokProvider implements Provider {
   }
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
-    this.assertVerifiedProfile();
     const prompt = this.pendingPrompt;
     if (!prompt) {
       throw new Error('Grok CLI requires prepareEphemeralTurn before building spawn arguments.');
@@ -302,18 +301,6 @@ export class GrokProvider implements Provider {
       type: 'raw',
       raw: event,
     } satisfies RawStreamEvent);
-  }
-
-  private assertVerifiedProfile(): void {
-    if (
-      this.compatibilityProfile?.id !== GROK_STREAMING_JSON_PROFILE_ID
-      || this.compatibilityProfile.confidence !== 'exact'
-    ) {
-      throw new Error(
-        'Grok CLI execution requires the exact Grok 1.0.0 streaming-json compatibility profile. '
-        + 'Run provider compatibility diagnostics and install the verified CLI version.',
-      );
-    }
   }
 
   private parseToolCall(event: GrokNativeStreamEvent): StreamEvent | StreamEvent[] {

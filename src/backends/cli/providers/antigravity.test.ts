@@ -22,7 +22,7 @@ function verifiedProvider(): AntigravityProvider {
 }
 
 describe('AntigravityProvider spawn arguments', () => {
-  it('requires the exact live-probed compatibility profile', () => {
+  it('uses the best-known adapter when no compatibility profile is available', () => {
     const provider = new AntigravityProvider();
     provider.prepareEphemeralTurn({ message: 'Say hi' });
 
@@ -32,8 +32,9 @@ describe('AntigravityProvider spawn arguments', () => {
       fork: false,
       permissions: true,
     });
-    expect(() => provider.buildSpawnArgs({ cwd: '/tmp/agy-provider-test' }))
-      .toThrow(/exact Antigravity 1\.1\.20 stream-json compatibility profile/);
+    const args = provider.buildSpawnArgs({ cwd: '/tmp/agy-provider-test' });
+    expect(args).toContain('stream-json');
+    expect(args).toContain('--add-dir');
   });
 
   it('always scopes the workspace with --add-dir so agy does not fall back to its own scratch', () => {

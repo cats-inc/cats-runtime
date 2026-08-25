@@ -116,7 +116,6 @@ export class AntigravityProvider implements Provider {
   }
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
-    this.assertVerifiedProfile();
     const prompt = this.pendingPrompt;
     if (!prompt) {
       throw new Error(
@@ -235,19 +234,6 @@ export class AntigravityProvider implements Provider {
       type: 'raw',
       raw: event,
     } satisfies RawStreamEvent);
-  }
-
-  private assertVerifiedProfile(): void {
-    if (
-      this.compatibilityProfile?.id !== ANTIGRAVITY_STREAM_JSON_PROFILE_ID
-      || this.compatibilityProfile.confidence !== 'exact'
-    ) {
-      throw new Error(
-        'Antigravity CLI execution requires the exact Antigravity 1.1.20 stream-json '
-        + 'compatibility profile. Run provider compatibility diagnostics and install the '
-        + 'verified CLI version.',
-      );
-    }
   }
 
   private parseInit(event: AntigravityNativeEvent): StreamEvent {

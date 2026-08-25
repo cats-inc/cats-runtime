@@ -16,7 +16,7 @@ const VERIFIED_PROFILE: CompatibilityProfileSelection = {
 };
 
 describe('GrokProvider', () => {
-  it('requires the exact fixture-backed compatibility profile', () => {
+  it('uses the best-known adapter when no compatibility profile is available', () => {
     const provider = new GrokProvider();
     provider.prepareEphemeralTurn({ message: 'Say hi' });
 
@@ -26,8 +26,9 @@ describe('GrokProvider', () => {
       fork: true,
       permissions: true,
     });
-    expect(() => provider.buildSpawnArgs({ cwd: '/tmp/grok-provider-test' }))
-      .toThrow(/exact Grok 1\.0\.0 streaming-json compatibility profile/);
+    const args = provider.buildSpawnArgs({ cwd: '/tmp/grok-provider-test' });
+    expect(args).toContain('streaming-json');
+    expect(args).toContain('/tmp/grok-provider-test');
   });
 
   it('builds verified ephemeral args with model, resume, fork, and safe headless defaults', () => {

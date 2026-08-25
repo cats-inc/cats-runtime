@@ -22,20 +22,20 @@ function verifiedProvider(): ClineProvider {
 }
 
 describe('ClineProvider', () => {
-  it('requires the exact fixture-backed compatibility profile', () => {
+  it('uses the best-known adapter when no compatibility profile is available', () => {
     const provider = new ClineProvider();
     provider.prepareEphemeralTurn({ message: 'Say hi' });
 
-    expect(() => provider.buildSpawnArgs({ cwd: '/work' }))
-      .toThrow(/exact Cline 3\.0\.51 JSON compatibility profile/);
+    expect(provider.buildSpawnArgs({ cwd: '/work' }))
+      .toEqual(['--json', '--cwd', '/work', '--auto-approve', 'false', 'Say hi']);
   });
 
-  it('refuses a best-fit profile rather than guessing the contract', () => {
+  it('uses a weak best-fit profile instead of refusing execution', () => {
     const provider = new ClineProvider({ ...VERIFIED_PROFILE, confidence: 'weak' });
     provider.prepareEphemeralTurn({ message: 'Say hi' });
 
-    expect(() => provider.buildSpawnArgs({ cwd: '/work' }))
-      .toThrow(/exact Cline 3\.0\.51 JSON compatibility profile/);
+    expect(provider.buildSpawnArgs({ cwd: '/work' }))
+      .toEqual(['--json', '--cwd', '/work', '--auto-approve', 'false', 'Say hi']);
   });
 
   it('reports resume as unavailable because --id conflicts with --json on 3.0.51', () => {

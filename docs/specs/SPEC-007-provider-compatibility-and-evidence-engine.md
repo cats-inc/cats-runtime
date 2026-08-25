@@ -317,7 +317,8 @@ Known realities include:
 
 The compatibility engine should therefore support:
 
-- exact version matching when it is available and trustworthy
+- exact version recognition as evidence provenance when it is available and
+  trustworthy, never as an execution allowlist (ADR-035)
 - semver-range matching when it is available but broader matching is safer
 - signature or feature-based fallback when version is unknown
 - explicit warnings when the runtime is operating on a best-fit rather than a

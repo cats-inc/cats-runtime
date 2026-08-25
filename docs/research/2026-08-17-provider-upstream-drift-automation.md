@@ -15,6 +15,12 @@ Action Items:
 - Make catalog staleness visible in `setup`/`diagnostics` instead of silently serving stale truth, and separately correct the curated catalog entry already known to be wrong
 - Audit which provider/platform/channel targets can be installed safely on CI runners before committing to surface baselines
 
+Policy update (2026-08-26): [ADR-035](../decisions/035-never-block-provider-execution-on-exact-cli-version.md)
+accepted the recommendation later in this note that exact CLI-version inequality
+must not degrade or block execution. Antigravity, Grok, and Cline now use their
+best-known adapters on forward drift; version and surface changes remain
+diagnostic/evolution evidence.
+
 ## Problem
 
 `cats-runtime` registers 16 CLI provider families (`src/backends/cli/providers/types.ts:24`):
@@ -43,7 +49,7 @@ Five separate locations, four of them hand-written TypeScript:
 
 - `src/core/compatibility/knowledge.ts` — per-provider argv profiles
   (`--output-format stream-json`, `--include-partial-messages`, …), `helpTokens`,
-  `supportedVersions`, `minVersionMajor`, live-probe args
+  `minVersionMajor`, live-probe args, and best-fit profiles
 - `src/core/provider-install/knowledge.ts` — install commands, `check.npmPackage`, binary
   path hints per platform, auth error patterns
 - `src/core/models/curatedModelCatalog.ts` + `config/curated-model-catalogs.yaml.example` —

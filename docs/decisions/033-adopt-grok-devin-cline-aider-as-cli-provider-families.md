@@ -5,8 +5,14 @@ Status: Proposed
 
 Implementation note: the User approved the Grok-only subset on 2026-08-08.
 Grok subsequently completed an authenticated lifecycle probe and now executes
-through an exact-version 1.0.0 adapter. The broader Devin, Cline, and Aider
+through the adapter whose fixture baseline was recorded on 1.0.0. The broader Devin, Cline, and Aider
 decision remains proposed.
+
+Policy amendment (2026-08-26): [ADR-035](./035-never-block-provider-execution-on-exact-cli-version.md)
+supersedes this proposal's exact-version execution gate. Fixture versions remain
+provenance, while forward and unknown versions use the best-known adapter.
+Cline has since gained a fixture-backed native adapter, and Devin executes
+through its verified ACP agent profile; Aider remains install-tier only.
 
 ## Context
 
@@ -36,14 +42,14 @@ The question this ADR would settle is not *whether* to recognize the four CLIs �
 
 ## Decision
 
-This ADR proposes that `cats-runtime` adopt `grok`, `devin`, `cline`, and `aider` as first-class CLI provider **families**, landing them at the install/check/setup tier first. Session execution adapters are gated behind per-CLI probe evidence and ship as explicit refusals until that evidence exists. Grok has now satisfied that gate; the other three have not.
+This ADR proposes that `cats-runtime` adopt `grok`, `devin`, `cline`, and `aider` as first-class CLI provider **families**, landing them at the install/check/setup tier first. Session execution adapters are gated behind per-CLI probe evidence and ship as explicit refusals only until a machine-readable invocation contract exists. Grok and Cline have now satisfied that native CLI gate, and Devin has a verified ACP agent profile; Aider has not.
 
 Specifically:
 
 1. **Four new provider ids** join `KNOWN_PROVIDERS`: `grok`, `devin`, `cline`, `aider`. They append to the CLI-family segment after `kiro` and before `ollama` / `openclaw` in `PROVIDER_ORDER`. Existing providers keep their relative order, while the two non-CLI providers move four absolute positions later in the dashboard.
 2. **Install packs follow the upstream install method**, not a house style: `grok`, `devin`, and `aider` register through `createNativeInstall(...)`; `cline` registers through `createGenericNpmKnowledge(...)` against the `cline` npm package.
-3. **Execution adapters begin as refusal stubs**, following the `AntigravityProvider` precedent (ADR-032). A provider is promoted only by a complete live probe. Grok 1.0.0 is promoted to native `streaming-json`; Devin, Cline, and Aider still refuse with their missing evidence.
-4. **Compatibility is exact where proven and presence-only otherwise.** Grok selects `grok-cli-streaming-json-1.0.0` only for parsed version 1.0.0. No execution profile exists for Devin, Cline, or Aider.
+3. **Execution adapters begin as refusal stubs** until a machine-readable invocation contract is known. A provider is promoted only by a complete live probe. Once promoted, version drift uses the best-known adapter under ADR-035 instead of reverting to a refusal stub.
+4. **Compatibility evidence is not an execution allowlist.** Grok uses `grok-cli-streaming-json-1.0.0` as fixture provenance and the best-known adapter for later or unknown versions. Exact version inequality alone never refuses execution.
 5. **Aider is modeled as non-interactive credential evidence, not env-key readiness.** Its `auth` block sets `interactive: false` and carries common BYO-model env vars (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`), with `docsUrl` pointing at `https://aider.chat/docs/llms.html`. Provider setup may report the names of non-empty variables visible to the runtime, but their presence does not prove that Aider's selected model is usable and their absence does not prove that Aider is unconfigured: Aider can also load `.env`, `.aider.conf.yml`, command-line credentials, or a local model. Until a provider-specific non-interactive auth probe exists, Aider auth remains `unknown` and provider setup must not render a "sign in" affordance.
 6. **Devin is modeled as install-complete-but-auth-unverified by default.** Because upstream deliberately strips the trailing `devin setup` from both official installers, a successful install never implies a usable CLI. Devin's knowledge entry carries `requiresShellRestart: true` plus an explicit manual step (`devin setup`) in `notes`, and provider setup surfaces that step without claiming whether it has subsequently been completed. A future non-interactive Devin auth probe is required before the runtime may report auth as ready.
 7. **Grok registers only the `grok` binary.** The upstream installer also drops an `agent` / `agent.exe` alias next to it; the runtime does not add `agent` as a PATH candidate. `agent` is a generic name with a high collision probability on a developer PATH, and a false positive there would report Grok as installed on a machine that has some unrelated `agent` binary.
@@ -92,7 +98,7 @@ The alternative — hold Devin out until someone probes it — leaves upstream i
 
 ### Negative
 
-- All four providers appear in runtime setup. Grok can run through its verified 1.0.0 adapter; the remaining three stay absent from product execution selectors, and direct API/config attempts receive an actionable refusal.
+- All four providers appear in runtime setup. Grok and Cline run through their fixture-backed best-known adapters, Devin runs through its verified ACP agent profile, and Aider remains absent from product execution selectors with an actionable refusal.
 - Sixteen exhaustive maps across two repos each grow by four entries; the diff is wide even though it is shallow.
 - Devin may be reclassified later, which would mean removing a provider id that briefly existed. Accepted per the rationale above.
 - Registering `cline` in the npm pack means the platform npm installer inherits whatever install-script handling upstream needed (`npm 12+` blocks package install scripts by default and `Install-NodeCLITools.ps1` passes `--allow-scripts`); the platform side must mirror that or Cline may install without a working shim.

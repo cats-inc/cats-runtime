@@ -274,11 +274,9 @@ describe('ProviderCompatibilityService', () => {
     expect(runner.run.mock.calls.every((call) => call[4] === 10_000)).toBe(true);
   });
 
-  // The shell-fallback test below is the only other place Antigravity's
-  // classification is asserted, and it is skipped on Windows — so a change to
-  // the Antigravity compatibility pin can reach CI unverified from a Windows
-  // machine. These two run everywhere.
-  it('admits the pinned Antigravity release and refuses every other version', async () => {
+  // The shell-fallback test below is skipped on Windows, so keep the version
+  // drift policy covered by a platform-independent assessment here.
+  it('keeps using the Antigravity adapter across version drift', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-agy-'));
     tempDirs.push(root);
 
@@ -316,17 +314,17 @@ describe('ProviderCompatibilityService', () => {
       return service.assessCliTarget(createCliTarget('antigravity'), { force: true });
     };
 
-    const pinned = await assess('1.1.20');
-    expect(pinned.classification).toBe('ready');
-    expect(pinned.profile.id).toBe('antigravity-cli-stream-json-1.1.20');
-    expect(pinned.profile.confidence).toBe('exact');
-
-    const older = await assess('1.0.0');
-    expect(older.classification).toBe('unsupported_version');
-    expect(older.profile.id).toBe('antigravity-cli-unverified');
-    expect(older.summary).toBe(
-      'Antigravity CLI version 1.0.0 is outside the explicitly supported compatibility baseline.',
-    );
+    for (const version of ['1.1.20', '1.2.0']) {
+      const assessment = await assess(version);
+      expect(assessment.classification).toBe('ready');
+      expect(assessment.profile.id).toBe('antigravity-cli-stream-json-1.1.20');
+      expect(assessment.profile.confidence).toBe('exact');
+      expect(assessment.setup.version).toMatchObject({
+        status: 'ready',
+        detected: version,
+        supportedRange: '>=1',
+      });
+    }
   });
 
   const shellFallbackIt = process.platform === 'win32' ? it.skip : it;
@@ -381,17 +379,11 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
 
       const assessment = await service.assessCliTarget(target);
       // What this test is actually about: the direct spawn exited without
-      // output, and the shell retry recovered enough to parse a version. The
-      // fake reports 1.0.0, which is outside the pinned Antigravity baseline,
-      // so the classification that follows is the refusal rather than a
-      // no-knowledge fallback.
+      // output, and the shell retry recovered enough to parse a version.
       expect(assessment.fingerprint.version.normalized).toBe('1.0.0');
       expect(assessment.setup.command.status).toBe('ready');
-      expect(assessment.classification).toBe('unsupported_version');
-      expect(assessment.profile.id).toBe('antigravity-cli-unverified');
-      expect(assessment.summary).toBe(
-        'Antigravity CLI version 1.0.0 is outside the explicitly supported compatibility baseline.',
-      );
+      expect(assessment.classification).toBe('ready');
+      expect(assessment.profile.id).toBe('antigravity-cli-stream-json-1.1.20');
     } finally {
       if (originalHome === undefined) {
         delete process.env.HOME;
@@ -1025,7 +1017,7 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
     expect(assessment.setup.version).toMatchObject({
       status: 'ready',
       detected: '1.0.0',
-      supportedRange: '1.0.0, 1.0.5',
+      supportedRange: '>=1',
     });
   });
 
@@ -1066,7 +1058,7 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
     });
   });
 
-  it('refuses unprobed Grok patch versions instead of assuming stream compatibility', async () => {
+  it('uses the best-known Grok adapter for an unprobed patch version', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-grok-unverified-'));
     tempDirs.push(root);
     const service = new ProviderCompatibilityService({
@@ -1091,15 +1083,53 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
 
     const assessment = await service.assessCliTarget(createCliTarget('grok'));
 
-    expect(assessment.classification).toBe('unsupported_version');
+    expect(assessment.classification).toBe('ready');
     expect(assessment.profile).toMatchObject({
-      id: 'grok-cli-unverified',
-      confidence: 'weak',
+      id: 'grok-cli-streaming-json-1.0.0',
+      confidence: 'exact',
+      parserId: 'grok-native-streaming-json',
     });
     expect(assessment.setup.version).toMatchObject({
-      status: 'unsupported',
+      status: 'ready',
       detected: '1.0.1',
-      supportedRange: '1.0.0, 1.0.5',
+      supportedRange: '>=1',
+    });
+  });
+
+  it('uses the best-known Cline adapter for an unprobed minor version', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-cline-forward-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
+          exitCode: 0,
+          stdout: args[0] === '--version'
+            ? '3.1.0\n'
+            : 'Usage: cline --json --auto-approve --thinking --acp\n',
+          stderr: '',
+          timedOut: false,
+          durationMs: 4,
+        })),
+      },
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-08-26T00:00:00.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('cline'));
+
+    expect(assessment.classification).toBe('ready');
+    expect(assessment.profile).toMatchObject({
+      id: 'cline-cli-json-3.0.51',
+      confidence: 'exact',
+      parserId: 'cline-native-json',
+    });
+    expect(assessment.setup.version).toMatchObject({
+      status: 'ready',
+      detected: '3.1.0',
+      supportedRange: '>=3',
     });
   });
 

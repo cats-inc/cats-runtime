@@ -2,6 +2,13 @@
 
 Date: 2026-08-24
 
+Policy update (2026-08-26): the fail-closed allowlist described below is
+historical and was removed by
+[ADR-035](../decisions/035-never-block-provider-execution-on-exact-cli-version.md).
+Grok, Cline, and Antigravity now attempt the best-known adapter across forward
+or unknown version drift. The probe evidence remains valid; the refusal policy
+does not.
+
 ## Scope and conclusion
 
 This note records the evidence behind admitting Grok CLI 1.0.5 and Cline CLI
@@ -18,15 +25,16 @@ pins recorded in `src/core/compatibility/knowledge.ts`.
 Probes ran against a temp `CATS_RUNTIME_DIR`, never the operator's
 `~/.cats/runtime`.
 
-## The pin is a whitelist, not a floor
+## Historical behavior: the pin was a whitelist, not a floor
 
-`buildProfileSelection` compares the detected version with
+At the time of this probe, `buildProfileSelection` compared the detected version with
 `supportedVersions.includes(normalized)`
 (`src/core/compatibility/ProviderCompatibilityService.ts:1617`), so a version
 newer than the recorded baseline is refused exactly like an older one, and the
 `upgrade_provider` remediation tells the operator to *upgrade* a CLI they have
-already upgraded. The refusal is correct; the wording is not, because the
-classification carries no direction.
+already upgraded. That refusal was later rejected as policy, not merely
+reworded, because version inequality is not evidence of an incompatible
+invocation or stream contract.
 
 Refusal is also self-referential for the evolution probe. `assertVerifiedProfile`
 (`src/backends/cli/providers/grok.ts:307`, `src/backends/cli/providers/cline.ts:174`)
@@ -41,7 +49,7 @@ has not already admitted:
 
 Both providers below therefore had to be probed with the candidate version added to
 `supportedVersions` first. Admitting a version to gather the evidence that
-justifies admitting it is the current cost of the design.
+justified admitting it. ADR-035 removed that self-referential gate.
 
 ## Grok 1.0.5 — admitted
 
@@ -148,7 +156,8 @@ Re-probing 3.0.57 with `manual_tool` after the fix:
 - normalized 33, ignored 14, **unknown 0**, schema failures 0, raw passthrough 0
 - `content_update:tool` now appears as a normalized type
 
-`supportedVersions` is therefore `['3.0.51', '3.0.57']`.
+Those captures establish 3.0.51 and 3.0.57 as fixture provenance. They no longer
+form an execution allowlist.
 
 The `regression` classification on that last artifact is another comparison
 artifact: it compares against the pre-fix run, where the model happened to emit

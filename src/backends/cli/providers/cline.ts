@@ -93,8 +93,6 @@ export class ClineProvider implements Provider {
   }
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
-    this.assertVerifiedProfile();
-
     const prompt = this.pendingPrompt;
     if (!prompt) {
       throw new Error('Cline CLI requires prepareEphemeralTurn before building spawn arguments.');
@@ -164,18 +162,6 @@ export class ClineProvider implements Provider {
     }
 
     return null;
-  }
-
-  private assertVerifiedProfile(): void {
-    if (
-      this.compatibilityProfile?.id !== CLINE_JSON_PROFILE_ID
-      || this.compatibilityProfile.confidence !== 'exact'
-    ) {
-      throw new Error(
-        'Cline CLI execution requires the exact Cline 3.0.51 JSON compatibility profile. '
-        + 'Run provider compatibility diagnostics and install the verified CLI version.',
-      );
-    }
   }
 
   parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {

@@ -166,13 +166,12 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       protocolFamily: 'stream-json',
       parserId: 'antigravity-native-stream-json',
       spawnBaseArgs: [...ANTIGRAVITY_STREAM_JSON_BASE_ARGS],
-      // Pinned exactly to the version the contract was read off. The parser
-      // encodes quirks a minor bump could silently change: text_delta being a
-      // delta rather than a snapshot, tool calls correlating on step_index
-      // because there is no tool id, successful tool steps carrying no output
-      // payload, and total_tokens excluding cache_read_tokens
-      // (docs/research/2026-08-25-antigravity-cli-stream-json-probe.md).
-      supportedVersions: ['1.1.20'],
+      // The contract was read off 1.1.20 and encodes several observed quirks.
+      // Newer releases still use this best-known adapter while diagnostics and
+      // evolution evidence surface any protocol drift; version inequality by
+      // itself must never block execution (ADR-035).
+      minVersionMajor: 1,
+      allowUnknownVersion: true,
       helpTokens: [
         'stream-json',
         '--output-format',
@@ -185,11 +184,16 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       liveProbeTokens: ['stream-json', '--conversation', '--add-dir'],
     },
     {
-      id: 'antigravity-cli-unverified',
-      label: 'Antigravity CLI unverified version refusal',
+      id: 'antigravity-cli-stream-json-best-fit',
+      label: 'Antigravity CLI stream-json best-fit',
       provider: 'antigravity',
-      protocolFamily: 'unverified',
-      parserId: 'antigravity-refusal',
+      protocolFamily: 'stream-json',
+      parserId: 'antigravity-native-stream-json',
+      spawnBaseArgs: [...ANTIGRAVITY_STREAM_JSON_BASE_ARGS],
+      allowUnknownVersion: true,
+      helpTokens: ['stream-json', '--output-format', '--add-dir'],
+      liveProbeArgs: ['--help'],
+      liveProbeTokens: ['stream-json', '--add-dir'],
     },
   ),
   copilot: buildKnowledge(
@@ -423,11 +427,12 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       protocolFamily: 'streaming-json',
       parserId: 'grok-native-streaming-json',
       spawnBaseArgs: [...GROK_STREAMING_JSON_BASE_ARGS],
-      // 1.0.0 is the fixture-recorded baseline. 1.0.5 was admitted after a
-      // manual_smoke evolution probe replayed through this same parser with no
-      // unknown event type, schema failure, or raw passthrough
-      // (docs/research/2026-08-24-grok-cline-version-drift-probe.md).
-      supportedVersions: ['1.0.0', '1.0.5'],
+      // 1.0.0 is the fixture-recorded baseline, and 1.0.5 replayed cleanly
+      // through the same parser. Newer releases use this best-known adapter;
+      // diagnostics and evolution evidence report drift without blocking the
+      // user's turn solely because the version changed (ADR-035).
+      minVersionMajor: 1,
+      allowUnknownVersion: true,
       helpTokens: [
         '--single',
         'streaming-json',
@@ -440,11 +445,16 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       liveProbeTokens: ['streaming-json', '--resume', '--tools'],
     },
     {
-      id: 'grok-cli-unverified',
-      label: 'Grok CLI unverified version refusal',
+      id: 'grok-cli-streaming-json-best-fit',
+      label: 'Grok CLI streaming-json best-fit',
       provider: 'grok',
-      protocolFamily: 'unverified',
-      parserId: 'grok-refusal',
+      protocolFamily: 'streaming-json',
+      parserId: 'grok-native-streaming-json',
+      spawnBaseArgs: [...GROK_STREAMING_JSON_BASE_ARGS],
+      allowUnknownVersion: true,
+      helpTokens: ['--single', 'streaming-json', '--tools'],
+      liveProbeArgs: ['--help'],
+      liveProbeTokens: ['streaming-json', '--tools'],
     },
   ),
   cline: buildKnowledge(
@@ -457,25 +467,30 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       protocolFamily: 'json-stream',
       parserId: 'cline-native-json',
       spawnBaseArgs: [...CLINE_JSON_BASE_ARGS],
-      // Pinned exactly. The contract this parser encodes was read off 3.0.51
-      // fixtures, including quirks (reasoning field name, object-shaped failed
-      // tool output, cumulative usage) that a minor bump could silently change.
-      // 3.0.57 was admitted only after a manual_tool probe found the one thing
-      // that did change — tool output now streams through content_update — and
-      // the adapter learned to normalize it
+      // The contract this parser encodes was read off 3.0.51 fixtures. A
+      // manual_tool probe against 3.0.57 found content_update tool streaming,
+      // and the adapter learned to normalize it. Future releases use this
+      // best-known adapter while drift remains visible in diagnostics and
+      // evolution evidence instead of becoming an exact-version gate (ADR-035)
       // (docs/research/fixtures/cline-3.0.57/, and the research note at
       // docs/research/2026-08-24-grok-cline-version-drift-probe.md).
-      supportedVersions: ['3.0.51', '3.0.57'],
+      minVersionMajor: 3,
+      allowUnknownVersion: true,
       helpTokens: ['--json', '--auto-approve', '--thinking', '--acp'],
       liveProbeArgs: ['--help'],
       liveProbeTokens: ['--json', '--auto-approve'],
     },
     {
-      id: 'cline-cli-unverified',
-      label: 'Cline CLI unverified version refusal',
+      id: 'cline-cli-json-best-fit',
+      label: 'Cline CLI JSON stream best-fit',
       provider: 'cline',
-      protocolFamily: 'unverified',
-      parserId: 'cline-refusal',
+      protocolFamily: 'json-stream',
+      parserId: 'cline-native-json',
+      spawnBaseArgs: [...CLINE_JSON_BASE_ARGS],
+      allowUnknownVersion: true,
+      helpTokens: ['--json', '--auto-approve'],
+      liveProbeArgs: ['--help'],
+      liveProbeTokens: ['--json', '--auto-approve'],
     },
   ),
   opencode: buildKnowledge(

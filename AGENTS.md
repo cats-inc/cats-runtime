@@ -118,6 +118,20 @@ contract.
   tests, and documentation to match the current contract instead of carrying
   fallback overhead for unreleased versions.
 
+## Provider CLI Version-Drift Policy
+
+- Provider adapters MUST NOT refuse or throw solely because the detected CLI
+  version is not an exact fixture-recorded or previously verified version.
+- On forward or unknown version drift, adapters MUST attempt the best-known
+  compatible invocation and parser. Compatibility diagnostics and evolution
+  evidence MAY warn about drift, but version equality MUST NOT be an execution
+  gate.
+- Exact versions MAY be recorded as fixture provenance. They MUST NOT be used
+  as execution allowlists. A pre-spawn refusal requires concrete evidence that
+  an invocation or safety contract is unavailable, not version inequality by
+  itself.
+- See [ADR-035](docs/decisions/035-never-block-provider-execution-on-exact-cli-version.md).
+
 ---
 
 ## Tech Stack

@@ -31,7 +31,6 @@ export interface ProviderCompatibilityProfile {
   protocolFamily: string;
   parserId: string;
   spawnBaseArgs?: string[];
-  supportedVersions?: string[];
   minVersionMajor?: number;
   maxVersionMajor?: number;
   allowUnknownVersion?: boolean;

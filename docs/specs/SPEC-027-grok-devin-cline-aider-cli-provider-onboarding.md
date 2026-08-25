@@ -8,9 +8,12 @@
 | **Owner** | User |
 | **Reviewer** | User |
 
+Compatibility policy amendment: [ADR-035](../decisions/035-never-block-provider-execution-on-exact-cli-version.md)
+supersedes every exact-version execution gate in this onboarding spec.
+
 ## Summary
 
-`environment-bootstrap` installs four AI coding CLIs that this spec onboards as runtime provider families: Grok CLI (xAI), Devin CLI (Cognition), Cline, and Aider. It covers install knowledge, check metadata, config bootstrap, diagnostics, dashboard/playground/setup surfaces, and evidence-gated execution. Grok 1.0.0 now has a complete fixture-backed native adapter; Devin, Cline, and Aider remain refusal-only until separately probed.
+`environment-bootstrap` installs four AI coding CLIs that this spec onboards as runtime provider families: Grok CLI (xAI), Devin CLI (Cognition), Cline, and Aider. It covers install knowledge, check metadata, config bootstrap, diagnostics, dashboard/playground/setup surfaces, and evidence-gated execution. Grok and Cline now have fixture-backed native adapters, Devin executes through the verified `devin-acp` agent profile, and Aider remains install-tier only. Fixture versions are provenance rather than execution allowlists.
 
 It is the runtime counterpart to `cats-platform` SPEC-112, which owns packaged installer helpers, the setup-provider inventory, desktop host wiring, and promotion of each working adapter into the product execution catalog. ADR-033 captures the underlying decision.
 
@@ -21,15 +24,15 @@ It is the runtime counterpart to `cats-platform` SPEC-112, which owns packaged i
 - Model Aider's BYO-key auth as non-interactive credential evidence rather than a login flow or an env-var readiness claim.
 - Model Devin's stripped `devin setup` step as an explicit post-install manual action, so presence never implies auth readiness and completion is not guessed.
 - Probe only the `grok` binary, never its `agent` alias.
-- Ship refusal-stub execution adapters for unprobed providers and promote Grok 1.0.0 to an exact-version native streaming adapter after its lifecycle probe.
+- Promote providers to native execution after probing their contracts; fixture versions record provenance, while later versions use the best-known adapter without an exact-version gate.
 - Extend `config/providers.yaml.example` and the generated-config bootstrap so each family gets a `cli/native` instance.
 - Surface all four in the dashboard, playground, and provider-setup with distinct badge tokens; expose only the live-enumerated `grok-4.5` id for Grok and no fabricated ids for the remaining providers.
 - Correct the Pi npm package name to `@earendil-works/pi-coding-agent`, matching upstream `cfe7785`.
 
 ## Non-Goals
 
-- Implementing session execution, stream parsing, session discovery, or history import for Devin, Cline, or Aider. Those are per-CLI follow-up slices gated on research notes.
-- Adding compatibility profiles for Devin, Cline, or Aider. Grok is pinned to the exact verified version 1.0.0.
+- Implementing additional session discovery or history import beyond each provider's separately verified execution contract. Those remain per-CLI follow-up slices gated on research notes.
+- Treating fixture-recorded versions as execution allowlists. Compatibility evidence may warn about drift but must not block solely on version inequality.
 - Adding unverified bundled model ids. Grok exposes the live-enumerated `grok-4.5`; the remaining providers keep their default sentinels.
 - Adding ACP profiles for any of the four.
 - Deciding Devin's final classification (CLI session provider vs. ADR-023 management adapter). This spec registers it as a CLI family and records the reversal condition.
@@ -96,16 +99,16 @@ Separately, `provider-install/knowledge.ts` installs Pi from `@mariozechner/pi-c
 
 #### Execution adapters
 
-10. Four provider classes shall be added under `src/backends/cli/providers/`. Devin, Cline, and Aider remain ephemeral refusal adapters with no claimed resume, fork, or permission capability.
+10. Four provider families shall be registered. Native execution is enabled only after a machine-readable invocation contract is known; once enabled, version drift alone never reverts the provider to a refusal adapter.
 11. Grok 1.0.0 shall execute through `streaming-json`, expose resume, fork, and whitelist permission compilation, parse native text/thought/tool/error/end records, and terminate its subprocess on cancellation even when no terminal record arrives.
-12. Grok compatibility shall be exact-version: parsed version 1.0.0 selects `grok-cli-streaming-json-1.0.0`; all other versions refuse until separately probed. A non-empty `--tools` list is the only supported permission boundary: default exposes only probed `read_file`, empty explicit whitelists refuse, and `search_replace` requires `read_file`.
+12. Grok compatibility shall use `grok-cli-streaming-json-1.0.0` as the fixture-backed baseline and best-known adapter for later or unknown versions. Version inequality alone shall never refuse execution. A non-empty `--tools` list is the only supported permission boundary: default exposes only probed `read_file`, empty explicit whitelists refuse, and `search_replace` requires `read_file`.
 13. `WorkerPool.createProvider` shall construct them by name, and its unknown-provider error string shall list all sixteen families.
 
 #### Capability and evolution metadata
 
 14. `src/core/providerEventCapabilities.ts` shall describe Grok's observed native text, reasoning, tool, result, and derived-progress events; entries for the other three remain conservative.
 15. `src/core/compatibility/providerEvolutionEntry.ts` shall register the four so evidence capture has a home, without asserting a stream profile.
-16. `src/core/compatibility/knowledge.ts` shall contain only the exact Grok 1.0.0 execution profile; the other three gain no profiles.
+16. `src/core/compatibility/knowledge.ts` shall keep fixture provenance separate from execution eligibility. Executable providers use feature probes, minimum baselines where applicable, and best-fit profiles rather than exact-version allowlists.
 
 #### Config
 
@@ -146,7 +149,7 @@ Separately, `provider-install/knowledge.ts` installs Pi from `@mariozechner/pi-c
 - [x] Aider's catalog view reports `auth.interactive === true`, its configured evidence keys, and auth status `unknown` rather than `ready` or `missing`.
 - [ ] Aider setup summaries report only detected variable names from an injected test environment, never values; an empty detection list is not treated as missing auth.
 - [ ] Devin's catalog view carries the `devin setup` manual step.
-- [ ] Starting Grok 1.0.0 parses the authenticated native stream, tools, errors, cancellation, resume, and fork; another Grok version refuses compatibility, and Devin, Cline, and Aider retain their refusal messages.
+- [ ] Starting Grok parses the authenticated native stream, tools, errors, cancellation, resume, and fork across fixture and forward-drift versions; Cline follows the same best-known-adapter policy, while providers with no machine-readable execution contract retain their evidence-based refusal.
 - [ ] Bootstrapping a fresh `providers.yaml` produces `cli/native` instances for all four.
 - [ ] Dashboard and playground render all four with distinct badges, verified `grok-4.5`, and no fabricated model ids.
 - [ ] Pi's install knowledge names `@earendil-works/pi-coding-agent`.
@@ -164,7 +167,10 @@ All four reuse the existing `ProviderInstallKnowledge` contract from ADR-013. Th
 
 ### Evidence-gated adapters
 
-`AntigravityProvider` is the refusal template for Devin, Cline, and Aider. Grok is the first promoted adapter: its native parser and spawn contract are tied to the complete Grok 1.0.0 fixture set, and compatibility refuses version drift rather than assuming it.
+Grok's native parser and spawn contract are tied to the complete Grok 1.0.0
+fixture set as provenance. Per ADR-035, it and every other executable provider
+continue with the best-known adapter across version drift; only concrete missing
+or unsafe capabilities justify a pre-spawn refusal.
 
 ### Detection contract per CLI
 
