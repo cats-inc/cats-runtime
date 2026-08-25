@@ -274,6 +274,61 @@ describe('ProviderCompatibilityService', () => {
     expect(runner.run.mock.calls.every((call) => call[4] === 10_000)).toBe(true);
   });
 
+  // The shell-fallback test below is the only other place Antigravity's
+  // classification is asserted, and it is skipped on Windows — so a change to
+  // the Antigravity compatibility pin can reach CI unverified from a Windows
+  // machine. These two run everywhere.
+  it('admits the pinned Antigravity release and refuses every other version', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-agy-'));
+    tempDirs.push(root);
+
+    const assess = async (version: string) => {
+      const runner = {
+        run: vi.fn(async (
+          _providerName: string,
+          _commandConfig: unknown,
+          args: string[],
+        ) => ({
+          exitCode: 0,
+          stdout: args.includes('--help')
+            ? [
+              'Usage of agy.exe:',
+              '  --add-dir  Add a directory to the workspace',
+              '  --conversation  Resume a previous conversation by ID',
+              '  --disable-slash-commands  Disable slash command expansion',
+              '  --dangerously-skip-permissions  Auto-approve all tool permission requests',
+              '  --output-format  Output format for print mode (text, json, stream-json)',
+            ].join('\n')
+            : `${version}\n`,
+          stderr: '',
+          timedOut: false,
+          durationMs: 5,
+        })),
+      };
+      const service = new ProviderCompatibilityService({
+        dataDir: join(root, version, 'data'),
+        sessionBaseDir: join(root, version, 'sessions'),
+      }, {
+        runner,
+        installCheckRunner: createInstallCheckRunner(),
+        now: () => Date.parse('2026-08-25T00:00:00.000Z'),
+      });
+      return service.assessCliTarget(createCliTarget('antigravity'), { force: true });
+    };
+
+    const pinned = await assess('1.1.20');
+    expect(pinned.classification).toBe('ready');
+    expect(pinned.profile.id).toBe('antigravity-cli-stream-json-1.1.20');
+    expect(pinned.profile.confidence).toBe('exact');
+
+    const older = await assess('1.0.0');
+    expect(older.classification).toBe('unsupported_version');
+    expect(older.profile.id).toBe('antigravity-cli-unverified');
+    expect(older.summary).toBe(
+      'Antigravity CLI version 1.0.0 is outside the explicitly supported compatibility baseline.',
+    );
+  });
+
   const shellFallbackIt = process.platform === 'win32' ? it.skip : it;
 
   shellFallbackIt('retries native compatibility probes through a shell when direct spawn exits without output', async () => {
@@ -325,11 +380,18 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
       });
 
       const assessment = await service.assessCliTarget(target);
-      expect(assessment.classification).toBe('degraded');
-      expect(assessment.profile.id).toBe('antigravity-cli-runtime-default');
-      expect(assessment.summary).toBe("No provider-specific compatibility profile is shipped for 'antigravity'.");
+      // What this test is actually about: the direct spawn exited without
+      // output, and the shell retry recovered enough to parse a version. The
+      // fake reports 1.0.0, which is outside the pinned Antigravity baseline,
+      // so the classification that follows is the refusal rather than a
+      // no-knowledge fallback.
       expect(assessment.fingerprint.version.normalized).toBe('1.0.0');
       expect(assessment.setup.command.status).toBe('ready');
+      expect(assessment.classification).toBe('unsupported_version');
+      expect(assessment.profile.id).toBe('antigravity-cli-unverified');
+      expect(assessment.summary).toBe(
+        'Antigravity CLI version 1.0.0 is outside the explicitly supported compatibility baseline.',
+      );
     } finally {
       if (originalHome === undefined) {
         delete process.env.HOME;
