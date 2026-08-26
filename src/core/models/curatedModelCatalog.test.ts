@@ -251,6 +251,30 @@ describe('curatedModelCatalog', () => {
     }
   });
 
+  it('keeps model-list freshness separate from version-only CLI probes', () => {
+    const runtime = createRuntimeRoot();
+
+    try {
+      const result = loadCuratedModelCatalog({
+        env: {
+          ...runtime.env,
+          CATS_RUNTIME_PACKAGE_ROOT: PACKAGE_ROOT,
+        },
+      });
+
+      expect(result.warnings).toEqual([]);
+      for (const providerName of ['copilot', 'kilo', 'kiro', 'junie']) {
+        const catalog = findCuratedCliCatalog(result.document, providerName);
+        expect(catalog?.lastUpdated).toBe('2026-04-17');
+        expect(catalog?.notes).toEqual(expect.arrayContaining([
+          expect.stringContaining('Entries below remain as of 2026-04-17'),
+        ]));
+      }
+    } finally {
+      runtime.cleanup();
+    }
+  });
+
   it('bundled Codex example matches the refreshed visible CLI catalog', () => {
     const runtime = createRuntimeRoot();
 

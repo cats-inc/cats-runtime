@@ -2945,7 +2945,7 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
-  it('applies curated Kiro CLI entry metadata from curated-model-catalogs.yaml', () => {
+  it('applies curated Kiro CLI entry metadata and default from curated-model-catalogs.yaml', () => {
     const runtime = createRuntimeRoot();
 
     try {
@@ -3013,12 +3013,12 @@ describe('ProviderModelCatalogService', () => {
         provider: 'kiro',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'claude-opus-4.6',
+        defaultModel: 'auto',
         source: 'static',
         cache: null,
         models: [
-          { id: 'auto', label: 'auto', default: false },
-          { id: 'claude-opus-4.6', label: 'claude-opus-4.6', default: true },
+          { id: 'auto', label: 'auto', default: true },
+          { id: 'claude-opus-4.6', label: 'claude-opus-4.6', default: false },
           { id: 'claude-sonnet-4.6', label: 'claude-sonnet-4.6', default: false },
           { id: 'claude-opus-4.5', label: 'claude-opus-4.5', default: false },
           { id: 'claude-sonnet-4.5', label: 'claude-sonnet-4.5', default: false },
@@ -3036,7 +3036,7 @@ describe('ProviderModelCatalogService', () => {
         provider: 'kiro',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'claude-opus-4.6',
+        defaultModel: 'auto',
         source: 'static',
         cache: null,
         entries: [

@@ -347,7 +347,7 @@ export function normalizeProviderCatalogModelId(
   return normalized;
 }
 
-function resolveDefaultModel(
+function resolveConfiguredDefaultModel(
   target: ProviderTargetDescriptor,
   env: NodeJS.ProcessEnv,
 ): string | null {
@@ -362,6 +362,18 @@ function resolveDefaultModel(
     : null;
   if (activeModel) {
     return normalizeProviderCatalogModelId(target, activeModel);
+  }
+
+  return null;
+}
+
+function resolveDefaultModel(
+  target: ProviderTargetDescriptor,
+  env: NodeJS.ProcessEnv,
+): string | null {
+  const configuredModel = resolveConfiguredDefaultModel(target, env);
+  if (configuredModel) {
+    return configuredModel;
   }
 
   if (target.providerName === 'junie' && target.backend === 'cli') {
@@ -1547,11 +1559,19 @@ export class ProviderModelCatalogService {
   ): ProviderModelCatalogResult {
     const curatedModels = buildCuratedStaticCliModels(target, this.config, this.env, warnings);
     const staticModels = curatedModels || getStaticProviderModels(target);
+    const configuredDefaultModel = resolveConfiguredDefaultModel(target, this.env);
+    const effectiveDefaultModel = configuredDefaultModel
+      ?? (curatedModels
+        ? curatedModels.find((entry) => entry.default === true)?.id ?? null
+        : defaultModel);
+    const normalizedModels = defaultModel
+      ? withDefaultModel(staticModels, effectiveDefaultModel).models
+      : staticModels;
     return this.buildCatalog(target, {
-      defaultModel,
+      defaultModel: effectiveDefaultModel,
       source: 'static',
       cache: null,
-      models: withDefaultModel(staticModels, defaultModel).models,
+      models: normalizedModels,
       warnings,
     });
   }

@@ -14,9 +14,10 @@ schema_version: 1
 # - provider shared_options override same-named catalog shared_options
 #
 # Provenance is per-catalog and no longer uniform - read each entry's `notes`.
-# Every catalog carries a `version` and `last_updated`; `last_updated` means the
-# entry was revisited on that date, NOT that every model below was re-read. When
-# only part of an entry could be re-verified, the notes say which part and why.
+# Every catalog carries a `version` and `last_updated`; `last_updated` records
+# when the model list itself was last re-read or otherwise verified. A newer CLI
+# version probe alone does not advance that date; its observation date and scope
+# belong in `notes` until the model list can also be re-verified.
 #
 # Seed data was originally backfilled from local CLI versions observed on
 # 2026-04-08 plus the then-current cats-runtime static/advanced baselines.
@@ -632,7 +633,7 @@ catalogs:
 
   - cli: Copilot
     version: 1.0.80
-    last_updated: 2026-08-26
+    last_updated: 2026-04-17
     notes:
       - "Source: Copilot model picker output supplied by user"
       - "2026-08-26: version re-probed as 1.0.80. Model list NOT re-verified - the CLI has no models subcommand, an invalid --model reports availability without enumerating, and the shipped app.js carries no catalog. The list is fetched per account at runtime and is only readable from the interactive /model picker. Entries below remain as of 2026-04-17."
@@ -705,7 +706,7 @@ catalogs:
 
   - cli: Kilo
     version: 7.4.23
-    last_updated: 2026-08-26
+    last_updated: 2026-04-17
     notes:
       - "Source: Kilo model picker output supplied by user."
       - "Entries below preserve picker-visible labels only; runtime maps them to Kilo gateway ids."
@@ -741,7 +742,7 @@ catalogs:
 
   - cli: Kiro
     version: 2.19.2
-    last_updated: 2026-08-26
+    last_updated: 2026-04-17
     notes:
       - "Source: kiro-cli model list output supplied by user"
       - "2026-08-26: version re-probed as 2.19.2 (kiro-cli-chat). Model list NOT re-verified - the local kiro-cli is logged out and the list is account-gated. Entries below remain as of 2026-04-17."
@@ -798,7 +799,7 @@ catalogs:
 
   - cli: Junie
     version: "26.8.24 (2929.5)"
-    last_updated: 2026-08-26
+    last_updated: 2026-04-17
     notes:
       - "Source: Junie model picker output supplied by user"
       - "All models routed through JetBrains AI"

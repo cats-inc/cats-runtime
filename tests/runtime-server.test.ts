@@ -4010,18 +4010,15 @@ providers:
         provider: 'codex',
         backend: 'cli',
         instance: 'native',
-        // v1 takes its defaultModel from the static baseline, not from the
-        // curated catalog - the curated default (gpt-5.6-sol) only drives
-        // /advanced's defaultSelection.
-        defaultModel: 'gpt-5.4',
+        defaultModel: 'gpt-5.6-sol',
         source: 'static',
         cache: null,
         models: expect.arrayContaining([
-          { id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol', default: false },
+          { id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol', default: true },
           { id: 'gpt-5.6-terra', label: 'GPT-5.6-Terra', default: false },
           { id: 'gpt-5.6-luna', label: 'GPT-5.6-Luna', default: false },
           { id: 'gpt-5.5', label: 'GPT-5.5', default: false },
-          { id: 'gpt-5.4', label: 'GPT-5.4', default: true },
+          { id: 'gpt-5.4', label: 'GPT-5.4', default: false },
           { id: 'gpt-5.4-mini', label: 'GPT-5.4-Mini', default: false },
           { id: 'gpt-5.3-codex-spark', label: 'GPT-5.3-Codex-Spark', default: false },
         ]),
@@ -4233,13 +4230,11 @@ providers:
         provider: 'codex',
         backend: 'cli',
         instance: 'native',
-        defaultModel: 'gpt-5.4',
+        defaultModel: 'gpt-5.6-sol',
         source: 'static',
         cache: null,
         presets: [],
         defaultSelection: {
-          // The curated Codex catalog defaults to gpt-5.6-sol at Reasoning
-          // Level Low; `defaultModel` still comes from the advanced baseline.
           entryId: 'gpt-5.6-sol',
           entryMode: 'explicit',
           controls: {
