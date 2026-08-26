@@ -34,15 +34,20 @@ schema_version: 1
 
 catalogs:
   - cli: Claude
-    version: 2.1.112
-    last_updated: 2026-04-17
+    version: 2.1.246
+    last_updated: 2026-08-26
     notes:
-      - "Source: claude /model picker and /effort output"
+      - "Sources observed 2026-08-26: `claude --version`, `claude --help`, and static extraction from the shipped 2.1.246 native executable"
+      - "The executable contains a compiled-in superset, not the account-resolved `/model` picker. Every alias, generation, and capability extracted here could appear; none is evidence that it does appear for this account. A pasted `/model` and `/effort` listing takes precedence."
+      - "The baked first-party alias table maps `opus` to `claude-opus-5`, `sonnet` to `claude-sonnet-5`, and `haiku` to `claude-haiku-4-5`; per-provider mappings differ and render-time account gates can replace or suppress rows."
+      - "Observed render-time filter reasons: model_unavailable_gate, entitlement_denied, suppressed_rows_non_first_party, suppressed_rows_foreign_base_url, and allowlist_filtered."
+      - "Only opus, sonnet, and haiku are represented because the runtime normalizer accepts only those aliases. The compiled Fable 5 alias, Default row, Opus Plan Mode, historical generations, and separate 1M rows are omitted instead of being silently dropped or collapsed onto another alias."
+      - "The `default` marker and effort-level visibility/defaults remain from the account-resolved 2026-04-17 `/model` and `/effort` snapshot; without a fresh paste they are not claimed as re-verified by the binary extraction."
     models:
       - name: Opus
-        label: Opus 4.7 with 1M context
+        label: Opus
         notes:
-          - Most capable for complex work
+          - "Compiled alias description: Opus 5 - best for everyday, complex tasks"
         default: true
         context: 1000000
         options:
@@ -59,25 +64,27 @@ catalogs:
                   - "Comprehensive implementation with extensive testing and documentation"
               - name: xHigh
                 notes:
-                  - "Deeper reasoning than high, just below maximum"
+                  - "Deeper reasoning than high, just below maximum (Fable 5, Opus 4.7+, Sonnet 5)"
               - name: Max
                 notes:
-                  - "Maximum capability with deepest reasoning"
+                  - "Maximum capability with deepest reasoning. May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks."
             default: xHigh
 
       - name: Sonnet
-        label: Sonnet 4.6
+        label: Sonnet
         notes:
-          - Best for everyday tasks
+          - "Compiled alias description: Sonnet 5 - efficient for routine tasks. Generally recommended for most coding tasks"
+        context: 1000000
         options:
           - name: Effort
             values: [Low, Medium, High, Max]
             default: Medium
 
       - name: Haiku
-        label: Haiku 4.5
+        label: Haiku
         notes:
-          - Fastest for quick answers
+          - "Compiled alias description: Haiku 4.5 - fastest for quick answers. Lower cost but less capable than Sonnet 4.6."
+        context: 200000
         options: []
 
   - cli: Codex
