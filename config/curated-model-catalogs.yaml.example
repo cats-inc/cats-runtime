@@ -22,13 +22,13 @@ schema_version: 1
 # Seed data was originally backfilled from local CLI versions observed on
 # 2026-04-08 plus the then-current cats-runtime static/advanced baselines.
 #
-# 2026-08-26 refresh: Antigravity, Codex, and Cursor are live CLI enumerations
-# (`agy models`, `codex debug models`, `cursor-agent models`). Copilot, Kilo,
-# Kiro, and Junie had their versions re-probed but not their model lists - those
-# CLIs either gate the list behind an account, expose it only in an interactive
-# picker, or publish a different artifact than the picker shows. Claude was left
-# untouched and is still the 2026-04-17 entry - it is known stale (2.1.112 vs
-# 2.1.246 installed, and the picker has since gained Fable 5 and Opus Plan Mode).
+# 2026-08-26 refresh: Antigravity, Codex, and Cursor are account-resolved live
+# CLI enumerations (`agy models`, `codex debug models`, `cursor-agent models`).
+# Claude was re-read from the compiled 2.1.246 native executable; that artifact
+# exposes a static superset rather than the account-resolved picker. Copilot,
+# Kilo, Kiro, and Junie had their versions re-probed but not their model lists -
+# those CLIs either gate the list behind an account, expose it only in an
+# interactive picker, or publish a different artifact than the picker shows.
 #
 # Treat this file as a starting point to correct, trim, or expand.
 
@@ -45,7 +45,7 @@ catalogs:
       - "The `default` marker and effort-level visibility/defaults remain from the account-resolved 2026-04-17 `/model` and `/effort` snapshot; without a fresh paste they are not claimed as re-verified by the binary extraction."
     models:
       - name: Opus
-        label: Opus
+        label: Opus 5
         notes:
           - "Compiled alias description: Opus 5 - best for everyday, complex tasks"
         default: true
@@ -71,7 +71,7 @@ catalogs:
             default: xHigh
 
       - name: Sonnet
-        label: Sonnet
+        label: Sonnet 5
         notes:
           - "Compiled alias description: Sonnet 5 - efficient for routine tasks. Generally recommended for most coding tasks"
         context: 1000000
@@ -81,7 +81,7 @@ catalogs:
             default: Medium
 
       - name: Haiku
-        label: Haiku
+        label: Haiku 4.5
         notes:
           - "Compiled alias description: Haiku 4.5 - fastest for quick answers. Lower cost but less capable than Sonnet 4.6."
         context: 200000
