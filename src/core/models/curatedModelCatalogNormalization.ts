@@ -481,7 +481,28 @@ export function normalizeVerbatimCuratedModelId(
   return label && label.length > 0 ? label : null;
 }
 
+/**
+ * Cursor ids are lowercase dot/dash slugs (`auto`, `gpt-5.3-codex-low`,
+ * `claude-opus-4-7-thinking-xhigh`); every picker label carries capitals and
+ * spaces, so the two never collide.
+ */
+function isCursorModelId(value: string): boolean {
+  return /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/.test(value);
+}
+
 export function normalizeCursorCuratedModelId(model: CuratedModelCatalogModel): string | null {
+  // `cursor-agent models` prints `<id> - <label>` pairs and the dynamic
+  // discovery path keys models by that id, so a curated `name` that is already
+  // an id is taken verbatim - that is what keeps the static fallback and the
+  // live catalog on the same identities. Cursor also changed its Anthropic id
+  // scheme at 4.7 (`claude-4.6-opus-high` but `claude-opus-4-7-low`), which no
+  // label-derived id can reproduce. Label-only catalogs still go through the
+  // mapper below.
+  const name = model.name?.trim();
+  if (name && isCursorModelId(name)) {
+    return name;
+  }
+
   const candidates = [model.name, model.label].filter((value): value is string => Boolean(value));
   for (const candidate of candidates) {
     const normalized = normalizeCursorModelName(candidate);

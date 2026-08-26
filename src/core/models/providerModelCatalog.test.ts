@@ -1078,7 +1078,8 @@ describe('ProviderModelCatalogService', () => {
 
       expect(service.inspectSummary('cursor')).toEqual({
         source: 'static',
-        defaultModel: 'composer-2-fast',
+        // `cursor-agent models` marks `auto` as the default on 2026.08.11.
+        defaultModel: 'auto',
         modelCount: cursorStaticModelCount,
         warnings: [
           'Live model discovery is available for cursor/cli/default via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',

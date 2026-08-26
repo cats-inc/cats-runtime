@@ -172,7 +172,7 @@ describe('curatedModelCatalog', () => {
     }
   });
 
-  it('bundled Cursor example marks Composer 2 Fast as the default entry', () => {
+  it('bundled Cursor example marks Auto as the only default entry', () => {
     const runtime = createRuntimeRoot();
 
     try {
@@ -185,10 +185,67 @@ describe('curatedModelCatalog', () => {
 
       expect(result.path).toBe(join(PACKAGE_ROOT, 'config', 'curated-model-catalogs.yaml.example'));
       expect(result.warnings).toEqual([]);
-      expect(findCuratedCliCatalog(result.document, 'cursor')?.models?.slice(0, 2)).toEqual([
-        { name: 'Auto' },
-        { name: 'Composer 2 Fast', default: true },
+
+      const catalog = findCuratedCliCatalog(result.document, 'cursor');
+      expect(catalog?.version).toBe('2026.08.11-e8db854');
+      expect(catalog?.lastUpdated).toBe('2026-08-26');
+      // `name` is the raw `cursor-agent --model` id, matching the identities the
+      // dynamic `--list-models` path produces; `label` is the picker text.
+      expect(catalog?.models?.slice(0, 2)).toEqual([
+        { name: 'auto', label: 'Auto', default: true },
+        { name: 'gpt-5.3-codex-low', label: 'Codex 5.3 Low' },
       ]);
+      expect(catalog?.models?.filter((model) => model.default).map((model) => model.name))
+        .toEqual(['auto']);
+      // Cursor's Anthropic id scheme changed at 4.7; both spellings must survive
+      // verbatim rather than being re-derived from the label.
+      const cursorIds = catalog?.models?.map((model) => model.name) ?? [];
+      expect(cursorIds).toContain('claude-4.6-opus-high');
+      expect(cursorIds).toContain('claude-opus-4-7-low');
+    } finally {
+      runtime.cleanup();
+    }
+  });
+
+  it('bundled Antigravity example carries the probed agy model ids verbatim', () => {
+    const runtime = createRuntimeRoot();
+
+    try {
+      const result = loadCuratedModelCatalog({
+        env: {
+          ...runtime.env,
+          CATS_RUNTIME_PACKAGE_ROOT: PACKAGE_ROOT,
+        },
+      });
+
+      expect(result.warnings).toEqual([]);
+
+      const catalog = findCuratedCliCatalog(result.document, 'antigravity');
+      expect(catalog?.version).toBe('1.1.20');
+      expect(catalog?.lastUpdated).toBe('2026-08-26');
+
+      const scope = resolveCuratedCatalogScope(catalog!, 'antigravity');
+      // `name` feeds normalizeVerbatimCuratedModelId, so these are the exact
+      // strings handed to `agy --model`; agy echoes labels back on a bad id.
+      expect(scope?.models.map((model) => model.name)).toEqual([
+        'gemini-3.7-flash-high',
+        'gemini-3.7-flash-medium',
+        'gemini-3.7-flash-low',
+        'gemini-3.6-flash-high',
+        'gemini-3.6-flash-medium',
+        'gemini-3.6-flash-low',
+        'gemini-3.5-flash-high',
+        'gemini-3.5-flash-medium',
+        'gemini-3.5-flash-low',
+        'gemini-3.1-pro-high',
+        'gemini-3.1-pro-low',
+        'claude-sonnet-4-6',
+        'claude-opus-4-6-thinking',
+        'gpt-oss-120b-medium',
+      ]);
+      // agy reads its default from the per-user settings.json `model` field,
+      // so the catalog must not claim one.
+      expect(scope?.models.some((model) => model.default)).toBe(false);
     } finally {
       runtime.cleanup();
     }

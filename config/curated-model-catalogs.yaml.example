@@ -13,10 +13,21 @@ schema_version: 1
 # - use `options: []` to say a model has no options
 # - provider shared_options override same-named catalog shared_options
 #
-# Seed data below was backfilled from:
-# - local CLI versions observed on 2026-04-08
-# - current cats-runtime static/advanced catalog baselines
-# - current local CLI/UI picker output and observed model lists
+# Provenance is per-catalog and no longer uniform - read each entry's `notes`.
+# Every catalog carries a `version` and `last_updated`; `last_updated` means the
+# entry was revisited on that date, NOT that every model below was re-read. When
+# only part of an entry could be re-verified, the notes say which part and why.
+#
+# Seed data was originally backfilled from local CLI versions observed on
+# 2026-04-08 plus the then-current cats-runtime static/advanced baselines.
+#
+# 2026-08-26 refresh: Antigravity, Codex, and Cursor are live CLI enumerations
+# (`agy models`, `codex debug models`, `cursor-agent models`). Copilot, Kilo,
+# Kiro, and Junie had their versions re-probed but not their model lists - those
+# CLIs either gate the list behind an account, expose it only in an interactive
+# picker, or publish a different artifact than the picker shows. Claude was left
+# untouched and is still the 2026-04-17 entry - it is known stale (2.1.112 vs
+# 2.1.246 installed, and the picker has since gained Fable 5 and Opus Plan Mode).
 #
 # Treat this file as a starting point to correct, trim, or expand.
 
@@ -165,105 +176,467 @@ catalogs:
             default: High
 
   - cli: Antigravity
-    version: probe-required
-    last_updated: 2026-05-24
+    version: 1.1.20
+    last_updated: 2026-08-26
     notes:
-      - "Source: cats-runtime Phase 0 Antigravity CLI probe notes. Raw agy model IDs are not yet verified."
-      - "Bundled static Antigravity model IDs stay empty until a live agy model-list contract is proven."
-    models: []
+      - "Source: live `agy models` on 1.1.20, one `<id><tab><label>` pair per line"
+      - "`name` is the raw id `--model` accepts. A rejected id makes agy echo the labels back instead, so ids and labels are not interchangeable on input."
+      - "No entry is marked default: agy takes its default from the per-user settings.json `model` field, and the runtime omits `--model` entirely when nothing is selected, so naming one here would override a preference the runtime cannot see."
+    models:
+      - name: gemini-3.7-flash-high
+        label: Gemini 3.7 Flash (High)
+      - name: gemini-3.7-flash-medium
+        label: Gemini 3.7 Flash (Medium)
+      - name: gemini-3.7-flash-low
+        label: Gemini 3.7 Flash (Low)
+      - name: gemini-3.6-flash-high
+        label: Gemini 3.6 Flash (High)
+      - name: gemini-3.6-flash-medium
+        label: Gemini 3.6 Flash (Medium)
+      - name: gemini-3.6-flash-low
+        label: Gemini 3.6 Flash (Low)
+      - name: gemini-3.5-flash-high
+        label: Gemini 3.5 Flash (High)
+      - name: gemini-3.5-flash-medium
+        label: Gemini 3.5 Flash (Medium)
+      - name: gemini-3.5-flash-low
+        label: Gemini 3.5 Flash (Low)
+      - name: gemini-3.1-pro-high
+        label: Gemini 3.1 Pro (High)
+      - name: gemini-3.1-pro-low
+        label: Gemini 3.1 Pro (Low)
+      - name: claude-sonnet-4-6
+        label: Claude Sonnet 4.6 (Thinking)
+      - name: claude-opus-4-6-thinking
+        label: Claude Opus 4.6 (Thinking)
+      - name: gpt-oss-120b-medium
+        label: GPT-OSS 120B (Medium)
 
   - cli: Cursor
-    version: 2026.04.16-2d20146
-    last_updated: 2026-04-17
+    version: 2026.08.11-e8db854
+    last_updated: 2026-08-26
     notes:
-      - "Source: Cursor Agent /model picker output supplied by user"
-      - "Entries below are raw visible /model names only; provider grouping and canonical ids are intentionally omitted."
+      - "Source: live `cursor-agent models` output, which prints `<id> - <label>` pairs"
+      - "`name` is the raw id `cursor-agent --model` accepts, and `label` is the picker-visible text. The dynamic discovery path (`cursor-agent --list-models`) keys models by the same id, so the static fallback and the live catalog now agree."
+      - "Superseded the 2026-04-17 label-only listing: Cursor changed its Anthropic id scheme at 4.7 (claude-4.6-opus-high but claude-opus-4-7-low), which no label-derived id can reproduce."
     models:
-      - name: Auto
-      - name: Composer 2 Fast
+      - name: auto
+        label: Auto
         default: true
-      - name: Composer 2
-      - name: Composer 1.5
-      - name: Codex 5.3 Low
-      - name: Codex 5.3 Low Fast
-      - name: Codex 5.3
-      - name: Codex 5.3 Fast
-      - name: Codex 5.3 High
-      - name: Codex 5.3 High Fast
-      - name: Codex 5.3 Extra High
-      - name: Codex 5.3 Extra High Fast
-      - name: GPT-5.2
-      - name: Codex 5.3 Spark Low
-      - name: Codex 5.3 Spark
-      - name: Codex 5.3 Spark High
-      - name: Codex 5.3 Spark Extra High
-      - name: Codex 5.2 Low
-      - name: Codex 5.2 Low Fast
-      - name: Codex 5.2
-      - name: Codex 5.2 Fast
-      - name: Codex 5.2 High
-      - name: Codex 5.2 High Fast
-      - name: Codex 5.2 Extra High
-      - name: Codex 5.2 Extra High Fast
-      - name: Codex 5.1 Max Low
-      - name: Codex 5.1 Max Low Fast
-      - name: Codex 5.1 Max
-      - name: Codex 5.1 Max Medium Fast
-      - name: Codex 5.1 Max High
-      - name: Codex 5.1 Max High Fast
-      - name: Codex 5.1 Max Extra High
-      - name: Codex 5.1 Max Extra High Fast
-      - name: Opus 4.7 Thinking
-      - name: GPT-5.4 1M High
-      - name: GPT-5.4 High Fast
-      - name: GPT-5.4 Extra High Fast
-      - name: Opus 4.7 Low
-      - name: Opus 4.7 Medium
-      - name: Opus 4.7
-      - name: Opus 4.7 Extra High
-      - name: Opus 4.7 Max
-      - name: Opus 4.7 Low Thinking
-      - name: Opus 4.7 Medium Thinking
-      - name: Opus 4.7 Extra High Thinking
-      - name: Opus 4.7 Max Thinking
-      - name: GPT-5.4 1M Low
-      - name: GPT-5.4 1M
-      - name: GPT-5.4 Fast
-      - name: GPT-5.4 1M Extra High
-      - name: Sonnet 4.6 1M
-      - name: Sonnet 4.6 1M Thinking
-      - name: GPT-5.2 Low
-      - name: GPT-5.2 Low Fast
-      - name: GPT-5.2 Fast
-      - name: GPT-5.2 High
-      - name: GPT-5.2 High Fast
-      - name: GPT-5.2 Extra High
-      - name: GPT-5.2 Extra High Fast
-      - name: Gemini 3.1 Pro
-      - name: GPT-5.4 Mini None
-      - name: GPT-5.4 Mini Low
-      - name: GPT-5.4 Mini
-      - name: GPT-5.4 Mini High
-      - name: GPT-5.4 Mini Extra High
-      - name: GPT-5.4 Nano None
-      - name: GPT-5.4 Nano Low
-      - name: GPT-5.4 Nano
-      - name: GPT-5.4 Nano High
-      - name: GPT-5.4 Nano Extra High
-      - name: Grok 4.20
-      - name: Grok 4.20 Thinking
-      - name: Gemini 3 Flash
-      - name: Codex 5.1 Mini Low
-      - name: Codex 5.1 Mini
-      - name: Codex 5.1 Mini High
-      - name: GPT-5 Mini
-      - name: Kimi K2.5
+      - name: gpt-5.3-codex-low
+        label: Codex 5.3 Low
+      - name: gpt-5.3-codex-low-fast
+        label: Codex 5.3 Low Fast
+      - name: gpt-5.3-codex
+        label: Codex 5.3
+      - name: gpt-5.3-codex-fast
+        label: Codex 5.3 Fast
+      - name: gpt-5.3-codex-high
+        label: Codex 5.3 High
+      - name: gpt-5.3-codex-high-fast
+        label: Codex 5.3 High Fast
+      - name: gpt-5.3-codex-xhigh
+        label: Codex 5.3 Extra High
+      - name: gpt-5.3-codex-xhigh-fast
+        label: Codex 5.3 Extra High Fast
+      - name: gpt-5.2
+        label: GPT-5.2
+      - name: cursor-grok-4.6-high-fast
+        label: Cursor Grok 4.6 Fast
+      - name: composer-2.5
+        label: Composer 2.5
+      - name: claude-opus-5-thinking-high
+        label: Claude Opus 5 1M Thinking
+      - name: claude-opus-5-thinking-high-fast
+        label: Claude Opus 5 1M Thinking Fast
+      - name: gpt-5.6-sol-high
+        label: GPT-5.6 Sol 1M High
+      - name: gpt-5.6-sol-high-fast
+        label: GPT-5.6 Sol High Fast
+      - name: gpt-5.6-sol-xhigh
+        label: GPT-5.6 Sol 1M Extra High
+      - name: gpt-5.6-sol-xhigh-fast
+        label: GPT-5.6 Sol Extra High Fast
+      - name: claude-fable-5-thinking-high
+        label: Claude Fable 5 1M Thinking (NO ZDR)
+      - name: claude-fable-5-thinking-xhigh
+        label: Claude Fable 5 1M Extra High Thinking (NO ZDR)
+      - name: cursor-grok-4.5-high
+        label: Cursor Grok 4.5
+      - name: cursor-grok-4.5-high-fast
+        label: Cursor Grok 4.5 Fast
+      - name: gemini-3.7-flash-high
+        label: Gemini 3.7 Flash
+      - name: claude-sonnet-5-thinking-high
+        label: Claude Sonnet 5 1M Thinking
+      - name: claude-sonnet-5-thinking-xhigh
+        label: Claude Sonnet 5 1M Extra High Thinking
+      - name: gpt-5.6-luna-high
+        label: GPT-5.6 Luna 1M High
+      - name: cursor-grok-4.6-low
+        label: Cursor Grok 4.6 Low
+      - name: cursor-grok-4.6-low-fast
+        label: Cursor Grok 4.6 Low Fast
+      - name: cursor-grok-4.6-medium
+        label: Cursor Grok 4.6 Medium
+      - name: cursor-grok-4.6-medium-fast
+        label: Cursor Grok 4.6 Medium Fast
+      - name: cursor-grok-4.6-high
+        label: Cursor Grok 4.6
+      - name: cursor-grok-4.6-xhigh
+        label: Cursor Grok 4.6 Extra High
+      - name: cursor-grok-4.6-xhigh-fast
+        label: Cursor Grok 4.6 Extra High Fast
+      - name: composer-2.5-fast
+        label: Composer 2.5 Fast
+      - name: claude-opus-5-low
+        label: Claude Opus 5 1M Low
+      - name: claude-opus-5-low-fast
+        label: Claude Opus 5 1M Low Fast
+      - name: claude-opus-5-medium
+        label: Claude Opus 5 1M Medium
+      - name: claude-opus-5-medium-fast
+        label: Claude Opus 5 1M Medium Fast
+      - name: claude-opus-5-high
+        label: Claude Opus 5 1M
+      - name: claude-opus-5-high-fast
+        label: Claude Opus 5 1M Fast
+      - name: claude-opus-5-thinking-low
+        label: Claude Opus 5 1M Low Thinking
+      - name: claude-opus-5-thinking-low-fast
+        label: Claude Opus 5 1M Low Thinking Fast
+      - name: claude-opus-5-thinking-medium
+        label: Claude Opus 5 1M Medium Thinking
+      - name: claude-opus-5-thinking-medium-fast
+        label: Claude Opus 5 1M Medium Thinking Fast
+      - name: claude-opus-5-thinking-xhigh
+        label: Claude Opus 5 1M Extra High Thinking
+      - name: claude-opus-5-thinking-xhigh-fast
+        label: Claude Opus 5 1M Extra High Thinking Fast
+      - name: claude-opus-5-thinking-max
+        label: Claude Opus 5 1M Max Thinking
+      - name: claude-opus-5-thinking-max-fast
+        label: Claude Opus 5 1M Max Thinking Fast
+      - name: claude-opus-4-8-low
+        label: Claude Opus 4.8 1M Low
+      - name: claude-opus-4-8-low-fast
+        label: Claude Opus 4.8 1M Low Fast
+      - name: claude-opus-4-8-medium
+        label: Claude Opus 4.8 1M Medium
+      - name: claude-opus-4-8-medium-fast
+        label: Claude Opus 4.8 1M Medium Fast
+      - name: claude-opus-4-8-high
+        label: Claude Opus 4.8 1M
+      - name: claude-opus-4-8-high-fast
+        label: Claude Opus 4.8 1M Fast
+      - name: claude-opus-4-8-xhigh
+        label: Claude Opus 4.8 1M Extra High
+      - name: claude-opus-4-8-xhigh-fast
+        label: Claude Opus 4.8 1M Extra High Fast
+      - name: claude-opus-4-8-max
+        label: Claude Opus 4.8 1M Max
+      - name: claude-opus-4-8-max-fast
+        label: Claude Opus 4.8 1M Max Fast
+      - name: claude-opus-4-8-thinking-low
+        label: Claude Opus 4.8 1M Low Thinking
+      - name: claude-opus-4-8-thinking-low-fast
+        label: Claude Opus 4.8 1M Low Thinking Fast
+      - name: claude-opus-4-8-thinking-medium
+        label: Claude Opus 4.8 1M Medium Thinking
+      - name: claude-opus-4-8-thinking-medium-fast
+        label: Claude Opus 4.8 1M Medium Thinking Fast
+      - name: claude-opus-4-8-thinking-high
+        label: Claude Opus 4.8 1M Thinking
+      - name: claude-opus-4-8-thinking-high-fast
+        label: Claude Opus 4.8 1M Thinking Fast
+      - name: claude-opus-4-8-thinking-xhigh
+        label: Claude Opus 4.8 1M Extra High Thinking
+      - name: claude-opus-4-8-thinking-xhigh-fast
+        label: Claude Opus 4.8 1M Extra High Thinking Fast
+      - name: claude-opus-4-8-thinking-max
+        label: Claude Opus 4.8 1M Max Thinking
+      - name: claude-opus-4-8-thinking-max-fast
+        label: Claude Opus 4.8 1M Max Thinking Fast
+      - name: gpt-5.6-sol-none
+        label: GPT-5.6 Sol 1M None
+      - name: gpt-5.6-sol-none-fast
+        label: GPT-5.6 Sol None Fast
+      - name: gpt-5.6-sol-low
+        label: GPT-5.6 Sol 1M Low
+      - name: gpt-5.6-sol-low-fast
+        label: GPT-5.6 Sol Low Fast
+      - name: gpt-5.6-sol-medium
+        label: GPT-5.6 Sol 1M
+      - name: gpt-5.6-sol-medium-fast
+        label: GPT-5.6 Sol Fast
+      - name: gpt-5.6-sol-max
+        label: GPT-5.6 Sol 1M Max
+      - name: gpt-5.6-sol-max-fast
+        label: GPT-5.6 Sol Max Fast
+      - name: gpt-5.5-none
+        label: GPT-5.5 1M None
+      - name: gpt-5.5-none-fast
+        label: GPT-5.5 None Fast
+      - name: gpt-5.5-low
+        label: GPT-5.5 1M Low
+      - name: gpt-5.5-low-fast
+        label: GPT-5.5 Low Fast
+      - name: gpt-5.5-medium
+        label: GPT-5.5 1M
+      - name: gpt-5.5-medium-fast
+        label: GPT-5.5 Fast
+      - name: gpt-5.5-high
+        label: GPT-5.5 1M High
+      - name: gpt-5.5-high-fast
+        label: GPT-5.5 High Fast
+      - name: gpt-5.5-extra-high
+        label: GPT-5.5 1M Extra High
+      - name: gpt-5.5-extra-high-fast
+        label: GPT-5.5 Extra High Fast
+      - name: claude-fable-5-low
+        label: Claude Fable 5 1M Low (NO ZDR)
+      - name: claude-fable-5-medium
+        label: Claude Fable 5 1M Medium (NO ZDR)
+      - name: claude-fable-5-high
+        label: Claude Fable 5 1M (NO ZDR)
+      - name: claude-fable-5-xhigh
+        label: Claude Fable 5 1M Extra High (NO ZDR)
+      - name: claude-fable-5-max
+        label: Claude Fable 5 1M Max (NO ZDR)
+      - name: claude-fable-5-thinking-low
+        label: Claude Fable 5 1M Low Thinking (NO ZDR)
+      - name: claude-fable-5-thinking-medium
+        label: Claude Fable 5 1M Medium Thinking (NO ZDR)
+      - name: claude-fable-5-thinking-max
+        label: Claude Fable 5 1M Max Thinking (NO ZDR)
+      - name: cursor-grok-4.5-low
+        label: Cursor Grok 4.5 Low
+      - name: cursor-grok-4.5-low-fast
+        label: Cursor Grok 4.5 Low Fast
+      - name: cursor-grok-4.5-medium
+        label: Cursor Grok 4.5 Medium
+      - name: cursor-grok-4.5-medium-fast
+        label: Cursor Grok 4.5 Medium Fast
+      - name: gemini-3.7-flash-low
+        label: Gemini 3.7 Flash Low
+      - name: gemini-3.7-flash-medium
+        label: Gemini 3.7 Flash Medium
+      - name: gpt-5.6-terra-none
+        label: GPT-5.6 Terra 1M None
+      - name: gpt-5.6-terra-none-fast
+        label: GPT-5.6 Terra None Fast
+      - name: gpt-5.6-terra-low
+        label: GPT-5.6 Terra 1M Low
+      - name: gpt-5.6-terra-low-fast
+        label: GPT-5.6 Terra Low Fast
+      - name: gpt-5.6-terra-medium
+        label: GPT-5.6 Terra 1M
+      - name: gpt-5.6-terra-medium-fast
+        label: GPT-5.6 Terra Fast
+      - name: gpt-5.6-terra-high
+        label: GPT-5.6 Terra 1M High
+      - name: gpt-5.6-terra-high-fast
+        label: GPT-5.6 Terra High Fast
+      - name: gpt-5.6-terra-xhigh
+        label: GPT-5.6 Terra 1M Extra High
+      - name: gpt-5.6-terra-xhigh-fast
+        label: GPT-5.6 Terra Extra High Fast
+      - name: gpt-5.6-terra-max
+        label: GPT-5.6 Terra 1M Max
+      - name: gpt-5.6-terra-max-fast
+        label: GPT-5.6 Terra Max Fast
+      - name: claude-sonnet-5-low
+        label: Claude Sonnet 5 1M Low
+      - name: claude-sonnet-5-medium
+        label: Claude Sonnet 5 1M Medium
+      - name: claude-sonnet-5-high
+        label: Claude Sonnet 5 1M
+      - name: claude-sonnet-5-xhigh
+        label: Claude Sonnet 5 1M Extra High
+      - name: claude-sonnet-5-max
+        label: Claude Sonnet 5 1M Max
+      - name: claude-sonnet-5-thinking-low
+        label: Claude Sonnet 5 1M Low Thinking
+      - name: claude-sonnet-5-thinking-medium
+        label: Claude Sonnet 5 1M Medium Thinking
+      - name: claude-sonnet-5-thinking-max
+        label: Claude Sonnet 5 1M Max Thinking
+      - name: claude-4.6-sonnet-medium
+        label: Claude Sonnet 4.6 1M
+      - name: claude-4.6-sonnet-medium-thinking
+        label: Claude Sonnet 4.6 1M Thinking
+      - name: claude-opus-4-7-low
+        label: Claude Opus 4.7 1M Low
+      - name: claude-opus-4-7-low-fast
+        label: Claude Opus 4.7 1M Low Fast
+      - name: claude-opus-4-7-medium
+        label: Claude Opus 4.7 1M Medium
+      - name: claude-opus-4-7-medium-fast
+        label: Claude Opus 4.7 1M Medium Fast
+      - name: claude-opus-4-7-high
+        label: Claude Opus 4.7 1M High
+      - name: claude-opus-4-7-high-fast
+        label: Claude Opus 4.7 1M High Fast
+      - name: claude-opus-4-7-xhigh
+        label: Claude Opus 4.7 1M
+      - name: claude-opus-4-7-xhigh-fast
+        label: Claude Opus 4.7 1M Fast
+      - name: claude-opus-4-7-max
+        label: Claude Opus 4.7 1M Max
+      - name: claude-opus-4-7-max-fast
+        label: Claude Opus 4.7 1M Max Fast
+      - name: claude-opus-4-7-thinking-low
+        label: Claude Opus 4.7 1M Low Thinking
+      - name: claude-opus-4-7-thinking-low-fast
+        label: Claude Opus 4.7 1M Low Thinking Fast
+      - name: claude-opus-4-7-thinking-medium
+        label: Claude Opus 4.7 1M Medium Thinking
+      - name: claude-opus-4-7-thinking-medium-fast
+        label: Claude Opus 4.7 1M Medium Thinking Fast
+      - name: claude-opus-4-7-thinking-high
+        label: Claude Opus 4.7 1M High Thinking
+      - name: claude-opus-4-7-thinking-high-fast
+        label: Claude Opus 4.7 1M High Thinking Fast
+      - name: claude-opus-4-7-thinking-xhigh
+        label: Claude Opus 4.7 1M Thinking
+      - name: claude-opus-4-7-thinking-xhigh-fast
+        label: Claude Opus 4.7 1M Thinking Fast
+      - name: claude-opus-4-7-thinking-max
+        label: Claude Opus 4.7 1M Max Thinking
+      - name: claude-opus-4-7-thinking-max-fast
+        label: Claude Opus 4.7 1M Max Thinking Fast
+      - name: gpt-5.4-low
+        label: GPT-5.4 1M Low
+      - name: gpt-5.4-medium
+        label: GPT-5.4 1M
+      - name: gpt-5.4-medium-fast
+        label: GPT-5.4 Fast
+      - name: gpt-5.4-high
+        label: GPT-5.4 1M High
+      - name: gpt-5.4-high-fast
+        label: GPT-5.4 High Fast
+      - name: gpt-5.4-xhigh
+        label: GPT-5.4 1M Extra High
+      - name: gpt-5.4-xhigh-fast
+        label: GPT-5.4 Extra High Fast
+      - name: claude-4.6-opus-high
+        label: Claude Opus 4.6 1M
+      - name: claude-4.6-opus-max
+        label: Claude Opus 4.6 1M Max
+      - name: claude-4.6-opus-high-thinking
+        label: Claude Opus 4.6 1M Thinking
+      - name: claude-4.6-opus-max-thinking
+        label: Claude Opus 4.6 1M Max Thinking
+      - name: claude-4.5-opus-high
+        label: Claude Opus 4.5
+      - name: claude-4.5-opus-high-thinking
+        label: Claude Opus 4.5 Thinking
+      - name: gpt-5.2-low
+        label: GPT-5.2 Low
+      - name: gpt-5.2-low-fast
+        label: GPT-5.2 Low Fast
+      - name: gpt-5.2-fast
+        label: GPT-5.2 Fast
+      - name: gpt-5.2-high
+        label: GPT-5.2 High
+      - name: gpt-5.2-high-fast
+        label: GPT-5.2 High Fast
+      - name: gpt-5.2-xhigh
+        label: GPT-5.2 Extra High
+      - name: gpt-5.2-xhigh-fast
+        label: GPT-5.2 Extra High Fast
+      - name: gpt-5.6-luna-none
+        label: GPT-5.6 Luna 1M None
+      - name: gpt-5.6-luna-none-fast
+        label: GPT-5.6 Luna None Fast
+      - name: gpt-5.6-luna-low
+        label: GPT-5.6 Luna 1M Low
+      - name: gpt-5.6-luna-low-fast
+        label: GPT-5.6 Luna Low Fast
+      - name: gpt-5.6-luna-medium
+        label: GPT-5.6 Luna 1M
+      - name: gpt-5.6-luna-medium-fast
+        label: GPT-5.6 Luna Fast
+      - name: gpt-5.6-luna-high-fast
+        label: GPT-5.6 Luna High Fast
+      - name: gpt-5.6-luna-xhigh
+        label: GPT-5.6 Luna 1M Extra High
+      - name: gpt-5.6-luna-xhigh-fast
+        label: GPT-5.6 Luna Extra High Fast
+      - name: gpt-5.6-luna-max
+        label: GPT-5.6 Luna 1M Max
+      - name: gpt-5.6-luna-max-fast
+        label: GPT-5.6 Luna Max Fast
+      - name: gemini-3.6-flash-minimal
+        label: Gemini 3.6 Flash Minimal
+      - name: gemini-3.6-flash-low
+        label: Gemini 3.6 Flash Low
+      - name: gemini-3.6-flash-medium
+        label: Gemini 3.6 Flash Medium
+      - name: gemini-3.6-flash-high
+        label: Gemini 3.6 Flash
+      - name: gemini-3.1-pro
+        label: Gemini 3.1 Pro
+      - name: gpt-5.4-mini-none
+        label: GPT-5.4 Mini None
+      - name: gpt-5.4-mini-low
+        label: GPT-5.4 Mini Low
+      - name: gpt-5.4-mini-medium
+        label: GPT-5.4 Mini
+      - name: gpt-5.4-mini-high
+        label: GPT-5.4 Mini High
+      - name: gpt-5.4-mini-xhigh
+        label: GPT-5.4 Mini Extra High
+      - name: gpt-5.4-nano-none
+        label: GPT-5.4 Nano None
+      - name: gpt-5.4-nano-low
+        label: GPT-5.4 Nano Low
+      - name: gpt-5.4-nano-medium
+        label: GPT-5.4 Nano
+      - name: gpt-5.4-nano-high
+        label: GPT-5.4 Nano High
+      - name: gpt-5.4-nano-xhigh
+        label: GPT-5.4 Nano Extra High
+      - name: claude-4.5-sonnet
+        label: Claude Sonnet 4.5
+      - name: claude-4.5-sonnet-thinking
+        label: Claude Sonnet 4.5 Thinking
+      - name: gpt-5.1-low
+        label: GPT-5.1 Low
+      - name: gpt-5.1
+        label: GPT-5.1
+      - name: gpt-5.1-high
+        label: GPT-5.1 High
+      - name: gemini-3.5-flash
+        label: Gemini 3.5 Flash
+      - name: claude-4-sonnet
+        label: Claude Sonnet 4
+      - name: claude-4-sonnet-thinking
+        label: Claude Sonnet 4 Thinking
+      - name: gpt-5-mini
+        label: GPT-5 Mini
+      - name: kimi-k3-low
+        label: Kimi K3 Low
+      - name: kimi-k3-high
+        label: Kimi K3 High
+      - name: kimi-k3-max
+        label: Kimi K3
+      - name: kimi-k2.7-code
+        label: Kimi K2.7 Code
+      - name: glm-5.2-high
+        label: GLM 5.2
+      - name: glm-5.2-max
+        label: GLM 5.2 Max
+      - name: gemini-3-flash
+        label: Gemini 3 Flash
 
   - cli: Copilot
-    version: v1.0.31
-    last_updated: 2026-04-17
+    version: 1.0.80
+    last_updated: 2026-08-26
     notes:
       - "Source: Copilot model picker output supplied by user"
+      - "2026-08-26: version re-probed as 1.0.80. Model list NOT re-verified - the CLI has no models subcommand, an invalid --model reports availability without enumerating, and the shipped app.js carries no catalog. The list is fetched per account at runtime and is only readable from the interactive /model picker. Entries below remain as of 2026-04-17."
+      - "2026-08-26: both effort option blocks re-verified verbatim against the shipped app.js bundle - all six option descriptions are unchanged."
     providers:
       - name: OpenAI
         shared_options:
@@ -331,11 +704,13 @@ catalogs:
             options: []
 
   - cli: Kilo
-    version: v7.2.0
-    last_updated: 2026-04-17
+    version: 7.4.23
+    last_updated: 2026-08-26
     notes:
       - "Source: Kilo model picker output supplied by user."
       - "Entries below preserve picker-visible labels only; runtime maps them to Kilo gateway ids."
+      - "2026-08-26: version re-probed as 7.4.23. Picker list NOT re-verified - `kilo models` returns the full 299-entry gateway catalog from models.dev, which is a different artifact: the picker virtual routing rows (Kilo Auto Frontier/Balanced/Free, Elephant) do not appear in it. Entries below remain as of 2026-04-17."
+      - "`kilo models --verbose` emits per-model JSON (id, name, family, cost, limit.context, limit.output) and is the better source if this section is ever re-scoped to the gateway catalog rather than the picker."
     models:
       - name: Kilo Auto Frontier
 
@@ -365,10 +740,12 @@ catalogs:
       - name: "Z.ai: GLM 5.1"
 
   - cli: Kiro
-    version: 2.0.0
-    last_updated: 2026-04-17
+    version: 2.19.2
+    last_updated: 2026-08-26
     notes:
       - "Source: kiro-cli model list output supplied by user"
+      - "2026-08-26: version re-probed as 2.19.2 (kiro-cli-chat). Model list NOT re-verified - the local kiro-cli is logged out and the list is account-gated. Entries below remain as of 2026-04-17."
+      - "`kiro-cli chat` also takes `--effort <low|medium|high|xhigh|max>`, which no entry below represents."
     models:
       - name: auto
         notes:
@@ -420,11 +797,13 @@ catalogs:
           - "Experimental preview of Qwen3 Coder Next"
 
   - cli: Junie
-    version: 1362.47
-    last_updated: 2026-04-17
+    version: "26.8.24 (2929.5)"
+    last_updated: 2026-08-26
     notes:
       - "Source: Junie model picker output supplied by user"
       - "All models routed through JetBrains AI"
+      - "2026-08-26: version re-probed as 26.8.24 (2929.5). Model list NOT re-verified - the CLI exposes --model/--provider but has no list command, and an invalid --model fails without enumerating. Entries below remain as of 2026-04-17."
+      - "`--provider` accepts openai, anthropic, google, xai, openrouter, copilot, litellm for BYOK; when unset the Junie/Custom provider is used."
     models:
       - name: Gemini 3 Flash
         default: true

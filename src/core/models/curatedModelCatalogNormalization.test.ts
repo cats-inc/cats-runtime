@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   normalizeCodexCuratedModelId,
   normalizeCopilotModelName,
+  normalizeCursorCuratedModelId,
   normalizeCursorModelName,
   normalizeJunieCuratedModelId,
   normalizeKiloModelName,
@@ -27,6 +28,30 @@ describe('curatedModelCatalogNormalization', () => {
     expect(normalizeCursorModelName('Gemini 3 Flash')).toBe('gemini-3-flash');
     expect(normalizeCursorModelName('Kimi K2.5')).toBe('kimi-k2.5');
     expect(normalizeCursorModelName('Unknown Cursor Model')).toBeNull();
+  });
+
+  it('takes curated Cursor ids verbatim and still maps legacy label-only entries', () => {
+    // `cursor-agent models` prints `<id> - <label>`, so a curated `name` that is
+    // already an id must survive untouched - including both Anthropic id
+    // schemes, which diverge at 4.7 and cannot be derived from the label.
+    expect(normalizeCursorCuratedModelId({ name: 'auto', label: 'Auto' })).toBe('auto');
+    expect(normalizeCursorCuratedModelId({
+      name: 'claude-opus-4-7-low',
+      label: 'Claude Opus 4.7 1M Low',
+    })).toBe('claude-opus-4-7-low');
+    expect(normalizeCursorCuratedModelId({
+      name: 'claude-4.6-opus-high',
+      label: 'Claude Opus 4.6 1M',
+    })).toBe('claude-4.6-opus-high');
+    expect(normalizeCursorCuratedModelId({
+      name: 'gpt-5.6-sol-xhigh',
+      label: 'GPT-5.6 Sol 1M Extra High',
+    })).toBe('gpt-5.6-sol-xhigh');
+
+    // A label-only catalog (the pre-2026-08-26 shape) still goes through the mapper.
+    expect(normalizeCursorCuratedModelId({ name: 'Codex 5.3 Extra High' }))
+      .toBe('gpt-5.3-codex-xhigh');
+    expect(normalizeCursorCuratedModelId({ name: 'Unknown Cursor Model' })).toBeNull();
   });
 
   it('rejects unsupported or mistyped Cursor anthropic labels and ids', () => {
