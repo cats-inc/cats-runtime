@@ -2973,7 +2973,9 @@ backends:
                 metering: expectIdleMeteringSummary(),
                 modelCatalog: expect.objectContaining({
                   source: 'static',
-                  defaultModel: 'composer-2-fast',
+                  // The bundled curated example tracks `cursor-agent models`,
+                  // which marks `auto` as the default on 2026.08.11.
+                  defaultModel: 'auto',
                   modelCount: cursorStaticModelCount,
                   warnings: [
                     'Live model discovery is available for cursor/cli/ubuntu via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
@@ -3037,7 +3039,9 @@ backends:
                 metering: expectIdleMeteringSummary(),
                 modelCatalog: expect.objectContaining({
                   source: 'static',
-                  defaultModel: 'composer-2-fast',
+                  // The bundled curated example tracks `cursor-agent models`,
+                  // which marks `auto` as the default on 2026.08.11.
+                  defaultModel: 'auto',
                   modelCount: cursorStaticModelCount,
                   warnings: [
                     'Live model discovery is available for cursor/cli/debian via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
@@ -4006,15 +4010,20 @@ providers:
         provider: 'codex',
         backend: 'cli',
         instance: 'native',
+        // v1 takes its defaultModel from the static baseline, not from the
+        // curated catalog - the curated default (gpt-5.6-sol) only drives
+        // /advanced's defaultSelection.
         defaultModel: 'gpt-5.4',
         source: 'static',
         cache: null,
         models: expect.arrayContaining([
-          { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
-          { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini', default: false },
-          { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex', default: false },
-          { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark', default: false },
-          { id: 'gpt-5.2', label: 'gpt-5.2', default: false },
+          { id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol', default: false },
+          { id: 'gpt-5.6-terra', label: 'GPT-5.6-Terra', default: false },
+          { id: 'gpt-5.6-luna', label: 'GPT-5.6-Luna', default: false },
+          { id: 'gpt-5.5', label: 'GPT-5.5', default: false },
+          { id: 'gpt-5.4', label: 'GPT-5.4', default: true },
+          { id: 'gpt-5.4-mini', label: 'GPT-5.4-Mini', default: false },
+          { id: 'gpt-5.3-codex-spark', label: 'GPT-5.3-Codex-Spark', default: false },
         ]),
         warnings: [],
       });
@@ -4196,7 +4205,7 @@ providers:
         instance: 'native',
         source: 'static',
       });
-      expect(payload.providers.codex.models[0]?.id).toBe('gpt-5.4');
+      expect(payload.providers.codex.models[0]?.id).toBe('gpt-5.6-sol');
       expect(payload.providers.claude).toMatchObject({
         provider: 'claude',
         backend: 'cli',
@@ -4229,10 +4238,12 @@ providers:
         cache: null,
         presets: [],
         defaultSelection: {
-          entryId: 'gpt-5.4',
+          // The curated Codex catalog defaults to gpt-5.6-sol at Reasoning
+          // Level Low; `defaultModel` still comes from the advanced baseline.
+          entryId: 'gpt-5.6-sol',
           entryMode: 'explicit',
           controls: {
-            'codex.reasoning_effort': 'medium',
+            'codex.reasoning_effort': 'low',
           },
         },
         support: {
@@ -4241,27 +4252,25 @@ providers:
         warnings: [],
       });
       expect(payload.entries.map((entry: { id: string }) => entry.id)).toEqual([
+        'gpt-5.6-sol',
+        'gpt-5.6-terra',
+        'gpt-5.6-luna',
+        'gpt-5.5',
         'gpt-5.4',
-        'gpt-5.2-codex',
-        'gpt-5.1-codex-max',
         'gpt-5.4-mini',
-        'gpt-5.3-codex',
         'gpt-5.3-codex-spark',
-        'gpt-5.2',
-        'gpt-5.1-codex-mini',
       ]);
       expect(payload.controls).toMatchObject([
         {
           key: 'codex.reasoning_effort',
           applicableEntryIds: [
+            'gpt-5.6-sol',
+            'gpt-5.6-terra',
+            'gpt-5.6-luna',
+            'gpt-5.5',
             'gpt-5.4',
-            'gpt-5.2-codex',
-            'gpt-5.1-codex-max',
             'gpt-5.4-mini',
-            'gpt-5.3-codex',
             'gpt-5.3-codex-spark',
-            'gpt-5.2',
-            'gpt-5.1-codex-mini',
           ],
         },
       ]);
