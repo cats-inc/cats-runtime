@@ -193,4 +193,68 @@ describe('curatedModelCatalog', () => {
       runtime.cleanup();
     }
   });
+
+  it('bundled Codex example matches the refreshed visible CLI catalog', () => {
+    const runtime = createRuntimeRoot();
+
+    try {
+      const result = loadCuratedModelCatalog({
+        env: {
+          ...runtime.env,
+          CATS_RUNTIME_PACKAGE_ROOT: PACKAGE_ROOT,
+        },
+      });
+
+      expect(result.warnings).toEqual([]);
+      const catalog = findCuratedCliCatalog(result.document, 'codex');
+      expect(catalog?.version).toBe('0.149.1');
+      expect(catalog?.lastUpdated).toBe('2026-08-26');
+
+      const scope = resolveCuratedCatalogScope(catalog!, 'codex');
+      expect(scope?.models.map((model) => model.name)).toEqual([
+        'gpt-5.6-sol',
+        'gpt-5.6-terra',
+        'gpt-5.6-luna',
+        'gpt-5.5',
+        'gpt-5.4',
+        'gpt-5.4-mini',
+        'gpt-5.3-codex-spark',
+      ]);
+      expect(scope?.models[0]).toMatchObject({
+        default: true,
+        context: 272000,
+      });
+      expect(resolveEffectiveCuratedModelOptions(scope!.sharedOptions, scope!.models[0]))
+        .toEqual([
+          expect.objectContaining({
+            name: 'Reasoning Level',
+            default: 'Low',
+            values: expect.arrayContaining([
+              { name: 'Max', notes: ['Maximum reasoning depth for the hardest problems'] },
+              { name: 'Ultra', notes: ['Maximum reasoning with automatic task delegation'] },
+            ]),
+          }),
+        ]);
+      expect(resolveEffectiveCuratedModelOptions(scope!.sharedOptions, scope!.models[2]))
+        .toEqual([
+          expect.objectContaining({
+            name: 'Reasoning Level',
+            default: 'Medium',
+            values: [
+              { name: 'Low' },
+              { name: 'Medium' },
+              { name: 'High' },
+              { name: 'Extra high' },
+              { name: 'Max' },
+            ],
+          }),
+        ]);
+      expect(scope?.models.at(-1)).toMatchObject({
+        name: 'gpt-5.3-codex-spark',
+        context: 128000,
+      });
+    } finally {
+      runtime.cleanup();
+    }
+  });
 });

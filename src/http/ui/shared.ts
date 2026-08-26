@@ -947,7 +947,7 @@ export const SHARED_UI_SCRIPT = `
     ) {
       return undefined;
     }
-    var reasoningOrder = ['low', 'medium', 'high', 'max'];
+    var reasoningOrder = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
     var requestedIndex = reasoningOrder.indexOf(requestedValue);
     if (requestedIndex < 0) return undefined;
     for (var cursor = requestedIndex - 1; cursor >= 0; cursor--) {

@@ -69,11 +69,12 @@ catalogs:
         options: []
 
   - cli: Codex
-    version: 0.121.0
-    last_updated: 2026-04-17
+    version: 0.149.1
+    last_updated: 2026-08-26
     notes:
-      - "Source: codex model picker and reasoning level selector"
-      - "Context window reported ~258K total"
+      - "Source: refreshed `codex debug models` output from an authenticated Codex CLI"
+      - "Only models with `visibility: list` are included; hidden internal models are omitted"
+      - "Context values reflect the Codex CLI catalog and may differ from OpenAI API limits"
     shared_options:
       - name: Reasoning Level
         values:
@@ -89,55 +90,79 @@ catalogs:
           - name: Extra high
             notes:
               - "Extra high reasoning depth for complex problems"
+          - name: Max
+            notes:
+              - "Maximum reasoning depth for the hardest problems"
+          - name: Ultra
+            notes:
+              - "Maximum reasoning with automatic task delegation"
         default: Medium
     models:
-      - name: gpt-5.4
-        label: gpt-5.4
+      - name: gpt-5.6-sol
+        label: GPT-5.6-Sol
         notes:
           - "Latest frontier agentic coding model."
         default: true
+        context: 272000
+        options:
+          - name: Reasoning Level
+            default: Low
 
-      - name: gpt-5.2-codex
-        label: gpt-5.2-codex
+      - name: gpt-5.6-terra
+        label: GPT-5.6-Terra
         notes:
-          - "Frontier agentic coding model."
+          - "Balanced agentic coding model for everyday work."
+        context: 272000
 
-      - name: gpt-5.1-codex-max
-        label: gpt-5.1-codex-max
+      - name: gpt-5.6-luna
+        label: GPT-5.6-Luna
         notes:
-          - "Codex-optimized flagship for deep and fast reasoning."
+          - "Fast and affordable agentic coding model."
+        context: 272000
+        options:
+          - name: Reasoning Level
+            values: [Low, Medium, High, Extra high, Max]
+            default: Medium
+
+      - name: gpt-5.5
+        label: GPT-5.5
+        notes:
+          - "Frontier model for complex coding, research, and real-world work."
+        context: 272000
+        options:
+          - name: Reasoning Level
+            values: [Low, Medium, High, Extra high]
+            default: Medium
+
+      - name: gpt-5.4
+        label: GPT-5.4
+        notes:
+          - "Strong model for everyday coding."
+        context: 272000
+        options:
+          - name: Reasoning Level
+            values: [Low, Medium, High, Extra high]
+            default: Medium
 
       - name: gpt-5.4-mini
-        label: gpt-5.4-mini
+        label: GPT-5.4-Mini
         notes:
-          - "Smaller frontier agentic coding model."
-
-      - name: gpt-5.3-codex
-        label: gpt-5.3-codex
-        notes:
-          - "Frontier Codex-optimized agentic coding model."
+          - "Small, fast, and cost-efficient model for simpler coding tasks."
+        context: 272000
+        options:
+          - name: Reasoning Level
+            values: [Low, Medium, High, Extra high]
+            default: Medium
 
       - name: gpt-5.3-codex-spark
-        label: gpt-5.3-codex-spark
+        label: GPT-5.3-Codex-Spark
         notes:
           - "Ultra-fast coding model."
+        context: 128000
         options:
           - name: Reasoning Level
+            values: [Low, Medium, High, Extra high]
             default: High
-
-      - name: gpt-5.2
-        label: gpt-5.2
-        notes:
-          - "Optimized for professional work and long-running agents."
-
-      - name: gpt-5.1-codex-mini
-        label: gpt-5.1-codex-mini
-        notes:
-          - "Optimized for codex. Cheaper, faster, but less capable."
-        options:
-          - name: Reasoning Level
-            values: [Medium, High]
-            default: Medium
 
   - cli: Antigravity
     version: probe-required

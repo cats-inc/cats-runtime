@@ -438,6 +438,10 @@ export function normalizeClaudeCuratedModelId(model: CuratedModelCatalogModel): 
 export function normalizeCodexCuratedModelId(model: CuratedModelCatalogModel): string | null {
   const candidates = [model.name, model.label].filter((value): value is string => Boolean(value));
   const knownIds = new Set([
+    'gpt-5.6-sol',
+    'gpt-5.6-terra',
+    'gpt-5.6-luna',
+    'gpt-5.5',
     'gpt-5.4',
     'gpt-5.2-codex',
     'gpt-5.1-codex-max',

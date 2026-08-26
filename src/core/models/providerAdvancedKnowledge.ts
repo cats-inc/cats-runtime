@@ -231,6 +231,10 @@ function normalizeCodexEffortValue(
     case 'extra-high':
     case 'xhigh':
       return 'xhigh';
+    case 'max':
+      return 'max';
+    case 'ultra':
+      return 'ultra';
     default:
       return null;
   }
@@ -248,6 +252,10 @@ function fallbackCodexEffortDescription(
       return 'Greater reasoning depth for complex problems.';
     case 'xhigh':
       return 'Extra high reasoning depth for complex problems.';
+    case 'max':
+      return 'Maximum reasoning depth for the hardest problems.';
+    case 'ultra':
+      return 'Maximum reasoning with automatic task delegation.';
     default:
       return undefined;
   }

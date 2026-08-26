@@ -401,6 +401,93 @@ describe('buildProviderAdvancedKnowledge', () => {
     }
   });
 
+  it('publishes current Codex max and ultra reasoning levels only for supported entries', () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-curated-codex-current-'));
+    const curatedPath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');
+    mkdirSync(join(runtimeRoot, 'config'), { recursive: true });
+    writeFileSync(curatedPath, [
+      'schema_version: 1',
+      'catalogs:',
+      '  - cli: Codex',
+      '    version: 0.149.1',
+      '    last_updated: 2026-08-26',
+      '    shared_options:',
+      '      - name: Reasoning Level',
+      '        values: [Low, Medium, High, Extra high, Max, Ultra]',
+      '        default: Medium',
+      '    models:',
+      '      - name: gpt-5.6-sol',
+      '        default: true',
+      '        options:',
+      '          - name: Reasoning Level',
+      '            default: Low',
+      '      - name: gpt-5.4',
+      '        options:',
+      '          - name: Reasoning Level',
+      '            values: [Low, Medium, High, Extra high]',
+      '            default: Medium',
+      '',
+    ].join('\n'), 'utf8');
+
+    try {
+      const target: ProviderTargetDescriptor = {
+        providerName: 'codex',
+        backend: 'cli',
+        instanceId: 'default',
+        defaultTarget: true,
+        cliInstance: {
+          id: 'default',
+          providerName: 'codex',
+          backend: 'cli',
+          command: 'codex',
+        },
+      };
+      const knowledge = buildProviderAdvancedKnowledge(target, createCatalog({
+        provider: 'codex',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt-5.6-sol',
+        models: [
+          { id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol', default: true },
+          { id: 'gpt-5.4', label: 'GPT-5.4' },
+        ],
+      }), {
+        env: {
+          ...process.env,
+          CATS_RUNTIME_DIR: runtimeRoot,
+        },
+      });
+
+      expect(knowledge.catalog.entries.map((entry) => entry.id)).toEqual([
+        'gpt-5.6-sol',
+        'gpt-5.4',
+      ]);
+      expect(knowledge.catalog.controls[0]?.values).toEqual(expect.arrayContaining([
+        {
+          value: 'max',
+          label: 'Max',
+          description: 'Maximum reasoning depth for the hardest problems.',
+          applicableEntryIds: ['gpt-5.6-sol'],
+        },
+        {
+          value: 'ultra',
+          label: 'Ultra',
+          description: 'Maximum reasoning with automatic task delegation.',
+          applicableEntryIds: ['gpt-5.6-sol'],
+        },
+      ]));
+      expect(knowledge.catalog.defaultSelection).toEqual({
+        entryId: 'gpt-5.6-sol',
+        entryMode: 'explicit',
+        controls: {
+          'codex.reasoning_effort': 'low',
+        },
+      });
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
   it('normalizes curated Cursor raw labels into advanced catalog entries', () => {
     const runtimeRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-curated-cursor-'));
     const curatedPath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');

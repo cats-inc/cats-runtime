@@ -51,6 +51,14 @@ describe('curatedModelCatalogNormalization', () => {
   });
 
   it('normalizes Codex curated catalog ids from the curated YAML allowlist', () => {
+    expect(normalizeCodexCuratedModelId({ name: 'gpt-5.6-sol' }))
+      .toBe('gpt-5.6-sol');
+    expect(normalizeCodexCuratedModelId({ label: 'GPT-5.6-Terra' }))
+      .toBe('gpt-5.6-terra');
+    expect(normalizeCodexCuratedModelId({ name: 'gpt-5.6-luna' }))
+      .toBe('gpt-5.6-luna');
+    expect(normalizeCodexCuratedModelId({ label: 'GPT-5.5' }))
+      .toBe('gpt-5.5');
     expect(normalizeCodexCuratedModelId({ name: 'gpt-5.2-codex' }))
       .toBe('gpt-5.2-codex');
     expect(normalizeCodexCuratedModelId({ label: 'gpt-5.1-codex-max' }))
