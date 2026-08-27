@@ -73,12 +73,21 @@ the catalog schema, or durable evidence and decision documents.
    `developer-skills/maintain-provider-model-catalogs/`.
 2. The skill shall be synced to `.agents/skills/` for Codex and
    `.claude/skills/` for Claude Code from the same canonical source.
+   The sync shall be idempotent and cheap enough to re-run after any edit to
+   the canonical source. The mirrors are ignored build output, so no
+   committed copy exists for CI to diff; regeneration, not drift detection,
+   is the mitigation for staleness.
 3. The canonical package shall contain one `SKILL.md` entrypoint and only the
    supporting references or scripts that materially improve this workflow.
-4. The skill description shall trigger for provider model-catalog refreshes,
+4. The implementation shall update every document that names `skills/` as the
+   canonical source for agent discovery mirrors, at minimum `AGENTS.md` and
+   `CLAUDE.md`. `CLAUDE.md` states that it is maintained by Claude alone, so
+   that edit shall be assigned to Claude rather than folded into another
+   agent's implementation scope.
+5. The skill description shall trigger for provider model-catalog refreshes,
    catalog audits, and reviews of catalog changes. It shall exclude generic
    provider adapter implementation and ordinary dependency updates.
-5. The skill shall support three modes:
+6. The skill shall support three modes:
    - **refresh**: collect evidence and edit the provider scope authorized by the
      user
    - **review**: independently collect or inspect evidence and report findings
@@ -86,12 +95,12 @@ the catalog schema, or durable evidence and decision documents.
    - **audit**: reconcile all registered provider families across the catalog
      surfaces and report stale, missing, conflicting, or intentionally empty
      coverage
-6. At the start of every mode, the skill shall inspect repository status and
+7. At the start of every mode, the skill shall inspect repository status and
    preserve unrelated tracked and untracked changes.
-7. The skill shall derive its provider inventory from current repository
+8. The skill shall derive its provider inventory from current repository
    sources, including `KNOWN_PROVIDERS` and the provider catalog, rather than
    carrying a fixed eight-provider or sixteen-provider list as authoritative.
-8. The skill shall reconcile, as applicable:
+9. The skill shall reconcile, as applicable:
    - provider registration and install knowledge
    - `config/curated-model-catalogs.yaml.example`
    - `STATIC_PROVIDER_MODELS`
@@ -99,10 +108,10 @@ the catalog schema, or durable evidence and decision documents.
    - curated model normalization
    - advanced provider knowledge
    - repo-wide tests and fixtures that consume the bundled example
-9. Provider installation method (`npm_global`, native installer, local model,
+10. Provider installation method (`npm_global`, native installer, local model,
    or another method) shall be treated as operational context, not as the rule
    deciding whether model-catalog maintenance is required.
-10. Each provider shall be classified by its actual catalog path, such as:
+11. Each provider shall be classified by its actual catalog path, such as:
     - account-resolved dynamic enumeration
     - curated static input
     - runtime static fallback
@@ -110,70 +119,80 @@ the catalog schema, or durable evidence and decision documents.
     - account-configured or BYO-model behavior
     - provider-default sentinel
     - unsupported execution path
-11. The skill shall use this evidence priority when sources conflict:
+12. The skill shall use this evidence priority when sources conflict:
     1. account-resolved machine-readable enumeration from the installed CLI
     2. user-provided output from the authenticated interactive picker
     3. static extraction from the installed shipped artifact, explicitly
        labeled as a possible superset
     4. version/help output, which can update an observed version note but does
        not verify a model list
-12. Vendor documentation or web research may explain a command or feature but
+13. Vendor documentation or web research may explain a command or feature but
     shall not substitute for account-resolved evidence when the catalog is
     entitlement- or account-dependent.
-13. The model's own knowledge shall never be used to fill catalog rows,
+14. The model's own knowledge shall never be used to fill catalog rows,
     defaults, context limits, output limits, or option values.
-14. `last_updated` shall change only when the model list was re-read or otherwise
+15. `last_updated` shall change only when the model list was re-read or otherwise
     verified. A newer `--version` result alone shall be recorded in notes with
     its observation date and scope.
-15. Raw selectable model ids and picker-visible labels shall remain distinct.
+16. Raw selectable model ids and picker-visible labels shall remain distinct.
     The skill shall preserve observed generation/version information in labels;
     ambiguity belongs in notes and shall not be resolved by stripping the
     generation.
-16. The skill shall inspect the typed curated schema before editing and shall
+17. The skill shall inspect the typed curated schema before editing and shall
     not invent unsupported YAML fields.
-17. The skill shall inspect the relevant normalizer before adding or renaming a
+18. The skill shall inspect the relevant normalizer before adding or renaming a
     curated row. A row that normalizes to `null` shall not be added silently.
-18. When observed upstream data exceeds current normalizer support, the skill
+19. When observed upstream data exceeds current normalizer support, the skill
     shall either:
     - omit the unsupported row and report the omission, or
     - extend normalizer/runtime behavior and tests only when that broader change
       is explicitly authorized
-19. The skill shall search the whole repository for consumers of the exact
+20. The skill shall search the whole repository for consumers of the exact
     bundled example before editing assertions. Tests using independent inline
     YAML fixtures shall not be changed merely to resemble the bundled file.
-20. Provider-scoped requests shall modify only the authorized provider section
+21. When curated input, runtime output, and a test assertion disagree, the skill
+    shall establish which one is authoritative before editing any of them. It
+    shall not assume the implementation is correct because a test currently
+    asserts its behavior, and shall not record an unexplained divergence as
+    intended behavior in a code comment or note. An unresolved three-way
+    disagreement shall be reported rather than settled by editing the
+    assertion. A curated `default`, option value, or limit that the runtime
+    does not honor is a candidate runtime defect, and confirming it requires
+    reading the resolution code rather than trusting either the test or the
+    observed payload.
+22. Provider-scoped requests shall modify only the authorized provider section
     and directly required tests/runtime code. If a global catalog comment
     becomes contradictory but lies outside an explicit section-only scope, the
     skill shall report it instead of silently expanding scope.
-21. Full-file refreshes shall update global provenance comments so they remain
+23. Full-file refreshes shall update global provenance comments so they remain
     truthful to the refreshed and untouched sections.
-22. Review mode shall not accept another agent's notes as proof. It shall
+24. Review mode shall not accept another agent's notes as proof. It shall
     reacquire available evidence or clearly state which claims could not be
     independently verified.
-23. Audit mode shall report providers that exist outside the curated YAML,
+25. Audit mode shall report providers that exist outside the curated YAML,
     including npm-installed providers, and explain whether their absence is
     dynamic, deliberate, unsupported, or an actionable gap.
-24. The skill shall not mutate provider adapters, parser logic, compatibility
+26. The skill shall not mutate provider adapters, parser logic, compatibility
     policy, install knowledge, or accepted evidence merely because it observes
     drift. Such changes require explicit scope and the relevant tests/docs.
-25. Validation shall be proportional to the changed surface and include, at
+27. Validation shall be proportional to the changed surface and include, at
     minimum:
     - YAML/schema loading and zero unexpected normalization warnings
     - focused model catalog and advanced-knowledge tests
     - repository-wide searches for exact-file fixture expectations
     - TypeScript checking when TypeScript or tests are changed
-26. When `tests/runtime-server.test.ts` or another environment-sensitive suite
+28. When `tests/runtime-server.test.ts` or another environment-sensitive suite
     has unrelated local failures, the report shall distinguish pre-existing
     failures from regressions introduced by the catalog change; it shall not
     modify unrelated tests to obtain a green local run.
-27. The final report shall state:
+29. The final report shall state:
     - what was observed and from which source
     - what could not be determined
     - which rows or claims were intentionally omitted
     - any choice between conflicting readings
     - files changed
     - validation results and unrelated failures
-28. The skill shall stop before external or release mutations unless the user
+30. The skill shall stop before external or release mutations unless the user
     separately authorizes commit, push, pull request, npm publication, or
     GitHub Release actions.
 
@@ -239,6 +258,8 @@ skills/                           runtime-delivered, npm-shipped; unchanged
 - [SPEC-023](./SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md)
 - [SPEC-024](./SPEC-024-curated-cli-catalog-pack-and-evidence-overlay.md)
 - `scripts/windows/Sync-AgentSkills.ps1`
+- `AGENTS.md` and `CLAUDE.md`, both of which currently name `skills/` as the
+  canonical source for agent discovery mirrors (see functional requirement 4)
 - the Agent Skills validation tooling used by the active coding-agent environment
 
 ## Acceptance Scenarios
@@ -258,7 +279,11 @@ skills/                           runtime-delivered, npm-shipped; unchanged
 6. A version-only probe leaves `last_updated` unchanged.
 7. A candidate row rejected by the normalizer is omitted or accompanied by an
    explicitly authorized runtime/test change; no silent-drop warning remains.
-8. Syncing the skill makes equivalent canonical content available to Codex and
+8. A curated `default: true` that the served catalog does not reflect is traced
+   to the resolution code and reported as a candidate runtime defect. The
+   contradicting assertion is not rewritten to match the served value, and no
+   comment is added asserting the divergence is intentional.
+9. Syncing the skill makes equivalent canonical content available to Codex and
    Claude Code, while `npm run verify:skills` and the runtime catalog exclude
    the developer skill.
 

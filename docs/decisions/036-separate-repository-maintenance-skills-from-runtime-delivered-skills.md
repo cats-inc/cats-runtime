@@ -33,6 +33,17 @@ library, but adding a direct top-level maintenance skill merely to satisfy that
 script would cause the runtime loader to discover and publish a developer-only
 workflow.
 
+The practical consequence is stronger than a partial mismatch: the script is a
+no-op today. `$SkillsDir` resolves to `skills/`
+(`scripts/windows/Sync-AgentSkills.ps1:56`), discovery is a non-recursive
+`Get-ChildItem -Directory` filtered to children that directly contain
+`SKILL.md` (`:78`), and the four children that exist — `chat`, `code`,
+`orchestration`, `work` — are family directories holding no `SKILL.md` of their
+own. The script therefore matches zero directories, warns `No skills found`, and
+returns (`:82`). Neither `.claude/skills/` nor `.agents/skills/` has ever been
+populated by it. Repointing the script at a new canonical root cannot regress
+behavior that does not currently occur.
+
 These are two different audiences and delivery contracts:
 
 1. runtime-delivered skills are product content selected and injected into Cats
@@ -98,9 +109,19 @@ The first repository-maintenance skill under this boundary will be
 
 - The repository gains a second skill root whose audience must remain clear.
 - The sync helper, shared collaboration docs, and agent-specific instructions
-  need one coordinated migration.
-- Generated mirrors can become stale until the sync helper is run; validation
-  must detect mirror drift.
+  need one coordinated migration. `AGENTS.md` and `CLAUDE.md` both currently
+  name `skills/` as the canonical source for agent discovery mirrors, and
+  `CLAUDE.md` is maintained by Claude alone, so that edit cannot sit in another
+  agent's implementation scope.
+- Generated mirrors can go stale between edits to the canonical source and the
+  next sync run. Because `.agents/` and `.claude/` are ignored
+  (`.gitignore:2,6`), no committed copy exists for CI to compare against, so
+  drift is not detectable there. The mitigation is regeneration rather than
+  detection: the mirrors are disposable build output, and the sync must be
+  cheap and idempotent enough to re-run after any canonical edit. Promoting the
+  mirrors into version control to make CI drift-detection possible is rejected
+  here — it would contradict decision point 3 and reintroduce the
+  multiple-editable-copies problem this ADR exists to prevent.
 
 ### Neutral
 
