@@ -42,6 +42,30 @@ requires a direct `SKILL.md`. The four children that exist — `chat`, `code`,
 own, so every helper reports `No skills found` and returns without populating a
 discovery mirror.
 
+A third discovery path has to be ruled out explicitly rather than by omission.
+`.gitignore:5` reserves `.gemini/`, and `GEMINI.md:69` claims skills are
+discovered from `.gemini/skills/<name>/SKILL.md`. Neither is a Gemini CLI
+leftover: ADR-032 replaced Gemini CLI with Antigravity, and `agy` inherited the
+whole `.gemini` namespace (`~/.gemini/antigravity-cli/`, `antigravity-ide/`,
+and a `GEMINI.md`). A string probe of the agy 1.1.20 executable confirms it
+reads `GEMINI.md` and `AGENTS.md` as context files — they sit adjacent in its
+string table. `GEMINI.md` is therefore live, not obsolete.
+
+Its skills claim, however, is false. ADR-107 point 8 in `cats-platform` deferred
+the `--agent gemini` / `.gemini/skills/` question to a probe that had never been
+run, defaulting to dropping the row. That probe was run on 2026-08-28: a scratch
+workspace seeded with both `<workspace>/.gemini/skills/probe-gemini/SKILL.md`
+and `<workspace>/.antigravity/skills/probe-antigravity/SKILL.md`, each carrying
+a unique codeword, then a single print-mode turn asking agy to enumerate the
+skills in its context. Agy returned 38 skills with absolute paths, drawn from
+exactly two user-level roots — `~/.gemini/antigravity-cli/builtin/skills/` and
+`~/.gemini/config/plugins/<plugin>/skills/` — and neither probe skill appeared
+at its alphabetical position. **Agy discovers no project-level skill directory
+on either candidate path.** `.gemini/skills/` is consequently not a sync target
+here, ADR-107's default action is correct, and `antigravity` should not be added
+as an `--agent` value. Delivering a skill to agy would mean the plugin route,
+which is out of scope for this decision.
+
 These are two different audiences and delivery contracts:
 
 1. runtime-delivered skills are product content selected and injected into Cats
@@ -73,6 +97,9 @@ Adopt separate canonical roots for the two skill classes:
    - `.claude/skills/` is the Claude Code mirror
    - both remain ignored and are refreshed from `developer-skills/`
    - generated mirrors are never edited as canonical sources
+   - there is no third mirror: `.gemini/skills/` is not read by agy (see
+     Context), so it is neither synced nor reserved by this decision, and
+     `GEMINI.md` is corrected rather than migrated
 4. **The Windows, Linux, and macOS agent-skill sync helpers will sync only
    repository-maintenance skills from `developer-skills/`.** Runtime-delivered
    skills continue to use the runtime's own resolution and materialization code
@@ -172,7 +199,13 @@ The first repository-maintenance skill under this boundary will be
 
 - [ADR-010: Separate A2A Protocol Artifacts, Project Memory, and Skill Packages](./010-separate-a2a-protocol-project-memory-and-skill-packages.md)
 - [ADR-018: Separate Skill-Library Content from Runtime Execution Engine](./018-separate-skill-library-content-from-runtime-execution-engine.md)
+- [ADR-032: Replace Gemini CLI with Antigravity CLI](./032-replace-gemini-cli-with-antigravity-cli.md) — deferred the
+  agent skills-directory question to the platform-side decision below
 - [ADR-034: Automate Light-Tier Provider Drift and Separate Observation from Acceptance](./034-automate-light-tier-provider-drift-and-separate-observation-from-acceptance.md)
+- `cats-platform` ADR-107: Replace Gemini CLI with Antigravity in Packaged Setup
+  — its point 8 owns the `--agent` enum and the `.gemini/skills/` target, and
+  is the decision this ADR's probe unblocks. This ADR owns the canonical
+  source (`developer-skills/`) only; the two must land consistently.
 - [SPEC-028: Provider Model Catalog Maintenance Skill](../specs/SPEC-028-provider-model-catalog-maintenance-skill.md)
 - [Runtime Skill Library](../../skills/README.md)
 - [Agent Collaboration Guide](../AGENT-GUIDE.md)

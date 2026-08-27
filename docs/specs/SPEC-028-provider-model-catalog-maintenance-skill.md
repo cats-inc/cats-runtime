@@ -85,9 +85,13 @@ the catalog schema, or durable evidence and decision documents.
 4. The implementation shall update every document that describes the old
    `skills/` agent-mirror contract, including `AGENTS.md`, `CODEX.md`,
    `CLAUDE.md`, `GEMINI.md`, and `scripts/README.md`. Agent-specific files shall
-   be assigned to their owning agents: Codex owns `CODEX.md`, Claude owns
-   `CLAUDE.md`, and Gemini owns `GEMINI.md` if that obsolete instruction remains
-   in the repository when implementation begins.
+   be assigned to their owning agents: Codex owns `CODEX.md` and Claude owns
+   `CLAUDE.md`. `GEMINI.md` is not obsolete — the Antigravity CLI reads
+   `GEMINI.md` and `AGENTS.md` as context files — so it shall be corrected
+   rather than deleted. Its current claim that skills are discovered from
+   `.gemini/skills/<name>/SKILL.md` is false and shall be removed: a probe of
+   agy 1.1.20 found no project-level skill discovery on either candidate path
+   (see ADR-036 Context).
 5. The skill description shall trigger for provider model-catalog refreshes,
    catalog audits, and reviews of catalog changes. It shall exclude generic
    provider adapter implementation and ordinary dependency updates.
