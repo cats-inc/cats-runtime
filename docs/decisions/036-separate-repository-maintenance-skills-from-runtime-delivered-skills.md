@@ -23,26 +23,24 @@ packages below that root, validates their runtime metadata, exposes them through
 the runtime skill catalog, materializes them into sessions, and includes the
 tree in the published npm package.
 
-At the same time, the repository's collaboration instructions and
-`scripts/windows/Sync-AgentSkills.ps1` currently describe `skills/` as the
+At the same time, the repository's collaboration instructions and Windows,
+Linux, and macOS agent-skill sync helpers currently describe `skills/` as the
 canonical source for coding-agent discovery mirrors under `.agents/skills` and
-`.claude/skills`. The sync script only considers direct child directories that
+`.claude/skills`. All three helpers only consider direct child directories that
 contain `SKILL.md`, while the runtime library is organized one level deeper by
-family. It therefore does not mirror the existing family-organized runtime
-library, but adding a direct top-level maintenance skill merely to satisfy that
-script would cause the runtime loader to discover and publish a developer-only
+family. They therefore do not mirror the existing family-organized runtime
+library, but adding a direct top-level maintenance skill merely to satisfy those
+helpers would cause the runtime loader to discover and publish a developer-only
 workflow.
 
-The practical consequence is stronger than a partial mismatch: the script is a
-no-op today. `$SkillsDir` resolves to `skills/`
-(`scripts/windows/Sync-AgentSkills.ps1:56`), discovery is a non-recursive
-`Get-ChildItem -Directory` filtered to children that directly contain
-`SKILL.md` (`:78`), and the four children that exist — `chat`, `code`,
+The practical consequence is stronger than a partial mismatch: all three
+helpers are no-ops for the current tracked tree. The PowerShell helper resolves
+`$SkillsDir` to `skills/` and uses a non-recursive `Get-ChildItem -Directory`;
+the POSIX helpers likewise iterate only `skills/*`. Each implementation then
+requires a direct `SKILL.md`. The four children that exist — `chat`, `code`,
 `orchestration`, `work` — are family directories holding no `SKILL.md` of their
-own. The script therefore matches zero directories, warns `No skills found`, and
-returns (`:82`). Neither `.claude/skills/` nor `.agents/skills/` has ever been
-populated by it. Repointing the script at a new canonical root cannot regress
-behavior that does not currently occur.
+own, so every helper reports `No skills found` and returns without populating a
+discovery mirror.
 
 These are two different audiences and delivery contracts:
 
@@ -75,10 +73,14 @@ Adopt separate canonical roots for the two skill classes:
    - `.claude/skills/` is the Claude Code mirror
    - both remain ignored and are refreshed from `developer-skills/`
    - generated mirrors are never edited as canonical sources
-4. **`Sync-AgentSkills.ps1` will sync only repository-maintenance skills from
-   `developer-skills/`.** Runtime-delivered skills continue to use the runtime's
-   own resolution and materialization code rather than being copied wholesale
-   into every coding agent's project discovery path.
+4. **The Windows, Linux, and macOS agent-skill sync helpers will sync only
+   repository-maintenance skills from `developer-skills/`.** Runtime-delivered
+   skills continue to use the runtime's own resolution and materialization code
+   rather than being copied wholesale into every coding agent's project
+   discovery path. Each helper must reconcile the repository-managed skill set:
+   deleting or renaming a canonical skill removes its obsolete generated mirror,
+   while unrelated skills installed locally in an agent discovery directory are
+   preserved.
 5. **Repository-maintenance skills encode procedure, not durable truth.** ADRs,
    specifications, plans, code, tests, and evidence artifacts remain the
    authoritative sources. A maintenance skill points agents to those sources
@@ -108,19 +110,19 @@ The first repository-maintenance skill under this boundary will be
 ### Negative
 
 - The repository gains a second skill root whose audience must remain clear.
-- The sync helper, shared collaboration docs, and agent-specific instructions
-  need one coordinated migration. `AGENTS.md` and `CLAUDE.md` both currently
-  name `skills/` as the canonical source for agent discovery mirrors, and
-  `CLAUDE.md` is maintained by Claude alone, so that edit cannot sit in another
-  agent's implementation scope.
+- All three sync helpers, their shared documentation, and agent-specific
+  instructions need one coordinated migration. `AGENTS.md`, `CODEX.md`,
+  `CLAUDE.md`, `GEMINI.md`, and `scripts/README.md` currently describe all or
+  part of the old `skills/` sync contract. Agent-owned instruction files must be
+  updated by their owning agent rather than folded into another agent's scope.
 - Generated mirrors can go stale between edits to the canonical source and the
   next sync run. Because `.agents/` and `.claude/` are ignored
   (`.gitignore:2,6`), no committed copy exists for CI to compare against, so
-  drift is not detectable there. The mitigation is regeneration rather than
-  detection: the mirrors are disposable build output, and the sync must be
-  cheap and idempotent enough to re-run after any canonical edit. Promoting the
-  mirrors into version control to make CI drift-detection possible is rejected
-  here — it would contradict decision point 3 and reintroduce the
+  CI cannot inspect a maintainer's local mirror freshness. The mitigation is a
+  cheap, idempotent regeneration step that safely reconciles repository-managed
+  entries, plus tests of that reconciliation behavior in an isolated target.
+  Promoting the mirrors into version control to make CI drift-detection possible
+  is rejected here — it would contradict decision point 3 and reintroduce the
   multiple-editable-copies problem this ADR exists to prevent.
 
 ### Neutral

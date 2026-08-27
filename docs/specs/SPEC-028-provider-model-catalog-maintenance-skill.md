@@ -73,17 +73,21 @@ the catalog schema, or durable evidence and decision documents.
    `developer-skills/maintain-provider-model-catalogs/`.
 2. The skill shall be synced to `.agents/skills/` for Codex and
    `.claude/skills/` for Claude Code from the same canonical source.
-   The sync shall be idempotent and cheap enough to re-run after any edit to
-   the canonical source. The mirrors are ignored build output, so no
-   committed copy exists for CI to diff; regeneration, not drift detection,
-   is the mitigation for staleness.
+   The Windows, Linux, and macOS sync entrypoints shall be idempotent and cheap
+   enough to re-run after any edit to the canonical source. Each sync shall
+   reconcile repository-managed entries: a deleted or renamed canonical skill
+   shall not leave an obsolete generated mirror, and unrelated locally installed
+   skills shall not be deleted. The mirrors are ignored build output, so no
+   committed copy exists for CI to diff; regeneration and isolated reconciliation
+   tests, not committed mirrors, are the mitigation for staleness.
 3. The canonical package shall contain one `SKILL.md` entrypoint and only the
    supporting references or scripts that materially improve this workflow.
-4. The implementation shall update every document that names `skills/` as the
-   canonical source for agent discovery mirrors, at minimum `AGENTS.md` and
-   `CLAUDE.md`. `CLAUDE.md` states that it is maintained by Claude alone, so
-   that edit shall be assigned to Claude rather than folded into another
-   agent's implementation scope.
+4. The implementation shall update every document that describes the old
+   `skills/` agent-mirror contract, including `AGENTS.md`, `CODEX.md`,
+   `CLAUDE.md`, `GEMINI.md`, and `scripts/README.md`. Agent-specific files shall
+   be assigned to their owning agents: Codex owns `CODEX.md`, Claude owns
+   `CLAUDE.md`, and Gemini owns `GEMINI.md` if that obsolete instruction remains
+   in the repository when implementation begins.
 5. The skill description shall trigger for provider model-catalog refreshes,
    catalog audits, and reviews of catalog changes. It shall exclude generic
    provider adapter implementation and ordinary dependency updates.
@@ -258,8 +262,11 @@ skills/                           runtime-delivered, npm-shipped; unchanged
 - [SPEC-023](./SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md)
 - [SPEC-024](./SPEC-024-curated-cli-catalog-pack-and-evidence-overlay.md)
 - `scripts/windows/Sync-AgentSkills.ps1`
-- `AGENTS.md` and `CLAUDE.md`, both of which currently name `skills/` as the
-  canonical source for agent discovery mirrors (see functional requirement 4)
+- `scripts/linux/sync-agent-skills.sh`
+- `scripts/macos/sync-agent-skills.sh`
+- `AGENTS.md`, `CODEX.md`, `CLAUDE.md`, `GEMINI.md`, and `scripts/README.md`,
+  which currently describe all or part of the old agent-skill sync contract
+  (see functional requirement 4)
 - the Agent Skills validation tooling used by the active coding-agent environment
 
 ## Acceptance Scenarios
@@ -283,9 +290,12 @@ skills/                           runtime-delivered, npm-shipped; unchanged
    to the resolution code and reported as a candidate runtime defect. The
    contradicting assertion is not rewritten to match the served value, and no
    comment is added asserting the divergence is intentional.
-9. Syncing the skill makes equivalent canonical content available to Codex and
-   Claude Code, while `npm run verify:skills` and the runtime catalog exclude
-   the developer skill.
+9. Each Windows, Linux, and macOS sync entrypoint makes equivalent canonical
+   content available to Codex and Claude Code, while `npm run verify:skills` and
+   the runtime catalog exclude the developer skill.
+10. After a canonical skill is renamed or deleted, the next sync removes its
+    obsolete repository-managed mirror without deleting an unrelated local skill.
+    Running the same sync again produces no further content changes.
 
 ## Open Questions
 
