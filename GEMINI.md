@@ -1,6 +1,8 @@
-# Gemini-Specific Instructions
+# Antigravity CLI Instructions
 
-> **If you are NOT Gemini, please ignore this file.**
+> **If you are NOT Antigravity (`agy`), please ignore this file.**
+
+This file is named `GEMINI.md` because the Antigravity CLI (`agy`) looks for this filename as its project context file, having inherited the `.gemini` namespace from the Gemini CLI that ADR-032 replaced. Its audience is the Antigravity CLI (`agy`).
 
 ## Prerequisites
 
@@ -16,17 +18,17 @@ Check the **Project Roles** table in `AGENTS.md`.
 
 | Alias | Action |
 |-------|--------|
-| `dyu` | **MUST** confirm you have read `AGENTS.md` and this file. **MUST** respond with exactly: "I am Gemini, and I understand." |
+| `dyu` | **MUST** confirm you have read `AGENTS.md` and this file. **MUST** respond with exactly: "I am Antigravity, and I understand." |
 
 ## About This File
 
-This file contains Gemini-specific configurations and instructions that should not be applied by other AI agents (Claude, Codex, etc.).
+This file contains Antigravity-specific configurations and instructions that should not be applied by other AI agents (Claude, Codex, etc.).
 
-Only Gemini should read and maintain this file.
+Only Antigravity (`agy`) should read and maintain this file.
 
 ---
 
-## Gemini-Specific Configurations
+## Antigravity-Specific Configurations
 
 ### Behavioral Guidelines
 
@@ -62,25 +64,26 @@ If assigned as Conductor in Project Roles table:
 
 ### Project-Specific Context
 
-(Add any project-specific context or conventions that Gemini should be aware of)
+(Add any project-specific context or conventions that Antigravity should be aware of)
 
 ### Agent Skills
 
-Gemini CLI discovers skills from `.gemini/skills/<name>/SKILL.md`. The canonical source is the `skills/` directory at the project root.
+Antigravity CLI does not support project-level skill discovery. There is no `.gemini/skills/` or `.antigravity/skills/` directory within a repository that is read or discovered by the CLI.
 
-To sync skills after changes:
-```powershell
-.\scripts\windows\Sync-AgentSkills.ps1
-```
+Skills reach Antigravity exclusively from user-level roots:
+- Builtin skills: `~/.gemini/antigravity-cli/builtin/skills/<name>/SKILL.md`
+- Plugin-installed skills: `~/.gemini/config/plugins/<plugin>/skills/<name>/SKILL.md`
+
+The repository's skill sync helpers (`.\scripts\windows\Sync-AgentSkills.ps1`, `scripts/linux/sync-agent-skills.sh`, `scripts/macos/sync-agent-skills.sh`) do not target Antigravity and must not be run for its benefit. Delivering a repository-owned skill to Antigravity would require the plugin distribution mechanism; no decision has been made to do that.
 
 ### Personal Memory
 
-(This section is for Gemini to record long-term observations or preferences specific to this user/project)
+(This section is for Antigravity to record long-term observations or preferences specific to this user/project)
 
 ---
 
 ## Maintenance
 
-This file is maintained by Gemini only. Other agents should not modify this file.
+This file is maintained by Antigravity only. Other agents should not modify this file.
 
-Last updated: <!-- Update this when making changes -->
+Last updated: 2026-08-28
