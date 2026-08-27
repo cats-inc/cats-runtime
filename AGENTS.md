@@ -1,7 +1,7 @@
 # AGENTS.md
 
 > Cross-agent guidelines following [AAIF](https://aaif.io) standards.
-> All AI agents (Claude, Gemini, Codex, etc.) MUST read this file first.
+> All AI agents (Claude, Antigravity, Codex, etc.) MUST read this file first.
 
 ## Instruction Priority and Compliance
 
@@ -178,7 +178,8 @@ contract.
 1. **MUST read this file first** (`AGENTS.md`) - Stop after reading and confirm understanding
 2. **MUST read your agent-specific file**:
    - Claude → `CLAUDE.md`
-   - Gemini → `GEMINI.md`
+   - Antigravity (`agy`) → `GEMINI.md` (the filename is what `agy` reads; it
+     inherited the `.gemini` namespace from the Gemini CLI that ADR-032 replaced)
    - Codex → `CODEX.md`
 3. **MUST consult `docs/AGENT-GUIDE.md`** for project-specific SOPs before performing tasks
 4. **MUST NOT read other agents' specific files**
@@ -226,7 +227,7 @@ project-root/
 │
 ├── AGENTS.md              # This file - cross-agent rules
 ├── CLAUDE.md              # Claude-specific
-├── GEMINI.md              # Gemini-specific
+├── GEMINI.md              # Antigravity-specific
 ├── CODEX.md               # Codex-specific
 │
 ├── .gitignore
@@ -595,7 +596,7 @@ usage() {
 | Agent | Write Code | Review | Test | Docs |
 |-------|------------|--------|------|------|
 | Claude | Yes | Yes | Yes | Yes |
-| Gemini | Yes | Yes | Yes | Yes |
+| Antigravity | Yes | Yes | Yes | Yes |
 | Codex | Yes | Yes | Yes | Yes |
 
 ### Collaboration Rules
@@ -609,7 +610,7 @@ usage() {
 7.  **File ownership**:
     *   Each agent MUST maintain ONLY its own specific file
     *   Claude maintains `CLAUDE.md` only
-    *   Gemini maintains `GEMINI.md` only
+    *   Antigravity maintains `GEMINI.md` only
     *   Codex maintains `CODEX.md` only
     *   All agents MAY update `AGENTS.md` but MUST provide clear justification in commit message
 
