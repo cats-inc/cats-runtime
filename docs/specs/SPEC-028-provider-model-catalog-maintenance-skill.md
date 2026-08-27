@@ -316,7 +316,12 @@ skills/                           runtime-delivered, npm-shipped; unchanged
 
 - [x] Approve ADR-036's `developer-skills/` boundary and generated-mirror
   approach. Approved 2026-08-28; ADR-036 is now Accepted.
-- [ ] Approve this single-skill, multi-mode scope before creating PLAN-037.
+- [x] Approve this single-skill, multi-mode scope before creating PLAN-037.
+  Approved 2026-08-28: one skill with refresh, review, and audit modes. The
+  three modes share provider inventory, the evidence-priority ladder, the
+  normalizer check, the repo-wide fixture search, and the report format;
+  splitting them would maintain three near-identical workflows, which the
+  maintainability requirement above already argues against for catalog data.
 
 ## References
 
