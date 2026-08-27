@@ -48,6 +48,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 | Spec | Title | Status | Related Plan |
 |------|-------|--------|--------------|
+| [SPEC-028](./SPEC-028-provider-model-catalog-maintenance-skill.md) | Provider Model Catalog Maintenance Skill | Draft | Pending approval; [ADR-036](../decisions/036-separate-repository-maintenance-skills-from-runtime-delivered-skills.md) |
 | [SPEC-027](./SPEC-027-grok-devin-cline-aider-cli-provider-onboarding.md) | Grok, Devin, Cline, and Aider CLI Provider Onboarding | In Progress — Grok 1.0.0 execution complete | [PLAN-034](../plans/PLAN-034-grok-devin-cline-aider-cli-provider-onboarding.md), [ADR-033](../decisions/033-adopt-grok-devin-cline-aider-as-cli-provider-families.md) |
 | [SPEC-026](./SPEC-026-antigravity-cli-provider-replacing-gemini.md) | Antigravity CLI Provider Replacing Gemini CLI | Draft | [PLAN-033](../plans/PLAN-033-replace-gemini-cli-with-antigravity-cli.md), [ADR-032](../decisions/032-replace-gemini-cli-with-antigravity-cli.md) |
 | [SPEC-025](./SPEC-025-acp-agent-adapters-and-runtime-facade.md) | ACP Agent Adapters and Runtime ACP Facade | In Progress | [PLAN-032](../plans/PLAN-032-acp-agent-adapters-and-runtime-facade.md) |
@@ -99,4 +100,4 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 ---
 
 *See also: [plans/](../plans/) for implementation plans*
-*Last updated: 2026-08-08 (SPEC-027 Grok 1.0.0 execution adapter completed; remaining providers stay approval-gated.)*
+*Last updated: 2026-08-28 (SPEC-028 drafted the cross-agent provider model catalog maintenance skill contract.)*
