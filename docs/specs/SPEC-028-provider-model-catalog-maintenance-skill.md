@@ -82,27 +82,20 @@ the catalog schema, or durable evidence and decision documents.
    tests, not committed mirrors, are the mitigation for staleness.
 3. The canonical package shall contain one `SKILL.md` entrypoint and only the
    supporting references or scripts that materially improve this workflow.
-4. The implementation shall update every document that describes the old
-   `skills/` agent-mirror contract, and shall assign agent-specific files to
-   their owning agents. Remaining at the time of writing:
-   - `AGENTS.md:280,294` still says skills live in `skills/` and are synced to
-     each agent's discovery path
-   - `CODEX.md:101,105` still names `skills/` as the canonical source — owned
-     by Codex
-   - `CLAUDE.md` carries an interim correction only, recording that the helpers
-     copy nothing and pointing here — owned by Claude
-   - `scripts/README.md:36-38` still describes all three helpers as syncing
-     `skills/`
+4. The implementation shall update every document that describes the agent
+   skill-discovery contract so that it matches observed behavior, and shall
+   assign each agent-specific file to its owning agent: Codex owns `CODEX.md`,
+   Claude owns `CLAUDE.md`, and Antigravity owns `GEMINI.md`. Shared files such
+   as `AGENTS.md` and `scripts/README.md` may be updated by any agent with
+   justification. Which files still need work, and which commits closed them,
+   belongs in PLAN-037 rather than in this requirement — a requirement states an
+   invariant, not a progress ledger.
 
-   Two parts are already done and are not deliverables of this spec:
-   - `GEMINI.md` was corrected in `cbe1984`. It is not obsolete — the
-     Antigravity CLI reads `GEMINI.md` and `AGENTS.md` as context files — so it
-     was fixed rather than deleted. Its claim that skills come from
-     `.gemini/skills/<name>/SKILL.md` was false: a probe of agy 1.1.20 found no
-     project-level skill discovery on either candidate path (see ADR-036
-     Context).
-   - `AGENTS.md` agent naming was corrected in `7ea3f35`; only its skills
-     contract above remains.
+   One correction is currently wrong rather than missing: `GEMINI.md` was
+   updated in `cbe1984` to say Antigravity has no project-level skill discovery.
+   The second probe pass disproved that (see ADR-036 Context). Only Antigravity
+   may edit that file, so this is tracked as owner-assigned rework, not as
+   completed work.
 5. The skill description shall trigger for provider model-catalog refreshes,
    catalog audits, and reviews of catalog changes. It shall exclude generic
    provider adapter implementation and ordinary dependency updates.
@@ -232,6 +225,15 @@ the catalog schema, or durable evidence and decision documents.
 
 ## Design Overview
 
+Why one skill rather than three — author's analysis, not part of the owner's
+approval: the three modes share the provider inventory step, the
+evidence-priority ladder, the normalizer check, the repo-wide fixture search,
+and the report format. Separate skills would carry three near-identical
+workflows that drift independently. The maintainability requirement above is
+narrower than this argument — it forbids duplicating catalog *values* inside the
+skill and does not by itself rule out multiple workflows — so it supports the
+choice by analogy only.
+
 The skill is one discoverable workflow with conditional references rather than
 one skill per provider:
 
@@ -317,11 +319,9 @@ skills/                           runtime-delivered, npm-shipped; unchanged
 - [x] Approve ADR-036's `developer-skills/` boundary and generated-mirror
   approach. Approved 2026-08-28; ADR-036 is now Accepted.
 - [x] Approve this single-skill, multi-mode scope before creating PLAN-037.
-  Approved 2026-08-28: one skill with refresh, review, and audit modes. The
-  three modes share provider inventory, the evidence-priority ladder, the
-  normalizer check, the repo-wide fixture search, and the report format;
-  splitting them would maintain three near-identical workflows, which the
-  maintainability requirement above already argues against for catalog data.
+  Approved 2026-08-28: one skill carrying refresh, review, and audit modes. The
+  approval covers that decision only. The reasoning behind the recommendation is
+  the author's and is recorded under Design Overview.
 
 ## References
 

@@ -51,20 +51,39 @@ and a `GEMINI.md`). A string probe of the agy 1.1.20 executable confirms it
 reads `GEMINI.md` and `AGENTS.md` as context files — they sit adjacent in its
 string table. `GEMINI.md` is therefore live, not obsolete.
 
-Its skills claim, however, is false. ADR-107 point 8 in `cats-platform` deferred
-the `--agent gemini` / `.gemini/skills/` question to a probe that had never been
-run, defaulting to dropping the row. That probe was run on 2026-08-28: a scratch
-workspace seeded with both `<workspace>/.gemini/skills/probe-gemini/SKILL.md`
-and `<workspace>/.antigravity/skills/probe-antigravity/SKILL.md`, each carrying
-a unique codeword, then a single print-mode turn asking agy to enumerate the
-skills in its context. Agy returned 38 skills with absolute paths, drawn from
-exactly two user-level roots — `~/.gemini/antigravity-cli/builtin/skills/` and
-`~/.gemini/config/plugins/<plugin>/skills/` — and neither probe skill appeared
-at its alphabetical position. **Agy discovers no project-level skill directory
-on either candidate path.** `.gemini/skills/` is consequently not a sync target
-here, ADR-107's default action is correct, and `antigravity` should not be added
-as an `--agent` value. Delivering a skill to agy would mean the plugin route,
-which is out of scope for this decision.
+Its skills claim, however, is false, and the true path matters to this decision.
+ADR-107 point 8 in `cats-platform` deferred the `--agent gemini` /
+`.gemini/skills/` question to a probe that had never been run, defaulting to
+dropping the row. Probing on 2026-08-28 took two passes.
+
+The first pass seeded `<workspace>/.gemini/skills/probe-gemini/SKILL.md` and
+`<workspace>/.antigravity/skills/probe-antigravity/SKILL.md`, each with a unique
+codeword, and asked agy in one print-mode turn to enumerate the skills in its
+context. It returned 38 skills from two user-level roots —
+`~/.gemini/antigravity-cli/builtin/skills/` and
+`~/.gemini/config/plugins/<plugin>/skills/` — and neither probe skill appeared.
+That result was over-read as "agy discovers no project-level skill directory",
+a universal negative drawn from two paths, both of them merely the paths named
+in the stale documentation being corrected.
+
+The second pass, prompted by review, seeded
+`<workspace>/.agents/skills/probe-agents/SKILL.md` alongside a `.gemini/skills/`
+control. **Agy reported the `.agents/skills/` skill by absolute path and again
+did not report the `.gemini/skills/` one.** The agy 1.1.22 executable contains
+seven `.agents/skills` literals, and Google's Antigravity documentation
+specifies `<workspace-root>/.agents/skills/` with a migration path off the old
+`.gemini/skills/`.
+
+The settled facts are therefore:
+
+- agy **does** discover project-level skills, at `<workspace>/.agents/skills/`
+- `.gemini/skills/` is **not** read, so `GEMINI.md`'s claim is still wrong and
+  ADR-107's default action of dropping that target is still correct
+- `.agents/skills/` is **not** a Codex-private mirror. It is a shared discovery
+  path that Codex and Antigravity both read, which is why no separate
+  Antigravity sync target is needed: anything written there for Codex is already
+  visible to agy. Whether to add an `--agent antigravity` alias for the same
+  destination is a naming question, not a delivery one.
 
 These are two different audiences and delivery contracts:
 
@@ -93,13 +112,17 @@ Adopt separate canonical roots for the two skill classes:
    - it is not read by the runtime skill catalog
    - it is not included in the npm package
 3. **Agent-specific paths remain generated discovery mirrors.**
-   - `.agents/skills/` is the Codex mirror
+   - `.agents/skills/` is read by Codex **and** by Antigravity (`agy`); it is a
+     shared discovery path, not a Codex-private one
    - `.claude/skills/` is the Claude Code mirror
    - both remain ignored and are refreshed from `developer-skills/`
    - generated mirrors are never edited as canonical sources
-   - there is no third mirror: `.gemini/skills/` is not read by agy (see
-     Context), so it is neither synced nor reserved by this decision, and
-     `GEMINI.md` is corrected rather than migrated
+   - there is no third mirror. `.gemini/skills/` is not read by agy (see
+     Context), so it is neither synced nor reserved, and `GEMINI.md` is
+     corrected rather than migrated. Antigravity needs no target of its own
+     because it already reads `.agents/skills/`; an `--agent antigravity` alias
+     pointing at that same directory may be added for clarity, but it would
+     deliver nothing new.
 4. **The Windows, Linux, and macOS agent-skill sync helpers will sync only
    repository-maintenance skills from `developer-skills/`.** Runtime-delivered
    skills continue to use the runtime's own resolution and materialization code
