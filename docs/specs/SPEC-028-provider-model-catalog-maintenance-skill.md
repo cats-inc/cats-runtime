@@ -83,15 +83,26 @@ the catalog schema, or durable evidence and decision documents.
 3. The canonical package shall contain one `SKILL.md` entrypoint and only the
    supporting references or scripts that materially improve this workflow.
 4. The implementation shall update every document that describes the old
-   `skills/` agent-mirror contract, including `AGENTS.md`, `CODEX.md`,
-   `CLAUDE.md`, `GEMINI.md`, and `scripts/README.md`. Agent-specific files shall
-   be assigned to their owning agents: Codex owns `CODEX.md` and Claude owns
-   `CLAUDE.md`. `GEMINI.md` is not obsolete — the Antigravity CLI reads
-   `GEMINI.md` and `AGENTS.md` as context files — so it shall be corrected
-   rather than deleted. Its current claim that skills are discovered from
-   `.gemini/skills/<name>/SKILL.md` is false and shall be removed: a probe of
-   agy 1.1.20 found no project-level skill discovery on either candidate path
-   (see ADR-036 Context).
+   `skills/` agent-mirror contract, and shall assign agent-specific files to
+   their owning agents. Remaining at the time of writing:
+   - `AGENTS.md:280,294` still says skills live in `skills/` and are synced to
+     each agent's discovery path
+   - `CODEX.md:101,105` still names `skills/` as the canonical source — owned
+     by Codex
+   - `CLAUDE.md` carries an interim correction only, recording that the helpers
+     copy nothing and pointing here — owned by Claude
+   - `scripts/README.md:36-38` still describes all three helpers as syncing
+     `skills/`
+
+   Two parts are already done and are not deliverables of this spec:
+   - `GEMINI.md` was corrected in `cbe1984`. It is not obsolete — the
+     Antigravity CLI reads `GEMINI.md` and `AGENTS.md` as context files — so it
+     was fixed rather than deleted. Its claim that skills come from
+     `.gemini/skills/<name>/SKILL.md` was false: a probe of agy 1.1.20 found no
+     project-level skill discovery on either candidate path (see ADR-036
+     Context).
+   - `AGENTS.md` agent naming was corrected in `7ea3f35`; only its skills
+     contract above remains.
 5. The skill description shall trigger for provider model-catalog refreshes,
    catalog audits, and reviews of catalog changes. It shall exclude generic
    provider adapter implementation and ordinary dependency updates.
