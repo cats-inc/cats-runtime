@@ -113,8 +113,8 @@ the catalog schema, or durable evidence and decision documents.
    - advanced provider knowledge
    - repo-wide tests and fixtures that consume the bundled example
 10. Provider installation method (`npm_global`, native installer, local model,
-   or another method) shall be treated as operational context, not as the rule
-   deciding whether model-catalog maintenance is required.
+    or another method) shall be treated as operational context, not as the rule
+    deciding whether model-catalog maintenance is required.
 11. Each provider shall be classified by its actual catalog path, such as:
     - account-resolved dynamic enumeration
     - curated static input
