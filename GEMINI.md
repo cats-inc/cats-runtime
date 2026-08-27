@@ -68,13 +68,13 @@ If assigned as Conductor in Project Roles table:
 
 ### Agent Skills
 
-Antigravity CLI does not support project-level skill discovery. There is no `.gemini/skills/` or `.antigravity/skills/` directory within a repository that is read or discovered by the CLI.
+Antigravity CLI discovers project-level skills from `<workspace>/.agents/skills/<name>/SKILL.md`. Neither `.gemini/skills/` nor `.antigravity/skills/` is read.
 
-Skills reach Antigravity exclusively from user-level roots:
+The `.agents/skills/` discovery path is shared with Codex, not private to it. Any skill synced or placed there for Codex is already visible to Antigravity without requiring a separate sync target or directory.
+
+In addition to project-level skills, skills reach Antigravity from user-level roots:
 - Builtin skills: `~/.gemini/antigravity-cli/builtin/skills/<name>/SKILL.md`
 - Plugin-installed skills: `~/.gemini/config/plugins/<plugin>/skills/<name>/SKILL.md`
-
-The repository's skill sync helpers (`.\scripts\windows\Sync-AgentSkills.ps1`, `scripts/linux/sync-agent-skills.sh`, `scripts/macos/sync-agent-skills.sh`) do not target Antigravity and must not be run for its benefit. Delivering a repository-owned skill to Antigravity would require the plugin distribution mechanism; no decision has been made to do that.
 
 ### Personal Memory
 
