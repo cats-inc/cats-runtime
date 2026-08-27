@@ -314,8 +314,8 @@ skills/                           runtime-delivered, npm-shipped; unchanged
 
 ## Open Questions
 
-- [ ] Approve ADR-036's `developer-skills/` boundary and generated-mirror
-  approach.
+- [x] Approve ADR-036's `developer-skills/` boundary and generated-mirror
+  approach. Approved 2026-08-28; ADR-036 is now Accepted.
 - [ ] Approve this single-skill, multi-mode scope before creating PLAN-037.
 
 ## References

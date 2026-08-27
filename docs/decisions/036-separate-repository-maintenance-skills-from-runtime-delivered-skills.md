@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -214,3 +214,6 @@ The first repository-maintenance skill under this boundary will be
 
 *Proposed: 2026-08-28*
 *Proposed by: Codex from user direction*
+*Accepted: 2026-08-28 by the repository owner. The second skill root is
+adopted; a maintainer procedure must not reach users through the runtime
+skill catalog or the npm package.*
