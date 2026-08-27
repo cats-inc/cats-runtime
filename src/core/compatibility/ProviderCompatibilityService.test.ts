@@ -116,6 +116,115 @@ describe('ProviderCompatibilityService', () => {
     expect(assessment.evidence).toBeUndefined();
   });
 
+  it('runs the version and help probes one at a time', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-serial-'));
+    tempDirs.push(root);
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const runner = {
+      run: vi.fn(async () => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setImmediate(resolve));
+        inFlight -= 1;
+        return {
+          exitCode: 0,
+          stdout: 'claude 1.2.3\n',
+          stderr: '',
+          timedOut: false,
+          durationMs: 1,
+        };
+      }),
+    };
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner,
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-03-23T00:00:00.000Z'),
+    });
+
+    await service.assessCliTarget(createCliTarget('claude'));
+
+    // Overlapping probes let a CLI that self-updates on launch run two
+    // concurrent npm writes against the same global tree.
+    expect(runner.run).toHaveBeenCalledTimes(2);
+    expect(maxInFlight).toBe(1);
+  });
+
+  it('reads an npm-global CLI version from package metadata instead of executing it', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-npm-version-'));
+    tempDirs.push(root);
+    const runner = {
+      run: vi.fn(async () => ({
+        exitCode: 0,
+        stdout: 'Usage: cline --json --auto-approve --thinking --acp\n',
+        stderr: '',
+        timedOut: false,
+        durationMs: 3,
+      })),
+    };
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner,
+      installCheckRunner: createInstallCheckRunner({
+        checkNpmPackage: vi.fn(async () => ({
+          exists: true,
+          version: '3.0.60',
+          timedOut: false,
+        })),
+      }),
+      now: () => Date.parse('2026-03-23T00:00:25.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('cline'));
+
+    expect(runner.run).toHaveBeenCalledTimes(1);
+    expect(runner.run.mock.calls[0]![2]).toEqual(['--help']);
+    expect(assessment.fingerprint.version.normalized).toBe('3.0.60');
+    expect(assessment.profile.id).toBe('cline-cli-json-3.0.51');
+    expect(assessment.setup.version.detected).toBe('3.0.60');
+  });
+
+  it('does not treat an npm-recorded version as proof the binary executes', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-npm-broken-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async () => ({
+          exitCode: null,
+          stdout: '',
+          stderr: '',
+          timedOut: false,
+          durationMs: 1,
+          error: 'spawn ENOENT',
+        })),
+      },
+      installCheckRunner: createInstallCheckRunner({
+        lookupCommand: vi.fn(async () => ({
+          available: false,
+          timedOut: false,
+        })),
+        checkNpmPackage: vi.fn(async () => ({
+          exists: true,
+          version: '3.0.60',
+          timedOut: false,
+        })),
+      }),
+      now: () => Date.parse('2026-03-23T00:00:30.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('cline'));
+
+    expect(assessment.setup.command.status).not.toBe('ready');
+  });
+
   it('detects Grok only from the grok binary and never probes the generic agent alias', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-grok-detection-'));
     tempDirs.push(root);
@@ -613,29 +722,43 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
       now: () => Date.parse('2026-03-23T00:00:05.000Z'),
     });
 
+    const flush = async () => {
+      for (let tick = 0; tick < 5; tick += 1) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+    };
+
     const firstAssessment = service.assessCliTarget(createCliTarget('claude'));
-    await Promise.resolve();
+    await flush();
     const secondAssessment = service.assessCliTarget(createCliTarget('codex'));
-    await Promise.resolve();
+    await flush();
+
+    // Codex waits on the slot, and the probes within one assessment are
+    // serialized, so only the claude version probe is in flight.
+    expect(startedProviders).toEqual([
+      'claude:--version',
+    ]);
+
+    pendingRuns.get('claude:--version')?.();
+    await flush();
 
     expect(startedProviders).toEqual([
       'claude:--version',
       'claude:--help',
     ]);
 
-    pendingRuns.get('claude:--version')?.();
     pendingRuns.get('claude:--help')?.();
     await firstAssessment;
-    await Promise.resolve();
+    await flush();
 
     expect(startedProviders).toEqual([
       'claude:--version',
       'claude:--help',
       'codex:--version',
-      'codex:--help',
     ]);
 
     pendingRuns.get('codex:--version')?.();
+    await flush();
     pendingRuns.get('codex:--help')?.();
 
     await Promise.all([firstAssessment, secondAssessment]);

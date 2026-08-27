@@ -14,6 +14,7 @@ import {
   defaultProviderInstallCheckRunner,
   type ProviderInstallCheckRunner,
   type RuntimeCommandLookupResult,
+  type RuntimeNpmPackageCheckResult,
   type RuntimePathCheckResult,
   type RuntimeValueCheckResult,
   runSpawnedCommand,
@@ -391,28 +392,41 @@ export class ProviderCompatibilityService {
       instance.commandConfig.runtime.mode,
       providerName as ProviderName,
     );
-    const versionProbePromise = versionArgs.length
-      ? this.runner.run(
+    // npm already records the installed version of an npm-global CLI, so read
+    // it from the package metadata instead of launching the binary for a
+    // version string. This runs before the probes because it decides whether
+    // the version probe has to execute at all.
+    const npmPackage = installKnowledge.check.npmPackage;
+    const packageCheck = !healthOnly && npmPackage
+      ? await this.installCheckRunner.checkNpmPackage(
+        npmPackage,
+        instance.commandConfig.runtime,
+        probeTimeoutMs,
+      )
+      : undefined;
+    const metadataVersion = parseVersion(packageCheck?.version);
+    // The probes run one after the other on purpose. A CLI that self-updates
+    // on launch (Cline does, via `npm update -g`) would otherwise have two
+    // concurrent npm writes racing over the same global tree, which leaves the
+    // package half-installed and its bin shims broken.
+    const versionProbe = versionArgs.length && !metadataVersion
+      ? await this.runner.run(
         providerName,
         instance.commandConfig,
         versionArgs,
         probeCwd,
         probeTimeoutMs,
       )
-      : Promise.resolve(undefined);
-    const helpProbePromise = helpArgs?.length
-      ? this.runner.run(
+      : undefined;
+    const helpProbe = helpArgs?.length
+      ? await this.runner.run(
         providerName,
         instance.commandConfig,
         helpArgs,
         probeCwd,
         probeTimeoutMs,
       )
-      : Promise.resolve(undefined);
-    const [versionProbe, helpProbe] = await Promise.all([
-      versionProbePromise,
-      helpProbePromise,
-    ]);
+      : undefined;
 
     const versionProbeRecord = versionProbe
       ? toProbeRecord('version', versionArgs, versionProbe)
@@ -420,30 +434,31 @@ export class ProviderCompatibilityService {
     const helpProbeRecord = helpProbe
       ? toProbeRecord('help', helpArgs || [], helpProbe)
       : undefined;
-    let parsedVersion = parseVersion(
+    const probedVersion = parseVersion(
       versionProbe?.stdout || versionProbe?.stderr,
     );
+    let parsedVersion = metadataVersion || probedVersion;
     const helpText = `${helpProbe?.stdout || ''}\n${helpProbe?.stderr || ''}`;
     const detectedFeatures = (compatibilityKnowledge?.primaryProfile.helpTokens || [])
       .filter((token) => helpText.includes(token))
       .map((token) => `token:${token}`);
     let missingHelpTokens = (compatibilityKnowledge?.primaryProfile.helpTokens || [])
       .filter((token) => !helpText.includes(token));
+    // Deliberately not `parsedVersion`: a version read from npm metadata says
+    // the package is installed, not that its binary executes.
     let commandAvailable = didExecuteProbe(versionProbeRecord)
       || didExecuteProbe(helpProbeRecord)
-      || Boolean(parsedVersion)
+      || Boolean(probedVersion)
       || detectedFeatures.length > 0;
     const [
       configuredLookup,
       binaryLookup,
       expectedPathCheck,
-      packageCheck,
       prerequisiteLookups,
       pathPersistenceCheck,
       npmPrefix,
     ] = healthOnly
       ? [
-          undefined,
           undefined,
           undefined,
           undefined,
@@ -471,13 +486,6 @@ export class ProviderCompatibilityService {
           installView.path.expectedPath
             ? this.installCheckRunner.checkPath(
               installView.path.expectedPath,
-              instance.commandConfig.runtime,
-              probeTimeoutMs,
-            )
-            : Promise.resolve(undefined),
-          installKnowledge.check.npmPackage
-            ? this.installCheckRunner.checkNpmPackage(
-              installKnowledge.check.npmPackage,
               instance.commandConfig.runtime,
               probeTimeoutMs,
             )
@@ -963,7 +971,7 @@ function buildCommandSummary(input: {
   configuredLookup: RuntimeCommandLookupResult;
   binaryLookup: RuntimeCommandLookupResult;
   expectedPathCheck?: RuntimePathCheckResult;
-  packageCheck?: RuntimePathCheckResult;
+  packageCheck?: RuntimeNpmPackageCheckResult;
 }): ProviderSetupSummary['command'] {
   if (input.commandAvailable || input.configuredLookup.available) {
     return {

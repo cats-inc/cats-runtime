@@ -40,6 +40,14 @@ export interface RuntimePathCheckResult {
   error?: string;
 }
 
+export interface RuntimeNpmPackageCheckResult {
+  exists: boolean;
+  /** Installed version reported by npm, when the package is present. */
+  version?: string;
+  timedOut: boolean;
+  error?: string;
+}
+
 export interface RuntimeValueCheckResult {
   value?: string;
   timedOut: boolean;
@@ -61,7 +69,7 @@ export interface ProviderInstallCheckRunner {
     packageName: string,
     runtime: ProviderRuntimeConfig,
     timeoutMs?: number,
-  ): Promise<RuntimePathCheckResult>;
+  ): Promise<RuntimeNpmPackageCheckResult>;
   checkShellRcEntry(
     shellRcPath: string,
     entry: string,
@@ -202,6 +210,34 @@ async function runShellCommand(
   return runCommand(invocation.command, invocation.args, timeoutMs);
 }
 
+// `npm list -g <pkg> --depth=0 --json` prints the installed version without
+// executing the CLI it installed. npm exits non-zero and marks the entry
+// `missing` when the package is absent, so an absent version is not an error.
+function parseNpmGlobalPackageVersion(
+  stdout: string,
+  packageName: string,
+): string | undefined {
+  const payload = stdout.trim();
+  if (!payload) {
+    return undefined;
+  }
+
+  let parsed: {
+    dependencies?: Record<string, { version?: unknown; missing?: unknown } | undefined>;
+  };
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    return undefined;
+  }
+
+  const entry = parsed.dependencies?.[packageName];
+  if (!entry || entry.missing === true || typeof entry.version !== 'string') {
+    return undefined;
+  }
+  return entry.version.trim() || undefined;
+}
+
 export const defaultProviderInstallCheckRunner: ProviderInstallCheckRunner = {
   async lookupCommand(
     command: string,
@@ -302,7 +338,7 @@ export const defaultProviderInstallCheckRunner: ProviderInstallCheckRunner = {
     packageName: string,
     runtime: ProviderRuntimeConfig,
     timeoutMs = DEFAULT_CHECK_TIMEOUT_MS,
-  ): Promise<RuntimePathCheckResult> {
+  ): Promise<RuntimeNpmPackageCheckResult> {
     if (!packageName.trim()) {
       return {
         exists: false,
@@ -311,15 +347,17 @@ export const defaultProviderInstallCheckRunner: ProviderInstallCheckRunner = {
     }
 
     const result = runtime.mode === 'native'
-      ? await runCommand('npm', ['list', '-g', packageName, '--depth=0'], timeoutMs)
+      ? await runCommand('npm', ['list', '-g', packageName, '--depth=0', '--json'], timeoutMs)
       : await runShellCommand(
         runtime,
-        `npm list -g ${quoteForBash(packageName)} --depth=0`,
+        `npm list -g ${quoteForBash(packageName)} --depth=0 --json`,
         timeoutMs,
       );
 
+    const version = parseNpmGlobalPackageVersion(result.stdout, packageName);
     return {
-      exists: result.exitCode === 0,
+      exists: result.exitCode === 0 || Boolean(version),
+      version,
       timedOut: result.timedOut,
       error: result.error,
     };

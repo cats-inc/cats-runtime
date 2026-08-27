@@ -435,7 +435,10 @@ describe('bootstrap mode server', () => {
     }
   });
 
-  it('POST /setup-scan without manual flag preserves auto scan semantics', { timeout: 60_000 }, async () => {
+  // Real scan against the host's CLIs. Each provider's version and help probes
+  // run one after the other (see ProviderCompatibilityService), so the ceiling
+  // has to cover two serialized probe timeouts per provider.
+  it('POST /setup-scan without manual flag preserves auto scan semantics', { timeout: 120_000 }, async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
