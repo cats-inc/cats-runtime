@@ -453,6 +453,19 @@ tests/
 
 ## Pull Request Guidelines
 
+### Branching Policy
+
+- Non-trivial changes go through a branch and a PR: `git checkout -b <type>/<slug>`,
+  push, open the PR, then `gh pr merge <n> --auto --squash`. The head branch is
+  deleted on merge.
+- `main` requires a pull request and zero approvals. A direct push to `main`
+  succeeds only because `enforce_admins` is off; reserve that for trivial
+  changes such as a docs typo or a version bump.
+- This project is developed from several machines at once. The required status
+  check runs with "branch must be up to date", so a PR opened before another
+  machine's merge has to be updated before it can land. Catching that is the
+  reason to use a PR here — not review, which a single account cannot provide.
+
 ### PR Title Format
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
