@@ -234,6 +234,7 @@ export class BootstrapService {
     this.config = opts.config;
     this.compatibility = opts.compatibility;
     this.scanConcurrency = normalizeScanConcurrency(opts.scanConcurrency);
+    this.recoverStrandedScanStatus();
   }
 
   // ---- Provider Universe (Layer 1) ----
@@ -260,31 +261,68 @@ export class BootstrapService {
     state.status = 'scanning';
     writeJsonAtomic(this.setupStatePath, state);
 
-    // A CLI installed since this runtime started is only on the persisted PATH,
-    // not on the one we inherited at boot. Pick it up before probing; a failure
-    // here just means we scan with the PATH we already have.
-    await refreshWindowsProcessPath().catch(() => ({ refreshed: false, added: [] }));
+    try {
+      // A CLI installed since this runtime started is only on the persisted
+      // PATH, not on the one we inherited at boot. Pick it up before probing; a
+      // failure here just means we scan with the PATH we already have.
+      await refreshWindowsProcessPath().catch(() => ({ refreshed: false, added: [] }));
 
-    const entries = await this.probeProviders();
-    const isManual = options.manual === true;
+      const entries = await this.probeProviders();
+      const isManual = options.manual === true;
 
-    const result: BootstrapScanResult = {
-      scannedAt: new Date().toISOString(),
-      scanType: isManual ? 'manual' : 'auto',
-      providers: entries,
-    };
+      const result: BootstrapScanResult = {
+        scannedAt: new Date().toISOString(),
+        scanType: isManual ? 'manual' : 'auto',
+        providers: entries,
+      };
 
-    writeJsonAtomic(this.scanPath, result);
-    if (isManual) {
-      writeJsonAtomic(this.manualScanPath, result);
-      state.lastManualScanAt = result.scannedAt;
+      writeJsonAtomic(this.scanPath, result);
+      if (isManual) {
+        writeJsonAtomic(this.manualScanPath, result);
+        state.lastManualScanAt = result.scannedAt;
+      }
+      state.lastScanAt = result.scannedAt;
+      state.status = 'ready';
+      state.error = null;
+      writeJsonAtomic(this.setupStatePath, state);
+
+      return result;
+    } catch (error) {
+      // `scanning` is persisted, and callers read it as "a scan is running" --
+      // the desktop host declines to start another one while it stands. A throw
+      // that left it there would disable detection for good, so the failure has
+      // to land in the file as a terminal state.
+      state.status = 'error';
+      state.error = error instanceof Error ? error.message : String(error);
+      writeJsonAtomic(this.setupStatePath, state);
+      throw error;
     }
-    state.lastScanAt = result.scannedAt;
-    state.status = 'ready';
-    state.error = null;
-    writeJsonAtomic(this.setupStatePath, state);
+  }
 
-    return result;
+  /**
+   * Clears a `scanning` status left behind by a process that is no longer
+   * running.
+   *
+   * The status is written before probing and cleared after, so a runtime that
+   * exits mid-scan strands it on disk. Nothing ever clears it: the desktop host
+   * reads `scanning` as "a scan is already in flight" and backs off, on every
+   * launch, forever -- which is exactly what happens when the packaged update
+   * handoff drains the sidecars while the startup scan is still running.
+   *
+   * A scan cannot outlive the process that started it, so any `scanning` found
+   * at construction belongs to a dead one and is stale by definition.
+   */
+  private recoverStrandedScanStatus(): void {
+    const state = readJsonSafe<SetupState>(this.setupStatePath);
+    if (state?.status !== 'scanning') {
+      return;
+    }
+    writeJsonAtomic(this.setupStatePath, {
+      ...state,
+      // Fall back to what the file itself can prove: a scan that completed once
+      // leaves lastScanAt behind, and its result is still on disk.
+      status: state.lastScanAt ? 'ready' : 'pending',
+    });
   }
 
   // ---- Setup State (persistence) ----
