@@ -67,12 +67,25 @@ If assigned as Conductor in Project Roles table:
 
 ### Agent Skills
 
-Claude Code discovers skills from `.claude/skills/<name>/SKILL.md`. The canonical source is the `skills/` directory at the project root.
+Claude Code discovers skills from `.claude/skills/<name>/SKILL.md`.
 
-To sync skills after changes:
 ```powershell
 .\scripts\windows\Sync-AgentSkills.ps1
 ```
+
+**This script currently copies nothing.** It looks for `SKILL.md` directly inside
+each child of `skills/`, but the runtime library is organized one level deeper by
+family (`skills/chat/companion/SKILL.md`), so it matches zero directories, warns
+`No skills found`, and returns. `.claude/skills/` has never been populated by it.
+Do not treat a clean run as proof that a skill was synced.
+
+`skills/` is the runtime-owned, npm-shipped skill library (ADR-018), not a
+neutral home for developer tooling. Where repository-maintenance skills should
+live, and what this script should point at, is the open question in
+[ADR-036](docs/decisions/036-separate-repository-maintenance-skills-from-runtime-delivered-skills.md)
+— **Proposed, not accepted**. Update this section when that lands; it is
+named as a deliverable in SPEC-028 functional requirement 4 because no other
+agent is permitted to edit this file.
 
 ### MCP Server Configurations
 
@@ -155,4 +168,4 @@ and docs to the current contract.
 
 This file is maintained by Claude only. Other agents should not modify this file.
 
-Last updated: 2026-08-03
+Last updated: 2026-08-28

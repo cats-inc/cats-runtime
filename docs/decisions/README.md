@@ -38,6 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [036-separate-repository-maintenance-skills-from-runtime-delivered-skills](./036-separate-repository-maintenance-skills-from-runtime-delivered-skills.md) | Separate repository-maintenance skills from runtime-delivered skills | Accepted | 2026-08-28 |
 | [035-never-block-provider-execution-on-exact-cli-version](./035-never-block-provider-execution-on-exact-cli-version.md) | Never block provider execution on an exact CLI version | Accepted | 2026-08-26 |
 | [034-automate-light-tier-provider-drift-and-separate-observation-from-acceptance](./034-automate-light-tier-provider-drift-and-separate-observation-from-acceptance.md) | Automate light-tier provider drift detection, keep live probes manual-first, and separate observation from acceptance | Proposed | 2026-08-17 |
 | [033-adopt-grok-devin-cline-aider-as-cli-provider-families](./033-adopt-grok-devin-cline-aider-as-cli-provider-families.md) | Adopt Grok, Devin, Cline, and Aider as CLI provider families, install-tier first | Proposed | 2026-08-07 |
@@ -84,6 +85,6 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 ---
 
-*Last updated: 2026-08-26 (ADR-035 accepted best-fit execution across provider CLI version drift.)*
+*Last updated: 2026-08-28 (ADR-036 accepted a separate canonical root for repository-maintenance skills.)*
 
 *See also: [AGENTS.md](../../AGENTS.md) for decision-making protocols*
