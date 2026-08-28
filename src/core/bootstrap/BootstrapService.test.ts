@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -259,6 +259,142 @@ describe('BootstrapService', () => {
 
       const yaml = readFileSync(createRuntimeTestPaths(root).configPath, 'utf8');
       expect(yaml).toContain(`db_path: ${defaultKiroDbPath(process.platform, 'docker')}`);
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+/**
+ * `scanning` is written before probing and cleared after, and the desktop host
+ * reads it as "a scan is already in flight" and declines to start another one.
+ * A runtime that exits mid-scan therefore strands it on disk and disables
+ * detection for good — which is exactly what the packaged update handoff does
+ * when it drains the sidecars while the startup scan is still running.
+ */
+describe('BootstrapService stranded scan recovery', () => {
+  function seedSetupState(root: string, state: Record<string, unknown>): string {
+    const dataDir = createRuntimeTestPaths(root).dataDir;
+    const setupDir = join(dataDir, 'setup');
+    mkdirSync(setupDir, { recursive: true });
+    const statePath = join(setupDir, 'setup-state.json');
+    writeFileSync(statePath, JSON.stringify(state), 'utf8');
+    return statePath;
+  }
+
+  function construct(root: string, env: NodeJS.ProcessEnv): void {
+    // eslint-disable-next-line no-new
+    new BootstrapService({
+      dataDir: createRuntimeTestPaths(root).dataDir,
+      configPath: createRuntimeTestPaths(root).configPath,
+      config: loadConfig(env),
+      compatibility: {} as unknown as ProviderCompatibilityService,
+    });
+  }
+
+  it('clears a scanning status left by a process that is gone', () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const statePath = seedSetupState(root, {
+        status: 'scanning',
+        lastScanAt: null,
+        lastManualScanAt: null,
+        appliedAt: null,
+        appliedConfigPath: null,
+        error: null,
+      });
+
+      construct(root, env);
+
+      // Nothing ever scanned, so there is no result to fall back to.
+      expect(JSON.parse(readFileSync(statePath, 'utf8')).status).toBe('pending');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('restores a scanning status to ready when a scan had already completed', () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const statePath = seedSetupState(root, {
+        status: 'scanning',
+        lastScanAt: '2026-08-28T18:00:00.000Z',
+        lastManualScanAt: null,
+        appliedAt: null,
+        appliedConfigPath: null,
+        error: null,
+      });
+
+      construct(root, env);
+
+      const restored = JSON.parse(readFileSync(statePath, 'utf8'));
+      expect(restored.status).toBe('ready');
+      // The earlier result is still on disk and still true.
+      expect(restored.lastScanAt).toBe('2026-08-28T18:00:00.000Z');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('leaves every other persisted status alone', () => {
+    for (const status of ['pending', 'ready', 'applied', 'error']) {
+      const { root, cleanup } = createTestRoot();
+      try {
+        const env = createTestEnv(root);
+        ensureDirs(env);
+        const statePath = seedSetupState(root, {
+          status,
+          lastScanAt: null,
+          lastManualScanAt: null,
+          appliedAt: null,
+          appliedConfigPath: null,
+          error: null,
+        });
+
+        construct(root, env);
+
+        expect(JSON.parse(readFileSync(statePath, 'utf8')).status).toBe(status);
+      } finally {
+        cleanup();
+      }
+    }
+  });
+
+  it('records a failed scan as an error rather than leaving it scanning', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const compatibility = {
+        assessCliTarget: async () => {
+          throw new Error('probe exploded');
+        },
+      } as unknown as ProviderCompatibilityService;
+
+      const bootstrap = new BootstrapService({
+        dataDir: createRuntimeTestPaths(root).dataDir,
+        configPath: createRuntimeTestPaths(root).configPath,
+        config: loadConfig(env),
+        compatibility,
+      });
+
+      // probeProvider swallows per-provider failures, so force the throw past
+      // it to prove the status is restored on the way out.
+      (bootstrap as unknown as { probeProviders: () => Promise<never> }).probeProviders =
+        async () => {
+          throw new Error('scan exploded');
+        };
+
+      await expect(bootstrap.scan()).rejects.toThrow('scan exploded');
+
+      const statePath = join(createRuntimeTestPaths(root).dataDir, 'setup', 'setup-state.json');
+      const state = JSON.parse(readFileSync(statePath, 'utf8'));
+      expect(state.status).toBe('error');
+      expect(state.error).toBe('scan exploded');
     } finally {
       cleanup();
     }
