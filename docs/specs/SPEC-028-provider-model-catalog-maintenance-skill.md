@@ -336,4 +336,4 @@ skills/                           runtime-delivered, npm-shipped; unchanged
 
 *Created: 2026-08-28*
 *Author: Codex*
-*Related Plan: Pending specification approval*
+*Related Plan: [PLAN-037](../plans/PLAN-037-provider-model-catalog-maintenance-skill.md)*
