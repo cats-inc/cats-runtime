@@ -240,6 +240,12 @@ describe('runtime MCP facade', () => {
   }) {
     const startup = createRuntimeStartupState();
     const peerNow = Date.parse('2026-03-25T00:00:05.000Z');
+    const completedScan = {
+      scannedAt: '2026-03-27T00:00:00.000Z',
+      scanType: 'manual',
+      providers: [],
+    };
+    let latestScan: typeof completedScan | null = null;
     const bootstrapService = {
       getSetupState: vi.fn(async () => ({
         status: 'pending',
@@ -249,8 +255,8 @@ describe('runtime MCP facade', () => {
         appliedConfigPath: null,
         error: null,
       })),
-      getLatestScan: vi.fn(async () => null),
-      getLatestManualScan: vi.fn(async () => null),
+      getLatestScan: vi.fn(async () => latestScan),
+      getLatestManualScan: vi.fn(async () => latestScan),
       getProviderUniverse: vi.fn(() => [
         {
           provider: 'claude',
@@ -258,11 +264,12 @@ describe('runtime MCP facade', () => {
           binaryName: 'claude',
         },
       ]),
-      scan: vi.fn(async () => ({
-        scannedAt: '2026-03-27T00:00:00.000Z',
-        scanType: 'manual',
-        providers: [],
-      })),
+      // The route starts a scan and answers 202; the tool then waits on
+      // /setup-state, so the stub has to publish its result the same way.
+      startScan: vi.fn(() => {
+        latestScan = completedScan;
+        return { started: true };
+      }),
       applyConfig: vi.fn(async (_providers: string[]) => ({
         configPath: join(rootDir, 'config', 'providers.yaml'),
       })),
@@ -1605,7 +1612,7 @@ describe('runtime MCP facade', () => {
       result: {
         structuredContent: {
           setupScanPath: string;
-          status: string;
+          state: { status: string };
           scan: {
             scanType: string;
           };
@@ -1613,7 +1620,9 @@ describe('runtime MCP facade', () => {
       };
     };
     expect(runSetupScan.result.structuredContent.setupScanPath).toBe('/setup-scan');
-    expect(runSetupScan.result.structuredContent.status).toBe('completed');
+    // The tool waited for the scan to leave `scanning` before answering, so it
+    // reports the settled state and the snapshot that run produced.
+    expect(runSetupScan.result.structuredContent.state.status).not.toBe('scanning');
     expect(runSetupScan.result.structuredContent.scan.scanType).toBe('manual');
 
     const applySetupConfigResponse = await app.request('/mcp', {

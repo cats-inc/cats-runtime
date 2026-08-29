@@ -37,6 +37,14 @@ describe('injectDashboardScanPanel', () => {
     expect(result).toContain("{ manual: true }");
   });
 
+  it('polls /setup-state after starting a scan instead of awaiting the POST', () => {
+    const result = injectDashboardScanPanel(MINIMAL_HTML);
+    // POST /setup-scan answers 202 while the probes run, so the panel has to
+    // wait on the persisted status rather than on the request completing.
+    expect(result).toContain('waitForScanToSettle');
+    expect(result).toContain("data.state.status !== 'scanning'");
+  });
+
   it('uses data.scan as canonical snapshot, not manualScan', () => {
     const result = injectDashboardScanPanel(MINIMAL_HTML);
     // The scan panel should use data.scan (always the most recent) rather

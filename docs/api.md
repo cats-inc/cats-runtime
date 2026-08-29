@@ -566,9 +566,18 @@ forcing a fresh scan on page load.
 bootstrap.  The dashboard, playground, and provider-setup page each expose
 their own API key input and do not persist the key across pages.
 
-`POST /setup-scan` triggers a provider scan. Pass `{"manual": true}`
-in the body for an explicit manual scan. Returns scan results with per-provider
-readiness, version, auth status, and remediation hints.
+`POST /setup-scan` starts a provider scan and returns `202` immediately with
+`{"status": "scanning", "started": <bool>, "state": <setup state>}`. Pass
+`{"manual": true}` in the body for an explicit manual scan. `started` is `false`
+when a scan was already running; a second start is refused rather than queued.
+
+The scan itself is not awaited by the request: it takes as long as the host's
+provider CLIs take to answer, which is longer than callers in front of the
+runtime are willing to hold a connection open. Poll `GET /setup-state` until
+`state.status` leaves `scanning`; the run then settles into `ready` with the
+snapshot in `scan` (and `manualScan` for a manual run), or into `error` with the
+reason in `state.error`. A runtime that dies mid-scan clears the stranded
+`scanning` status on its next start.
 
 `POST /setup-apply` accepts `{"providers": ["claude", "codex", ...]}`
 and writes a minimal `providers.yaml` with only the selected providers. On
