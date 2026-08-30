@@ -218,6 +218,7 @@ export class BootstrapService {
   private readonly config: RuntimeConfig;
   private readonly compatibility: ProviderCompatibilityService;
   private readonly scanConcurrency: number;
+  private inFlightScan: Promise<BootstrapScanResult> | null = null;
 
   constructor(opts: {
     dataDir: string;
@@ -256,8 +257,41 @@ export class BootstrapService {
 
   // ---- Machine Detection (Layer 2) ----
 
+  /**
+   * Starts a scan and returns without waiting for it.
+   *
+   * How long a scan takes is a property of the host, not of this runtime: it
+   * grows with every provider CLI installed and with how cold the disk is.
+   * Holding an HTTP request open for it forces every caller to pick a timeout,
+   * and a caller that picks one too low reports a failure for a scan that is
+   * still running and will succeed. Progress is already durable in
+   * `setup-state.json`, so callers poll that instead.
+   *
+   * Single-flighted: a second start while one is running is a no-op, not a
+   * second set of probes racing the first over the same CLIs.
+   */
+  startScan(options: { manual?: boolean } = {}): { started: boolean } {
+    if (this.inFlightScan) {
+      return { started: false };
+    }
+
+    const running = this.scan(options).finally(() => {
+      this.inFlightScan = null;
+    });
+    // Nothing awaits this promise. `scan` has already persisted the failure by
+    // the time it rejects, so the state file carries the report; without this
+    // handler the rejection would be unhandled and take the process down.
+    running.catch(() => undefined);
+    this.inFlightScan = running;
+
+    return { started: true };
+  }
+
   async scan(options: { manual?: boolean } = {}): Promise<BootstrapScanResult> {
-    const state = await this.getSetupState();
+    // Marked before the first await so that `startScan` cannot return to a
+    // caller that then reads a status still saying `ready` from the last scan
+    // and concludes this one already finished.
+    const state = this.readSetupState();
     state.status = 'scanning';
     writeJsonAtomic(this.setupStatePath, state);
 
@@ -328,6 +362,10 @@ export class BootstrapService {
   // ---- Setup State (persistence) ----
 
   async getSetupState(): Promise<SetupState> {
+    return this.readSetupState();
+  }
+
+  private readSetupState(): SetupState {
     return readJsonSafe<SetupState>(this.setupStatePath) ?? defaultSetupState();
   }
 

@@ -40,12 +40,16 @@ setupRoutes.post('/setup-scan', async (c) => {
     || c.req.query('manual') === 'true'
     || c.req.query('manual') === '1';
 
-  const result = await ctx.bootstrapService.scan({ manual });
+  const { started } = ctx.bootstrapService.startScan({ manual });
 
+  // 202, not the finished scan: the probes outlive any timeout a caller in
+  // front of this route is willing to hold. Callers poll /setup-state, which
+  // reports `scanning` until the run settles into `ready` or `error`.
   return c.json({
-    status: 'completed',
-    scan: result,
-  });
+    status: 'scanning',
+    started,
+    state: await ctx.bootstrapService.getSetupState(),
+  }, 202);
 });
 
 setupRoutes.post('/setup-apply', async (c) => {

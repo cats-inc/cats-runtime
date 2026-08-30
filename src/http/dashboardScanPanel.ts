@@ -188,6 +188,31 @@ const SCAN_PANEL_SCRIPT = `
     });
   }
 
+  // --- Wait for a started scan to settle ---
+  // POST /setup-scan answers 202, not the result: the probes outlive any
+  // timeout a caller can hold open. A 'scanning' status in /setup-state is the
+  // progress signal, and the runtime clears it when the run settles or on its
+  // next start if it died mid-scan -- so this ends on the runtime's answer,
+  // never on a guess about how long a scan is allowed to take.
+  var SCAN_POLL_INTERVAL_MS = 1000;
+  function waitForScanToSettle(fetchFn) {
+    return new Promise(function(resolve, reject) {
+      var poll = function() {
+        fetchFn('/setup-state').then(function(res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        }).then(function(data) {
+          if (!data || !data.state || data.state.status !== 'scanning') {
+            resolve(data);
+            return;
+          }
+          setTimeout(poll, SCAN_POLL_INTERVAL_MS);
+        }).catch(reject);
+      };
+      setTimeout(poll, SCAN_POLL_INTERVAL_MS);
+    });
+  }
+
   // --- Explicit operator scan ---
   var manualBtn = document.getElementById('scanPanelManualBtn');
   manualBtn.addEventListener('click', function() {
@@ -203,9 +228,12 @@ const SCAN_PANEL_SCRIPT = `
       body: JSON.stringify({ manual: true }),
     }).then(function(res) {
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      return res.json();
+      return waitForScanToSettle(fetchFn);
     }).then(function(data) {
-      if (data.scan && data.scan.providers) {
+      if (data && data.state && data.state.status === 'error') {
+        throw new Error(data.state.error || 'The runtime reported a failed scan.');
+      }
+      if (data && data.scan && data.scan.providers) {
         renderProviders(data.scan.providers);
         renderMeta(data.scan);
       }

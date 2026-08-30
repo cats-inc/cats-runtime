@@ -2185,6 +2185,26 @@ function bindCheckboxes() {
   update();
 }
 
+const SCAN_POLL_INTERVAL_MS = 1000;
+
+// The scan takes as long as this host's CLIs take to answer, which is why the
+// route hands back 202 instead of the result. There is no deadline to enforce
+// here: `scanning` lives in the runtime's state file and is cleared when the
+// run settles, and a runtime that dies mid-scan clears it on next start, so
+// this loop ends on the runtime's answer or on the request failing -- never on
+// a guess about how long a scan is allowed to take.
+async function waitForScanToSettle(fetchFn) {
+  while (true) {
+    await new Promise((resolve) => setTimeout(resolve, SCAN_POLL_INTERVAL_MS));
+    const res = await fetchFn('/setup-state');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data || !data.state || data.state.status !== 'scanning') {
+      return data;
+    }
+  }
+}
+
 async function runScan() {
   if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
   setActiveSetupWorkspace('providers');
@@ -2208,19 +2228,11 @@ async function runScan() {
       body: JSON.stringify({ manual: true }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    if (data.scan) {
-      if (latestSetupState) {
-        latestSetupState.scan = data.scan;
-        updateStatusBar(latestSetupState);
-      } else {
-        updateStatusBar({
-          bootstrapRequired: true,
-          scan: data.scan,
-        });
-      }
-      renderScanResults(data.scan);
+    const data = await waitForScanToSettle(fetchFn);
+    if (data.state && data.state.status === 'error') {
+      throw new Error(data.state.error || 'The runtime reported a failed scan.');
     }
+    applySetupStateReadModel(data);
   } catch (err) {
     document.getElementById('providerListItems').innerHTML =
       '<div class="px-6 py-12 text-center text-sm text-red-300">Scan failed: ' + escapeHtml(err.message) + '</div>';

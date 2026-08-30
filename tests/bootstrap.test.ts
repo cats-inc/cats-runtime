@@ -54,6 +54,23 @@ function createTestEnv(root: string, configPath?: string): NodeJS.ProcessEnv {
   });
 }
 
+async function waitForSetupScanToSettle(
+  runtime: ReturnType<typeof createRuntimeServer>,
+): Promise<Record<string, unknown>> {
+  for (let attempt = 0; attempt < 2400; attempt += 1) {
+    const response = await runtime.app.request('/setup-state');
+    expect(response.status).toBe(200);
+    const body = await response.json() as Record<string, unknown>;
+    if ((body.state as { status?: string } | undefined)?.status !== 'scanning') {
+      return body;
+    }
+    await new Promise((resolve) => {
+      setTimeout(resolve, 100);
+    });
+  }
+  throw new Error('setup scan never left the scanning state');
+}
+
 function ensureDirs(env: NodeJS.ProcessEnv): void {
   const paths = createRuntimeTestPaths(env.HOME || env.USERPROFILE || '');
   ensureRuntimeTestDirs(paths);
@@ -435,10 +452,55 @@ describe('bootstrap mode server', () => {
     }
   });
 
-  // Real scan against the host's CLIs. Each provider's version and help probes
-  // run one after the other (see ProviderCompatibilityService), so the ceiling
-  // has to cover two serialized probe timeouts per provider.
-  it('POST /setup-scan without manual flag preserves auto scan semantics', { timeout: 120_000 }, async () => {
+  it('POST /setup-scan answers immediately instead of holding the request open', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
+      const startup = createRuntimeStartupState({ bootstrapRequired: true });
+      const runtime = createRuntimeServer(config, { startup });
+      try {
+        // No timeout on this assertion on purpose: the point of the route is
+        // that it returns before the probes do, so it must answer well inside a
+        // default test timeout even though a real scan takes minutes.
+        const response = await runtime.app.request('/setup-scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        expect(response.status).toBe(202);
+        const body = await response.json() as Record<string, unknown>;
+        expect(body).toEqual(expect.objectContaining({
+          status: 'scanning',
+          started: true,
+        }));
+        expect(body.state).toEqual(expect.objectContaining({ status: 'scanning' }));
+
+        // A second start while the first is running is refused, not queued.
+        const second = await runtime.app.request('/setup-scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        expect(second.status).toBe(202);
+        expect(await second.json()).toEqual(expect.objectContaining({
+          status: 'scanning',
+          started: false,
+        }));
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
+  // Real scan against the host's CLIs, waited out through /setup-state the way
+  // every caller now does. The ceiling covers two serialized probe timeouts per
+  // provider (see ProviderCompatibilityService) on a host with every CLI
+  // installed; it is not a contract, only a bound on this test hanging.
+  it('POST /setup-scan without manual flag preserves auto scan semantics', { timeout: 240_000 }, async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
@@ -452,15 +514,13 @@ describe('bootstrap mode server', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
         });
-        expect(response.status).toBe(200);
-        const body = await response.json() as Record<string, unknown>;
-        expect(body.scan).toEqual(expect.objectContaining({
+        expect(response.status).toBe(202);
+
+        const stateBody = await waitForSetupScanToSettle(runtime);
+        expect(stateBody.state).toEqual(expect.objectContaining({ status: 'ready' }));
+        expect(stateBody.scan).toEqual(expect.objectContaining({
           scanType: 'auto',
         }));
-
-        const stateResponse = await runtime.app.request('/setup-state');
-        expect(stateResponse.status).toBe(200);
-        const stateBody = await stateResponse.json() as Record<string, unknown>;
         expect(stateBody.manualScan).toBeNull();
       } finally {
         await runtime.close();
@@ -730,6 +790,7 @@ describe('bootstrap mode server', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ manual: false }),
         });
+        await waitForSetupScanToSettle(runtime);
 
         // Now check state
         const response = await runtime.app.request('/setup-state');
@@ -904,6 +965,7 @@ describe('bootstrap mode server', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ manual: true }),
         });
+        await waitForSetupScanToSettle(runtime);
 
         const response = await runtime.app.request('/setup-state');
         expect(response.status).toBe(200);
@@ -1030,6 +1092,7 @@ describe('bootstrap mode server', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ manual: true }),
         });
+        await waitForSetupScanToSettle(runtime);
 
         // Exit bootstrap mode
         startup.bootstrapRequired = false;

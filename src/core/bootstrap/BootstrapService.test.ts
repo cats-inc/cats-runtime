@@ -400,3 +400,119 @@ describe('BootstrapService stranded scan recovery', () => {
     }
   });
 });
+
+interface GatedProbe {
+  release: () => void;
+  runs: () => number;
+}
+
+function gateProbes(bootstrap: BootstrapService): GatedProbe {
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let runs = 0;
+  (bootstrap as unknown as { probeProviders: () => Promise<unknown[]> }).probeProviders =
+    async () => {
+      runs += 1;
+      await gate;
+      return [];
+    };
+  return { release, runs: () => runs };
+}
+
+async function waitForStatus(statePath: string, status: string): Promise<void> {
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    if (existsSync(statePath)
+      && JSON.parse(readFileSync(statePath, 'utf8')).status === status) {
+      return;
+    }
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10);
+    });
+  }
+  throw new Error(`setup state never reached ${status}`);
+}
+
+describe('BootstrapService.startScan', () => {
+  function createGatedService(root: string) {
+    const env = createTestEnv(root);
+    ensureDirs(env);
+    const paths = createRuntimeTestPaths(root);
+    const bootstrap = new BootstrapService({
+      dataDir: paths.dataDir,
+      configPath: paths.configPath,
+      config: loadConfig(env),
+      compatibility: {
+        assessCliTarget: async () => {
+          throw new Error('probes are gated in this test');
+        },
+      } as unknown as ProviderCompatibilityService,
+    });
+    return {
+      bootstrap,
+      statePath: join(paths.dataDir, 'setup', 'setup-state.json'),
+    };
+  }
+
+  it('persists the scanning status before returning to its caller', () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const { bootstrap, statePath } = createGatedService(root);
+      const probes = gateProbes(bootstrap);
+
+      // The route answers from the state file the moment this returns. If the
+      // status were written after the first await, that answer would still say
+      // `ready` from the previous scan and the caller would stop polling before
+      // this run had produced anything.
+      expect(bootstrap.startScan({ manual: true })).toEqual({ started: true });
+      expect(JSON.parse(readFileSync(statePath, 'utf8')).status).toBe('scanning');
+
+      probes.release();
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('single-flights a running scan and accepts a new one once it settles', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const { bootstrap, statePath } = createGatedService(root);
+      const probes = gateProbes(bootstrap);
+
+      expect(bootstrap.startScan()).toEqual({ started: true });
+      expect(bootstrap.startScan()).toEqual({ started: false });
+
+      probes.release();
+      await waitForStatus(statePath, 'ready');
+      // The refused start left no second set of probes racing the first over
+      // the same CLIs.
+      expect(probes.runs()).toBe(1);
+
+      expect(bootstrap.startScan()).toEqual({ started: true });
+      await waitForStatus(statePath, 'ready');
+      expect(probes.runs()).toBe(2);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('records a background failure as an error instead of rejecting into nowhere', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const { bootstrap, statePath } = createGatedService(root);
+      (bootstrap as unknown as { probeProviders: () => Promise<never> }).probeProviders =
+        async () => {
+          throw new Error('scan exploded');
+        };
+
+      // Nothing awaits the promise startScan kicks off, so the failure has to
+      // land in the state file rather than surfacing as an unhandled rejection.
+      expect(bootstrap.startScan()).toEqual({ started: true });
+      await waitForStatus(statePath, 'error');
+      expect(JSON.parse(readFileSync(statePath, 'utf8')).error).toBe('scan exploded');
+    } finally {
+      cleanup();
+    }
+  });
+});

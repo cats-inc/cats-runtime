@@ -1491,13 +1491,26 @@ async function runSetupScan(
     body.manual = true;
   }
 
-  const result = await requestRuntimeJson(ctx, '/setup-scan', {
+  const started = await requestRuntimeJson(ctx, '/setup-scan', {
     method: 'POST',
     body,
   });
-  ensureRouteSuccess('run_setup_scan', result.status, result.body);
+  ensureRouteSuccess('run_setup_scan', started.status, started.body);
 
-  const payload = ensureObject(result.body, 'run_setup_scan result');
+  // The route starts the scan and answers 202; the run outlives the request.
+  // This tool promises a finished scan, so it waits the way every other caller
+  // does -- on /setup-state leaving `scanning`.
+  const payload = await waitForSetupScanToSettle(ctx);
+  const state = asRecord(payload.state);
+  if (state?.status === 'error') {
+    throw new McpToolError(
+      -32603,
+      typeof state.error === 'string' && state.error
+        ? `Setup scan failed: ${state.error}`
+        : 'Setup scan failed.',
+    );
+  }
+
   const scan = asRecord(payload.scan);
   const scanType = typeof scan?.scanType === 'string' ? scan.scanType : 'unknown';
 
@@ -1508,6 +1521,24 @@ async function runSetupScan(
       setupScanPath: '/setup-scan',
     },
   };
+}
+
+const SETUP_SCAN_POLL_INTERVAL_MS = 250;
+
+async function waitForSetupScanToSettle(
+  ctx: AppContext,
+): Promise<Record<string, unknown>> {
+  while (true) {
+    const result = await requestRuntimeJson(ctx, '/setup-state', { method: 'GET' });
+    ensureRouteSuccess('run_setup_scan', result.status, result.body);
+    const payload = ensureObject(result.body, 'run_setup_scan result');
+    if (asRecord(payload.state)?.status !== 'scanning') {
+      return payload;
+    }
+    await new Promise((resolve) => {
+      setTimeout(resolve, SETUP_SCAN_POLL_INTERVAL_MS);
+    });
+  }
 }
 
 async function applySetupConfig(
