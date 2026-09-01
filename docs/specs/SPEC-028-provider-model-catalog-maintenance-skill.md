@@ -24,6 +24,15 @@ The skill is developer tooling governed by ADR-036. It is not a
 runtime-delivered Cats skill and does not replace the provider drift watcher,
 the catalog schema, or durable evidence and decision documents.
 
+Model catalogs are not flat. A CLI's picker exposes a model list, and each model
+may carry its own option axis — reasoning level, effort, or thinking depth —
+whose available values differ from model to model. Machine-readable enumeration
+rarely reaches that second level, so the maintainer's own terminal is a
+first-class evidence source rather than a fallback. The skill shall therefore
+accept pasted picker output in whatever shape the terminal produced it, echo
+back what it read, and treat the operator's confirmation of that reading as a
+precondition for editing.
+
 ## Goals
 
 - provide one repeatable workflow for provider catalog refresh, audit, and
@@ -36,6 +45,10 @@ the catalog schema, or durable evidence and decision documents.
 - preserve unrelated working-tree edits and user-requested provider scope
 - make the same canonical workflow discoverable by Codex and Claude Code
 - produce a clear report of observed facts, gaps, judgment calls, and validation
+- accept operator-pasted CLI output without asking anyone to hand-write JSON or
+  YAML
+- confirm every parsed reading with the operator before touching a catalog file
+- carry per-model option axes whose available values differ between models
 
 ## Non-Goals
 
@@ -97,8 +110,10 @@ the catalog schema, or durable evidence and decision documents.
    may edit that file, so this is tracked as owner-assigned rework, not as
    completed work.
 5. The skill description shall trigger for provider model-catalog refreshes,
-   catalog audits, and reviews of catalog changes. It shall exclude generic
-   provider adapter implementation and ordinary dependency updates.
+   catalog audits, reviews of catalog changes, and an operator pasting CLI
+   model-picker or option-picker output with no other stated intent. It shall
+   exclude generic provider adapter implementation and ordinary dependency
+   updates.
 6. The skill shall support three modes:
    - **refresh**: collect evidence and edit the provider scope authorized by the
      user
@@ -145,7 +160,11 @@ the catalog schema, or durable evidence and decision documents.
     defaults, context limits, output limits, or option values.
 15. `last_updated` shall change only when the model list was re-read or otherwise
     verified. A newer `--version` result alone shall be recorded in notes with
-    its observation date and scope.
+    its observation date and scope. A pasted model list is such a verification
+    and shall advance the field even when no option axis was re-read; the option
+    axes keep their own provenance and observation date in `notes` under
+    requirement 35. The field shall not be split per option axis, which would
+    require the schema change requirement 17 forbids improvising.
 16. Raw selectable model ids and picker-visible labels shall remain distinct.
     The skill shall preserve observed generation/version information in labels;
     ambiguity belongs in notes and shall not be resolved by stripping the
@@ -207,6 +226,55 @@ the catalog schema, or durable evidence and decision documents.
 30. The skill shall stop before external or release mutations unless the user
     separately authorizes commit, push, pull request, npm publication, or
     GitHub Release actions.
+31. Operator-pasted evidence shall be accepted in its raw terminal form. The
+    skill shall not require the operator to hand-write JSON or YAML, to
+    reformat, or to strip ANSI sequences, box-drawing characters, selection
+    markers, wrapped lines, or picker chrome. One line of context naming the
+    provider and the command is sufficient; where it is absent and the source is
+    ambiguous, the skill shall ask rather than guess. A pasted single-line
+    confirmation message is evidence on the same terms as a pasted list.
+32. Parsing shall be deterministic wherever it can be. Stripping terminal
+    control sequences, rendering the confirmation table, and computing which
+    readings are still missing shall be performed by a script in the skill
+    package rather than improvised per invocation. Model judgment applies only
+    to the ambiguous readings that script surfaces.
+33. Confirmation is a precondition, not a courtesy. Before editing any catalog
+    file from pasted evidence, the skill shall echo back a compact
+    human-readable table of what it parsed — models, labels, option axes,
+    values, defaults, and explicitly what was not observed — and obtain the
+    operator's plain-language confirmation or correction. The report shall
+    record the paste, the parsed reading, and the operator's response. An edit
+    made from pasted evidence without that record is a defect, and review mode
+    shall treat it as one.
+34. Option axes are per-model and are acquired over multiple rounds. A model
+    list and a per-model option list are separate observations, and an option
+    list is evidence only for the model that was selected when it was captured.
+    The skill shall compute the remaining gaps, name the exact next command and
+    the model that must be selected first, and shall never extend one model's
+    observed values to another model.
+35. Partial evidence produces a partial update and never a deletion. Evidence
+    covering one level shall leave the other level's existing rows intact, with
+    the unverified level's provenance and observation date recorded in `notes`.
+    Absence from a paste is not evidence of removal: a row that an entitlement
+    gate, scrolling, or truncation could have hidden shall be retained and
+    reported.
+36. Three readings shall be confirmed with the operator rather than inferred:
+    - whether a selection marker denotes the account default or merely the
+      session's current selection
+    - whether the pasted list is complete, or was scrolled or truncated
+    - which raw selectable id a picker-visible label corresponds to, whenever
+      the normalizer carries no mapping for it
+37. Pasted evidence that materially supports a catalog change shall be preserved
+    where it can be cited. Such a paste shall be stored as a redacted artifact
+    under `docs/research/fixtures/<cli>-<version>/`, following the naming already
+    used there — named for what was captured and carrying the `.redacted`
+    marker — with the version taken from the CLI at capture time, and cited from
+    the affected catalog's `notes`. A paste too short to be worth a file may stay
+    in the conversation and be summarized in `notes` instead. Either way, account
+    identifiers, email addresses, organization names, and any authenticated
+    session material shall be removed before the paste is written to disk or
+    quoted in a note, and each removal shall leave a visible placeholder rather
+    than a silent gap.
 
 ### Non-Functional Requirements
 
@@ -222,6 +290,9 @@ the catalog schema, or durable evidence and decision documents.
   credentials or authenticated session material.
 - **Maintainability**: Current provider values live in runtime code/catalogs,
   not duplicated as a second catalog inside the skill.
+- **Operator effort**: What a maintainer supplies by hand is capped at copying
+  terminal output and answering plain-language questions. Any format the
+  operator would have to author by hand is a design failure.
 
 ## Design Overview
 
@@ -242,6 +313,7 @@ developer-skills/
   maintain-provider-model-catalogs/
     SKILL.md
     references/
+      paste-intake.md
       evidence-and-scope.md
       catalog-surfaces.md
       providers/
@@ -250,6 +322,8 @@ developer-skills/
         antigravity.md
         cursor.md
         ...only when provider-specific procedure is needed
+    scripts/
+      normalize-picker-paste.*
 ```
 
 `SKILL.md` selects refresh, review, or audit mode, performs the current-provider
@@ -257,6 +331,24 @@ inventory, and loads only the relevant references. `catalog-surfaces.md`
 explains how to locate authoritative code paths but does not copy current model
 lists. Provider references document non-obvious extraction procedures, source
 limitations, and safe stopping conditions.
+
+The intake split follows the same rule as the rest of the package: procedure is
+shared, recipes are not. `paste-intake.md` carries the parts that must be
+identical for every provider — the tolerant-parse rules, the confirmation-table
+format, the multi-round gap calculation, and the partial-evidence rules.
+A provider reference carries only what differs: which command produces the list,
+whether such a command exists at all, and what its output does and does not
+prove. `normalize-picker-paste.*` makes the mechanical half reproducible so the
+agent's judgment is spent only on the ambiguous half.
+
+That split is also the answer to whether this should be one skill per provider.
+What is provider-specific is the extraction recipe, not the workflow, and a
+reference loaded on demand costs the same context as a separate skill while
+keeping one copy of the rules that carry the correctness. Audit mode has no
+per-provider form at all — it reconciles the whole registered set at once — and
+a family of near-identical skill descriptions would make skill selection
+unreliable, whereas one skill over a code-derived inventory admits the next
+provider without authoring anything.
 
 The implementation shall also establish a separate developer-skill sync path:
 
@@ -313,6 +405,21 @@ skills/                           runtime-delivered, npm-shipped; unchanged
 10. After a canonical skill is renamed or deleted, the next sync removes its
     obsolete repository-managed mirror without deleting an unrelated local skill.
     Running the same sync again produces no further content changes.
+11. An operator pastes raw model-picker output carrying ANSI sequences,
+    box-drawing characters, and a selection marker, saying only which CLI it came
+    from. The skill parses it without asking for any reformatting, echoes a
+    confirmation table that names what it could not observe, asks whether the
+    marked row is the account default or the session's current selection, and
+    makes no catalog edit until the operator answers.
+12. A model-list paste is followed by an option-picker paste captured with one
+    model selected. The skill records that model's values, names the next model
+    and the command needed to capture it, and applies the observed values to no
+    other model. Stopping there updates the model list and leaves every other
+    model's existing option rows in place, with the unverified scope and its
+    date recorded in `notes`.
+13. A paste omits a model the catalog currently lists. The skill keeps the row,
+    reports the absence as unexplained, and asks whether the list was complete
+    before anyone treats it as a removal.
 
 ## Open Questions
 
@@ -322,6 +429,17 @@ skills/                           runtime-delivered, npm-shipped; unchanged
   Approved 2026-08-28: one skill carrying refresh, review, and audit modes. The
   approval covers that decision only. The reasoning behind the recommendation is
   the author's and is recorded under Design Overview.
+- [x] Should raw operator pastes be tracked as redacted evidence artifacts under
+  `docs/research/fixtures/<cli>-<version>/`, or stay untracked? Approved
+  2026-09-01: track them there, following the naming already used (for example
+  `grok-1.0.0/models.success.redacted.txt`), and cite them from `notes`. A paste
+  too short to be worth a file stays in the conversation. Redaction is required
+  either way. Written into requirement 37.
+- [x] Should a model-list-only paste advance `last_updated`? Approved
+  2026-09-01: yes. The rule stays in requirement 15 rather than gaining a
+  requirement of its own, so the field has one definition; the option axes' own
+  provenance stays in `notes` under requirement 35. A per-option freshness field
+  is rejected — it is the schema change requirement 17 forbids improvising.
 
 ## References
 
@@ -336,4 +454,8 @@ skills/                           runtime-delivered, npm-shipped; unchanged
 
 *Created: 2026-08-28*
 *Author: Codex*
+*Amended: 2026-09-01 by Claude — operator-pasted evidence intake and the
+confirmation gate (requirements 31-37, scenarios 11-13), plus the paste clause
+in requirement 15. Both open questions were answered by the repository owner the
+same day. The approved single-skill, multi-mode scope is unchanged.*
 *Related Plan: [PLAN-037](../plans/PLAN-037-provider-model-catalog-maintenance-skill.md)*

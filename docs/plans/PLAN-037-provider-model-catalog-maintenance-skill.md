@@ -116,7 +116,18 @@ foreign entries, and are safe to re-run.
 
 - [ ] `developer-skills/maintain-provider-model-catalogs/SKILL.md` — mode
       selection (refresh / review / audit), provider inventory derived from
-      `KNOWN_PROVIDERS` and the provider catalog, and routing into references.
+      `KNOWN_PROVIDERS` and the provider catalog, routing into references, and
+      the confirmation gate that blocks any edit made from pasted evidence.
+- [ ] `references/paste-intake.md` — the operator-paste protocol (requirements
+      31-37): tolerant parsing of raw terminal output, the confirmation table
+      that must be echoed and answered before any edit, the multi-round gap
+      calculation for per-model option axes, partial-evidence-never-deletes,
+      the three readings that must be asked rather than inferred, and where a
+      redacted paste is filed so a `notes` entry can cite it.
+- [ ] `scripts/normalize-picker-paste.*` — the deterministic half of
+      requirement 32: strip terminal control sequences and picker chrome,
+      render the confirmation table, and report which model and option readings
+      are still missing. PowerShell and POSIX, per the portability requirement.
 - [ ] `references/evidence-and-scope.md` — the evidence-priority ladder
       (requirement 12), the `last_updated` rule (15), scope preservation
       (7, 22, 23), and the three-way-disagreement rule (21).
@@ -158,8 +169,11 @@ Per SPEC-028 requirement 4. Agent-owned files go to their owners.
 - `developer-skills/maintain-provider-model-catalogs/SKILL.md`
 - `developer-skills/maintain-provider-model-catalogs/references/evidence-and-scope.md`
 - `developer-skills/maintain-provider-model-catalogs/references/catalog-surfaces.md`
+- `developer-skills/maintain-provider-model-catalogs/references/paste-intake.md`
 - `developer-skills/maintain-provider-model-catalogs/references/providers/*.md`
+- `developer-skills/maintain-provider-model-catalogs/scripts/normalize-picker-paste.*`
 - a reconciliation test for the sync helpers
+- parser fixtures and tests for `normalize-picker-paste.*`
 
 **Modify**
 - `scripts/windows/Sync-AgentSkills.ps1`
@@ -186,11 +200,26 @@ Per SPEC-028 requirement 4. Agent-owned files go to their owners.
 - **The skill stores procedure, not values.** Per SPEC-028's maintainability
   requirement, current model lists live in runtime code and catalogs. A
   reference that names a model id will be wrong within weeks.
+- **One skill, not one per provider.** Settled in SPEC-028 and unchanged by the
+  paste-intake amendment. What varies per provider is the extraction recipe,
+  and a conditionally loaded reference carries that at the same context cost as
+  a separate skill would. Audit mode has no per-provider form — it reconciles
+  the whole registered set — and a family of near-identical skill descriptions
+  would make skill selection unreliable.
+- **Deterministic parse, judged confirmation.** The script owns what must come
+  out identical every time; the agent's judgment is spent only on the readings
+  the script flags as ambiguous. A confirmation gate that depends on the model
+  remembering to ask is not a gate, which is why requirement 33 makes the
+  recorded exchange part of the report and reviewable.
 
 ## Testing Strategy
 
 - Reconciliation and idempotence tests for the helpers, against a temp target.
   These must never touch the developer's real discovery directories.
+- Parser tests for `normalize-picker-paste.*` over captured raw pastes: ANSI
+  sequences, box drawing, a wrapped line, a single-line confirmation message,
+  and a deliberately truncated list. Fixtures only — no live probes, no
+  credentials.
 - `npm run verify:skills` continues to validate only `skills/`.
 - `npm pack --dry-run` excludes `developer-skills/`.
 - Existing `tests/workspace-substrate.test.ts` updated per the Phase 0 outcome.
@@ -218,3 +247,5 @@ Per SPEC-028 requirement 4. Agent-owned files go to their owners.
 |------|--------|
 | 2026-08-28 | Plan created from ADR-036 (Accepted) and SPEC-028 (both open questions answered) |
 | 2026-08-28 | Phase 0 added after review found `WorkspaceSubstrateService` generates all three sync helpers into user workspaces, a surface neither ADR-036 nor SPEC-028 accounts for |
+| 2026-09-01 | SPEC-028 amended with operator-pasted evidence intake and the confirmation gate (requirements 31-36, scenarios 11-13) after the owner observed that nothing in the spec said how a maintainer hands over picker output, and that option axes are per-model. Phase 2 gains `paste-intake.md` and `normalize-picker-paste.*`; the approved one-skill scope is unchanged. Two questions left open in SPEC-028 for the owner: whether raw pastes become tracked fixtures, and whether a model-list-only paste advances `last_updated` |
+| 2026-09-01 | Owner answered both the same day. Supporting pastes are filed as redacted artifacts under `docs/research/fixtures/<cli>-<version>/` and cited from `notes` (new requirement 37); a pasted model list advances `last_updated`, and that rule stays inside requirement 15 rather than becoming a requirement of its own, so the field keeps one definition. A per-option freshness field is rejected as the schema change requirement 17 forbids improvising |
