@@ -21,6 +21,13 @@
     The working tree must be clean. In a shared clone a dirty tree usually means
     another agent left work behind, so the script stops instead of guessing.
 
+    The default branch comes from origin/HEAD, falling back to init.defaultBranch,
+    main, or master, and only ever to a branch that actually exists - guessing a
+    name breaks a clone whose default is not what this script assumed. A fetch
+    that fails because the remote is unreachable only warns, since the recorded
+    upstream state stays accurate and an offline run can at worst miss a recently
+    merged branch.
+
 .PARAMETER ReturnToDefault
     Switch to the default branch and fast-forward it after sweeping. The switch
     happens regardless when the current branch is one of the deleted ones,
@@ -65,6 +72,49 @@ function Invoke-Git {
     return $output
 }
 
+function Test-LocalBranch {
+    param([string]$Name)
+
+    if (-not $Name) { return $false }
+    Invoke-Git @("show-ref", "--verify", "--quiet", "refs/heads/$Name") -AllowFailure | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Get-RemoteDefaultBranch {
+    $ref = Invoke-Git @("symbolic-ref", "--quiet", "refs/remotes/origin/HEAD") -AllowFailure
+    if ($LASTEXITCODE -eq 0 -and $ref) {
+        return ($ref | Select-Object -First 1).ToString().Trim() -replace '^refs/remotes/origin/', ''
+    }
+    return $null
+}
+
+function Resolve-DefaultBranch {
+    # origin/HEAD records what the remote considers default. Prefer it, and try
+    # once to populate it when the clone never recorded one.
+    $name = Get-RemoteDefaultBranch
+    if ($name) { return $name }
+
+    Invoke-Git @("remote", "set-head", "origin", "--auto") -AllowFailure | Out-Null
+    $name = Get-RemoteDefaultBranch
+    if ($name) { return $name }
+
+    # No remote, or one that has never been reachable. Guessing a name here is
+    # how a fresh clone breaks, because init.defaultBranch varies by machine.
+    # Only return a branch that actually exists.
+    $configured = Invoke-Git @("config", "--get", "init.defaultBranch") -AllowFailure
+    $configuredName = if ($LASTEXITCODE -eq 0 -and $configured) {
+        ($configured | Select-Object -First 1).ToString().Trim()
+    } else {
+        $null
+    }
+
+    foreach ($candidate in @($configuredName, "main", "master")) {
+        if (Test-LocalBranch $candidate) { return $candidate }
+    }
+
+    return $null
+}
+
 # Resolve the repository first so every later call is explicitly scoped to it.
 $startDir = if ($RepositoryRoot) { $RepositoryRoot } else { (Get-Location).Path }
 $script:RepoRoot = & git -C $startDir rev-parse --show-toplevel 2>$null
@@ -84,21 +134,17 @@ if ($dirty) {
 # before deciding what can go.
 Invoke-Git @("worktree", "prune") | Out-Null
 
+# A failed fetch is not fatal. `gone` is recorded by an earlier successful prune
+# and stays accurate, so the worst an offline run can do is miss a branch that
+# was merged since the last fetch - it can never delete the wrong one.
 if (-not $SkipFetch) {
-    Invoke-Git @("fetch", "--prune") | Out-Null
+    Invoke-Git @("fetch", "--prune") -AllowFailure | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "git fetch --prune failed; sweeping on the upstream state already recorded. Branches merged since the last successful fetch will not be detected yet."
+    }
 }
 
-# origin/HEAD is the recorded default branch; refresh it if the clone lacks one.
-$defaultRef = Invoke-Git @("symbolic-ref", "--quiet", "refs/remotes/origin/HEAD") -AllowFailure
-if ($LASTEXITCODE -ne 0 -or -not $defaultRef) {
-    Invoke-Git @("remote", "set-head", "origin", "--auto") -AllowFailure | Out-Null
-    $defaultRef = Invoke-Git @("symbolic-ref", "--quiet", "refs/remotes/origin/HEAD") -AllowFailure
-}
-$defaultBranch = if ($defaultRef) {
-    ($defaultRef | Select-Object -First 1).ToString().Trim() -replace '^refs/remotes/origin/', ''
-} else {
-    "main"
-}
+$defaultBranch = Resolve-DefaultBranch
 
 $currentBranch = (Invoke-Git @("branch", "--show-current") | Select-Object -First 1)
 if ($currentBranch) { $currentBranch = $currentBranch.ToString().Trim() }
@@ -138,7 +184,10 @@ if ($deletable.Count -eq 0) {
 } else {
     # A checked-out branch cannot be deleted, so step off it first.
     if ($currentBranch -and $deletable -contains $currentBranch) {
-        if ($PSCmdlet.ShouldProcess($defaultBranch, "Switch away from '$currentBranch' before deleting it")) {
+        if (-not $defaultBranch) {
+            Write-Host "  skip   $currentBranch (checked out, and no default branch to switch to)"
+            $deletable = @($deletable | Where-Object { $_ -ne $currentBranch })
+        } elseif ($PSCmdlet.ShouldProcess($defaultBranch, "Switch away from '$currentBranch' before deleting it")) {
             Invoke-Git @("switch", $defaultBranch) | Out-Null
             Write-Host "  switch $defaultBranch (left '$currentBranch' so it can be removed)"
             $currentBranch = $defaultBranch
@@ -162,15 +211,19 @@ if ($deletable.Count -eq 0) {
     }
 }
 
-if ($ReturnToDefault -and $currentBranch -ne $defaultBranch) {
-    if ($PSCmdlet.ShouldProcess($defaultBranch, "Switch and fast-forward")) {
-        Invoke-Git @("switch", $defaultBranch) | Out-Null
-        Invoke-Git @("pull", "--ff-only") -AllowFailure | Out-Null
-        Write-Host "  switch $defaultBranch (fast-forwarded)"
-    }
-} elseif ($ReturnToDefault) {
-    if ($PSCmdlet.ShouldProcess($defaultBranch, "Fast-forward")) {
-        Invoke-Git @("pull", "--ff-only") -AllowFailure | Out-Null
-        Write-Host "  pull   $defaultBranch (fast-forwarded)"
+if ($ReturnToDefault) {
+    if (-not $defaultBranch) {
+        Write-Warning "No default branch could be determined, so -ReturnToDefault did nothing."
+    } elseif ($currentBranch -ne $defaultBranch) {
+        if ($PSCmdlet.ShouldProcess($defaultBranch, "Switch and fast-forward")) {
+            Invoke-Git @("switch", $defaultBranch) | Out-Null
+            Invoke-Git @("pull", "--ff-only") -AllowFailure | Out-Null
+            Write-Host "  switch $defaultBranch (fast-forwarded)"
+        }
+    } else {
+        if ($PSCmdlet.ShouldProcess($defaultBranch, "Fast-forward")) {
+            Invoke-Git @("pull", "--ff-only") -AllowFailure | Out-Null
+            Write-Host "  pull   $defaultBranch (fast-forwarded)"
+        }
     }
 }

@@ -71,3 +71,33 @@ platform-specific wrapper scripts:
   `./scripts/linux/workspace-substrate.sh --operation audit --workspace-path .`
 - macOS:
   `./scripts/macos/workspace-substrate.sh --operation audit --workspace-path .`
+
+## Merged-Branch Sweep
+
+- `scripts/windows/Remove-MergedBranches.ps1`
+
+This project squash-merges and lets GitHub delete the head branch, so every
+landed PR leaves a local branch behind. Because a squashed commit has a
+different SHA than the branch it came from, `git branch -d` reports "not fully
+merged" and refuses. The script keys off upstream state instead: a branch counts
+as merged once it had an upstream and that upstream is gone.
+
+```powershell
+.\scripts\windows\Remove-MergedBranches.ps1 -WhatIf
+.\scripts\windows\Remove-MergedBranches.ps1 -ReturnToDefault
+```
+
+It refuses to run on a dirty working tree, never sweeps a branch that was never
+pushed, and skips branches checked out in another worktree. Run
+`git config --global fetch.prune true` once so the `gone` markers it reads
+appear without remembering `--prune`.
+
+Three copies of this script exist and are meant to stay in step:
+
+- here
+- `cats-platform` at the same path
+- `project-bootstrap` at `templates/base/scripts/windows/`, which is where new
+  projects inherit it from
+
+The template copy is the one to treat as canonical when they disagree, since it
+has to work in a repository whose default branch and remote are unknown.
