@@ -1,7 +1,8 @@
 # Codex CLI 0.152.0 interactive `/model` picker, captured 2026-09-02.
 # Operator-pasted from an authenticated session and confirmed complete (7 rows, nothing scrolled off).
 # Manual redaction pass performed: the capture contains no account, identity, path, or session material.
-# Only gpt-5.6-sol's `More reasoning…` submenu was opened; terra and luna were not.
+# All three `More reasoning…` submenus (sol, terra, luna) were opened; the terra and luna
+# screens were captured in a follow-up round on the same day and CLI version, appended below.
 # Visible glyphs are preserved verbatim, including ›, …, ⚠, and ·.
 OpenAI Codex (v0.152.0)
 
@@ -71,3 +72,20 @@ OpenAI Codex (v0.152.0)
   2. Medium          Balances speed and reasoning depth for everyday tasks
 › 3. High (default)  Greater reasoning depth for complex problems
   4. Extra high      Extra high reasoning depth for complex problems
+
+# --- follow-up capture, same session and CLI version ---
+
+  Select Reasoning Level for gpt-5.6-terra > More reasoning…
+
+  Advanced Reasoning
+  ⚠ Consumes usage limits faster
+
+› 1. Max    For difficult problems when quality matters more than speed · higher usage
+  2. Ultra  For demanding work using multiple agents · highest usage
+
+  Select Reasoning Level for gpt-5.6-luna > More reasoning…
+
+  Advanced Reasoning
+  ⚠ Consumes usage limits faster
+
+› 1. Max  For difficult problems when quality matters more than speed · higher usage
