@@ -475,6 +475,16 @@ tests/
   check runs with "branch must be up to date", so a PR opened before another
   machine's merge has to be updated before it can land. Catching that is the
   reason to use a PR here — not review, which a single account cannot provide.
+- The head branch is deleted on the remote, but the local one survives. Since the
+  merge is a squash, `git branch -d` reports "not fully merged" and refuses every
+  time — the merge evidence here is the upstream being gone, not commit
+  reachability. Run `git config --global fetch.prune true` once so those `gone`
+  markers appear without remembering `--prune`.
+- Sweep the leftovers with `.\scripts\windows\Remove-MergedBranches.ps1`, which is
+  meant to open a session in this shared clone. It stops on a dirty working tree,
+  never touches a branch that was never pushed, and skips any branch held by
+  another worktree. `-WhatIf` previews; `-ReturnToDefault` also lands you on an
+  up-to-date default branch.
 
 ### PR Title Format
 
