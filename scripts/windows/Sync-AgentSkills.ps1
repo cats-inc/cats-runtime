@@ -1,116 +1,58 @@
 <#
 .SYNOPSIS
-    Syncs skills from the canonical skills/ directory to each agent's discovery path.
+    Sync repository-maintenance skills into local agent discovery paths.
 
 .DESCRIPTION
-    Copies skill directories from the project's skills/ directory to the agent-specific
-    discovery paths (.claude/skills/, .agents/skills/), including any supporting files
-    under each skill (e.g., scripts/, references/, assets/).
-
-    This script follows the Agent Skills open standard (agentskills.io).
+    Uses developer-skills/ as the canonical source and reconciles only entries
+    recorded as cats-runtime-managed. Unrelated local skills are preserved.
 
 .PARAMETER Clean
-    Remove existing skills in target directories before syncing.
+    Recreate repository-managed mirrors without deleting unrelated local skills.
 
 .PARAMETER Agent
-    Only sync to a specific agent (claude, codex). If not specified, syncs to all.
+    Sync only Claude Code or the shared Codex/Antigravity/Grok discovery path.
 
-.EXAMPLE
-    .\Sync-AgentSkills.ps1
-    Syncs all skills to all agent discovery paths.
+.PARAMETER SourceRoot
+    Override developer-skills/. Intended for isolated validation.
 
-.EXAMPLE
-    .\Sync-AgentSkills.ps1 -Agent claude
-    Syncs skills only to .claude/skills/.
-
-.EXAMPLE
-    .\Sync-AgentSkills.ps1 -Clean
-    Cleans target directories before syncing.
+.PARAMETER DestinationRoot
+    Override the root containing .claude/ and .agents/. Intended for isolated validation.
 #>
 param(
     [Parameter(Mandatory = $false)]
     [switch]$Clean,
 
     [Parameter(Mandatory = $false)]
-    [ValidateSet("claude", "codex")]
-    [string]$Agent
+    [ValidateSet("claude", "codex", "antigravity", "grok")]
+    [string]$Agent,
+
+    [Parameter(Mandatory = $false)]
+    [string]$SourceRoot,
+
+    [Parameter(Mandatory = $false)]
+    [string]$DestinationRoot
 )
 
 $ErrorActionPreference = "Stop"
 
-# Find project root (directory containing AGENTS.md)
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
+$SyncEngine = [System.IO.Path]::GetFullPath((Join-Path $ScriptDir "..\sync-agent-skills.mjs"))
+$NodeArgs = @($SyncEngine)
 
-# Walk up to find AGENTS.md if script is not at expected depth
-while ($ProjectRoot -and -not (Test-Path (Join-Path $ProjectRoot "AGENTS.md"))) {
-    $Parent = Split-Path -Parent $ProjectRoot
-    if ($Parent -eq $ProjectRoot) { break }
-    $ProjectRoot = $Parent
+if ($Clean) {
+    $NodeArgs += "--clean"
 }
-
-if (-not (Test-Path (Join-Path $ProjectRoot "AGENTS.md"))) {
-    throw "Could not find project root (no AGENTS.md found)."
-}
-
-$SkillsDir = Join-Path $ProjectRoot "skills"
-
-if (-not (Test-Path $SkillsDir)) {
-    Write-Warning "No skills/ directory found at $SkillsDir"
-    return
-}
-
-# Define agent discovery paths
-$AgentPaths = @{
-    "claude" = Join-Path $ProjectRoot ".claude" "skills"
-    "codex"  = Join-Path $ProjectRoot ".agents" "skills"
-}
-
-# Filter to specific agent if requested
 if ($Agent) {
-    $TargetAgents = @{ $Agent = $AgentPaths[$Agent] }
+    $NodeArgs += @("--agent", $Agent)
 }
-else {
-    $TargetAgents = $AgentPaths
+if ($SourceRoot) {
+    $NodeArgs += @("--source-root", $SourceRoot)
 }
-
-# Discover skills (directories containing SKILL.md)
-$SkillDirs = Get-ChildItem -Path $SkillsDir -Directory | Where-Object {
-    Test-Path (Join-Path $_.FullName "SKILL.md")
+if ($DestinationRoot) {
+    $NodeArgs += @("--destination-root", $DestinationRoot)
 }
 
-if ($SkillDirs.Count -eq 0) {
-    Write-Warning "No skills found in $SkillsDir (no directories with SKILL.md)"
-    return
+& node @NodeArgs
+if ($LASTEXITCODE -ne 0) {
+    throw "Agent skill sync failed with exit code $LASTEXITCODE."
 }
-
-Write-Host "Found $($SkillDirs.Count) skill(s): $($SkillDirs.Name -join ', ')" -ForegroundColor Cyan
-
-foreach ($AgentName in $TargetAgents.Keys) {
-    $TargetDir = $TargetAgents[$AgentName]
-
-    # Clean if requested
-    if ($Clean -and (Test-Path $TargetDir)) {
-        Remove-Item -Path $TargetDir -Recurse -Force
-        Write-Host "  Cleaned: $TargetDir" -ForegroundColor Yellow
-    }
-
-    # Create target directory
-    if (-not (Test-Path $TargetDir)) {
-        New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
-    }
-
-    foreach ($Skill in $SkillDirs) {
-        $SkillTarget = Join-Path $TargetDir $Skill.Name
-
-        if (Test-Path $SkillTarget) {
-            Remove-Item -Path $SkillTarget -Recurse -Force
-        }
-
-        Copy-Item -Path $Skill.FullName -Destination $TargetDir -Recurse -Force
-    }
-
-    Write-Host "  Synced $($SkillDirs.Count) skill(s) to $AgentName`: $TargetDir" -ForegroundColor Green
-}
-
-Write-Host "`nSync complete. Synced $($SkillDirs.Count) skill(s) to $($TargetAgents.Count) agent path(s)." -ForegroundColor Cyan

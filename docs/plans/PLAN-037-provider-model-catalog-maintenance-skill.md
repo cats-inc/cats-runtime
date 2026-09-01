@@ -7,9 +7,9 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | In Progress (Skill and Sync Implemented; Claude-Owned Doc Remains) |
 | **Owner** | user |
-| **Assigned To** | Unassigned |
+| **Assigned To** | Codex |
 | **Reviewer** | Codex |
 
 ## Related Spec
@@ -71,17 +71,22 @@ repositories, and removing it deletes the divergence risk rather than managing
 it. If the substrate feature is wanted, option 1 is honest as long as the
 generator carries a comment saying why the two differ.
 
+**Outcome (2026-09-01): option 1.** The repository owner requested implementation
+of the skill and its Claude mirror. The implementation keeps that work scoped:
+cats-runtime's tracked helpers now reconcile `developer-skills/`, while the
+generic substrate feature remains available to other workspaces. ADR-036 records
+the split, a source comment makes it deliberate, and tests pin both sides.
+
 ## Implementation Phases
 
 ### Phase 0: Settle the substrate question
 
-- [ ] Decide among the three options above; record the outcome in ADR-036 as an
+- [x] Decide among the three options above; record the outcome in ADR-036 as an
       amendment, since decision point 4 is currently silent on the generator.
-- [ ] If option 1 or 2: add a test that fails when the repo helper and the
+- [x] If option 1 or 2: add a test that fails when the repo helper and the
       generated helper drift for reasons other than the intended difference.
-- [ ] If option 3: remove the generator's skill-sync emission, its prose at
-      :376-377, and the `tests/workspace-substrate.test.ts` assertions that pin
-      them, and note the removal in the substrate documentation.
+- [x] Record option 3 as not selected; retain the generator's generic
+      `skills/` emission and pin that root in `tests/workspace-substrate.test.ts`.
 
 **Deliverable**: an ADR-036 amendment and, if applicable, the generator change.
 
@@ -91,21 +96,21 @@ Nothing here depends on the skill's content, and the reconciliation semantics
 are the part most likely to destroy a maintainer's local state, so it lands
 first and alone.
 
-- [ ] Repoint `scripts/windows/Sync-AgentSkills.ps1`,
+- [x] Repoint `scripts/windows/Sync-AgentSkills.ps1`,
       `scripts/linux/sync-agent-skills.sh`, and
       `scripts/macos/sync-agent-skills.sh` at `developer-skills/`.
-- [ ] Keep discovery at direct children — `developer-skills/<name>/SKILL.md` —
+- [x] Keep discovery at direct children — `developer-skills/<name>/SKILL.md` —
       which now matches the layout, unlike `skills/`.
-- [ ] Implement reconciliation per SPEC-028 requirement 2: a renamed or deleted
+- [x] Implement reconciliation per SPEC-028 requirement 2: a renamed or deleted
       canonical skill must not leave an obsolete generated mirror, and a skill
       the maintainer installed locally into `.claude/skills/` or
       `.agents/skills/` must survive. Track repository-managed entries
       explicitly rather than clearing the target directory.
-- [ ] Audit the existing `-Clean` / `--clean` path, which currently does
+- [x] Audit the existing `-Clean` / `--clean` path, which currently does
       `Remove-Item -Recurse -Force` on the whole target directory. Under the new
       contract that deletes unrelated local skills.
-- [ ] Make a second run with no canonical changes produce no content changes.
-- [ ] Tests, per SPEC-028 requirement 2 and acceptance scenario 10, running
+- [x] Make a second run with no canonical changes produce no content changes.
+- [x] Tests, per SPEC-028 requirement 2 and acceptance scenario 10, running
       against an isolated target directory and never the developer's real
       `.claude/skills/` or `.agents/skills/`.
 
@@ -114,59 +119,60 @@ foreign entries, and are safe to re-run.
 
 ### Phase 2: Author the skill
 
-- [ ] `developer-skills/maintain-provider-model-catalogs/SKILL.md` — mode
+- [x] `developer-skills/maintain-provider-model-catalogs/SKILL.md` — mode
       selection (refresh / review / audit), provider inventory derived from
       `KNOWN_PROVIDERS` and the provider catalog, routing into references, the
       capture-only default for a bare paste, selectable interaction behavior,
       and the non-bypassable ambiguity/schema-loss gates.
-- [ ] `references/paste-intake.md` — the operator-paste protocol (requirements
+- [x] `references/paste-intake.md` — the operator-paste protocol (requirements
       31-38): tolerant intake of raw terminal output, the ordered observation
       tree, natural-language interaction policies, multi-round gap calculation
       for per-model and dependent option axes, partial-evidence-never-deletes,
       hard confirmation gates, schema-loss reporting, and where redacted
       evidence is filed so a `notes` entry can cite it.
-- [ ] `scripts/normalize-picker-paste.mjs` — the deterministic mechanical half
+- [x] `scripts/normalize-picker-paste.mjs` — the deterministic mechanical half
       of requirement 32, implemented once for the repository's Node.js runtime:
       strip terminal control sequences without destroying visible hierarchy,
       retain unparsed lines, render an observation summary, and compute gaps
-      from the agent-created observation document. Provider semantics remain in
-      fixture-backed extractors or explicit agent judgment; the script must not
-      guess or flatten them.
-- [ ] `references/evidence-and-scope.md` — the evidence-priority ladder
+      from the agent-created observation document. It also assesses an
+      agent-created edit decision so selectable interaction policies and hard
+      gates produce testable artifacts without asking the operator for structured
+      input. Provider semantics remain in fixture-backed extractors or explicit
+      agent judgment; the script must not guess or flatten them.
+- [x] `references/evidence-and-scope.md` — the evidence-priority ladder
       (requirement 12), the `last_updated` rule (15), scope preservation
       (7, 22, 23), and the three-way-disagreement rule (21).
-- [ ] `references/catalog-surfaces.md` — how to locate each authoritative code
+- [x] `references/catalog-surfaces.md` — how to locate each authoritative code
       path (requirement 9) without copying current values into the skill.
-- [ ] `references/providers/*.md` — only where a provider's extraction
+- [x] `references/providers/*.md` — only where a provider's extraction
       procedure is non-obvious. On current evidence that means Claude (no
       `models` subcommand; static binary extraction yields a superset), Copilot
       and Kiro (account-gated), and Kilo (`kilo models` returns the gateway
       catalog, not the picker).
-- [ ] Run the sync and confirm the skill appears in `.claude/skills/` and
-      `.agents/skills/` — the latter serving Codex and Antigravity both.
-- [ ] Confirm `npm run verify:skills` ignores `developer-skills/`, the runtime
+- [x] Run the sync and confirm the skill appears in `.claude/skills/` and
+      `.agents/skills/` — the latter serving Codex, Antigravity, and Grok. The
+      explicit Antigravity/Grok agent names alias that same target.
+- [x] Confirm `npm run verify:skills` ignores `developer-skills/`, the runtime
       skill catalog does not list it, and `npm pack --dry-run` excludes it
       (acceptance scenario 9).
 
-**Deliverable**: the skill, discoverable by three agents from one source.
+**Deliverable**: the skill, discoverable by four agents from one source.
 
 ### Phase 3: Documentation migration
 
 Per SPEC-028 requirement 4. Agent-owned files go to their owners.
 
-- [ ] `AGENTS.md:280,294` — shared; still says skills live in `skills/` and are
-      synced to each agent's discovery path.
-- [ ] `scripts/README.md:36-38` — shared; still describes all three helpers as
-      syncing `skills/`.
-- [ ] `CODEX.md:101,105` — **Codex owns this file.**
+- [x] `AGENTS.md:280,294` — shared; update the canonical/mirror contract and
+      synced discovery paths.
+- [x] `scripts/README.md:36-38` — shared; document the common reconciler and
+      intentional substrate-template split.
+- [x] `CODEX.md:101,105` — **Codex owns this file.**
 - [ ] `CLAUDE.md` — **Claude owns this file.** It currently carries only an
       interim note that the helpers copy nothing; that note is replaced once
       Phase 1 makes them work.
-- [ ] `GEMINI.md` — **Antigravity owns this file.** Its first probe result was
-      over-generalized into a claim that Antigravity has no project-level skill
-      discovery. ADR-036's second probe established that it reads
-      `.agents/skills/`; assign the correction to Antigravity and do not have
-      Codex or Claude edit it.
+- [x] `GEMINI.md` — **Antigravity owns this file.** Commit `193a37b` corrected the
+      over-generalized first probe and now identifies `.agents/skills/` as the
+      project discovery path. Codex did not edit this file.
 
 **Deliverable**: no document describes a sync contract that does not exist.
 
@@ -179,6 +185,8 @@ Per SPEC-028 requirement 4. Agent-owned files go to their owners.
 - `developer-skills/maintain-provider-model-catalogs/references/paste-intake.md`
 - `developer-skills/maintain-provider-model-catalogs/references/providers/*.md`
 - `developer-skills/maintain-provider-model-catalogs/scripts/normalize-picker-paste.mjs`
+- `developer-skills/maintain-provider-model-catalogs/tests/**`
+- `scripts/sync-agent-skills.mjs`
 - a reconciliation test for the sync helpers
 - normalization fixtures and tests for `normalize-picker-paste.mjs`
 
@@ -200,10 +208,11 @@ Per SPEC-028 requirement 4. Agent-owned files go to their owners.
   cannot detect mirror drift, because `.agents/` and `.claude/` are ignored
   (`.gitignore:2,6`). The mitigation is a cheap idempotent sync — which only
   works if the sync is also non-destructive toward entries it does not own.
-- **`.agents/skills/` is shared, not Codex-private.** Probed 2026-08-28: agy
-  reads `<workspace>/.agents/skills/`. One sync to that directory serves Codex
-  and Antigravity. No `--agent antigravity` value is needed; an alias for the
-  same destination would be cosmetic.
+- **`.agents/skills/` is shared, not Codex-private.** Probed for Antigravity on
+  2026-08-28; the owner-provided working `quant-x` reference records Grok's
+  equivalent accepted probe in commit `c4e523a`. One sync serves Codex,
+  Antigravity, and Grok. The explicit Antigravity/Grok names are aliases for the
+  same destination, not additional mirrors.
 - **The skill stores procedure, not values.** Per SPEC-028's maintainability
   requirement, current model lists live in runtime code and catalogs. A
   reference that names a model id will be wrong within weeks.
@@ -254,8 +263,10 @@ Per SPEC-028 requirement 4. Agent-owned files go to their owners.
   run, so nobody has seen their destructive `-Clean` path in practice. Phase 1
   addresses reconciliation before the skill exists to sync, and the tests use an
   isolated target.
-- **The generated substrate helper and the repo helper silently diverge.** This
-  is the Phase 0 decision; option 3 removes the risk, options 1 and 2 manage it.
+- **The generated substrate helper and the repo helper silently diverge.** Option
+  1 was selected. A source comment identifies the generic-versus-repository
+  split, and tests pin `skills/` in generated helpers plus the shared reconciler
+  used by all three repository entrypoints.
 - **The skill accumulates catalog values and rots.** Reviewed against the
   maintainability requirement when the references are written; provider
   references document procedure and limitation, never current model lists.
@@ -281,3 +292,4 @@ Per SPEC-028 requirement 4. Agent-owned files go to their owners.
 | 2026-09-01 | SPEC-028 amended with operator-pasted evidence intake and an initial confirmation gate (requirements 31-36, scenarios 11-13) after the owner observed that nothing in the spec said how a maintainer hands over picker output, and that option axes are per-model. Phase 2 gains `paste-intake.md` and a normalization helper; the approved one-skill scope is unchanged. Two questions were left for the owner: whether raw pastes become tracked fixtures, and whether a complete model-list-only paste advances `last_updated` |
 | 2026-09-01 | Owner answered both the same day. Supporting pastes are filed as redacted artifacts under `docs/research/fixtures/<cli>-<version>/` and cited from `notes` (new requirement 37); a complete scope-confirmed pasted model list advances `last_updated`, and that rule stays inside requirement 15 rather than becoming a requirement of its own, so the field keeps one definition. A per-option freshness field is rejected as the schema change requirement 17 forbids improvising |
 | 2026-09-01 | Owner-directed review refined the intake design: a bare paste is capture-only; explicit updates default to confirming uncertainty and may opt into confirm-all or apply-authorized behavior; hard ambiguity, deletion, scope, conflict, and schema-loss gates remain mandatory. Evidence first becomes a lossless hierarchical observation tree, only complete scope-confirmed lists advance `last_updated`, and the mechanical helper is one cross-platform `normalize-picker-paste.mjs` rather than parallel PowerShell/POSIX parsers. SPEC-028 scenarios 14-17 and Phase 2 forward-tests cover these decisions |
+| 2026-09-01 | Implementation completed in the feature-branch working tree: Phase 0 selected the split option and amended ADR-036; one Node reconciler now backs all three platform entrypoints, tracks managed mirrors, preserves local skills, handles rename/delete, rejects linked source/target escapes before writing, and is idempotent. The canonical skill, paste normalizer, ordered-tree/gap fixtures, interaction-policy decision artifacts, and Claude plus shared Codex/Antigravity/Grok mirrors were created. Focused tests (17), direct normalizer/decision tests (6), typecheck, runtime-skill verification (33 runtime packages), runtime catalog exclusion, and npm pack exclusion passed. The full `npm test` regression run reached three unrelated `tests/runtime-peer-routing.test.ts` cleanup timeouts while repeatedly discovering 36 local Antigravity sessions, then stopped producing output; the runner was interrupted, and an isolated single-thread rerun reproduced the same three 60-second timeouts after all tested HTTP exchanges completed. Shared docs and CODEX.md were updated; GEMINI.md was already corrected by its owner in `193a37b`, while CLAUDE.md remains assigned to Claude. |

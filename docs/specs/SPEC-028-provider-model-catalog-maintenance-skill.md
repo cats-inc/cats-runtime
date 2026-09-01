@@ -4,17 +4,17 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | In Progress (Skill and Sync Implemented; Claude-Owned Doc Remains) |
 | **Owner** | Codex |
 | **Reviewer** | User |
 
 ## Summary
 
 Create one repository-maintenance Agent Skill,
-`maintain-provider-model-catalogs`, that lets Codex and Claude Code refresh,
-audit, or independently review `cats-runtime` provider model-catalog knowledge
-from observable evidence. The skill shall cover all registered CLI provider
-families and all relevant catalog mechanisms rather than treating the eight
+`maintain-provider-model-catalogs`, that lets Codex, Claude Code, Antigravity,
+and Grok refresh, audit, or independently review `cats-runtime` provider
+model-catalog knowledge from observable evidence. The skill shall cover all
+registered CLI provider families and all relevant catalog mechanisms rather than treating the eight
 current sections in `curated-model-catalogs.yaml.example` as a closed provider
 list. It shall preserve the distinction between curated input, static fallback,
 dynamic discovery, normalization, deliberately empty catalogs, and
@@ -46,7 +46,7 @@ A paste by itself authorizes capture and preview, not a repository edit.
 - prevent unsupported rows from being silently dropped by normalization
 - preserve unrelated working-tree edits and user-requested provider scope
 - make the same canonical workflow discoverable by Codex, Claude Code,
-  Antigravity, and future repository-mapped Agent Skills consumers
+  Antigravity, Grok, and future repository-mapped Agent Skills consumers
 - produce a clear report of observed facts, gaps, judgment calls, and validation
 - accept operator-pasted CLI output without asking anyone to hand-write JSON or
   YAML
@@ -89,8 +89,8 @@ A paste by itself authorizes capture and preview, not a repository edit.
 
 1. The canonical skill package shall live at
    `developer-skills/maintain-provider-model-catalogs/`.
-2. The skill shall be synced to `.agents/skills/`, which Codex and Antigravity
-   both discover, and `.claude/skills/` for Claude Code from the same canonical
+2. The skill shall be synced to `.agents/skills/`, which Codex, Antigravity, and Grok
+   discover, and `.claude/skills/` for Claude Code from the same canonical
    source. A future agent receives the same package by adding only its verified
    discovery path as another generated mirror; it does not gain a second
    canonical copy.
@@ -112,11 +112,10 @@ A paste by itself authorizes capture and preview, not a repository edit.
    belongs in PLAN-037 rather than in this requirement — a requirement states an
    invariant, not a progress ledger.
 
-   One correction is currently wrong rather than missing: `GEMINI.md` was
-   updated in `cbe1984` to say Antigravity has no project-level skill discovery.
-   The second probe pass disproved that (see ADR-036 Context). Only Antigravity
-   may edit that file, so this is tracked as owner-assigned rework, not as
-   completed work.
+   `GEMINI.md` shall identify `.agents/skills/` as Antigravity's project-level
+   discovery path and shall not revive `.gemini/skills/` or
+   `.antigravity/skills/`. Agent-owned completion and commits are tracked in
+   PLAN-037 rather than in this requirement.
 5. The skill description shall trigger for provider model-catalog refreshes,
    catalog audits, reviews of catalog changes, and raw CLI model-picker or
    option-picker output that appears to be supplied as catalog evidence. A paste
@@ -414,7 +413,7 @@ The implementation shall also establish a separate developer-skill sync path:
 ```text
 developer-skills/                 canonical, tracked
         |
-        +--> .agents/skills/      generated Codex mirror
+        +--> .agents/skills/      generated Codex/Antigravity/Grok mirror
         `--> .claude/skills/      generated Claude Code mirror
 
 skills/                           runtime-delivered, npm-shipped; unchanged
@@ -459,7 +458,7 @@ skills/                           runtime-delivered, npm-shipped; unchanged
    contradicting assertion is not rewritten to match the served value, and no
    comment is added asserting the divergence is intentional.
 9. Each Windows, Linux, and macOS sync entrypoint makes equivalent canonical
-   content available to Codex, Antigravity, and Claude Code, while
+   content available to Codex, Antigravity, Grok, and Claude Code, while
    `npm run verify:skills` and the runtime catalog exclude the developer skill.
 10. After a canonical skill is renamed or deleted, the next sync removes its
     obsolete repository-managed mirror without deleting an unrelated local skill.

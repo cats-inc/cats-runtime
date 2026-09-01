@@ -1,0 +1,7 @@
+{
+  "ansiAndNested": "\u001b[2J\u001b[36mModels\u001b[0m\n┌ Select a model ┐\n  › model-alpha  Alpha\n      Reasoning\n        High\n  model-beta  Beta\n└────────────────┘\nAccount: maintainer@example.com\nAuthorization: Bearer sample-secret-token",
+  "singleLine": "Model changed to model-alpha.",
+  "truncated": "Models (scroll for more)\n  model-alpha\n  model-beta\n  …",
+  "wrapped": "  model-gamma  A long visible description\n               continued by the terminal picker",
+  "uuidIdentifiers": "Model: 123e4567-e89b-12d3-a456-426614174000\nTenant ID: 123e4567-e89b-12d3-a456-426614174001"
+}

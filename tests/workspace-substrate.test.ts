@@ -396,6 +396,18 @@ describe('WorkspaceSubstrateService', () => {
         .toContain('agent-card.public.json.example');
       expect(readFileSync(join(root, 'scripts', 'README.md'), 'utf-8'))
         .toContain('Sync-AgentSkills.ps1');
+      const generatedWindowsSync = readFileSync(
+        join(root, 'scripts', 'windows', 'Sync-AgentSkills.ps1'),
+        'utf-8',
+      );
+      const generatedLinuxSync = readFileSync(
+        join(root, 'scripts', 'linux', 'sync-agent-skills.sh'),
+        'utf-8',
+      );
+      expect(generatedWindowsSync).toContain('Join-Path $ProjectRoot "skills"');
+      expect(generatedLinuxSync).toContain('skills_dir="$project_root/skills"');
+      expect(generatedWindowsSync).not.toContain('developer-skills');
+      expect(generatedLinuxSync).not.toContain('developer-skills');
     } finally {
       cleanup();
     }

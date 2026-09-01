@@ -48,7 +48,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 | Spec | Title | Status | Related Plan |
 |------|-------|--------|--------------|
-| [SPEC-028](./SPEC-028-provider-model-catalog-maintenance-skill.md) | Provider Model Catalog Maintenance Skill | Draft | [PLAN-037](../plans/PLAN-037-provider-model-catalog-maintenance-skill.md), [ADR-036](../decisions/036-separate-repository-maintenance-skills-from-runtime-delivered-skills.md) |
+| [SPEC-028](./SPEC-028-provider-model-catalog-maintenance-skill.md) | Provider Model Catalog Maintenance Skill | In Progress (Skill and Sync Implemented; Claude-Owned Doc Remains) | [PLAN-037](../plans/PLAN-037-provider-model-catalog-maintenance-skill.md), [ADR-036](../decisions/036-separate-repository-maintenance-skills-from-runtime-delivered-skills.md) |
 | [SPEC-027](./SPEC-027-grok-devin-cline-aider-cli-provider-onboarding.md) | Grok, Devin, Cline, and Aider CLI Provider Onboarding | In Progress — Grok 1.0.0 execution complete | [PLAN-034](../plans/PLAN-034-grok-devin-cline-aider-cli-provider-onboarding.md), [ADR-033](../decisions/033-adopt-grok-devin-cline-aider-as-cli-provider-families.md) |
 | [SPEC-026](./SPEC-026-antigravity-cli-provider-replacing-gemini.md) | Antigravity CLI Provider Replacing Gemini CLI | Draft | [PLAN-033](../plans/PLAN-033-replace-gemini-cli-with-antigravity-cli.md), [ADR-032](../decisions/032-replace-gemini-cli-with-antigravity-cli.md) |
 | [SPEC-025](./SPEC-025-acp-agent-adapters-and-runtime-facade.md) | ACP Agent Adapters and Runtime ACP Facade | In Progress | [PLAN-032](../plans/PLAN-032-acp-agent-adapters-and-runtime-facade.md) |
@@ -100,5 +100,5 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 ---
 
 *See also: [plans/](../plans/) for implementation plans*
-*Last updated: 2026-09-01 (SPEC-028 refined raw paste intake with selectable
-human confirmation, lossless hierarchy, and complete-scope freshness.)*
+*Last updated: 2026-09-01 (SPEC-028's canonical skill, shared Grok-capable mirror, paste intake,
+nested observations, and testable interaction decisions are implemented; Claude's doc remains.)*

@@ -273,19 +273,26 @@ Each subproject directory should contain:
 
 ## Agent Skills
 
-This project supports [Agent Skills](https://agentskills.io), an open standard for structured, reusable agent instructions. The repo-owned sync helpers currently target Claude Code and Codex.
+This project supports [Agent Skills](https://agentskills.io), an open standard for structured,
+reusable agent instructions. Repository-maintenance skills and runtime-delivered Cats skills have
+separate canonical roots.
 
 ### How It Works
 
-Skills live in `skills/` (version-controlled) and are synced to each agent's discovery path via `Sync-AgentSkills.ps1`. Each agent automatically discovers skills from its own directory.
+Repository-maintenance skills live in `developer-skills/` (version-controlled) and are reconciled
+into each coding agent's ignored discovery path. Runtime-delivered product skills remain under
+`skills/` and are not copied by these helpers.
 
 | Agent | Discovery Path |
 |-------|---------------|
 | Claude Code | `.claude/skills/<name>/SKILL.md` |
 | Codex | `.agents/skills/<name>/SKILL.md` |
-Antigravity CLI is intentionally not listed here yet. Its repo/project skill
-discovery path has not been verified, so the sync helpers do not create an
-`.antigravity/skills` convention.
+| Antigravity (`agy`) | `.agents/skills/<name>/SKILL.md` |
+| Grok | `.agents/skills/<name>/SKILL.md` |
+
+`.agents/skills/` is the shared Codex/Antigravity/Grok discovery path. There is no
+`.antigravity/skills/` or `.gemini/skills/` mirror. Generated mirrors are not canonical and must not
+be edited directly.
 
 ### Syncing Skills
 
@@ -294,7 +301,9 @@ After adding or modifying skills, run:
 .\scripts\windows\Sync-AgentSkills.ps1
 ```
 
-See `skills/README.md` for full details on the SKILL.md format and available skills.
+The sync records repository-managed entries and preserves unrelated locally installed skills.
+`-Clean` recreates only managed mirrors. See ADR-036 for the canonical/mirror boundary and
+`skills/README.md` for the separate runtime-delivered skill library.
 
 ---
 
