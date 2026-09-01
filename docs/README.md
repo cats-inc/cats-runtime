@@ -102,5 +102,5 @@ later passes:
 
 ---
 
-*Last updated: 2026-09-01 (SPEC-028 and PLAN-037 refined the provider catalog
-maintenance skill's raw-paste and human-confirmation design.)*
+*Last updated: 2026-09-01 (SPEC-028 and PLAN-037 implemented the provider catalog
+maintenance skill, safe cross-agent mirrors, and lossless raw-paste tooling.)*

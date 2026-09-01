@@ -85,6 +85,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 ---
 
-*Last updated: 2026-08-28 (ADR-036 accepted a separate canonical root for repository-maintenance skills.)*
+*Last updated: 2026-09-01 (ADR-036 now records the intentional substrate split and the shared
+Codex/Antigravity/Grok `.agents/skills/` mirror.)*
 
 *See also: [AGENTS.md](../../AGENTS.md) for decision-making protocols*

@@ -1,0 +1,224 @@
+[
+  {
+    "name": "bare catalog paste defers a marker gate and cannot edit",
+    "input": {
+      "schemaVersion": 1,
+      "catalogIntent": true,
+      "editRequested": false,
+      "modelListCompleteness": "unknown",
+      "changes": [
+        {
+          "id": "default-alpha",
+          "kind": "record-default",
+          "confidence": "high",
+          "inScope": true,
+          "dependsOnSelectionMarkerAsDefault": true
+        }
+      ]
+    },
+    "expected": {
+      "selectedPolicy": "capture-preview",
+      "previewScope": "capture-summary",
+      "repositoryMutationAllowed": false,
+      "readyChangeIds": [],
+      "confirmationRequiredChangeIds": [],
+      "deferredHardGates": [
+        {
+          "id": "default-alpha",
+          "hardGates": ["selection-marker-default"]
+        }
+      ]
+    }
+  },
+  {
+    "name": "confirm uncertainty applies clear changes and asks about uncertainty",
+    "input": {
+      "schemaVersion": 1,
+      "catalogIntent": true,
+      "editRequested": true,
+      "modelListCompleteness": "complete",
+      "changes": [
+        { "id": "add-alpha", "kind": "add", "confidence": "high", "inScope": true },
+        { "id": "label-note", "kind": "update", "confidence": "low", "inScope": true },
+        {
+          "id": "reasoning-token",
+          "kind": "update",
+          "confidence": "high",
+          "inScope": true,
+          "rawMappingRequired": true
+        }
+      ]
+    },
+    "expected": {
+      "selectedPolicy": "confirm-uncertainty",
+      "previewScope": "proposed-delta",
+      "repositoryMutationAllowed": false,
+      "readyChangeIds": ["add-alpha"],
+      "confirmationRequiredChangeIds": ["label-note", "reasoning-token"],
+      "omittedChangeIds": []
+    }
+  },
+  {
+    "name": "confirm all gates every proposed change behind the full preview",
+    "input": {
+      "schemaVersion": 1,
+      "catalogIntent": true,
+      "editRequested": true,
+      "requestedPolicy": "confirm-all",
+      "modelListCompleteness": "complete",
+      "changes": [
+        { "id": "add-alpha", "kind": "add", "confidence": "high", "inScope": true },
+        { "id": "update-beta", "kind": "update", "confidence": "low", "inScope": true }
+      ]
+    },
+    "expected": {
+      "selectedPolicy": "confirm-all",
+      "previewScope": "all-readings",
+      "repositoryMutationAllowed": false,
+      "readyChangeIds": [],
+      "confirmationRequiredChangeIds": ["add-alpha", "update-beta"]
+    }
+  },
+  {
+    "name": "apply authorized applies clear rows, omits low confidence, and keeps hard gates",
+    "input": {
+      "schemaVersion": 1,
+      "catalogIntent": true,
+      "editRequested": true,
+      "requestedPolicy": "apply-authorized",
+      "modelListCompleteness": "complete",
+      "changes": [
+        { "id": "add-alpha", "kind": "add", "confidence": "high", "inScope": true },
+        { "id": "weak-note", "kind": "update", "confidence": "low", "inScope": true },
+        {
+          "id": "reasoning-token",
+          "kind": "update",
+          "confidence": "low",
+          "inScope": true,
+          "rawMappingRequired": true
+        }
+      ]
+    },
+    "expected": {
+      "selectedPolicy": "apply-authorized",
+      "previewScope": "none",
+      "repositoryMutationAllowed": true,
+      "readyChangeIds": ["add-alpha"],
+      "confirmationRequiredChangeIds": ["reasoning-token"],
+      "omittedChangeIds": ["weak-note"]
+    }
+  },
+  {
+    "name": "truncated freshness, deletion, and hierarchy loss remain hard gates",
+    "input": {
+      "schemaVersion": 1,
+      "catalogIntent": true,
+      "editRequested": true,
+      "requestedPolicy": "apply-authorized",
+      "modelListCompleteness": "partial",
+      "changes": [
+        {
+          "id": "freshness",
+          "kind": "advance-last-updated",
+          "confidence": "high",
+          "inScope": true
+        },
+        { "id": "remove-beta", "kind": "remove", "confidence": "high", "inScope": true },
+        {
+          "id": "nested-budget",
+          "kind": "update",
+          "confidence": "high",
+          "inScope": true,
+          "projectionLoss": true
+        },
+        { "id": "other-provider", "kind": "update", "confidence": "high", "inScope": false }
+      ]
+    },
+    "expected": {
+      "selectedPolicy": "apply-authorized",
+      "repositoryMutationAllowed": false,
+      "readyChangeIds": [],
+      "confirmationRequiredChangeIds": [
+        "freshness",
+        "remove-beta",
+        "nested-budget",
+        "other-provider"
+      ]
+    }
+  },
+  {
+    "name": "a complete model list can advance freshness without claiming option coverage",
+    "input": {
+      "schemaVersion": 1,
+      "catalogIntent": true,
+      "editRequested": true,
+      "modelListCompleteness": "complete",
+      "changes": [
+        {
+          "id": "freshness",
+          "kind": "advance-last-updated",
+          "confidence": "high",
+          "inScope": true
+        }
+      ]
+    },
+    "expected": {
+      "selectedPolicy": "confirm-uncertainty",
+      "repositoryMutationAllowed": true,
+      "readyChangeIds": ["freshness"],
+      "confirmationRequiredChangeIds": []
+    }
+  },
+  {
+    "name": "confirmed full preview and deletion can be reassessed as ready",
+    "input": {
+      "schemaVersion": 1,
+      "catalogIntent": true,
+      "editRequested": true,
+      "requestedPolicy": "confirm-all",
+      "modelListCompleteness": "complete",
+      "changes": [
+        {
+          "id": "add-alpha",
+          "kind": "add",
+          "confidence": "low",
+          "inScope": true,
+          "confirmed": true
+        },
+        {
+          "id": "remove-beta",
+          "kind": "remove",
+          "confidence": "high",
+          "inScope": true,
+          "confirmed": true,
+          "deletionConfirmed": true
+        }
+      ]
+    },
+    "expected": {
+      "selectedPolicy": "confirm-all",
+      "repositoryMutationAllowed": true,
+      "readyChangeIds": ["add-alpha", "remove-beta"],
+      "confirmationRequiredChangeIds": []
+    }
+  },
+  {
+    "name": "current-session model help does not enter catalog maintenance",
+    "input": {
+      "schemaVersion": 1,
+      "catalogIntent": false,
+      "editRequested": false,
+      "modelListCompleteness": "unknown",
+      "changes": [
+        { "id": "select-alpha", "kind": "other", "confidence": "high", "inScope": false }
+      ]
+    },
+    "expected": {
+      "selectedPolicy": "not-applicable",
+      "previewScope": "not-applicable",
+      "repositoryMutationAllowed": false,
+      "readyChangeIds": [],
+      "confirmationRequiredChangeIds": []
+    }
+  }
+]

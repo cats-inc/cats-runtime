@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "provider": "example-cli",
+  "interactionPolicy": "capture-preview",
+  "source": {
+    "kind": "interactive-picker",
+    "command": "/model",
+    "artifact": "docs/research/fixtures/example-cli-unknown-version/models.redacted.txt"
+  },
+  "observations": [
+    {
+      "id": "model-list",
+      "path": [],
+      "completeness": "complete",
+      "nodes": [
+        {
+          "id": "model:alpha",
+          "kind": "model",
+          "parentPath": [],
+          "rawText": "› model-alpha  Alpha",
+          "rawId": "model-alpha",
+          "label": "Alpha",
+          "selection": "selected",
+          "defaultClaim": "unknown",
+          "completeness": "complete",
+          "sourceFragment": "model-list:2",
+          "children": []
+        },
+        {
+          "id": "model:beta",
+          "kind": "model",
+          "parentPath": [],
+          "rawText": "model-beta  Beta",
+          "rawId": "model-beta",
+          "label": "Beta",
+          "selection": "not-selected",
+          "defaultClaim": "unknown",
+          "completeness": "complete",
+          "sourceFragment": "model-list:3",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "alpha-reasoning",
+      "path": ["model:alpha"],
+      "completeness": "complete",
+      "nodes": [
+        {
+          "id": "option:reasoning",
+          "kind": "option",
+          "parentPath": ["model:alpha"],
+          "rawText": "Reasoning",
+          "label": "Reasoning",
+          "selection": "unknown",
+          "defaultClaim": "unknown",
+          "completeness": "complete",
+          "sourceFragment": "alpha-reasoning:1",
+          "children": [
+            {
+              "id": "value:low",
+              "kind": "value",
+              "parentPath": ["model:alpha", "option:reasoning"],
+              "rawText": "Low",
+              "label": "Low",
+              "selection": "not-selected",
+              "defaultClaim": "unknown",
+              "completeness": "complete",
+              "sourceFragment": "alpha-reasoning:2",
+              "children": []
+            },
+            {
+              "id": "value:high",
+              "kind": "value",
+              "parentPath": ["model:alpha", "option:reasoning"],
+              "rawText": "› High",
+              "label": "High",
+              "selection": "selected",
+              "defaultClaim": "unknown",
+              "completeness": "complete",
+              "sourceFragment": "alpha-reasoning:3",
+              "children": [
+                {
+                  "id": "option:budget",
+                  "kind": "option",
+                  "parentPath": ["model:alpha", "option:reasoning", "value:high"],
+                  "rawText": "Budget",
+                  "label": "Budget",
+                  "selection": "unknown",
+                  "defaultClaim": "unknown",
+                  "completeness": "complete",
+                  "sourceFragment": "alpha-budget:1",
+                  "children": [
+                    {
+                      "id": "value:large",
+                      "kind": "value",
+                      "parentPath": ["model:alpha", "option:reasoning", "value:high", "option:budget"],
+                      "rawText": "Large",
+                      "rawId": null,
+                      "label": "Large",
+                      "selection": "selected",
+                      "defaultClaim": "unknown",
+                      "completeness": "complete",
+                      "sourceFragment": "alpha-budget:2",
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "expectedPaths": [
+    {
+      "path": ["model:alpha", "option:reasoning"],
+      "captureAction": "Open Alpha's reasoning picker",
+      "selectFirst": ["model:alpha"]
+    },
+    {
+      "path": ["model:beta", "option:reasoning"],
+      "captureAction": "Select Beta, then open its reasoning picker",
+      "selectFirst": ["model:beta"]
+    },
+    {
+      "path": ["model:alpha", "option:reasoning", "value:high", "option:budget", "value:large"],
+      "captureAction": "Select High, then inspect Budget",
+      "selectFirst": ["model:alpha", "option:reasoning", "value:high"]
+    }
+  ]
+}

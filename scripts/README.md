@@ -33,13 +33,24 @@ Local npm package smoke tests are available on each desktop platform:
 
 | Script | Platform | Purpose |
 |--------|----------|---------|
-| `scripts/windows/Sync-AgentSkills.ps1` | Windows | Sync `skills/` into `.claude/skills` and `.agents/skills` |
-| `scripts/linux/sync-agent-skills.sh` | Linux | Sync `skills/` into the same agent discovery paths on POSIX hosts |
-| `scripts/macos/sync-agent-skills.sh` | macOS | Sync `skills/` into the same agent discovery paths on POSIX hosts |
+| `scripts/sync-agent-skills.mjs` | Cross-platform | Reconcile canonical `developer-skills/` into ignored agent discovery mirrors |
+| `scripts/windows/Sync-AgentSkills.ps1` | Windows | Invoke the shared reconciler from PowerShell |
+| `scripts/linux/sync-agent-skills.sh` | Linux | Invoke the shared reconciler from Bash |
+| `scripts/macos/sync-agent-skills.sh` | macOS | Invoke the shared reconciler from Bash |
 
-Antigravity CLI is intentionally not a skill sync target yet. Its repo/project
-skill discovery path has not been verified, so these helpers do not create an
-`.antigravity/skills` convention.
+The canonical repository-maintenance packages live under `developer-skills/`. The reconciler writes
+them to `.claude/skills/` for Claude Code and `.agents/skills/` for Codex, Antigravity, and Grok.
+It tracks repository-managed skill names in each target, removes stale managed mirrors, preserves
+unrelated local skills, refuses to overwrite an unmanaged name collision, and rejects linked
+source trees or discovery paths before writing. `--clean` / `-Clean` recreates only
+repository-managed entries. Runtime-delivered packages under `skills/` are not synced.
+
+`--agent antigravity` and `--agent grok` are explicit aliases for the same `.agents/skills/` target
+as `--agent codex`; they do not create additional copies.
+
+The runtime's `WorkspaceSubstrateService` intentionally continues to generate generic `skills/`
+sync helpers for arbitrary new workspaces. Those generated templates and this repository-specific
+`developer-skills/` workflow have different canonical roots by ADR-036's implementation amendment.
 
 Shared behavior:
 

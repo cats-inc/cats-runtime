@@ -46,7 +46,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
-| [PLAN-037](./PLAN-037-provider-model-catalog-maintenance-skill.md) | Provider Model Catalog Maintenance Skill | Draft | [SPEC-028](../specs/SPEC-028-provider-model-catalog-maintenance-skill.md), [ADR-036](../decisions/036-separate-repository-maintenance-skills-from-runtime-delivered-skills.md) |
+| [PLAN-037](./PLAN-037-provider-model-catalog-maintenance-skill.md) | Provider Model Catalog Maintenance Skill | In Progress (Skill and Sync Implemented; Claude-Owned Doc Remains) | [SPEC-028](../specs/SPEC-028-provider-model-catalog-maintenance-skill.md), [ADR-036](../decisions/036-separate-repository-maintenance-skills-from-runtime-delivered-skills.md) |
 | [PLAN-036](./PLAN-036-provider-upstream-drift-watch-and-staleness-surfacing.md) | Provider Upstream Drift Watch and Staleness Surfacing | Draft | [ADR-034](../decisions/034-automate-light-tier-provider-drift-and-separate-observation-from-acceptance.md), [ADR-029](../decisions/029-keep-advanced-provider-catalogs-verified-and-manual-refresh.md) |
 | [PLAN-035](./PLAN-035-cline-success-path-end-to-end-verification.md) | Cline Success-Path End-to-End Verification | Blocked — waiting on Cline account credit | [SPEC-027](../specs/SPEC-027-grok-devin-cline-aider-cli-provider-onboarding.md) |
 | [PLAN-034](./PLAN-034-grok-devin-cline-aider-cli-provider-onboarding.md) | Grok, Devin, Cline, and Aider CLI Provider Onboarding | In Progress — Grok, Cline, Devin, and Aider landed; success-path verification deferred to PLAN-035 | [SPEC-027](../specs/SPEC-027-grok-devin-cline-aider-cli-provider-onboarding.md), [ADR-033](../decisions/033-adopt-grok-devin-cline-aider-as-cli-provider-families.md) |
@@ -110,5 +110,5 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 ---
 
 *See also: [specs/](../specs/) for feature specifications*
-*Last updated: 2026-09-01 (PLAN-037 refined paste intake, lossless projection,
-and behavioral forward-testing for the provider catalog skill.)*
+*Last updated: 2026-09-01 (PLAN-037 implemented the canonical provider-catalog skill,
+safe cross-platform mirrors, nested paste tooling, and testable interaction decisions.)*
