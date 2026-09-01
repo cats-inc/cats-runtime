@@ -26,12 +26,14 @@ the catalog schema, or durable evidence and decision documents.
 
 Model catalogs are not flat. A CLI's picker exposes a model list, and each model
 may carry its own option axis — reasoning level, effort, or thinking depth —
-whose available values differ from model to model. Machine-readable enumeration
-rarely reaches that second level, so the maintainer's own terminal is a
-first-class evidence source rather than a fallback. The skill shall therefore
-accept pasted picker output in whatever shape the terminal produced it, echo
-back what it read, and treat the operator's confirmation of that reading as a
-precondition for editing.
+whose available values differ from model to model. An option may itself reveal
+another dependent choice. Machine-readable enumeration rarely reaches those
+levels, so the maintainer's own terminal is a first-class evidence source rather
+than a fallback. The skill shall accept pasted picker output in whatever shape
+the terminal produced it, preserve the observed hierarchy before projecting it
+onto the curated schema, and let the operator choose in plain language whether
+to preview every reading, confirm only uncertainty, or apply unambiguous changes.
+A paste by itself authorizes capture and preview, not a repository edit.
 
 ## Goals
 
@@ -43,12 +45,15 @@ precondition for editing.
   account scope honestly
 - prevent unsupported rows from being silently dropped by normalization
 - preserve unrelated working-tree edits and user-requested provider scope
-- make the same canonical workflow discoverable by Codex and Claude Code
+- make the same canonical workflow discoverable by Codex, Claude Code,
+  Antigravity, and future repository-mapped Agent Skills consumers
 - produce a clear report of observed facts, gaps, judgment calls, and validation
 - accept operator-pasted CLI output without asking anyone to hand-write JSON or
   YAML
-- confirm every parsed reading with the operator before touching a catalog file
-- carry per-model option axes whose available values differ between models
+- provide selectable human-in-the-loop behavior while retaining mandatory
+  confirmation for ambiguous, lossy, destructive, or scope-expanding readings
+- preserve per-model and dependent option axes whose available values differ
+  between models without silently flattening them
 
 ## Non-Goals
 
@@ -84,8 +89,11 @@ precondition for editing.
 
 1. The canonical skill package shall live at
    `developer-skills/maintain-provider-model-catalogs/`.
-2. The skill shall be synced to `.agents/skills/` for Codex and
-   `.claude/skills/` for Claude Code from the same canonical source.
+2. The skill shall be synced to `.agents/skills/`, which Codex and Antigravity
+   both discover, and `.claude/skills/` for Claude Code from the same canonical
+   source. A future agent receives the same package by adding only its verified
+   discovery path as another generated mirror; it does not gain a second
+   canonical copy.
    The Windows, Linux, and macOS sync entrypoints shall be idempotent and cheap
    enough to re-run after any edit to the canonical source. Each sync shall
    reconcile repository-managed entries: a deleted or renamed canonical skill
@@ -110,10 +118,12 @@ precondition for editing.
    may edit that file, so this is tracked as owner-assigned rework, not as
    completed work.
 5. The skill description shall trigger for provider model-catalog refreshes,
-   catalog audits, reviews of catalog changes, and an operator pasting CLI
-   model-picker or option-picker output with no other stated intent. It shall
-   exclude generic provider adapter implementation and ordinary dependency
-   updates.
+   catalog audits, reviews of catalog changes, and raw CLI model-picker or
+   option-picker output that appears to be supplied as catalog evidence. A paste
+   with no explicit mutation request shall enter capture/preview behavior and
+   shall not imply permission to edit. The description shall exclude generic
+   provider adapter implementation, ordinary dependency updates, and requests
+   that only select or troubleshoot the current session's model.
 6. The skill shall support three modes:
    - **refresh**: collect evidence and edit the provider scope authorized by the
      user
@@ -159,16 +169,21 @@ precondition for editing.
 14. The model's own knowledge shall never be used to fill catalog rows,
     defaults, context limits, output limits, or option values.
 15. `last_updated` shall change only when the model list was re-read or otherwise
-    verified. A newer `--version` result alone shall be recorded in notes with
-    its observation date and scope. A pasted model list is such a verification
-    and shall advance the field even when no option axis was re-read; the option
-    axes keep their own provenance and observation date in `notes` under
-    requirement 35. The field shall not be split per option axis, which would
-    require the schema change requirement 17 forbids improvising.
+    verified as complete for the catalog or provider scope being updated. A
+    newer `--version` result alone shall be recorded in notes with its observation
+    date and scope. A pasted model list that the operator confirms is complete is
+    such a verification and shall advance the field even when no option axis was
+    re-read. A partial, scrolled, truncated, or completeness-unknown paste shall
+    not advance it. The option axes keep their own provenance and observation
+    date in `notes` under requirement 35. The field shall not be split per option
+    axis, which would require the schema change requirement 17 forbids
+    improvising.
 16. Raw selectable model ids and picker-visible labels shall remain distinct.
     The skill shall preserve observed generation/version information in labels;
     ambiguity belongs in notes and shall not be resolved by stripping the
-    generation.
+    generation. The same rule applies to option and control values: a displayed
+    label such as `Extra high` shall not be assumed to equal a raw CLI token such
+    as `xhigh` unless an observed mapping or the relevant normalizer proves it.
 17. The skill shall inspect the typed curated schema before editing and shall
     not invent unsupported YAML fields.
 18. The skill shall inspect the relevant normalizer before adding or renaming a
@@ -233,48 +248,88 @@ precondition for editing.
     provider and the command is sufficient; where it is absent and the source is
     ambiguous, the skill shall ask rather than guess. A pasted single-line
     confirmation message is evidence on the same terms as a pasted list.
-32. Parsing shall be deterministic wherever it can be. Stripping terminal
-    control sequences, rendering the confirmation table, and computing which
-    readings are still missing shall be performed by a script in the skill
-    package rather than improvised per invocation. Model judgment applies only
-    to the ambiguous readings that script surfaces.
-33. Confirmation is a precondition, not a courtesy. Before editing any catalog
-    file from pasted evidence, the skill shall echo back a compact
-    human-readable table of what it parsed — models, labels, option axes,
-    values, defaults, and explicitly what was not observed — and obtain the
-    operator's plain-language confirmation or correction. The report shall
-    record the paste, the parsed reading, and the operator's response. An edit
-    made from pasted evidence without that record is a defect, and review mode
-    shall treat it as one.
-34. Option axes are per-model and are acquired over multiple rounds. A model
-    list and a per-model option list are separate observations, and an option
-    list is evidence only for the model that was selected when it was captured.
-    The skill shall compute the remaining gaps, name the exact next command and
-    the model that must be selected first, and shall never extend one model's
-    observed values to another model.
+32. Mechanical normalization shall be deterministic wherever it materially
+    improves reliability. One cross-platform script in the skill package,
+    runnable with the repository's Node.js runtime, shall strip ANSI and other
+    terminal control sequences without destroying visible text, indentation, or
+    ordering; retain unparsed lines; render a normalized observation summary;
+    and compute gaps from an agent-created observation document. A
+    provider-specific deterministic extractor may be added only when fixtures
+    establish a stable grammar. The script shall not invent semantic hierarchy,
+    flatten nested choices, or require the operator to supply structured input.
+33. Human-in-the-loop behavior shall follow the operator's plain-language intent
+    rather than a required JSON/YAML setting:
+    - **capture/preview**: the default for a bare paste; parse and report without
+      editing
+    - **confirm all**: echo a compact table of models, labels, option axes,
+      values, defaults, completeness, and unobserved data before any edit
+    - **confirm uncertainty**: the default when an update is explicitly
+      requested; summarize the proposed change, ask about every materially
+      uncertain reading and each hard gate in requirement 36, then apply the
+      confirmed in-scope subset
+    - **apply authorized**: when the operator explicitly asks to skip routine
+      confirmation, apply unambiguous in-scope readings, omit and report
+      non-hard low-confidence readings, and still stop at requirement 36 hard
+      gates
+
+    Any preview or confirmation summary shall be redacted before it is echoed.
+    The report shall record the selected behavior, the parsed reading, every
+    question asked, and the operator's response. Review mode shall treat an edit
+    that violates the selected behavior or bypasses a hard gate as a defect.
+34. Captured evidence shall first become a lossless, ordered observation tree.
+    Nodes may represent models, options, values, and dependent sub-options and
+    shall retain, when observed, raw text, raw selectable id, visible label,
+    current-selection marker, claimed default, completeness, source fragment,
+    and parent path. A model list and each per-model or dependent option screen
+    are separate observations acquired over one or more rounds. A fragment is
+    evidence only for the selected model and option path shown when it was
+    captured. The skill shall compute the remaining gaps, name the next capture
+    action and any model or option that must be selected first, and shall never
+    extend one model's observed values to another model.
 35. Partial evidence produces a partial update and never a deletion. Evidence
     covering one level shall leave the other level's existing rows intact, with
     the unverified level's provenance and observation date recorded in `notes`.
     Absence from a paste is not evidence of removal: a row that an entitlement
     gate, scrolling, or truncation could have hidden shall be retained and
     reported.
-36. Three readings shall be confirmed with the operator rather than inferred:
+36. The following become hard confirmation gates when they materially affect a
+    proposed edit and shall not be inferred even under **apply authorized**
+    behavior. Capture/preview may report and defer them until an edit needs the
+    answer:
     - whether a selection marker denotes the account default or merely the
-      session's current selection
-    - whether the pasted list is complete, or was scrolled or truncated
-    - which raw selectable id a picker-visible label corresponds to, whenever
-      the normalizer carries no mapping for it
+      session's current selection, before writing a default
+    - whether the pasted list is complete, or was scrolled or truncated, before
+      removing an existing row or advancing `last_updated`
+    - which raw selectable id or option token a picker-visible label corresponds
+      to, whenever the proposed row needs a mapping the normalizer does not carry
+    - which reading wins when conflicting pasted fragments or existing evidence
+      would produce different edits
+    - whether to remove an existing row, expand beyond the requested provider
+      scope, or accept a projection that cannot preserve the observed hierarchy
 37. Pasted evidence that materially supports a catalog change shall be preserved
     where it can be cited. Such a paste shall be stored as a redacted artifact
     under `docs/research/fixtures/<cli>-<version>/`, following the naming already
     used there — named for what was captured and carrying the `.redacted`
     marker — with the version taken from the CLI at capture time, and cited from
-    the affected catalog's `notes`. A paste too short to be worth a file may stay
-    in the conversation and be summarized in `notes` instead. Either way, account
-    identifiers, email addresses, organization names, and any authenticated
-    session material shall be removed before the paste is written to disk or
-    quoted in a note, and each removal shall leave a visible placeholder rather
-    than a silent gap.
+    the affected catalog's `notes`. If the capture's version cannot be observed,
+    the skill shall not substitute the local machine's version or invent one; it
+    may request a raw version paste when version materially affects the reading,
+    otherwise it shall use an explicit `unknown-version` evidence scope and
+    report the missing provenance. A paste too short to be worth a file may stay
+    in the conversation and be summarized in `notes` instead. Either way,
+    account identifiers, email addresses, organization names, and any
+    authenticated session material shall be removed before the paste is written
+    to disk or quoted in a note, and each removal shall leave a visible
+    placeholder rather than a silent gap.
+38. Projection from the observation tree into the typed curated schema shall be
+    explicitly loss-checked before editing. A representable subset may be
+    written only within the authorized scope. A branch that would be discarded,
+    merged with a sibling, detached from its parent condition, or reduced from a
+    distinct raw token and label to one guessed value shall remain in the
+    redacted evidence and report instead of being silently flattened. Extending
+    the curated schema, normalizer, advanced-knowledge model, or runtime behavior
+    requires separate explicit authorization and the corresponding tests and
+    documentation.
 
 ### Non-Functional Requirements
 
@@ -290,6 +345,8 @@ precondition for editing.
   credentials or authenticated session material.
 - **Maintainability**: Current provider values live in runtime code/catalogs,
   not duplicated as a second catalog inside the skill.
+- **Losslessness**: Raw observations retain their hierarchy and ambiguity until
+  an authorized, representable projection is chosen.
 - **Operator effort**: What a maintainer supplies by hand is capped at copying
   terminal output and answering plain-language questions. Any format the
   operator would have to author by hand is a design failure.
@@ -323,7 +380,7 @@ developer-skills/
         cursor.md
         ...only when provider-specific procedure is needed
     scripts/
-      normalize-picker-paste.*
+      normalize-picker-paste.mjs
 ```
 
 `SKILL.md` selects refresh, review, or audit mode, performs the current-provider
@@ -334,12 +391,14 @@ limitations, and safe stopping conditions.
 
 The intake split follows the same rule as the rest of the package: procedure is
 shared, recipes are not. `paste-intake.md` carries the parts that must be
-identical for every provider — the tolerant-parse rules, the confirmation-table
-format, the multi-round gap calculation, and the partial-evidence rules.
-A provider reference carries only what differs: which command produces the list,
-whether such a command exists at all, and what its output does and does not
-prove. `normalize-picker-paste.*` makes the mechanical half reproducible so the
-agent's judgment is spent only on the ambiguous half.
+identical for every provider — tolerant mechanical normalization, the lossless
+observation-tree contract, natural-language interaction policies, multi-round
+gap calculation, schema-loss checks, and partial-evidence rules. A provider
+reference carries only what differs: which capture action produces the list,
+whether such an action exists at all, and what its output does and does not
+prove. `normalize-picker-paste.mjs` makes only the mechanical half reproducible;
+provider semantics stay in a fixture-backed extractor or in explicit agent
+judgment, and ambiguity remains visible.
 
 That split is also the answer to whether this should be one skill per provider.
 What is provider-specific is the extraction recipe, not the workflow, and a
@@ -400,26 +459,48 @@ skills/                           runtime-delivered, npm-shipped; unchanged
    contradicting assertion is not rewritten to match the served value, and no
    comment is added asserting the divergence is intentional.
 9. Each Windows, Linux, and macOS sync entrypoint makes equivalent canonical
-   content available to Codex and Claude Code, while `npm run verify:skills` and
-   the runtime catalog exclude the developer skill.
+   content available to Codex, Antigravity, and Claude Code, while
+   `npm run verify:skills` and the runtime catalog exclude the developer skill.
 10. After a canonical skill is renamed or deleted, the next sync removes its
     obsolete repository-managed mirror without deleting an unrelated local skill.
     Running the same sync again produces no further content changes.
 11. An operator pastes raw model-picker output carrying ANSI sequences,
     box-drawing characters, and a selection marker, saying only which CLI it came
-    from. The skill parses it without asking for any reformatting, echoes a
-    confirmation table that names what it could not observe, asks whether the
-    marked row is the account default or the session's current selection, and
-    makes no catalog edit until the operator answers.
+    from. The skill parses it without asking for any reformatting, enters
+    capture/preview behavior because no edit was requested, echoes a summary that
+    names what it could not observe, and reports that the marker's meaning is
+    unresolved. It makes no catalog edit from the paste alone and asks about the
+    marker only if the operator requests that a default be recorded.
 12. A model-list paste is followed by an option-picker paste captured with one
     model selected. The skill records that model's values, names the next model
-    and the command needed to capture it, and applies the observed values to no
-    other model. Stopping there updates the model list and leaves every other
-    model's existing option rows in place, with the unverified scope and its
-    date recorded in `notes`.
+    and capture action needed, and applies the observed values to no other model.
+    Stopping there after confirming that the model list itself was complete may
+    update the model list and `last_updated`; it leaves every other model's
+    existing option rows in place, with the unverified scope and its date
+    recorded in `notes`.
 13. A paste omits a model the catalog currently lists. The skill keeps the row,
     reports the absence as unexplained, and asks whether the list was complete
     before anyone treats it as a removal.
+14. An operator asks to update a provider and says to ask only when uncertain.
+    The skill summarizes the proposed in-scope additions, asks about an unmapped
+    option label, and records **confirm uncertainty** plus the answer in its
+    report. The same request with **confirm all** produces a complete preview
+    before any edit. Under **apply authorized**, the skill may apply clear rows
+    without that preview and omit a non-hard low-confidence note, but it may not
+    bypass the unmapped-label question.
+15. A captured option value reveals a dependent sub-option that the current
+    curated schema cannot represent. The skill retains the whole branch in its
+    observation tree and redacted evidence, shows exactly what a YAML projection
+    would lose, and makes no lossy projection until the operator explicitly
+    chooses to omit it or authorizes a broader schema/runtime change.
+16. A scrolled or truncated model-list paste updates neither removals nor
+    `last_updated`. A later paste confirmed as the complete list for the same
+    provider scope may advance `last_updated` without claiming that unobserved
+    per-model option axes were refreshed.
+17. A user pastes `/model` output only to choose or troubleshoot the current
+    session model. The catalog-maintenance workflow does not claim the paste or
+    propose a repository edit unless the user also expresses catalog-maintenance
+    intent.
 
 ## Open Questions
 
@@ -435,8 +516,10 @@ skills/                           runtime-delivered, npm-shipped; unchanged
   `grok-1.0.0/models.success.redacted.txt`), and cite them from `notes`. A paste
   too short to be worth a file stays in the conversation. Redaction is required
   either way. Written into requirement 37.
-- [x] Should a model-list-only paste advance `last_updated`? Approved
-  2026-09-01: yes. The rule stays in requirement 15 rather than gaining a
+- [x] Should a complete model-list-only paste advance `last_updated`? Approved
+  2026-09-01: yes. The operator must confirm completeness for the catalog or
+  provider scope; partial, scrolled, truncated, or completeness-unknown pastes do
+  not advance it. The rule stays in requirement 15 rather than gaining a
   requirement of its own, so the field has one definition; the option axes' own
   provenance stays in `notes` under requirement 35. A per-option freshness field
   is rejected — it is the schema change requirement 17 forbids improvising.
@@ -458,4 +541,8 @@ skills/                           runtime-delivered, npm-shipped; unchanged
 confirmation gate (requirements 31-37, scenarios 11-13), plus the paste clause
 in requirement 15. Both open questions were answered by the repository owner the
 same day. The approved single-skill, multi-mode scope is unchanged.*
+*Amended: 2026-09-01 by Codex at the repository owner's request — selectable
+human-in-the-loop behavior, lossless hierarchical observations, explicit
+schema-loss gates, complete-scope freshness, and capture-only handling for a
+bare paste (requirements 5, 15-16, 31-38; scenarios 11-17).*
 *Related Plan: [PLAN-037](../plans/PLAN-037-provider-model-catalog-maintenance-skill.md)*

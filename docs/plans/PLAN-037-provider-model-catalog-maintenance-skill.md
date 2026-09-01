@@ -116,18 +116,22 @@ foreign entries, and are safe to re-run.
 
 - [ ] `developer-skills/maintain-provider-model-catalogs/SKILL.md` — mode
       selection (refresh / review / audit), provider inventory derived from
-      `KNOWN_PROVIDERS` and the provider catalog, routing into references, and
-      the confirmation gate that blocks any edit made from pasted evidence.
+      `KNOWN_PROVIDERS` and the provider catalog, routing into references, the
+      capture-only default for a bare paste, selectable interaction behavior,
+      and the non-bypassable ambiguity/schema-loss gates.
 - [ ] `references/paste-intake.md` — the operator-paste protocol (requirements
-      31-37): tolerant parsing of raw terminal output, the confirmation table
-      that must be echoed and answered before any edit, the multi-round gap
-      calculation for per-model option axes, partial-evidence-never-deletes,
-      the three readings that must be asked rather than inferred, and where a
-      redacted paste is filed so a `notes` entry can cite it.
-- [ ] `scripts/normalize-picker-paste.*` — the deterministic half of
-      requirement 32: strip terminal control sequences and picker chrome,
-      render the confirmation table, and report which model and option readings
-      are still missing. PowerShell and POSIX, per the portability requirement.
+      31-38): tolerant intake of raw terminal output, the ordered observation
+      tree, natural-language interaction policies, multi-round gap calculation
+      for per-model and dependent option axes, partial-evidence-never-deletes,
+      hard confirmation gates, schema-loss reporting, and where redacted
+      evidence is filed so a `notes` entry can cite it.
+- [ ] `scripts/normalize-picker-paste.mjs` — the deterministic mechanical half
+      of requirement 32, implemented once for the repository's Node.js runtime:
+      strip terminal control sequences without destroying visible hierarchy,
+      retain unparsed lines, render an observation summary, and compute gaps
+      from the agent-created observation document. Provider semantics remain in
+      fixture-backed extractors or explicit agent judgment; the script must not
+      guess or flatten them.
 - [ ] `references/evidence-and-scope.md` — the evidence-priority ladder
       (requirement 12), the `last_updated` rule (15), scope preservation
       (7, 22, 23), and the three-way-disagreement rule (21).
@@ -158,8 +162,11 @@ Per SPEC-028 requirement 4. Agent-owned files go to their owners.
 - [ ] `CLAUDE.md` — **Claude owns this file.** It currently carries only an
       interim note that the helpers copy nothing; that note is replaced once
       Phase 1 makes them work.
-- [ ] `GEMINI.md` needs no change: it was corrected in `cbe1984` and `193a37b`
-      and already describes `.agents/skills/` accurately.
+- [ ] `GEMINI.md` — **Antigravity owns this file.** Its first probe result was
+      over-generalized into a claim that Antigravity has no project-level skill
+      discovery. ADR-036's second probe established that it reads
+      `.agents/skills/`; assign the correction to Antigravity and do not have
+      Codex or Claude edit it.
 
 **Deliverable**: no document describes a sync contract that does not exist.
 
@@ -171,9 +178,9 @@ Per SPEC-028 requirement 4. Agent-owned files go to their owners.
 - `developer-skills/maintain-provider-model-catalogs/references/catalog-surfaces.md`
 - `developer-skills/maintain-provider-model-catalogs/references/paste-intake.md`
 - `developer-skills/maintain-provider-model-catalogs/references/providers/*.md`
-- `developer-skills/maintain-provider-model-catalogs/scripts/normalize-picker-paste.*`
+- `developer-skills/maintain-provider-model-catalogs/scripts/normalize-picker-paste.mjs`
 - a reconciliation test for the sync helpers
-- parser fixtures and tests for `normalize-picker-paste.*`
+- normalization fixtures and tests for `normalize-picker-paste.mjs`
 
 **Modify**
 - `scripts/windows/Sync-AgentSkills.ps1`
@@ -206,20 +213,35 @@ Per SPEC-028 requirement 4. Agent-owned files go to their owners.
   a separate skill would. Audit mode has no per-provider form — it reconciles
   the whole registered set — and a family of near-identical skill descriptions
   would make skill selection unreliable.
-- **Deterministic parse, judged confirmation.** The script owns what must come
-  out identical every time; the agent's judgment is spent only on the readings
-  the script flags as ambiguous. A confirmation gate that depends on the model
-  remembering to ask is not a gate, which is why requirement 33 makes the
-  recorded exchange part of the report and reviewable.
+- **Deterministic mechanics, lossless judged semantics.** One portable Node.js
+  script owns ANSI/control-sequence removal, preservation of visible ordering,
+  summary rendering, and gap calculation. It does not pretend that sixteen
+  evolving picker formats share one stable semantic grammar. Provider-specific
+  extractors require fixtures; otherwise the agent builds a lossless observation
+  tree and leaves ambiguity explicit.
+- **Selectable interaction, mandatory hard gates.** A bare paste is capture-only.
+  An explicit update defaults to summarizing and confirming material
+  uncertainty, while plain-language requests may choose **confirm all** or
+  **apply authorized** behavior. **Apply authorized** omits and reports non-hard
+  low-confidence readings instead of guessing them. No policy may bypass a
+  material hard gate for ambiguity, conflicting evidence, deletion, scope
+  expansion, or a lossy projection; capture-only may defer the question until
+  an edit needs the answer. The report records the chosen behavior and any
+  exchange so review can verify it.
 
 ## Testing Strategy
 
 - Reconciliation and idempotence tests for the helpers, against a temp target.
   These must never touch the developer's real discovery directories.
-- Parser tests for `normalize-picker-paste.*` over captured raw pastes: ANSI
-  sequences, box drawing, a wrapped line, a single-line confirmation message,
-  and a deliberately truncated list. Fixtures only — no live probes, no
-  credentials.
+- Normalization tests for `normalize-picker-paste.mjs` over captured raw pastes:
+  ANSI sequences, box drawing, wrapped lines, nested indentation, unparsed
+  lines, a single-line confirmation message, and a deliberately truncated list.
+  Fixtures only — no live probes and no credentials.
+- Behavioral forward-tests for the skill cover capture-only bare pastes,
+  **confirm all**, **confirm uncertainty**, **apply authorized**, a hard-gated
+  ambiguous raw option token, a nested branch the YAML schema cannot represent,
+  and complete versus truncated freshness. These tests inspect decisions and
+  resulting artifacts rather than matching exact prose.
 - `npm run verify:skills` continues to validate only `skills/`.
 - `npm pack --dry-run` excludes `developer-skills/`.
 - Existing `tests/workspace-substrate.test.ts` updated per the Phase 0 outcome.
@@ -237,6 +259,15 @@ Per SPEC-028 requirement 4. Agent-owned files go to their owners.
 - **The skill accumulates catalog values and rots.** Reviewed against the
   maintainability requirement when the references are written; provider
   references document procedure and limitation, never current model lists.
+- **The intake flattens a provider's nested picker into the current YAML shape.**
+  The observation tree is lossless and precedes projection. Requirement 38 makes
+  any discarded, merged, detached, or guessed branch a hard gate rather than a
+  silent edit.
+- **Routine confirmations make raw paste intake more work than manual editing.**
+  Requirement 33 defaults an explicit update to confirming only uncertainty and
+  allows the operator to choose **confirm all** or **apply authorized** in
+  ordinary language, while requirement 36 preserves the small set of
+  non-bypassable questions.
 - **Nothing forces the docs in Phase 3 to stay true.** They drifted for months
   precisely because no test covers prose. Out of scope here, but worth noting
   that the only durable fix is making the helper's real behavior discoverable.
@@ -247,5 +278,6 @@ Per SPEC-028 requirement 4. Agent-owned files go to their owners.
 |------|--------|
 | 2026-08-28 | Plan created from ADR-036 (Accepted) and SPEC-028 (both open questions answered) |
 | 2026-08-28 | Phase 0 added after review found `WorkspaceSubstrateService` generates all three sync helpers into user workspaces, a surface neither ADR-036 nor SPEC-028 accounts for |
-| 2026-09-01 | SPEC-028 amended with operator-pasted evidence intake and the confirmation gate (requirements 31-36, scenarios 11-13) after the owner observed that nothing in the spec said how a maintainer hands over picker output, and that option axes are per-model. Phase 2 gains `paste-intake.md` and `normalize-picker-paste.*`; the approved one-skill scope is unchanged. Two questions left open in SPEC-028 for the owner: whether raw pastes become tracked fixtures, and whether a model-list-only paste advances `last_updated` |
-| 2026-09-01 | Owner answered both the same day. Supporting pastes are filed as redacted artifacts under `docs/research/fixtures/<cli>-<version>/` and cited from `notes` (new requirement 37); a pasted model list advances `last_updated`, and that rule stays inside requirement 15 rather than becoming a requirement of its own, so the field keeps one definition. A per-option freshness field is rejected as the schema change requirement 17 forbids improvising |
+| 2026-09-01 | SPEC-028 amended with operator-pasted evidence intake and an initial confirmation gate (requirements 31-36, scenarios 11-13) after the owner observed that nothing in the spec said how a maintainer hands over picker output, and that option axes are per-model. Phase 2 gains `paste-intake.md` and a normalization helper; the approved one-skill scope is unchanged. Two questions were left for the owner: whether raw pastes become tracked fixtures, and whether a complete model-list-only paste advances `last_updated` |
+| 2026-09-01 | Owner answered both the same day. Supporting pastes are filed as redacted artifacts under `docs/research/fixtures/<cli>-<version>/` and cited from `notes` (new requirement 37); a complete scope-confirmed pasted model list advances `last_updated`, and that rule stays inside requirement 15 rather than becoming a requirement of its own, so the field keeps one definition. A per-option freshness field is rejected as the schema change requirement 17 forbids improvising |
+| 2026-09-01 | Owner-directed review refined the intake design: a bare paste is capture-only; explicit updates default to confirming uncertainty and may opt into confirm-all or apply-authorized behavior; hard ambiguity, deletion, scope, conflict, and schema-loss gates remain mandatory. Evidence first becomes a lossless hierarchical observation tree, only complete scope-confirmed lists advance `last_updated`, and the mechanical helper is one cross-platform `normalize-picker-paste.mjs` rather than parallel PowerShell/POSIX parsers. SPEC-028 scenarios 14-17 and Phase 2 forward-tests cover these decisions |

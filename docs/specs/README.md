@@ -100,4 +100,5 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 ---
 
 *See also: [plans/](../plans/) for implementation plans*
-*Last updated: 2026-08-28 (SPEC-028 drafted the cross-agent provider model catalog maintenance skill contract.)*
+*Last updated: 2026-09-01 (SPEC-028 refined raw paste intake with selectable
+human confirmation, lossless hierarchy, and complete-scope freshness.)*

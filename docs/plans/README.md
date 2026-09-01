@@ -110,4 +110,5 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 ---
 
 *See also: [specs/](../specs/) for feature specifications*
-*Last updated: 2026-08-28 (PLAN-037 created for the provider model catalog maintenance skill.)*
+*Last updated: 2026-09-01 (PLAN-037 refined paste intake, lossless projection,
+and behavioral forward-testing for the provider catalog skill.)*
