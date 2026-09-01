@@ -73,31 +73,37 @@ Claude Code discovers skills from `.claude/skills/<name>/SKILL.md`.
 .\scripts\windows\Sync-AgentSkills.ps1
 ```
 
-**This script currently copies nothing.** It looks for `SKILL.md` directly inside
-each child of `skills/`, but the runtime library is organized one level deeper by
-family (`skills/chat/companion/SKILL.md`), so it matches zero directories, warns
-`No skills found`, and returns. `.claude/skills/` has never been populated by it.
-Do not treat a clean run as proof that a skill was synced.
+It copies. The three platform entrypoints are thin wrappers over one reconciler,
+`scripts/sync-agent-skills.mjs`, whose canonical source is
+`developer-skills/<name>/SKILL.md` — direct children, matching the actual layout.
+Today that is `maintain-provider-model-catalogs`.
 
-`skills/` is the runtime-owned, npm-shipped skill library (ADR-018), not a
-neutral home for developer tooling.
-[ADR-036](docs/decisions/036-separate-repository-maintenance-skills-from-runtime-delivered-skills.md)
-— **Accepted 2026-08-28** — settles where repository-maintenance skills belong:
-a separate, flat `developer-skills/` root that this script mirrors into
-`.claude/skills/`. That root is not read by the runtime skill catalog and is not
-published to npm, so a maintainer procedure never reaches users as product
-content.
+What a run does and does not touch:
 
-Neither the root nor the repointing exists yet.
-[PLAN-037](docs/plans/PLAN-037-provider-model-catalog-maintenance-skill.md) is
-Draft and unassigned. Its Phase 0 must first settle whether
-`WorkspaceSubstrateService` keeps generating these same helpers into user
-workspaces, where `developer-skills/` means nothing; Phase 1 then repoints the
-helpers and makes the sync reconcile deletions without removing skills you
-installed into `.claude/skills/` yourself. Until Phase 1 lands, the paragraph
-above still describes what running the script does. Revise this section when it
-does land; it is named as a deliverable in SPEC-028 functional requirement 4
-because no other agent is permitted to edit this file.
+- it records what it owns in `.claude/skills/.cats-runtime-managed-skills`, so a
+  renamed or deleted canonical skill loses its mirror on the next run
+- a skill you installed into `.claude/skills/` yourself is left alone
+- it refuses to overwrite an unmanaged directory that shares a canonical name,
+  rather than clobbering it
+- `-Clean` recreates repository-managed mirrors only; it no longer wipes the
+  target directory
+- re-running with no canonical change reports `unchanged` and writes nothing
+- a default run also refreshes `.agents/skills/`, the shared
+  Codex/Antigravity/Grok path; `-Agent claude` limits it to yours
+
+`skills/` stays the runtime-owned, npm-shipped skill library (ADR-018), and
+`developer-skills/` stays out of both paths to users: the runtime skill catalog
+resolves only `skills/` roots, and `package.json` `files` ships `skills` and not
+`developer-skills`. That separation is
+[ADR-036](docs/decisions/036-separate-repository-maintenance-skills-from-runtime-delivered-skills.md),
+delivered by
+[PLAN-037](docs/plans/PLAN-037-provider-model-catalog-maintenance-skill.md).
+
+One divergence is deliberate, per that ADR's implementation amendment: the
+helpers `WorkspaceSubstrateService` generates into other people's workspaces
+still sync a generic `skills/` root, because `developer-skills/` is a
+cats-runtime convention while those templates are product surface. Tests pin both
+roots. Do not "fix" one to match the other.
 
 ### MCP Server Configurations
 
@@ -180,4 +186,4 @@ and docs to the current contract.
 
 This file is maintained by Claude only. Other agents should not modify this file.
 
-Last updated: 2026-09-01
+Last updated: 2026-09-02
