@@ -119,10 +119,11 @@ foreign entries, and are safe to re-run.
       `KNOWN_PROVIDERS` and the provider catalog, routing into references, and
       the confirmation gate that blocks any edit made from pasted evidence.
 - [ ] `references/paste-intake.md` — the operator-paste protocol (requirements
-      31-36): tolerant parsing of raw terminal output, the confirmation table
+      31-37): tolerant parsing of raw terminal output, the confirmation table
       that must be echoed and answered before any edit, the multi-round gap
       calculation for per-model option axes, partial-evidence-never-deletes,
-      and the three readings that must be asked rather than inferred.
+      the three readings that must be asked rather than inferred, and where a
+      redacted paste is filed so a `notes` entry can cite it.
 - [ ] `scripts/normalize-picker-paste.*` — the deterministic half of
       requirement 32: strip terminal control sequences and picker chrome,
       render the confirmation table, and report which model and option readings
@@ -247,3 +248,4 @@ Per SPEC-028 requirement 4. Agent-owned files go to their owners.
 | 2026-08-28 | Plan created from ADR-036 (Accepted) and SPEC-028 (both open questions answered) |
 | 2026-08-28 | Phase 0 added after review found `WorkspaceSubstrateService` generates all three sync helpers into user workspaces, a surface neither ADR-036 nor SPEC-028 accounts for |
 | 2026-09-01 | SPEC-028 amended with operator-pasted evidence intake and the confirmation gate (requirements 31-36, scenarios 11-13) after the owner observed that nothing in the spec said how a maintainer hands over picker output, and that option axes are per-model. Phase 2 gains `paste-intake.md` and `normalize-picker-paste.*`; the approved one-skill scope is unchanged. Two questions left open in SPEC-028 for the owner: whether raw pastes become tracked fixtures, and whether a model-list-only paste advances `last_updated` |
+| 2026-09-01 | Owner answered both the same day. Supporting pastes are filed as redacted artifacts under `docs/research/fixtures/<cli>-<version>/` and cited from `notes` (new requirement 37); a pasted model list advances `last_updated`, and that rule stays inside requirement 15 rather than becoming a requirement of its own, so the field keeps one definition. A per-option freshness field is rejected as the schema change requirement 17 forbids improvising |

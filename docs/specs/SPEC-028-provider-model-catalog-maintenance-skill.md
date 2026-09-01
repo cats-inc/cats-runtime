@@ -160,7 +160,11 @@ precondition for editing.
     defaults, context limits, output limits, or option values.
 15. `last_updated` shall change only when the model list was re-read or otherwise
     verified. A newer `--version` result alone shall be recorded in notes with
-    its observation date and scope.
+    its observation date and scope. A pasted model list is such a verification
+    and shall advance the field even when no option axis was re-read; the option
+    axes keep their own provenance and observation date in `notes` under
+    requirement 35. The field shall not be split per option axis, which would
+    require the schema change requirement 17 forbids improvising.
 16. Raw selectable model ids and picker-visible labels shall remain distinct.
     The skill shall preserve observed generation/version information in labels;
     ambiguity belongs in notes and shall not be resolved by stripping the
@@ -260,6 +264,17 @@ precondition for editing.
     - whether the pasted list is complete, or was scrolled or truncated
     - which raw selectable id a picker-visible label corresponds to, whenever
       the normalizer carries no mapping for it
+37. Pasted evidence that materially supports a catalog change shall be preserved
+    where it can be cited. Such a paste shall be stored as a redacted artifact
+    under `docs/research/fixtures/<cli>-<version>/`, following the naming already
+    used there — named for what was captured and carrying the `.redacted`
+    marker — with the version taken from the CLI at capture time, and cited from
+    the affected catalog's `notes`. A paste too short to be worth a file may stay
+    in the conversation and be summarized in `notes` instead. Either way, account
+    identifiers, email addresses, organization names, and any authenticated
+    session material shall be removed before the paste is written to disk or
+    quoted in a note, and each removal shall leave a visible placeholder rather
+    than a silent gap.
 
 ### Non-Functional Requirements
 
@@ -414,18 +429,17 @@ skills/                           runtime-delivered, npm-shipped; unchanged
   Approved 2026-08-28: one skill carrying refresh, review, and audit modes. The
   approval covers that decision only. The reasoning behind the recommendation is
   the author's and is recorded under Design Overview.
-- [ ] Should raw operator pastes be tracked as redacted evidence artifacts under
-  `docs/research/fixtures/<cli>-<version>/`, following the convention already
-  used there (for example `grok-1.0.0/models.success.redacted.txt`), or stay
-  untracked? Recommendation: track long pastes there and cite them from `notes`,
-  keep short ones in the conversation, and redact account, email, and
-  organization identifiers either way. Requirements 31-36 are deliberately
-  silent on storage until this is answered.
-- [ ] Should a model-list-only paste advance `last_updated`? Recommendation:
-  yes. Requirement 15 already scopes that field to the model list, and
-  requirement 35 puts the option-axis provenance in `notes`. The alternative is
-  a per-option freshness field, which requirement 17 forbids inventing without a
-  deliberate schema change.
+- [x] Should raw operator pastes be tracked as redacted evidence artifacts under
+  `docs/research/fixtures/<cli>-<version>/`, or stay untracked? Approved
+  2026-09-01: track them there, following the naming already used (for example
+  `grok-1.0.0/models.success.redacted.txt`), and cite them from `notes`. A paste
+  too short to be worth a file stays in the conversation. Redaction is required
+  either way. Written into requirement 37.
+- [x] Should a model-list-only paste advance `last_updated`? Approved
+  2026-09-01: yes. The rule stays in requirement 15 rather than gaining a
+  requirement of its own, so the field has one definition; the option axes' own
+  provenance stays in `notes` under requirement 35. A per-option freshness field
+  is rejected — it is the schema change requirement 17 forbids improvising.
 
 ## References
 
@@ -441,6 +455,7 @@ skills/                           runtime-delivered, npm-shipped; unchanged
 *Created: 2026-08-28*
 *Author: Codex*
 *Amended: 2026-09-01 by Claude — operator-pasted evidence intake and the
-confirmation gate (requirements 31-36, scenarios 11-13). The approved
-single-skill, multi-mode scope is unchanged.*
+confirmation gate (requirements 31-37, scenarios 11-13), plus the paste clause
+in requirement 15. Both open questions were answered by the repository owner the
+same day. The approved single-skill, multi-mode scope is unchanged.*
 *Related Plan: [PLAN-037](../plans/PLAN-037-provider-model-catalog-maintenance-skill.md)*
