@@ -288,8 +288,8 @@ describe('curatedModelCatalog', () => {
 
       expect(result.warnings).toEqual([]);
       const catalog = findCuratedCliCatalog(result.document, 'codex');
-      expect(catalog?.version).toBe('0.149.1');
-      expect(catalog?.lastUpdated).toBe('2026-08-26');
+      expect(catalog?.version).toBe('0.152.0');
+      expect(catalog?.lastUpdated).toBe('2026-09-02');
 
       const scope = resolveCuratedCatalogScope(catalog!, 'codex');
       expect(scope?.models.map((model) => model.name)).toEqual([
@@ -311,8 +311,14 @@ describe('curatedModelCatalog', () => {
             name: 'Reasoning Level',
             default: 'Low',
             values: expect.arrayContaining([
-              { name: 'Max', notes: ['Maximum reasoning depth for the hardest problems'] },
-              { name: 'Ultra', notes: ['Maximum reasoning with automatic task delegation'] },
+              {
+                name: 'Max',
+                notes: ['For difficult problems when quality matters more than speed · higher usage'],
+              },
+              {
+                name: 'Ultra',
+                notes: ['For demanding work using multiple agents · highest usage'],
+              },
             ]),
           }),
         ]);

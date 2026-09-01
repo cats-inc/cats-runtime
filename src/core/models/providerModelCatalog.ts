@@ -199,12 +199,20 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'sonnet', label: 'Sonnet 4.6' },
     { id: 'haiku', label: 'Haiku 4.5' },
   ],
+  // Aligned 2026-09-02 with the Codex CLI 0.152.0 interactive `/model` picker,
+  // which the operator confirmed listed exactly these seven rows in this order.
+  // The picker renders raw ids rather than display names, so `label` repeats the
+  // id here; the curated catalog carries the `GPT-5.6-Sol` style display labels
+  // from `codex debug models` and takes precedence whenever it loads. This table
+  // is only the fallback for a missing curated document.
   codex: [
-    { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
+    { id: 'gpt-5.6-sol', label: 'gpt-5.6-sol', default: true },
+    { id: 'gpt-5.6-terra', label: 'gpt-5.6-terra' },
+    { id: 'gpt-5.6-luna', label: 'gpt-5.6-luna' },
+    { id: 'gpt-5.5', label: 'gpt-5.5' },
+    { id: 'gpt-5.4', label: 'gpt-5.4' },
     { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini' },
-    { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex' },
     { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark' },
-    { id: 'gpt-5.2', label: 'gpt-5.2' },
   ],
   // Enumerated live from `agy models` on 1.1.20, which prints one
   // `<id>\t<label>` pair per line. The ids are what `--model` accepts; a

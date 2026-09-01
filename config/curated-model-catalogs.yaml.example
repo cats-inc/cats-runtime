@@ -24,6 +24,8 @@ schema_version: 1
 #
 # 2026-08-26 refresh: Antigravity, Codex, and Cursor are account-resolved live
 # CLI enumerations (`agy models`, `codex debug models`, `cursor-agent models`).
+# 2026-09-02: the Codex entry was re-read from the interactive `/model` picker on
+# 0.152.0 and now carries mixed provenance - see that entry's own `notes`.
 # Claude was re-read from the compiled 2.1.246 native executable; that artifact
 # exposes a static superset rather than the account-resolved picker. Copilot,
 # Kilo, Kiro, and Junie had their versions re-probed but not their model lists -
@@ -88,12 +90,19 @@ catalogs:
         options: []
 
   - cli: Codex
-    version: 0.149.1
-    last_updated: 2026-08-26
+    version: 0.152.0
+    last_updated: 2026-09-02
     notes:
-      - "Source: refreshed `codex debug models` output from an authenticated Codex CLI"
-      - "Only models with `visibility: list` are included; hidden internal models are omitted"
+      - "Model list re-read 2026-09-02 from the authenticated interactive `/model` picker on Codex CLI 0.152.0; the operator confirmed all seven rows were visible with nothing scrolled off"
+      - "Every model id, ordering, description, reasoning-level value set, and per-model reasoning default below was re-verified against that picker"
+      - "Evidence: docs/research/fixtures/codex-0.152.0/model-picker.success.redacted.txt"
+      - "The picker shows raw ids only. Every `label` and every `context` number still comes from the 2026-08-26 `codex debug models` run on 0.149.1 and was not re-observed here"
+      - "`default: true` on gpt-5.6-sol likewise remains from that 0.149.1 `codex debug models` run. The 0.152.0 model list marks gpt-5.6-sol only `(current)`, which is the session selection; the reasoning screens print a separate `(default)` marker, so the model list itself makes no account-default claim either way"
+      - "Only models with `visibility: list` are included; hidden internal models are omitted. That filter is from the 0.149.1 `codex debug models` output and was not re-checked"
       - "Context values reflect the Codex CLI catalog and may differ from OpenAI API limits"
+      - "Max and Ultra sit behind a `More reasoning…` entry that opens an `Advanced Reasoning` screen headed `⚠ Consumes usage limits faster`. That nesting has no representation in this schema and is flattened into the value lists below. The picker gates it per model: gpt-5.6-sol and gpt-5.6-terra offer `Max and Ultra`, gpt-5.6-luna offers `Max` only, and gpt-5.5, gpt-5.4, gpt-5.4-mini, and gpt-5.3-codex-spark show no such entry at all"
+      - "Only gpt-5.6-sol's `More reasoning…` submenu was actually opened on 0.152.0. The terra and luna entries above are read from the picker's own hint text rather than from an opened submenu"
+      - "Max and Ultra descriptions are the 0.152.0 picker text observed under gpt-5.6-sol. They replace wording that had been carried over from the runtime advanced-knowledge baseline and never observed in a picker"
     shared_options:
       - name: Reasoning Level
         values:
@@ -111,10 +120,10 @@ catalogs:
               - "Extra high reasoning depth for complex problems"
           - name: Max
             notes:
-              - "Maximum reasoning depth for the hardest problems"
+              - "For difficult problems when quality matters more than speed · higher usage"
           - name: Ultra
             notes:
-              - "Maximum reasoning with automatic task delegation"
+              - "For demanding work using multiple agents · highest usage"
         default: Medium
     models:
       - name: gpt-5.6-sol
