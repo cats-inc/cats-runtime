@@ -142,7 +142,11 @@ if ($deletable.Count -eq 0) {
             Invoke-Git @("switch", $defaultBranch) | Out-Null
             Write-Host "  switch $defaultBranch (left '$currentBranch' so it can be removed)"
             $currentBranch = $defaultBranch
-        } else {
+        } elseif (-not $WhatIfPreference) {
+            # Declined under -Confirm: the branch cannot be deleted while it is
+            # still checked out, so drop it. -WhatIf also lands here because
+            # ShouldProcess reports false, but there the intent is a preview, so
+            # keep the branch listed and let the delete below be previewed too.
             $deletable = @($deletable | Where-Object { $_ -ne $currentBranch })
         }
     }
