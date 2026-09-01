@@ -1,3 +1,4 @@
+// Keep this Node test out of Vitest's *.test.* auto-discovery.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';

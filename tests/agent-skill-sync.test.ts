@@ -247,13 +247,12 @@ describe('repository-maintenance skill sync', () => {
   it('runs the provider picker normalization behavior suite', () => {
     const result = spawnSync(process.execPath, [
       '--test',
-      '--test-isolation=none',
       join(
         REPO_ROOT,
         'developer-skills',
         'maintain-provider-model-catalogs',
         'tests',
-        'normalize-picker-paste.test.mjs',
+        'normalize-picker-paste.node-test.mjs',
       ),
     ], {
       cwd: REPO_ROOT,
