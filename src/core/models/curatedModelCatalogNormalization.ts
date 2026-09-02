@@ -412,28 +412,28 @@ export function normalizeClaudeCuratedModelId(model: CuratedModelCatalogModel): 
     if (
       normalized === 'fable'
       || normalized.includes('claude-fable')
-      || normalized.includes('fable 5')
+      || /^fable \d/u.test(normalized)
     ) {
       return 'fable';
     }
     if (
       normalized === 'opus'
       || normalized.includes('claude-opus')
-      || normalized.includes('opus 4.6')
+      || /^opus \d/u.test(normalized)
     ) {
       return 'opus';
     }
     if (
       normalized === 'sonnet'
       || normalized.includes('claude-sonnet')
-      || normalized.includes('sonnet 4.6')
+      || /^sonnet \d/u.test(normalized)
     ) {
       return 'sonnet';
     }
     if (
       normalized === 'haiku'
       || normalized.includes('claude-haiku')
-      || normalized.includes('haiku 4.5')
+      || /^haiku \d/u.test(normalized)
     ) {
       return 'haiku';
     }
