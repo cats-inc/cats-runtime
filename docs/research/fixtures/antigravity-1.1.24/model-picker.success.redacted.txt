@@ -1,0 +1,46 @@
+# Source: operator-pasted Antigravity CLI interactive /model picker
+# Version: 1.1.24
+# Observed: 2026-09-03
+# Account scope: operator session; account identifiers not provided
+# Platform/channel: not reported
+# Completeness: complete - the operator reported the whole Switch Model list, and the
+#   independent `agy models` enumeration captured the same day resolves to exactly these
+#   seven families
+# Note: the picker lists model families and exposes Effort as a separate slider. The raw ids
+#   `--model` accepts are flattened per effort level and are recorded in
+#   models-command.success.redacted.txt; this screen never renders a raw id.
+# Redaction: no account identifiers, organization names, paths, tokens, or session material present
+
+Switch Model
+
+> Gemini 3.8 Flash             (current)
+  Gemini 3.7 Flash
+  Gemini 3.6 Flash
+  Gemini 3.1 Pro
+  Claude Sonnet 4.6 (Thinking)
+  Claude Opus 4.6 (Thinking)
+  GPT-OSS 120B (Medium)
+
+  Effort  ◂        ●━━━━━━━━━━━━━━●━━━━━━━━━━━━━━◉        ▸
+                  low          medium          high
+            Deepest reasoning for complex problems — slower but strongest
+
+The operator reported that Gemini 3.8 Flash, 3.7 Flash, and 3.6 Flash each adjust
+left/right across all three of these Effort states:
+
+  Effort  ◂        ◉──────────────○──────────────○        ▸
+                  low          medium          high
+            Faster responses, lighter reasoning — great for simpler tasks
+
+  Effort  ◂        ●━━━━━━━━━━━━━━◉──────────────○        ▸
+                  low          medium          high
+            Balanced speed and reasoning quality for most tasks
+
+  Effort  ◂        ●━━━━━━━━━━━━━━●━━━━━━━━━━━━━━◉        ▸
+                  low          medium          high
+            Deepest reasoning for complex problems — slower but strongest
+
+The operator reported that Gemini 3.1 Pro exposes only low and high; its per-level
+descriptions were not captured.
+
+The operator reported that the remaining non-Gemini rows cannot be adjusted at all.
