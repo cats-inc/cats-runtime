@@ -50,7 +50,7 @@ catalogs:
       - "`default: true` on Opus is retained from the account-resolved 2026-04-17 snapshot. The 2.1.257 `√` marker was on the Default sentinel, so this refresh neither re-verifies nor removes that older explicit-alias default."
     models:
       - name: Opus
-        label: Opus (1M context)
+        label: Opus 5 (1M context)
         notes:
           - "Picker description: Opus 5 with 1M context - best for everyday, complex tasks"
         default: true
@@ -79,7 +79,7 @@ catalogs:
             default: High
 
       - name: Fable
-        label: Fable
+        label: Fable 5.1
         notes:
           - "Picker description: Fable 5.1 - most capable for your hardest and longest-running tasks"
         options:
@@ -98,7 +98,7 @@ catalogs:
             default: High
 
       - name: Sonnet
-        label: Sonnet
+        label: Sonnet 5
         notes:
           - "Picker description: Sonnet 5 - efficient for routine tasks"
         context: 1000000
@@ -118,7 +118,7 @@ catalogs:
             default: High
 
       - name: Haiku
-        label: Haiku
+        label: Haiku 4.5
         notes:
           - "Picker description: Haiku 4.5 - fastest for quick answers"
         context: 200000

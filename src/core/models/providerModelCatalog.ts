@@ -198,10 +198,10 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
   // interactive `/model` picker. The provider-default null sentinel is not an
   // executable model id, so this fallback contains only the four model aliases.
   claude: [
-    { id: 'opus', label: 'Opus (1M context)', default: true },
-    { id: 'fable', label: 'Fable' },
-    { id: 'sonnet', label: 'Sonnet' },
-    { id: 'haiku', label: 'Haiku' },
+    { id: 'opus', label: 'Opus 5 (1M context)', default: true },
+    { id: 'fable', label: 'Fable 5.1' },
+    { id: 'sonnet', label: 'Sonnet 5' },
+    { id: 'haiku', label: 'Haiku 4.5' },
   ],
   // Aligned 2026-09-02 with the Codex CLI 0.152.0 interactive `/model` picker,
   // which the operator confirmed listed exactly these seven rows in this order.

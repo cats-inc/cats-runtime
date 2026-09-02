@@ -11,8 +11,19 @@ import {
 } from './curatedModelCatalogNormalization.js';
 
 describe('curatedModelCatalogNormalization', () => {
+  it('resolves a version-suffixed picker label to the bare executable alias', () => {
+    // The catalog labels carry the version the picker shows, so the id must not
+    // move when the vendor bumps it. Label-only entries have no `name` to fall
+    // back on, which is the case that pinning one version per alias broke.
+    expect(normalizeClaudeCuratedModelId({ label: 'Opus 5 (1M context)' })).toBe('opus');
+    expect(normalizeClaudeCuratedModelId({ label: 'Opus 6 (1M context)' })).toBe('opus');
+    expect(normalizeClaudeCuratedModelId({ label: 'Sonnet 5' })).toBe('sonnet');
+    expect(normalizeClaudeCuratedModelId({ label: 'Haiku 4.5' })).toBe('haiku');
+    expect(normalizeClaudeCuratedModelId({ label: 'Fable 5.1' })).toBe('fable');
+  });
+
   it('normalizes current Claude picker labels into executable aliases', () => {
-    expect(normalizeClaudeCuratedModelId({ name: 'Opus', label: 'Opus (1M context)' }))
+    expect(normalizeClaudeCuratedModelId({ name: 'Opus', label: 'Opus 5 (1M context)' }))
       .toBe('opus');
     expect(normalizeClaudeCuratedModelId({ name: 'Fable', label: 'Fable 5.1' }))
       .toBe('fable');
