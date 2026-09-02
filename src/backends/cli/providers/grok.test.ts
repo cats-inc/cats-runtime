@@ -56,6 +56,32 @@ describe('GrokProvider', () => {
     expect(args).toContain('read_file');
   });
 
+  it('passes the curated reasoning effort through as --reasoning-effort', () => {
+    const provider = new GrokProvider(VERIFIED_PROFILE);
+    provider.prepareEphemeralTurn({ message: 'Think hard' });
+
+    const args = provider.buildSpawnArgs({
+      cwd: '/tmp/grok-provider-test',
+      model: 'grok-4.6',
+      modelControls: { 'grok.reasoning_effort': 'xhigh' },
+    });
+
+    expect(args[args.indexOf('--reasoning-effort') + 1]).toBe('xhigh');
+    expect(args[args.indexOf('--model') + 1]).toBe('grok-4.6');
+  });
+
+  it('omits --reasoning-effort when no effort control is selected', () => {
+    const provider = new GrokProvider(VERIFIED_PROFILE);
+    provider.prepareEphemeralTurn({ message: 'Say hi' });
+
+    const args = provider.buildSpawnArgs({
+      cwd: '/tmp/grok-provider-test',
+      model: 'grok-4.5',
+    });
+
+    expect(args).not.toContain('--reasoning-effort');
+  });
+
   it('maps skip and non-empty whitelist permissions to verified Grok flags', () => {
     const skipProvider = new GrokProvider(VERIFIED_PROFILE);
     skipProvider.prepareEphemeralTurn({ message: 'Run it' });

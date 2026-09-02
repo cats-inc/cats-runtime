@@ -496,7 +496,9 @@ describe('runtime server', () => {
       expect(html).toContain('validateRuntimeApiKey');
       expect(html).toContain('getRuntimeAuthHeaders');
       expect(html).toContain("antigravity:[{value:'antigravity-default',label:'Antigravity default'}],");
-      expect(html).toContain("grok:[{value:'grok-4.5',label:'grok-4.5 (default)'}],");
+      // Grok 1.0.13 enumerates two models and marks neither default; the
+      // `(default)` marker `grok models` prints comes from the per-user config.
+      expect(html).toContain("grok:[{value:'grok-4.6',label:'Grok 4.6'},{value:'grok-4.5',label:'Grok 4.5'}],");
       expect(html).toContain("junie:[{value:'Gemini 3 Flash',label:'Gemini 3 Flash (default)'},{value:'Claude Opus 4.6',label:'Claude Opus 4.6'},{value:'Claude Opus 4.7',label:'Claude Opus 4.7'},{value:'Claude Sonnet 4.6',label:'Claude Sonnet 4.6'},{value:'Gemini 3.1 Flash Lite',label:'Gemini 3.1 Flash Lite'},{value:'Gemini 3.1 Pro Preview',label:'Gemini 3.1 Pro Preview'},{value:'GPT-5',label:'GPT-5'},{value:'GPT-5.2',label:'GPT-5.2'},{value:'GPT-5.3-codex',label:'GPT-5.3-codex'},{value:'GPT-5.4',label:'GPT-5.4'},{value:'Grok 4.1 Fast Reasoning',label:'Grok 4.1 Fast Reasoning'}],");
       expect(html).not.toContain("junie:[{value:'gpt-5.4',label:'gpt-5.4 (default)'}],");
       expect(html).toContain('/providers/${name}/models/advanced');
@@ -4514,16 +4516,33 @@ providers:
           ],
         },
       ]);
-      expect(advancedPayload.controls[0]?.values).toEqual(expect.arrayContaining([
+      // The HTTP payload carries one option per submitted token. `medium` and
+      // `high` each default for only part of the catalog, so neither is
+      // suffixed `(default)`; per-entry defaults ride on the entries instead.
+      expect(advancedPayload.controls[0]?.values).toEqual([
         expect.objectContaining({
-          value: 'medium',
-          label: 'Medium (default)',
+          value: 'low',
+          label: 'Low',
           applicableEntryIds: [
             'gpt-5.4',
             'gpt-5.2-codex',
             'gpt-5.1-codex-max',
             'gpt-5.4-mini',
             'gpt-5.3-codex',
+            'gpt-5.3-codex-spark',
+            'gpt-5.2',
+          ],
+        }),
+        expect.objectContaining({
+          value: 'medium',
+          label: 'Medium',
+          applicableEntryIds: [
+            'gpt-5.4',
+            'gpt-5.2-codex',
+            'gpt-5.1-codex-max',
+            'gpt-5.4-mini',
+            'gpt-5.3-codex',
+            'gpt-5.3-codex-spark',
             'gpt-5.2',
             'gpt-5.1-codex-mini',
           ],
@@ -4537,20 +4556,9 @@ providers:
             'gpt-5.1-codex-max',
             'gpt-5.4-mini',
             'gpt-5.3-codex',
-            'gpt-5.2',
-            'gpt-5.1-codex-mini',
-          ],
-        }),
-        expect.objectContaining({
-          value: 'low',
-          applicableEntryIds: [
-            'gpt-5.4',
-            'gpt-5.2-codex',
-            'gpt-5.1-codex-max',
-            'gpt-5.4-mini',
-            'gpt-5.3-codex',
             'gpt-5.3-codex-spark',
             'gpt-5.2',
+            'gpt-5.1-codex-mini',
           ],
         }),
         expect.objectContaining({
@@ -4565,7 +4573,7 @@ providers:
             'gpt-5.2',
           ],
         }),
-      ]));
+      ]);
       expect(advancedPayload.warnings).toEqual([]);
     });
   });
@@ -4851,7 +4859,8 @@ providers:
             description: 'Controls GitHub Copilot CLI reasoning effort for supported models.',
             kind: 'enum',
             scope: 'both',
-            values: expect.arrayContaining([
+            // One option per submitted token, every entry unioned onto it.
+            values: [
               expect.objectContaining({
                 value: 'low',
                 label: 'Low',
@@ -4865,30 +4874,27 @@ providers:
               }),
               expect.objectContaining({
                 value: 'medium',
-                label: 'Medium (default)',
-                applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini', 'claude-sonnet-4'],
-              }),
-              expect.objectContaining({
-                value: 'high',
-                label: 'High (default)',
-                applicableEntryIds: ['gpt-5.2-codex', 'claude-opus-4.6'],
-              }),
-              expect.objectContaining({
-                value: 'medium',
                 label: 'Medium',
-                applicableEntryIds: ['gpt-5.2-codex', 'claude-opus-4.6'],
+                applicableEntryIds: [
+                  'gpt-5.4',
+                  'gpt-5.4-mini',
+                  'gpt-5.2-codex',
+                  'claude-opus-4.6',
+                  'claude-sonnet-4',
+                ],
               }),
               expect.objectContaining({
                 value: 'high',
                 label: 'High',
-                applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini', 'claude-sonnet-4'],
+                applicableEntryIds: [
+                  'gpt-5.4',
+                  'gpt-5.4-mini',
+                  'gpt-5.2-codex',
+                  'claude-opus-4.6',
+                  'claude-sonnet-4',
+                ],
               }),
-              expect.objectContaining({
-                value: 'high',
-                label: 'High (default)',
-                applicableEntryIds: ['gpt-5.2-codex', 'claude-opus-4.6'],
-              }),
-            ]),
+            ],
             applicableEntryIds: [
               'gpt-5.4',
               'gpt-5.4-mini',

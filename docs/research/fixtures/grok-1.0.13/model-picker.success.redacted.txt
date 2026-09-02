@@ -1,0 +1,46 @@
+# Source: operator-supplied screenshots of the Grok CLI interactive /model picker,
+#   transcribed here because the evidence arrived as images rather than text
+# Version: 1.0.13 (operator-reported "Grok Build 1.0.13"; local `grok --version` agrees)
+# Observed: 2026-09-03
+# Account scope: operator session; account identifiers not provided
+# Platform/channel: not reported
+# Completeness: complete - model list plus both per-model effort screens
+# Redaction: no account identifiers, organization names, paths, tokens, or session
+#   material appear in the screenshots.
+
+Model list screen:
+
+> Grok 4.6 (current)   SpaceXAI's latest frontier model
+  Grok 4.5
+
+Effort screen with `/model Grok 4.6` shown on the prompt line below the menu:
+
+> Extra High Effort (active)   Highest effort and reasoning level
+  High Effort                  Higher implementation quality with extensive reasoning
+  Medium Effort                Balanced effort with standard implementation and testing
+  Low Effort                   Quick, fast implementations
+
+Effort screen with `/model Grok 4.5` shown on the prompt line below the menu:
+
+> High Effort     Highest implementation quality with extensive reasoning
+  Medium Effort   Balanced effort with standard implementation and testing
+  Low Effort      Quick, fast implementations
+
+Both screens agree line for line with the per-model `reasoning_efforts` menus in the
+account-resolved manifest recorded in models-cache.success.redacted.txt: four entries
+for grok-4.6 whose High row reads "Higher implementation quality with extensive
+reasoning", and three entries for grok-4.5 whose High row reads "Highest implementation
+quality with extensive reasoning".
+
+Resolved caption conflict, retained for provenance. An earlier round of screenshots
+arrived with the model list duplicated into the slot captioned as the Grok 4.6 effort
+screen, so the only effort image then available carried a Grok 4.5 caption while its
+content matched grok-4.6. These re-captured screens each include the `/model <name>`
+prompt line, which settles the attribution directly rather than by inference.
+
+Selection markers are not defaults. The "(active)" marker on Extra High Effort is the
+operator's current session selection: the manifest marks `high` as `default: true` for
+both models, and ~/.grok/config.toml on the observed machine sets
+`default_reasoning_effort = "xhigh"`, which explains the marker as a per-user setting.
+The Grok 4.5 screen shows no "(active)" marker at all - `xhigh` is not among that
+model's three levels - and its cursor simply rests on the first row.

@@ -344,7 +344,10 @@ describe('buildProviderAdvancedKnowledge', () => {
           description: 'Controls Codex CLI reasoning depth for supported models.',
           kind: 'enum',
           scope: 'both',
-          values: expect.arrayContaining([
+          // One option per distinct value, with the entry ids unioned. `high`
+          // and `medium` each default for only one of the two models, so
+          // neither carries the `(default)` suffix on the shared option.
+          values: [
             {
               value: 'low',
               label: 'Low',
@@ -355,13 +358,13 @@ describe('buildProviderAdvancedKnowledge', () => {
               value: 'medium',
               label: 'Medium',
               description: 'Balances speed and reasoning depth for everyday tasks.',
-              applicableEntryIds: ['gpt-5.3-codex-spark'],
+              applicableEntryIds: ['gpt-5.3-codex-spark', 'gpt-5.4'],
             },
             {
               value: 'high',
-              label: 'High (default)',
+              label: 'High',
               description: 'Greater reasoning depth for complex problems.',
-              applicableEntryIds: ['gpt-5.3-codex-spark'],
+              applicableEntryIds: ['gpt-5.3-codex-spark', 'gpt-5.4'],
             },
             {
               value: 'xhigh',
@@ -369,19 +372,7 @@ describe('buildProviderAdvancedKnowledge', () => {
               description: 'Extra high reasoning depth for complex problems.',
               applicableEntryIds: ['gpt-5.3-codex-spark', 'gpt-5.4'],
             },
-            {
-              value: 'medium',
-              label: 'Medium (default)',
-              description: 'Balances speed and reasoning depth for everyday tasks.',
-              applicableEntryIds: ['gpt-5.4'],
-            },
-            {
-              value: 'high',
-              label: 'High',
-              description: 'Greater reasoning depth for complex problems.',
-              applicableEntryIds: ['gpt-5.4'],
-            },
-          ]),
+          ],
           applicableEntryIds: ['gpt-5.3-codex-spark', 'gpt-5.4'],
           semanticTags: ['reasoning_intensity'],
         }),
@@ -483,6 +474,181 @@ describe('buildProviderAdvancedKnowledge', () => {
           'codex.reasoning_effort': 'low',
         },
       });
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('emits one enum option per value even when models disagree on wording and defaults', () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-curated-dedupe-'));
+    const curatedPath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');
+    mkdirSync(join(runtimeRoot, 'config'), { recursive: true });
+    // Two models offer the same tokens but describe `high` differently and
+    // disagree about which level is their default. Keying the option on the
+    // rendered label or description used to split each token into several
+    // options that all submit the same value, which no picker can represent.
+    writeFileSync(curatedPath, [
+      'schema_version: 1',
+      'catalogs:',
+      '  - cli: Claude',
+      '    version: 2.1.257',
+      '    last_updated: 2026-09-03',
+      '    models:',
+      '      - name: Opus',
+      '        options:',
+      '          - name: Effort',
+      '            values:',
+      '              - name: Low',
+      '              - name: High',
+      '                notes:',
+      '                  - "Deeper reasoning for Opus"',
+      '            default: High',
+      '      - name: Sonnet',
+      '        options:',
+      '          - name: Effort',
+      '            values:',
+      '              - name: Low',
+      '              - name: High',
+      '                notes:',
+      '                  - "Deeper reasoning for Sonnet"',
+      '            default: Low',
+      '',
+    ].join('\n'), 'utf8');
+
+    try {
+      const target: ProviderTargetDescriptor = {
+        providerName: 'claude',
+        backend: 'cli',
+        instanceId: 'default',
+        defaultTarget: true,
+        cliInstance: {
+          id: 'default',
+          providerName: 'claude',
+          backend: 'cli',
+          command: 'claude',
+        },
+      };
+
+      const knowledge = buildProviderAdvancedKnowledge(target, createCatalog({
+        provider: 'claude',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'opus',
+        models: [
+          { id: 'opus', label: 'opus', default: true },
+          { id: 'sonnet', label: 'sonnet' },
+        ],
+      }), {
+        env: {
+          ...process.env,
+          CATS_RUNTIME_DIR: runtimeRoot,
+        },
+      });
+
+      const values = knowledge.controlsByKey['claude.reasoning_effort']?.values ?? [];
+      expect(values.map((value) => value.value)).toEqual(['low', 'high']);
+      // Neither level defaults for both models, so neither is suffixed; the
+      // first model's wording wins the shared description.
+      expect(values.map((value) => value.label)).toEqual(['Low', 'High']);
+      expect(values.find((value) => value.value === 'high')?.description)
+        .toBe('Deeper reasoning for Opus');
+      expect(values.every((value) => value.applicableEntryIds?.length === 2)).toBe(true);
+      // The per-model defaults still differ; only the shared label is neutral.
+      expect(knowledge.entryDefaults).toMatchObject({
+        opus: { 'claude.reasoning_effort': 'high' },
+        sonnet: { 'claude.reasoning_effort': 'low' },
+      });
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('publishes curated Grok CLI effort controls scoped to each model own menu', () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-curated-grok-'));
+    const curatedPath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');
+    mkdirSync(join(runtimeRoot, 'config'), { recursive: true });
+    // Grok's ids do not encode effort, and the account-resolved manifest gives
+    // grok-4.6 an xhigh level that grok-4.5 does not have. The control must
+    // keep that per-model boundary instead of offering xhigh everywhere.
+    writeFileSync(curatedPath, [
+      'schema_version: 1',
+      'catalogs:',
+      '  - cli: Grok',
+      '    version: 1.0.13',
+      '    last_updated: 2026-09-03',
+      '    models:',
+      '      - name: grok-4.6',
+      '        label: Grok 4.6',
+      '        context: 500000',
+      '        options:',
+      '          - name: Effort',
+      '            values: [xhigh, high, medium, low]',
+      '            default: high',
+      '      - name: grok-4.5',
+      '        label: Grok 4.5',
+      '        context: 500000',
+      '        options:',
+      '          - name: Effort',
+      '            values: [high, medium, low]',
+      '            default: high',
+      '',
+    ].join('\n'), 'utf8');
+
+    try {
+      const target: ProviderTargetDescriptor = {
+        providerName: 'grok',
+        backend: 'cli',
+        instanceId: 'native',
+        defaultTarget: true,
+        cliInstance: {
+          id: 'native',
+          providerName: 'grok',
+          backend: 'cli',
+          command: 'grok',
+        },
+      };
+
+      const knowledge = buildProviderAdvancedKnowledge(target, createCatalog({
+        provider: 'grok',
+        backend: 'cli',
+        instance: 'native',
+        defaultModel: null,
+        models: [
+          { id: 'grok-4.6', label: 'Grok 4.6' },
+          { id: 'grok-4.5', label: 'Grok 4.5' },
+        ],
+      }), {
+        env: {
+          ...process.env,
+          CATS_RUNTIME_DIR: runtimeRoot,
+        },
+      });
+
+      const effort = knowledge.catalog.controls
+        .find((control) => control.key === 'grok.reasoning_effort');
+      expect(effort).toBeDefined();
+      expect(effort?.label).toBe('Reasoning effort');
+      expect(effort?.applicableEntryIds).toEqual(['grok-4.6', 'grok-4.5']);
+      // xhigh belongs to grok-4.6 alone; the shared levels list both entries.
+      expect(effort?.values.map((value) => [value.value, value.applicableEntryIds]))
+        .toEqual([
+          ['xhigh', ['grok-4.6']],
+          ['high', ['grok-4.6', 'grok-4.5']],
+          ['medium', ['grok-4.6', 'grok-4.5']],
+          ['low', ['grok-4.6', 'grok-4.5']],
+        ]);
+      // The manifest marks high as each model's own default; the operator's
+      // config.toml xhigh preference is deliberately not encoded here.
+      expect(knowledge.catalog.defaultSelection).toEqual({
+        entryId: 'grok-4.6',
+        entryMode: 'explicit',
+        controls: { 'grok.reasoning_effort': 'high' },
+      });
+      // No curated row claims a default model, so nothing marks an entry
+      // default; grok-4.6 is only the first entry the UI pre-fills.
+      expect(knowledge.catalog.entries.map((entry) => [entry.id, entry.default]))
+        .toEqual([['grok-4.6', undefined], ['grok-4.5', undefined]]);
+      expect(knowledge.catalog.warnings).toEqual([]);
     } finally {
       rmSync(runtimeRoot, { recursive: true, force: true });
     }
@@ -793,56 +959,50 @@ describe('buildProviderAdvancedKnowledge', () => {
           description: 'Controls GitHub Copilot CLI reasoning effort for supported models.',
           kind: 'enum',
           scope: 'both',
-          values: expect.arrayContaining([
+          // The OpenAI and Anthropic groups word the same three levels
+          // differently, but they submit the same tokens, so each token gets
+          // exactly one option. The first group's wording wins the shared
+          // description; the per-group wording stays in the curated catalog.
+          // None of the three defaults for every model, so no `(default)`
+          // suffix survives - per-entry defaults live in `entryDefaults`.
+          values: [
             {
               value: 'low',
               label: 'Low',
               description: 'Faster responses, less detailed reasoning',
-              applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.2-codex'],
+              applicableEntryIds: [
+                'gpt-5.4',
+                'gpt-5.4-mini',
+                'gpt-5.2-codex',
+                'claude-opus-4.6',
+                'claude-sonnet-4',
+              ],
             },
             {
               value: 'medium',
-              label: 'Medium (default)',
+              label: 'Medium',
               description: 'Balanced speed and reasoning depth',
-              applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini'],
+              applicableEntryIds: [
+                'gpt-5.4',
+                'gpt-5.4-mini',
+                'gpt-5.2-codex',
+                'claude-opus-4.6',
+                'claude-sonnet-4',
+              ],
             },
             {
               value: 'high',
               label: 'High',
               description: 'More thorough reasoning, slower responses',
-              applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini'],
+              applicableEntryIds: [
+                'gpt-5.4',
+                'gpt-5.4-mini',
+                'gpt-5.2-codex',
+                'claude-opus-4.6',
+                'claude-sonnet-4',
+              ],
             },
-            {
-              value: 'high',
-              label: 'High (default)',
-              description: 'More thorough reasoning, slower responses',
-              applicableEntryIds: ['gpt-5.2-codex'],
-            },
-            {
-              value: 'low',
-              label: 'Low',
-              description: 'Minimal thinking, prioritizes speed',
-              applicableEntryIds: ['claude-opus-4.6', 'claude-sonnet-4'],
-            },
-            {
-              value: 'medium',
-              label: 'Medium (default)',
-              description: 'Balanced, thinks on harder problems',
-              applicableEntryIds: ['claude-sonnet-4'],
-            },
-            {
-              value: 'high',
-              label: 'High (default)',
-              description: 'Optimal performance, thorough thinking',
-              applicableEntryIds: ['claude-opus-4.6'],
-            },
-            {
-              value: 'high',
-              label: 'High',
-              description: 'Optimal performance, thorough thinking',
-              applicableEntryIds: ['claude-sonnet-4'],
-            },
-          ]),
+          ],
           applicableEntryIds: [
             'gpt-5.4',
             'gpt-5.4-mini',
@@ -988,38 +1148,33 @@ describe('buildProviderAdvancedKnowledge', () => {
           ],
         }),
       );
-      expect(knowledge.catalog.controls[0]?.values).toEqual(expect.arrayContaining([
+      // The flat shape resolves to the same three options as the grouped one:
+      // one per submitted token, every entry unioned onto it, and no
+      // `(default)` suffix because none of the three is the default everywhere.
+      const allEntryIds = [
+        'gpt-5.4',
+        'gpt-5.4-mini',
+        'gpt-5.2-codex',
+        'claude-opus-4.6',
+        'claude-sonnet-4',
+      ];
+      expect(knowledge.catalog.controls[0]?.values).toEqual([
         expect.objectContaining({
           value: 'low',
           label: 'Low',
-          applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.2-codex'],
+          applicableEntryIds: allEntryIds,
         }),
         expect.objectContaining({
           value: 'medium',
-          label: 'Medium (default)',
-          applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini'],
+          label: 'Medium',
+          applicableEntryIds: allEntryIds,
         }),
         expect.objectContaining({
           value: 'high',
-          label: 'High (default)',
-          applicableEntryIds: ['gpt-5.2-codex'],
+          label: 'High',
+          applicableEntryIds: allEntryIds,
         }),
-        expect.objectContaining({
-          value: 'low',
-          label: 'Low',
-          applicableEntryIds: ['claude-opus-4.6', 'claude-sonnet-4'],
-        }),
-        expect.objectContaining({
-          value: 'medium',
-          label: 'Medium (default)',
-          applicableEntryIds: ['claude-sonnet-4'],
-        }),
-        expect.objectContaining({
-          value: 'high',
-          label: 'High (default)',
-          applicableEntryIds: ['claude-opus-4.6'],
-        }),
-      ]));
+      ]);
       expect(knowledge.catalog.warnings).toEqual([]);
     } finally {
       rmSync(runtimeRoot, { recursive: true, force: true });
