@@ -4052,9 +4052,13 @@ providers:
       // `--model` takes the slug, not the display label agy prints back when it
       // rejects one, so the catalog has to serve ids in that form.
       expect(body.models[0]).toEqual({
-        id: 'gemini-3.7-flash-high',
-        label: 'Gemini 3.7 Flash (High)',
+        id: 'gemini-3.8-flash-high',
+        label: 'Gemini 3.8 Flash (High)',
       });
+      // 1.1.24 dropped the 3.5 Flash family; serving ids agy rejects is worse
+      // than serving a shorter list.
+      expect(body.models.map((model: { id: string }) => model.id))
+        .not.toContain('gemini-3.5-flash-high');
       expect(body.models.map((model: { id: string }) => model.id))
         .toContain('claude-opus-4-6-thinking');
       // agy reads its own default from the per-user settings.json, so the

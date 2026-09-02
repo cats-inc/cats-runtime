@@ -221,28 +221,37 @@ describe('curatedModelCatalog', () => {
       expect(result.warnings).toEqual([]);
 
       const catalog = findCuratedCliCatalog(result.document, 'antigravity');
-      expect(catalog?.version).toBe('1.1.20');
-      expect(catalog?.lastUpdated).toBe('2026-08-26');
+      expect(catalog?.version).toBe('1.1.24');
+      expect(catalog?.lastUpdated).toBe('2026-09-03');
 
       const scope = resolveCuratedCatalogScope(catalog!, 'antigravity');
       // `name` feeds normalizeVerbatimCuratedModelId, so these are the exact
       // strings handed to `agy --model`; agy echoes labels back on a bad id.
       expect(scope?.models.map((model) => model.name)).toEqual([
+        'gemini-3.8-flash-high',
+        'gemini-3.8-flash-medium',
+        'gemini-3.8-flash-low',
         'gemini-3.7-flash-high',
         'gemini-3.7-flash-medium',
         'gemini-3.7-flash-low',
         'gemini-3.6-flash-high',
         'gemini-3.6-flash-medium',
         'gemini-3.6-flash-low',
-        'gemini-3.5-flash-high',
-        'gemini-3.5-flash-medium',
-        'gemini-3.5-flash-low',
         'gemini-3.1-pro-high',
         'gemini-3.1-pro-low',
         'claude-sonnet-4-6',
         'claude-opus-4-6-thinking',
         'gpt-oss-120b-medium',
       ]);
+      // The picker's Effort slider is already flattened into the ids, so the
+      // curated rows carry the observed per-level descriptions as notes rather
+      // than a second option axis the Antigravity overlay would discard.
+      expect(scope?.models.find((model) => model.name === 'gemini-3.8-flash-low')?.notes)
+        .toEqual(['Effort low: faster responses, lighter reasoning - great for simpler tasks']);
+      // Gemini 3.1 Pro exposes only low/high and its descriptions were never
+      // captured, so the Flash wording must not be copied onto it.
+      expect(scope?.models.find((model) => model.name === 'gemini-3.1-pro-low')?.notes)
+        .toBeUndefined();
       // agy reads its default from the per-user settings.json `model` field,
       // so the catalog must not claim one.
       expect(scope?.models.some((model) => model.default)).toBe(false);
