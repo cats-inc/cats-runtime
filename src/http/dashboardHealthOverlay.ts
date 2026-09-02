@@ -7,6 +7,51 @@ interface RuntimeHealthProviderSummary {
   summary?: string;
 }
 
+/**
+ * The payload the overlay shows when the diagnostics request is rejected.
+ *
+ * A rejection means two different things depending on how the page was
+ * reached. Served directly by the runtime, `401`/`403` comes from
+ * `bearerAuth` and really is a missing API key. Served through the Cats
+ * platform proxy, the runtime never sees the request: the platform's auth
+ * gate rejects it because there is no Cats browser session, and the runtime
+ * may well have no API key configured at all. Reporting a missing key there
+ * sends the reader looking for a credential that does not exist.
+ *
+ * The provider summary carries a non-ok `status` so `formatRuntimeHealthLabel`
+ * uses this explanation instead of falling back to `providers 0/0 ok`, which
+ * reads as a real count of zero working providers.
+ */
+export function createRuntimeDiagnosticsAuthPayload(proxyMode: boolean) {
+  const runtimeSummary = proxyMode
+    ? 'Sign in to Cats to see runtime diagnostics.'
+    : 'API key required for runtime diagnostics.';
+  const providerSummary = proxyMode
+    ? 'Provider diagnostics are hidden until you sign in to Cats.'
+    : 'Provider diagnostics are locked until the API key is provided.';
+
+  return {
+    status: 'degraded',
+    runtime: {
+      // `unavailable` keeps the label to this one sentence: the runtime may be
+      // perfectly healthy, we simply cannot see it from here.
+      status: 'unavailable',
+      summary: runtimeSummary,
+      startup: {},
+    },
+    providers: {
+      probe: 'light',
+      summary: {
+        status: 'unavailable',
+        ok: 0,
+        targets: 0,
+        summary: providerSummary,
+      },
+      defaults: [],
+    },
+  };
+}
+
 export function formatRuntimeHealthLabel(
   runtimeStatus: string | undefined,
   runtimeSummary: string,
@@ -29,6 +74,7 @@ const DASHBOARD_HEALTH_OVERLAY = `
 <script>
 (() => {
   const formatRuntimeHealthLabel = ${formatRuntimeHealthLabel.toString()};
+  const createRuntimeDiagnosticsAuthPayload = ${createRuntimeDiagnosticsAuthPayload.toString()};
   const summaryPath = ${JSON.stringify(RUNTIME_DIAGNOSTICS_PATHS.health)};
   let runtimeHealthPayload = null;
   let refreshInFlight = false;
@@ -199,23 +245,9 @@ const DASHBOARD_HEALTH_OVERLAY = `
 
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
-          runtimeHealthPayload = {
-            status: 'degraded',
-            runtime: {
-              status: 'degraded',
-              summary: 'API key required for runtime diagnostics.',
-              startup: {},
-            },
-            providers: {
-              probe: 'light',
-              summary: {
-                ok: 0,
-                targets: 0,
-                summary: 'Provider diagnostics are locked until the API key is provided.',
-              },
-              defaults: [],
-            },
-          };
+          runtimeHealthPayload = createRuntimeDiagnosticsAuthPayload(
+            window.__CATS_RUNTIME_PROXY_MODE__ === true,
+          );
           renderRuntimeHealthOverlay();
           return;
         }
