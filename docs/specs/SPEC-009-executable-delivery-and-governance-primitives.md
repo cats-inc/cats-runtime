@@ -100,6 +100,11 @@ level a workspace ought to use.
     rather than hardcoding GitHub as the only long-term target.
 15. Delivery capability reporting should be visible to later dashboard or API
     surfaces.
+16. Approved commit delivery for a runtime-owned worktree session shall leave
+    the commit on a pushable branch rather than detached HEAD. The runtime shall
+    derive a deterministic reserved branch when the caller does not provide
+    one, reject invalid/conflicting refs before committing, and let worktree
+    cleanup remove only runtime-owned delivery refs under discard semantics.
 
 ### Non-Functional Requirements
 
@@ -166,6 +171,9 @@ Slice-1 boundaries:
 
 - runtime supports artifact-only delivery without fake repo requirements
 - repo-backed flows currently stop at repo inspect / commit / push
+- approved commit apply turns detached runtime-owned session worktrees into a
+  deterministic `cats/runtime/<session-id>` branch before committing, allowing
+  push/review follow-through without changing ordinary worktree preparation
 - preview metadata is normalized as runtime-owned preview surfaces derived from
   artifacts and services
 - PR/check and preview/deploy integrations remain explicit future seams, not
@@ -288,4 +296,3 @@ structured delivery result
 *Created: 2026-03-20*
 *Author: Codex*
 *Related Plan: TBD*
-

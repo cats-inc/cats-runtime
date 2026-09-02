@@ -1541,6 +1541,15 @@ Commit preview example:
 `"repo": { "stageAll": true }`. Without that flag, apply uses only the
 already-staged index.
 
+When an approved `create-commit` targets a runtime-owned `worktree` session
+whose HEAD is detached, the runtime creates a deterministic
+`cats/runtime/<session-id>` local branch before committing. Callers may instead
+provide `repo.branch`; an invalid name or an existing conflicting branch
+blocks the action without committing. This makes the resulting commit directly
+eligible for the existing push and review adapters. Discard/orphan cleanup
+removes automatically named runtime delivery branches after detaching the
+worktree; merge cleanup retains them as recoverable local refs.
+
 Push apply example:
 
 ```json

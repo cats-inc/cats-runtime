@@ -39,6 +39,7 @@ import type {
   SessionInfo,
   WorkspaceSubstrateActorRole,
 } from '../types.js';
+import { buildRuntimeDeliveryBranch } from '../workspace/runtimeDeliveryBranch.js';
 
 const PRIVILEGED_ACTOR_ROLES = ['boss_cat', 'system', 'owner'] as const;
 const DEFAULT_GIT_TIMEOUT_MS = 15_000;
@@ -134,6 +135,23 @@ function normalizeWorkspacePath(workspacePath: string | undefined): string | und
     return undefined;
   }
   return resolve(workspacePath);
+}
+
+function resolveCommitBranch(
+  request: RuntimeDeliveryRequest,
+  resolved: ResolvedDeliveryInput,
+  repo: RuntimeRepoStatus,
+): string | undefined {
+  if (!repo.detached) {
+    return repo.branch ?? undefined;
+  }
+  const requestedBranch = request.repo?.branch?.trim();
+  if (requestedBranch) {
+    return requestedBranch;
+  }
+  return resolved.session?.workspace.kind === 'worktree'
+    ? buildRuntimeDeliveryBranch(resolved.session.id)
+    : undefined;
 }
 
 function resolveFromWorkspace(
@@ -1299,6 +1317,24 @@ export class RuntimeDeliveryService {
       ? createCapability('ready')
       : createCapability('blocked', 'No artifacts are currently available to publish.');
 
+    const commitBranch = resolveCommitBranch(request, resolved, result.repo);
+    if (result.repo.detached && commitBranch) {
+      const branchValidation = await runGit(result.repo.rootPath!, [
+        'check-ref-format',
+        '--branch',
+        commitBranch,
+      ]);
+      if (branchValidation.code !== 0) {
+        result.blockedReasons.push(createIssue(
+          'invalid_commit_branch',
+          'blocked',
+          branchValidation.stderr.trim()
+            || branchValidation.stdout.trim()
+            || `Invalid commit branch '${commitBranch}'.`,
+        ));
+      }
+    }
+
     if (result.repo.repository && result.repo.clean && request.repo?.allowEmpty !== true) {
       result.blockedReasons.push(createIssue(
         'nothing_to_commit',
@@ -1327,6 +1363,7 @@ export class RuntimeDeliveryService {
           message,
           stageAll,
           allowEmpty: request.repo?.allowEmpty === true,
+          ...(commitBranch ? { branch: commitBranch } : {}),
         },
       };
       return this.updateSummary(result);
@@ -1335,6 +1372,28 @@ export class RuntimeDeliveryService {
     if (result.blockedReasons.length > 0) {
       result.state = result.capabilities.commit.state === 'unsupported' ? 'unsupported' : 'blocked';
       return this.updateSummary(result);
+    }
+
+    if (result.repo.detached && commitBranch) {
+      const branchResult = await runGit(result.repo.rootPath!, [
+        'checkout',
+        '-b',
+        commitBranch,
+      ]);
+      if (branchResult.code !== 0) {
+        result.state = 'blocked';
+        result.blockedReasons.push(createIssue(
+          'git_branch_create_failed',
+          'blocked',
+          branchResult.stderr.trim()
+            || branchResult.stdout.trim()
+            || `Failed to create delivery branch '${commitBranch}'.`,
+        ));
+        return this.updateSummary(result);
+      }
+      const refreshed = await this.inspectRepo(result.repo.rootPath);
+      result.repo = refreshed.repo;
+      result.capabilities.push = buildRepoCapabilities(result.repo).push;
     }
 
     if (stageAll) {
@@ -1375,6 +1434,7 @@ export class RuntimeDeliveryService {
         oid: headResult.stdout.trim() || result.repo.headOid,
         message,
         stageAll,
+        ...(result.repo.branch ? { branch: result.repo.branch } : {}),
       },
     };
     return this.updateSummary(result);

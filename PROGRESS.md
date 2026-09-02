@@ -4,11 +4,10 @@
 
 ## Current Status
 
-Latest update (2026-04-28): Codex CLI read-only/default sessions now send the
-current Codex JSON-RPC approval policy variant (`never`) with a read-only
-sandbox instead of the obsolete structured `reject` payload, preserving
-read-only behavior while keeping relay-style supervised fan-out compatible with
-current Codex.
+Latest update (2026-09-02): approved commit delivery now turns detached
+runtime-owned worktree sessions into deterministic `cats/runtime/<session-id>`
+branches before committing, so push/review follow-through has a real branch;
+discard and orphan cleanup remove only those reserved runtime refs.
 
 | Component | Status | Description |
 |-----------|--------|-------------|
@@ -676,6 +675,7 @@ into `cats-runtime`.
 | Freeze additive workspace isolation metadata in runtime session contracts | [x] | Session payloads, hydration metadata, registry persistence, and workspace grouping now retain `workspaceIsolation` and `hydration.workspace.isolationMode` |
 | Wire worktree preparation into create/resume/fork | [x] | `POST /sessions`, `POST /sessions/{id}/resume`, and `POST /sessions/{id}/fork` now prepare or recreate worktree-backed runtime cwd state before spawn |
 | Wire worktree cleanup into reset/delete | [x] | `POST /sessions/{id}/reset` and `DELETE /sessions/{id}` now support `worktreeCleanupPolicy: "discard" | "merge" | "preserve"` plus retained cleanup responses |
+| Make worktree delivery commits pushable | [x] | Approved `create-commit` apply creates a deterministic reserved runtime branch when a runtime-owned worktree session is detached; discard/orphan cleanup deletes that local ref and merge cleanup retains it |
 | Add bounded retained cleanup retry route | [x] | `POST /sessions/{id}/workspace/cleanup` plus MCP `cleanup_session_workspace` now retry retained worktree cleanup, refresh persisted hydration/skill delivery state, and auto-settle retained reset follow-through when cleanup finally succeeds |
 | Return explicit retry cleanup path for retained lifecycle responses | [x] | Retained worktree-backed `reset`/`delete` responses now include `retryCleanupPath`, and the same next-hop path propagates through MCP payloads so orchestrators can call the bounded cleanup retry seam directly |
 | Surface cleanup retry path through session inspection | [x] | `inspection.maintenance.cleanup` now advertises `retryCleanupPath` when a closed worktree session is actually ready for bounded cleanup retry, so later `GET /sessions` reads preserve the same next hop |
@@ -701,4 +701,4 @@ into `cats-runtime`.
 
 ---
 
-*Last updated: 2026-04-20*
+*Last updated: 2026-09-02*
