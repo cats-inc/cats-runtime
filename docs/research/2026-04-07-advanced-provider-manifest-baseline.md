@@ -45,9 +45,20 @@ location instead of leaving the knowledge implicit inside route builders.
 - Target match: `provider=claude`, `backend=cli`
 - Verified metadata:
   - entry-scoped `claude.reasoning_effort`
-  - alias entries `default` / `sonnet` / `haiku`
+  - executable alias entries `opus` / `fable` / `sonnet` / `haiku`
+  - Low / Medium / High / xHigh / Max / Ultracode for Opus, Fable, and Sonnet,
+    with High as the observed default; Haiku does not support effort
   - no public presets; default selection remains explicit
 - Evidence basis:
+  - the operator-confirmed complete Claude Code 2.1.257 interactive `/model`
+    picker capture in
+    `docs/research/fixtures/claude-2.1.257/model-picker.success.redacted.txt`
+  - read-only Claude Code 2.1.258 `--help`, static artifact extraction, and a
+    successful `claude --effort ultracode --version` parser check independently
+    confirm the `fable` alias and raw `ultracode` session value; the newer
+    artifact is token-mapping evidence, not 2.1.257 account entitlement
+  - the picker-visible `Default (recommended)` row is a provider-default null
+    sentinel and is deliberately not exposed as an executable model id
   - current runtime behavior already maps this control into runtime-owned
     request patches in `src/core/models/providerSelectionResolution.ts`
   - regression coverage locks entry-specific values/defaults in

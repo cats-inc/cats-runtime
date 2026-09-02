@@ -1213,7 +1213,7 @@ describe('buildProviderAdvancedKnowledge', () => {
     }
   });
 
-  it('publishes curated native Claude CLI aliases and effort controls', () => {
+  it('publishes current native Claude CLI aliases and effort controls', () => {
     const target: ProviderTargetDescriptor = {
       providerName: 'claude',
       backend: 'cli',
@@ -1235,9 +1235,10 @@ describe('buildProviderAdvancedKnowledge', () => {
       source: 'static',
       cache: null,
       models: [
-        { id: 'opus', label: 'Opus 4.6 with 1M context', default: true },
-        { id: 'sonnet', label: 'Sonnet 4.6' },
-        { id: 'haiku', label: 'Haiku 4.5' },
+        { id: 'opus', label: 'Opus (1M context)', default: true },
+        { id: 'fable', label: 'Fable' },
+        { id: 'sonnet', label: 'Sonnet' },
+        { id: 'haiku', label: 'Haiku' },
       ],
       warnings: [],
     });
@@ -1250,29 +1251,36 @@ describe('buildProviderAdvancedKnowledge', () => {
       provenance: {
         status: 'verified_manifest',
         manifestId: 'claude-cli-v1',
-        manifestVersion: '2026-04-07',
+        manifestVersion: '2026-09-02',
         evidenceRefs: [
           'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#claude-cli-v1',
+          'docs/research/fixtures/claude-2.1.257/model-picker.success.redacted.txt',
         ],
       },
     });
     expect(knowledge.catalog.entries).toEqual([
       {
         id: 'opus',
-        label: 'Opus 4.6 with 1M context',
+        label: 'Opus (1M context)',
         default: true,
         capabilityTags: ['tool_use', 'reasoning'],
-        notes: ['Most capable for complex work.'],
+        notes: ['Best for everyday, complex tasks.'],
+      },
+      {
+        id: 'fable',
+        label: 'Fable',
+        capabilityTags: ['tool_use', 'reasoning'],
+        notes: ['Most capable for your hardest and longest-running tasks.'],
       },
       {
         id: 'sonnet',
-        label: 'Sonnet 4.6',
+        label: 'Sonnet',
         capabilityTags: ['tool_use'],
-        notes: ['Best for everyday tasks.'],
+        notes: ['Efficient for routine tasks.'],
       },
       {
         id: 'haiku',
-        label: 'Haiku 4.5',
+        label: 'Haiku',
         capabilityTags: ['tool_use', 'latency_optimized'],
         notes: ['Fastest for quick answers.'],
       },
@@ -1288,35 +1296,47 @@ describe('buildProviderAdvancedKnowledge', () => {
           value: 'low',
           label: 'Low',
           description: 'Lighter reasoning for faster responses.',
-          applicableEntryIds: ['opus', 'sonnet'],
+          applicableEntryIds: ['opus', 'fable', 'sonnet'],
         },
         {
           value: 'medium',
-          label: 'Medium (default)',
+          label: 'Medium',
           description: 'Balanced effort for most work.',
-          applicableEntryIds: ['opus', 'sonnet'],
+          applicableEntryIds: ['opus', 'fable', 'sonnet'],
         },
         {
           value: 'high',
-          label: 'High',
+          label: 'High (default)',
           description: 'Greater depth for complex tasks.',
-          applicableEntryIds: ['opus', 'sonnet'],
+          applicableEntryIds: ['opus', 'fable', 'sonnet'],
+        },
+        {
+          value: 'xhigh',
+          label: 'xHigh',
+          description: 'Deeper reasoning than high, just below maximum.',
+          applicableEntryIds: ['opus', 'fable', 'sonnet'],
         },
         {
           value: 'max',
           label: 'Max',
           description: 'Maximum effort for the most complex work.',
-          applicableEntryIds: ['opus'],
+          applicableEntryIds: ['opus', 'fable', 'sonnet'],
+        },
+        {
+          value: 'ultracode',
+          label: 'Ultracode',
+          description: 'xHigh effort plus dynamic workflow orchestration for this session.',
+          applicableEntryIds: ['opus', 'fable', 'sonnet'],
         },
       ],
-      applicableEntryIds: ['opus', 'sonnet'],
+      applicableEntryIds: ['opus', 'fable', 'sonnet'],
       semanticTags: ['reasoning_intensity'],
     });
     expect(knowledge.catalog.defaultSelection).toEqual({
       entryId: 'opus',
       entryMode: 'explicit',
       controls: {
-        'claude.reasoning_effort': 'medium',
+        'claude.reasoning_effort': 'high',
       },
     });
   });

@@ -115,6 +115,10 @@ describe('normalizeProviderCatalogModelId', () => {
       providerName: 'claude',
       backend: 'cli',
     }, 'claude-opus-4-6')).toBe('opus');
+    expect(normalizeProviderCatalogModelId({
+      providerName: 'claude',
+      backend: 'cli',
+    }, 'claude-fable-5-1')).toBe('fable');
   });
 
   it('normalizes Kilo picker labels to canonical gateway ids', () => {
@@ -2090,9 +2094,10 @@ describe('ProviderModelCatalogService', () => {
           provenance: {
             status: 'verified_manifest',
             manifestId: 'claude-cli-v1',
-            manifestVersion: '2026-04-07',
+            manifestVersion: '2026-09-02',
             evidenceRefs: [
               'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#claude-cli-v1',
+              'docs/research/fixtures/claude-2.1.257/model-picker.success.redacted.txt',
             ],
           },
         },

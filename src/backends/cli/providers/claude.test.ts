@@ -28,15 +28,15 @@ describe('ClaudeProvider', () => {
       expect(args).toContain('opus');
     });
 
-    it('includes effort flag when a Claude reasoning control is present', () => {
+    it('passes the Ultracode effort value through to Claude Code', () => {
       const args = provider.buildSpawnArgs({
         cwd: '/tmp',
         modelControls: {
-          'claude.reasoning_effort': 'max',
+          'claude.reasoning_effort': 'ultracode',
         },
       });
       expect(args).toContain('--effort');
-      expect(args).toContain('max');
+      expect(args).toContain('ultracode');
     });
 
     it('includes resume flag', () => {

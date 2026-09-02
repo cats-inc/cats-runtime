@@ -410,6 +410,13 @@ export function normalizeClaudeCuratedModelId(model: CuratedModelCatalogModel): 
   for (const candidate of candidates) {
     const normalized = candidate.trim().toLowerCase();
     if (
+      normalized === 'fable'
+      || normalized.includes('claude-fable')
+      || normalized.includes('fable 5')
+    ) {
+      return 'fable';
+    }
+    if (
       normalized === 'opus'
       || normalized.includes('claude-opus')
       || normalized.includes('opus 4.6')

@@ -24,32 +24,32 @@ schema_version: 1
 #
 # 2026-08-26 refresh: Antigravity, Codex, and Cursor are account-resolved live
 # CLI enumerations (`agy models`, `codex debug models`, `cursor-agent models`).
-# 2026-09-02: the Codex entry was re-read from the interactive `/model` picker on
-# 0.152.0 and now carries mixed provenance - see that entry's own `notes`.
-# Claude was re-read from the compiled 2.1.246 native executable; that artifact
-# exposes a static superset rather than the account-resolved picker. Copilot,
-# Kilo, Kiro, and Junie had their versions re-probed but not their model lists -
-# those CLIs either gate the list behind an account, expose it only in an
+# 2026-09-02: the Claude and Codex entries were re-read from their interactive
+# `/model` pickers and now carry mixed provenance - see each entry's `notes`.
+# Copilot, Kilo, Kiro, and Junie had their versions re-probed but not their model
+# lists - those CLIs either gate the list behind an account, expose it only in an
 # interactive picker, or publish a different artifact than the picker shows.
 #
 # Treat this file as a starting point to correct, trim, or expand.
 
 catalogs:
   - cli: Claude
-    version: 2.1.246
-    last_updated: 2026-08-26
+    version: 2.1.257
+    last_updated: 2026-09-02
     notes:
-      - "Sources observed 2026-08-26: `claude --version`, `claude --help`, and static extraction from the shipped 2.1.246 native executable"
-      - "The executable contains a compiled-in superset, not the account-resolved `/model` picker. Every alias, generation, and capability extracted here could appear; none is evidence that it does appear for this account. A pasted `/model` and `/effort` listing takes precedence."
-      - "The baked first-party alias table maps `opus` to `claude-opus-5`, `sonnet` to `claude-sonnet-5`, and `haiku` to `claude-haiku-4-5`; per-provider mappings differ and render-time account gates can replace or suppress rows."
-      - "Observed render-time filter reasons: model_unavailable_gate, entitlement_denied, suppressed_rows_non_first_party, suppressed_rows_foreign_base_url, and allowlist_filtered."
-      - "Only opus, sonnet, and haiku are represented because the runtime normalizer accepts only those aliases. The compiled Fable 5 alias, Default row, Opus Plan Mode, historical generations, and separate 1M rows are omitted instead of being silently dropped or collapsed onto another alias."
-      - "The `default` marker and effort-level visibility/defaults remain from the account-resolved 2026-04-17 `/model` and `/effort` snapshot; without a fresh paste they are not claimed as re-verified by the binary extraction."
+      - "Model list re-read 2026-09-02 from the operator-pasted interactive `/model` picker on Claude Code 2.1.257; the operator confirmed all five visible rows were present with nothing scrolled off"
+      - "Evidence: docs/research/fixtures/claude-2.1.257/model-picker.success.redacted.txt"
+      - "The picker rows were Default (recommended), Opus (1M context), Fable, Sonnet, and Haiku, in that order. `Default` is a provider-default null sentinel and is retained in evidence rather than projected into a model id that the runtime would pass through `--model`. The `√` marker is recorded only as the current picker selection and is not interpreted as an account-default claim."
+      - "Picker descriptions identify Opus 5, Fable 5.1, Sonnet 5, and Haiku 4.5. The `opus`, `sonnet`, and `haiku` aliases remain grounded in the earlier 2.1.246 static extraction; read-only `--help` and static extraction from the locally installed 2.1.258 executable independently expose `fable` and `claude-fable-5-1`. That newer artifact is raw-token evidence only, not account-entitlement evidence for 2.1.257."
+      - "For Default, Opus, Fable, and Sonnet, the operator observed the complete ordered effort set Low, Medium, High, xHigh, Max, Ultracode, with High marked `(default)`. Haiku instead displayed `Effort not supported for Haiku`. The Default sentinel's effort branch remains evidence-only; the other three branches are represented per model."
+      - "The locally installed 2.1.258 artifact maps the picker-visible Ultracode choice to the raw `ultracode` session value and describes it as xHigh effort plus dynamic workflow orchestration. A read-only `claude --effort ultracode --version` parser check accepted that token and returned 2.1.258; the top-level `--help` list itself still stops at Max."
+      - "Opus 1M context was re-observed in the picker. Sonnet 1M and Haiku 200K context values are retained from the 2.1.246 static extraction and were not re-observed; Fable context is omitted because the 2.1.257 picker row did not state one."
+      - "`default: true` on Opus is retained from the account-resolved 2026-04-17 snapshot. The 2.1.257 `√` marker was on the Default sentinel, so this refresh neither re-verifies nor removes that older explicit-alias default."
     models:
       - name: Opus
-        label: Opus 5
+        label: Opus (1M context)
         notes:
-          - "Compiled alias description: Opus 5 - best for everyday, complex tasks"
+          - "Picker description: Opus 5 with 1M context - best for everyday, complex tasks"
         default: true
         context: 1000000
         options:
@@ -70,22 +70,54 @@ catalogs:
               - name: Max
                 notes:
                   - "Maximum capability with deepest reasoning. May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks."
-            default: xHigh
+              - name: Ultracode
+                notes:
+                  - "2.1.258 static artifact description: xHigh effort plus dynamic workflow orchestration for this session only"
+            default: High
+
+      - name: Fable
+        label: Fable
+        notes:
+          - "Picker description: Fable 5.1 - most capable for your hardest and longest-running tasks"
+        options:
+          - name: Effort
+            values:
+              - Low
+              - Medium
+              - High
+              - xHigh
+              - name: Max
+                notes:
+                  - "May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks."
+              - name: Ultracode
+                notes:
+                  - "2.1.258 static artifact description: xHigh effort plus dynamic workflow orchestration for this session only"
+            default: High
 
       - name: Sonnet
-        label: Sonnet 5
+        label: Sonnet
         notes:
-          - "Compiled alias description: Sonnet 5 - efficient for routine tasks. Generally recommended for most coding tasks"
+          - "Picker description: Sonnet 5 - efficient for routine tasks"
         context: 1000000
         options:
           - name: Effort
-            values: [Low, Medium, High, Max]
-            default: Medium
+            values:
+              - Low
+              - Medium
+              - High
+              - xHigh
+              - name: Max
+                notes:
+                  - "May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks."
+              - name: Ultracode
+                notes:
+                  - "2.1.258 static artifact description: xHigh effort plus dynamic workflow orchestration for this session only"
+            default: High
 
       - name: Haiku
-        label: Haiku 4.5
+        label: Haiku
         notes:
-          - "Compiled alias description: Haiku 4.5 - fastest for quick answers. Lower cost but less capable than Sonnet 4.6."
+          - "Picker description: Haiku 4.5 - fastest for quick answers"
         context: 200000
         options: []
 
