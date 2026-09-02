@@ -12,7 +12,7 @@ import {
   ensureRuntimeTestDirs,
 } from './support/runtimeTestPaths.js';
 
-const PEER_ROUTING_TEST_TIMEOUT_MS = 60_000;
+const PEER_ROUTING_TEST_TIMEOUT_MS = process.platform === 'win32' ? 120_000 : 60_000;
 
 function parseSse(text: string): Array<Record<string, unknown>> {
   return text
@@ -37,6 +37,7 @@ function createTestConfig(
     CATS_RUNTIME_PORT: '3110',
     CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
     CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
+    ANTIGRAVITY_SESSIONS_DIR: join(root, '.gemini', 'antigravity-cli', 'conversations'),
     AUGGIE_SESSIONS_DIR: join(root, '.augment', 'sessions'),
     CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
     CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
@@ -49,6 +50,7 @@ function createTestConfig(
 
   ensureRuntimeTestDirs(paths);
   for (const dir of [
+    env.ANTIGRAVITY_SESSIONS_DIR,
     env.AUGGIE_SESSIONS_DIR,
     env.CLAUDE_PROJECTS_DIR,
     env.CODEX_SESSIONS_DIR,

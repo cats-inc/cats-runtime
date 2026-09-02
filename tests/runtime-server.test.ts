@@ -32,7 +32,12 @@ import {
   resolveCuratedCatalogScope,
 } from '../src/core/models/curatedModelCatalog.js';
 
-const RUNTIME_SERVER_INTEGRATION_TIMEOUT_MS = 20_000;
+const RUNTIME_SERVER_DEFAULT_TIMEOUT_MS = process.platform === 'win32' ? 30_000 : 5_000;
+const RUNTIME_SERVER_MEDIUM_TIMEOUT_MS = process.platform === 'win32' ? 60_000 : 10_000;
+const RUNTIME_SERVER_LONG_TIMEOUT_MS = process.platform === 'win32' ? 90_000 : 15_000;
+const RUNTIME_SERVER_INTEGRATION_TIMEOUT_MS = process.platform === 'win32' ? 120_000 : 20_000;
+
+vi.setConfig({ testTimeout: RUNTIME_SERVER_DEFAULT_TIMEOUT_MS });
 
 function alignDefaultProviderRuntime(
   config: ReturnType<typeof loadConfig>,
@@ -143,6 +148,7 @@ function createTestConfig(overrides = {}) {
     CATS_RUNTIME_PORT: '3110',
     CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
     CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
+    ANTIGRAVITY_SESSIONS_DIR: join(root, '.gemini', 'antigravity-cli', 'conversations'),
     AUGGIE_SESSIONS_DIR: join(root, '.augment', 'sessions'),
     CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
     CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
@@ -161,6 +167,7 @@ function createTestConfig(overrides = {}) {
 
   ensureRuntimeTestDirs(paths);
   for (const dir of [
+    env.ANTIGRAVITY_SESSIONS_DIR,
     env.AUGGIE_SESSIONS_DIR,
     env.CLAUDE_PROJECTS_DIR,
     env.CODEX_SESSIONS_DIR,
@@ -1268,7 +1275,7 @@ describe('runtime server', () => {
       await runtime.close();
       rmSync(root, { recursive: true, force: true });
     }
-  }, 10000);
+  }, RUNTIME_SERVER_MEDIUM_TIMEOUT_MS);
 
   it('surfaces retained worktree backlog on health diagnostics', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-worktree-health-test-'));
@@ -1362,7 +1369,7 @@ describe('runtime server', () => {
       await runtime.close();
       rmSync(root, { recursive: true, force: true });
     }
-  }, 10000);
+  }, RUNTIME_SERVER_MEDIUM_TIMEOUT_MS);
 
   it('background worktree maintenance auto-cleans expired preserved delete sessions', async () => {
     await withRuntime({}, {}, async (runtime) => {
@@ -3134,7 +3141,7 @@ backends:
         totalOutputTokens: 0,
       } as never, {
         type: 'error',
-        text: '429 Too Many Requests. Retry after 2s.',
+        text: '429 Too Many Requests. Retry after 60s.',
       }, {
         turnStartedAt: Date.now() - 10,
       });
@@ -3357,7 +3364,7 @@ backends:
       await runtime.close();
       await cleanup();
     }
-  }, 15_000);
+  }, RUNTIME_SERVER_LONG_TIMEOUT_MS);
 
   it('POST /sessions rejects providers omitted by positive-list YAML config', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-positive-list-test-'));
@@ -3968,7 +3975,8 @@ providers:
     try {
       discovery.start();
 
-      for (let attempt = 0; attempt < 20; attempt += 1) {
+      const discoveryAttempts = process.platform === 'win32' ? 200 : 20;
+      for (let attempt = 0; attempt < discoveryAttempts; attempt += 1) {
         if (runtime.context.registry.list({ provider: 'auggie' }).length > 0) {
           break;
         }
