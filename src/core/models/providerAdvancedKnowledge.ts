@@ -268,6 +268,51 @@ function fallbackCodexEffortDescription(
   }
 }
 
+// Grok's account-resolved manifest supplies the raw `--reasoning-effort` token
+// and its menu label side by side, so the curated catalog carries the tokens
+// verbatim. The label spellings are accepted too because a curator reading the
+// picker sees "Extra High Effort" rather than `xhigh`.
+function normalizeGrokEffortValue(
+  value: string | undefined,
+): ProviderAdvancedControlValue | null {
+  const normalized = value?.trim().toLowerCase();
+  switch (normalized) {
+    case 'low':
+    case 'low effort':
+      return 'low';
+    case 'medium':
+    case 'medium effort':
+      return 'medium';
+    case 'high':
+    case 'high effort':
+      return 'high';
+    case 'extra high':
+    case 'extra-high':
+    case 'extra high effort':
+    case 'xhigh':
+      return 'xhigh';
+    default:
+      return null;
+  }
+}
+
+function fallbackGrokEffortDescription(
+  value: ProviderAdvancedControlValue,
+): string | undefined {
+  switch (value) {
+    case 'low':
+      return 'Quick, fast implementations.';
+    case 'medium':
+      return 'Balanced effort with standard implementation and testing.';
+    case 'high':
+      return 'Higher implementation quality with extensive reasoning.';
+    case 'xhigh':
+      return 'Highest effort and reasoning level.';
+    default:
+      return undefined;
+  }
+}
+
 function normalizeCopilotEffortValue(
   value: string | undefined,
 ): ProviderAdvancedControlValue | null {
@@ -422,8 +467,20 @@ function buildCuratedEnumControl(
     };
   }
 
-  const controlOptions: ProviderAdvancedCatalogControlOption[] = [];
-  const optionIndex = new Map<string, ProviderAdvancedCatalogControlOption>();
+  // One enum option per distinct value. Keying on the rendered label or the
+  // description instead would split a single value into several options that
+  // all submit the same token, which no picker can represent: models legitimately
+  // disagree about a level's wording, and about whether it is their default.
+  interface EnumOptionDraft {
+    value: ProviderAdvancedControlValue;
+    displayName: string;
+    description?: string;
+    applicableEntryIds: string[];
+    defaultForEntryIds: Set<string>;
+  }
+
+  const drafts: EnumOptionDraft[] = [];
+  const draftsByValue = new Map<string, EnumOptionDraft>();
   const entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>> = {};
 
   for (const [entryId, option] of optionsByEntryId.entries()) {
@@ -440,34 +497,46 @@ function buildCuratedEnumControl(
         continue;
       }
       const description = value.notes?.[0] || control.fallbackDescription(normalizedValue);
-      const label = normalizedValue === defaultValue
-        ? `${value.name} (default)`
-        : value.name;
-      const optionKey = [
-        String(normalizedValue),
-        label,
-        description || '',
-      ].join('|');
-      const existing = optionIndex.get(optionKey);
-      if (existing) {
-        const applicableEntryIds = existing.applicableEntryIds || [];
-        if (!applicableEntryIds.includes(entryId)) {
-          applicableEntryIds.push(entryId);
-          existing.applicableEntryIds = applicableEntryIds;
-        }
-        continue;
+      const valueKey = String(normalizedValue);
+      let draft = draftsByValue.get(valueKey);
+      if (!draft) {
+        // First appearance fixes the display name and ordering; a later model
+        // that words the same level differently keeps its wording in the
+        // curated catalog rather than forcing a second option here.
+        draft = {
+          value: normalizedValue,
+          displayName: value.name,
+          ...(description ? { description } : {}),
+          applicableEntryIds: [],
+          defaultForEntryIds: new Set<string>(),
+        };
+        drafts.push(draft);
+        draftsByValue.set(valueKey, draft);
+      } else if (!draft.description && description) {
+        draft.description = description;
       }
 
-      const nextOption: ProviderAdvancedCatalogControlOption = {
-        value: normalizedValue,
-        label,
-        ...(description ? { description } : {}),
-        applicableEntryIds: [entryId],
-      };
-      controlOptions.push(nextOption);
-      optionIndex.set(optionKey, nextOption);
+      if (!draft.applicableEntryIds.includes(entryId)) {
+        draft.applicableEntryIds.push(entryId);
+      }
+      if (normalizedValue === defaultValue) {
+        draft.defaultForEntryIds.add(entryId);
+      }
     }
   }
+
+  const controlOptions: ProviderAdvancedCatalogControlOption[] = drafts.map((draft) => {
+    // `(default)` is only honest on a shared option when every model offering
+    // the value defaults to it. Per-entry defaults stay in `entryDefaults`.
+    const defaultForEveryEntry = draft.applicableEntryIds.length > 0
+      && draft.applicableEntryIds.every((entryId) => draft.defaultForEntryIds.has(entryId));
+    return {
+      value: draft.value,
+      label: defaultForEveryEntry ? `${draft.displayName} (default)` : draft.displayName,
+      ...(draft.description ? { description: draft.description } : {}),
+      applicableEntryIds: draft.applicableEntryIds,
+    };
+  });
 
   if (controlOptions.length === 0) {
     return {
@@ -517,6 +586,21 @@ function buildCuratedCodexCliControls(
     description: 'Controls Codex CLI reasoning depth for supported models.',
     normalizeValue: normalizeCodexEffortValue,
     fallbackDescription: fallbackCodexEffortDescription,
+  });
+}
+
+function buildCuratedGrokCliControls(
+  optionsByEntryId: Map<string, CuratedModelCatalogOption>,
+): {
+  controls?: ProviderAdvancedCatalogControl[];
+  entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
+} {
+  return buildCuratedEnumControl(optionsByEntryId, {
+    key: 'grok.reasoning_effort',
+    label: 'Reasoning effort',
+    description: 'Controls Grok CLI reasoning effort for supported models.',
+    normalizeValue: normalizeGrokEffortValue,
+    fallbackDescription: fallbackGrokEffortDescription,
   });
 }
 
@@ -682,7 +766,45 @@ function buildCuratedGrokCliOverlay(
     return null;
   }
 
-  return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeVerbatimCuratedModelId);
+  // Unlike Antigravity, Grok's ids do not encode effort: the CLI takes it as a
+  // separate `--reasoning-effort` argument, and the account-resolved manifest
+  // gives each model its own menu. So the overlay carries the option axis
+  // instead of collapsing to entry metadata.
+  const entriesById: Record<string, CuratedEntryMetadata> = {};
+  const effortOptions = new Map<string, CuratedModelCatalogOption>();
+  const warnings: string[] = [];
+  for (const model of scope.models) {
+    const entryId = normalizeVerbatimCuratedModelId(model);
+    if (!entryId) {
+      warnings.push(
+        `Curated model '${describeCuratedModelLabel(model)}' for ${catalog.cli} could not be normalized and was ignored.`,
+      );
+      continue;
+    }
+    entriesById[entryId] = buildCuratedEntryMetadata(model);
+
+    const effectiveOptions = resolveEffectiveCuratedModelOptions(scope.sharedOptions, model);
+    const effortOption = effectiveOptions.find((option) => matchesCuratedOptionName(option, [
+      'effort',
+      'reasoning effort',
+    ]));
+    if (effortOption) {
+      effortOptions.set(entryId, effortOption);
+    }
+  }
+
+  if (Object.keys(entriesById).length === 0) {
+    return null;
+  }
+
+  const normalizedEntriesById = coerceSingleCuratedDefaultEntryMetadata(entriesById);
+  const controlResult = buildCuratedGrokCliControls(effortOptions);
+  return {
+    entriesById: normalizedEntriesById,
+    ...(controlResult.controls ? { controls: controlResult.controls } : {}),
+    entryDefaults: controlResult.entryDefaults,
+    warnings,
+  };
 }
 
 function flattenCuratedCatalogProviderModels(

@@ -335,12 +335,19 @@ describe('ProviderModelCatalogService', () => {
 
     expect(catalog.models).toEqual([
       {
+        id: 'grok-4.6',
+        label: 'Grok 4.6',
+      },
+      {
         id: 'grok-4.5',
-        label: 'grok-4.5',
-        default: true,
+        label: 'Grok 4.5',
       },
     ]);
-    expect(catalog.defaultModel).toBe('grok-4.5');
+    // The 1.0.13 manifest carries no default field; the `(default)` marker
+    // `grok models` prints reports the per-user config.toml `[models] default`,
+    // so the runtime must not pick one on the user's behalf.
+    expect(catalog.defaultModel).toBeNull();
+    expect(catalog.models.some((model) => model.default)).toBe(false);
     expect(catalog.warnings).toEqual([]);
   });
 
@@ -2360,6 +2367,9 @@ describe('ProviderModelCatalogService', () => {
         description: 'Controls Codex CLI reasoning depth for supported models.',
         kind: 'enum',
         scope: 'both',
+        // One option per submitted token. `medium` defaults for every model but
+        // gpt-5.3-codex-spark, and `high` only for spark, so neither is the
+        // default everywhere and neither keeps a `(default)` suffix.
         values: expect.arrayContaining([
           {
             value: 'low',
@@ -2377,7 +2387,7 @@ describe('ProviderModelCatalogService', () => {
           },
           {
             value: 'medium',
-            label: 'Medium (default)',
+            label: 'Medium',
             description: 'Balances speed and reasoning depth for everyday tasks.',
             applicableEntryIds: [
               'gpt-5.4',
@@ -2385,16 +2395,9 @@ describe('ProviderModelCatalogService', () => {
               'gpt-5.1-codex-max',
               'gpt-5.4-mini',
               'gpt-5.3-codex',
+              'gpt-5.3-codex-spark',
               'gpt-5.2',
               'gpt-5.1-codex-mini',
-            ],
-          },
-          {
-            value: 'medium',
-            label: 'Medium',
-            description: 'Balances speed and reasoning depth for everyday tasks.',
-            applicableEntryIds: [
-              'gpt-5.3-codex-spark',
             ],
           },
           {
@@ -2407,16 +2410,9 @@ describe('ProviderModelCatalogService', () => {
               'gpt-5.1-codex-max',
               'gpt-5.4-mini',
               'gpt-5.3-codex',
+              'gpt-5.3-codex-spark',
               'gpt-5.2',
               'gpt-5.1-codex-mini',
-            ],
-          },
-          {
-            value: 'high',
-            label: 'High (default)',
-            description: 'Greater reasoning depth for complex problems.',
-            applicableEntryIds: [
-              'gpt-5.3-codex-spark',
             ],
           },
           {
@@ -2446,7 +2442,11 @@ describe('ProviderModelCatalogService', () => {
         ],
         semanticTags: ['reasoning_intensity'],
       });
-      expect(catalog.controls[0]?.values).toHaveLength(6);
+      // low, medium, high, xhigh - one per submitted token, not one per
+      // (token, label, description) combination.
+      expect(catalog.controls[0]?.values).toHaveLength(4);
+      expect(catalog.controls[0]?.values.map((value) => value.value))
+        .toEqual(['low', 'medium', 'high', 'xhigh']);
       expect(catalog.defaultSelection).toEqual({
         entryId: 'gpt-5.4',
         entryMode: 'explicit',
@@ -2742,7 +2742,10 @@ describe('ProviderModelCatalogService', () => {
             description: 'Controls GitHub Copilot CLI reasoning effort for supported models.',
             kind: 'enum',
             scope: 'both',
-            values: expect.arrayContaining([
+            // One option per submitted token, every entry unioned onto it.
+            // `medium` and `high` each default for only part of the catalog,
+            // so neither keeps a `(default)` suffix on the shared option.
+            values: [
               expect.objectContaining({
                 value: 'low',
                 label: 'Low',
@@ -2756,30 +2759,27 @@ describe('ProviderModelCatalogService', () => {
               }),
               expect.objectContaining({
                 value: 'medium',
-                label: 'Medium (default)',
-                applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini', 'claude-sonnet-4'],
-              }),
-              expect.objectContaining({
-                value: 'high',
-                label: 'High (default)',
-                applicableEntryIds: ['gpt-5.2-codex', 'claude-opus-4.6'],
-              }),
-              expect.objectContaining({
-                value: 'medium',
                 label: 'Medium',
-                applicableEntryIds: ['gpt-5.2-codex', 'claude-opus-4.6'],
+                applicableEntryIds: [
+                  'gpt-5.4',
+                  'gpt-5.4-mini',
+                  'gpt-5.2-codex',
+                  'claude-opus-4.6',
+                  'claude-sonnet-4',
+                ],
               }),
               expect.objectContaining({
                 value: 'high',
                 label: 'High',
-                applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini', 'claude-sonnet-4'],
+                applicableEntryIds: [
+                  'gpt-5.4',
+                  'gpt-5.4-mini',
+                  'gpt-5.2-codex',
+                  'claude-opus-4.6',
+                  'claude-sonnet-4',
+                ],
               }),
-              expect.objectContaining({
-                value: 'high',
-                label: 'High (default)',
-                applicableEntryIds: ['gpt-5.2-codex', 'claude-opus-4.6'],
-              }),
-            ]),
+            ],
             applicableEntryIds: [
               'gpt-5.4',
               'gpt-5.4-mini',

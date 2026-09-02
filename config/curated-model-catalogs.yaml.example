@@ -26,9 +26,10 @@ schema_version: 1
 # CLI enumerations (`agy models`, `codex debug models`, `cursor-agent models`).
 # 2026-09-02: the Claude and Codex entries were re-read from their interactive
 # `/model` pickers and now carry mixed provenance - see each entry's `notes`.
-# 2026-09-03: only the Antigravity entry was refreshed, from `agy models` on
-# 1.1.24 corroborated by that build's `/model` picker. Every other entry keeps
-# the provenance and date recorded in its own `notes`.
+# 2026-09-03: the Antigravity entry was refreshed from `agy models` on 1.1.24
+# corroborated by that build's `/model` picker, and a Grok entry was added for
+# the first time from the Grok CLI 1.0.13 account-resolved model manifest.
+# Every other entry keeps the provenance and date recorded in its own `notes`.
 # Copilot, Kilo, Kiro, and Junie had their versions re-probed but not their model
 # lists - those CLIs either gate the list behind an account, expose it only in an
 # interactive picker, or publish a different artifact than the picker shows.
@@ -287,6 +288,61 @@ catalogs:
         label: Claude Opus 4.6 (Thinking)
       - name: gpt-oss-120b-medium
         label: GPT-OSS 120B (Medium)
+
+  - cli: Grok
+    version: 1.0.13
+    last_updated: 2026-09-03
+    notes:
+      - "First curated Grok entry; before 2026-09-03 the runtime carried only the 1.0.0 static fallback row `grok-4.5`."
+      - "Model list read 2026-09-03 from the CLI's own account-resolved manifest at ~/.grok/models_cache.json, fetched 2026-09-02T17:48:31Z from https://cli-chat-proxy.grok.com/v1/models by Grok Build 1.0.13 with session auth. The manifest holds exactly these two models, so the list is complete for this account."
+      - "Evidence: docs/research/fixtures/grok-1.0.13/models-cache.success.redacted.json"
+      - "Corroborated the same day by `grok models` on 1.0.13, which printed both ids and exited 0, and by the operator-pasted interactive `/model` picker. Evidence: docs/research/fixtures/grok-1.0.13/models-command.success.redacted.txt and docs/research/fixtures/grok-1.0.13/model-picker.success.redacted.txt"
+      - "`name` is the raw id `grok --model` accepts, taken from the manifest `id` field; `label` is the manifest `name` field, which is also what the picker renders."
+      - "No entry is marked default. The manifest carries no default field at all; `grok models` prints `Default model: grok-4.6` and a `(default)` marker, but ~/.grok/config.toml on the observed machine sets `[models] default = \"grok-4.6\"`, so that marker reports a per-user preference rather than an account or vendor default. The adapter already omits `--model` when nothing is selected, so claiming one here would override a preference the runtime cannot see. This supersedes the older `grok-4.5 default: true` claim, which came from the 1.0.0 probe reading the same config-derived marker."
+      - "Both models advertise `supports_reasoning_effort: true` and a per-model `reasoning_efforts` menu. Option value names below are the raw tokens `grok --reasoning-effort` (alias `--effort`) accepts, taken from the manifest `value` field; each value's note carries the menu label and description verbatim. The menus differ per model and are never shared: grok-4.6 offers four levels including `xhigh`, grok-4.5 only three."
+      - "Effort menus were re-captured 2026-09-03 as per-model picker screens that each show the `/model <name>` prompt line, and they agree line for line with the manifest. Bundled `~/.grok/README.md` documents the wider flag vocabulary `none, minimal, low, medium, high, xhigh, max` plus per-model menu ids; only the account-resolved per-model menus are curated here."
+      - "`default: high` on both models is the manifest's own `default: true` entry, not a picker marker. The observed machine's `~/.grok/config.toml` sets `default_reasoning_effort = \"xhigh\"`, which is why the picker showed Extra High as `(active)` for grok-4.6; that per-user override is deliberately not encoded here."
+      - "`context: 500000` for both models is the manifest `context_window` field. `max_completion_tokens` is null upstream and is therefore omitted rather than guessed."
+    models:
+      - name: grok-4.6
+        label: Grok 4.6
+        notes:
+          - "Manifest description: SpaceXAI's latest frontier model"
+        context: 500000
+        options:
+          - name: Effort
+            values:
+              - name: xhigh
+                notes:
+                  - "Extra High Effort - Highest effort and reasoning level"
+              - name: high
+                notes:
+                  - "High Effort - Higher implementation quality with extensive reasoning"
+              - name: medium
+                notes:
+                  - "Medium Effort - Balanced effort with standard implementation and testing"
+              - name: low
+                notes:
+                  - "Low Effort - Quick, fast implementations"
+            default: high
+      - name: grok-4.5
+        label: Grok 4.5
+        notes:
+          - "The manifest carries no description for this model; the picker row shows the label alone."
+        context: 500000
+        options:
+          - name: Effort
+            values:
+              - name: high
+                notes:
+                  - "High Effort - Highest implementation quality with extensive reasoning"
+              - name: medium
+                notes:
+                  - "Medium Effort - Balanced effort with standard implementation and testing"
+              - name: low
+                notes:
+                  - "Low Effort - Quick, fast implementations"
+            default: high
 
   - cli: Cursor
     version: 2026.08.11-e8db854

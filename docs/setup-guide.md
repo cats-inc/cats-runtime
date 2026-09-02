@@ -23,6 +23,15 @@ event type, schema failure, or raw passthrough. That probe does not cover the
 error, cancellation, resume, fork, or permission-mode paths the 1.0.0 fixtures
 under `docs/research/fixtures/grok-1.0.0/` record.
 
+Grok model ids come from the CLI's own account-resolved manifest, which it
+caches at `~/.grok/models_cache.json` and renders through `grok models`. On
+1.0.13 that manifest holds `grok-4.6` and `grok-4.5`; Cats bundles both and
+marks neither default, because the `(default)` marker `grok models` prints
+reports the per-user `~/.grok/config.toml` `[models] default` rather than an
+account or vendor default. Evidence is under
+`docs/research/fixtures/grok-1.0.13/`. Both models also advertise a
+`--reasoning-effort` menu that the runtime does not yet expose as a control.
+
 Grok writes every conversation to `~/.grok/sessions/<encoded-cwd>/<session-id>/`,
 keyed by URL-encoded working directory, with `summary.json` as the index entry
 the runtime reads. Sessions appear on the dashboard without any extra step.

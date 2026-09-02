@@ -260,6 +260,53 @@ describe('curatedModelCatalog', () => {
     }
   });
 
+  it('bundled Grok example keeps each model own effort menu rather than sharing one', () => {
+    const runtime = createRuntimeRoot();
+
+    try {
+      const result = loadCuratedModelCatalog({
+        env: {
+          ...runtime.env,
+          CATS_RUNTIME_PACKAGE_ROOT: PACKAGE_ROOT,
+        },
+      });
+
+      expect(result.warnings).toEqual([]);
+
+      const catalog = findCuratedCliCatalog(result.document, 'grok');
+      expect(catalog?.version).toBe('1.0.13');
+      expect(catalog?.lastUpdated).toBe('2026-09-03');
+
+      const scope = resolveCuratedCatalogScope(catalog!, 'grok');
+      expect(scope?.models.map((model) => model.name)).toEqual(['grok-4.6', 'grok-4.5']);
+      // The manifest carries no default field; `grok models` only echoes the
+      // per-user config.toml preference, so the catalog must not claim one.
+      expect(scope?.models.some((model) => model.default)).toBe(false);
+
+      // Option values are the raw `--reasoning-effort` tokens. grok-4.6 has an
+      // xhigh level that grok-4.5 does not, so the menus must not be shared.
+      const effortFor = (name: string) => resolveEffectiveCuratedModelOptions(
+        scope!.sharedOptions,
+        scope!.models.find((model) => model.name === name)!,
+      ).find((option) => option.name === 'Effort');
+
+      expect(effortFor('grok-4.6')?.values?.map((value) => value.name))
+        .toEqual(['xhigh', 'high', 'medium', 'low']);
+      expect(effortFor('grok-4.5')?.values?.map((value) => value.name))
+        .toEqual(['high', 'medium', 'low']);
+      expect(effortFor('grok-4.6')?.default).toBe('high');
+      expect(effortFor('grok-4.5')?.default).toBe('high');
+      // The two models describe `high` differently upstream; that wording is
+      // what distinguishes their picker screens and must survive verbatim.
+      expect(effortFor('grok-4.6')?.values?.find((value) => value.name === 'high')?.notes)
+        .toEqual(['High Effort - Higher implementation quality with extensive reasoning']);
+      expect(effortFor('grok-4.5')?.values?.find((value) => value.name === 'high')?.notes)
+        .toEqual(['High Effort - Highest implementation quality with extensive reasoning']);
+    } finally {
+      runtime.cleanup();
+    }
+  });
+
   it('keeps model-list freshness separate from version-only CLI probes', () => {
     const runtime = createRuntimeRoot();
 

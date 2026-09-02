@@ -144,6 +144,12 @@ export class GrokProvider implements Provider {
     if (model) {
       args.push('--model', model);
     }
+    // `--reasoning-effort` is the documented spelling; `--effort` is its alias.
+    // The accepted level differs per model, so the curated per-model menu is
+    // what bounds the value rather than a single provider-wide list.
+    if (typeof opts.modelControls?.['grok.reasoning_effort'] === 'string') {
+      args.push('--reasoning-effort', opts.modelControls['grok.reasoning_effort']);
+    }
     if (opts.resumeSessionId) {
       args.push('--resume', opts.resumeSessionId);
     }

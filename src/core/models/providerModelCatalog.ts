@@ -245,8 +245,17 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'claude-opus-4-6-thinking', label: 'Claude Opus 4.6 (Thinking)' },
     { id: 'gpt-oss-120b-medium', label: 'GPT-OSS 120B (Medium)' },
   ],
+  // Read 2026-09-03 from the Grok CLI 1.0.13 account-resolved model manifest
+  // (~/.grok/models_cache.json, fetched from the vendor endpoint by the CLI
+  // itself) and corroborated by `grok models` on the same build. No entry is
+  // marked default: the manifest carries no default field, and the `(default)`
+  // marker `grok models` prints comes from the per-user `config.toml`
+  // `[models] default`. The adapter omits `--model` when no model is selected,
+  // so claiming one here would override a preference the runtime cannot see.
+  // This supersedes the 1.0.0 row that claimed `grok-4.5` as default.
   grok: [
-    { id: 'grok-4.5', label: 'grok-4.5', default: true },
+    { id: 'grok-4.6', label: 'Grok 4.6' },
+    { id: 'grok-4.5', label: 'Grok 4.5' },
   ],
   // Cline exposes no model-enumeration command; the only observed id is
   // whatever the signed-in account has configured. Left empty rather than

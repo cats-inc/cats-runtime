@@ -1,0 +1,20 @@
+# Source: live `grok models` on the locally installed Grok CLI
+# Version: 1.0.13 (from `grok --version`: grok 1.0.13 (5e9a58528b76))
+# Observed: 2026-09-03
+# Account scope: operator's signed-in grok.com session on this machine
+# Platform/channel: Windows 11, installer channel "internal" per ~/.grok/config.toml
+# Completeness: complete - the command printed the full list and exited 0
+# Note: the `Default model:` line and the `(default)` marker report the per-user
+#   ~/.grok/config.toml `[models] default = "grok-4.6"` setting. The account-resolved
+#   manifest in models-cache.success.redacted.txt carries no default field at all,
+#   so this marker is not evidence of an account or vendor default.
+# Redaction: the login line's identity source is replaced with a placeholder, matching
+#   the grok-1.0.0 fixture convention. No other identifiers, paths, or tokens present.
+
+You are logged in with <REDACTED_AUTH_SOURCE>.
+
+Default model: grok-4.6
+
+Available models:
+  * grok-4.6 (default)
+  - grok-4.5
