@@ -149,6 +149,39 @@ describe('sessionWorkspace', () => {
     expect(runGit(repoDir, ['status', '--porcelain'])).toBe('');
   });
 
+  it('deletes a runtime-owned delivery branch when its worktree is discarded', async () => {
+    const { repoDir, sessionBaseDir } = createGitWorkspace();
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'session-delivery-discard',
+      sessionBaseDir,
+      cwd: repoDir,
+      workspaceMode: 'shared',
+      workspaceIsolationMode: 'worktree',
+    });
+    const branch = 'cats/runtime/session-delivery-discard';
+    runGit(prepared.cwd, ['checkout', '-b', branch]);
+    writeFileSync(join(prepared.cwd, 'tracked.txt'), 'committed delivery\n', 'utf8');
+    runGit(prepared.cwd, ['add', '-A']);
+    runGit(prepared.cwd, ['commit', '-m', 'delivery commit']);
+
+    const cleanup = await cleanupSessionWorkspace({
+      sessionId: 'session-delivery-discard',
+      sessionBaseDir,
+      workspace: prepared.workspace,
+      worktreeCleanupPolicy: 'discard',
+    });
+
+    expect(cleanup).toEqual(expect.objectContaining({
+      status: 'completed',
+      reasonCodes: [
+        'worktree_changes_discarded',
+        'runtime_delivery_branch_deleted',
+      ],
+    }));
+    expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(false);
+    expect(runGit(repoDir, ['branch', '--list', branch])).toBe('');
+  });
+
   it('merges worktree changes back into the source repository before cleanup', { timeout: 15_000 }, async () => {
     const { repoDir, sessionBaseDir } = createGitWorkspace();
     const prepared = await prepareSessionWorkspace({

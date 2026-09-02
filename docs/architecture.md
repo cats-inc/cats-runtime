@@ -583,6 +583,10 @@ path is intentionally narrow:
   delivery-governance policy into the runtime
 - Requires explicit delivery-side opt-in before `create-commit` stages workspace
   changes; apply otherwise uses the existing Git index only
+- Materializes detached runtime-owned worktree sessions onto deterministic
+  `cats/runtime/<session-id>` branches at approved commit time so the same
+  workspace can continue through push/review adapters; discard/orphan cleanup
+  removes those reserved local refs while merge cleanup retains them
 - Does not own product-level approval UX, workspace orchestration policy, or
   post-apply delegation behavior
 - Provides the minimal "ensure this known session is awake" helper reused by the
@@ -600,6 +604,9 @@ path is intentionally narrow:
 - Supports explicit worktree cleanup policies (`discard`, `merge`, or
   `preserve`) and returns retained/completed cleanup summaries instead of
   assuming cleanup always succeeds
+- Recognizes the reserved `cats/runtime/*` delivery-branch namespace during
+  cleanup: discard/orphan cleanup deletes the local ref after detaching the
+  worktree, while merge cleanup keeps it as recovery evidence
 - Keeps retained worktree sessions pointed at the still-live worktree path so
   later observe/reset/delete flows stay consistent when cleanup is intentionally
   preserved or cannot finish safely

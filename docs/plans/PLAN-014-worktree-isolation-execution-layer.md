@@ -33,6 +33,10 @@ shared-only or sandbox-only.
    explicit `preserve` worktree disposition for manual handling.
 5. Vitest coverage now exercises direct helper behavior plus route-level
    worktree flows.
+6. Delivery commit apply now materializes detached runtime-owned session
+   worktrees onto a deterministic `cats/runtime/<session-id>` branch only when
+   delivery needs it. Discard/orphan cleanup removes those reserved local refs;
+   merge cleanup retains them for recovery.
 
 ## Watchpoints
 
@@ -50,4 +54,4 @@ shared-only or sandbox-only.
 
 ---
 
-*Last updated: 2026-03-24*
+*Last updated: 2026-09-02*

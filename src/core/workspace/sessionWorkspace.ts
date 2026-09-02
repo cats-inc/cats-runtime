@@ -30,6 +30,7 @@ import {
   toLegacyWorkspaceIsolationState,
   toLegacyWorkspaceMode,
 } from './legacyWorkspace.js';
+import { isRuntimeDeliveryBranch } from './runtimeDeliveryBranch.js';
 export { deriveWorkspaceIsolationMode } from './legacyWorkspace.js';
 
 const GIT_TIMEOUT_MS = 15_000;
@@ -328,12 +329,19 @@ export async function cleanupOrphanedWorktree(
   }
 
   const sourceRepoRoot = await resolveWorktreeSourceRepoRoot(worktreePath);
+  const runtimeDeliveryBranch = await readRuntimeDeliveryBranch(worktreePath);
   if (sourceRepoRoot) {
     const detached = await detachWorktree(sourceRepoRoot, worktreePath);
     if (detached) {
+      const branchReason = runtimeDeliveryBranch
+        ? await removeRuntimeDeliveryBranch(sourceRepoRoot, runtimeDeliveryBranch)
+        : undefined;
       return {
         removed: true,
-        reasonCodes: ['orphaned_worktree_detached'],
+        reasonCodes: [
+          'orphaned_worktree_detached',
+          ...(branchReason ? [branchReason] : []),
+        ],
         sourceRepoRoot,
       };
     }
@@ -371,6 +379,7 @@ async function cleanupWorktreeWorkspace(
   const reasonCodes: string[] = [];
   const worktree = workspace.worktree;
   const sourceCwd = workspace.sourceCwd ?? worktree.sourceRepoRoot;
+  const runtimeDeliveryBranch = await readRuntimeDeliveryBranch(worktree.worktreePath);
   let mergedPathCount = 0;
 
   if (policy === 'merge') {
@@ -555,6 +564,17 @@ async function cleanupWorktreeWorkspace(
     };
   }
 
+  if (runtimeDeliveryBranch) {
+    if (policy === 'discard') {
+      reasonCodes.push(await removeRuntimeDeliveryBranch(
+        worktree.sourceRepoRoot,
+        runtimeDeliveryBranch,
+      ));
+    } else {
+      reasonCodes.push('runtime_delivery_branch_retained');
+    }
+  }
+
   const nextWorkspace: SessionWorkspaceState = {
     kind: 'worktree',
     access: workspace.access,
@@ -711,6 +731,21 @@ async function readGitValue(cwd: string, args: string[]): Promise<string | undef
   }
   const value = result.stdout.trim();
   return value.length > 0 ? value : undefined;
+}
+
+async function readRuntimeDeliveryBranch(worktreePath: string): Promise<string | undefined> {
+  const branch = await readGitValue(worktreePath, ['branch', '--show-current']);
+  return isRuntimeDeliveryBranch(branch) ? branch : undefined;
+}
+
+async function removeRuntimeDeliveryBranch(
+  sourceRepoRoot: string,
+  branch: string,
+): Promise<string> {
+  const result = await runGit(sourceRepoRoot, ['branch', '-D', branch]);
+  return result.code === 0
+    ? 'runtime_delivery_branch_deleted'
+    : 'runtime_delivery_branch_delete_failed';
 }
 
 async function resolveWorktreeSourceRepoRoot(

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -8,6 +8,7 @@ import {
   inspectRuntimeDeliveryContract,
   RuntimeDeliveryService,
 } from '../src/core/runtime/RuntimeDeliveryService.js';
+import type { SessionInfo } from '../src/core/types.js';
 import { createRuntimeServer } from '../src/server.js';
 import {
   createRuntimeTestEnv,
@@ -293,6 +294,130 @@ describe('RuntimeDeliveryService', () => {
       if (repo.remotePath) {
         rmSync(repo.remotePath, { recursive: true, force: true });
       }
+    }
+  }, 15_000);
+
+  it('creates a runtime delivery branch before committing in a detached session worktree', async () => {
+    const { root, cleanup } = createWorkspace('cats-runtime-delivery-source-');
+    const worktree = createWorkspace('cats-runtime-delivery-worktree-');
+    const repo = initGitRepo(root, { withRemote: true });
+    const worktreePath = join(worktree.root, 'session');
+    const sessionId = 'golden-path-session';
+    runGit(root, ['worktree', 'add', '--detach', worktreePath, 'HEAD']);
+    writeFileSync(join(worktreePath, 'README.md'), '# repo\n\ndelivered\n', 'utf-8');
+
+    const session: SessionInfo = {
+      id: sessionId,
+      providerName: 'claude',
+      status: 'ready',
+      origin: 'runtime',
+      cwd: worktreePath,
+      workspace: {
+        kind: 'worktree',
+        access: 'read_write',
+        runtimeCwd: worktreePath,
+        sourceCwd: root,
+        worktree: {
+          id: 'delivery-worktree',
+          sourceRepoRoot: root,
+          sourceHeadOid: runGit(root, ['rev-parse', 'HEAD']),
+          sourceHeadRef: 'main',
+          worktreePath,
+          preparedAt: '2026-09-02T00:00:00.000Z',
+        },
+      },
+      messageCount: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      createdAt: '2026-09-02T00:00:00.000Z',
+      updatedAt: '2026-09-02T00:00:00.000Z',
+    };
+    const service = new RuntimeDeliveryService({
+      registry: { get: (id) => id === sessionId ? session : undefined },
+    });
+
+    try {
+      expect(runGit(worktreePath, ['branch', '--show-current'])).toBe('');
+
+      const committed = await service.execute({
+        action: 'create-commit',
+        sessionId,
+        apply: true,
+        authorization: { actorRole: 'owner', approved: true },
+        repo: { message: 'feat: deliver work', stageAll: true },
+      });
+
+      expect(committed.state).toBe('completed');
+      expect(committed.repo).toMatchObject({
+        branch: 'cats/runtime/golden-path-session',
+        detached: false,
+        clean: true,
+      });
+      expect(committed.metadata).toMatchObject({
+        commit: {
+          branch: 'cats/runtime/golden-path-session',
+          message: 'feat: deliver work',
+        },
+      });
+
+      const pushed = await service.execute({
+        action: 'push-branch',
+        sessionId,
+        apply: true,
+        authorization: { actorRole: 'owner', approved: true },
+      });
+
+      expect(pushed.state).toBe('completed');
+      expect(runGit(worktreePath, ['branch', '--show-current']))
+        .toBe('cats/runtime/golden-path-session');
+      expect(runGit(worktreePath, [
+        'ls-remote',
+        '--heads',
+        'origin',
+        'cats/runtime/golden-path-session',
+      ])).toContain('refs/heads/cats/runtime/golden-path-session');
+    } finally {
+      if (existsSync(worktreePath)) {
+        runGit(root, ['worktree', 'remove', '--force', worktreePath]);
+      }
+      cleanup();
+      worktree.cleanup();
+      if (repo.remotePath) {
+        rmSync(repo.remotePath, { recursive: true, force: true });
+      }
+    }
+  }, 15_000);
+
+  it('rejects an invalid requested branch before committing detached work', async () => {
+    const { root, cleanup } = createWorkspace('cats-runtime-delivery-invalid-branch-');
+    const service = createService();
+    initGitRepo(root);
+    const baselineHead = runGit(root, ['rev-parse', 'HEAD']);
+    runGit(root, ['checkout', '--detach']);
+    writeFileSync(join(root, 'README.md'), '# repo\n\nnot committed\n', 'utf-8');
+
+    try {
+      const result = await service.execute({
+        action: 'create-commit',
+        workspacePath: root,
+        apply: true,
+        authorization: { actorRole: 'owner', approved: true },
+        repo: {
+          branch: 'not a valid branch',
+          message: 'feat: should not commit',
+          stageAll: true,
+        },
+      });
+
+      expect(result.state).toBe('blocked');
+      expect(result.blockedReasons).toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: 'invalid_commit_branch' }),
+      ]));
+      expect(runGit(root, ['rev-parse', 'HEAD'])).toBe(baselineHead);
+      expect(runGit(root, ['branch', '--show-current'])).toBe('');
+      expect(runGit(root, ['status', '--porcelain'])).toContain('README.md');
+    } finally {
+      cleanup();
     }
   }, 15_000);
 });
