@@ -3435,13 +3435,13 @@ providers:
                 modelCatalog: expect.objectContaining({
                   source: 'static',
                   defaultModel: expect.any(String),
-                  modelCount: 3,
+                  modelCount: 4,
                   warnings: [],
                   statusCounts: {
                     configured: 0,
                     available: 0,
                     running: 0,
-                    unknown: 3,
+                    unknown: 4,
                   },
                 }),
                 tooling: expect.objectContaining({
@@ -4297,7 +4297,7 @@ providers:
           entryId: 'opus',
           entryMode: 'explicit',
           controls: {
-            'claude.reasoning_effort': 'xhigh',
+            'claude.reasoning_effort': 'high',
           },
         },
         support: {
@@ -4307,6 +4307,7 @@ providers:
       });
       expect(payload.entries.map((entry: { id: string }) => entry.id)).toEqual([
         'opus',
+        'fable',
         'sonnet',
         'haiku',
       ]);
@@ -4315,19 +4316,20 @@ providers:
       );
       expect(reasoningControl).toMatchObject({
         key: 'claude.reasoning_effort',
-        applicableEntryIds: ['opus', 'sonnet'],
+        applicableEntryIds: ['opus', 'fable', 'sonnet'],
       });
-      expect(reasoningControl?.values).toEqual(expect.arrayContaining([
-        expect.objectContaining({ value: 'low', applicableEntryIds: ['opus'] }),
-        expect.objectContaining({ value: 'low', applicableEntryIds: ['sonnet'] }),
-        expect.objectContaining({ value: 'medium', applicableEntryIds: ['opus'] }),
-        expect.objectContaining({ value: 'medium', applicableEntryIds: ['sonnet'] }),
-        expect.objectContaining({ value: 'high', applicableEntryIds: ['opus'] }),
-        expect.objectContaining({ value: 'high', applicableEntryIds: ['sonnet'] }),
-        expect.objectContaining({ value: 'xhigh', applicableEntryIds: ['opus'] }),
-        expect.objectContaining({ value: 'max', applicableEntryIds: ['opus'] }),
-        expect.objectContaining({ value: 'max', applicableEntryIds: ['sonnet'] }),
-      ]));
+      const applicableEntriesFor = (value: string): string[] => Array.from(
+        new Set(
+          reasoningControl?.values
+            .filter((option: { value: string }) => option.value === value)
+            .flatMap((option: { applicableEntryIds?: string[] }) => (
+              option.applicableEntryIds || []
+            )),
+        ),
+      );
+      for (const value of ['low', 'medium', 'high', 'xhigh', 'max', 'ultracode']) {
+        expect(applicableEntriesFor(value)).toEqual(['opus', 'fable', 'sonnet']);
+      }
     });
   });
 

@@ -1,0 +1,37 @@
+# Source: operator-pasted Claude Code interactive /model picker
+# Version: 2.1.257
+# Observed: 2026-09-02
+# Account scope: operator session; account identifiers not provided
+# Platform/channel: not reported
+# Completeness: operator confirmed all five model rows were visible with nothing scrolled off
+# Redaction: no account identifiers, organization names, paths, tokens, or session material present
+
+Select model
+Switch between Claude models. Your pick becomes the default for new sessions. For other/previous model names, specify with --model.
+
+> 1. Default (recommended) √  Opus 5 with 1M context · Best for everyday, complex tasks
+  2. Opus (1M context)        Opus 5 with 1M context · Best for everyday, complex tasks
+  3. Fable                    Fable 5.1 · Most capable for your hardest and longest-running tasks
+  4. Sonnet                   Sonnet 5 · Efficient for routine tasks
+  5. Haiku                    Haiku 4.5 · Fastest for quick answers
+
+◉ xHigh effort ←/→ to adjust
+
+The operator reported that rows 1–4 expose all six choices when adjusted left/right:
+
+○ Low effort ←/→ to adjust
+
+◐ Medium effort ←/→ to adjust
+
+● High effort (default) ←/→ to adjust
+
+◉ xHigh effort ←/→ to adjust
+
+◈ Max effort ←/→ to adjust
+May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+✦ Ultracode effort ←/→ to adjust
+
+The operator reported that row 5 cannot be adjusted and displays:
+
+○ Effort not supported for Haiku

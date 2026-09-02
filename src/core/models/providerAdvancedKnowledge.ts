@@ -106,7 +106,8 @@ function buildEntryCapabilityTags(
 
   const normalized = entryId.toLowerCase();
   if (
-    normalized.includes('opus')
+    normalized.includes('fable')
+    || normalized.includes('opus')
     || normalized.includes('pro')
     || normalized.includes('gpt-5.4')
     || normalized.includes('reason')
@@ -131,9 +132,11 @@ function buildEntryNotes(
   if (target.providerName === 'claude' && target.backend === 'cli') {
     switch (entryId) {
       case 'opus':
-        return ['Most capable for complex work.'];
+        return ['Best for everyday, complex tasks.'];
+      case 'fable':
+        return ['Most capable for your hardest and longest-running tasks.'];
       case 'sonnet':
-        return ['Best for everyday tasks.'];
+        return ['Efficient for routine tasks.'];
       case 'haiku':
         return ['Fastest for quick answers.'];
       default:
@@ -192,6 +195,8 @@ function normalizeClaudeEffortValue(
       return 'xhigh';
     case 'max':
       return 'max';
+    case 'ultracode':
+      return 'ultracode';
     default:
       return null;
   }
@@ -211,6 +216,8 @@ function fallbackClaudeEffortDescription(
       return 'Deeper reasoning than high, just below maximum.';
     case 'max':
       return 'Maximum effort for the most complex work.';
+    case 'ultracode':
+      return 'xHigh effort plus dynamic workflow orchestration for this session.';
     default:
       return undefined;
   }
@@ -1063,7 +1070,7 @@ function buildClaudeCliControls(
   entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
 } {
   const effortEntryIds = entries
-    .filter((entry) => entry.id === 'opus' || entry.id === 'sonnet')
+    .filter((entry) => entry.id === 'opus' || entry.id === 'fable' || entry.id === 'sonnet')
     .map((entry) => entry.id);
   if (effortEntryIds.length === 0) {
     return {
@@ -1088,21 +1095,33 @@ function buildClaudeCliControls(
         },
         {
           value: 'medium',
-          label: 'Medium (default)',
+          label: 'Medium',
           description: 'Balanced effort for most work.',
           applicableEntryIds: effortEntryIds,
         },
         {
           value: 'high',
-          label: 'High',
+          label: 'High (default)',
           description: 'Greater depth for complex tasks.',
+          applicableEntryIds: effortEntryIds,
+        },
+        {
+          value: 'xhigh',
+          label: 'xHigh',
+          description: 'Deeper reasoning than high, just below maximum.',
           applicableEntryIds: effortEntryIds,
         },
         {
           value: 'max',
           label: 'Max',
           description: 'Maximum effort for the most complex work.',
-          applicableEntryIds: ['opus'],
+          applicableEntryIds: effortEntryIds,
+        },
+        {
+          value: 'ultracode',
+          label: 'Ultracode',
+          description: 'xHigh effort plus dynamic workflow orchestration for this session.',
+          applicableEntryIds: effortEntryIds,
         },
       ]),
       applicableEntryIds: effortEntryIds,
@@ -1111,7 +1130,7 @@ function buildClaudeCliControls(
     entryDefaults: Object.fromEntries(
       effortEntryIds.map((entryId) => [
         entryId,
-        { 'claude.reasoning_effort': 'medium' as ProviderAdvancedControlValue },
+        { 'claude.reasoning_effort': 'high' as ProviderAdvancedControlValue },
       ]),
     ),
   };
@@ -1325,10 +1344,11 @@ const VERIFIED_ADVANCED_MANIFESTS: VerifiedAdvancedManifest[] = [
   },
   {
     id: 'claude-cli-v1',
-    version: '2026-04-07',
+    version: '2026-09-02',
     supportTier: 'full',
     evidenceRefs: [
       'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#claude-cli-v1',
+      'docs/research/fixtures/claude-2.1.257/model-picker.success.redacted.txt',
     ],
     matches: (target) => target.providerName === 'claude' && target.backend === 'cli',
     build: (_target, entries) => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  normalizeClaudeCuratedModelId,
   normalizeCodexCuratedModelId,
   normalizeCopilotModelName,
   normalizeCursorCuratedModelId,
@@ -10,6 +11,18 @@ import {
 } from './curatedModelCatalogNormalization.js';
 
 describe('curatedModelCatalogNormalization', () => {
+  it('normalizes current Claude picker labels into executable aliases', () => {
+    expect(normalizeClaudeCuratedModelId({ name: 'Opus', label: 'Opus (1M context)' }))
+      .toBe('opus');
+    expect(normalizeClaudeCuratedModelId({ name: 'Fable', label: 'Fable 5.1' }))
+      .toBe('fable');
+    expect(normalizeClaudeCuratedModelId({ name: 'Sonnet', label: 'Sonnet 5' }))
+      .toBe('sonnet');
+    expect(normalizeClaudeCuratedModelId({ name: 'Haiku', label: 'Haiku 4.5' }))
+      .toBe('haiku');
+    expect(normalizeClaudeCuratedModelId({ name: 'Default (recommended)' })).toBeNull();
+  });
+
   it('normalizes Cursor /model labels into runtime-owned catalog ids', () => {
     expect(normalizeCursorModelName('Auto')).toBe('auto');
     expect(normalizeCursorModelName('Codex 5.3 Extra High')).toBe('gpt-5.3-codex-xhigh');
