@@ -2049,7 +2049,8 @@ function tracksProviderDiscoveryState(session: SessionInfo): boolean {
   return Boolean(
     session.providerBackend === 'cli'
     && session.providerSessionId
-    && (session.providerName === 'auggie'
+    && (session.providerName === 'antigravity'
+      || session.providerName === 'auggie'
       || session.providerName === 'claude'
       || session.providerName === 'codex'
       || session.providerName === 'copilot'
@@ -2081,6 +2082,17 @@ function collectProviderDiscoveryArtifactPaths(ctx: AppContext, session: Session
     if (session.providerName === 'copilot' && basename(sourcePath) === 'workspace.yaml') {
       artifactPaths.add(sourcePath);
       artifactPaths.add(join(dirname(sourcePath), 'events.jsonl'));
+      continue;
+    }
+
+    // Antigravity keeps every conversation in its own SQLite database, in WAL
+    // mode. Removing the `.db` alone leaves the sidecars behind, and a stale
+    // `-wal` would be replayed into any later database that reuses the
+    // conversation id.
+    if (session.providerName === 'antigravity') {
+      artifactPaths.add(sourcePath);
+      artifactPaths.add(`${sourcePath}-wal`);
+      artifactPaths.add(`${sourcePath}-shm`);
       continue;
     }
 
@@ -2487,10 +2499,41 @@ function prepareProviderDiscoveryDeletion(
   session: SessionInfo,
 ): PreparedFileDeletion {
   return combinePreparedDeletions(
-    ctx.registry.preparePathDeletion(collectProviderDiscoveryArtifactPaths(ctx, session)),
+    ctx.registry.preparePathDeletion(
+      collectProviderDiscoveryArtifactPaths(ctx, session),
+      { preserveDirs: collectPreservedProviderDirectories(ctx, session) },
+    ),
     prepareClaudeSessionIndexDeletion(session),
     prepareJunieSessionIndexDeletion(session),
   );
+}
+
+/**
+ * Directories a delete must leave standing even after it empties them.
+ *
+ * Every other file-backed provider nests its transcripts at least one level
+ * below the directory discovery watches, so pruning the emptied parent removes
+ * a per-project or per-session folder. Antigravity keeps every conversation
+ * database directly in the watched root, so deleting the last conversation
+ * would otherwise take that root with it -- and `FileWatcher` stops for good
+ * once its directory disappears, leaving later conversations undiscovered
+ * until the runtime restarts.
+ */
+function collectPreservedProviderDirectories(
+  ctx: AppContext,
+  session: SessionInfo,
+): string[] {
+  if (session.providerName !== 'antigravity') {
+    return [];
+  }
+
+  try {
+    return [
+      resolveFileBackedProviderPath(ctx.config, 'antigravity', session.providerInstanceId),
+    ];
+  } catch {
+    return [];
+  }
 }
 
 async function verifyProviderDiscoveryStateDeleted(
