@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { delimiter, extname, isAbsolute, join, posix as pathPosix, win32 as pathWin32 } from 'node:path';
 import type { ProviderCommandConfig, ProviderRuntimeConfig } from '../config.js';
 import { resolveRuntimeRoot, resolveRuntimeSessionsDir } from '../../../shared/runtimePaths.js';
+import { resolveWindowsNodeShim } from './windowsNodeShim.js';
 
 export interface ShellInvocation {
   command: string;
@@ -477,6 +478,23 @@ function buildNativeSpawnConfig(
           shell: false,
           cwd,
         };
+      }
+      // An npm shim is a batch file, so reaching it means going through
+      // `cmd.exe` -- and a console created from the packaged desktop host, which
+      // has no console of its own, is handed to the default terminal app.
+      // Windows Terminal opens a real window for that handoff regardless of the
+      // hidden-window flag, which is a terminal flashing up on every launch.
+      // Run what the shim would have run instead. See `windowsNodeShim.ts`.
+      {
+        const shimTarget = resolveWindowsNodeShim(commandPath);
+        if (shimTarget) {
+          return {
+            command: shimTarget.command,
+            args: [...shimTarget.args, ...args],
+            shell: false,
+            cwd,
+          };
+        }
       }
       return buildWindowsShellProxySpawnConfig(commandPath, args, cwd);
 
