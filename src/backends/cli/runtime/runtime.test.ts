@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -183,21 +183,29 @@ describe('runtime adapters', () => {
     expect(spawnConfig.shell).toBe(false);
   });
 
-  it('wraps the Windows Copilot auto runner in a hidden cmd proxy', () => {
-    const spawnConfig = buildProcessSpawnConfig(
-      {
-        path: 'copilot',
-        runner: 'auto',
-        runtime: {
-          mode: 'native',
-        },
-      },
-      'copilot',
-      ['--help'],
-      'C:\\Users\\kenne\\repo',
-    );
+  it('keeps the hidden cmd proxy for a batch file that is not an npm node shim', () => {
+    if (process.platform !== 'win32') return;
 
-    if (process.platform === 'win32') {
+    // Only npm's node shim can be bypassed, because only there do we know what
+    // the batch file would have run. Anything else still needs cmd.exe.
+    const binDir = mkdtempSync(join(tmpdir(), 'cats-batch-spawn-'));
+    try {
+      writeFileSync(
+        join(binDir, 'tool.cmd'),
+        ['@echo off', 'some-other-tool.exe %*'].join('\r\n'),
+      );
+
+      const spawnConfig = buildProcessSpawnConfig(
+        {
+          path: join(binDir, 'tool.cmd'),
+          runner: 'auto',
+          runtime: { mode: 'native' },
+        },
+        'copilot',
+        ['--help'],
+        'C:\\Users\\kenne\\repo',
+      );
+
       expect(spawnConfig.command.toLowerCase()).toContain('cmd.exe');
       expect(spawnConfig.args.slice(0, 4)).toEqual([
         '/d',
@@ -205,17 +213,63 @@ describe('runtime adapters', () => {
         '/s',
         '/c',
       ]);
-      expect(spawnConfig.args[4]).toContain('copilot');
+      expect(spawnConfig.args[4]).toContain('tool.cmd');
       expect(spawnConfig.args[4]).toContain('"--help"');
       expect(spawnConfig.windowsVerbatimArguments).toBe(true);
       expect(spawnConfig.env).toBeUndefined();
       expect(spawnConfig.shell).toBe(false);
-      return;
+    } finally {
+      rmSync(binDir, { recursive: true, force: true });
     }
+  });
 
-    expect(spawnConfig.command.toLowerCase()).toContain('copilot');
-    expect(spawnConfig.args).toEqual(['--help']);
-    expect(spawnConfig.shell).toBe(false);
+  it('runs an npm shim through node instead of a console-creating cmd proxy', () => {
+    if (process.platform !== 'win32') return;
+
+    // Spawning cmd.exe from the packaged desktop host -- a GUI process with no
+    // console -- hands a console to the default terminal app, and Windows
+    // Terminal opens a real window for that handoff whatever the hidden-window
+    // flag says. Providers behind an npm shim were the only ones that hit it.
+    const binDir = mkdtempSync(join(tmpdir(), 'cats-shim-spawn-'));
+    try {
+      mkdirSync(join(binDir, 'node_modules', 'pkg', 'bin'), { recursive: true });
+      const script = join(binDir, 'node_modules', 'pkg', 'bin', 'cli.js');
+      writeFileSync(script, '');
+      writeFileSync(join(binDir, 'node.exe'), '');
+      writeFileSync(
+        join(binDir, 'tool.cmd'),
+        [
+          'IF EXIST "%dp0%\\node.exe" (',
+          '  SET "_prog=%dp0%\\node.exe"',
+          ')',
+          'endLocal & "%_prog%"  "%dp0%\\node_modules\\pkg\\bin\\cli.js" %*',
+        ].join('\r\n'),
+      );
+
+      const spawnConfig = buildProcessSpawnConfig(
+        {
+          path: join(binDir, 'tool'),
+          runner: 'auto',
+          runtime: { mode: 'native' },
+        },
+        'codex',
+        ['app-server', '-c', 'model="gpt-5.6-sol"'],
+        'C:\\Users\\kenne\\repo',
+      );
+
+      expect(spawnConfig.command).toBe(join(binDir, 'node.exe'));
+      // The arguments no longer pass through cmd's quote stripping either.
+      expect(spawnConfig.args).toEqual([
+        script,
+        'app-server',
+        '-c',
+        'model="gpt-5.6-sol"',
+      ]);
+      expect(spawnConfig.shell).toBe(false);
+      expect(spawnConfig.windowsVerbatimArguments).toBeUndefined();
+    } finally {
+      rmSync(binDir, { recursive: true, force: true });
+    }
   });
 
   it('keeps explicit PowerShell runners on the env-based PowerShell proxy', () => {
