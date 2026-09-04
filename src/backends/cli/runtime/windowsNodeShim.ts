@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { dirname, extname, isAbsolute, join, resolve } from 'node:path';
+import { delimiter, dirname, extname, isAbsolute, join, resolve } from 'node:path';
 
 /**
  * Resolve an npm-style Windows `.cmd` shim to the node invocation it performs,
@@ -62,7 +62,10 @@ export function resolveWindowsNodeShim(commandPath: string): WindowsNodeShimTarg
   }
 
   const shimDir = dirname(resolve(shimPath));
-  const script = join(shimDir, launch[1]);
+  // The shim spells its script path with backslashes. `join` only reads those
+  // as separators on Windows, so normalize before joining -- otherwise the
+  // whole thing is taken for one filename and never resolves.
+  const script = join(shimDir, ...launch[1].split(/[\\/]+/u).filter(Boolean));
   if (!isExistingFile(script)) {
     return null;
   }
@@ -110,7 +113,7 @@ function resolveNodeForShim(shimDir: string): string | null {
     return bundled;
   }
 
-  for (const dir of (process.env.PATH || '').split(';')) {
+  for (const dir of (process.env.PATH || '').split(delimiter)) {
     const trimmed = dir.trim();
     if (!trimmed) continue;
     const candidate = isAbsolute(trimmed)
