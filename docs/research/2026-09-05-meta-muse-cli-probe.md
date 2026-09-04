@@ -147,6 +147,10 @@ Model responses are tasks too (`task_kind: "model.meta.response"`, or
 `model.unknown.response` under `--provider echo`), so `tool.` is the prefix that
 separates a tool call from a model step.
 
+There is also no reasoning signal. `task.lifecycle.status` carries operational lines
+such as `opening meta model stream attempt 1/10`, which the adapter surfaces as status
+progress rather than dressing up as model thinking.
+
 **There is no token usage anywhere in the stream.** No probe produced a usage
 record, and the payload-type table the binary carries has no usage entry for the
 exec plane. Turns through this provider report no usage; that is a property of

@@ -282,7 +282,7 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       toolUse: 'native',
       toolResult: 'native',
       progress: 'derived',
-      reasoning: 'derived',
+      reasoning: 'none',
     },
     transcript: {
       contentBlocks: 'none',
@@ -293,7 +293,7 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
     notes: [
       'Meta Muse 1.0.3 `exec --json` streams MSP records: run.output.delta carries incremental text.',
       'Tool calls and results are native (tool.result names the tool and its outcome).',
-      'Reasoning is derived from task.lifecycle.status messages; muse emits no reasoning deltas.',
+      'No reasoning signal of any kind: task.lifecycle.status carries operational lines such as "opening meta model stream attempt 1/10", which surface as status progress.',
       'The stream carries no token usage at all, so turns report no usage.',
       'Every record names its session in stream.id, which is what --session-id resumes.',
     ],

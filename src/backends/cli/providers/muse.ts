@@ -544,7 +544,10 @@ export class MuseProvider implements Provider {
         text: message,
         provider: 'muse',
         backend: 'cli',
-        kind: pending ? 'tool' : 'reasoning',
+        // These are operational lines ("opening meta model stream attempt
+        // 1/10"), not model thinking. muse emits no reasoning deltas at all,
+        // so labelling them reasoning would invent a signal it does not have.
+        kind: pending ? 'tool' : 'status',
         status: 'running',
         source: 'provider',
         native: {
