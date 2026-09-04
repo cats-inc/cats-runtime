@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import type {
   PermissionMode,
   ProviderModelResolution,
@@ -640,7 +640,11 @@ export class SessionRegistry {
 
   preparePathDeletion(
     artifactPaths: Iterable<string>,
+    options: { preserveDirs?: Iterable<string> } = {},
   ): PreparedFileDeletion {
+    const preservedDirs = new Set(
+      Array.from(options.preserveDirs ?? [], (dir) => resolve(dir)),
+    );
     const stagedArtifacts: StagedTranscriptArtifact[] = [];
     let hadFiles = false;
 
@@ -671,7 +675,11 @@ export class SessionRegistry {
         }
 
         completed = true;
-        const cleanupDirs = new Set(stagedArtifacts.map((artifact) => artifact.cleanupDir));
+        const cleanupDirs = new Set(
+          stagedArtifacts
+            .map((artifact) => artifact.cleanupDir)
+            .filter((dir) => !preservedDirs.has(resolve(dir))),
+        );
         for (const artifact of stagedArtifacts) {
           try {
             rmSync(artifact.stagedPath, { recursive: true, force: true });

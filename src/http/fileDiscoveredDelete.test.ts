@@ -28,6 +28,7 @@ describe('file-discovered session deletion', () => {
   let junieSessionsDir: string;
   let clineSessionsDir: string;
   let grokSessionsDir: string;
+  let antigravitySessionsDir: string;
   let sessionBaseDir: string;
 
   const makeConfig = (): CliRuntimeConfig => ({
@@ -52,6 +53,7 @@ describe('file-discovered session deletion', () => {
     copilotSessionsDir,
     clineSessionsDir,
     grokSessionsDir,
+    antigravitySessionsDir,
     cursorChatsDir: '~/.cursor/chats',
     cursorRuntime: {
       mode: 'wsl',
@@ -86,6 +88,7 @@ describe('file-discovered session deletion', () => {
     junieSessionsDir = join(tmpdir(), `junie-delete-test-${Date.now()}`);
     clineSessionsDir = join(tmpdir(), `cline-delete-test-${Date.now()}`);
     grokSessionsDir = join(tmpdir(), `grok-delete-test-${Date.now()}`);
+    antigravitySessionsDir = join(tmpdir(), `antigravity-delete-test-${Date.now()}`);
     sessionBaseDir = join(tmpdir(), `cats-runtime-delete-test-${Date.now()}`, 'sessions');
     mkdirSync(claudeProjectsDir, { recursive: true });
     mkdirSync(codexSessionsDir, { recursive: true });
@@ -93,6 +96,7 @@ describe('file-discovered session deletion', () => {
     mkdirSync(junieSessionsDir, { recursive: true });
     mkdirSync(clineSessionsDir, { recursive: true });
     mkdirSync(grokSessionsDir, { recursive: true });
+    mkdirSync(antigravitySessionsDir, { recursive: true });
     mkdirSync(sessionBaseDir, { recursive: true });
 
     registry = new SessionRegistry(undefined, sessionBaseDir);
@@ -160,6 +164,7 @@ describe('file-discovered session deletion', () => {
     rmSync(junieSessionsDir, { recursive: true, force: true });
     rmSync(clineSessionsDir, { recursive: true, force: true });
     rmSync(grokSessionsDir, { recursive: true, force: true });
+    rmSync(antigravitySessionsDir, { recursive: true, force: true });
     rmSync(sessionBaseDir, { recursive: true, force: true });
   });
 
@@ -609,5 +614,65 @@ describe('file-discovered session deletion', () => {
     });
     expect(grokResponse.status).toBe(200);
     expect(existsSync(grokDir)).toBe(false);
+  });
+
+  it('deletes discovered Antigravity conversation databases with their WAL sidecars', async () => {
+    const conversationId = 'antigravity-delete';
+    const databasePath = join(antigravitySessionsDir, `${conversationId}.db`);
+    const walPath = `${databasePath}-wal`;
+    const shmPath = `${databasePath}-shm`;
+    const keptPath = join(antigravitySessionsDir, 'antigravity-keep.db');
+    writeFileSync(databasePath, 'SQLite format 3 ');
+    writeFileSync(walPath, '');
+    writeFileSync(shmPath, '');
+    writeFileSync(keptPath, 'SQLite format 3 ');
+
+    const session = registry.upsertDiscovered(conversationId, {
+      providerName: 'antigravity',
+      cwd: 'C:/repo',
+      summary: 'Delete me',
+      sourcePath: databasePath,
+      messageCount: 2,
+    });
+
+    const res = await app.request(`/sessions/${session!.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    // A registry-only delete leaves the database on disk for the next scan to
+    // rediscover, which is what made these sessions look undeletable.
+    expect(body.status).toBe('deleted');
+    expect(body.fileDeleted).toBe(true);
+    expect(registry.get(session!.id)).toBeUndefined();
+    expect(existsSync(databasePath)).toBe(false);
+    expect(existsSync(walPath)).toBe(false);
+    expect(existsSync(shmPath)).toBe(false);
+    expect(existsSync(keptPath)).toBe(true);
+  });
+
+  it('keeps the Antigravity conversations directory after its last conversation is deleted', async () => {
+    const conversationId = 'antigravity-last';
+    const databasePath = join(antigravitySessionsDir, `${conversationId}.db`);
+    writeFileSync(databasePath, 'SQLite format 3 ');
+
+    const session = registry.upsertDiscovered(conversationId, {
+      providerName: 'antigravity',
+      cwd: 'C:/repo',
+      summary: 'Last one',
+      sourcePath: databasePath,
+      messageCount: 1,
+    });
+
+    const res = await app.request(`/sessions/${session!.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    expect(existsSync(databasePath)).toBe(false);
+    // Antigravity stores conversations directly in the directory discovery
+    // watches, and FileWatcher stops for good when that directory disappears.
+    expect(existsSync(antigravitySessionsDir)).toBe(true);
   });
 });
