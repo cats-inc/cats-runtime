@@ -217,6 +217,13 @@ describe('package contract', () => {
     }
   });
 
+  // This case packs a tarball, installs it into a scratch consumer, and then
+  // runs six separate node entrypoints out of the install. That is minutes of
+  // real work, not the seconds a unit test budgets for, and it had been sitting
+  // just under its limit: measured runs land anywhere from 160s to 425s
+  // depending on how warm the npm cache is and how loaded the machine is. The
+  // budget below covers the slow end rather than turning a cold cache into a
+  // red build.
   it('smokes the installed runtime entrypoint plus bundled helper scripts from a local tarball', () => {
     const installRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-pack-install-'));
     cleanupPaths.push(installRoot);
@@ -323,5 +330,5 @@ describe('package contract', () => {
         }),
       ]),
     }));
-  }, 120000);
+  }, 600000);
 });
