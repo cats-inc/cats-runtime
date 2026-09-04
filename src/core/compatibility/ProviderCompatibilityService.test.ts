@@ -347,10 +347,10 @@ describe('ProviderCompatibilityService', () => {
     const runner = {
       run: vi.fn(async () => ({
         exitCode: 0,
-        stdout: 'aider 0.86.2\n',
+        stdout: 'Muse Code 1.0.3 (1.0.3-R2198.1)\n',
         stderr: '',
         timedOut: false,
-        durationMs: 8300,
+        durationMs: 5700,
       })),
     };
     const service = new ProviderCompatibilityService({
@@ -364,12 +364,12 @@ describe('ProviderCompatibilityService', () => {
       now: () => Date.parse('2026-08-24T00:00:00.000Z'),
     });
 
-    await service.assessCliTarget(createCliTarget('aider'), { force: true });
-    expect(runner.run.mock.calls.every((call) => call[4] === 30_000)).toBe(true);
+    await service.assessCliTarget(createCliTarget('muse'), { force: true });
+    expect(runner.run.mock.calls.every((call) => call[4] === 20_000)).toBe(true);
 
     runner.run.mockClear();
     await service.assessCliTarget(
-      createCliTarget('aider', 'docker-dev', {
+      createCliTarget('muse', 'docker-dev', {
         mode: 'docker',
         container: 'cats-cli-dev',
         environmentId: 'docker-dev',

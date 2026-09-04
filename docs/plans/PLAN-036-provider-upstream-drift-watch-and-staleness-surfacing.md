@@ -85,10 +85,14 @@ Non-goals for this plan:
       optional version URL. `manual` means no deterministic automated signal and must remain
       visible in reports.
 - [ ] Task 0.3: Onboard all 16 `ProviderName` values with their actual support level, not with
-      family registration treated as full execution support. `aider` is the worked example:
-      `src/backends/cli/providers/aider.ts:13` throws from `buildSpawnArgs`, so it is
-      install-and-detect only and its `execution` coverage is `not_applicable`. Alternate-backend
-      execution and providers outside the current evolution-probe rollout must be equally explicit.
+      family registration treated as full execution support. `devin` is the worked example: it is
+      a registered CLI provider family for install, version, path, and auth discovery, but it has
+      no executable `cli/native` target, so its CLI-backend `execution` coverage is
+      `not_applicable` and its real execution lives on `agent/acp`. Alternate-backend execution
+      and providers outside the current evolution-probe rollout must be equally explicit.
+      (This task originally used `aider` as the worked example; [ADR-037](../decisions/037-adopt-meta-muse-as-an-executable-cli-provider-and-retire-aider.md)
+      retired that provider, and `muse` took its place in `ProviderName` as a fully executable
+      family.)
 - [ ] Task 0.4: Derive npm release sources from `check.npmPackage` in
       `src/core/provider-install/knowledge.ts` rather than restating them. The seven existing
       coordinates (`codex`, `copilot`, `opencode`, `kilo`, `auggie`, `pi`, `cline`) must have

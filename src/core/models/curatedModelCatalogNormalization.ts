@@ -587,6 +587,7 @@ export function normalizeCuratedModelId(
       return normalizeCodexCuratedModelId(model);
     case 'antigravity':
     case 'grok':
+    case 'muse':
       return normalizeVerbatimCuratedModelId(model);
     case 'kilo':
       return normalizeKiloCuratedModelId(model);

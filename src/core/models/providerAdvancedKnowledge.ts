@@ -313,6 +313,62 @@ function fallbackGrokEffortDescription(
   }
 }
 
+// muse takes one provider-wide effort list on `--reasoning-effort`; unlike
+// Grok's, the menu does not vary per model, so the tokens are accepted verbatim
+// and the label spellings a curator might paste are folded onto them.
+function normalizeMuseEffortValue(
+  value: string | undefined,
+): ProviderAdvancedControlValue | null {
+  const normalized = value?.trim().toLowerCase();
+  switch (normalized) {
+    case 'none':
+      return 'none';
+    case 'minimal':
+      return 'minimal';
+    case 'low':
+      return 'low';
+    case 'medium':
+      return 'medium';
+    case 'high':
+      return 'high';
+    case 'extra high':
+    case 'extra-high':
+    case 'xhigh':
+      return 'xhigh';
+    case 'max':
+      return 'max';
+    case 'ultra':
+      return 'ultra';
+    default:
+      return null;
+  }
+}
+
+function fallbackMuseEffortDescription(
+  value: ProviderAdvancedControlValue,
+): string | undefined {
+  switch (value) {
+    case 'none':
+      return 'No reasoning budget.';
+    case 'minimal':
+      return 'Minimal reasoning budget.';
+    case 'low':
+      return 'Quick responses with lighter reasoning.';
+    case 'medium':
+      return 'Balances speed and reasoning depth.';
+    case 'high':
+      return 'Greater reasoning depth for complex problems.';
+    case 'xhigh':
+      return 'Extra high reasoning depth.';
+    case 'max':
+      return 'Maximum reasoning depth.';
+    case 'ultra':
+      return 'Highest reasoning budget muse exposes.';
+    default:
+      return undefined;
+  }
+}
+
 function normalizeCopilotEffortValue(
   value: string | undefined,
 ): ProviderAdvancedControlValue | null {
@@ -604,6 +660,21 @@ function buildCuratedGrokCliControls(
   });
 }
 
+function buildCuratedMuseCliControls(
+  optionsByEntryId: Map<string, CuratedModelCatalogOption>,
+): {
+  controls?: ProviderAdvancedCatalogControl[];
+  entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
+} {
+  return buildCuratedEnumControl(optionsByEntryId, {
+    key: 'muse.reasoning_effort',
+    label: 'Reasoning effort',
+    description: 'Controls Meta Muse CLI reasoning effort.',
+    normalizeValue: normalizeMuseEffortValue,
+    fallbackDescription: fallbackMuseEffortDescription,
+  });
+}
+
 function buildCuratedCopilotCliControls(
   optionsByEntryId: Map<string, CuratedModelCatalogOption>,
 ): {
@@ -799,6 +870,60 @@ function buildCuratedGrokCliOverlay(
 
   const normalizedEntriesById = coerceSingleCuratedDefaultEntryMetadata(entriesById);
   const controlResult = buildCuratedGrokCliControls(effortOptions);
+  return {
+    entriesById: normalizedEntriesById,
+    ...(controlResult.controls ? { controls: controlResult.controls } : {}),
+    entryDefaults: controlResult.entryDefaults,
+    warnings,
+  };
+}
+
+function buildCuratedMuseCliOverlay(
+  document: CuratedModelCatalogDocument | undefined,
+): CuratedCatalogOverlay | null {
+  const catalog = findCuratedCliCatalog(document, 'muse');
+  if (!catalog) {
+    return null;
+  }
+
+  const scope = resolveCuratedCatalogScope(catalog, 'muse');
+  if (!scope) {
+    return null;
+  }
+
+  // Same shape as Grok: the effort token is a separate CLI argument rather than
+  // part of the model id. It differs in where the menu lives - muse publishes
+  // one list for every model, so the curated entry carries it in
+  // shared_options and every model resolves to the same axis.
+  const entriesById: Record<string, CuratedEntryMetadata> = {};
+  const effortOptions = new Map<string, CuratedModelCatalogOption>();
+  const warnings: string[] = [];
+  for (const model of scope.models) {
+    const entryId = normalizeVerbatimCuratedModelId(model);
+    if (!entryId) {
+      warnings.push(
+        `Curated model '${describeCuratedModelLabel(model)}' for ${catalog.cli} could not be normalized and was ignored.`,
+      );
+      continue;
+    }
+    entriesById[entryId] = buildCuratedEntryMetadata(model);
+
+    const effectiveOptions = resolveEffectiveCuratedModelOptions(scope.sharedOptions, model);
+    const effortOption = effectiveOptions.find((option) => matchesCuratedOptionName(option, [
+      'effort',
+      'reasoning effort',
+    ]));
+    if (effortOption) {
+      effortOptions.set(entryId, effortOption);
+    }
+  }
+
+  if (Object.keys(entriesById).length === 0) {
+    return null;
+  }
+
+  const normalizedEntriesById = coerceSingleCuratedDefaultEntryMetadata(entriesById);
+  const controlResult = buildCuratedMuseCliControls(effortOptions);
   return {
     entriesById: normalizedEntriesById,
     ...(controlResult.controls ? { controls: controlResult.controls } : {}),
@@ -1517,6 +1642,7 @@ function loadCuratedOverlay(
       && target.providerName !== 'codex'
       && target.providerName !== 'antigravity'
       && target.providerName !== 'grok'
+      && target.providerName !== 'muse'
       && target.providerName !== 'kilo'
       && target.providerName !== 'kiro'
       && target.providerName !== 'junie'
@@ -1542,6 +1668,8 @@ function loadCuratedOverlay(
         return buildCuratedAntigravityCliOverlay(result.document);
       case 'grok':
         return buildCuratedGrokCliOverlay(result.document);
+      case 'muse':
+        return buildCuratedMuseCliOverlay(result.document);
       case 'kilo':
         return buildCuratedKiloCliOverlay(result.document);
       case 'kiro':

@@ -8,7 +8,7 @@
 - npm 12+
 - Installed local CLIs for the providers you want to use (`claude`, `codex`,
   `agy` for Antigravity, `cursor-agent`, `kiro-cli`, `grok`, `cline`, `devin`,
-  `aider`, `kilo`, `opencode`, etc.)
+  `muse` for Meta Muse, `kilo`, `opencode`, etc.)
 
 Grok CLI installs with `irm https://x.ai/cli/install.ps1 | iex` on Windows or
 `curl -fsSL https://x.ai/cli/install.sh | bash` on macOS/Linux. Its binary is
@@ -138,24 +138,46 @@ Dashboard light health runs only the bounded command probe and does not create
 Devin sessions. Use provider diagnostics with `probe=live` when an actual ACP
 initialize/session bootstrap check is needed.
 
-Aider installs with `irm https://aider.chat/install.ps1 | iex` on Windows or
-`curl -LsSf https://aider.chat/install.sh | sh` on macOS/Linux, into
-`~/.local/bin`. Cats detects and installs Aider but cannot run sessions through
-it: version 0.86.2 has no machine-readable output, no ACP or server mode, exits
-0 even when the model call fails, and runs `git init` in whatever directory it
-is pointed at. Aider also reads credentials from several places — environment,
-`.env`, `.aider.conf.yml`, and its own `~/.aider/oauth-keys.env` written by a
-first-run OpenRouter sign-in — so Cats reports the credential names it can see
-as evidence rather than claiming Aider is ready or unready. Its Python startup
-also makes it the slowest CLI to probe — roughly 8 s for the concurrent
-version/help pair — so it declares a 30 s `check.minProbeTimeoutMs` floor
-instead of timing out under the runtime-wide budget. Uninstall with
-`uv tool uninstall aider-chat`; deleting `~/.local/bin/aider` only removes the
-shim.
+Meta Muse installs with `irm https://dev.meta.ai/install.ps1 | iex` on Windows or
+`curl -fsSL https://dev.meta.ai/install.sh | bash` on macOS/Linux. Authenticate
+once with `muse login`, which writes `~/.config/muse/auth.json`; there is no
+API-key variable that substitutes for that account sign-in.
 
-Fresh bootstrap config therefore keeps Aider in setup discovery but does not
-create a `cli/native` execution target. It should not contribute a degraded
-provider-health result until an executable adapter contract is verified.
+What the installer places is a launcher, not the agent. It downloads
+`muse-bin-<version>` beside itself and records the version in `.muse-version`,
+so a run that dies in between leaves a launcher with no binary — which is why
+packaged setup treats the launcher alone as "not installed" and reinstalls. The
+launcher lives in `%LOCALAPPDATA%\Programs\muse` on Windows (as `muse.cmd`) and
+in `~/.local/bin` on macOS and Linux; `MUSE_INSTALL_DIR` overrides both. It also
+self-updates in the background unless `MUSE_NO_AUTO_UPDATE=1` is set, so the
+installed build moves on its own between runs.
+
+Because the launcher forwards every argument straight to the agent binary, the
+packaged setup helpers never execute `muse` at all and read `.muse-version`
+instead: a flag the binary does not recognise opens the interactive TUI rather
+than failing, which would hang an unattended install. The runtime's own
+compatibility probe does run `--version`, under a 20-second floor that covers
+the launcher's roughly 4-second indirection.
+
+Sessions run through `muse exec --json`, and `--session-id` resumes a previous
+conversation with its history intact. Fork is not available — `session/fork`
+exists only on the MSP host `muse serve` exposes — so a fork request is refused
+rather than silently downgraded to a resume. The stream carries no token usage
+at all, so muse turns report none.
+
+Permission modes map to muse's capability switches, not to `--approval-mode`: a
+probe on 1.0.3 wrote a file just as readily under `--approval-mode untrusted` as
+under `never`, because a headless run has no reviewer to prompt. `default` runs
+read-only with `--disable-write --disable-shell --disable-web-tools`, `skip`
+leaves every capability on, and `whitelist` turns the requested tools into those
+same three switches — refusing an allowlist that names only part of a gated
+group, because muse cannot enforce it. Selecting a model is best-effort: an
+unknown `--model` id is ignored and the account default answers instead.
+
+Finished muse runs do not appear through file-backed session discovery. Its
+transcripts live under `~/.local/share/muse/sessions` in a dated tree with an
+index database that the runtime has no scanner for; resume is unaffected because
+it goes through `--session-id`.
 
 The runtime pins Devin's session mode to match its own permission mode, because
 Devin's default (`accept-edits`) writes files without asking: `skip` runs as

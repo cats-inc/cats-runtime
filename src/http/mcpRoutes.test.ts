@@ -200,7 +200,7 @@ describe('runtime MCP facade', () => {
         grok: {},
         cline: {},
         devin: {},
-        aider: {},
+        muse: {},
       },
       externalSessionLiveWindowMs: 0,
       maxSessions: 10,

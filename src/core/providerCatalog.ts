@@ -27,7 +27,7 @@ const PROVIDER_ORDER = [
   'grok',
   'cline',
   'devin',
-  'aider',
+  'muse',
   'ollama',
   'openclaw',
 ] as const;
