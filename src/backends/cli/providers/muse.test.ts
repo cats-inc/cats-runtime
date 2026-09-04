@@ -65,7 +65,19 @@ describe('MuseProvider', () => {
 
     const args = provider.buildSpawnArgs({ cwd: '/tmp/muse-provider-test' });
     expect(args.slice(0, 2)).toEqual(['exec', '--json']);
-    expect(args.at(-1)).toBe('Say hi');
+    expect(args.slice(-2)).toEqual(['--', 'Say hi']);
+  });
+
+  it('ends option parsing before the prompt so a leading dash is not a flag', () => {
+    // Probed on 1.0.3: `muse exec "-do the thing"` prints
+    // "unknown option -do the thing" plus a usage line instead of running.
+    const provider = new MuseProvider(VERIFIED_PROFILE);
+    provider.prepareEphemeralTurn({ message: '--fix the failing test' });
+
+    const args = provider.buildSpawnArgs({ cwd: '/tmp/muse-provider-test' });
+    expect(args.slice(-2)).toEqual(['--', '--fix the failing test']);
+    // Exactly one separator, and it is the one immediately before the prompt.
+    expect(args.filter((arg) => arg === '--')).toHaveLength(1);
   });
 
   it('refuses to build spawn args before prepareEphemeralTurn', () => {

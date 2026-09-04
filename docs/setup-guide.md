@@ -160,7 +160,8 @@ compatibility probe does run `--version`, under a 20-second floor that covers
 the launcher's roughly 4-second indirection.
 
 Sessions run through `muse exec --json`, and `--session-id` resumes a previous
-conversation with its history intact. Fork is not available — `session/fork`
+conversation with its history intact. The prompt goes after a `--` separator
+because muse treats a leading `-` as an unknown option rather than as text. Fork is not available — `session/fork`
 exists only on the MSP host `muse serve` exposes — so a fork request is refused
 rather than silently downgraded to a resume. The stream carries no token usage
 at all, so muse turns report none.

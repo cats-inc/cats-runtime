@@ -74,6 +74,10 @@ default 10s budget that the provider declares `minProbeTimeoutMs: 20_000`.
 - The workspace root defaults to the process cwd, which is what the adapter
   relies on: passing `--workspace` would send an untranslated host path into the
   WSL and Docker runners.
+- **The prompt is positional, and a leading `-` is fatal.** `muse exec "-do the
+  thing"` prints `unknown option -do the thing` plus a usage line instead of running,
+  and exits 0 while doing it. `--` ends option parsing and works, so the adapter always
+  emits `-- <prompt>`; an arbitrary runtime prompt cannot be passed safely without it.
 - Model catalog, read from muse's own `model/list` over the MSP host it serves
   on stdio (`muse serve`) — the CLI has no `models` subcommand:
 

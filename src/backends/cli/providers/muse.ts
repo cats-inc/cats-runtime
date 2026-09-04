@@ -215,11 +215,11 @@ export class MuseProvider implements Provider {
       );
     }
 
-    const args = [...(this.compatibilityProfile?.spawnBaseArgs ?? MUSE_EXEC_JSON_BASE_ARGS)];
-
     // muse roots the workspace at the process cwd, which the runtime already
     // sets (and translates for the WSL and Docker runners). Passing
     // `--workspace` as well would send an untranslated host path into those.
+    const args = [...(this.compatibilityProfile?.spawnBaseArgs ?? MUSE_EXEC_JSON_BASE_ARGS)];
+
     if (opts.resumeSessionId) {
       args.push('--session-id', opts.resumeSessionId);
     }
@@ -242,7 +242,11 @@ export class MuseProvider implements Provider {
     }
 
     appendMusePermissionArgs(args, opts);
-    args.push(prompt);
+    // The prompt is positional, and muse rejects one that starts with `-` as an
+    // unknown option ("unknown option -leading dash prompt", exit 0 with a usage
+    // line). `--` ends option parsing and is the only thing that makes an
+    // arbitrary runtime prompt safe to pass.
+    args.push('--', prompt);
     return args;
   }
 
