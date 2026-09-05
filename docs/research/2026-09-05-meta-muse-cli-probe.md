@@ -232,6 +232,52 @@ read-only fixture used both.
 and trusts the workspace, which loads that repository's own muse skills and
 rules. That is more than "skip permission checks" asks for.
 
+## Spawning from a stale PATH — the desktop "not in the list" bug
+
+Found after the provider shipped: with muse installed, the desktop's provider
+list did not show it. The runtime's own diagnostics explained why. Muse came
+back `degraded` with `version_unknown`, and the captured version line was
+cmd.exe's `'"muse"' is not recognized as an internal or external command`
+(CP950 mojibake, since the host is Traditional Chinese). The muse installer
+adds `%LOCALAPPDATA%\Programs\muse` to the **User** PATH in the registry, but
+any process already running — the shell, the desktop host, the runtime it
+spawns — keeps the PATH it started with. Grok resolved fine in the same
+process only because `~/.grok/bin` had been on PATH long before.
+
+The contradiction was that setup reported `expectedPathExists: true` for
+`%LOCALAPPDATA%\Programs\muse\muse.cmd` while the spawn path fell through to
+`cmd.exe "muse"`. The runtime knew where the binary was and did not use it.
+
+Two changes in `src/backends/cli/runtime/runtime.ts`:
+
+- **Install-knowledge fallback.** When neither PATH nor the common npm
+  directories can see a bare command, the resolver consults the provider's own
+  `expectedPaths[platform]` and `pathHints[platform].directoryHint`, with
+  `%VAR%` and `~` expanded, and spawns from there if the file exists. This is
+  guarded by basename: the expected path names the *stock* binary, and an
+  operator who configured `path: my-wrapper` must get a failure for
+  `my-wrapper`, not a silent switch to the installer's binary. The same
+  fallback applies on POSIX for a GUI-launched host whose PATH lacks
+  `~/.local/bin`, though the desktop host already prepends that directory.
+- **Launcher bypass** (`windowsMuseLauncher.ts`). `muse.cmd` is a batch file,
+  so reaching it means `cmd.exe`, which from the console-less desktop host
+  hands a console to Windows Terminal and flashes a window — the exact
+  problem `windowsNodeShim.ts` fixed for npm shims. The resolver recognises the
+  installer's shim by its `-File "%~dp0.muse-launcher.ps1"` line, reads
+  `.muse-version` beside it, and spawns `muse-bin-<version>.exe` directly,
+  passing `MUSE_RELEASE_INFO` from `.muse-release-info.json` exactly as the
+  launcher would. It also removes the launcher's ~4s startup from every spawn.
+  A launcher with no binary behind it (the half-install state) is left alone,
+  since only the launcher can repair that. The one behaviour lost is the
+  launcher's background update check on runtime-initiated launches.
+
+Verified on this machine with a runtime started from a shell whose PATH did
+not contain the muse directory: `/diagnostics/providers?force=1` now reports
+muse `ok`, version `1.0.3` from `Muse Code 1.0.3 (1.0.3-R2198.1)`, and the
+exact `muse-cli-exec-json-1.0.3` profile. The desktop's `/api/providers` only
+lists a provider whose runtime diagnostics are `ok` or `degraded`, so this is
+what the list was waiting on.
+
 ## Session storage — not wired
 
 muse keeps transcripts under `~/.local/share/muse/sessions/<yyyy>/<mm>/<dd>/

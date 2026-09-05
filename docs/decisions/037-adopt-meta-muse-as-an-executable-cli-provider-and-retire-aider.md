@@ -3,6 +3,17 @@
 Date: 2026-09-05
 Status: Accepted
 
+Implementation amendment (2026-09-05): the first packaged build left muse out
+of the desktop provider list on a host that had it installed. The runtime
+process inherited a PATH captured before the install, could not resolve `muse`,
+and reported it `degraded` — while its own setup summary said the expected path
+existed. Command resolution now falls back to the provider's install-knowledge
+`expectedPaths`, guarded so an operator-configured command is never swapped for
+the stock binary, and the Windows `muse.cmd` launcher is bypassed in favour of
+`muse-bin-<version>.exe` the same way npm shims are, which also takes `cmd.exe`
+and the launcher's ~4s startup out of every spawn. Evidence and verification are
+in the probe note's "Spawning from a stale PATH" section.
+
 ## Context
 
 `environment-bootstrap` — the upstream installer suite this project mirrors —
