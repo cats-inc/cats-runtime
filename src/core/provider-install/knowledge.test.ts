@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildProviderInstallCatalogView } from './knowledge.js';
+import { buildProviderInstallCatalogView, getProviderInstallKnowledge } from './knowledge.js';
 
 describe('buildProviderInstallCatalogView', () => {
   it('keeps Kiro on the native Windows install path', () => {
@@ -123,42 +123,46 @@ describe('buildProviderInstallCatalogView', () => {
   });
 
   it.each([
-    ['win32', 'windows', 'irm https://aider.chat/install.ps1 | iex', '~/.local/bin/aider.exe'],
-    ['darwin', 'macos', 'curl -LsSf https://aider.chat/install.sh | sh', '~/.local/bin/aider'],
-    ['linux', 'linux', 'curl -LsSf https://aider.chat/install.sh | sh', '~/.local/bin/aider'],
-  ] as const)('describes the Aider installer on %s', (
+    ['win32', 'windows', 'irm https://dev.meta.ai/install.ps1 | iex',
+      '%LOCALAPPDATA%\\Programs\\muse\\muse.cmd'],
+    ['darwin', 'macos', 'curl -fsSL https://dev.meta.ai/install.sh | bash', '~/.local/bin/muse'],
+    ['linux', 'linux', 'curl -fsSL https://dev.meta.ai/install.sh | bash', '~/.local/bin/muse'],
+  ] as const)('describes the Meta Muse installer on %s', (
     hostPlatform,
     executionPlatform,
     command,
     expectedPath,
   ) => {
-    const view = buildProviderInstallCatalogView('aider', { mode: 'native' }, hostPlatform);
+    const view = buildProviderInstallCatalogView('muse', { mode: 'native' }, hostPlatform);
 
     expect(view).toMatchObject({
-      familyLabel: 'Aider',
+      familyLabel: 'Meta Muse CLI',
       installPack: 'native-cli',
       executionPlatform,
-      binaryName: 'aider',
-      install: { installerId: 'aider', method: 'native_installer', command },
+      binaryName: 'muse',
+      install: { installerId: 'meta-muse-cli', method: 'native_installer', command },
       path: { expectedPath },
     });
-    // Deleting the shim leaves aider-chat installed in the uv tool environment.
-    expect(view.install.notes?.some((note) => note.includes('uv tool uninstall aider-chat')))
-      .toBe(true);
   });
 
-  it('models Aider auth as multi-source rather than env-var-only', () => {
-    // Aider reads credentials from env vars, .env, .aider.conf.yml, and an
-    // OpenRouter OAuth store it writes to ~/.aider/oauth-keys.env. A probe host
-    // with no model env vars set still reached the model, so env presence alone
-    // cannot decide readiness.
-    const view = buildProviderInstallCatalogView('aider', { mode: 'native' }, 'linux');
+  it('models Meta Muse auth as an account sign-in with no env-var substitute', () => {
+    // muse authenticates against a Meta account and writes the credential to
+    // ~/.config/muse/auth.json. There is no documented API-key variable that
+    // stands in for that, so claiming one would make an unauthenticated host
+    // look ready.
+    const view = buildProviderInstallCatalogView('muse', { mode: 'native' }, 'linux');
 
-    expect(view.auth.envVars).toContain('ANTHROPIC_API_KEY');
-    expect(view.auth.envVars).toContain('OPENROUTER_API_KEY');
+    expect(view.auth.envVars).toEqual([]);
     expect(view.auth.interactive).toBe(true);
-    expect(view.auth.hint).toContain('oauth-keys.env');
-    expect(view.auth.hint).toContain('do not prove readiness');
+    expect(view.auth.hint).toContain('muse login');
+    expect(view.auth.hint).toContain('auth.json');
+  });
+
+  it('raises the Meta Muse probe floor above the launcher indirection cost', () => {
+    // The installed entry point is a launcher that re-execs the real binary;
+    // measured at ~4.2s per probe on 1.0.3, which the default 10s budget can
+    // exhaust when the version and help probes run together.
+    expect(getProviderInstallKnowledge('muse').check.minProbeTimeoutMs).toBe(20_000);
   });
 
   it('installs Pi from the renamed npm package', () => {

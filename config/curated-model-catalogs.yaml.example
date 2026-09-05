@@ -29,6 +29,8 @@ schema_version: 1
 # 2026-09-03: the Antigravity entry was refreshed from `agy models` on 1.1.24
 # corroborated by that build's `/model` picker, and a Grok entry was added for
 # the first time from the Grok CLI 1.0.13 account-resolved model manifest.
+# 2026-09-05: a Muse entry was added for the first time from muse 1.0.3's own
+# `model/list` reply over `muse serve`.
 # Every other entry keeps the provenance and date recorded in its own `notes`.
 # Copilot, Kilo, Kiro, and Junie had their versions re-probed but not their model
 # lists - those CLIs either gate the list behind an account, expose it only in an
@@ -343,6 +345,73 @@ catalogs:
                 notes:
                   - "Low Effort - Quick, fast implementations"
             default: high
+
+  - cli: Muse
+    version: 1.0.3-R2198.1
+    last_updated: 2026-09-05
+    notes:
+      - "First curated Meta Muse entry, added with the provider itself on 2026-09-05."
+      - "Model list read 2026-09-05 from muse's own `model/list` reply over the MSP host it serves on stdio (`muse serve`), which is its only enumeration surface - the CLI has no `models` subcommand and `muse exec` cannot list. The reply carried providerId `meta`, profileId `tbh`, and source `providerCatalog`, so the list is account-resolved and complete for this account."
+      - "Evidence: docs/research/2026-09-05-meta-muse-cli-probe.md"
+      - "`name` is the raw id `muse --model` accepts (the reply's `modelId`); `label` is a rendering of the reply's `displayLabel`, which upstream sets equal to the id."
+      - "The `-contributor` rows are the same models on terms Meta describes as \"Your content, including inter-session messages, may be used for product improvement.\" They are listed so an operator can choose one deliberately."
+      - "No entry is marked default even though `model/list` flags `muse-spark-1.3-contributor` as `isDefault`. Projecting that here would make every runtime turn opt into content sharing without the operator asking for it; with no `--model` argument muse still uses whatever the account prefers."
+      - "`context: 1007997` and `max_output: 128000` are the reply's `contextLimit` and `outputLimit`, identical across all four rows. `cost` is null upstream and is therefore omitted rather than guessed."
+      - "The effort menu is provider-wide, not per model: `--reasoning-effort` is a root argument on both `muse` and `muse exec`, and its help states one list for every model - none, minimal, low, medium, high, xhigh, max, ultra - with `high` as the default. That is why it sits in shared_options and no model overrides it."
+    shared_options:
+      - name: Reasoning effort
+        values:
+          - name: none
+            notes:
+              - "No reasoning budget."
+          - name: minimal
+            notes:
+              - "Minimal reasoning budget."
+          - name: low
+            notes:
+              - "Quick responses with lighter reasoning."
+          - name: medium
+            notes:
+              - "Balances speed and reasoning depth."
+          - name: high
+            notes:
+              - "Greater reasoning depth for complex problems."
+          - name: xhigh
+            notes:
+              - "Extra high reasoning depth."
+          - name: max
+            notes:
+              - "Maximum reasoning depth."
+          - name: ultra
+            notes:
+              - "Highest reasoning budget muse exposes."
+        default: high
+    models:
+      - name: muse-spark-1.3
+        label: muse-spark-1.3
+        notes:
+          - "releaseDate 2026-09-02; the catalog carries no description for this row."
+        context: 1007997
+        max_output: 128000
+      - name: muse-spark-1.3-contributor
+        label: muse-spark-1.3 (contributor)
+        notes:
+          - "Catalog description: Your content, including inter-session messages, may be used for product improvement."
+          - "Marked isDefault by `model/list`; deliberately not marked default here."
+        context: 1007997
+        max_output: 128000
+      - name: muse-spark-1.2
+        label: muse-spark-1.2
+        notes:
+          - "releaseDate 2026-08-05; the catalog carries no description for this row."
+        context: 1007997
+        max_output: 128000
+      - name: muse-spark-1.2-contributor
+        label: muse-spark-1.2 (contributor)
+        notes:
+          - "Catalog description: Your content, including inter-session messages, may be used for product improvement."
+        context: 1007997
+        max_output: 128000
 
   - cli: Cursor
     version: 2026.08.11-e8db854

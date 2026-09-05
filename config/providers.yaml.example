@@ -86,6 +86,10 @@ routing:
       default_target:
         backend: cli
         instance: native
+    muse:
+      default_target:
+        backend: cli
+        instance: native
     devin:
       default_target:
         backend: agent
@@ -272,6 +276,19 @@ backends:
             # Cline cannot resume through the CLI, so these records are the only
             # trace a host gets of a finished run.
             sessions_dir: ~/.cline/data/sessions
+
+      muse:
+        instances:
+          native:
+            environment: native
+            # The installer places a launcher on PATH: ~/.local/bin/muse on
+            # macOS and Linux, %LOCALAPPDATA%/Programs/muse/muse.cmd on Windows.
+            command: muse
+            runner: auto
+            # No sessions_dir: muse keeps its transcripts in a dated tree under
+            # ~/.local/share/muse/sessions with a companion index database, and
+            # the runtime has no scanner for that layout yet. Resume works
+            # regardless, because it goes through `muse exec --session-id`.
 
   api:
     providers:

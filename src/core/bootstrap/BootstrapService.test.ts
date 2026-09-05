@@ -198,13 +198,13 @@ describe('BootstrapService', () => {
     }
   });
 
-  it('keeps install-only Aider out of generated execution targets', async () => {
+  it('writes Meta Muse as an executable CLI target', async () => {
     const { root, cleanup } = createTestRoot();
     try {
-      const aiderPath = join(root, 'bin', 'aider.exe');
+      const musePath = join(root, 'bin', 'muse.cmd');
       const env = {
         ...createTestEnv(root),
-        AIDER_PATH: aiderPath,
+        MUSE_PATH: musePath,
       };
       ensureDirs(env);
       const compatibility = {
@@ -221,14 +221,20 @@ describe('BootstrapService', () => {
       });
 
       await bootstrap.scan();
-      await bootstrap.applyConfig(['aider']);
+      await bootstrap.applyConfig(['muse']);
 
       const generated = loadConfig(env);
-      expect(generated.providerInstances?.aider).toEqual({});
-      expect(generated.providerDefaultTargets?.aider).toBeUndefined();
+      expect(generated.providerInstances?.muse?.native).toEqual(expect.objectContaining({
+        id: 'native',
+        providerName: 'muse',
+      }));
+      expect(generated.providerDefaultTargets?.muse).toEqual({
+        backend: 'cli',
+        instance: 'native',
+      });
 
       const yaml = readFileSync(createRuntimeTestPaths(root).configPath, 'utf8');
-      expect(yaml).not.toContain('aider:');
+      expect(yaml).toContain('muse:');
     } finally {
       cleanup();
     }

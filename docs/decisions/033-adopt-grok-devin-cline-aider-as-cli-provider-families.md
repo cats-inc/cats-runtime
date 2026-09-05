@@ -22,6 +22,12 @@ default. Selecting Aider keeps it in setup discovery but does not create any
 execution target because its CLI has no machine-readable contract. Setup
 scanning remains independent of configured execution targets.
 
+Aider amendment (2026-09-05): [ADR-037](./037-adopt-meta-muse-as-an-executable-cli-provider-and-retire-aider.md)
+retires Aider entirely. The install-tier-only arrangement described above no longer
+exists in the runtime; the adapter, install knowledge, and packaged installers are
+deleted, and Meta Muse takes its place as an executable CLI provider family. This
+record and the 2026-08-09 Aider probe stay as the history of why.
+
 Diagnostics amendment (2026-08-26): recurring light health checks must not
 create provider-owned ACP sessions. They verify the launch command only;
 explicit `probe=live` diagnostics own initialize and session bootstrap.

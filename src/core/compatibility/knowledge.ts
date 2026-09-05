@@ -11,6 +11,10 @@ import {
   CLINE_JSON_BASE_ARGS,
   CLINE_JSON_PROFILE_ID,
 } from '../../backends/cli/providers/cline.js';
+import {
+  MUSE_EXEC_JSON_BASE_ARGS,
+  MUSE_EXEC_JSON_PROFILE_ID,
+} from '../../backends/cli/providers/muse.js';
 import type {
   ProviderCompatibilityKnowledge,
   ProviderCompatibilityProfile,
@@ -455,6 +459,40 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       helpTokens: ['--single', 'streaming-json', '--tools'],
       liveProbeArgs: ['--help'],
       liveProbeTokens: ['streaming-json', '--tools'],
+    },
+  ),
+  muse: buildKnowledge(
+    'muse',
+    'Meta Muse CLI',
+    {
+      id: MUSE_EXEC_JSON_PROFILE_ID,
+      label: 'Meta Muse CLI 1.0.3 exec MSP records',
+      provider: 'muse',
+      protocolFamily: 'json-stream',
+      parserId: 'muse-native-msp-records',
+      spawnBaseArgs: [...MUSE_EXEC_JSON_BASE_ARGS],
+      // 1.0.3 is the fixture-recorded baseline. The launcher self-updates in
+      // the background, so the installed build moves on its own between runs;
+      // drift is reported, never used as an execution gate (ADR-035).
+      minVersionMajor: 1,
+      allowUnknownVersion: true,
+      // The top-level help is what `helpArgs` captures; the flags this parser
+      // depends on live under `muse exec --help`, which the live probe reads.
+      helpTokens: ['exec', 'resume', '--reasoning-effort', '--approval-mode'],
+      liveProbeArgs: ['exec', '--help'],
+      liveProbeTokens: ['--json', '--session-id', '--disable-write'],
+    },
+    {
+      id: 'muse-cli-exec-json-best-fit',
+      label: 'Meta Muse CLI exec JSON best-fit',
+      provider: 'muse',
+      protocolFamily: 'json-stream',
+      parserId: 'muse-native-msp-records',
+      spawnBaseArgs: [...MUSE_EXEC_JSON_BASE_ARGS],
+      allowUnknownVersion: true,
+      helpTokens: ['exec'],
+      liveProbeArgs: ['exec', '--help'],
+      liveProbeTokens: ['--json'],
     },
   ),
   cline: buildKnowledge(

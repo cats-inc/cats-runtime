@@ -265,9 +265,23 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
   // execute Devin through the CLI backend, so no ids are bundled until the ACP
   // path lands and can prove which of them are selectable from it.
   devin: [],
-  // Aider is BYO-model and routes through litellm to whatever provider the
-  // user configured, so there is no runtime-owned catalog to bundle.
-  aider: [],
+  // Read 2026-09-05 from muse 1.0.3's own `model/list` over the MSP host it
+  // serves on stdio (`muse serve`), which is the only enumeration surface the
+  // CLI has — `muse exec` has no models subcommand. The rows come back
+  // newest-first with providerId `meta` and profileId `tbh`; every one of them
+  // reports a 1,007,997-token context and a 128,000-token output cap. The
+  // `-contributor` variants are the same models on terms that let Meta use the
+  // session for product improvement, which is why the catalog default is not
+  // mirrored here: `model/list` marks `muse-spark-1.3-contributor` as
+  // `isDefault`, and silently opting a runtime turn into content sharing is not
+  // the runtime's call to make. With no `--model` argument muse uses whatever
+  // the account already prefers.
+  muse: [
+    { id: 'muse-spark-1.3', label: 'muse-spark-1.3' },
+    { id: 'muse-spark-1.3-contributor', label: 'muse-spark-1.3 (contributor)' },
+    { id: 'muse-spark-1.2', label: 'muse-spark-1.2' },
+    { id: 'muse-spark-1.2-contributor', label: 'muse-spark-1.2 (contributor)' },
+  ],
   copilot: [
     { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
     { id: 'claude-opus-4.6', label: 'claude-opus-4.6' },

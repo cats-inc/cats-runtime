@@ -179,7 +179,7 @@ export interface CliRuntimeConfig {
   grokPath: string;
   clinePath: string;
   devinPath: string;
-  aiderPath: string;
+  musePath: string;
   copilotPath: string;
   cursorPath: string;
   kiroPath: string;
@@ -461,7 +461,7 @@ export function loadConfig(
     grokPath: configured.providerCommands.grok.path,
     clinePath: configured.providerCommands.cline.path,
     devinPath: configured.providerCommands.devin.path,
-    aiderPath: configured.providerCommands.aider.path,
+    musePath: configured.providerCommands.muse.path,
     copilotPath: configured.providerCommands.copilot.path,
     cursorPath: configured.providerCommands.cursor.path,
     kiroPath: configured.providerCommands.kiro.path,
@@ -692,7 +692,7 @@ function buildLegacyRuntimeShape(
     grok: 'native',
     cline: 'native',
     devin: 'native',
-    aider: 'native',
+    muse: 'native',
   } satisfies Record<ProviderName, string>;
   const providerDefaultTargets = Object.fromEntries(
     Object.entries(providerDefaultInstances).map(([provider, instance]) => [provider, {
@@ -783,11 +783,11 @@ function buildLegacyRuntimeShape(
         commandConfig: providerCommands.devin,
       },
     },
-    aider: {
+    muse: {
       native: {
         id: 'native',
-        providerName: 'aider',
-        commandConfig: providerCommands.aider,
+        providerName: 'muse',
+        commandConfig: providerCommands.muse,
       },
     },
     copilot: {
@@ -899,7 +899,7 @@ function buildLegacyProviderCommands(
   const grokPath = env.GROK_PATH || 'grok';
   const clinePath = env.CLINE_PATH || 'cline';
   const devinPath = env.DEVIN_PATH || 'devin';
-  const aiderPath = env.AIDER_PATH || 'aider';
+  const musePath = env.MUSE_PATH || 'muse';
   const copilotPath = env.COPILOT_PATH || 'copilot';
   const cursorPath = env.CURSOR_PATH || 'cursor-agent';
   const kiroPath = env.KIRO_PATH || 'kiro-cli';
@@ -952,10 +952,10 @@ function buildLegacyProviderCommands(
       defaultProviderRuntimeMode('devin'),
       env,
     ),
-    aider: readProviderCommandConfig(
-      'AIDER',
-      aiderPath,
-      defaultProviderRuntimeMode('aider'),
+    muse: readProviderCommandConfig(
+      'MUSE',
+      musePath,
+      defaultProviderRuntimeMode('muse'),
       env,
     ),
     copilot: readProviderCommandConfig(
@@ -1736,7 +1736,7 @@ function cloneProviderCommands(
     grok: cloneProviderCommandConfig(commands.grok),
     cline: cloneProviderCommandConfig(commands.cline),
     devin: cloneProviderCommandConfig(commands.devin),
-    aider: cloneProviderCommandConfig(commands.aider),
+    muse: cloneProviderCommandConfig(commands.muse),
     copilot: cloneProviderCommandConfig(commands.copilot),
     cursor: cloneProviderCommandConfig(commands.cursor),
     kiro: cloneProviderCommandConfig(commands.kiro),
@@ -1759,7 +1759,7 @@ function cloneProviderInstances(
     grok: cloneInstanceMap(instances.grok),
     cline: cloneInstanceMap(instances.cline),
     devin: cloneInstanceMap(instances.devin),
-    aider: cloneInstanceMap(instances.aider),
+    muse: cloneInstanceMap(instances.muse),
     copilot: cloneInstanceMap(instances.copilot),
     cursor: cloneInstanceMap(instances.cursor),
     kiro: cloneInstanceMap(instances.kiro),

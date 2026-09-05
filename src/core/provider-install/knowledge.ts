@@ -81,6 +81,37 @@ function createGrokBinPathHints(): Partial<Record<ProviderExecutionPlatform, Pro
   };
 }
 
+// muse is the one native CLI whose Windows and POSIX install directories do
+// not match: the official install.ps1 writes a muse.cmd shim plus a PowerShell
+// launcher into %LOCALAPPDATA%\Programs\muse, while install.sh drops a single
+// launcher script into ~/.local/bin.
+function createMuseBinPathHints(): Partial<Record<ProviderExecutionPlatform, ProviderPathHint>> {
+  return {
+    windows: {
+      expectedPath: '%LOCALAPPDATA%\\Programs\\muse\\muse.cmd',
+      directoryHint: '%LOCALAPPDATA%\\Programs\\muse',
+      exportCommand: 'setx PATH "%LOCALAPPDATA%\\Programs\\muse;%PATH%"',
+      reloadHint: 'Open a new terminal window after installing Meta Muse CLI.',
+    },
+    macos: {
+      expectedPath: '~/.local/bin/muse',
+      directoryHint: '~/.local/bin',
+      exportCommand: 'export PATH="$HOME/.local/bin:$PATH"',
+      shellRcPath: '~/.zshrc',
+      persistenceEntry: '.local/bin',
+      reloadHint: 'Run source ~/.zshrc or source ~/.bashrc before invoking muse.',
+    },
+    linux: {
+      expectedPath: '~/.local/bin/muse',
+      directoryHint: '~/.local/bin',
+      exportCommand: 'export PATH="$HOME/.local/bin:$PATH"',
+      shellRcPath: '~/.bashrc',
+      persistenceEntry: '.local/bin',
+      reloadHint: 'Run source ~/.bashrc before invoking muse.',
+    },
+  };
+}
+
 function createNpmPathHints(
   binaryName: string,
 ): Partial<Record<ProviderExecutionPlatform, ProviderPathHint>> {
@@ -631,61 +662,60 @@ const INSTALL_KNOWLEDGE: Record<ProviderName, ProviderInstallKnowledge> = {
     '@earendil-works/pi-coding-agent',
     'Complete the Pi Coding Agent CLI authentication flow after install.',
   ),
-  aider: {
-    provider: 'aider',
-    familyLabel: 'Aider',
+  muse: {
+    provider: 'muse',
+    familyLabel: 'Meta Muse CLI',
     installPack: 'native-cli',
-    binaryName: 'aider',
-    defaultDocsUrl: 'https://aider.chat/docs/llms.html',
+    binaryName: 'muse',
+    defaultDocsUrl: 'https://dev.meta.ai',
     check: {
       versionArgs: ['--version'],
       helpArgs: ['--help'],
-      // Aider pays a Python interpreter startup on every invocation. Measured on
-      // 0.86.2: ~4.9s for --version alone and ~8.3s when the version and help
-      // probes run concurrently, which is what the compatibility service does.
-      // Under the default 10s budget a full provider scan times out both probes,
-      // and an installed, working CLI is reported as probe_failed with no version.
-      minProbeTimeoutMs: 30_000,
-      prerequisites: createNativeInstallerPrerequisites('Aider'),
+      // What the installer places is a launcher, not the agent: it resolves
+      // muse-bin-<version> next to itself and re-execs it. Measured on 1.0.3,
+      // that indirection costs ~4.2s per probe and ~5.7s when the version and
+      // help probes run concurrently, which is what the compatibility service
+      // does. The default 10s budget leaves almost no headroom on a cold host.
+      minProbeTimeoutMs: 20_000,
+      prerequisites: createNativeInstallerPrerequisites('Meta Muse CLI'),
       expectedPaths: {
-        windows: '~/.local/bin/aider.exe',
-        macos: '~/.local/bin/aider',
-        linux: '~/.local/bin/aider',
+        windows: '%LOCALAPPDATA%\\Programs\\muse\\muse.cmd',
+        macos: '~/.local/bin/muse',
+        linux: '~/.local/bin/muse',
       },
-      pathHints: createLocalBinPathHints('aider'),
+      pathHints: createMuseBinPathHints(),
     },
     auth: {
       requiredAfterInstall: true,
-      // Aider is BYO-model: it routes to whichever provider it finds a
-      // credential for, so no single variable is authoritative.
-      envVars: [
-        'ANTHROPIC_API_KEY',
-        'OPENAI_API_KEY',
-        'GEMINI_API_KEY',
-        'DEEPSEEK_API_KEY',
-        'OPENROUTER_API_KEY',
-      ],
-      // Aider has no `login` subcommand, but running it without a credential
-      // starts an OpenRouter browser sign-in and persists the result to
-      // ~/.aider/oauth-keys.env. That flow is undocumented in --help and was
-      // only found by probing; see docs/research/2026-08-09-aider-cli-probe.md.
+      // muse authenticates against a Meta account and stores the result in
+      // ~/.config/muse/auth.json. There is no documented API-key variable that
+      // substitutes for that sign-in; `muse auth` exists to store provider
+      // credentials, not to replace the account login.
+      envVars: [],
       interactive: true,
-      docsUrl: 'https://aider.chat/docs/llms.html',
-      hint: 'Set a model API key, or complete the OpenRouter sign-in Aider offers on first run '
-        + '(stored in ~/.aider/oauth-keys.env). Aider also reads .env and .aider.conf.yml, so '
-        + 'environment variables alone do not prove readiness.',
-      errorPatterns: [...GENERIC_AUTH_ERROR_PATTERNS, 'no api key', 'litellm.authenticationerror'],
+      docsUrl: 'https://dev.meta.ai',
+      hint: 'Run muse login once to sign in to the Meta account; the credential is stored in '
+        + '~/.config/muse/auth.json.',
+      errorPatterns: [...GENERIC_AUTH_ERROR_PATTERNS, 'muse login', 'not logged in'],
     },
     platforms: createNativeInstall(
-      'aider',
-      'irm https://aider.chat/install.ps1 | iex',
-      'curl -LsSf https://aider.chat/install.sh | sh',
+      'meta-muse-cli',
+      'irm https://dev.meta.ai/install.ps1 | iex',
+      'curl -fsSL https://dev.meta.ai/install.sh | bash',
       {
-        docsUrl: 'https://aider.chat/docs/llms.html',
+        docsUrl: 'https://dev.meta.ai',
         notes: [
-          'The official installer is the uv installer plus uv tool install --force --python python3.12 --with pip aider-chat@latest.',
-          'It also installs its own uv into ~/.local/bin, which may shadow a newer uv depending on PATH order.',
-          'Uninstall with uv tool uninstall aider-chat; deleting ~/.local/bin/aider only removes the shim.',
+          'The installer places a launcher that downloads muse-bin-<version> beside itself and '
+            + 'records the version in .muse-version.',
+          'The launcher self-updates in the background; set MUSE_NO_AUTO_UPDATE=1 to stop it.',
+          'Uninstall by removing the install directory: the launcher, the .muse-* state files, '
+            + 'and every muse-bin-<version> build it downloaded all live there.',
+        ],
+        windowsNotes: [
+          'The Windows installer writes muse.cmd plus .muse-launcher.ps1 into '
+            + '%LOCALAPPDATA%\\Programs\\muse, not ~/.local/bin.',
+          'The launcher runs under Windows PowerShell 5.1; a PSModulePath inherited from '
+            + 'PowerShell 7 can break its download step and leave a shim with no binary.',
         ],
       },
     ),

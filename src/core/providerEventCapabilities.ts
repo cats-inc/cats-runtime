@@ -276,25 +276,26 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       'Execution is pinned to the exact fixture-backed 3.0.51 compatibility profile.',
     ],
   },
-  aider: {
+  muse: {
     normalizedStream: {
-      text: { mode: 'none', stepwise: false },
-      toolUse: 'none',
-      toolResult: 'none',
-      progress: 'none',
+      text: { mode: 'chunk', stepwise: true },
+      toolUse: 'native',
+      toolResult: 'native',
+      progress: 'derived',
       reasoning: 'none',
     },
     transcript: {
       contentBlocks: 'none',
     },
     presentation: {
-      recommended: 'unknown',
+      recommended: 'content_blocks',
     },
     notes: [
-      'Aider 0.86.2 has no machine-readable output, ACP, or server mode.',
-      'It prints human-formatted prose and rounded usage text ("Tokens: 2.3k sent").',
-      'It exits 0 even when the model call fails, so success cannot be detected.',
-      'Install and detection only; the runtime cannot execute Aider turns.',
+      'Meta Muse 1.0.3 `exec --json` streams MSP records: run.output.delta carries incremental text.',
+      'Tool calls and results are native (tool.result names the tool and its outcome).',
+      'No reasoning signal of any kind: task.lifecycle.status carries operational lines such as "opening meta model stream attempt 1/10", which surface as status progress.',
+      'The stream carries no token usage at all, so turns report no usage.',
+      'Every record names its session in stream.id, which is what --session-id resumes.',
     ],
   },
   devin: {

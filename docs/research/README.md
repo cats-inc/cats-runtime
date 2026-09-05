@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-09-05-meta-muse-cli-probe](./2026-09-05-meta-muse-cli-probe.md) | Meta Muse CLI install, execution, and permission probe | The `muse exec --json` MSP record stream and its tool/text/terminal records; why the installed entry point is a launcher and why `.muse-version` is read instead of running the tool; the `--session-id` resume contract and the absent fork; the account-resolved model list read over `muse serve`; and the finding that `--approval-mode untrusted` still executed a write, so only the `--disable-*` capability switches gate a headless run |
 | [2026-08-27-cline-self-update-and-probe-concurrency](./2026-08-27-cline-self-update-and-probe-concurrency.md) | Cline self-update vs. the setup scan | How two concurrent `--version`/`--help` probes made Cline self-update twice at once and uninstall itself from the npm global tree; the npm-log evidence chain back to the probe cwd; why the updater outlives the probe and shows a console window despite `windowsHide`; what the runtime fix covers and the cross-provider race it does not; and the symptoms to check when a Cline session dies mid-turn |
 | [2026-08-25-antigravity-cli-stream-json-probe](./2026-08-25-antigravity-cli-stream-json-probe.md) | Antigravity CLI 1.1.20 stream-json probe | The live contract that reversed a doc-only refusal; `text_delta` deltas, `step_index` tool correlation, and cache-token arithmetic; the `--add-dir` workspace trap and the `--mode accept-edits` silent-write trap that misreports `permission_mode`; the per-conversation SQLite session store and why `conversation_summaries.db` is not its index; and the `agy models` id-versus-label split |
 | [2026-08-24-grok-cline-version-drift-probe](./2026-08-24-grok-cline-version-drift-probe.md) | Grok 1.0.5 and Cline 3.0.57 version drift probe | Historical evidence of why the retired version whitelist blocked newer CLIs and its own probes; the evidence from Grok 1.0.5; the single-turn `manual_tool` profile that reached Cline's tool path and found `content_update` drift; and the probe-timeout and workspace-cleanup defects found on the way |
@@ -45,4 +46,4 @@ Action Items:
 
 ---
 
-*Last updated: 2026-08-18*
+*Last updated: 2026-09-05*

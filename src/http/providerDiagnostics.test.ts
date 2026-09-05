@@ -165,7 +165,7 @@ describe('provider diagnostics HTTP contract', () => {
         grok: {},
         cline: {},
         devin: {},
-        aider: {},
+        muse: {},
       },
     } as unknown as CliRuntimeConfig;
 
