@@ -155,9 +155,21 @@ installed build moves on its own between runs.
 Because the launcher forwards every argument straight to the agent binary, the
 packaged setup helpers never execute `muse` at all and read `.muse-version`
 instead: a flag the binary does not recognise opens the interactive TUI rather
-than failing, which would hang an unattended install. The runtime's own
-compatibility probe does run `--version`, under a 20-second floor that covers
-the launcher's roughly 4-second indirection.
+than failing, which would hang an unattended install. The runtime does run
+`--version` for its compatibility probe, but on Windows it resolves `muse.cmd`
+to the recorded `muse-bin-<version>.exe` beside it and spawns that directly —
+the same treatment npm shims get — so neither the probe nor a session pays the
+launcher's roughly 4-second startup or goes through `cmd.exe`. The 20-second
+probe floor stays for the half-installed case where only the launcher exists.
+
+The runtime also finds muse when PATH does not. The installer writes the
+install directory into the User PATH in the registry, which nothing already
+running picks up, so a runtime started before the install (or launched by a
+desktop host that was) cannot see `muse` on PATH. Command resolution falls
+back to the install directory the runtime already knows from its own setup
+knowledge, so muse shows up as ready without a relaunch. That fallback only
+ever stands in for the stock `muse` command; a custom `command:` in
+`providers.yaml` that PATH cannot see still fails as that command.
 
 Sessions run through `muse exec --json`, and `--session-id` resumes a previous
 conversation with its history intact. The prompt goes after a `--` separator

@@ -4,6 +4,13 @@ import { delimiter, extname, isAbsolute, join, posix as pathPosix, win32 as path
 import type { ProviderCommandConfig, ProviderRuntimeConfig } from '../config.js';
 import { resolveRuntimeRoot, resolveRuntimeSessionsDir } from '../../../shared/runtimePaths.js';
 import { resolveWindowsNodeShim } from './windowsNodeShim.js';
+import { resolveWindowsMuseLauncher } from './windowsMuseLauncher.js';
+import {
+  getProviderInstallKnowledge,
+  resolveExecutionPlatform,
+} from '../../../core/provider-install/knowledge.js';
+import { expandNativeEnvPath } from '../../../core/provider-install/pathUtils.js';
+import { KNOWN_PROVIDERS, type ProviderName } from '../providers/types.js';
 
 export interface ShellInvocation {
   command: string;
@@ -459,6 +466,8 @@ function buildNativeSpawnConfig(
   const commandPath = resolveCommandPathForRunner(
     commandConfig.path,
     commandConfig.runner,
+    providerName,
+    commandConfig.runtime,
   );
 
   switch (commandConfig.runner) {
@@ -478,6 +487,21 @@ function buildNativeSpawnConfig(
           shell: false,
           cwd,
         };
+      }
+      // Meta Muse's `muse.cmd` is a batch file as well, and one whose target is
+      // knowable from the files beside it, so it gets the same treatment as
+      // the npm shim below. See `windowsMuseLauncher.ts`.
+      if (providerName === 'muse') {
+        const launcherTarget = resolveWindowsMuseLauncher(commandPath);
+        if (launcherTarget) {
+          return {
+            command: launcherTarget.command,
+            args,
+            shell: false,
+            cwd,
+            ...(launcherTarget.env ? { env: launcherTarget.env } : {}),
+          };
+        }
       }
       // An npm shim is a batch file, so reaching it means going through
       // `cmd.exe` -- and a console created from the packaged desktop host, which
@@ -629,14 +653,112 @@ function buildWindowsCmdSpawnConfig(
 function resolveCommandPathForRunner(
   commandPath: string,
   runner: ProviderCommandConfig['runner'],
+  providerName: string,
+  runtime: ProviderRuntimeConfig,
 ): string {
-  if (process.platform !== 'win32') {
-    return commandPath;
-  }
   if (runner === 'shell') {
     return commandPath;
   }
-  return resolveWindowsCommandPath(commandPath);
+  if (process.platform !== 'win32') {
+    return resolvePosixCommandPath(commandPath, providerName, runtime);
+  }
+  return resolveWindowsCommandPath(commandPath, providerName, runtime);
+}
+
+/**
+ * A bare command is left to the spawn's own PATH lookup as long as PATH can
+ * see it. When it cannot, the install knowledge says where the provider's own
+ * installer puts the binary, and that is the one place worth checking before
+ * giving up: the process that launched the runtime may simply predate the
+ * install, or -- for a GUI-launched host -- never had the user's shell PATH.
+ */
+function resolvePosixCommandPath(
+  commandPath: string,
+  providerName: string,
+  runtime: ProviderRuntimeConfig,
+): string {
+  if (isExplicitPath(commandPath)) {
+    return commandPath;
+  }
+
+  const pathDirs = (process.env.PATH || '')
+    .split(delimiter)
+    .map((dir) => dir.trim())
+    .filter(Boolean);
+  if (findCommandPath(commandPath, pathDirs, [''])) {
+    return commandPath;
+  }
+
+  return resolveInstallKnowledgeCommandPath(commandPath, providerName, runtime, [''])
+    ?? commandPath;
+}
+
+/**
+ * Where the provider's installer places its binary, per the install
+ * knowledge, when PATH does not lead there. This is what lets a `muse`
+ * installed into `%LOCALAPPDATA%\Programs\muse` run from a runtime whose PATH
+ * was captured before the install: setup already reported the expected path
+ * as present, so refusing to spawn from it was the runtime contradicting
+ * itself.
+ */
+function resolveInstallKnowledgeCommandPath(
+  commandPath: string,
+  providerName: string,
+  runtime: ProviderRuntimeConfig,
+  extensions: string[],
+): string | null {
+  if (!(KNOWN_PROVIDERS as readonly string[]).includes(providerName)) {
+    return null;
+  }
+
+  const knowledge = getProviderInstallKnowledge(providerName as ProviderName);
+  const platform = resolveExecutionPlatform(runtime);
+
+  // The expected path names the stock binary. It only stands in for the
+  // configured command when it *is* that command: an operator who configured
+  // `path: my-wrapper` and does not have it on PATH must get a failure for
+  // `my-wrapper`, not a silent switch to the installer's binary.
+  const expectedPath = knowledge.check.expectedPaths?.[platform];
+  const resolvedExpectedPath = expectedPath ? expandInstallKnowledgePath(expectedPath) : null;
+  if (
+    resolvedExpectedPath
+    && commandBaseName(resolvedExpectedPath) === commandBaseName(commandPath)
+    && existsSync(resolvedExpectedPath)
+  ) {
+    return resolvedExpectedPath;
+  }
+
+  const directoryHint = knowledge.check.pathHints?.[platform]?.directoryHint;
+  const resolvedDirectory = directoryHint ? expandInstallKnowledgePath(directoryHint) : null;
+  if (resolvedDirectory) {
+    return findCommandPath(commandPath, [resolvedDirectory], extensions);
+  }
+
+  return null;
+}
+
+/** `muse`, `muse.cmd`, and `...\Programs\muse\muse.cmd` all name the same command. */
+function commandBaseName(pathValue: string): string {
+  const lastSegment = pathValue.split(/[\\/]/).pop() ?? pathValue;
+  return lastSegment.replace(/\.(?:exe|cmd|bat|com|ps1)$/i, '').toLowerCase();
+}
+
+/**
+ * Install knowledge spells paths the way the installers document them:
+ * `%LOCALAPPDATA%\...` on Windows and `~/...` elsewhere. An environment
+ * variable that is not set leaves its `%NAME%` in place, and a path like that
+ * cannot exist, so it is dropped rather than probed.
+ */
+function expandInstallKnowledgePath(pathValue: string): string | null {
+  let expanded = expandNativeEnvPath(pathValue);
+  if (expanded.startsWith('~/') || expanded.startsWith('~\\')) {
+    const home = process.env.HOME || process.env.USERPROFILE || '';
+    if (!home) {
+      return null;
+    }
+    expanded = `${home}${expanded.slice(1)}`;
+  }
+  return /%[^%]+%/.test(expanded) ? null : expanded;
 }
 
 function shouldUseDirectWindowsSpawn(commandPath: string): boolean {
@@ -700,7 +822,11 @@ function escapeWindowsCmdMetaChars(value: string): string {
   return value.replace(/[\^&|<>()]/g, '^$&');
 }
 
-function resolveWindowsCommandPath(commandPath: string): string {
+function resolveWindowsCommandPath(
+  commandPath: string,
+  providerName: string,
+  runtime: ProviderRuntimeConfig,
+): string {
   if (isExplicitPath(commandPath)) {
     return commandPath;
   }
@@ -725,7 +851,12 @@ function resolveWindowsCommandPath(commandPath: string): string {
     '.exe',
     '',
   ]);
-  return resolvedFromNpmBins || commandPath;
+  if (resolvedFromNpmBins) {
+    return resolvedFromNpmBins;
+  }
+
+  return resolveInstallKnowledgeCommandPath(commandPath, providerName, runtime, extensions)
+    ?? commandPath;
 }
 
 function isExplicitPath(commandPath: string): boolean {
