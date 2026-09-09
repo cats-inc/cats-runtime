@@ -204,6 +204,7 @@ export type RuntimeProgressKind =
   | 'provider_cache'
   | 'model_state'
   | 'guardrail'
+  | 'quota'
   | 'session';
 export type RuntimeProgressStatus =
   | 'started'

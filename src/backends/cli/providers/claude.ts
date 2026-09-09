@@ -1,4 +1,5 @@
 import type {
+  ClaudeRateLimitInfo,
   CompatibilityProfileSelection,
   Provider,
   ProviderCapabilities,
@@ -12,6 +13,7 @@ import type {
   ProgressStreamEvent,
   RawStreamEvent,
   ResultStreamEvent,
+  RuntimeProgressStatus,
   TextStreamEvent,
   ToolResultStreamEvent,
   ToolUseStreamEvent,
@@ -27,6 +29,13 @@ import { compileRuntimeTurnPrompt } from './prompt.js';
 export class ClaudeProvider implements Provider {
   name = 'claude';
   capabilities: ProviderCapabilities = { resume: true, fork: true, permissions: true };
+
+  /**
+   * Latest account rate-limit snapshot observed on this worker. Claude Code emits a
+   * `rate_limit_event` around every API call, so the turn's `result` can carry the freshest
+   * snapshot as `metadata.runtimeUsage.quota` without any extra request or credential access.
+   */
+  private _lastRateLimit: ClaudeQuotaSnapshot | null = null;
 
   constructor(
     private readonly compatibilityProfile?: CompatibilityProfileSelection,
@@ -158,8 +167,30 @@ export class ClaudeProvider implements Provider {
       }
     }
 
-    // result — done, with token usage
+    // rate_limit_event — account-level rate-limit snapshot the CLI already holds
+    if (event.type === 'rate_limit_event') {
+      const snapshot = normalizeClaudeRateLimit(event.rate_limit_info);
+      if (!snapshot) {
+        return observeRawPassthrough(this.evolutionObserver, {
+          rawEventType: 'rate_limit_event',
+          reason: 'rate_limit_event_without_info',
+          rawSample: event,
+        }, {
+          type: 'raw',
+          raw: event,
+        } satisfies RawStreamEvent);
+      }
+
+      this._lastRateLimit = snapshot;
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'rate_limit_event',
+        rawSample: event,
+      }, createClaudeQuotaProgressEvent(snapshot, event.rate_limit_info));
+    }
+
+    // result — done, with token usage, list-price cost, and the latest quota snapshot
     if (event.type === 'result') {
+      const estimatedCost = finiteNumber(event.total_cost_usd);
       return observeNormalized(this.evolutionObserver, {
         rawEventType: 'result',
         rawSample: event,
@@ -174,7 +205,9 @@ export class ClaudeProvider implements Provider {
           promptInputTokens: event.usage.input_tokens ?? 0,
           cacheReadInputTokens: event.usage.cache_read_input_tokens ?? 0,
           cacheCreationInputTokens: event.usage.cache_creation_input_tokens ?? 0,
+          ...(estimatedCost === undefined ? {} : { estimatedCost, currency: 'USD' }),
         } : undefined,
+        metadata: buildClaudeResultMetadata(event, this._lastRateLimit),
         raw: event,
       } satisfies ResultStreamEvent);
     }
@@ -397,4 +430,145 @@ function stringifyClaudeContent(value: unknown): string | undefined {
   } catch {
     return String(value);
   }
+}
+
+interface ClaudeQuotaSnapshot {
+  quota: Record<string, string | number | boolean>;
+  status: Extract<RuntimeProgressStatus, 'updated' | 'warned' | 'blocked'>;
+  text: string;
+}
+
+/**
+ * Flatten a Claude Code `rate_limit_info` payload into the runtime quota contract: primitive
+ * key/value pairs, ISO timestamps, and one `<window>.utilization` / `<window>.resetsAt` pair
+ * per unified window. Observed on Claude Code 2.1.267; see
+ * docs/research/2026-09-10-claude-codex-rate-limit-signal-probe.md.
+ */
+function normalizeClaudeRateLimit(
+  info: ClaudeRateLimitInfo | undefined,
+): ClaudeQuotaSnapshot | null {
+  if (!info || typeof info !== 'object') {
+    return null;
+  }
+
+  const quota: Record<string, string | number | boolean> = {
+    source: 'claude.rate_limit_event',
+    observedAt: new Date().toISOString(),
+  };
+  if (typeof info.status === 'string' && info.status) {
+    quota.status = info.status;
+  }
+  if (typeof info.rateLimitType === 'string' && info.rateLimitType) {
+    quota.rateLimitType = info.rateLimitType;
+  }
+  const resetsAt = unixSecondsToIso(info.resetsAt);
+  if (resetsAt) {
+    quota.resetsAt = resetsAt;
+  }
+  if (typeof info.isUsingOverage === 'boolean') {
+    quota.isUsingOverage = info.isUsingOverage;
+  }
+  if (typeof info.overageStatus === 'string' && info.overageStatus) {
+    quota.overageStatus = info.overageStatus;
+  }
+  if (typeof info.overageDisabledReason === 'string' && info.overageDisabledReason) {
+    quota.overageDisabledReason = info.overageDisabledReason;
+  }
+
+  const windows: string[] = [];
+  const unifiedWindows = info.unifiedWindows && typeof info.unifiedWindows === 'object'
+    ? info.unifiedWindows
+    : {};
+  for (const [name, window] of Object.entries(unifiedWindows)) {
+    if (!window || typeof window !== 'object') {
+      continue;
+    }
+    const utilization = finiteNumber(window.utilization);
+    const windowResetsAt = unixSecondsToIso(window.resetsAt);
+    if (utilization !== undefined) {
+      quota[`${name}.utilization`] = utilization;
+    }
+    if (windowResetsAt) {
+      quota[`${name}.resetsAt`] = windowResetsAt;
+    }
+    if (utilization !== undefined) {
+      const resetLabel = windowResetsAt ? ` (resets ${windowResetsAt})` : '';
+      windows.push(`${name} ${formatPercent(utilization)} used${resetLabel}`);
+    }
+  }
+
+  const status = info.status === 'rejected'
+    ? 'blocked'
+    : info.status === 'allowed_warning'
+      ? 'warned'
+      : 'updated';
+  const statusLabel = typeof info.status === 'string' && info.status ? info.status : 'observed';
+  const headline = `Claude rate limit ${statusLabel}`;
+  const text = windows.length > 0
+    ? `${headline}: ${windows.join(', ')}.`
+    : `${headline}.`;
+
+  return { quota, status, text };
+}
+
+function createClaudeQuotaProgressEvent(
+  snapshot: ClaudeQuotaSnapshot,
+  info: ClaudeRateLimitInfo | undefined,
+): ProgressStreamEvent {
+  return createRuntimeProgressEvent({
+    text: snapshot.text,
+    provider: 'claude',
+    backend: 'cli',
+    kind: 'quota',
+    status: snapshot.status,
+    source: 'provider',
+    native: {
+      sourceEvent: 'rate_limit_event',
+      ...(info ? { rateLimitInfo: info } : {}),
+    },
+    details: {
+      quota: snapshot.quota,
+    },
+  });
+}
+
+function buildClaudeResultMetadata(
+  event: ClaudeStreamEvent,
+  rateLimit: ClaudeQuotaSnapshot | null,
+): Record<string, unknown> {
+  const durationMs = finiteNumber(event.duration_ms);
+  const durationApiMs = finiteNumber(event.duration_api_ms);
+  const numTurns = finiteNumber(event.num_turns);
+  const modelUsage = event.modelUsage && typeof event.modelUsage === 'object'
+    ? event.modelUsage
+    : undefined;
+
+  return {
+    ...(rateLimit ? { runtimeUsage: { quota: rateLimit.quota } } : {}),
+    native: {
+      sourceEvent: 'result',
+      ...(event.subtype ? { subtype: event.subtype } : {}),
+      ...(typeof event.is_error === 'boolean' ? { isError: event.is_error } : {}),
+      ...(durationMs === undefined ? {} : { durationMs }),
+      ...(durationApiMs === undefined ? {} : { durationApiMs }),
+      ...(numTurns === undefined ? {} : { numTurns }),
+      ...(modelUsage ? { modelUsage } : {}),
+    },
+  };
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function unixSecondsToIso(value: unknown): string | undefined {
+  const seconds = finiteNumber(value);
+  if (seconds === undefined || seconds <= 0) {
+    return undefined;
+  }
+  return new Date(seconds * 1000).toISOString();
+}
+
+function formatPercent(fraction: number): string {
+  return `${Math.round(fraction * 100)}%`;
 }

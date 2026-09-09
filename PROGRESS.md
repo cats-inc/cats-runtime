@@ -307,12 +307,15 @@ provider-agnostic progress without moving budget policy into `cats-runtime`.
 | Normalize provider-agnostic progress across multiple CLI providers | [x] | Junie, Pi, Goose, Copilot, Codex, Cursor, Claude, and Gemini now emit `type: "progress"` events with shared runtime metadata; Codex additionally surfaces plan, reasoning, command-output, file-change, session-status, and model-reroute checkpoints instead of silently consuming those CLI notifications; Copilot now preserves multiple tool requests plus structured tool completion, Cursor now promotes provider `thinking` plus assistant tool/reasoning blocks, Claude now surfaces tool-use, tool-result, and reasoning blocks instead of burying them in raw payloads, Gemini now preserves multipart assistant tool blocks instead of flattening everything into plain text, and Junie can promote structured session-poll tool lifecycle hints into shared `tool_use` / `tool_result` events when upstream exposes them |
 | Extend API/local incident and progress surfacing onto the same contract | [x] | API/local transports now emit additive incident hints and normalized progress events for continuation/cache/warm-state flows |
 | Cover metering, incidents, guardrails, and progress with automated tests | [x] | Route, server, parser/provider, API integration, and direct metering-service tests cover the delivered slice |
+| Normalize provider-reported account quota signals without touching credentials | [x] | Claude Code `rate_limit_event` and Codex `account/rateLimits/updated` now become `progress` events with `metadata.kind: "quota"` plus `metadata.runtimeUsage.quota` on the turn `result`; Claude `total_cost_usd` fills `usage.estimatedCost`; Codex usage keeps cache/prompt/total counts; metering aggregates and provider-target snapshots keep the latest quota snapshot. Wire shapes and redacted fixtures: `docs/research/2026-09-10-claude-codex-rate-limit-signal-probe.md` |
 
 #### Deferred Boundaries
 
 - [ ] No product budget policy, approval override flow, or war-room orchestration in runtime
 - [ ] No provider compatibility profile selection as part of this slice
 - [ ] No attempt to fabricate exact costs where providers only expose partial or derived usage
+- [ ] No reading of provider credential files (`~/.claude/.credentials.json`, `~/.codex/auth.json`, and similar) to query account quota; only signals a CLI emits on its own stream are normalized
+- [ ] No cooldown or incident derived from a `rejected` / reached quota snapshot until that semantic has been observed live
 
 #### Verification
 

@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-09-10-claude-codex-rate-limit-signal-probe](./2026-09-10-claude-codex-rate-limit-signal-probe.md) | Claude Code 2.1.267 and codex-cli 0.153.4 rate-limit signal probe | The account-level quota signals both CLIs already emit on their own streams (`rate_limit_event` with per-window utilization and reset times; `account/rateLimits/updated` and the on-demand `account/rateLimits/read`); the `total_cost_usd`, `modelUsage`, and cache-token fields the adapters had been dropping; why reading `~/.claude/.credentials.json` for the OAuth usage endpoint is out of bounds; and the redacted fixtures that pin the adapters |
 | [2026-09-05-meta-muse-cli-probe](./2026-09-05-meta-muse-cli-probe.md) | Meta Muse CLI install, execution, and permission probe | The `muse exec --json` MSP record stream and its tool/text/terminal records; why the installed entry point is a launcher and why `.muse-version` is read instead of running the tool; the `--session-id` resume contract and the absent fork; the account-resolved model list read over `muse serve`; and the finding that `--approval-mode untrusted` still executed a write, so only the `--disable-*` capability switches gate a headless run |
 | [2026-08-27-cline-self-update-and-probe-concurrency](./2026-08-27-cline-self-update-and-probe-concurrency.md) | Cline self-update vs. the setup scan | How two concurrent `--version`/`--help` probes made Cline self-update twice at once and uninstall itself from the npm global tree; the npm-log evidence chain back to the probe cwd; why the updater outlives the probe and shows a console window despite `windowsHide`; what the runtime fix covers and the cross-provider race it does not; and the symptoms to check when a Cline session dies mid-turn |
 | [2026-08-25-antigravity-cli-stream-json-probe](./2026-08-25-antigravity-cli-stream-json-probe.md) | Antigravity CLI 1.1.20 stream-json probe | The live contract that reversed a doc-only refusal; `text_delta` deltas, `step_index` tool correlation, and cache-token arithmetic; the `--add-dir` workspace trap and the `--mode accept-edits` silent-write trap that misreports `permission_mode`; the per-conversation SQLite session store and why `conversation_summaries.db` is not its index; and the `agy models` id-versus-label split |
@@ -46,4 +47,4 @@ Action Items:
 
 ---
 
-*Last updated: 2026-09-05*
+*Last updated: 2026-09-10*
