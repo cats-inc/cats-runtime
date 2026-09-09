@@ -13,6 +13,7 @@ import type {
   RawStreamEvent,
   ResultStreamEvent,
   StreamEvent,
+  StreamUsage,
   TextStreamEvent,
   ToolUseStreamEvent,
 } from '../../../core/types.js';
@@ -72,7 +73,15 @@ export class CodexProvider implements Provider {
   private state: CodexState = 'uninitialized';
   private threadId: string | null = null;
   private nextId = 0;
-  private _lastUsage: { inputTokens: number; outputTokens: number } | null = null;
+  private _lastUsage: StreamUsage | null = null;
+  private _lastUsageNative: Record<string, unknown> | null = null;
+  /**
+   * Latest account rate-limit snapshot from `account/rateLimits/updated`. Codex emits it once
+   * per turn right after `thread/tokenUsage/updated`, so `turn/completed` can carry it as
+   * `metadata.runtimeUsage.quota`. The CLI holds the credentials; the runtime only reads the
+   * notification it already sends.
+   */
+  private _lastRateLimits: Record<string, string | number | boolean> | null = null;
   private _pendingMessage: string | null = null;
   private _spawnOpts: ProviderSpawnOptions | null = null;
   private _permissionMode: PermissionMode = 'skip';
@@ -436,13 +445,11 @@ export class CodexProvider implements Provider {
 
     // Token usage arrives separately from turn/completed
     if (method === 'thread/tokenUsage/updated') {
-      const tokenUsage = params.tokenUsage as Record<string, unknown> | undefined;
-      const last = tokenUsage?.last as Record<string, unknown> | undefined;
+      const tokenUsage = asRecord(params.tokenUsage);
+      const last = asRecord(tokenUsage?.last);
       if (last) {
-        this._lastUsage = {
-          inputTokens: (last.inputTokens as number) ?? 0,
-          outputTokens: (last.outputTokens as number) ?? 0,
-        };
+        this._lastUsage = normalizeCodexTokenUsage(last);
+        this._lastUsageNative = buildCodexTokenUsageNative(tokenUsage);
       }
       return observeIgnored(this.evolutionObserver, {
         rawEventType: method,
@@ -451,16 +458,56 @@ export class CodexProvider implements Provider {
       }, null);
     }
 
-    // Turn completed — attach cached usage if available
+    // Account rate limits arrive once per turn, right after token usage
+    if (method === 'account/rateLimits/updated') {
+      const snapshot = normalizeCodexRateLimits(asRecord(params.rateLimits));
+      if (!snapshot) {
+        return observeIgnored(this.evolutionObserver, {
+          rawEventType: method,
+          reason: 'rate_limits_without_snapshot',
+          rawSample: msg,
+        }, null);
+      }
+
+      this._lastRateLimits = snapshot.quota;
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: method,
+        rawSample: msg,
+      }, createCodexProgressEvent({
+        text: snapshot.text,
+        kind: 'quota',
+        status: snapshot.status,
+        native: {
+          sourceEvent: method,
+          rateLimits: params.rateLimits,
+        },
+        details: {
+          quota: snapshot.quota,
+        },
+      }));
+    }
+
+    // Turn completed — attach cached usage plus the latest quota snapshot if available
     if (method === 'turn/completed') {
       const usage = this._lastUsage ?? undefined;
+      const usageNative = this._lastUsageNative;
+      const quota = this._lastRateLimits;
       this._lastUsage = null;
+      this._lastUsageNative = null;
       return observeNormalized(this.evolutionObserver, {
         rawEventType: method,
         rawSample: msg,
       }, {
         type: 'result',
         usage,
+        ...(quota || usageNative
+          ? {
+            metadata: {
+              ...(quota ? { runtimeUsage: { quota } } : {}),
+              ...(usageNative ? { native: { sourceEvent: method, tokenUsage: usageNative } } : {}),
+            },
+          }
+          : {}),
       } satisfies ResultStreamEvent);
     }
 
@@ -816,9 +863,10 @@ function formatJsonRpcError(error: NonNullable<JsonRpcResponse['error']>): strin
 
 function createCodexProgressEvent(input: {
   text: string;
-  kind: 'plan' | 'reasoning' | 'tool' | 'command' | 'files' | 'model_state' | 'session';
-  status: 'started' | 'running' | 'updated' | 'completed';
+  kind: 'plan' | 'reasoning' | 'tool' | 'command' | 'files' | 'model_state' | 'quota' | 'session';
+  status: 'started' | 'running' | 'updated' | 'completed' | 'blocked';
   native: Record<string, unknown>;
+  details?: Record<string, unknown>;
 }): ProgressStreamEvent {
   return createRuntimeProgressEvent({
     text: input.text,
@@ -828,6 +876,7 @@ function createCodexProgressEvent(input: {
     status: input.status,
     source: 'provider',
     native: input.native,
+    ...(input.details ? { details: input.details } : {}),
   });
 }
 
@@ -1033,4 +1082,158 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     return undefined;
   }
   return value as Record<string, unknown>;
+}
+
+/**
+ * Codex counts cached prompt tokens inside `inputTokens`, which matches the Claude adapter's
+ * "full prompt" `inputTokens`; `promptInputTokens` is the uncached remainder. Observed on
+ * codex-cli 0.153.4; see docs/research/2026-09-10-claude-codex-rate-limit-signal-probe.md.
+ */
+function normalizeCodexTokenUsage(last: Record<string, unknown>): StreamUsage {
+  const inputTokens = finiteNumber(last.inputTokens) ?? 0;
+  const outputTokens = finiteNumber(last.outputTokens) ?? 0;
+  const cacheReadInputTokens = finiteNumber(last.cachedInputTokens);
+  const cacheCreationInputTokens = finiteNumber(last.cacheWriteInputTokens);
+  const totalTokens = finiteNumber(last.totalTokens);
+
+  return {
+    inputTokens,
+    outputTokens,
+    ...(cacheReadInputTokens === undefined
+      ? {}
+      : {
+        promptInputTokens: Math.max(0, inputTokens - cacheReadInputTokens),
+        cacheReadInputTokens,
+      }),
+    ...(cacheCreationInputTokens === undefined ? {} : { cacheCreationInputTokens }),
+    ...(totalTokens === undefined ? {} : { totalTokens }),
+  };
+}
+
+function buildCodexTokenUsageNative(
+  tokenUsage: Record<string, unknown> | undefined,
+): Record<string, unknown> | null {
+  const total = asRecord(tokenUsage?.total);
+  const modelContextWindow = finiteNumber(tokenUsage?.modelContextWindow);
+  if (!total && modelContextWindow === undefined) {
+    return null;
+  }
+
+  return {
+    ...(total ? { total } : {}),
+    ...(modelContextWindow === undefined ? {} : { modelContextWindow }),
+  };
+}
+
+interface CodexQuotaSnapshot {
+  quota: Record<string, string | number | boolean>;
+  status: 'updated' | 'blocked';
+  text: string;
+}
+
+/**
+ * Flatten an app-server `RateLimitSnapshot` into the runtime quota contract. Only rate-limit
+ * facts are kept: window usage, reset times, plan, credits, and reached / spend-control flags.
+ * Account identifiers that ride along on the read response are deliberately not copied.
+ */
+function normalizeCodexRateLimits(
+  rateLimits: Record<string, unknown> | undefined,
+): CodexQuotaSnapshot | null {
+  if (!rateLimits) {
+    return null;
+  }
+
+  const quota: Record<string, string | number | boolean> = {
+    source: 'codex.account/rateLimits/updated',
+    observedAt: new Date().toISOString(),
+  };
+  const limitId = readNonEmptyString(rateLimits.limitId);
+  const limitName = readNonEmptyString(rateLimits.limitName);
+  const planType = readNonEmptyString(rateLimits.planType);
+  const rateLimitReachedType = readNonEmptyString(rateLimits.rateLimitReachedType);
+  if (limitId) {
+    quota.limitId = limitId;
+  }
+  if (limitName) {
+    quota.limitName = limitName;
+  }
+  if (planType) {
+    quota.planType = planType;
+  }
+  if (rateLimitReachedType) {
+    quota.rateLimitReachedType = rateLimitReachedType;
+  }
+  if (typeof rateLimits.spendControlReached === 'boolean') {
+    quota.spendControlReached = rateLimits.spendControlReached;
+  }
+
+  const windows: string[] = [];
+  for (const name of ['primary', 'secondary'] as const) {
+    const window = asRecord(rateLimits[name]);
+    if (!window) {
+      continue;
+    }
+    const usedPercent = finiteNumber(window.usedPercent);
+    const windowDurationMins = finiteNumber(window.windowDurationMins);
+    const resetsAt = unixSecondsToIso(window.resetsAt);
+    if (usedPercent !== undefined) {
+      quota[`${name}.usedPercent`] = usedPercent;
+    }
+    if (windowDurationMins !== undefined) {
+      quota[`${name}.windowDurationMins`] = windowDurationMins;
+    }
+    if (resetsAt) {
+      quota[`${name}.resetsAt`] = resetsAt;
+    }
+    if (usedPercent !== undefined) {
+      const windowLabel = windowDurationMins === undefined
+        ? ''
+        : ` of ${windowDurationMins}-minute window`;
+      windows.push(
+        `${name} ${usedPercent}% used${windowLabel}${resetsAt ? ` (resets ${resetsAt})` : ''}`,
+      );
+    }
+  }
+
+  const credits = asRecord(rateLimits.credits);
+  if (credits) {
+    if (typeof credits.hasCredits === 'boolean') {
+      quota['credits.hasCredits'] = credits.hasCredits;
+    }
+    if (typeof credits.unlimited === 'boolean') {
+      quota['credits.unlimited'] = credits.unlimited;
+    }
+    const balance = readNonEmptyString(credits.balance);
+    if (balance) {
+      quota['credits.balance'] = balance;
+    }
+  }
+
+  // Only `source` and `observedAt` means the notification carried no rate-limit facts.
+  if (Object.keys(quota).length === 2) {
+    return null;
+  }
+
+  const blocked = Boolean(rateLimitReachedType) || rateLimits.spendControlReached === true;
+  const headline = rateLimitReachedType
+    ? `Codex rate limit reached (${rateLimitReachedType})`
+    : 'Codex rate limit';
+  const planLabel = planType ? `plan ${planType}` : '';
+  const text = windows.length > 0
+    ? `${headline}: ${windows.join(', ')}${planLabel ? `; ${planLabel}` : ''}.`
+    : `${headline}${planLabel ? `: ${planLabel}` : ''}.`;
+
+  return { quota, status: blocked ? 'blocked' : 'updated', text };
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function unixSecondsToIso(value: unknown): string | undefined {
+  const seconds = finiteNumber(value);
+  if (seconds === undefined || seconds <= 0) {
+    return undefined;
+  }
+  return new Date(seconds * 1000).toISOString();
 }

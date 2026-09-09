@@ -415,6 +415,165 @@ describe('ClaudeProvider', () => {
       expect(event?.usage?.cacheCreationInputTokens).toBe(5);
     });
 
+    it('normalizes rate_limit_event into quota progress and carries it onto result', () => {
+      const rateLimitProvider = new ClaudeProvider();
+      const fiveHourResetsAt = new Date(1789007400 * 1000).toISOString();
+      const sevenDayResetsAt = new Date(1789506000 * 1000).toISOString();
+      const progress = toEventList(rateLimitProvider.parseStreamLine(JSON.stringify({
+        type: 'rate_limit_event',
+        rate_limit_info: {
+          status: 'allowed',
+          resetsAt: 1789007400,
+          rateLimitType: 'five_hour',
+          overageStatus: 'rejected',
+          overageDisabledReason: 'org_level_disabled',
+          isUsingOverage: false,
+          unifiedWindows: {
+            five_hour: { utilization: 0.07, resetsAt: 1789007400 },
+            seven_day: { utilization: 0.01, resetsAt: 1789506000 },
+          },
+        },
+        uuid: 'uuid-1',
+        session_id: 'claude-abc',
+      })));
+
+      expect(progress).toHaveLength(1);
+      expect(progress[0]).toEqual(expect.objectContaining({
+        type: 'progress',
+        text: `Claude rate limit allowed: five_hour 7% used (resets ${fiveHourResetsAt}), `
+          + `seven_day 1% used (resets ${sevenDayResetsAt}).`,
+        metadata: expect.objectContaining({
+          kind: 'quota',
+          status: 'updated',
+          source: 'provider',
+          provider: 'claude',
+          backend: 'cli',
+          native: expect.objectContaining({ sourceEvent: 'rate_limit_event' }),
+          quota: {
+            source: 'claude.rate_limit_event',
+            observedAt: expect.any(String),
+            status: 'allowed',
+            rateLimitType: 'five_hour',
+            resetsAt: fiveHourResetsAt,
+            isUsingOverage: false,
+            overageStatus: 'rejected',
+            overageDisabledReason: 'org_level_disabled',
+            'five_hour.utilization': 0.07,
+            'five_hour.resetsAt': fiveHourResetsAt,
+            'seven_day.utilization': 0.01,
+            'seven_day.resetsAt': sevenDayResetsAt,
+          },
+        }),
+      }));
+
+      const result = rateLimitProvider.parseStreamLine(JSON.stringify({
+        type: 'result',
+        subtype: 'success',
+        is_error: false,
+        session_id: 'claude-abc',
+        duration_ms: 4323,
+        duration_api_ms: 5275,
+        num_turns: 1,
+        total_cost_usd: 0.15941175,
+        usage: {
+          input_tokens: 2,
+          cache_creation_input_tokens: 7724,
+          cache_read_input_tokens: 15055,
+          output_tokens: 4,
+        },
+        modelUsage: {
+          'claude-fable-5-1': {
+            inputTokens: 2,
+            outputTokens: 4,
+            costUSD: 0.15846375,
+            contextWindow: 1000000,
+          },
+        },
+      }));
+
+      expect(result).toEqual(expect.objectContaining({
+        type: 'result',
+        sessionId: 'claude-abc',
+        usage: {
+          inputTokens: 22781,
+          outputTokens: 4,
+          promptInputTokens: 2,
+          cacheReadInputTokens: 15055,
+          cacheCreationInputTokens: 7724,
+          estimatedCost: 0.15941175,
+          currency: 'USD',
+        },
+        metadata: {
+          runtimeUsage: {
+            quota: expect.objectContaining({
+              status: 'allowed',
+              'five_hour.utilization': 0.07,
+            }),
+          },
+          native: {
+            sourceEvent: 'result',
+            subtype: 'success',
+            isError: false,
+            durationMs: 4323,
+            durationApiMs: 5275,
+            numTurns: 1,
+            modelUsage: {
+              'claude-fable-5-1': expect.objectContaining({ costUSD: 0.15846375 }),
+            },
+          },
+        },
+      }));
+    });
+
+    it('maps allowed_warning and rejected rate-limit statuses onto warned and blocked', () => {
+      for (const [status, expected] of [
+        ['allowed_warning', 'warned'],
+        ['rejected', 'blocked'],
+      ] as const) {
+        const [event] = toEventList(new ClaudeProvider().parseStreamLine(JSON.stringify({
+          type: 'rate_limit_event',
+          rate_limit_info: {
+            status,
+            rateLimitType: 'seven_day',
+            unifiedWindows: { seven_day: { utilization: 1 } },
+          },
+        })));
+
+        expect(event?.type).toBe('progress');
+        expect(event?.metadata).toEqual(expect.objectContaining({
+          kind: 'quota',
+          status: expected,
+          quota: expect.objectContaining({
+            status,
+            rateLimitType: 'seven_day',
+            'seven_day.utilization': 1,
+          }),
+        }));
+      }
+    });
+
+    it('leaves result metadata without quota until a rate_limit_event was observed', () => {
+      const result = new ClaudeProvider().parseStreamLine(JSON.stringify({
+        type: 'result',
+        subtype: 'success',
+        session_id: 'claude-abc',
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }));
+
+      expect(result?.usage?.estimatedCost).toBeUndefined();
+      expect(result?.metadata).toEqual({
+        native: { sourceEvent: 'result', subtype: 'success' },
+      });
+    });
+
+    it('passes rate_limit_event without rate_limit_info through as raw', () => {
+      const event = new ClaudeProvider().parseStreamLine(JSON.stringify({
+        type: 'rate_limit_event',
+        session_id: 'claude-abc',
+      }));
+      expect(event?.type).toBe('raw');
+    });
+
     it('returns raw for non-JSON lines', () => {
       const event = provider.parseStreamLine('Starting Claude...');
       expect(event?.type).toBe('raw');

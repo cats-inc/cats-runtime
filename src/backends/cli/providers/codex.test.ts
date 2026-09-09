@@ -481,6 +481,155 @@ describe('CodexProvider', () => {
       expect(event?.usage).toBeUndefined();
     });
 
+    it('normalizes cached token usage with cache, prompt, total, and context-window facts', () => {
+      const tokenUsage = {
+        total: {
+          totalTokens: 16579,
+          inputTokens: 16574,
+          cachedInputTokens: 12288,
+          cacheWriteInputTokens: 0,
+          outputTokens: 5,
+          reasoningOutputTokens: 0,
+        },
+        last: {
+          totalTokens: 16579,
+          inputTokens: 16574,
+          cachedInputTokens: 12288,
+          cacheWriteInputTokens: 0,
+          outputTokens: 5,
+          reasoningOutputTokens: 0,
+        },
+        modelContextWindow: 258400,
+      };
+      provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'thread/tokenUsage/updated',
+        params: { threadId: 'thread-1', turnId: 'turn-1', tokenUsage },
+      }));
+
+      const event = provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'turn/completed',
+        params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } },
+      }));
+
+      expect(event?.type).toBe('result');
+      expect(event?.usage).toEqual({
+        inputTokens: 16574,
+        outputTokens: 5,
+        promptInputTokens: 4286,
+        cacheReadInputTokens: 12288,
+        cacheCreationInputTokens: 0,
+        totalTokens: 16579,
+      });
+      expect(event?.metadata).toEqual({
+        native: {
+          sourceEvent: 'turn/completed',
+          tokenUsage: { total: tokenUsage.total, modelContextWindow: 258400 },
+        },
+      });
+    });
+
+    it('normalizes account/rateLimits/updated into quota progress and carries it onto turn/completed', () => {
+      const resetsAt = new Date(1789593617 * 1000).toISOString();
+      const rateLimits = {
+        limitId: 'codex',
+        limitName: null,
+        primary: { usedPercent: 1, windowDurationMins: 10080, resetsAt: 1789593617 },
+        secondary: null,
+        credits: { hasCredits: false, unlimited: false, balance: '0' },
+        individualLimit: null,
+        spendControlReached: null,
+        planType: 'pro',
+        rateLimitReachedType: null,
+      };
+      const progress = provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'account/rateLimits/updated',
+        params: { rateLimits },
+      }));
+
+      expect(progress).toEqual(expect.objectContaining({
+        type: 'progress',
+        text: `Codex rate limit: primary 1% used of 10080-minute window (resets ${resetsAt}); plan pro.`,
+        metadata: expect.objectContaining({
+          kind: 'quota',
+          status: 'updated',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'cli',
+          native: { sourceEvent: 'account/rateLimits/updated', rateLimits },
+          quota: {
+            source: 'codex.account/rateLimits/updated',
+            observedAt: expect.any(String),
+            limitId: 'codex',
+            planType: 'pro',
+            'primary.usedPercent': 1,
+            'primary.windowDurationMins': 10080,
+            'primary.resetsAt': resetsAt,
+            'credits.hasCredits': false,
+            'credits.unlimited': false,
+            'credits.balance': '0',
+          },
+        }),
+      }));
+
+      const result = provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'turn/completed',
+        params: { threadId: 'thread-1' },
+      }));
+      expect(result?.type).toBe('result');
+      expect(result?.usage).toBeUndefined();
+      expect(result?.metadata).toEqual({
+        runtimeUsage: {
+          quota: expect.objectContaining({ limitId: 'codex', 'primary.usedPercent': 1 }),
+        },
+      });
+    });
+
+    it('marks reached rate limits as blocked quota progress', () => {
+      const progress = provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'account/rateLimits/updated',
+        params: {
+          rateLimits: {
+            limitId: 'codex',
+            primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: 1789011952 },
+            secondary: { usedPercent: 40, windowDurationMins: 10080, resetsAt: 1789598752 },
+            planType: 'pro',
+            rateLimitReachedType: 'primary',
+          },
+        },
+      }));
+
+      expect(progress?.type).toBe('progress');
+      expect(progress?.text).toContain('Codex rate limit reached (primary)');
+      expect(progress?.metadata).toEqual(expect.objectContaining({
+        kind: 'quota',
+        status: 'blocked',
+        quota: expect.objectContaining({
+          rateLimitReachedType: 'primary',
+          'primary.usedPercent': 100,
+          'secondary.usedPercent': 40,
+          'secondary.windowDurationMins': 10080,
+        }),
+      }));
+    });
+
+    it('ignores account/rateLimits/updated without a usable snapshot', () => {
+      expect(provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'account/rateLimits/updated',
+        params: {},
+      }))).toBeNull();
+      expect(provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'account/rateLimits/updated',
+        params: { rateLimits: { limitId: null, primary: null, secondary: null } },
+      }))).toBeNull();
+    });
+
     it('parses turn/failed as error event', () => {
       const event = provider.parseStreamLine(JSON.stringify({
         jsonrpc: '2.0',

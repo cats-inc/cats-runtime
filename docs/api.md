@@ -833,7 +833,9 @@ integrate against:
   preview-surface kinds
 - full `metering` state:
   - `summary`: aggregate status/counts
-  - `usage`: totals plus `byProviderInstance` / `bySession`
+  - `usage`: totals plus `byProviderInstance` / `bySession`; each aggregate
+    also keeps the latest provider-reported `quota` snapshot when one was
+    observed (totals do not, because quota is per provider account)
   - `incidents`: recent incident evidence plus active provider-instance guardrails
   - `guardrails`: configured thresholds/cooldowns plus currently active outcomes
 
@@ -1199,7 +1201,11 @@ includes:
 - `metering.target`: resolved `provider`, `instance`, and `backend`
 - `metering.summary`: bounded status/counts for recent incidents plus active
   guardrails (`status`, `incidents`, `activeGuardrails`, `activeCooldowns`,
-  `activeBlocks`, `warningOnlyGuardrails`)
+  `activeBlocks`, `warningOnlyGuardrails`); `usageRecords` counts the usage
+  observations recorded for that exact target
+- `metering.usage`: the target's aggregate tokens, cost, latency, and
+  confidence counts plus its latest provider-reported `quota` snapshot; absent
+  until the target has recorded usage
 - `metering.recentIncidents`: recent provider-target incidents such as
   `rate_limited`
 - `metering.activeGuardrails`: currently active cooldown/block outcomes for the
@@ -2842,7 +2848,50 @@ additive `content_block` events in addition to `init`, `text`, `result`, and
 When providers report usage, `result.usage` may also include additive
 `promptInputTokens`, `cacheReadInputTokens`, and
 `cacheCreationInputTokens` fields in addition to aggregate `inputTokens` and
-`outputTokens`.
+`outputTokens`. Providers that report a cost also fill `estimatedCost` plus
+`currency`: Claude Code's `total_cost_usd` (a list-price equivalent even on a
+subscription account), Cline's `totalCost`, and Grok's `total_cost_usd` map
+there today. Codex usage keeps `cacheReadInputTokens`,
+`cacheCreationInputTokens`, `promptInputTokens`, and `totalTokens` from
+`thread/tokenUsage/updated`.
+
+The runtime-owned metering service then merges the normalized per-turn signal
+back onto the same `result` as `metadata.runtimeUsage` (`totalTokens`,
+`estimatedCost`, `currency`, `latencyMs`, `sourceConfidence`, and an optional
+flat `quota` record). Provider-native turn facts stay under `metadata.native`
+(Claude: `subtype`, `isError`, `durationMs`, `durationApiMs`, `numTurns`,
+per-model `modelUsage`; Codex: thread `tokenUsage.total` plus
+`modelContextWindow`).
+
+Account-level quota is a separate, provider-reported signal. The runtime never
+reads a provider credential file to obtain it; it only normalizes what the CLI
+already emits on its own stream:
+
+- Claude Code emits `rate_limit_event` frames around each API call on
+  subscription-backed sessions. The adapter turns each one into a `progress`
+  event with `metadata.kind: "quota"` and a flat `metadata.quota` record
+  (`status`, `rateLimitType`, `resetsAt`, one `<window>.utilization` fraction
+  plus `<window>.resetsAt` per unified window such as `five_hour` and
+  `seven_day`, and the overage flags), and copies the latest snapshot onto the
+  turn's `result` as `metadata.runtimeUsage.quota`.
+- Codex app-server emits `account/rateLimits/updated` once per turn. The
+  adapter maps it onto the same `progress` shape (`limitId`, `limitName`,
+  `planType`, `primary.usedPercent`, `primary.windowDurationMins`,
+  `primary.resetsAt`, optional `secondary.*`, `credits.*`,
+  `rateLimitReachedType`, `spendControlReached`) and onto the
+  `turn/completed` result metadata.
+- Copilot already reported `premiumRequests` through the same
+  `metadata.runtimeUsage.quota` slot.
+
+`metadata.status` on a quota progress event is `updated` for a plain
+observation, `warned` when Claude reports `allowed_warning`, and `blocked` when
+Claude reports `rejected` or Codex reports a reached limit or spend control.
+The runtime does not derive cooldowns or incidents from those snapshots yet;
+hosts decide. Every quota record carries `source` and `observedAt` so a fresh
+snapshot can be told from a reused one, and every timestamp is an ISO-8601
+string. See
+[the probe note](./research/2026-09-10-claude-codex-rate-limit-signal-probe.md)
+for the observed wire shapes.
 
 `content_block` is a runtime-owned host contract layered over the normalized
 stream. It lets hosts render a stable live transcript without depending on
@@ -2935,6 +2984,8 @@ Current normalized progress kinds:
 - `model_state`: local-model lifecycle hints such as Ollama `keep_alive`
   requests
 - `guardrail`: runtime-owned warning/block/cooldown checkpoints
+- `quota`: provider-reported account rate-limit or quota snapshots, with the
+  flat record under `metadata.quota`
 - `session`: provider session lifecycle checkpoints
 
 Runtime-owned strategy loops emit additive `progress` events with
@@ -3531,7 +3582,8 @@ Each instance entry also exposes additive compact `metering` summary metadata:
 - `summary`: operator-facing explanation of whether the target is currently
   under runtime-owned cooldown/block pressure
 - `usageRecords`, `incidents`, `activeGuardrails`, `activeCooldowns`,
-  `activeBlocks`: bounded counts for that resolved provider target
+  `activeBlocks`: bounded counts for that resolved provider target;
+  `usageRecords` is the number of usage observations recorded for it
 
 This reuses the same runtime-owned metering service behind
 `GET /diagnostics/runtime`, `GET /diagnostics/health`, and

@@ -217,6 +217,81 @@ describe('RuntimeMeteringService', () => {
     }));
   });
 
+  it('keeps the latest provider quota snapshot on usage aggregates and provider-target snapshots', () => {
+    const service = new RuntimeMeteringService();
+    const session = createSession({
+      providerName: 'claude',
+      providerBackend: 'cli',
+      providerInstanceId: 'default',
+    });
+    const olderQuota = { source: 'claude.rate_limit_event', 'five_hour.utilization': 0.07 };
+    const latestQuota = { source: 'claude.rate_limit_event', 'five_hour.utilization': 0.09 };
+
+    service.observeEvent(session, {
+      type: 'result',
+      usage: { inputTokens: 10, outputTokens: 2 },
+      metadata: { runtimeUsage: { quota: olderQuota } },
+    }, {
+      turnStartedAt: Date.now() - 5,
+    });
+    const observed = service.observeEvent(session, {
+      type: 'result',
+      usage: { inputTokens: 5, outputTokens: 1 },
+      metadata: { runtimeUsage: { quota: latestQuota } },
+    }, {
+      turnStartedAt: Date.now() - 5,
+    });
+
+    expect(observed.metadata?.runtimeUsage).toEqual(expect.objectContaining({
+      totalTokens: 6,
+      quota: latestQuota,
+    }));
+
+    const snapshot = service.buildSnapshot([session]);
+    expect(snapshot.usage.totals.quota).toBeUndefined();
+    expect(snapshot.usage.byProviderInstance).toEqual([
+      expect.objectContaining({
+        provider: 'claude',
+        instance: 'default',
+        backend: 'cli',
+        observationCount: 2,
+        totalTokens: 18,
+        quota: latestQuota,
+      }),
+    ]);
+    expect(snapshot.usage.bySession).toEqual([
+      expect.objectContaining({
+        sessionId: 'session-1',
+        observationCount: 2,
+        quota: latestQuota,
+      }),
+    ]);
+
+    const target = service.buildProviderTargetSnapshot({
+      provider: 'claude',
+      instance: 'default',
+      backend: 'cli',
+    });
+    expect(target.summary).toEqual(expect.objectContaining({
+      status: 'ok',
+      usageRecords: 2,
+      incidents: 0,
+    }));
+    expect(target.usage).toEqual(expect.objectContaining({
+      observationCount: 2,
+      totalTokens: 18,
+      quota: latestQuota,
+    }));
+
+    const otherTarget = service.buildProviderTargetSnapshot({
+      provider: 'codex',
+      instance: 'default',
+      backend: 'cli',
+    });
+    expect(otherTarget.usage).toBeUndefined();
+    expect(otherTarget.summary.usageRecords).toBe(0);
+  });
+
   it('builds provider-target snapshots for diagnostics read models', () => {
     const service = new RuntimeMeteringService({
       rateLimitCooldownMs: 5_000,

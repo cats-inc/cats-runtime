@@ -677,6 +677,11 @@ path is intentionally narrow:
   source-confidence without requiring provider-specific callers
 - Derives machine-readable incidents for rate-limit, quota, and concurrency
   failures from API and CLI surfaces
+- Records provider-reported account quota snapshots (Claude Code
+  `rate_limit_event`, Codex `account/rateLimits/updated`, Copilot premium
+  request counts) as a flat `quota` record on usage records and keeps the
+  latest one per provider instance, session, and provider target, without
+  reading any provider credential file
 - Maintains the first execution guardrail slice for warn / block / cooldown
   behavior without embedding product budget policy
 - Produces diagnostics-friendly aggregates for `GET /diagnostics/runtime` and

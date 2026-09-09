@@ -45,6 +45,8 @@ export interface RuntimeProviderTargetMeteringSnapshot {
     backend: ProviderBackend;
   };
   summary: RuntimeMeteringSummary;
+  /** Aggregate usage for this target, including the latest provider-reported `quota` snapshot. */
+  usage?: RuntimeUsageAggregate;
   recentIncidents: RuntimeRateLimitIncident[];
   activeGuardrails: RuntimeGuardrailResult[];
 }
@@ -352,10 +354,24 @@ export class RuntimeMeteringService {
       )
       .slice(-10)
       .reverse();
+    const usage = aggregateUsageRecords(
+      this.usageRecords.filter((record) =>
+        record.provider === target.provider
+        && record.instance === target.instance
+        && record.backend === target.backend,
+      ),
+      () => providerGuardrailKey(target.provider, target.instance, target.backend),
+      (record) => ({
+        provider: record.provider,
+        instance: record.instance,
+        backend: record.backend,
+      }),
+    ).at(0);
 
     return {
       target,
-      summary: buildSummary(0, recentIncidents.length, activeGuardrails),
+      summary: buildSummary(usage?.observationCount ?? 0, recentIncidents.length, activeGuardrails),
+      ...(usage ? { usage } : {}),
       recentIncidents,
       activeGuardrails,
     };
@@ -533,6 +549,10 @@ function aggregateUsageRecords<T extends RuntimeUsageAggregate>(
     }
 
     applyUsageRecordToAggregate(target, record);
+    if (record.quota) {
+      // Quota is a point-in-time provider snapshot, not an additive counter: keep the latest.
+      target.quota = record.quota;
+    }
   }
 
   return Array.from(aggregated.values()).sort((left, right) =>
