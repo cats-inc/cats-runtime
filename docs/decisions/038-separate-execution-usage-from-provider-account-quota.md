@@ -3,11 +3,12 @@
 ## Status
 
 Accepted — ownership and data distinction approved on 2026-09-10.
-Collector, persistence, and new read-contract implementation remain planned.
+The memory-only read contract and passive Claude/Codex window projection are now
+implemented under PLAN-038. Active collectors, verified accounts and persistence remain planned.
 
 ## Context
 
-The official Cats Usage utility will live in cats-apps and run through the
+The official Usage utility will live in cats-apps and run through the
 cats-platform App host. Runtime already records result usage, classifies rate
 limits/quota errors, and enforces execution guardrails under ADR-017.
 
@@ -40,13 +41,13 @@ account-balance or reset-window contract.
 8. Keep execution guardrail state separate from observed account allowance.
    Quota reset times and local cooldown expiry are different facts.
 9. Product budget policy, approvals, and operator UI remain above runtime.
-   Cats Usage is an observational client and does not own execution decisions.
+   Usage is an observational client and does not own execution decisions.
 
 ## Consequences
 
 ### Positive
 
-- Cats Usage and other consumers can reuse one provider-aware data source.
+- Usage and other consumers can reuse one provider-aware data source.
 - The UI can honestly display partial/unknown data and shared account windows.
 - Collection and execution restrictions remain available without an open app.
 
@@ -65,7 +66,7 @@ account-balance or reset-window contract.
 
 ## Alternatives Considered
 
-### Query Provider CLIs Inside Cats Usage
+### Query Provider CLIs Inside Usage
 
 Would couple a renderer/package to credentials and provider drift. Rejected because
 provider acquisition is already a runtime responsibility.

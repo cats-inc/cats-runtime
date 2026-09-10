@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Planned; implementation not started |
+| Status | U1 and passive quota observation implemented; active collectors/history deferred |
 | Owner | cats-runtime |
 | Related spec | SPEC-029 |
 | Related decision | ADR-038 |
@@ -25,21 +25,24 @@ as a runtime subsystem and give the host a narrow, truthful data source.
 
 - [x] Inspect existing token/cost normalization, incidents, guardrails, and diagnostics.
 - [x] Record the in-memory retention and quota metadata limitations.
-- [x] Record the three-repository ownership decision and linked Cats Usage plan.
-- [ ] Freeze DTO/route naming, null/unknown semantics, and source coverage with
+- [x] Record the three-repository ownership decision and linked Usage plan.
+- [x] Freeze DTO/route naming, null/unknown semantics, and source coverage with
       platform PLAN-106.
-- [ ] Define account linkage and dimensioned quota/currency aggregation rules.
+- [x] Define unverified account linkage, non-additive quota and per-currency aggregation rules.
 
 ### Phase 1: U1 Snapshot and Coverage
 
-- [ ] Expose current usage/incidents through a narrow read service with observation
+- [x] Expose current usage/incidents through a narrow read service with observation
       epoch, retained range, and truncation metadata.
-- [ ] Keep account quota unavailable until a real source exists.
+- [x] Keep unsupported quota unavailable; expose only existing verified passive signal mappings.
 - [ ] Verify cumulative/replayed usage normalization and currency separation.
-- [ ] Add HTTP/auth/redaction and host-consumer contract fixtures.
-- [ ] Keep existing diagnostic consumers aligned without claiming new history.
+- [x] Add HTTP/auth/redaction and host-consumer contract fixtures.
+- [x] Keep existing diagnostic consumers aligned without claiming new history.
 
 ### Phase 2: Collector Evidence
+
+- [x] Reuse the dated Claude/Codex stream probe and redacted provider fixtures for
+      passive windows. No new paid/live probe was performed in this implementation.
 
 - [ ] Investigate structured account-query seams for initial CLI families.
 - [ ] Record source/auth/window/unit/scope evidence and redacted fixtures.
@@ -47,9 +50,13 @@ as a runtime subsystem and give the host a narrow, truthful data source.
 - [ ] Capture unsupported/auth-required/error cases and retry behavior.
 - [ ] Follow version-drift policy; avoid exact fixture-version execution gates.
 
-No provider account request or paid probe is performed by this documentation task.
+No provider account request or paid probe is performed by this implementation task.
 
 ### Phase 3: U2 Account Quota Service
+
+- [x] Retain quota-only progress per target independently from token-bearing results;
+      preserve original timestamps, reject older late snapshots, mark stale resets.
+- [x] Keep cached reads independent from dashboard visibility and provider requests.
 
 - [ ] Implement separate account/window storage, including quota-only observations.
 - [ ] Link verified shared accounts to provider targets without duplicating allowance.
@@ -57,7 +64,7 @@ No provider account request or paid probe is performed by this documentation tas
       stale retention, and backoff.
 - [ ] Expose the agreed snapshot and separately controlled explicit refresh route.
 - [ ] Verify that app visibility/polling cannot amplify provider queries.
-- [ ] Keep account balance and execution-block transitions independent.
+- [x] Keep account balance and execution-block transitions independent.
 
 ### Phase 4: U3 Durable History
 
@@ -68,10 +75,15 @@ No provider account request or paid probe is performed by this documentation tas
 
 ### Phase 5: Consumer Validation
 
-- [ ] Validate current usage and account windows through the platform read bridge.
-- [ ] Verify Cats Usage unknown/zero/stale/shared-account presentation with fixtures.
-- [ ] Update the provider support matrix with actual evidence.
-- [ ] Run targeted service/HTTP tests and isolated cross-repository package checks.
+- [x] Validate current usage and passive windows through the platform contract.
+- [x] Verify Usage unknown/zero/stale and unverified account presentation with fixtures.
+- [x] Document Claude/Codex passive support and unsupported active collection.
+- [x] Run targeted service/HTTP tests and isolated cross-repository package checks.
+
+`/usage/snapshot` is memory-only and authenticated. It exposes the most recent
+supported passive observation per provider/instance/backend, not a complete
+multi-account inventory. Cumulative/replay-safe durable history and verified shared
+account linkage remain open; no historical totals are advertised.
 
 ## Work Areas
 

@@ -4,12 +4,23 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Draft; ownership accepted under ADR-038 |
+| Status | U1/passive-window slice implemented; active collectors and history deferred |
 | Owner | cats-runtime |
-| Implementation | Existing execution metering only; new quota/read contract not implemented |
-| Consumer | Cats Usage via cats-platform |
+| Implementation | Authenticated bounded snapshot and separate passive quota observations |
+| Consumer | Usage via cats-platform |
 
 ## Summary
+
+Implemented slice (2026-09-10): authenticated, no-store `GET /usage/snapshot`
+with schemaVersion 1, runtime epoch, retained-memory coverage, null-vs-zero metrics,
+per-currency costs, confidence, provider/instance/session grouping, incidents and
+guardrails. Quota-only progress is retained separately. Existing fixture-backed
+Claude fraction and Codex percentage reports become percentage/reset windows;
+five-minute age, future skew and elapsed resets mark observations stale without
+refilling them. Original timestamps prevent late cached results from appearing new.
+No credential reads, provider calls, persistence, upstream refresh route or verified
+account identity/linking is introduced. The most recent report per target is shown,
+not a complete multi-account/multi-limit inventory. App polling reads memory only.
 
 Provide a truthful, reusable snapshot of runtime-observed execution usage and
 provider-reported account allowance. Add verified quota acquisition and later

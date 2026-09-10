@@ -51,6 +51,7 @@ import { agentSessionRoutes } from './routes/agentSessions.js';
 import { browserRoutes } from './routes/browser.js';
 import { deliveryRoutes } from './routes/delivery.js';
 import { diagnosticsRoutes } from './routes/diagnostics.js';
+import { usageRoutes } from './routes/usage.js';
 import { compatibilityEvidenceRoutes } from './routes/compatibilityEvidence.js';
 import { setupDiagnosticsRoutes } from './routes/setupDiagnostics.js';
 import { healthRoutes } from './routes/health.js';
@@ -389,6 +390,7 @@ export function createRuntimeApp(ctx: AppContext) {
 
   app.route('/', healthRoutes);
   app.route('/', diagnosticsRoutes);
+  app.route('/', usageRoutes);
   app.route('/', compatibilityEvidenceRoutes);
   app.route('/', setupDiagnosticsRoutes);
   app.route('/', setupRoutes);
