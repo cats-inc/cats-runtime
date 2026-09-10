@@ -81,8 +81,8 @@ describe('runtime-managed skills HTTP contract', () => {
         description: 'Companion skill',
         status: 'resolved',
         source: 'runtime_catalog',
-        sourcePath: 'skills/chat/companion',
-        entryFile: 'skills/chat/companion/SKILL.md',
+        sourcePath: 'runtime-skills/chat/companion',
+        entryFile: 'runtime-skills/chat/companion/SKILL.md',
         fingerprint: 'companion-fingerprint',
         library: {
           family: 'chat',

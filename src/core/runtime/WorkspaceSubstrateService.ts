@@ -379,9 +379,8 @@ function buildScriptsReadme(profile: WorkspaceSubstrateProfileId): string {
   ].join('\n');
 }
 
-// These workspace templates intentionally remain generic and sync `skills/`.
-// cats-runtime's own repository helpers sync its developer-only `developer-skills/`
-// root through scripts/sync-agent-skills.mjs. ADR-036 records this deliberate split.
+// Both generated workspaces and this repository use `skills/` for developer skills.
+// The built-in product library lives separately in `runtime-skills/` (ADR-036).
 function buildWindowsSyncAgentSkillsScript(profile: WorkspaceSubstrateProfileId): string {
   return [
     '<#',

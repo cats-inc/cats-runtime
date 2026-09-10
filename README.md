@@ -187,7 +187,7 @@ The executable package starts the same runtime entrypoint as `npm start` and
 supports either bootstrap-first startup with no preexisting `providers.yaml`,
 or a preseeded valid config / equivalent environment overrides.
 
-Published package contents now also include the runtime-owned `skills/`
+Published package contents now also include the runtime-owned `runtime-skills/`
 library so validated skill packages ship with the executable boundary instead
 of only existing in the source checkout.
 

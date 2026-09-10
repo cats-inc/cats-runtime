@@ -26,7 +26,7 @@
   "files": [
     "build/runtime",
     "public",
-    "skills",
+    "runtime-skills",
     "config/management.yaml.example",
     "config/providers.yaml.example",
     "config/curated-model-catalogs.yaml.example",

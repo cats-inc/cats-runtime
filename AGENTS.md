@@ -279,9 +279,13 @@ separate canonical roots.
 
 ### How It Works
 
-Repository-maintenance skills live in `developer-skills/` (version-controlled) and are reconciled
-into each coding agent's ignored discovery path. Runtime-delivered product skills remain under
-`skills/` and are not copied by these helpers.
+Repository-maintenance skills live in `skills/` (version-controlled) and are reconciled
+into each coding agent's ignored discovery path. Runtime-delivered product skills live under
+`runtime-skills/` and are not copied by these helpers.
+
+Agents MUST use this current canonical-root contract from ADR-036's 2026-09-11
+amendment. Earlier directory descriptions in agent-specific files are superseded;
+each agent maintains the corresponding updates to its own instruction file.
 
 | Agent | Discovery Path |
 |-------|---------------|
@@ -303,7 +307,7 @@ After adding or modifying skills, run:
 
 The sync records repository-managed entries and preserves unrelated locally installed skills.
 `-Clean` recreates only managed mirrors. See ADR-036 for the canonical/mirror boundary and
-`skills/README.md` for the separate runtime-delivered skill library.
+`runtime-skills/README.md` for the separate runtime-delivered skill library.
 
 ---
 

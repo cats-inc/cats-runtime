@@ -26,6 +26,10 @@ Use these three layers deliberately:
 | Project Memory | `PROGRESS.md`, `ROADMAP.md`, `docs/research/`, `docs/decisions/`, `docs/specs/`, `docs/plans/` | Durable repo knowledge, decisions, validation evidence, status, and handoff truth |
 | Skill | `skills/**/SKILL.md` | Reusable procedural instructions for how an agent should work with the first two layers |
 
+The built-in product skill library lives separately at `runtime-skills/`.
+Only that product root is published and loaded by the default runtime catalog;
+developer `skills/` is synchronized into coding-agent discovery paths (ADR-036).
+
 `docs/a2a/` is not a project status log. `SKILL.md` is not a replacement for
 durable repo memory.
 

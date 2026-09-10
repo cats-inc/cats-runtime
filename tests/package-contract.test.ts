@@ -156,7 +156,7 @@ describe('package contract', () => {
     expect(manifest.files).toEqual([
       'build/runtime',
       'public',
-      'skills',
+      'runtime-skills',
       'config/management.yaml.example',
       'config/providers.yaml.example',
       'config/curated-model-catalogs.yaml.example',
@@ -183,13 +183,15 @@ describe('package contract', () => {
       'public/index.html',
       'public/playground.html',
       'public/provider-setup.html',
-      'skills/README.md',
+      'runtime-skills/README.md',
       'package.json',
     ]));
 
     expect([...packedPaths].some((path) => path.startsWith('src/'))).toBe(false);
     expect([...packedPaths].some((path) => path.startsWith('tests/'))).toBe(false);
     expect([...packedPaths].some((path) => path.startsWith('docs/'))).toBe(false);
+    expect([...packedPaths].some((path) => path.startsWith('skills/'))).toBe(false);
+    expect([...packedPaths].some((path) => path.startsWith('developer-skills/'))).toBe(false);
     expect(packedPaths.has('tsconfig.json')).toBe(false);
     expect(packedPaths.has('vitest.config.ts')).toBe(false);
   }, 20000);
@@ -253,6 +255,13 @@ describe('package contract', () => {
     expect(runtimeHelp.status).toBe(0);
     expect(runtimeHelp.stdout).toContain('Usage: cats-runtime [options]');
     expect(runtimeHelp.stdout).toContain('cats-runtime mcp [options]');
+
+    const skillVerification = runNodeCommand([
+      join(installedRoot, 'build', 'runtime', 'bin', 'verifySkills.js'),
+    ], { cwd: consumerDir, env: { CATS_RUNTIME_PACKAGE_ROOT: '' } });
+    expect(skillVerification.status, skillVerification.stderr).toBe(0);
+    expect(skillVerification.stdout).toMatch(/verified \d+ runtime-owned skill packages/);
+    expect(existsSync(join(installedRoot, 'skills'))).toBe(false);
 
     const runtimeMcpInspect = runNodeCommand([
       join(installedRoot, 'build', 'runtime', 'index.js'),

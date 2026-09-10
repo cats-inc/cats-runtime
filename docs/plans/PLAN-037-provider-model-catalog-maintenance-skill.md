@@ -3,6 +3,10 @@
 > Stand up the `developer-skills/` root from ADR-036, make the sync helpers
 > actually work, and author `maintain-provider-model-catalogs` from SPEC-028.
 
+Current paths are `skills/` for developers and `runtime-skills/` for the product
+library. Earlier phases below retain their historical directory names; see the
+[2026-09-11 alignment](#2026-09-11-directory-alignment) for the approved follow-up.
+
 ## Metadata
 
 | Field | Value |
@@ -282,6 +286,63 @@ Per SPEC-028 requirement 4. Agent-owned files go to their owners.
 - **Nothing forces the docs in Phase 3 to stay true.** They drifted for months
   precisely because no test covers prose. Out of scope here, but worth noting
   that the only durable fix is making the helper's real behavior discoverable.
+
+## 2026-09-11 Directory Alignment
+
+The owner approved restoring the project-bootstrap `skills/` convention across
+Cats; ADR-036 records the replacement directory contract. Implementation is on
+`refactor/developer-skill-roots` in runtime, one and platform.
+
+- [x] Move product packages to `runtime-skills/` and the maintenance package to `skills/`.
+- [x] Update default catalog resolution, persisted instruction reload, verifier
+      inputs, npm allowlist and developer sync without changing generic workspaces.
+- [x] Point all cats-one member inventories at developer `skills/`; reconcile
+      existing ownership for the relocated package through normal protections.
+- [x] Repair platform's nested developer-skill discovery on all three OS helpers,
+      and update Desktop staging and smoke-check paths for the runtime library.
+- [x] Pass focused runtime catalog, helper, substrate and package checks.
+- [x] Pass cats-one workspace tests and platform helper/Desktop packaging tests.
+- [x] Refresh repository and parent mirrors and check the final workspace.
+- [x] Record independent review and validation results.
+
+Validation completed on Windows, 2026-09-11:
+
+- `npm exec -- vitest run src/core/skills/catalog.test.ts tests/agent-skill-sync.test.ts tests/workspace-substrate.test.ts --pool=threads --poolOptions.threads.singleThread`: 41 passed.
+- `npm exec -- vitest run tests/package-contract.test.ts --pool=threads --poolOptions.threads.singleThread`: 4 passed, including build, npm payload inspection and installation into a temporary consumer.
+- After the review isolation fix, reran the installed-runtime package case:
+  1 passed, 3 intentionally filtered. The installed verifier clears inherited
+  package-root overrides and validates the packaged product library itself.
+- `node build/runtime/bin/verifySkills.js`: all 33 product packages verified.
+- Final pre-commit `npm run release:check` passed after integrating current main:
+  2,042 tests passed, 10 skipped; all 33 product packages verified and npm pack
+  dry-run passed. The test process used isolated HOME/USERPROFILE/AppData and
+  PATH to prevent startup from discovering personally installed provider CLIs.
+  Full regression exposed a stale Pi product fixture and an OpenCode mock that
+  assumed a Windows installation. Updated product fixtures and made the mocked
+  command explicit; all 133 focused cases and the final full gate passed.
+  Independent follow-up review reported no remaining findings.
+- cats-one `npm test`: 97 passed, 2 filesystem-specific skips (99 total).
+- Platform `npm run build:host` and
+  `node --test tests/skill-sync-scripts.test.js tests/desktop-packaging.test.js`:
+  build passed, 33 tests passed. After optional-shell detection was added,
+  the 9 helper tests passed again under PowerShell 5.1/7 and Git Bash.
+- Both repository syncs completed; cats-one's real workspace sync and automatic
+  check updated the runtime maintenance origin and reported all seven outputs
+  matching their source and ownership. The product library was not inventoried.
+- Independent read-only review completed with all findings addressed: catalog
+  test initialization, Bash 3.2 empty-array handling, optional PowerShell 7
+  detection and installed-verifier environment isolation. Review confirmed
+  all moved packages were retained and product instruction content was unchanged.
+
+Native macOS/Linux execution and installed Desktop launch were not performed.
+POSIX wrapper behavior was exercised through Git Bash and packaging through
+isolated fixtures. The initial package test was interrupted because its scratch
+npm install lacked sandbox network access; it passed after an authorized rerun,
+and the interrupted temporary fixture was removed.
+
+Only shared guidance and Codex-owned instructions are updated by Codex. Other
+agent-specific instructions require their owners to apply ADR-036's current
+paths; the shared instructions explicitly distinguish the two canonical roots.
 
 ## Progress Log
 

@@ -34,7 +34,7 @@ platform, MCP tool registry, or scheduler-driven agent behavior model.
 
 - Make skills a runtime-owned execution concern rather than prompt-only or
   repo-only metadata
-- Reuse the existing `skills/` directory as the canonical source of skill
+- Use the built-in `runtime-skills/` directory as the canonical source of skill
   packages
 - Let sessions carry explicit skill selections as part of the runtime contract
 - Provide a backend-neutral way for adapters to receive resolved skills
@@ -66,11 +66,11 @@ platform, MCP tool registry, or scheduler-driven agent behavior model.
 
 ### Functional Requirements
 
-1. The runtime shall treat `skills/` as the canonical source of runtime-managed
+1. The runtime shall treat `runtime-skills/` as the canonical source of runtime-managed
    skill packages.
 2. The runtime shall validate that a skill package is structurally usable before
    it can be attached to a session. The minimum validation bar for v0 is:
-   - the skill lives under `skills/<name>/`
+   - the skill lives under `runtime-skills/<name>/`
    - the package contains a `SKILL.md`
    - `SKILL.md` has parseable YAML frontmatter
    - frontmatter `name` exists and matches the directory name
@@ -230,7 +230,7 @@ needs a narrow structural validator rather than a full semantic linter.
 
 The validator should confirm:
 
-- the package exists under `skills/<name>/`
+- the package exists under `runtime-skills/<name>/`
 - `SKILL.md` exists at the package root
 - YAML frontmatter is parseable
 - frontmatter `name` matches the directory name
@@ -268,7 +268,7 @@ supports local skill directories.
 
 ## Dependencies
 
-- `skills/` directory structure and sync conventions
+- `runtime-skills/` directory structure and sync conventions
 - existing session create/message contracts in `src/http/routes/sessions.ts`
   and `src/http/routes/messages.ts`
 - session registry/history surfaces that already persist `instructions`,
@@ -298,7 +298,7 @@ supports local skill directories.
 - [cats-runtime gap assessment](../research/2026-03-19-paperclip-gap-assessment.md)
 - [Paperclip alignment research](../research/2026-03-17-paperclip-openclaw-pi-alignment.md)
 - [cats paperclip control-plane analysis](../../../cats-platform/docs/research/paperclip-control-plane-analysis.md)
-- [skills README](../../skills/README.md)
+- [skills README](../../runtime-skills/README.md)
 
 ---
 

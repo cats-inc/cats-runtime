@@ -106,7 +106,7 @@ describe('ComponentName', () => {
 - Cover both NDJSON and SSE for peer execution changes; do not assume one merged wire format
 - Keep at least one two-runtime integration test around caller-owned observe/stream behavior for peer-routed turns
 - Cover path alias rejection separately from plain `..` traversal so symlink/junction and hardlink regressions stay caught
-- Cover skill-library metadata normalization and duplicate-id rejection when changing `src/core/skills/catalog.ts` or `skills/`
+- Cover skill-library metadata normalization and duplicate-id rejection when changing `src/core/skills/catalog.ts` or `runtime-skills/`
 - Cover skill-catalog route/MCP query echoes when changing `src/http/routes/skills.ts` or `src/mcp/tools.ts`, especially filters, sorting, and pagination
 
 ## CI/CD Integration

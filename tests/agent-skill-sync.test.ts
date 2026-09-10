@@ -66,6 +66,24 @@ function runSync(
 }
 
 describe('repository-maintenance skill sync', () => {
+  it('discovers the repository developer root without mirroring the product library', () => {
+    const root = createTempRoot();
+    try {
+      const result = spawnSync(process.execPath, [SYNC_ENGINE, '--destination-root', root], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      });
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+      expect(result.stdout).toContain('Found 1 repository-maintenance skill(s)');
+      for (const mirror of ['.agents', '.claude']) {
+        expect(existsSync(join(root, mirror, 'skills', 'maintain-provider-model-catalogs', 'SKILL.md'))).toBe(true);
+        expect(existsSync(join(root, mirror, 'skills', 'companion'))).toBe(false);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('mirrors both agents, reconciles renames, stays idempotent, and preserves local skills', () => {
     const root = createTempRoot();
     const sourceRoot = join(root, 'canonical');
@@ -249,7 +267,7 @@ describe('repository-maintenance skill sync', () => {
       '--test',
       join(
         REPO_ROOT,
-        'developer-skills',
+        'skills',
         'maintain-provider-model-catalogs',
         'tests',
         'normalize-picker-paste.node-test.mjs',

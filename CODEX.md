@@ -99,8 +99,8 @@ If assigned as Conductor in Project Roles table:
 ### Agent Skills
 
 Codex discovers repository-maintenance skills from `.agents/skills/<name>/SKILL.md`; Antigravity and
-Grok share that discovery path. The canonical source is `developer-skills/`. Do not edit the
-generated mirror directly. Runtime-delivered Cats skills remain under the separate `skills/` root.
+Grok share that discovery path. The canonical source is `skills/`. Do not edit the
+generated mirror directly. Runtime-delivered Cats skills remain under the separate `runtime-skills/` root.
 
 To sync skills after changes:
 ```powershell

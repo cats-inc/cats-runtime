@@ -22,7 +22,7 @@ Record the selected policy, every material question, and the operator's answer.
 Use the portable helper from the canonical skill or its active mirror:
 
 ```text
-node developer-skills/maintain-provider-model-catalogs/scripts/normalize-picker-paste.mjs normalize raw.txt --output normalized.json
+node skills/maintain-provider-model-catalogs/scripts/normalize-picker-paste.mjs normalize raw.txt --output normalized.json
 ```
 
 Use `-` instead of `raw.txt` to pipe or stream clipboard content without first persisting the raw
@@ -112,8 +112,8 @@ After the agent identifies expected capture paths, add entries such as:
 Then run:
 
 ```text
-node developer-skills/maintain-provider-model-catalogs/scripts/normalize-picker-paste.mjs gaps observation.json
-node developer-skills/maintain-provider-model-catalogs/scripts/normalize-picker-paste.mjs summary observation.json
+node skills/maintain-provider-model-catalogs/scripts/normalize-picker-paste.mjs gaps observation.json
+node skills/maintain-provider-model-catalogs/scripts/normalize-picker-paste.mjs summary observation.json
 ```
 
 The helper validates parent paths, renders a redacted compact summary, and compares declared expected
@@ -153,7 +153,7 @@ records its own decision facts in a temporary JSON document:
 Run:
 
 ```text
-node developer-skills/maintain-provider-model-catalogs/scripts/normalize-picker-paste.mjs assess decision.json
+node skills/maintain-provider-model-catalogs/scripts/normalize-picker-paste.mjs assess decision.json
 ```
 
 Omit `requestedPolicy` to select capture/preview for a paste without an edit request and confirm

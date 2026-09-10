@@ -1789,8 +1789,8 @@ Example response:
       "description": "Core companion chat behavior.",
       "status": "resolved",
       "source": "runtime_catalog",
-      "sourcePath": "/repo/cats-runtime/skills/chat/companion",
-      "entryFile": "/repo/cats-runtime/skills/chat/companion/SKILL.md",
+      "sourcePath": "/repo/cats-runtime/runtime-skills/chat/companion",
+      "entryFile": "/repo/cats-runtime/runtime-skills/chat/companion/SKILL.md",
       "fingerprint": "sha256...",
       "library": {
         "family": "chat",
@@ -2230,8 +2230,8 @@ Example shape:
         "description": "Core companion behavior...",
         "status": "resolved",
         "source": "runtime_catalog",
-        "sourcePath": "/repo/cats-runtime/skills/chat/companion",
-        "entryFile": "/repo/cats-runtime/skills/chat/companion/SKILL.md",
+        "sourcePath": "/repo/cats-runtime/runtime-skills/chat/companion",
+        "entryFile": "/repo/cats-runtime/runtime-skills/chat/companion/SKILL.md",
         "fingerprint": "sha256...",
         "library": {
           "family": "chat",

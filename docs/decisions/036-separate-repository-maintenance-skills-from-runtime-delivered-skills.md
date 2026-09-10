@@ -4,6 +4,11 @@
 
 Accepted
 
+Current directory contract (owner-approved amendment, 2026-09-11): developer
+skills use `skills/`; the shipped product library uses `runtime-skills/`.
+The original context and decisions below preserve the earlier directory names;
+the directory-alignment amendment supersedes those names.
+
 ## Context
 
 `cats-runtime` needs a reusable skill for maintaining provider model catalogs.
@@ -169,6 +174,40 @@ This narrows decision point 4 to cats-runtime's tracked repository helpers. It d
 generic workspace substrate feature or make `developer-skills/` a convention imposed on generated
 workspaces.
 
+## 2026-09-11 Amendment: Preserve the Bootstrap Developer Convention
+
+The owner confirmed that project-bootstrap and its initialized/upgraded projects
+already reserve root `skills/` for developer Agent Skills. Keeping runtime's
+product library there created the exception that led to `developer-skills/`.
+The owner approved aligning all Cats repositories with the existing convention.
+
+1. Move the entire built-in product library to `runtime-skills/`, preserving
+   package identities, metadata and content. Default package-root discovery,
+   verification, npm contents and platform Desktop staging use that root only.
+2. Move the maintenance package into `skills/maintain-provider-model-catalogs/`
+   and remove the old `developer-skills/` root. Repository helper sync uses
+   `skills/`, which remains outside the npm payload and default runtime catalog.
+3. Preserve generic user workspace `skills/` and explicit custom skill-library
+   inputs. Session delivery still uses agent discovery paths; runtime source
+   directory names do not change those destinations or public skill ids.
+4. Update cats-one to inventory `skills/` in all four members and exclude
+   `runtime-skills/`. Existing parent ownership for the one relocated package
+   may be reconciled through normal digest checks and the journal; it must not
+   enable discovery of the retired root or overwrite edited mirrors.
+5. Keep cats-platform's developer `skills/` root. Repair its recursive package
+   discovery and duplicate-name preflight, preserving bundled resources, and
+   update its Desktop runtime-library copy and smoke checks.
+
+This replaces the directory names in the original decision and the 2026-09-01
+amendment, while preserving their separation of audiences and delivery. No
+fallback from the new built-in product root to developer `skills/` is allowed.
+Generic workspace substrate templates retain their existing `skills/` contract.
+
+The approved implementation and validation checklist is recorded in
+[PLAN-037](../plans/PLAN-037-provider-model-catalog-maintenance-skill.md#2026-09-11-directory-alignment).
+Agent-specific files remain owned by their respective agents; shared guidance
+and this amendment are authoritative for current paths.
+
 ## Consequences
 
 ### Positive
@@ -255,7 +294,7 @@ workspaces.
   is the decision this ADR's probe unblocks. This ADR owns the canonical
   source (`developer-skills/`) only; the two must land consistently.
 - [SPEC-028: Provider Model Catalog Maintenance Skill](../specs/SPEC-028-provider-model-catalog-maintenance-skill.md)
-- [Runtime Skill Library](../../skills/README.md)
+- [Runtime Skill Library](../../runtime-skills/README.md)
 - [Agent Collaboration Guide](../AGENT-GUIDE.md)
 
 ---

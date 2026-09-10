@@ -3,6 +3,10 @@
 > Implementation plan for turning repo-local `skills/` packages into an
 > execution-time runtime/session contract.
 
+Directory update (2026-09-11): the shipped library is now `runtime-skills/`;
+root `skills/` holds developer skills. Older phase descriptions below retain
+their original paths. See ADR-036 and PLAN-037 for the approved alignment.
+
 ## Metadata
 
 | Field | Value |

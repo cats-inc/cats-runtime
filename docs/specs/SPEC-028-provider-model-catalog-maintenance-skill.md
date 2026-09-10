@@ -24,6 +24,13 @@ The skill is developer tooling governed by ADR-036. It is not a
 runtime-delivered Cats skill and does not replace the provider drift watcher,
 the catalog schema, or durable evidence and decision documents.
 
+The 2026-09-11 owner-approved ADR-036 amendment places this developer package
+under `skills/` and moves the built-in product library to `runtime-skills/`.
+Default catalog discovery, verification and npm publishing must use only the
+product root. Existing skill ids, delivery destinations and generic workspace
+`skills/` inputs remain unchanged. Cross-repository follow-through is tracked
+in PLAN-037's directory-alignment checklist.
+
 Model catalogs are not flat. A CLI's picker exposes a model list, and each model
 may carry its own option axis — reasoning level, effort, or thinking depth —
 whose available values differ from model to model. An option may itself reveal
@@ -88,7 +95,7 @@ A paste by itself authorizes capture and preview, not a repository edit.
 ### Functional Requirements
 
 1. The canonical skill package shall live at
-   `developer-skills/maintain-provider-model-catalogs/`.
+   `skills/maintain-provider-model-catalogs/`.
 2. The skill shall be synced to `.agents/skills/`, which Codex, Antigravity, and Grok
    discover, and `.claude/skills/` for Claude Code from the same canonical
    source. A future agent receives the same package by adding only its verified
@@ -365,7 +372,7 @@ The skill is one discoverable workflow with conditional references rather than
 one skill per provider:
 
 ```text
-developer-skills/
+skills/
   maintain-provider-model-catalogs/
     SKILL.md
     references/
@@ -411,12 +418,12 @@ provider without authoring anything.
 The implementation shall also establish a separate developer-skill sync path:
 
 ```text
-developer-skills/                 canonical, tracked
+skills/                          developer canonical source, tracked
         |
         +--> .agents/skills/      generated Codex/Antigravity/Grok mirror
         `--> .claude/skills/      generated Claude Code mirror
 
-skills/                           runtime-delivered, npm-shipped; unchanged
+runtime-skills/                   runtime-delivered, npm-shipped
 ```
 
 ## Dependencies
@@ -503,7 +510,7 @@ skills/                           runtime-delivered, npm-shipped; unchanged
 
 ## Open Questions
 
-- [x] Approve ADR-036's `developer-skills/` boundary and generated-mirror
+- [x] Approve ADR-036's `skills/` boundary and generated-mirror
   approach. Approved 2026-08-28; ADR-036 is now Accepted.
 - [x] Approve this single-skill, multi-mode scope before creating PLAN-037.
   Approved 2026-08-28: one skill carrying refresh, review, and audit modes. The
