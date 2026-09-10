@@ -23,7 +23,7 @@ import {
   providerGuardrailKey,
 } from './incidentDetection.js';
 import { asRecord, readNumber, readString } from './utils.js';
-import { buildUsageSnapshot, usageTargetKey, type UsageQuotaObservation, type UsageTarget } from './usageSnapshot.js';
+import { buildUsageSnapshot, isAccountQuotaSource, normalizeUsageQuota, usageTargetKey, type UsageQuotaObservation, type UsageTarget } from './usageSnapshot.js';
 
 const MAX_USAGE_RECORDS = 1000;
 const MAX_INCIDENTS = 100;
@@ -118,6 +118,13 @@ export class RuntimeMeteringService {
   }
 
   observeQuota(observation: UsageQuotaObservation): void {
+    // Execution counters (e.g. Copilot premiumRequests) are not account allowance.
+    // Keep them in usageRecords, but never let them replace an account observation.
+    if (observation.backend !== 'cli' || !isAccountQuotaSource(observation.quota.source)
+      || !observation.quota.source.startsWith(`${observation.provider}.`)) return;
+    const windows = normalizeUsageQuota(observation, this.options.now?.() ?? new Date()).windows;
+    if (!windows.some((window) => window.unlimited || window.usedPercent !== null
+      || window.used !== null || window.limit !== null || window.remaining !== null)) return;
     const key = usageTargetKey(observation);
     const previous = this.quotaObservations.get(key);
     const previousTime = Date.parse(String(previous?.quota.observedAt ?? previous?.observedAt ?? ''));

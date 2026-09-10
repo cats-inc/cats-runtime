@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | U1/passive observations and native Codex explicit refresh implemented; other collectors/history deferred |
+| Status | Native Codex/Copilot/Claude/Antigravity explicit refresh implemented; Kiro auth/success verification and history deferred |
 | Owner | cats-runtime |
 | Related spec | SPEC-029 |
 | Related decision | ADR-038 |
@@ -79,6 +79,34 @@ PR preparation (2026-09-11): full Windows `npm test` passed: 208 test files pass
 auto-merge PRs only; utility/Runtime/Desktop publication and installed updates remain
 deferred.
 
+### Phase 2b: Authorized Additional CLI Queries (2026-09-11)
+
+Implement and verify Copilot first, then Claude and Kiro; investigate Antigravity
+(`agy`) separately. Gemini CLI is retired and is not a candidate. Enable a collector
+only after a quota-only invocation is verified against the installed CLI. CLI-owned
+authentication is allowed; Cats must not read credentials, call provider HTTP APIs,
+start a model turn, or use execution-token statistics as account allowance.
+
+- [x] Copilot: verify CLI server `account.getQuota`, sanitize entitlement windows,
+      and retain native units/unlimited semantics.
+- [x] Claude: verify a non-model invocation of its built-in usage command before
+      enabling automation; do not send `/usage` as a model prompt.
+- [x] Kiro: inspect CLI/ACP and probe no-session account read; record auth failure.
+- [ ] Kiro: obtain an authenticated success fixture and verify unit/window mapping before enabling.
+- [x] Antigravity: verify standalone built-in `/usage` in `agy`, not Gemini CLI documentation.
+- [x] Extend the permission-checked host/SDK/Usage path for verified collectors,
+      with provider+instance isolation, tests, and independent review.
+- [x] Record live evidence, supported environments, and any precise blockers.
+
+This follow-up authorizes implementation and validation only, not publication,
+version tags, or replacing the user's installed Desktop.
+
+The [probe record](../research/2026-09-11-additional-cli-quota-queries.md) records
+Copilot 1.0.83, Claude 2.1.267, Antigravity 1.2.0 and Kiro 2.21.2 evidence. Versions
+are provenance, not allowlists. Independent review found and fixed execution-count
+and status-only cache replacement, plus custom-argv launch risks. New collectors
+reject custom arguments; last numeric observations retain their original timestamp.
+
 ### Phase 3: U2 Account Quota Service
 
 - [x] Retain quota-only progress per target independently from token-bearing results;
@@ -89,8 +117,8 @@ deferred.
 - [ ] Link verified shared accounts to provider targets without duplicating allowance.
 - [ ] Add cached reads, bounded scheduling, deduplicated refresh, timeout/cancellation,
       stale retention, and backoff.
-- [ ] Expose the agreed snapshot and separately controlled explicit refresh route.
-- [ ] Verify that app visibility/polling cannot amplify provider queries.
+- [x] Expose the bounded memory snapshot and separately controlled explicit refresh route.
+- [x] Verify that app visibility/polling cannot amplify provider queries.
 - [x] Keep account balance and execution-block transitions independent.
 
 ### Phase 4: U3 Durable History
@@ -104,11 +132,11 @@ deferred.
 
 - [x] Validate current usage and passive windows through the platform contract.
 - [x] Verify Usage unknown/zero/stale and unverified account presentation with fixtures.
-- [x] Document Claude/Codex passive support and unsupported active collection.
+- [x] Document Claude/Codex passive support, four verified manual collectors and the Kiro gate.
 - [x] Run targeted service/HTTP tests and isolated cross-repository package checks.
 
 `/usage/snapshot` is memory-only and authenticated. It exposes the most recent
-supported passive or explicit Codex observation per provider/instance/backend, not a complete
+supported passive or explicit CLI observation per provider/instance/backend, not a complete
 multi-account inventory. Cumulative/replay-safe durable history and verified shared
 account linkage remain open; no historical totals are advertised.
 
@@ -144,6 +172,8 @@ Live collector verification is a separately scoped activity with recorded eviden
 
 | Date | Update |
 |------|--------|
+| 2026-09-11 | PR-only delivery authorized. Full Windows npm test passed (2,037 passed, 10 skipped, 0 failed); isolated the API-only peer fixture from real CLI diagnostics and settled aborted requests after an existing timeout surfaced. Independent delta review passed. No product-route/timeout change, tag, publication or installed update. |
+| 2026-09-11 | Native Copilot/Claude/Antigravity queries, SDK 1.2 and Usage 0.2.0 implemented and independently reviewed. Focused tests and built-App browser checks passed; Kiro authentication/success mapping remains open. No release or installed update. |
 | 2026-09-10 | Baseline and ownership recorded; all new runtime implementation remains planned. |
 
 *Created: 2026-09-10*

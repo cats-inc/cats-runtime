@@ -65,9 +65,26 @@ describe('Usage snapshot', () => {
       source: 'codex.account/rateLimits/updated', 'primary.usedPercent': 200,
     } } }, { turnStartedAt: now.getTime() });
     service.observeEvent(session('copilot'), { type: 'result', metadata: { runtimeUsage: { quota: { premiumRequests: 1 } } } }, { turnStartedAt: now.getTime() });
+    const snapshot = service.buildUsageSnapshot([session(), session('copilot')]);
+    expect(snapshot.targets.find((target) => target.provider === 'codex')!.quota).toMatchObject({ status: 'unavailable', windows: [] });
+    expect(snapshot.targets.find((target) => target.provider === 'copilot')!.quota).toMatchObject({ status: 'unavailable', windows: [], refreshSupported: true });
+  });
+
+  it('keeps explicit Copilot account quantities and unlimited windows separate from execution usage', () => {
+    const service = new RuntimeMeteringService({ now: () => now });
+    service.observeQuota({ provider: 'copilot', instance: 'default', backend: 'cli', observedAt: now.toISOString(), quota: {
+      source: 'copilot.account.getQuota', 'premium_interactions.unit': 'requests',
+      'premium_interactions.used': 60, 'premium_interactions.limit': 300, 'premium_interactions.remaining': 240,
+      'premium_interactions.usedPercent': 20, 'chat.unit': 'requests', 'chat.unlimited': true,
+    } });
     const snapshot = service.buildUsageSnapshot([]);
-    expect(snapshot.targets.find((target) => target.provider === 'codex')!.quota.windows[0]!.usedPercent).toBeNull();
-    expect(snapshot.targets.find((target) => target.provider === 'copilot')!.quota.status).toBe('unsupported');
+    expect(snapshot.totals.observations).toBe(0);
+    expect(snapshot.targets[0]!.quota).toMatchObject({ status: 'available', refreshSupported: true,
+      source: 'copilot.account.getQuota', scope: 'provider_account_query', windows: [
+        { id: 'chat', unlimited: true, limit: null, remaining: null, usedPercent: null, remainingPercent: null },
+        { id: 'premium_interactions', unit: 'requests', used: 60, limit: 300, remaining: 240, remainingPercent: 80 },
+      ],
+    });
   });
 
   it('does not sum quota across targets with unverified account identity', () => {
@@ -81,6 +98,21 @@ describe('Usage snapshot', () => {
     expect(snapshot.targets).toHaveLength(2);
     expect(snapshot.targets.every((target) => target.quota.windows[0]!.usedPercent === 40)).toBe(true);
     expect(snapshot.totals).not.toHaveProperty('quota');
+  });
+
+  it('retains account quota after a newer Copilot execution counter', () => {
+    const service = new RuntimeMeteringService({ now: () => now });
+    service.observeQuota({ provider: 'copilot', instance: 'main', backend: 'cli', observedAt: now.toISOString(), quota: {
+      source: 'copilot.account.getQuota', 'premium_interactions.usedPercent': 20,
+    } });
+    service.observeEvent(session('copilot'), { type: 'result', usage: { inputTokens: 10, outputTokens: 20 },
+      metadata: { runtimeUsage: { quota: { premiumRequests: 1 } } },
+    }, { turnStartedAt: now.getTime(), observedAt: new Date(now.getTime() + 1000).toISOString() });
+    const snapshot = service.buildUsageSnapshot([]);
+    expect(snapshot.targets[0]!.quota).toMatchObject({ source: 'copilot.account.getQuota',
+      windows: [{ usedPercent: 20, remainingPercent: 80 }],
+    });
+    expect(snapshot.totals).toMatchObject({ observations: 1, totalTokens: 30 });
   });
 
   it('exposes record eviction and changes epochs across restarts without claiming history', () => {
@@ -102,5 +134,18 @@ describe('Usage snapshot', () => {
       source: 'codex.account/rateLimits/updated', observedAt: new Date(now.getTime() - 60_000).toISOString(), 'primary.usedPercent': 10,
     } } } }, { turnStartedAt: now.getTime() });
     expect(service.buildUsageSnapshot([]).targets[0]!.quota.windows[0]!.usedPercent).toBe(40);
+  });
+
+  it('retains Claude account numbers and timestamp after a newer status-only passive event', () => {
+    const service = new RuntimeMeteringService({ now: () => now });
+    service.observeQuota({ provider: 'claude', instance: 'main', backend: 'cli', observedAt: now.toISOString(), quota: {
+      source: 'claude.get_usage', 'seven_day.usedPercent': 6,
+    } });
+    const before = service.buildUsageSnapshot([]).targets[0]!.quota;
+    service.observeEvent(session('claude'), { type: 'progress', metadata: { kind: 'quota', quota: {
+      source: 'claude.rate_limit_event', status: 'allowed', observedAt: new Date(now.getTime() + 1000).toISOString(),
+    } } }, { turnStartedAt: now.getTime() });
+    expect(service.buildUsageSnapshot([]).targets[0]!.quota).toEqual(before);
+    expect(before.windows[0]).toMatchObject({ usedPercent: 6, remainingPercent: 94 });
   });
 });

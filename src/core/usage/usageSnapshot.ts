@@ -13,11 +13,25 @@ export interface UsageQuotaObservation extends UsageTarget {
 
 export interface UsageQuotaWindow {
   id: string;
-  unit: 'percent';
+  unit: 'percent' | 'requests' | 'credits';
+  used: number | null;
+  limit: number | null;
+  remaining: number | null;
+  unlimited: boolean;
   usedPercent: number | null;
   remainingPercent: number | null;
   resetsAt: string | null;
   windowMinutes: number | null;
+}
+
+export function supportsQuotaRefresh(provider: unknown): provider is 'codex' | 'copilot' | 'claude' | 'antigravity' {
+  return provider === 'codex' || provider === 'copilot' || provider === 'claude' || provider === 'antigravity';
+}
+
+export function isAccountQuotaSource(value: unknown): value is string {
+  return value === 'claude.rate_limit_event' || value === 'claude.get_usage'
+    || value === 'codex.account/rateLimits/updated' || value === 'codex.account/rateLimits/read'
+    || value === 'copilot.account.getQuota' || value === 'antigravity.usage';
 }
 
 function finite(value: unknown): number | null {
@@ -36,24 +50,28 @@ export function usageTargetKey(target: UsageTarget): string {
 /** Only adapters with an existing, fixture-backed signal mapping are normalized here. */
 export function normalizeUsageQuota(observation: UsageQuotaObservation | undefined, now: Date) {
   const quota = observation?.quota;
-  const source = quota?.source === 'claude.rate_limit_event' || quota?.source === 'codex.account/rateLimits/updated' || quota?.source === 'codex.account/rateLimits/read'
-    ? quota.source : null;
+  const source = isAccountQuotaSource(quota?.source) ? quota.source : null;
   const windows: UsageQuotaWindow[] = [];
   if (quota && source) {
     const suffix = source === 'claude.rate_limit_event' ? '.utilization' : '.usedPercent';
     const ids = new Set(Object.keys(quota)
-      .filter((key) => key.endsWith(suffix) || key.endsWith('.resetsAt'))
+      .filter((key) => key.endsWith(suffix) || key.endsWith('.resetsAt') || key.endsWith('.unit'))
       .map((key) => key.slice(0, key.lastIndexOf('.'))));
     for (const id of [...ids].sort().slice(0, 20)) {
       if (!/^[a-z][a-z0-9_-]{0,63}$/u.test(id)) continue;
       const raw = finite(quota[`${id}${suffix}`]);
       const percent = raw === null ? null : source === 'claude.rate_limit_event' ? raw * 100 : raw;
       const usedPercent = percent !== null && percent <= 100 ? percent : null;
+      const unlimited = quota[`${id}.unlimited`] === true;
       windows.push({
         id,
-        unit: 'percent',
-        usedPercent,
-        remainingPercent: usedPercent === null ? null : Math.max(0, 100 - usedPercent),
+        unit: quota[`${id}.unit`] === 'requests' ? 'requests' : quota[`${id}.unit`] === 'credits' ? 'credits' : 'percent',
+        used: finite(quota[`${id}.used`]),
+        limit: unlimited ? null : finite(quota[`${id}.limit`]),
+        remaining: unlimited ? null : finite(quota[`${id}.remaining`]),
+        unlimited,
+        usedPercent: unlimited ? null : usedPercent,
+        remainingPercent: unlimited || usedPercent === null ? null : Math.max(0, 100 - usedPercent),
         resetsAt: timestamp(quota[`${id}.resetsAt`]),
         windowMinutes: finite(quota[`${id}.windowDurationMins`]),
       });
@@ -67,14 +85,14 @@ export function normalizeUsageQuota(observation: UsageQuotaObservation | undefin
   );
   return {
     status: windows.length ? 'available' as const
-      : observation?.provider === 'claude' || observation?.provider === 'codex'
+      : observation?.provider === 'claude' || supportsQuotaRefresh(observation?.provider)
         ? 'unavailable' as const : 'unsupported' as const,
     freshness: observedAt === null ? 'unknown' as const : stale ? 'stale' as const : 'fresh' as const,
     source,
     observedAt,
     accountId: null,
     accountLinkage: 'unverified' as const,
-    scope: source === 'codex.account/rateLimits/read' ? 'provider_account_query' as const : 'provider_reported_during_runtime_execution' as const,
+    scope: source === 'codex.account/rateLimits/read' || source === 'copilot.account.getQuota' || source === 'claude.get_usage' || source === 'antigravity.usage' ? 'provider_account_query' as const : 'provider_reported_during_runtime_execution' as const,
     limitId: typeof quota?.limitId === 'string' && /^[a-zA-Z0-9_-]{1,64}$/u.test(quota.limitId) ? quota.limitId : null,
     automaticRefresh: false as const,
     windows,
@@ -180,11 +198,11 @@ export function buildUsageSnapshot(input: {
     targets: [...targets.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(0, 200).map(([key, target]) => {
       const observation = observations.get(key);
       const quota = normalizeUsageQuota(observation, input.now);
-      if (!observation && (target.provider === 'claude' || target.provider === 'codex')) quota.status = 'unavailable';
+      if (!observation && (target.provider === 'claude' || supportsQuotaRefresh(target.provider))) quota.status = 'unavailable';
       return {
         ...publicTarget(target),
         usage: usageTotals(groupedRecords.get(key) ?? []),
-        quota,
+        quota: { ...quota, refreshSupported: target.backend === 'cli' && supportsQuotaRefresh(target.provider) },
         guardrails: safeGuardrails.filter((entry) => entry.provider === target.provider
           && entry.instance === target.instance && entry.backend === target.backend),
       };

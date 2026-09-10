@@ -24,14 +24,26 @@ No raw provider payloads, credentials or local paths are exported. Durable histo
 is not implemented. See
 [SPEC-029](specs/SPEC-029-provider-account-quota-and-usage-snapshots.md).
 
-## Explicit Codex quota refresh
+## Explicit CLI quota refresh
 
 `POST /usage/refresh` accepts `{ "provider": "codex", "instance": "<configured instance>" }`.
+The allowed providers are `codex`, `copilot`, `claude` and `antigravity`.
 It requires normal Runtime authentication, works during bootstrap, and rejects
 unknown targets, extra fields and bodies above 1 KiB before spawning anything.
-The native Codex CLI receives only `initialize`, `initialized` and
-`account/rateLimits/read` on stdio. Cats never reads CLI credentials or issues
-provider API queries; the CLI owns authentication. WSL/Docker are unsupported.
+Each native CLI receives a quota-only invocation:
+
+| Provider | CLI-owned read |
+|----------|----------------|
+| Codex | App Server `initialize`, `initialized`, then `account/rateLimits/read` |
+| Copilot | Headless stdio `connect` (or `ping` fallback), then `account.getQuota` |
+| Claude Code | Stream control `initialize`, then `get_usage` with `skip_behaviors:true` |
+| Antigravity | Standalone built-in `--print /usage --output-format text` |
+
+Cats never reads CLI credentials or issues provider API queries; the CLI owns
+authentication. No model prompt or session-creation request is sent. The new
+Copilot/Claude/Antigravity collectors reject custom argv before spawning.
+WSL/Docker are unsupported. Kiro is not enabled without an authenticated success
+fixture and verified unit/window mapping.
 
 The response is `{status,nextRefreshAt,snapshot}` with `Cache-Control: no-store`.
 Status is `updated`, `cooldown`, `busy`, `auth_required`, `unsupported`,
@@ -39,9 +51,13 @@ Status is `updated`, `cooldown`, `busy`, `auth_required`, `unsupported`,
 cleanup, same-target coalescing, one active collector and a 60-second cooldown
 after success or failure. Runtime shutdown cancels active work. A failed read
 preserves the previous quota and timestamp without inventing zero or blocking
-execution. The returned snapshot is the same bounded v1 read model, with active
-quota source `codex.account/rateLimits/read`, scope `provider_account_query` and
-sanitized `limitId`. It does not create session/token history.
+execution. The returned snapshot is the same bounded v1 read model, with a
+whitelisted provider-specific quota source and scope `provider_account_query`.
+Targets advertise `refreshSupported`; windows preserve percentage or native
+`used`/`limit`/`remaining` quantities and `unlimited` semantics. Missing values
+remain null, unlimited is not 100%, and elapsed reset dates remain stale. See
+[SPEC-029](specs/SPEC-029-provider-account-quota-and-usage-snapshots.md) for exact
+source/window fields. A quota read does not create session/token history.
 
 ## Base URL
 

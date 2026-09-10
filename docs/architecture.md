@@ -36,7 +36,7 @@ The architectural split is:
 - `core/wakeup`: runtime-owned scheduled wakeup substrate and persistence
 - `http`: inbound transport and route wiring
 
-### Usage Versus Account Quota (Passive Snapshot Implemented)
+### Usage Versus Account Quota (Cached Snapshot and Manual CLI Queries)
 
 Execution metering currently holds a bounded in-memory view of observed turns,
 incidents, and guardrails. It is neither a durable billing ledger nor a complete
@@ -49,9 +49,10 @@ unrelated subscription allowance.
 Usage in `cats-apps` consumes sanitized snapshots through the
 `cats-platform` App host, not provider credentials or runtime-internal classes.
 The stable `/usage/snapshot` API and separate `/usage/refresh` POST for native
-Codex CLI account reads are implemented. Cats never extracts CLI credentials or
-calls provider APIs directly; the quota-only App Server process owns authentication.
-Other collectors and durable history described in
+Codex/Copilot/Claude/Antigravity CLI account reads are implemented. Cats never
+extracts CLI credentials or calls provider APIs directly; each quota-only CLI
+process owns authentication. Kiro success verification, scheduled polling,
+verified account linkage and durable history described in
 [ADR-038](./decisions/038-separate-execution-usage-from-provider-account-quota.md),
 [SPEC-029](./specs/SPEC-029-provider-account-quota-and-usage-snapshots.md), and
 [PLAN-038](./plans/PLAN-038-provider-account-quota-and-usage-snapshots.md) remain

@@ -68,6 +68,9 @@ import { PeerExecutionReplayService } from './core/peers/PeerExecutionReplayServ
 import { createRuntimeApp, type AppContext } from './http/app.js';
 import { RuntimeMeteringService } from './core/usage/RuntimeMeteringService.js';
 import { QuotaRefreshService } from './core/usage/QuotaRefreshService.js';
+import { readCopilotQuota } from './backends/cli/usage/copilotQuota.js';
+import { readClaudeQuota } from './backends/cli/usage/claudeQuota.js';
+import { readAntigravityQuota } from './backends/cli/usage/antigravityQuota.js';
 import { readCodexQuota } from './backends/cli/usage/codexQuota.js';
 import { primeProviderAvailabilityDiagnosticsCache } from './http/routes/diagnostics.js';
 import { executeRetainedWorktreeCleanup } from './http/routes/sessions.js';
@@ -1018,9 +1021,14 @@ export function createRuntimeServer(
   context.worktreeMaintenance = worktreeMaintenance;
   context.metering = new RuntimeMeteringService(config.metering);
   context.quotaRefresh = new QuotaRefreshService({
-    collect: async (target, signal) => target.provider === 'codex' && target.backend === 'cli'
-      ? readCodexQuota(resolveProviderInstance(config, 'codex', target.instance).commandConfig, signal)
-      : { status: 'unsupported' },
+    collect: async (target, signal) => {
+      if (target.backend !== 'cli') return { status: 'unsupported' };
+      if (target.provider === 'codex') return readCodexQuota(resolveProviderInstance(config, 'codex', target.instance).commandConfig, signal);
+      if (target.provider === 'copilot') return readCopilotQuota(resolveProviderInstance(config, 'copilot', target.instance).commandConfig, signal);
+      if (target.provider === 'claude') return readClaudeQuota(resolveProviderInstance(config, 'claude', target.instance).commandConfig, signal);
+      if (target.provider === 'antigravity') return readAntigravityQuota(resolveProviderInstance(config, 'antigravity', target.instance).commandConfig, signal);
+      return { status: 'unsupported' };
+    },
     observe: (observation) => context.metering!.observeQuota(observation),
   });
 

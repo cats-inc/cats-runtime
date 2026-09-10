@@ -4,13 +4,21 @@
 
 ## Current Status
 
-Implementation update (2026-09-10): `/usage/snapshot` provides sanitized current
+Implementation update (2026-09-11): `/usage/snapshot` provides sanitized current
 usage, epoch/truncation, separate currencies, incidents/guardrails and passive
 Claude/Codex quota windows. Quota-only events are retained independently; elapsed
 reset times never imply refilled quota. HTTP/auth/redaction and metering regression
 tests pass. The Usage consumer is implemented behind the platform App bridge.
-Active collectors, verified shared accounts, durable history and independent review
-remain deferred/unverified. Existing completed PLAN-009 remains completed.
+Explicit native Codex/Copilot/Claude/Antigravity CLI collectors are implemented;
+authentication remains inside the CLI. Independent review and focused regressions
+pass, including retention of account observations across execution/status-only
+events. Kiro requires an authenticated success fixture; scheduled polling,
+verified shared accounts and durable history remain deferred. This follow-up
+does not publish or update an installed Desktop. Existing PLAN-009 remains completed.
+PR-only delivery was subsequently authorized. Full Windows `npm test` passed:
+2,037 passed, 10 skipped, 0 failed. A pre-existing peer-routing fixture was isolated
+from installed CLI diagnostics and given abort/settle cleanup; the product route
+and test timeouts were not changed. Independent delta review passed.
 See [PLAN-038](./docs/plans/PLAN-038-provider-account-quota-and-usage-snapshots.md).
 
 Latest update (2026-09-02): approved commit delivery now turns detached
