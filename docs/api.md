@@ -16,13 +16,32 @@ with `Cache-Control: no-store`. It never starts a provider CLI or refreshes an
 account quota on demand.
 
 The response contains `generatedAt`, the runtime epoch, memory-only `coverage`,
-token/currency totals, provider-instance targets, session aggregates, passive
+token/currency totals, provider-instance targets, session aggregates, cached
 quota windows, incidents and guardrail summaries. Missing measurements are
 `null`, not zero; currencies stay separate. Quota freshness is evaluated against
 observation/reset times and unverified account targets are not combined.
-No raw provider payloads, credentials or local paths are exported. History and
-active account collectors are not implemented. See
+No raw provider payloads, credentials or local paths are exported. Durable history
+is not implemented. See
 [SPEC-029](specs/SPEC-029-provider-account-quota-and-usage-snapshots.md).
+
+## Explicit Codex quota refresh
+
+`POST /usage/refresh` accepts `{ "provider": "codex", "instance": "<configured instance>" }`.
+It requires normal Runtime authentication, works during bootstrap, and rejects
+unknown targets, extra fields and bodies above 1 KiB before spawning anything.
+The native Codex CLI receives only `initialize`, `initialized` and
+`account/rateLimits/read` on stdio. Cats never reads CLI credentials or issues
+provider API queries; the CLI owns authentication. WSL/Docker are unsupported.
+
+The response is `{status,nextRefreshAt,snapshot}` with `Cache-Control: no-store`.
+Status is `updated`, `cooldown`, `busy`, `auth_required`, `unsupported`,
+`unavailable`, `timeout` or `error`. CLI attempts have an 8-second deadline plus
+cleanup, same-target coalescing, one active collector and a 60-second cooldown
+after success or failure. Runtime shutdown cancels active work. A failed read
+preserves the previous quota and timestamp without inventing zero or blocking
+execution. The returned snapshot is the same bounded v1 read model, with active
+quota source `codex.account/rateLimits/read`, scope `provider_account_query` and
+sanitized `limitId`. It does not create session/token history.
 
 ## Base URL
 

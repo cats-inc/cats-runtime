@@ -4,7 +4,8 @@
 
 Accepted — ownership and data distinction approved on 2026-09-10.
 The memory-only read contract and passive Claude/Codex window projection are now
-implemented under PLAN-038. Active collectors, verified accounts and persistence remain planned.
+implemented under PLAN-038. Explicit native Codex CLI reads are now implemented;
+other active collectors, verified accounts and persistence remain planned.
 
 ## Context
 
@@ -42,6 +43,9 @@ account-balance or reset-window contract.
    Quota reset times and local cooldown expiry are different facts.
 9. Product budget policy, approvals, and operator UI remain above runtime.
    Usage is an observational client and does not own execution decisions.
+10. The first explicit collector uses Codex CLI App Server stdio only. Cats must
+    not read CLI credentials or use them in provider API calls. Authentication and
+    upstream access belong to the CLI. Account reads never start a model turn.
 
 ## Consequences
 

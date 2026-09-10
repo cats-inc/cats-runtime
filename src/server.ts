@@ -66,6 +66,9 @@ import { PeerExecutionService } from './core/peers/PeerExecutionService.js';
 import { PeerExecutionAdmissionService } from './core/peers/PeerExecutionAdmissionService.js';
 import { PeerExecutionReplayService } from './core/peers/PeerExecutionReplayService.js';
 import { createRuntimeApp, type AppContext } from './http/app.js';
+import { RuntimeMeteringService } from './core/usage/RuntimeMeteringService.js';
+import { QuotaRefreshService } from './core/usage/QuotaRefreshService.js';
+import { readCodexQuota } from './backends/cli/usage/codexQuota.js';
 import { primeProviderAvailabilityDiagnosticsCache } from './http/routes/diagnostics.js';
 import { executeRetainedWorktreeCleanup } from './http/routes/sessions.js';
 import type { ProviderName } from './backends/cli/providers/types.js';
@@ -1013,6 +1016,13 @@ export function createRuntimeServer(
     },
   });
   context.worktreeMaintenance = worktreeMaintenance;
+  context.metering = new RuntimeMeteringService(config.metering);
+  context.quotaRefresh = new QuotaRefreshService({
+    collect: async (target, signal) => target.provider === 'codex' && target.backend === 'cli'
+      ? readCodexQuota(resolveProviderInstance(config, 'codex', target.instance).commandConfig, signal)
+      : { status: 'unsupported' },
+    observe: (observation) => context.metering!.observeQuota(observation),
+  });
 
   // Bootstrap service is always created so setup routes can function.
   const paths = getRuntimeResolvedPaths(config);
@@ -1185,6 +1195,7 @@ export function createRuntimeServer(
 
       closePromise = (async () => {
         markRuntimeStopping(startup, startup.shutdownReason);
+        await context.quotaRefresh?.close();
         const pendingStart = startPromise;
         if (pendingStart) {
           await pendingStart.catch(() => undefined);

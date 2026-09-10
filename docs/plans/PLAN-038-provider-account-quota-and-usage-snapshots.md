@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | U1 and passive quota observation implemented; active collectors/history deferred |
+| Status | U1/passive observations and native Codex explicit refresh implemented; other collectors/history deferred |
 | Owner | cats-runtime |
 | Related spec | SPEC-029 |
 | Related decision | ADR-038 |
@@ -50,7 +50,34 @@ as a runtime subsystem and give the host a narrow, truthful data source.
 - [ ] Capture unsupported/auth-required/error cases and retry behavior.
 - [ ] Follow version-drift policy; avoid exact fixture-version execution gates.
 
-No provider account request or paid probe is performed by this implementation task.
+The follow-up Codex slice was explicitly authorized for CLI-only account reads.
+Native Windows real-CLI validation succeeded without a thread/model turn; no
+credential files or provider HTTP endpoints were accessed by Cats.
+
+### Phase 2a: Explicit Codex Slice
+
+- [x] Verify `initialize` → `initialized` → `account/rateLimits/read` over stdio.
+- [x] Preserve the actual Codex limit/window duration and reported percentage.
+- [x] Add separate POST, 8-second timeout, process cleanup, same-target coalescing,
+      single active collector, 60-second success/failure cooldown and shutdown abort.
+- [x] Retain previous data on failures; do not insert synthetic usage/session records.
+- [x] Test bootstrap/auth, target validation, redaction, missing/zero values,
+      malformed/oversized output, timeout, cancellation and passive polling.
+- [x] Return unsupported before spawning for unverified WSL/Docker transports.
+- [ ] Publish coordinated Runtime/SDK/Usage artifacts and validate installed delivery.
+
+Validation (2026-09-11): 28 focused quota/metering/HTTP tests plus four targeted
+server lifecycle cases passed; Runtime compiled. The existing close-during-startup
+case caught an early-await regression: mark stopping synchronously before awaiting
+collector cleanup. The corrected case passed and received independent review.
+The built Usage/SDK/authenticated host/Runtime/real native CLI path passed in an
+isolated browser/profile. WSL/Docker stdin limitations were independently reviewed
+and gated before spawn. No release or installed update was requested for this slice.
+
+PR preparation (2026-09-11): full Windows `npm test` passed: 208 test files passed,
+2 skipped; 2,004 cases passed and 10 skipped. The owner authorized commit/push and
+auto-merge PRs only; utility/Runtime/Desktop publication and installed updates remain
+deferred.
 
 ### Phase 3: U2 Account Quota Service
 
@@ -81,7 +108,7 @@ No provider account request or paid probe is performed by this implementation ta
 - [x] Run targeted service/HTTP tests and isolated cross-repository package checks.
 
 `/usage/snapshot` is memory-only and authenticated. It exposes the most recent
-supported passive observation per provider/instance/backend, not a complete
+supported passive or explicit Codex observation per provider/instance/backend, not a complete
 multi-account inventory. Cumulative/replay-safe durable history and verified shared
 account linkage remain open; no historical totals are advertised.
 

@@ -36,7 +36,7 @@ export function usageTargetKey(target: UsageTarget): string {
 /** Only adapters with an existing, fixture-backed signal mapping are normalized here. */
 export function normalizeUsageQuota(observation: UsageQuotaObservation | undefined, now: Date) {
   const quota = observation?.quota;
-  const source = quota?.source === 'claude.rate_limit_event' || quota?.source === 'codex.account/rateLimits/updated'
+  const source = quota?.source === 'claude.rate_limit_event' || quota?.source === 'codex.account/rateLimits/updated' || quota?.source === 'codex.account/rateLimits/read'
     ? quota.source : null;
   const windows: UsageQuotaWindow[] = [];
   if (quota && source) {
@@ -74,7 +74,8 @@ export function normalizeUsageQuota(observation: UsageQuotaObservation | undefin
     observedAt,
     accountId: null,
     accountLinkage: 'unverified' as const,
-    scope: 'provider_reported_during_runtime_execution' as const,
+    scope: source === 'codex.account/rateLimits/read' ? 'provider_account_query' as const : 'provider_reported_during_runtime_execution' as const,
+    limitId: typeof quota?.limitId === 'string' && /^[a-zA-Z0-9_-]{1,64}$/u.test(quota.limitId) ? quota.limitId : null,
     automaticRefresh: false as const,
     windows,
   };

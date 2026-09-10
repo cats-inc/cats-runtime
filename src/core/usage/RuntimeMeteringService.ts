@@ -117,6 +117,21 @@ export class RuntimeMeteringService {
     return guardrails;
   }
 
+  observeQuota(observation: UsageQuotaObservation): void {
+    const key = usageTargetKey(observation);
+    const previous = this.quotaObservations.get(key);
+    const previousTime = Date.parse(String(previous?.quota.observedAt ?? previous?.observedAt ?? ''));
+    const nextTime = Date.parse(String(observation.quota.observedAt ?? observation.observedAt));
+    if (!Number.isFinite(previousTime) || !Number.isFinite(nextTime) || nextTime >= previousTime) {
+      this.quotaObservations.delete(key);
+      this.quotaObservations.set(key, observation);
+    }
+    if (this.quotaObservations.size > MAX_USAGE_RECORDS) {
+      this.quotaObservations.delete(this.quotaObservations.keys().next().value!);
+      this.droppedQuotaTargets += 1;
+    }
+  }
+
   evaluatePreflight(session: SessionInfo): RuntimeGuardrailResult {
     this.evictExpiredGuardrails();
 
@@ -225,18 +240,7 @@ export class RuntimeMeteringService {
         observedAt,
         quota,
       };
-      const key = usageTargetKey(observation);
-      const previous = this.quotaObservations.get(key);
-      const previousTime = Date.parse(String(previous?.quota.observedAt ?? previous?.observedAt ?? ''));
-      const nextTime = Date.parse(String(quota.observedAt ?? observedAt));
-      if (!Number.isFinite(previousTime) || !Number.isFinite(nextTime) || nextTime >= previousTime) {
-        this.quotaObservations.delete(key);
-        this.quotaObservations.set(key, observation);
-      }
-      if (this.quotaObservations.size > MAX_USAGE_RECORDS) {
-        this.quotaObservations.delete(this.quotaObservations.keys().next().value!);
-        this.droppedQuotaTargets += 1;
-      }
+      this.observeQuota(observation);
     }
 
     if (nextEvent.type === 'result') {

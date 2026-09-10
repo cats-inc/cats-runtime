@@ -28,6 +28,7 @@ import { GithubReviewAdapter } from '../core/management/adapters/github/GithubRe
 import { ZeaburDeploymentAdapter } from '../core/management/adapters/zeabur/ZeaburDeploymentAdapter.js';
 import { WorkspaceSubstrateService } from '../core/runtime/WorkspaceSubstrateService.js';
 import { RuntimeMeteringService } from '../core/usage/RuntimeMeteringService.js';
+import type { QuotaRefreshService } from '../core/usage/QuotaRefreshService.js';
 import { RuntimeWorktreeMaintenanceService } from '../core/workspace/RuntimeWorktreeMaintenanceService.js';
 import type { RuntimeWakeupService } from '../core/wakeup/RuntimeWakeupService.js';
 import type { PeerRegistry } from '../core/peers/PeerRegistry.js';
@@ -101,6 +102,7 @@ export interface AppContext {
   management?: RuntimeManagementService;
   workspaceSubstrate?: WorkspaceSubstrateService;
   metering?: RuntimeMeteringService;
+  quotaRefresh?: QuotaRefreshService;
   wakeup?: RuntimeWakeupService;
   browser?: RuntimeBrowserService;
   browserMaintenance?: RuntimeBrowserMaintenanceService;

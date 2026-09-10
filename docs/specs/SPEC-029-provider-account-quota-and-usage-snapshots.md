@@ -4,12 +4,39 @@
 
 | Field | Value |
 |-------|-------|
-| Status | U1/passive-window slice implemented; active collectors and history deferred |
+| Status | U1/passive windows and explicit native Codex CLI refresh implemented; history deferred |
 | Owner | cats-runtime |
 | Implementation | Authenticated bounded snapshot and separate passive quota observations |
 | Consumer | Usage via cats-platform |
 
 ## Summary
+
+### Explicit Codex CLI refresh (2026-09-10)
+
+- `POST /usage/refresh` accepts only `{provider:"codex", instance:string}` for a
+  configured CLI target. It works during bootstrap, behind runtime authentication.
+- Run the configured CLI's `app-server` over stdio: await `initialize`, send
+  `initialized`, then `account/rateLimits/read`. Never start a thread/model turn,
+  read local credentials, or issue a provider HTTP request from Cats.
+- Return `{status, nextRefreshAt, snapshot}`. Status is `updated`, `cooldown`,
+  `busy`, `auth_required`, `unsupported`, `unavailable`, `timeout`, or `error`.
+  Preserve the previous observation on failure. A successful read with no numeric
+  windows is unavailable, not an invented zero.
+- Prefer the `codex` bucket in `rateLimitsByLimitId`; otherwise retain the reported
+  primary bucket and its limit ID. Do not aggregate different model limits.
+- Bound each query to 8 seconds plus process cleanup; coalesce same-target reads,
+  allow one collector at a time, and cool down each target for 60 seconds after
+  every attempt. Shutdown aborts and reaps active queries. Polling remains passive.
+- Platform requires separate `runtime.telemetry.refresh` permission and the
+  version-bound `usage.refreshQuota` SDK operation. Usage offers a Codex-only
+  explicit button, original observation/reset times, and sanitized failure text.
+- Evidence: [official App Server protocol](https://learn.chatgpt.com/docs/app-server).
+  Add protocol fixtures, timeout/cancellation/auth/redaction tests and a real CLI
+  quota-only probe before claiming the collector works.
+- Native Windows was verified with the actual installed CLI. Native macOS/Linux
+  use the same stdio protocol; platform CI/acceptance remains separate. WSL and
+  Docker return `unsupported` without spawning: their current bootstrap launcher
+  consumes stdin. No CLI version equality gate is imposed.
 
 Implemented slice (2026-09-10): authenticated, no-store `GET /usage/snapshot`
 with schemaVersion 1, runtime epoch, retained-memory coverage, null-vs-zero metrics,
@@ -18,8 +45,9 @@ guardrails. Quota-only progress is retained separately. Existing fixture-backed
 Claude fraction and Codex percentage reports become percentage/reset windows;
 five-minute age, future skew and elapsed resets mark observations stale without
 refilling them. Original timestamps prevent late cached results from appearing new.
-No credential reads, provider calls, persistence, upstream refresh route or verified
-account identity/linking is introduced. The most recent report per target is shown,
+That original slice did not introduce provider calls. Explicit Codex reads above
+now add a separately authorized path, but no credential reads, persistence or
+verified account identity/linking. The most recent report per target is shown,
 not a complete multi-account/multi-limit inventory. App polling reads memory only.
 
 Provide a truthful, reusable snapshot of runtime-observed execution usage and
@@ -38,8 +66,8 @@ durable history without moving budget policy or app presentation into runtime.
 - A quota-only signal without token/cost values is not sufficient for the current
   usage-record gate; the new account path must handle it independently.
 
-No active account quota collector, universal remaining/reset API, or durable
-metering history is claimed by this baseline.
+Only Codex native account reads are currently collected on demand. No universal
+remaining/reset API or durable metering history is claimed.
 
 ## Goals
 
@@ -57,8 +85,9 @@ metering history is claimed by this baseline.
 
 ## Proposed Contract
 
-The exact wire schema must be frozen with platform SPEC-115 before implementation.
-The following data groups are required; they are not currently shipped fields.
+The v1 snapshot and explicit-refresh wire schema are frozen with platform SPEC-115.
+The following groups describe the broader target; verified accounts and durable
+coverage remain later work.
 
 | Group | Required meaning |
 |-------|------------------|
@@ -119,10 +148,10 @@ unsupported, unavailable, auth_required, or error; fresh/stale where data exists
 
 ## API Direction
 
-A dedicated GET /usage/snapshot and a separate bounded POST /usage/refresh are
-proposed for the normalized read and explicit refresh request. Neither route exists
-yet. The first host slice may project existing diagnostics into a limited DTO with
-account quota marked unavailable. Do not document a proposed route as callable.
+`GET /usage/snapshot` reads memory only. `POST /usage/refresh` performs the explicit
+Codex read described above. The returned snapshot retains its v1 schema; active
+quota has source `codex.account/rateLimits/read`, scope `provider_account_query`,
+and an optional sanitized `limitId`. It is not execution-token history.
 
 A later history read is gated on persistence. Cache refresh requests return their
 actual status; requesting refresh is not evidence of a fresh observation.
