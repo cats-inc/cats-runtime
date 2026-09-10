@@ -30,13 +30,13 @@ import type {
 
 const BUILT_RUNTIME_SEGMENT = `${path.sep}build${path.sep}runtime${path.sep}`;
 const SOURCE_SKILLS_ROOT_CANDIDATES = [
-  ['..', '..', '..', 'skills'],
-  ['..', '..', '..', '..', 'skills'],
+  ['..', '..', '..', 'runtime-skills'],
+  ['..', '..', '..', '..', 'runtime-skills'],
 ] as const;
 const BUILT_SKILLS_ROOT_CANDIDATES = [
-  ['..', '..', 'skills'],
-  ['..', '..', '..', '..', 'skills'],
-  ['..', '..', '..', 'skills'],
+  ['..', '..', 'runtime-skills'],
+  ['..', '..', '..', '..', 'runtime-skills'],
+  ['..', '..', '..', 'runtime-skills'],
 ] as const;
 const CODER_SKILLS_ROOT = path.join('.agents', 'skills');
 const RUNTIME_SKILL_STATE_ROOT = '.runtime-skills';
@@ -231,7 +231,7 @@ export function resolveRuntimeSkillsRoot(moduleUrl: string = import.meta.url): s
     const resolvedOverride = path.isAbsolute(packageRootOverride)
       ? packageRootOverride
       : path.resolve(process.cwd(), packageRootOverride);
-    const overrideSkillsRoot = path.join(resolvedOverride, 'skills');
+    const overrideSkillsRoot = path.join(resolvedOverride, 'runtime-skills');
     if (existsSync(overrideSkillsRoot)) {
       return overrideSkillsRoot;
     }
@@ -739,7 +739,8 @@ function discoverRuntimeSkillEntrySources(
 function inferSkillsRootFromEntryFile(entryFile: string): string | undefined {
   let currentDir = path.dirname(entryFile);
   while (true) {
-    if (path.basename(currentDir) === 'skills') {
+    // Explicit custom libraries may still use the generic workspace skills/ root.
+    if (['runtime-skills', 'skills'].includes(path.basename(currentDir))) {
       return currentDir;
     }
 

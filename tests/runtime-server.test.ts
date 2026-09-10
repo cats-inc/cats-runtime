@@ -6266,7 +6266,10 @@ providers:
       });
 
     try {
-      await withRuntime({}, {}, async (runtime) => {
+      await withRuntime({
+        // The mocked command must not depend on a personal OpenCode installation.
+        env: { OPENCODE_PATH: process.platform === 'win32' ? 'opencode.cmd' : 'opencode' },
+      }, {}, async (runtime) => {
         const first = await runtime.app.request('/providers/opencode/models');
         expect(first.status).toBe(200);
         expect(await first.json()).toEqual({

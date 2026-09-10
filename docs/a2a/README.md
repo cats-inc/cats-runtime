@@ -67,8 +67,9 @@ examples move.
   `docs/decisions/`, `docs/specs/`, `docs/plans/`, `PROGRESS.md`, and
   `ROADMAP.md`.
 - Procedural collaboration behavior belongs in skills such as
-  `skills/orchestration/a2a-handoff/` and
-  `skills/orchestration/project-memory-sync/`.
+  the runtime-delivered `runtime-skills/orchestration/a2a-handoff/` and
+  `runtime-skills/orchestration/project-memory-sync/` packages. Repository
+  maintenance skills use the separate developer `skills/` root (ADR-036).
 
 Do not turn this directory into a handoff log, a project status mirror, or a
 dumping ground for local SOP.

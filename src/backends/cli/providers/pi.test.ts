@@ -20,8 +20,8 @@ describe('PiProvider', () => {
         description: 'Checks delivery and outputs.',
         status: 'resolved',
         source: 'runtime_catalog',
-        sourcePath: 'skills/orchestration/delivery-auditor',
-        entryFile: 'skills/orchestration/delivery-auditor/SKILL.md',
+        sourcePath: 'runtime-skills/orchestration/delivery-auditor',
+        entryFile: 'runtime-skills/orchestration/delivery-auditor/SKILL.md',
         fingerprint: 'delivery-auditor-fingerprint',
         library: {
           family: 'orchestration',

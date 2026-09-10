@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildRuntimeSkillInstructionOverlay,
   inspectRuntimeSkillCatalog,
@@ -17,6 +17,7 @@ describe('runtime skill catalog', () => {
   const cleanupPaths: string[] = [];
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     while (cleanupPaths.length > 0) {
       const target = cleanupPaths.pop();
       if (target) {
@@ -109,7 +110,7 @@ describe('runtime skill catalog', () => {
   }
 
   it('resolves the shipped runtime skills root for both source and built module locations', () => {
-    const expectedSkillsRoot = join(process.cwd(), 'skills');
+    const expectedSkillsRoot = join(process.cwd(), 'runtime-skills');
     const sourceModuleUrl = pathToFileURL(
       join(process.cwd(), 'src', 'core', 'skills', 'catalog.ts'),
     ).href;
@@ -124,12 +125,50 @@ describe('runtime skill catalog', () => {
   it('resolves bundled runtime skills from a build/runtime entrypoint path', () => {
     const packageRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-bundled-skills-'));
     cleanupPaths.push(packageRoot);
-    mkdirSync(join(packageRoot, 'skills'), { recursive: true });
+    mkdirSync(join(packageRoot, 'runtime-skills'), { recursive: true });
     const bundledModuleUrl = pathToFileURL(
       join(packageRoot, 'build', 'runtime', 'index.js'),
     ).href;
 
-    expect(resolveRuntimeSkillsRoot(bundledModuleUrl)).toBe(join(packageRoot, 'skills'));
+    expect(resolveRuntimeSkillsRoot(bundledModuleUrl)).toBe(join(packageRoot, 'runtime-skills'));
+  });
+
+  it('loads only the product library from an explicit runtime package root', async () => {
+    const packageRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-package-skills-'));
+    cleanupPaths.push(packageRoot);
+    writeSkillPackage(join(packageRoot, 'skills'), 'developer-only');
+    writeSkillPackage(join(packageRoot, 'runtime-skills'), 'product-only');
+    vi.stubEnv('CATS_RUNTIME_PACKAGE_ROOT', packageRoot);
+    expect(resolveRuntimeSkillsRoot()).toBe(join(packageRoot, 'runtime-skills'));
+    vi.resetModules();
+    const packagedCatalog = await import('./catalog.js');
+    expect(packagedCatalog.listRuntimeSkillCatalog().map(skill => skill.id)).toEqual(['product-only']);
+  });
+
+  it('never falls back to developer skills when the built-in product library is missing', () => {
+    const packageRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-missing-product-skills-'));
+    cleanupPaths.push(packageRoot);
+    writeSkillPackage(join(packageRoot, 'skills'), 'developer-only');
+    const moduleUrl = pathToFileURL(join(packageRoot, 'build', 'runtime', 'index.js')).href;
+    const root = resolveRuntimeSkillsRoot(moduleUrl);
+    expect(root).toBe(join(packageRoot, 'runtime-skills'));
+    expect(listRuntimeSkillCatalog(root)).toEqual([]);
+  });
+
+  it.each(['runtime-skills', 'skills'])('reloads persisted instruction delivery from %s after restart', async rootName => {
+    const packageRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-reload-skills-'));
+    cleanupPaths.push(packageRoot);
+    const skillsRoot = join(packageRoot, rootName);
+    const cwd = join(packageRoot, 'workspace');
+    mkdirSync(cwd);
+    writeSkillPackage(skillsRoot, 'reloadable', { family: 'code', body: 'Reload these instructions.' });
+    const state = resolveRuntimeSkillManifest({ requestedSkills: ['reloadable'] }, {
+      sessionId: 'reload', providerName: 'claude', providerBackend: 'api',
+      cwd, workspaceMode: 'shared', sessionBaseDir: packageRoot, skillsRoot,
+    });
+    vi.resetModules();
+    const restartedCatalog = await import('./catalog.js');
+    expect(restartedCatalog.buildRuntimeSkillInstructionOverlay(state)).toContain('Reload these instructions.');
   });
 
   it('materializes filesystem skills for Codex isolated workspaces', () => {

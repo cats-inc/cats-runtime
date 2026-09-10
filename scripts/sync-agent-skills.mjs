@@ -26,7 +26,7 @@ function usage() {
     '  --agent <name>             claude, codex, antigravity, or grok (default: both paths)',
     '  --clean                    Recreate repository-managed mirrors only',
     '  --project-root <path>      Override the cats-runtime repository root',
-    '  --source-root <path>       Override developer-skills/ (for isolated tests)',
+    '  --source-root <path>       Override skills/ (for isolated tests)',
     '  --destination-root <path>  Override the mirror parent root (for isolated tests)',
     '  -h, --help                 Show this help',
   ].join('\n');
@@ -326,7 +326,7 @@ export async function syncAgentSkills(rawOptions = {}) {
     throw new Error(`Could not find cats-runtime project root at '${projectRoot}'.`);
   }
 
-  const sourceRoot = resolve(rawOptions.sourceRoot || join(projectRoot, 'developer-skills'));
+  const sourceRoot = resolve(rawOptions.sourceRoot || join(projectRoot, 'skills'));
   const destinationRoot = resolve(rawOptions.destinationRoot || projectRoot);
   await mkdir(destinationRoot, { recursive: true });
   const sharedAgentsTarget = resolve(destinationRoot, '.agents', 'skills');

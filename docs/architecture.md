@@ -92,7 +92,7 @@ truth instead of drifting into separate bootstrap follow-through models.
 Runtime-managed skills now sit at the shared runtime layer rather than inside
 product shells or ad-hoc prompt helpers. The runtime:
 
-- validates execution-ready family-organized `skills/**/SKILL.md` packages
+- validates execution-ready family-organized `runtime-skills/**/SKILL.md` packages
 - resolves requested runtime skill ids into session-owned metadata
 - chooses a backend-aware delivery mode (`filesystem`, `instructions`, `none`)
 - injects instruction delivery into prompt-driven CLI, Pi/API, and agent
@@ -173,6 +173,8 @@ Current truth:
 ## Internal Layout
 
 ```text
+skills/                    # developer-maintenance packages
+runtime-skills/            # shipped product packages, grouped by family
 src/
   startup.ts
   core/
@@ -183,10 +185,7 @@ src/
     providerActiveConfig.ts
     provider-install/
     skills/
-      orchestration/
-      work/
-      chat/
-      code/
+      catalog.ts
     dotenv.ts
     providerCatalog.ts
     progress.ts
@@ -657,7 +656,7 @@ path is intentionally narrow:
 
 ### `src/core/skills`
 
-- Discovers runtime-owned skill packages from `skills/`
+- Discovers runtime-owned skill packages from `runtime-skills/`
 - Validates `SKILL.md` frontmatter and instruction bodies before runtime use
 - Derives stable library metadata (`family`, `slug`, `role`, `packageKind`,
   `capabilityTags`, `deliveryHints`) for runtime-owned packages

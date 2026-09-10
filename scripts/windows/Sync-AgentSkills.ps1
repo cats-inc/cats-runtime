@@ -3,7 +3,7 @@
     Sync repository-maintenance skills into local agent discovery paths.
 
 .DESCRIPTION
-    Uses developer-skills/ as the canonical source and reconciles only entries
+    Uses skills/ as the canonical source and reconciles only entries
     recorded as cats-runtime-managed. Unrelated local skills are preserved.
 
 .PARAMETER Clean
@@ -13,7 +13,7 @@
     Sync only Claude Code or the shared Codex/Antigravity/Grok discovery path.
 
 .PARAMETER SourceRoot
-    Override developer-skills/. Intended for isolated validation.
+    Override skills/. Intended for isolated validation.
 
 .PARAMETER DestinationRoot
     Override the root containing .claude/ and .agents/. Intended for isolated validation.
