@@ -14,6 +14,15 @@ Accepted
 
 ## Context
 
+Follow-up (2026-09-10): execution metering remains owned by runtime under this
+decision. [ADR-038](./038-separate-execution-usage-from-provider-account-quota.md)
+separates provider account/window allowance from observed turn usage and keeps
+new collectors runtime-owned. [SPEC-029](../specs/SPEC-029-provider-account-quota-and-usage-snapshots.md)
+and [PLAN-038](../plans/PLAN-038-provider-account-quota-and-usage-snapshots.md)
+describe the unimplemented Cats Usage read-model/collector track; they do not
+redefine existing metering as an account balance or move budget policy into
+runtime.
+
 The Cats stack now spans three execution families:
 
 - `api` / `local` backends with explicit token-usage reporting and provider
@@ -144,10 +153,9 @@ execution guardrails across backend families.
 - [SPEC-003](../specs/SPEC-003-agent-backend.md)
 - [ADR-016](./016-own-executable-delivery-primitives-not-delivery-policy.md)
 - [cats ADR-023](../../../cats-platform/docs/decisions/023-own-budget-policy-and-cost-control-in-product.md)
-- [cats Paperclip Control-Plane Analysis](../../../cats-platform/docs/research/paperclip-control-plane-analysis.md)
+- [cats Paperclip Control-Plane Analysis](../../../cats-platform/docs/research/2026-04-02-paperclip-control-plane-analysis.md)
 
 ---
 
 *Accepted: 2026-03-20*
 *Decision makers: user + Codex*
-

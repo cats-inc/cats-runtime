@@ -4,6 +4,13 @@
 
 ## Current Status
 
+Planning update (2026-09-10): ADR-038 / SPEC-029 / PLAN-038 distinguish the
+existing in-memory execution metering from provider account allowance snapshots.
+The Cats Usage consumer is planned in `cats-apps`, behind the platform's App SDK.
+Collectors, a stable usage snapshot API, and durable history remain unimplemented;
+this documentation work does not change the completed PLAN-009 first slice.
+See [PLAN-038](./docs/plans/PLAN-038-provider-account-quota-and-usage-snapshots.md).
+
 Latest update (2026-09-02): approved commit delivery now turns detached
 runtime-owned worktree sessions into deterministic `cats/runtime/<session-id>`
 branches before committing, so push/review follow-through has a real branch;

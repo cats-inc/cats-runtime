@@ -20,6 +20,13 @@
 
 ## Overview
 
+Completion scope clarification (2026-09-10): this plan remains completed for its
+first execution-metering/progress/guardrail slice. Current records are bounded
+and in-memory, not a persistent history or an account-quota balance. New stable
+snapshots, provider account-quota collectors, and durable history are explicitly
+future work in [PLAN-038](./PLAN-038-provider-account-quota-and-usage-snapshots.md)
+and [SPEC-029](../specs/SPEC-029-provider-account-quota-and-usage-snapshots.md).
+
 The first slice should stay runtime-owned and additive.
 
 `cats-runtime` will gain one shared metering subsystem that:

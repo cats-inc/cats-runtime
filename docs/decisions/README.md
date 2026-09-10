@@ -22,15 +22,18 @@ Create an ADR when:
 ## Naming Convention
 
 ```
-ADR-NNN-short-title.md
+NNN-short-title.md
 
 Examples:
-ADR-001-use-postgresql-database.md
-ADR-002-adopt-hexagonal-architecture.md
-ADR-003-jwt-authentication.md
+001-use-postgresql-database.md
+002-adopt-hexagonal-architecture.md
+003-jwt-authentication.md
 ```
 
 ## Template
+
+File names use the numeric prefix above; document headings and references use
+`ADR-NNN`, matching the existing records in this repository.
 
 Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
@@ -38,6 +41,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [038-separate-execution-usage-from-provider-account-quota](./038-separate-execution-usage-from-provider-account-quota.md) | Separate Execution Usage from Provider Account Quota | Accepted | 2026-09-10 |
 | [037-adopt-meta-muse-as-an-executable-cli-provider-and-retire-aider](./037-adopt-meta-muse-as-an-executable-cli-provider-and-retire-aider.md) | Adopt Meta Muse as an executable CLI provider family and retire Aider | Accepted | 2026-09-05 |
 | [036-separate-repository-maintenance-skills-from-runtime-delivered-skills](./036-separate-repository-maintenance-skills-from-runtime-delivered-skills.md) | Separate repository-maintenance skills from runtime-delivered skills | Accepted | 2026-08-28 |
 | [035-never-block-provider-execution-on-exact-cli-version](./035-never-block-provider-execution-on-exact-cli-version.md) | Never block provider execution on an exact CLI version | Accepted | 2026-08-26 |
