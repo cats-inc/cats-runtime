@@ -11,6 +11,13 @@ are retained; unknown values are not zero. No active account polling or durable
 history is added. The Usage app in `cats-apps` consumes this via the platform's
 read-only App bridge. See [SPEC-029](./docs/specs/SPEC-029-provider-account-quota-and-usage-snapshots.md).
 
+Manual quota refresh (2026-09-11): explicit native Codex, Copilot, Claude Code and
+Antigravity CLI queries are implemented behind the separate authenticated refresh
+route. Authentication stays inside each CLI; Cats does not read credentials or
+call provider account APIs. Kiro remains gated on a verified authenticated result.
+See the [live evidence and limits](./docs/research/2026-09-11-additional-cli-quota-queries.md).
+This implementation does not publish or update an installed Desktop.
+
 `cats-runtime` is the stable execution boundary for upper-layer products such as
 `cats-platform` and `crew-chat-poc`. It now embeds the CLI runtime directly instead
 of proxying to a second local sidecar service.

@@ -2,6 +2,8 @@ import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { listProviderInstances } from '../src/backends/cli/config.js';
+import { KNOWN_PROVIDERS } from '../src/backends/cli/providers/types.js';
 import { loadConfig } from '../src/core/config.js';
 import { createRuntimeServer } from '../src/server.js';
 import { parseCoreNdjson as parseNdjson } from './streamEventTestUtils.js';
@@ -62,8 +64,14 @@ function createTestConfig(
     mkdirSync(dir, { recursive: true });
   }
 
+  const isolatedConfig = loadConfig(env);
+  // These peer fixtures use only a mocked API target. Missing provider keys
+  // fall back to real native CLI instances, so disable every CLI explicitly.
+  for (const provider of KNOWN_PROVIDERS) {
+    isolatedConfig.providerInstances[provider] = {};
+  }
   const config = {
-    ...loadConfig(env),
+    ...isolatedConfig,
     host: '127.0.0.1',
     port: 0,
     providerDefaultTargets: {
@@ -111,6 +119,17 @@ async function waitFor(
 }
 
 describe('runtime peer routing integration', () => {
+  it('does not include real native CLI targets in the API-only fixture', async () => {
+    const fixture = createTestConfig();
+    try {
+      for (const provider of KNOWN_PROVIDERS) {
+        expect(listProviderInstances(fixture.config, provider)).toEqual([]);
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
   it('routes a message to a trusted peer over NDJSON and preserves caller-owned session state', async () => {
     const calleeConfig = createTestConfig({
       env: {
@@ -357,6 +376,8 @@ describe('runtime peer routing integration', () => {
   }, PEER_ROUTING_TEST_TIMEOUT_MS);
 
   it('keeps /sessions/:id/stream usable during a peer-routed turn', async () => {
+    const requestController = new AbortController();
+    let messagePromise: Promise<Response> | undefined;
     let releaseExecution: (() => void) | undefined;
     const executionGate = new Promise<void>((resolve) => {
       releaseExecution = resolve;
@@ -439,8 +460,9 @@ describe('runtime peer routing integration', () => {
       });
       caller.context.registry.updateStatus(session.id, 'ready');
 
-      const messagePromise = fetch(`http://${callerAddress.host}:${callerAddress.port}/sessions/${session.id}/messages`, {
+      messagePromise = fetch(`http://${callerAddress.host}:${callerAddress.port}/sessions/${session.id}/messages`, {
         method: 'POST',
+        signal: requestController.signal,
         headers: {
           'content-type': 'application/json',
           accept: 'application/x-ndjson',
@@ -453,12 +475,17 @@ describe('runtime peer routing integration', () => {
           },
         }),
       });
+      // Observe rejection immediately; the successful path still awaits the
+      // original promise and fails if the request fails before returning data.
+      void messagePromise.catch(() => undefined);
 
       await waitFor(() => Boolean(caller.context.runtime?.get(session.id)?.busy));
       // Wait for the observer connection to be established before letting the
       // peer execution finish, otherwise the test can race and only observe the
       // final session_closed frame in full-suite runs.
-      const streamResponse = await fetch(`http://${callerAddress.host}:${callerAddress.port}/sessions/${session.id}/stream`);
+      const streamResponse = await fetch(`http://${callerAddress.host}:${callerAddress.port}/sessions/${session.id}/stream`, {
+        signal: requestController.signal,
+      });
 
       releaseExecution?.();
 
@@ -477,6 +504,9 @@ describe('runtime peer routing integration', () => {
         expect.objectContaining({ type: 'session_closed' }),
       ]));
     } finally {
+      releaseExecution?.();
+      requestController.abort();
+      await messagePromise?.catch(() => undefined);
       await caller.close();
       await callee.close();
       await callerConfig.cleanup();

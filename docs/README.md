@@ -7,11 +7,14 @@
 Existing execution metering and guardrails are not an account-quota service.
 The 2026-09-10 implementation adds authenticated `/usage/snapshot`, explicit
 retained coverage/epoch and passive Claude/Codex windows with unknown/stale semantics.
-Active collectors, verified account linkage and durable history remain deferred.
+Explicit native Codex/Copilot/Claude/Antigravity refresh is implemented as a
+separate authenticated action; snapshot polling remains passive. Kiro verification,
+scheduled polling, verified account linkage and durable history remain deferred.
 
 - [ADR-038: execution usage versus account quota](./decisions/038-separate-execution-usage-from-provider-account-quota.md)
 - [SPEC-029: quota and usage snapshots](./specs/SPEC-029-provider-account-quota-and-usage-snapshots.md)
 - [PLAN-038: staged implementation and provider evidence gates](./plans/PLAN-038-provider-account-quota-and-usage-snapshots.md)
+- [Additional CLI quota evidence and verification limits](./research/2026-09-11-additional-cli-quota-queries.md)
 - [Usage dashboard specification](../../cats-apps/docs/specs/SPEC-002-cats-usage-dashboard.md)
 - [Platform package host and telemetry bridge](../../cats-platform/docs/specs/SPEC-115-versioned-official-app-packages-and-telemetry-bridge.md)
 

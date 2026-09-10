@@ -4,8 +4,9 @@
 
 Accepted — ownership and data distinction approved on 2026-09-10.
 The memory-only read contract and passive Claude/Codex window projection are now
-implemented under PLAN-038. Explicit native Codex CLI reads are now implemented;
-other active collectors, verified accounts and persistence remain planned.
+implemented under PLAN-038. Explicit native Codex, Copilot, Claude Code and
+Antigravity CLI reads are implemented. Kiro remains gated on authenticated
+success evidence; scheduled polling, verified accounts and persistence remain planned.
 
 ## Context
 

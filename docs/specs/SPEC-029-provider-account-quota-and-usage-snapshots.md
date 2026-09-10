@@ -4,18 +4,19 @@
 
 | Field | Value |
 |-------|-------|
-| Status | U1/passive windows and explicit native Codex CLI refresh implemented; history deferred |
+| Status | Explicit native Codex/Copilot/Claude/Antigravity refresh implemented; Kiro verification and history deferred |
 | Owner | cats-runtime |
 | Implementation | Authenticated bounded snapshot and separate passive quota observations |
 | Consumer | Usage via cats-platform |
 
 ## Summary
 
-### Explicit Codex CLI refresh (2026-09-10)
+### Explicit CLI refresh (Codex 2026-09-10; additional providers 2026-09-11)
 
-- `POST /usage/refresh` accepts only `{provider:"codex", instance:string}` for a
-  configured CLI target. It works during bootstrap, behind runtime authentication.
-- Run the configured CLI's `app-server` over stdio: await `initialize`, send
+- `POST /usage/refresh` accepts only `{provider, instance:string}`, where provider
+  is `codex`, `copilot`, `claude`, or `antigravity`, for a configured CLI target.
+  It works during bootstrap, behind runtime authentication.
+- For Codex, run the configured CLI's `app-server` over stdio: await `initialize`, send
   `initialized`, then `account/rateLimits/read`. Never start a thread/model turn,
   read local credentials, or issue a provider HTTP request from Cats.
 - Return `{status, nextRefreshAt, snapshot}`. Status is `updated`, `cooldown`,
@@ -28,7 +29,7 @@
   allow one collector at a time, and cool down each target for 60 seconds after
   every attempt. Shutdown aborts and reaps active queries. Polling remains passive.
 - Platform requires separate `runtime.telemetry.refresh` permission and the
-  version-bound `usage.refreshQuota` SDK operation. Usage offers a Codex-only
+  version-bound `usage.refreshQuota` SDK operation. Usage offers a capability-gated
   explicit button, original observation/reset times, and sanitized failure text.
 - Evidence: [official App Server protocol](https://learn.chatgpt.com/docs/app-server).
   Add protocol fixtures, timeout/cancellation/auth/redaction tests and a real CLI
@@ -37,6 +38,30 @@
   use the same stdio protocol; platform CI/acceptance remains separate. WSL and
   Docker return `unsupported` without spawning: their current bootstrap launcher
   consumes stdin. No CLI version equality gate is imposed.
+
+Additional collectors use CLI-owned authentication exclusively:
+
+| Provider | Quota-only invocation | Interpretation |
+|----------|-----------------------|----------------|
+| Copilot | `--headless --no-auto-update --stdio`; `connect` (SDK `ping` fallback), then `account.getQuota` | Request entitlement, used/remaining, explicit unlimited; never session `premiumRequests` |
+| Claude Code | Safe-mode stream-json controls: `initialize`, then `get_usage` with `skip_behaviors:true` | Utilization is 0–100, unlike passive fractions; fixed reported five-hour/seven-day windows |
+| Antigravity (`agy`) | Standalone `--print /usage --output-format text` built-in report | Separate model-pool weekly/five-hour windows; not Gemini CLI |
+
+These three collectors reject nonempty custom `command.args` before spawning:
+prompt/resume/stream or slash-disabling flags are not a verified quota-only launch.
+They share bounded pipes, 512-KiB aggregate stdout/stderr, timeout, cancellation,
+hidden Windows launch and owned process-tree cleanup. No raw stderr leaves Runtime.
+Kiro's no-session `_kiro/account/getUsage` probe returned an auth-related failure;
+success payload/window semantics remain unverified, so no Kiro collector is enabled.
+See the [dated probe and limitations](../research/2026-09-11-additional-cli-quota-queries.md).
+
+SDK 1.2 adds `quota.refreshSupported` plus nullable native `used`, `limit`,
+`remaining`, `unit` (`percent`/`requests`/`credits`) and `unlimited` per window.
+Unlimited is not 100% or a negative limit. No reset date is invented: an elapsed
+Copilot `resetDate` stays elapsed/stale even after a successful RPC. Unknown-source
+execution counters and status-only passive reports cannot replace account numbers
+or refresh their observation timestamp. Nonempty reports still represent the latest
+report, not a merged historical inventory of every previously seen window.
 
 Implemented slice (2026-09-10): authenticated, no-store `GET /usage/snapshot`
 with schemaVersion 1, runtime epoch, retained-memory coverage, null-vs-zero metrics,
@@ -66,7 +91,7 @@ durable history without moving budget policy or app presentation into runtime.
 - A quota-only signal without token/cost values is not sufficient for the current
   usage-record gate; the new account path must handle it independently.
 
-Only Codex native account reads are currently collected on demand. No universal
+Only the four verified native CLI paths above are collected on demand. No universal
 remaining/reset API or durable metering history is claimed.
 
 ## Goals
@@ -149,8 +174,8 @@ unsupported, unavailable, auth_required, or error; fresh/stale where data exists
 ## API Direction
 
 `GET /usage/snapshot` reads memory only. `POST /usage/refresh` performs the explicit
-Codex read described above. The returned snapshot retains its v1 schema; active
-quota has source `codex.account/rateLimits/read`, scope `provider_account_query`,
+CLI read described above. The returned snapshot retains its v1 schema; active
+quota has a provider-specific allowlisted source, scope `provider_account_query`,
 and an optional sanitized `limitId`. It is not execution-token history.
 
 A later history read is gated on persistence. Cache refresh requests return their

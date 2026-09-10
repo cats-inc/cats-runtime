@@ -38,7 +38,7 @@ it('explicit refresh authenticates, validates the configured target, works in bo
   const collect = vi.fn(async () => ({ status: 'updated' as const, quota: {
     source: 'codex.account/rateLimits/read', 'primary.usedPercent': 10,
   } }));
-  const ctx = { config: { apiKey: 'fixture', providerInstances: { codex: { primary: {} } } },
+  const ctx = { config: { apiKey: 'fixture', providerInstances: { codex: { primary: {} }, copilot: { primary: {} }, claude: { primary: {} }, antigravity: { primary: {} } } },
     startup: { bootstrapRequired: true }, registry: { list: () => [] }, metering,
     quotaRefresh: new QuotaRefreshService({ collect, observe: (q) => metering.observeQuota(q) }),
   } as unknown as AppContext;
@@ -51,14 +51,25 @@ it('explicit refresh authenticates, validates the configured target, works in bo
   });
   const target = { provider: 'codex', instance: 'primary' };
   expect((await request(target, false)).status).toBe(401);
-  for (const input of [null, [], { ...target, instance: '__proto__' }, { ...target, provider: 'claude' }, { ...target, command: 'unsafe' }]) {
+  for (const input of [null, [], { ...target, instance: '__proto__' }, { ...target, provider: 'kiro' }, { ...target, command: 'unsafe' }]) {
     expect((await request(input)).status).toBe(400);
   }
   expect((await request({ ...target, instance: 'x'.repeat(2000) })).status).toBe(413);
   expect(collect).not.toHaveBeenCalled();
   const response = await request(target);
   expect(response.headers.get('Cache-Control')).toBe('no-store');
-  expect(await response.json()).toMatchObject({ status: 'updated', snapshot: { sessions: [], totals: { observations: 0 }, targets: [{ quota: { windows: [{ remainingPercent: 90 }] } }] } });
+  const body = await response.json();
+  expect(body).toMatchObject({ status: 'updated', snapshot: { sessions: [], totals: { observations: 0 } } });
+  expect(body.snapshot.targets.find((target: { provider: string }) => target.provider === 'codex').quota.windows).toMatchObject([{ remainingPercent: 90 }]);
   expect(await (await request(target)).json()).toMatchObject({ status: 'cooldown' });
   expect(collect).toHaveBeenCalledOnce();
+  expect((await request({ provider: 'copilot', instance: 'primary' })).status).toBe(200);
+  expect(collect).toHaveBeenLastCalledWith({ provider: 'copilot', instance: 'primary', backend: 'cli' }, expect.any(AbortSignal));
+  expect(collect).toHaveBeenCalledTimes(2);
+  expect((await request({ provider: 'claude', instance: 'primary' })).status).toBe(200);
+  expect(collect).toHaveBeenLastCalledWith({ provider: 'claude', instance: 'primary', backend: 'cli' }, expect.any(AbortSignal));
+  expect(collect).toHaveBeenCalledTimes(3);
+  expect((await request({ provider: 'antigravity', instance: 'primary' })).status).toBe(200);
+  expect(collect).toHaveBeenLastCalledWith({ provider: 'antigravity', instance: 'primary', backend: 'cli' }, expect.any(AbortSignal));
+  expect(collect).toHaveBeenCalledTimes(4);
 });
