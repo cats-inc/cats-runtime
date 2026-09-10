@@ -4,6 +4,12 @@
 
 ## Overview
 
+Cats Usage planning (2026-09-10): current execution metering is not a provider
+account-quota service. Runtime ownership of verified quota collection and a
+stable read model is now documented, with implementation still pending. The
+dashboard will live in `cats-apps` and consume data through the platform host.
+See the [planning entry point](./docs/README.md#cats-usage-and-provider-account-quota).
+
 `cats-runtime` is the stable execution boundary for upper-layer products such as
 `cats-platform` and `crew-chat-poc`. It now embeds the CLI runtime directly instead
 of proxying to a second local sidecar service.

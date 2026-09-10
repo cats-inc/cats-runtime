@@ -10,6 +10,14 @@
 
 ## Summary
 
+Scope update (2026-09-10): the completed PLAN-009 first slice supplies in-memory
+execution usage, incidents, and guardrails. It does not supply a provider-account
+quota poller, complete remaining/reset windows, or durable usage history. Those
+follow-ons are now tracked separately in [SPEC-029](./SPEC-029-provider-account-quota-and-usage-snapshots.md)
+and [PLAN-038](../plans/PLAN-038-provider-account-quota-and-usage-snapshots.md), under
+[ADR-038](../decisions/038-separate-execution-usage-from-provider-account-quota.md).
+The original requirements below remain the execution-metering track.
+
 `cats-runtime` already captures some usage data today, but it does so
 inconsistently across backends and without a unified guardrail layer.
 
@@ -263,4 +271,3 @@ machine-readable runtime responses
 *Author: Codex*
 *Last updated: 2026-03-23*
 *Related Plan: [PLAN-009-usage-metering-progress-and-guardrails](../plans/PLAN-009-usage-metering-progress-and-guardrails.md)*
-
