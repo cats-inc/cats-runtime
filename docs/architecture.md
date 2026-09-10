@@ -36,7 +36,7 @@ The architectural split is:
 - `core/wakeup`: runtime-owned scheduled wakeup substrate and persistence
 - `http`: inbound transport and route wiring
 
-### Usage Versus Account Quota (Accepted Boundary, New Contract Pending)
+### Usage Versus Account Quota (Passive Snapshot Implemented)
 
 Execution metering currently holds a bounded in-memory view of observed turns,
 incidents, and guardrails. It is neither a durable billing ledger nor a complete
@@ -46,13 +46,15 @@ explicit unknown/unsupported states. Shared accounts must not be counted once
 per configured CLI instance, and token totals must not be subtracted from an
 unrelated subscription allowance.
 
-Cats Usage in `cats-apps` will consume sanitized snapshots through the
+Usage in `cats-apps` consumes sanitized snapshots through the
 `cats-platform` App host, not provider credentials or runtime-internal classes.
-The collectors, stable snapshot API, and durable history described in
+The stable `/usage/snapshot` API is implemented. Active collectors and durable history described in
 [ADR-038](./decisions/038-separate-execution-usage-from-provider-account-quota.md),
 [SPEC-029](./specs/SPEC-029-provider-account-quota-and-usage-snapshots.md), and
 [PLAN-038](./plans/PLAN-038-provider-account-quota-and-usage-snapshots.md) remain
-planned. Existing metering and guardrail behavior is unchanged by this track.
+planned. Quota-only reports are retained separately; normalized passive windows
+preserve their observation/reset times and remain unverified account linkage.
+Existing execution guardrail behavior remains independent of the dashboard.
 
 ### Bootstrap Three-Layer Model
 

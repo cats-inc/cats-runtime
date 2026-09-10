@@ -23,11 +23,13 @@ import {
   providerGuardrailKey,
 } from './incidentDetection.js';
 import { asRecord, readNumber, readString } from './utils.js';
+import { buildUsageSnapshot, usageTargetKey, type UsageQuotaObservation, type UsageTarget } from './usageSnapshot.js';
 
 const MAX_USAGE_RECORDS = 1000;
 const MAX_INCIDENTS = 100;
 
 interface RuntimeMeteringOptions {
+  now?: () => Date;
   sessionTotalTokensWarn?: number;
   sessionTotalTokensBlock?: number;
   rateLimitCooldownMs?: number;
@@ -55,8 +57,35 @@ export class RuntimeMeteringService {
   private readonly usageRecords: RuntimeUsageRecord[] = [];
   private readonly incidents: RuntimeRateLimitIncident[] = [];
   private readonly providerGuardrails = new Map<string, RuntimeGuardrailResult>();
+  private readonly quotaObservations = new Map<string, UsageQuotaObservation>();
+  private readonly observationEpoch = randomUUID();
+  private readonly observationStartedAt: string;
+  private droppedUsageRecords = 0;
+  private droppedQuotaTargets = 0;
 
-  constructor(private readonly options: RuntimeMeteringOptions = {}) {}
+  constructor(private readonly options: RuntimeMeteringOptions = {}) {
+    this.observationStartedAt = (options.now?.() ?? new Date()).toISOString();
+  }
+
+  buildUsageSnapshot(sessions: SessionInfo[], configuredTargets: UsageTarget[] = []) {
+    const snapshot = this.buildSnapshot(sessions);
+    return buildUsageSnapshot({
+      now: this.options.now?.() ?? new Date(),
+      epoch: this.observationEpoch,
+      startedAt: this.observationStartedAt,
+      records: this.usageRecords,
+      droppedRecords: this.droppedUsageRecords,
+      quotaObservations: [...this.quotaObservations.values()],
+      droppedQuotaTargets: this.droppedQuotaTargets,
+      targets: [...configuredTargets, ...sessions.map((session) => ({
+        provider: session.providerName,
+        instance: session.providerInstanceId || 'default',
+        backend: session.providerBackend || 'cli' as const,
+      }))],
+      incidents: this.incidents,
+      guardrails: snapshot.guardrails.active,
+    });
+  }
 
   getConfiguredGuardrails(): RuntimeUsageGuardrail[] {
     const guardrails: RuntimeUsageGuardrail[] = [];
@@ -182,8 +211,33 @@ export class RuntimeMeteringService {
     event: StreamEvent,
     options: ObserveEventOptions,
   ): StreamEvent {
-    const observedAt = options.observedAt ?? new Date().toISOString();
+    const observedAt = options.observedAt ?? (this.options.now?.() ?? new Date()).toISOString();
     let nextEvent = this.ensureProgressContext(session, event);
+
+    const eventMetadata = asRecord(nextEvent.metadata);
+    const quota = readQuota(asRecord(asRecord(eventMetadata?.runtimeUsage)?.quota)
+      ?? (nextEvent.type === 'progress' && eventMetadata?.kind === 'quota' ? asRecord(eventMetadata.quota) : null));
+    if (quota) {
+      const observation: UsageQuotaObservation = {
+        provider: session.providerName,
+        instance: session.providerInstanceId || 'default',
+        backend: session.providerBackend || 'cli',
+        observedAt,
+        quota,
+      };
+      const key = usageTargetKey(observation);
+      const previous = this.quotaObservations.get(key);
+      const previousTime = Date.parse(String(previous?.quota.observedAt ?? previous?.observedAt ?? ''));
+      const nextTime = Date.parse(String(quota.observedAt ?? observedAt));
+      if (!Number.isFinite(previousTime) || !Number.isFinite(nextTime) || nextTime >= previousTime) {
+        this.quotaObservations.delete(key);
+        this.quotaObservations.set(key, observation);
+      }
+      if (this.quotaObservations.size > MAX_USAGE_RECORDS) {
+        this.quotaObservations.delete(this.quotaObservations.keys().next().value!);
+        this.droppedQuotaTargets += 1;
+      }
+    }
 
     if (nextEvent.type === 'result') {
       const usageRecord = this.buildUsageRecord(session, nextEvent, {
@@ -389,9 +443,9 @@ export class RuntimeMeteringService {
     const inputTokens = event.usage?.inputTokens;
     const outputTokens = event.usage?.outputTokens;
     const hasUsage = Boolean(
-      (typeof inputTokens === 'number' && inputTokens > 0)
-      || (typeof outputTokens === 'number' && outputTokens > 0)
-      || (typeof signal.totalTokens === 'number' && signal.totalTokens > 0)
+      (typeof inputTokens === 'number' && Number.isFinite(inputTokens) && inputTokens >= 0)
+      || (typeof outputTokens === 'number' && Number.isFinite(outputTokens) && outputTokens >= 0)
+      || (typeof signal.totalTokens === 'number' && Number.isFinite(signal.totalTokens) && signal.totalTokens >= 0)
       || signal.estimatedCost !== undefined,
     );
 
@@ -457,6 +511,7 @@ export class RuntimeMeteringService {
   private pushUsageRecord(record: RuntimeUsageRecord): void {
     this.usageRecords.push(record);
     if (this.usageRecords.length > MAX_USAGE_RECORDS) {
+      this.droppedUsageRecords += this.usageRecords.length - MAX_USAGE_RECORDS;
       this.usageRecords.splice(0, this.usageRecords.length - MAX_USAGE_RECORDS);
     }
   }

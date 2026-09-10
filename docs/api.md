@@ -7,6 +7,23 @@
 `cats-runtime` serves the runtime contract directly. Requests no longer hop
 through a second local runtime service.
 
+## Cached usage snapshot
+
+`GET /usage/snapshot` returns the bounded, sanitized `schemaVersion: 1` usage
+snapshot consumed by the Usage utility through the Platform telemetry bridge.
+It uses the existing inbound authentication and bootstrap guards and responds
+with `Cache-Control: no-store`. It never starts a provider CLI or refreshes an
+account quota on demand.
+
+The response contains `generatedAt`, the runtime epoch, memory-only `coverage`,
+token/currency totals, provider-instance targets, session aggregates, passive
+quota windows, incidents and guardrail summaries. Missing measurements are
+`null`, not zero; currencies stay separate. Quota freshness is evaluated against
+observation/reset times and unverified account targets are not combined.
+No raw provider payloads, credentials or local paths are exported. History and
+active account collectors are not implemented. See
+[SPEC-029](specs/SPEC-029-provider-account-quota-and-usage-snapshots.md).
+
 ## Base URL
 
 ```text

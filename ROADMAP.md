@@ -15,20 +15,21 @@
 > `cats-platform` consumption. Future work should treat Kilo under the generic
 > bootstrap/compatibility tracks rather than as a separate launch gap.
 
-## Usage and Account-Quota Track (Planned)
+## Usage and Account-Quota Track (U1 / Passive Signals Implemented)
 
 - [x] Record the usage/quota distinction and runtime ownership in ADR-038.
-- [ ] U1: expose a stable, sanitized snapshot over the existing bounded execution
+- [x] U1: expose a stable, sanitized snapshot over the existing bounded execution
       metering, with explicit collection coverage and process/restart boundaries.
 - [ ] U2: add evidence-backed provider account-quota collectors, shared-account
       de-duplication, freshness/reset semantics, and bounded refresh behavior.
 - [ ] U3: add durable storage and retention before advertising historical charts.
 
-Cats Usage UI belongs to `cats-apps`; App permissions and the host bridge belong
+Usage UI belongs to `cats-apps`; App permissions and the host bridge belong
 to `cats-platform`. See [SPEC-029](./docs/specs/SPEC-029-provider-account-quota-and-usage-snapshots.md)
 and [PLAN-038](./docs/plans/PLAN-038-provider-account-quota-and-usage-snapshots.md).
-Existing usage/incident/guardrail support remains shipped; it does not imply
-that remaining account quota is already available.
+Existing usage/incident/guardrail support remains shipped. Passive Claude/Codex
+remaining-percent/reset observations are now exposed; active full-account quota
+collection and durable historical coverage are not implied.
 
 ## Optimizations
 

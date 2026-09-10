@@ -19,7 +19,7 @@ decision. [ADR-038](./038-separate-execution-usage-from-provider-account-quota.m
 separates provider account/window allowance from observed turn usage and keeps
 new collectors runtime-owned. [SPEC-029](../specs/SPEC-029-provider-account-quota-and-usage-snapshots.md)
 and [PLAN-038](../plans/PLAN-038-provider-account-quota-and-usage-snapshots.md)
-describe the unimplemented Cats Usage read-model/collector track; they do not
+describe the unimplemented Usage read-model/collector track; they do not
 redefine existing metering as an account balance or move budget policy into
 runtime.
 

@@ -4,11 +4,13 @@
 
 ## Current Status
 
-Planning update (2026-09-10): ADR-038 / SPEC-029 / PLAN-038 distinguish the
-existing in-memory execution metering from provider account allowance snapshots.
-The Cats Usage consumer is planned in `cats-apps`, behind the platform's App SDK.
-Collectors, a stable usage snapshot API, and durable history remain unimplemented;
-this documentation work does not change the completed PLAN-009 first slice.
+Implementation update (2026-09-10): `/usage/snapshot` provides sanitized current
+usage, epoch/truncation, separate currencies, incidents/guardrails and passive
+Claude/Codex quota windows. Quota-only events are retained independently; elapsed
+reset times never imply refilled quota. HTTP/auth/redaction and metering regression
+tests pass. The Usage consumer is implemented behind the platform App bridge.
+Active collectors, verified shared accounts, durable history and independent review
+remain deferred/unverified. Existing completed PLAN-009 remains completed.
 See [PLAN-038](./docs/plans/PLAN-038-provider-account-quota-and-usage-snapshots.md).
 
 Latest update (2026-09-02): approved commit delivery now turns detached
