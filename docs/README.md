@@ -97,6 +97,10 @@ When working on this project:
 
 ## Current Documentation Gaps
 
+The [Codex explicit quota-read evidence](research/2026-09-11-codex-cli-explicit-quota-read.md)
+records the native CLI-only collector and isolated built-App verification. Installed
+delivery, other native OS acceptance and remote transports are separate gates.
+
 The runtime's main contracts are now documented, but these areas still need
 later passes:
 

@@ -6,6 +6,7 @@ import { bootstrapGuard } from './routes/bootstrapGuard.js';
 import { usageRoutes } from './routes/usage.js';
 import type { RuntimeRouteEnv } from './routes/diagnosticsSupport.js';
 import { RuntimeMeteringService } from '../core/usage/RuntimeMeteringService.js';
+import { QuotaRefreshService } from '../core/usage/QuotaRefreshService.js';
 
 describe('GET /usage/snapshot', () => {
   it('requires normal auth, works during bootstrap, and only reads memory', async () => {
@@ -30,4 +31,34 @@ describe('GET /usage/snapshot', () => {
     expect(JSON.stringify(body)).not.toContain('never-spawn');
     expect(list).toHaveBeenCalledOnce();
   });
+});
+
+it('explicit refresh authenticates, validates the configured target, works in bootstrap and never creates sessions', async () => {
+  const metering = new RuntimeMeteringService();
+  const collect = vi.fn(async () => ({ status: 'updated' as const, quota: {
+    source: 'codex.account/rateLimits/read', 'primary.usedPercent': 10,
+  } }));
+  const ctx = { config: { apiKey: 'fixture', providerInstances: { codex: { primary: {} } } },
+    startup: { bootstrapRequired: true }, registry: { list: () => [] }, metering,
+    quotaRefresh: new QuotaRefreshService({ collect, observe: (q) => metering.observeQuota(q) }),
+  } as unknown as AppContext;
+  const app = new Hono<RuntimeRouteEnv>();
+  app.use('*', bearerAuth(ctx.config));
+  app.use('*', async (c, next) => { c.set('ctx', ctx); await next(); });
+  app.use('*', bootstrapGuard()); app.route('/', usageRoutes);
+  const request = (body: unknown, authorized = true) => app.request('/usage/refresh', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...(authorized ? { Authorization: 'Bearer fixture' } : {}) }, body: JSON.stringify(body),
+  });
+  const target = { provider: 'codex', instance: 'primary' };
+  expect((await request(target, false)).status).toBe(401);
+  for (const input of [null, [], { ...target, instance: '__proto__' }, { ...target, provider: 'claude' }, { ...target, command: 'unsafe' }]) {
+    expect((await request(input)).status).toBe(400);
+  }
+  expect((await request({ ...target, instance: 'x'.repeat(2000) })).status).toBe(413);
+  expect(collect).not.toHaveBeenCalled();
+  const response = await request(target);
+  expect(response.headers.get('Cache-Control')).toBe('no-store');
+  expect(await response.json()).toMatchObject({ status: 'updated', snapshot: { sessions: [], totals: { observations: 0 }, targets: [{ quota: { windows: [{ remainingPercent: 90 }] } }] } });
+  expect(await (await request(target)).json()).toMatchObject({ status: 'cooldown' });
+  expect(collect).toHaveBeenCalledOnce();
 });
