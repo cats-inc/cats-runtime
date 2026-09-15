@@ -845,7 +845,7 @@ async function diagnoseCliTarget(
     }
   }
 
-  if (probeMode === 'live') {
+  if (probeMode === 'live' && compatibilityPurpose === 'diagnostics') {
     await appendModelCatalogDiagnostics(ctx, target, checks, config);
   }
 
@@ -1232,17 +1232,17 @@ async function diagnoseAgentTarget(
   }
 
   try {
-    const shouldProbeLive = probeMode === 'live'
+    const shouldRunProbe = probeMode === 'live'
       || agentRuntime.transport.liveProbe === 'rpc_health'
       || agentRuntime.transport.liveProbe === 'command_help';
     const probe = ctx.agentBackend
       ? await ctx.agentBackend.probe(
           target,
-          shouldProbeLive,
+          shouldRunProbe,
           DEFAULT_RUNTIME_AGENT_PROBE_TIMEOUT_MS,
           { mode: probeMode },
         )
-      : await probeRuntimeAgentInstance(instance, shouldProbeLive, {
+      : await probeRuntimeAgentInstance(instance, shouldRunProbe, {
           probe: { mode: probeMode },
         });
     if (!probe.supported) {
@@ -1256,7 +1256,7 @@ async function diagnoseAgentTarget(
       return { checks, config };
     }
 
-    if (!shouldProbeLive) {
+    if (!shouldRunProbe) {
       checks.push(
         createCheck(
           'probe_skipped',
@@ -1539,6 +1539,10 @@ async function diagnoseTarget(
   options: ProviderDiagnosticsCollectionOptions = {},
   toolCatalogContext?: ProviderDiagnosticToolCatalogContext,
 ): Promise<ProviderDiagnosticResult> {
+  // Background callers cannot promote a health/setup scan into a live probe.
+  if (options.compatibilityPurpose && options.compatibilityPurpose !== 'diagnostics') {
+    probeMode = 'light';
+  }
   let result: {
     checks: DiagnosticCheck[];
     config: Record<string, unknown>;

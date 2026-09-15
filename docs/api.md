@@ -4029,6 +4029,20 @@ mirrors the diagnostics summary view:
 Targets that have not been probed yet, plus non-CLI backends, return
 `compatibility: null`. Non-CLI backends also return `install: null`.
 
+All CLI light checks use command resolution and installation metadata. Setup,
+execution preparation, and health/availability checks never execute provider
+commands, including after metadata failures and even when live mode is requested.
+Only `purpose=diagnostics` with `probeMode=live` runs compatibility commands.
+A resolved command uses the best-known adapter with `degraded`, unverified
+compatibility and no claimed help signature or live validation. It remains usable;
+a missing command stays unavailable. ACP light checks likewise only resolve the
+configured command. Background diagnostics do not launch dynamic model/tool
+discovery. Actual user turns and explicit live diagnostics can execute providers.
+
+`compatibility.fingerprint.version.source` is `package` for a version read from
+npm installation metadata, `command` for observed CLI output, or `unknown` when
+no version was detected. Package metadata alone does not prove command execution.
+
 Some CLI entries may also expose runtime-owned `activeConfig` metadata when the
 runtime can inspect provider-local configuration directly. The first slice is
 Goose-specific and returns:

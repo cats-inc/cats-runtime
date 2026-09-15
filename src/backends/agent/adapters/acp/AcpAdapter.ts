@@ -17,6 +17,8 @@ import type { PermissionMode, SessionProviderState, StreamEvent } from '../../..
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
 import type { ManagedExecutionLifecycleReason } from '../../../../core/runtime/ManagedExecutionHandle.js';
 import { runCliCommand } from '../../../../core/management/cli.js';
+import { lookupNativeCommand } from '../../../../core/process/commandLookup.js';
+import { getProviderProcessPolicy } from '../../../cli/runtime/providerProcessPolicy.js';
 import { hiddenWindowsSpawnOptions } from '../../../../core/process/windowsSpawn.js';
 import { createRuntimeProgressEvent } from '../../../../core/progress.js';
 import { resolveSafeWorkspacePath } from '../../../../core/tools/pathSafety.js';
@@ -567,6 +569,7 @@ async function runTransientBootstrap(
   }
 
   const client = new AcpStdioClient({
+    providerFamily: resolveAcpProviderProfile(instance)?.family,
     command,
     args: instance.args,
     cwd,
@@ -1689,8 +1692,27 @@ export class AcpAdapter implements AgentAdapter {
       };
     }
 
-    const env = sanitizeEnv(this.options.env || process.env);
-    const args = buildAcpHelpProbeArgs(instance, profile);
+    if (options.mode !== 'live') {
+      const lookup = await lookupNativeCommand(command, {
+        cwd: instance.cwd,
+        env: sanitizeEnv(this.options.env || process.env),
+      });
+      const status = lookup.available ? 'degraded' : 'unavailable';
+      const message = lookup.available
+        ? 'ACP command is installed; execution has not been verified.'
+        : 'ACP command could not be found.';
+      return {
+        health: { status, checkedAt, details: message },
+        checks: [{
+          code: 'acp_command_lookup', status, message,
+          details: { command, resolvedPath: lookup.resolvedPath },
+        }],
+      };
+    }
+
+    const policy = getProviderProcessPolicy(profile?.family || '', buildAcpHelpProbeArgs(instance, profile), command);
+    const env = { ...sanitizeEnv(this.options.env || process.env), ...policy.env };
+    const args = policy.args;
     const runner = this.options.cliCommandRunner || runCliCommand;
     const result = await runner(command, args, {
       cwd: instance.cwd,
@@ -1752,10 +1774,8 @@ export class AcpAdapter implements AgentAdapter {
       hasOutput: combinedOutput.length > 0,
     };
 
-    // Light health polling proves that the configured command is launchable
-    // without creating a provider-owned session every few seconds. Explicit
-    // live diagnostics additionally perform ACP initialize/session bootstrap.
-    if (status === 'ok' && options.mode !== 'light') {
+    // Only explicit live diagnostics perform help and ACP session bootstrap.
+    if (status === 'ok') {
       const cwd = resolveBootstrapCwd(instance.cwd, process.cwd());
       if (!cwd) {
         status = 'unavailable';
@@ -1856,6 +1876,7 @@ export class AcpAdapter implements AgentAdapter {
 
     const env = sanitizeEnv(this.options.env || process.env);
     const client = new AcpStdioClient({
+      providerFamily: resolveAcpProviderProfile(instance)?.family,
       command,
       args: instance.args,
       cwd,
@@ -2015,6 +2036,7 @@ export class AcpAdapter implements AgentAdapter {
     };
 
     const client = new AcpStdioClient({
+      providerFamily: resolveAcpProviderProfile(input.instance)?.family,
       command,
       args: input.instance.args,
       cwd: input.instance.cwd || input.acpHost.context.cwd,
@@ -2268,6 +2290,7 @@ export class AcpAdapter implements AgentAdapter {
     const env = sanitizeEnv(this.options.env || process.env);
     const bootstrapTimeoutMs = resolveBootstrapTimeoutMs(instance);
     const client = new AcpStdioClient({
+      providerFamily: resolveAcpProviderProfile(instance)?.family,
       command,
       args: instance.args,
       cwd: instance.cwd || sessionCwd,
@@ -2317,6 +2340,7 @@ export class AcpAdapter implements AgentAdapter {
     const env = sanitizeEnv(this.options.env || process.env);
     const bootstrapTimeoutMs = resolveBootstrapTimeoutMs(instance);
     const client = new AcpStdioClient({
+      providerFamily: resolveAcpProviderProfile(instance)?.family,
       command,
       args: instance.args,
       cwd: instance.cwd || process.cwd(),

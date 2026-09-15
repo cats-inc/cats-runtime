@@ -61,6 +61,7 @@ describe('runtime adapters', () => {
           'import os',
           '',
           'payload = json.loads(base64.b64decode(os.environ["CATS_RUNTIME_WSL_EXEC_B64"]).decode("utf-8"))',
+          'os.environ.update(payload.get("env", {}))',
           'if payload.get("ensureCwd"):',
           '    os.makedirs(payload["cwd"], exist_ok=True)',
           'for file in payload.get("tempFiles", []):',
@@ -416,6 +417,7 @@ describe('runtime adapters', () => {
       cwd: '/workspace/repo',
       command: 'claude',
       args: ['--help'],
+      env: { DISABLE_AUTOUPDATER: '1' },
     }), 'utf8').toString('base64');
 
     expect(spawnConfig.command).toBe('docker');
@@ -434,6 +436,7 @@ describe('runtime adapters', () => {
           'import os',
           '',
           'payload = json.loads(base64.b64decode(os.environ["CATS_RUNTIME_DOCKER_EXEC_B64"]).decode("utf-8"))',
+          'os.environ.update(payload.get("env", {}))',
           'os.environ["PATH"] = "/root/.local/bin:" + os.environ.get("PATH", "")',
           'if payload.get("ensureCwd"):',
           '    os.makedirs(payload["cwd"], exist_ok=True)',

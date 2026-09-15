@@ -1,10 +1,27 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  defaultOpencodeModelDiscoveryRunner,
   discoverOpencodeModels,
   parseOpencodeModelListOutput,
 } from './models.js';
 
 describe('opencode model discovery', () => {
+  it('preserves inherited environment and updater controls in the spawned process', async () => {
+    vi.stubEnv('CATS_MODEL_FIXTURE_ENV', 'inherited-fixture');
+    try {
+      const result = await defaultOpencodeModelDiscoveryRunner.run({
+        id: 'fixture', providerName: 'opencode',
+        commandConfig: { path: process.execPath, runner: 'direct', runtime: { mode: 'native' } },
+      }, ['-e', 'process.stdout.write(JSON.stringify({ inherited: process.env.CATS_MODEL_FIXTURE_ENV, updater: process.env.OPENCODE_DISABLE_AUTOUPDATE, hasPath: Boolean(process.env.PATH) }))'], process.cwd());
+      expect(result.exitCode).toBe(0);
+      expect(JSON.parse(result.stdout)).toEqual({
+        inherited: 'inherited-fixture', updater: 'true', hasPath: true,
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('parses provider/model rows and dedupes entries', () => {
     expect(parseOpencodeModelListOutput([
       'anthropic/claude-sonnet-4.5',

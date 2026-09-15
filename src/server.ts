@@ -310,14 +310,6 @@ export function createDiscoveryController(
       ctx.resolveKiloNative,
       ctx.kiloNative,
     );
-  const resolveGooseNative = (instanceId?: string): GooseNativeSessionService =>
-    resolveContextService(
-      ctx.config,
-      'goose',
-      instanceId,
-      ctx.resolveGooseNative,
-      ctx.gooseNative,
-    );
   const resolveOpencodeNative = (instanceId?: string): OpencodeNativeSessionService =>
     resolveContextService(
       ctx.config,
@@ -707,14 +699,8 @@ export function createDiscoveryController(
         if (timer) timers.push(timer);
       }
 
-      for (const instance of listProviderInstances(ctx.config, 'goose')) {
-        const timer = startNativeDiscovery(
-          'goose',
-          instance.id,
-          () => resolveGooseNative(instance.id).listAllSessions(),
-        );
-        if (timer) timers.push(timer);
-      }
+      // Goose enumeration executes the provider CLI (including per-session
+      // exports). Keep it available through explicit discovery, never timers.
     },
     stop() {
       if (!started) return;

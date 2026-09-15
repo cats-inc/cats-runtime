@@ -70,6 +70,24 @@ ADR-033, SPEC-027 requirement 12, and historical PLAN/research descriptions of
 the Antigravity, Grok, and Cline refusal gates. Those documents remain useful as
 probe history, not as authority to restore an exact-version gate.
 
+## 2026-09-15 detection amendment
+
+Cline's informational commands can start detached npm self-updates. Flags such
+as `--version` and `--help` are therefore not a side-effect-free detection contract
+for any provider. All background CLI and ACP detection uses command resolution,
+installation metadata, and cached evidence. Setup, health, and execution
+preparation remain passive even if passed live mode. Missing or timed-out metadata
+never authorizes fallback execution. The selected best-known adapter remains
+usable with unverified compatibility; package versions are marked as package
+evidence, with no fabricated help tokens or live validation.
+
+Explicit live diagnostics and actual turns still observe the executable contract.
+Cats adds documented per-process updater controls where supported (Claude,
+OpenCode, Muse, Junie), including ACP and remote runtime payloads, without changing
+global user settings. Unknown providers do not receive guessed flags. This does
+not establish that every upstream updater can be suppressed during an actual turn.
+See the [incident and validation record](../research/2026-08-27-cline-self-update-and-probe-concurrency.md).
+
 ## Related
 
 - [ADR-025: Keep provider evolution detection manual-first and evidence-driven](./025-keep-provider-evolution-detection-manual-first-and-evidence-driven.md)

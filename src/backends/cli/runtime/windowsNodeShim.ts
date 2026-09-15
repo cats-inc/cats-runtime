@@ -30,6 +30,39 @@ export interface WindowsNodeShimTarget {
   args: string[];
 }
 
+export interface WindowsNpmShimTarget extends WindowsNodeShimTarget {
+  /** Node's bundled npm launcher resolves a global npm override first. */
+  prefixScript?: string;
+}
+
+/** Resolve either npm's global shim or the launcher bundled with Node.js. */
+export function resolveWindowsNpmShim(commandPath: string): WindowsNpmShimTarget | null {
+  const generic = resolveWindowsNodeShim(commandPath);
+  if (generic) return generic;
+
+  const shimPath = findShimFile(commandPath);
+  if (!shimPath) return null;
+  let contents: string;
+  try {
+    contents = readFileSync(shimPath, 'utf8');
+  } catch {
+    return null;
+  }
+  // Only recognize npm's own launcher. Do not reinterpret arbitrary wrappers.
+  if (!/SET "NPM_CLI_JS=%~dp0\\node_modules\\npm\\bin\\npm-cli\.js"/iu.test(contents)
+    || !/SET "NPM_PREFIX_JS=%~dp0\\node_modules\\npm\\bin\\npm-prefix\.js"/iu.test(contents)
+    || !/"%NODE_EXE%" "%NPM_CLI_JS%" %\*/u.test(contents)) {
+    return null;
+  }
+  const shimDir = dirname(resolve(shimPath));
+  const command = resolveNodeForShim(shimDir);
+  const script = join(shimDir, 'node_modules', 'npm', 'bin', 'npm-cli.js');
+  const prefixScript = join(shimDir, 'node_modules', 'npm', 'bin', 'npm-prefix.js');
+  return command && isExistingFile(script) && isExistingFile(prefixScript)
+    ? { command, args: [script], prefixScript }
+    : null;
+}
+
 /**
  * The tail of an npm `.cmd` shim, e.g.
  *

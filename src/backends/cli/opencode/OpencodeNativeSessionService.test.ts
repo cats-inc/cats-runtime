@@ -107,6 +107,7 @@ describe('OpencodeNativeSessionService', () => {
         ],
         shell: false,
         cwd: 'C:\\Users\\kenne\\repo',
+        env: { OPENCODE_DISABLE_AUTOUPDATE: 'true' },
         windowsVerbatimArguments: true,
       });
     } finally {

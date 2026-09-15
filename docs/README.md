@@ -18,6 +18,12 @@ scheduled polling, verified account linkage and durable history remain deferred.
 - [Usage dashboard specification](../../cats-apps/docs/specs/SPEC-002-cats-usage-dashboard.md)
 - [Platform package host and telemetry bridge](../../cats-platform/docs/specs/SPEC-115-versioned-official-app-packages-and-telemetry-bridge.md)
 
+## Provider Detection
+
+Provider detection incident: [Cline updates at Windows login and passive detection for all CLIs](./research/2026-08-27-cline-self-update-and-probe-concurrency.md)
+records the September 15 recurrence, shared CLI/ACP policy, Desktop handling,
+and regression scope.
+
 ## Root-Level Documents
 
 These important documents live in the project root:

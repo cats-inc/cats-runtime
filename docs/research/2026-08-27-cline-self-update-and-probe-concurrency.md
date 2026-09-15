@@ -1,6 +1,7 @@
 # Cline CLI self-update — probe concurrency and the npm-global tree
 
 Date: 2026-08-27
+Last updated: 2026-09-15
 Scope: A setup scan uninstalled an installed provider CLI. Root cause, blast radius, and
 what the runtime fix does and does not cover.
 Host: Windows 11 26100, packaged Cats desktop (`cats-runtime@0.1.5`), `npm@12.0.2`,
@@ -89,6 +90,9 @@ version exists. The incident needed an already-stale install.
 
 ## What the runtime fix covers
 
+This section records the August mitigation. The September recurrence and
+replacement are documented below.
+
 `ProviderCompatibilityService`:
 
 - The version and help probes now run one after the other.
@@ -132,6 +136,118 @@ If a cline session dies mid-turn, or a provider that was detected earlier goes m
 - Whether `CI=1` or a similar environment variable suppresses cline's updater. Cline's
   README documents no opt-out.
 - The updater's own logic, which lives in the compiled `@cline/cli-windows-x64` binary.
+
+## 2026-09-15 recurrence at Windows login
+
+The packaged Cats process started with `--launch-at-login` at 18:16:44 Taiwan time.
+Its runtime sidecar reported version `0.1.21` and readiness at 18:17:10. Four npm
+debug logs then recorded `npm update --global cline --tag latest --min-release-age 0`:
+
+| npm log UTC timestamp | Exit | Evidence |
+| --- | --- | --- |
+| `2026-09-15T10_18_31_901Z` | 1 | `EEXIST` at the global `cline` shim |
+| `2026-09-15T10_18_52_574Z` | 0 | Update completed |
+| `2026-09-15T10_19_35_148Z` | 0 | Update completed |
+| `2026-09-15T10_19_56_393Z` | 0 | Update completed |
+
+All four recorded `~/.cats/runtime/data` as cwd and used Node `24.21.0` / npm
+`12.0.2`. Afterwards, the three global Cline shims and
+`~/.npm-global/node_modules/cline/package.json` were missing, with an empty package
+directory left behind. This is consistent with the competing reify/rollback
+failure seen in August; no Cline command was executed during the investigation.
+
+Two holes remained in the August mitigation:
+
+1. Health-purpose compatibility assessments skipped npm metadata altogether and
+   still ran both version and help commands. Diagnostics availability refreshes
+   use that purpose even after Desktop opens without a setup scan.
+2. Native install checks called `spawn('npm', ..., { shell: false })`. Windows
+   npm is a command shim, so that lookup can fail before supplying a version,
+   causing standard scans to fall back to executing Cline again.
+
+The four npm logs prove the updates originated in the probe cwd; they do not
+identify the exact pair of HTTP callers. The reported PowerShell processes had
+already exited before process-tree inspection, so their individual origins are
+not established. Do not label every reported console as separately proven.
+
+### Replacement behavior
+
+- All 16 CLI families use passive light detection. Setup, execution preparation,
+  diagnostics light mode, and health resolve configured commands and inspect
+  installation metadata without executing the provider. Missing, invalid, or
+  timed-out metadata never falls back to `--version` or `--help`.
+- Health, setup, and execution preparation stay passive even when passed live
+  mode. Executable compatibility checks require diagnostics purpose plus live
+  mode. Actual user turns still execute the provider.
+- Metadata-derived versions use fingerprint source `package`. Finding a command
+  selects a fallback adapter with unverified compatibility, without fabricated
+  help tokens or live validation. Missing commands remain unavailable even if
+  npm still records a version.
+- Background requests normalize to light mode before cache lookup/write, so a
+  setup request carrying live mode cannot satisfy later real live diagnostics.
+  Ordinary installed/unverified results do not create empty evidence artifacts;
+  installation failures and live failures retain their evidence.
+- Native install checks use the runtime's command resolver. Both npm-created
+  shims and Node's bundled `npm.cmd` run their Node entrypoint directly. The
+  bundled launcher first runs `npm-prefix.js` through hidden Node and honors an
+  installed npm override at that prefix. Unknown Windows wrappers produce an
+  inspection error instead of opening a shell. The whole inspection shares one
+  timeout budget.
+- Passive command lookup shares the launcher's npm-directory and install-path
+  fallbacks, so a GUI process with stale PATH can still find a stock install
+  without executing it or substituting for a missing custom wrapper.
+- ACP light/default probes resolve their command without running help or opening
+  a session. Health/availability diagnostics also prevent dynamic model/tool
+  discovery from bypassing the passive policy.
+- Goose's CLI-backed session list/export is no longer scheduled at startup or on
+  the background discovery timer. Explicit manual discovery remains available;
+  existing retained sessions are preserved. Other passive session readers and
+  OpenCode/Kilo reads from already-running servers retain their behavior.
+- Desktop accepts installed but unverified (`degraded`) providers as usable and
+  retains their warning/remediation details. Its first-run Windows Ollama audit
+  reads executable version metadata rather than launching `ollama --version`.
+
+### Process-scoped updater controls
+
+Cats also uses confirmed updater controls for provider execution. Environment
+controls apply to native children, WSL/Docker exec payloads, and ACP families.
+The Junie flag is injected only when the executable itself is Junie; arbitrary
+Node/npx/ACP bridges keep their arguments. Controls do not persist global
+environment or provider-config changes. Model discovery preserves inherited
+environment variables when merging these controls, and ACP passive command
+lookup uses the same child PATH/cwd as real launches.
+
+| Provider | Control | Evidence |
+| --- | --- | --- |
+| Claude | `DISABLE_AUTOUPDATER=1` | [Official setup guide](https://code.claude.com/docs/en/setup) |
+| OpenCode | `OPENCODE_DISABLE_AUTOUPDATE=true` | [Official CLI environment variables](https://opencode.ai/docs/cli/#environment-variables) |
+| Muse | `MUSE_NO_AUTO_UPDATE=1` | Installed launcher and [September 5 probe](./2026-09-05-meta-muse-cli-probe.md) |
+| Junie | `--skip-update-check` once | [Official CLI parameters](https://junie.jetbrains.com/docs/parameters.html) |
+
+No suppression flags are guessed for other providers. Cline's observed updater
+remains possible during actual turns or explicit live diagnostics; passive
+detection prevents background launch without needing an upstream opt-out.
+
+Regression coverage includes every CLI in native/WSL/Docker, all four purposes,
+repeated scans, absent/malformed/timed-out metadata, missing commands, explicit
+live diagnostics, background requests carrying live mode, and both Windows npm
+launcher forms with the shell unavailable. It also covers prefix overrides,
+stale PATH, ACP passive probes and updater controls, child-only environment
+changes, Goose background discovery, Desktop usability, and passive Ollama
+version detection. Tests use isolated fixtures, not real provider turns.
+
+Validation on Windows, 2026-09-15: the final 16-file Runtime regression set passed
+290 tests, with one POSIX-only test skipped. Three additional runtime-server
+tests passed for health summaries and startup/periodic discovery. Desktop
+readiness, setup readiness, and isolated Ollama helper tests passed 43 tests.
+Runtime and Desktop TypeScript builds, Runtime bundling, and diff whitespace
+checks passed. Cross-review findings covering npm launchers, stale/custom PATH,
+cache modes, Junie wrappers, child environment inheritance, and evidence retention
+were fixed and verified; no code findings remain.
+
+The installed Desktop and damaged global Cline installation remain unchanged.
+The source fix must be packaged and installed before it affects login on this
+machine; this record does not claim a reboot test of a newly installed package.
 
 ## Related
 

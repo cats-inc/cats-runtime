@@ -222,11 +222,13 @@ describe('provider diagnostics HTTP contract', () => {
     options: {
       metering?: RuntimeMeteringService;
       installCheckRunner?: ProviderInstallCheckRunner;
+      onCompatibilityProbe?: () => void;
     } = {},
   ) {
     const compatibility = new ProviderCompatibilityService(config, {
       runner: {
         run: vi.fn(async (_providerName, _commandConfig, args: string[]) => {
+          options.onCompatibilityProbe?.();
           if (args[0] === '--version') {
             return {
               exitCode: 0,
@@ -446,11 +448,7 @@ describe('provider diagnostics HTTP contract', () => {
         instance: 'default',
       }),
     ]);
-    expect(runner.run.mock.calls.map(([, commandConfig, args]) => `${commandConfig.path}:${args[0]}`))
-      .toEqual([
-        'claude-default:--version',
-        'claude-default:--help',
-      ]);
+    expect(runner.run).not.toHaveBeenCalled();
   });
 
   it('surfaces runtime ACP coexistence diagnostics on runtime and health snapshots', async () => {
@@ -797,7 +795,7 @@ describe('provider diagnostics HTTP contract', () => {
           instance: 'default',
           defaultTarget: true,
           availability: expect.objectContaining({
-            status: 'ok',
+            status: 'degraded',
             probe: 'light',
           }),
         },
@@ -828,7 +826,7 @@ describe('provider diagnostics HTTP contract', () => {
       '/diagnostics/providers?scope=availability&provider=claude&backend=cli&instance=default&force=1',
     );
     expect(response.status).toBe(200);
-    expect(installCheckRunner.lookupCommand).not.toHaveBeenCalled();
+    expect(installCheckRunner.lookupCommand).toHaveBeenCalledWith('claude', { mode: 'native' }, 10_000);
     expect(installCheckRunner.checkPath).not.toHaveBeenCalled();
     expect(installCheckRunner.checkNpmPackage).not.toHaveBeenCalled();
     expect(installCheckRunner.checkShellRcEntry).not.toHaveBeenCalled();
@@ -909,7 +907,7 @@ describe('provider diagnostics HTTP contract', () => {
       expect(payload.providers).toEqual([
         expect.objectContaining({
           availability: expect.objectContaining({
-            status: 'ok',
+            status: 'degraded',
             probe: 'light',
           }),
         }),
@@ -929,11 +927,28 @@ describe('provider diagnostics HTTP contract', () => {
 
     const response = await app.request('/diagnostics/health?force=1');
     expect(response.status).toBe(200);
-    expect(installCheckRunner.lookupCommand).not.toHaveBeenCalled();
+    expect(installCheckRunner.lookupCommand).toHaveBeenCalledWith('claude', { mode: 'native' }, 10_000);
     expect(installCheckRunner.checkPath).not.toHaveBeenCalled();
     expect(installCheckRunner.checkNpmPackage).not.toHaveBeenCalled();
     expect(installCheckRunner.checkShellRcEntry).not.toHaveBeenCalled();
     expect(installCheckRunner.getNpmPrefix).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    '/diagnostics/health?probe=live&force=1',
+    '/diagnostics/providers?scope=availability&probe=live&force=1',
+  ])('keeps background diagnostics passive even with live mode: %s', async (url) => {
+    const onCompatibilityProbe = vi.fn(() => { throw new Error('Must not execute a provider'); });
+    const modelSpy = vi.spyOn(ProviderModelCatalogService.prototype, 'getCatalog')
+      .mockRejectedValue(new Error('Must not launch model discovery'));
+    try {
+      const app = createTestApp(makeConfig(), { onCompatibilityProbe });
+      expect((await app.request(url)).status).toBe(200);
+      expect(onCompatibilityProbe).not.toHaveBeenCalled();
+      expect(modelSpy).not.toHaveBeenCalled();
+    } finally {
+      modelSpy.mockRestore();
+    }
   });
 
   it('returns machine-readable reprobe and compatibility cache metadata', async () => {

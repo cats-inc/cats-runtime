@@ -250,7 +250,8 @@ export class ProviderCompatibilityService {
       throw new Error('Compatibility probes only support CLI targets');
     }
 
-    const probeMode = options.probeMode || 'light';
+    const purpose = options.purpose || 'diagnostics';
+    const probeMode = purpose === 'diagnostics' ? options.probeMode || 'light' : 'light';
     const cachePurpose = resolveCompatibilityCachePurpose(options.purpose);
     const cached = !options.force
       ? this.getFreshCachedEntry(
@@ -275,7 +276,7 @@ export class ProviderCompatibilityService {
     let assessment: CompatibilityAssessment;
     try {
       assessment = await this.buildAssessment(target, {
-        purpose: options.purpose || 'diagnostics',
+        purpose,
         probeMode,
       });
     } finally {
@@ -388,6 +389,10 @@ export class ProviderCompatibilityService {
     const checkedAt = new Date(nowMs).toISOString();
     const baseCacheState = this.buildCacheState(nowMs, false);
     const healthOnly = options.purpose === 'health';
+    // Informational CLI commands can update installations or start daemons.
+    // Executing probes requires an explicit live diagnostics request for every
+    // provider. Missing metadata never authorizes falling back to execution.
+    const metadataOnly = options.purpose !== 'diagnostics' || options.probeMode !== 'live';
     const probeTimeoutMs = this.resolveProbeTimeoutMs(
       instance.commandConfig.runtime.mode,
       providerName as ProviderName,
@@ -397,7 +402,7 @@ export class ProviderCompatibilityService {
     // version string. This runs before the probes because it decides whether
     // the version probe has to execute at all.
     const npmPackage = installKnowledge.check.npmPackage;
-    const packageCheck = !healthOnly && npmPackage
+    const packageCheck = npmPackage
       ? await this.installCheckRunner.checkNpmPackage(
         npmPackage,
         instance.commandConfig.runtime,
@@ -405,11 +410,9 @@ export class ProviderCompatibilityService {
       )
       : undefined;
     const metadataVersion = parseVersion(packageCheck?.version);
-    // The probes run one after the other on purpose. A CLI that self-updates
-    // on launch (Cline does, via `npm update -g`) would otherwise have two
-    // concurrent npm writes racing over the same global tree, which leaves the
-    // package half-installed and its bin shims broken.
-    const versionProbe = versionArgs.length && !metadataVersion
+    // Serializing probes cannot contain a detached self-updater. Background
+    // checks remain passive even when package inspection fails.
+    const versionProbe = !metadataOnly && versionArgs.length && !metadataVersion
       ? await this.runner.run(
         providerName,
         instance.commandConfig,
@@ -418,7 +421,7 @@ export class ProviderCompatibilityService {
         probeTimeoutMs,
       )
       : undefined;
-    const helpProbe = helpArgs?.length
+    const helpProbe = !metadataOnly && helpArgs?.length
       ? await this.runner.run(
         providerName,
         instance.commandConfig,
@@ -437,12 +440,12 @@ export class ProviderCompatibilityService {
     const probedVersion = parseVersion(
       versionProbe?.stdout || versionProbe?.stderr,
     );
-    let parsedVersion = metadataVersion || probedVersion;
+    const parsedVersion = metadataVersion || probedVersion;
     const helpText = `${helpProbe?.stdout || ''}\n${helpProbe?.stderr || ''}`;
     const detectedFeatures = (compatibilityKnowledge?.primaryProfile.helpTokens || [])
       .filter((token) => helpText.includes(token))
       .map((token) => `token:${token}`);
-    let missingHelpTokens = (compatibilityKnowledge?.primaryProfile.helpTokens || [])
+    const missingHelpTokens = (compatibilityKnowledge?.primaryProfile.helpTokens || [])
       .filter((token) => !helpText.includes(token));
     // Deliberately not `parsedVersion`: a version read from npm metadata says
     // the package is installed, not that its binary executes.
@@ -459,7 +462,11 @@ export class ProviderCompatibilityService {
       npmPrefix,
     ] = healthOnly
       ? [
-          undefined,
+          await this.installCheckRunner.lookupCommand(
+            instance.commandConfig.path,
+            instance.commandConfig.runtime,
+            probeTimeoutMs,
+          ),
           undefined,
           undefined,
           [],
@@ -516,21 +523,19 @@ export class ProviderCompatibilityService {
             : Promise.resolve(undefined),
         ]);
 
-    const commandSummary = healthOnly
-      ? buildHealthCommandSummary({
-          configuredCommand: instance.commandConfig.path,
-          installView,
-          commandAvailable,
-        })
-      : buildCommandSummary({
-          configuredCommand: instance.commandConfig.path,
-          installView,
-          commandAvailable,
-          configuredLookup: configuredLookup!,
-          binaryLookup: binaryLookup!,
-          expectedPathCheck,
-          packageCheck,
-        });
+    if (metadataOnly) {
+      commandAvailable = configuredLookup?.available === true;
+    }
+
+    const commandSummary = buildCommandSummary({
+      configuredCommand: instance.commandConfig.path,
+      installView,
+      commandAvailable,
+      configuredLookup,
+      binaryLookup: binaryLookup ?? configuredLookup,
+      expectedPathCheck,
+      packageCheck,
+    });
     if (!healthOnly && commandSummary.status !== 'ready') {
       checks.push(createCheck(
         mapCommandStatusToCode(commandSummary.status),
@@ -570,33 +575,24 @@ export class ProviderCompatibilityService {
       }
     }
 
-    const metadataFallback = await maybeInferCompatibilityFromInstallMetadata({
-      providerName,
-      runtime: instance.commandConfig.runtime,
-      commandSummary,
-      versionProbe,
-      helpProbe,
-      installView,
-      compatibilityKnowledge,
-    });
-    if (metadataFallback) {
-      parsedVersion = metadataFallback.parsedVersion;
-      missingHelpTokens = [];
-      detectedFeatures.push(...metadataFallback.detectedFeatures);
-      commandAvailable = true;
+    if (metadataOnly) {
       checks.push(createCheck(
-        'metadata_probe_inference',
+        'passive_probe',
         'ok',
-        metadataFallback.summary,
+        `Inspected ${installView.familyLabel} installation without executing the provider.`,
       ));
     }
 
     checks.push(createCheck(
       'command_available',
       commandAvailable ? 'ok' : 'unavailable',
-      commandAvailable
-        ? `Executed compatibility probe for '${target.providerName}/${target.instanceId}'`
-        : `Failed to execute compatibility probe for '${target.providerName}/${target.instanceId}'`,
+      metadataOnly
+        ? (commandAvailable
+            ? `Resolved '${target.providerName}/${target.instanceId}' without executing it`
+            : `Could not resolve '${target.providerName}/${target.instanceId}' without executing it`)
+        : (commandAvailable
+            ? `Executed compatibility probe for '${target.providerName}/${target.instanceId}'`
+            : `Failed to execute compatibility probe for '${target.providerName}/${target.instanceId}'`),
       {
         command: instance.commandConfig.path,
         runtime: instance.commandConfig.runtime,
@@ -664,7 +660,7 @@ export class ProviderCompatibilityService {
       ));
     }
 
-    if (compatibilityKnowledge?.primaryProfile.helpTokens?.length) {
+    if (!metadataOnly && compatibilityKnowledge?.primaryProfile.helpTokens?.length) {
       checks.push(createCheck(
         missingHelpTokens.length === 0 ? 'feature_signature_matched' : 'feature_signature_partial',
         missingHelpTokens.length === 0 ? 'ok' : 'degraded',
@@ -684,6 +680,7 @@ export class ProviderCompatibilityService {
       missingHelpTokens,
       knowledge: compatibilityKnowledge,
       defaultProfile,
+      metadataOnly,
     });
     let classification = selection.classification;
     let summary = selection.summary;
@@ -691,7 +688,7 @@ export class ProviderCompatibilityService {
     const profileDefinition = selection.profileDefinition;
     let profile = selection.profile;
 
-    const liveProbeRecord = await this.maybeRunLiveProbe({
+    const liveProbeRecord = metadataOnly ? undefined : await this.maybeRunLiveProbe({
       instance,
       providerName,
       probeCwd,
@@ -813,7 +810,7 @@ export class ProviderCompatibilityService {
           major: parsedVersion.major,
           minor: parsedVersion.minor,
           patch: parsedVersion.patch,
-          source: 'command',
+          source: metadataVersion ? 'package' : 'command',
           detected: true,
         } : {
           raw: extractFirstLine(versionProbe?.stdout || versionProbe?.stderr),
@@ -842,7 +839,9 @@ export class ProviderCompatibilityService {
       },
     };
 
-    if (classification !== 'ready' && options.purpose !== 'health') {
+    const passiveUnverified = metadataOnly && commandAvailable && classification === 'degraded'
+      && !checks.some((check) => check.status === 'unavailable');
+    if (classification !== 'ready' && options.purpose !== 'health' && !passiveUnverified) {
       assessment.evidence = await this.captureEvidenceBundle(assessment, instance.commandConfig);
       if (assessment.evidence) {
         assessment.checks.push(createCheck(
@@ -1043,22 +1042,6 @@ function buildCommandSummary(input: {
     expectedPath: input.installView.path.expectedPath,
     expectedPathExists: input.expectedPathCheck?.exists,
     packageInstalled: input.packageCheck?.exists,
-  };
-}
-
-function buildHealthCommandSummary(input: {
-  configuredCommand: string;
-  installView: ProviderInstallCatalogView;
-  commandAvailable: boolean;
-}): ProviderSetupSummary['command'] {
-  return {
-    configuredCommand: input.configuredCommand,
-    binaryName: input.installView.binaryName,
-    status: input.commandAvailable ? 'ready' : 'probe_failed',
-    summary: input.commandAvailable
-      ? `Health probe executed ${input.installView.familyLabel} in the configured runtime.`
-      : `Health probe could not execute ${input.installView.familyLabel} in the configured runtime.`,
-    expectedPath: input.installView.path.expectedPath,
   };
 }
 
@@ -1592,6 +1575,7 @@ function selectProfile(input: {
   missingHelpTokens: string[];
   knowledge: ReturnType<typeof getProviderCompatibilityKnowledge>;
   defaultProfile: ReturnType<typeof getDefaultCompatibilityProfile>;
+  metadataOnly: boolean;
 }): {
   classification: CompatibilityClassification;
   profile: CompatibilityProfileSelection;
@@ -1605,8 +1589,12 @@ function selectProfile(input: {
       classification: 'probe_failed',
       profile: toSelection(input.defaultProfile, 'weak'),
       profileDefinition: input.defaultProfile,
-      summary: `Compatibility probe could not execute '${input.providerName}' in the configured runtime.`,
-      warnings: ['The runtime could not execute the configured provider command.'],
+      summary: input.metadataOnly
+        ? `Installation inspection could not resolve '${input.providerName}' in the configured runtime.`
+        : `Compatibility probe could not execute '${input.providerName}' in the configured runtime.`,
+      warnings: [input.metadataOnly
+        ? 'The runtime could not resolve the configured provider command.'
+        : 'The runtime could not execute the configured provider command.'],
       reason: 'command_unavailable',
     };
   }
@@ -1636,6 +1624,18 @@ function selectProfile(input: {
       summary: `${knowledge.familyLabel} version ${input.parsedVersion.normalized} is older than the supported compatibility baseline.`,
       warnings: ['The detected CLI version is older than the first supported compatibility profile.'],
       reason: 'unsupported_version',
+    };
+  }
+
+  if (input.metadataOnly) {
+    const profileDefinition = knowledge.fallbackProfile || knowledge.primaryProfile;
+    return {
+      classification: 'degraded',
+      profile: toSelection(profileDefinition, 'fallback'),
+      profileDefinition,
+      summary: `${knowledge.familyLabel} is installed; command execution and compatibility are unverified.`,
+      warnings: ['Using the best-known adapter; passive detection does not verify command execution.'],
+      reason: 'fallback',
     };
   }
 
@@ -1910,23 +1910,6 @@ function parseVersion(text: string | undefined): ParsedVersion | undefined {
     minor,
     patch,
   };
-}
-
-async function maybeInferCompatibilityFromInstallMetadata(input: {
-  providerName: ProviderName;
-  runtime: ProviderCommandConfig['runtime'];
-  commandSummary: ProviderSetupSummary['command'];
-  versionProbe?: ProbeResult;
-  helpProbe?: ProbeResult;
-  installView: ProviderInstallCatalogView;
-  compatibilityKnowledge: ReturnType<typeof getProviderCompatibilityKnowledge>;
-}): Promise<{
-  parsedVersion: ParsedVersion;
-  detectedFeatures: string[];
-  summary: string;
-} | undefined> {
-  void input;
-  return undefined;
 }
 
 function toProbeRecord(
