@@ -285,10 +285,8 @@ backends:
             # macOS and Linux, %LOCALAPPDATA%/Programs/muse/muse.cmd on Windows.
             command: muse
             runner: auto
-            # No sessions_dir: muse keeps its transcripts in a dated tree under
-            # ~/.local/share/muse/sessions with a companion index database, and
-            # the runtime has no scanner for that layout yet. Resume works
-            # regardless, because it goes through `muse exec --session-id`.
+            # Dated durable logs provide automatic discovery and history.
+            sessions_dir: ~/.local/share/muse/sessions
 
   api:
     providers:

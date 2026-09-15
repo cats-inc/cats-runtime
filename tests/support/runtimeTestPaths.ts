@@ -35,6 +35,7 @@ export function createRuntimeTestEnv(
     CATS_RUNTIME_DIR: paths.runtimeDir,
     CLINE_SESSIONS_DIR: join(root, '.cline', 'data', 'sessions'),
     GROK_SESSIONS_DIR: join(root, '.grok', 'sessions'),
+    MUSE_SESSIONS_DIR: join(root, '.local', 'share', 'muse', 'sessions'),
     ...overrides,
   };
 }

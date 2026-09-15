@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,7 +15,70 @@ describe('FileWatcher', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     rmSync(watchDir, { recursive: true, force: true });
+  });
+
+  it('discovers sessions when their directory is created after startup', async () => {
+    vi.useFakeTimers();
+    const sessionsDir = join(watchDir, 'new-cli', 'sessions');
+    const scanner: SessionScannerLike = {
+      scan: async () => existsSync(sessionsDir) ? [{
+        providerSessionId: 'first-session',
+        projectPath: sessionsDir,
+        sourcePath: join(sessionsDir, 'session.jsonl'),
+        cwd: watchDir,
+      }] : [],
+    };
+    const watcher = new FileWatcher(sessionsDir, scanner, 'pi', registry, 'native');
+    try {
+      await watcher.start();
+      expect(registry.list()).toHaveLength(0);
+      mkdirSync(sessionsDir, { recursive: true });
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(registry.list()).toHaveLength(1);
+      expect(registry.list()[0].providerSessionId).toBe('first-session');
+    } finally {
+      watcher.stop();
+    }
+  });
+
+  it('does not import an initial scan that completes after the watcher stops', async () => {
+    let finish!: (sessions: Awaited<ReturnType<SessionScannerLike['scan']>>) => void;
+    const scanner: SessionScannerLike = { scan: () => new Promise((resolve) => { finish = resolve; }) };
+    const watcher = new FileWatcher(watchDir, scanner, 'pi', registry, 'native');
+    const starting = watcher.start();
+    watcher.stop();
+    finish([{
+      providerSessionId: 'late-session', projectPath: watchDir,
+      sourcePath: join(watchDir, 'session.jsonl'), cwd: watchDir,
+    }]);
+    await starting;
+    expect(registry.list()).toEqual([]);
+  });
+
+  it('reruns a pending scan request after a slow scan finishes', async () => {
+    vi.useFakeTimers();
+    let finish!: (sessions: Awaited<ReturnType<SessionScannerLike['scan']>>) => void;
+    const scanner = { scan: vi.fn<SessionScannerLike['scan']>()
+      .mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }))
+      .mockResolvedValue([{
+        providerSessionId: 'changed-during-scan', projectPath: watchDir,
+        sourcePath: join(watchDir, 'session.jsonl'), cwd: watchDir,
+      }]),
+    };
+    const watcher = new FileWatcher(watchDir, scanner, 'pi', registry, 'native');
+    try {
+      const starting = watcher.start();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(scanner.scan).toHaveBeenCalledTimes(1);
+      finish([]);
+      await starting;
+      await vi.waitFor(() => expect(registry.list()).toHaveLength(1));
+      expect(scanner.scan).toHaveBeenCalledTimes(2);
+    } finally {
+      watcher.stop();
+    }
   });
 
   it('prunes stale closed discovered sessions missing from the latest file-backed scan', async () => {

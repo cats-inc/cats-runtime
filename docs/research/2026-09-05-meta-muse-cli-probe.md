@@ -278,14 +278,53 @@ exact `muse-cli-exec-json-1.0.3` profile. The desktop's `/api/providers` only
 lists a provider whose runtime diagnostics are `ok` or `degraded`, so this is
 what the list was waiting on.
 
-## Session storage — not wired
+## Session storage — automatic discovery added 2026-09-16
 
 muse keeps transcripts under `~/.local/share/muse/sessions/<yyyy>/<mm>/<dd>/
 <session-uuid>/session.jsonl` (that path is used on Windows too), with a
-companion `session-index.db` and an `.msp-view-v1` projection directory. The
-runtime has no scanner for that layout, so no `museSessionsDir` is configured
-and finished muse runs do not appear through file-backed discovery. Resume is
-unaffected: it goes through `--session-id`, not through the files.
+companion `session-index.db` and an `.msp-view-v1` projection directory.
+
+A read-only inspection of existing Windows logs on 2026-09-16 established the
+durable format needed for discovery. It differs from exec stdout: metadata is
+`runtime.session.metadata` with `payload.record.workspace_root` / `model_id`;
+working-directory updates also appear in `runtime.session.route_facts`.
+`runtime.session` records nest a run event in `payload.event`: `started.prompt`
+is the user turn, and `assistant_message_committed.text` is the assistant turn.
+`recorded_at` is Unix microseconds. Transaction frames contain JSON-encoded
+child records. User-intent intake, reasoning, and task output are separate
+records and must not be duplicated or treated as assistant replies.
+
+The runtime now scans these logs on startup, watches later changes, and retries
+missing session directories. The same reader supplies provider-owned history.
+`MUSE_SESSIONS_DIR` and per-instance `sessions_dir` configure the root; deletion
+uses the same contained provider-directory boundary as Cline and Grok. It does
+not query or mutate the Muse index database. Resume continues to use
+`--session-id`. Tests use synthetic versions of these observed shapes under
+temporary directories; no verification sessions were created in user state.
+
+The accompanying Devin audit found that Dashboard refresh previously only read
+the registry while manual discovery queried ACP. Agent targets now receive an
+asynchronous initial scan and periodic scans without `session/new`. Complete
+pagination follows the [ACP Session List contract](https://agentclientprotocol.com/protocol/v1/session-list);
+incomplete listings never prune the registry.
+
+Validation on 2026-09-16:
+
+- Focused discovery, configuration, ACP, and deletion suites: 171 tests passed
+  across six files. Existing Cline/Grok scanner suites: nine tests passed.
+- Selected runtime startup/dashboard and agent-discovery integration checks:
+  nine tests passed. These include the existing prohibition on background Goose
+  execution and file-watcher deduplication.
+- Full `npm test` passed before PR submission: 214 test files and 2,158 tests
+  passed; two files and ten tests were skipped. This includes a fresh build and
+  the UI artifact check with the generated pages staged for commit.
+- TypeScript `tsc --noEmit -p tsconfig.json` and `npm run build:ui` also passed.
+- Independent review verified the watcher catch-up/shutdown guards, complete
+  ACP pagination, unsupported permanent deletion, stale-list rejection after
+  deletion, and Muse path precedence. No remaining correctness findings were
+  reported.
+- This validates the source change with isolated fixtures. The installed Desktop
+  runtime (`0.1.22`) was not replaced during this check.
 
 ## Fixtures
 

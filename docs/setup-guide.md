@@ -131,6 +131,16 @@ import the sessions Devin already owns — `sessionId`, `cwd`, `title`, and
 deleting one of those runtime sessions also deletes it inside Devin, rather than
 only dropping the local record.
 
+Agent sessions are also discovered automatically when the runtime starts and
+then at `CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS` (5 seconds by default).
+Every configured agent instance participates, including non-default targets.
+The Dashboard's regular list refresh picks up imported sessions without a
+manual scan. Discovery only initializes the protocol and lists existing
+sessions; it never calls `session/new`. Slow scans do not overlap, failed scans
+retain known sessions, and agents without listing support are skipped until the
+discovery controller restarts. Setting the interval to `0` leaves agent
+discovery manual-only.
+
 The generated ACP target uses a 15-second startup timeout. Devin 3000.5.20 on
 Windows can take more than five seconds to finish `session/new`; the shorter
 generic timeout misclassifies a working target as unavailable.
@@ -187,10 +197,15 @@ same three switches — refusing an allowlist that names only part of a gated
 group, because muse cannot enforce it. Selecting a model is best-effort: an
 unknown `--model` id is ignored and the account default answers instead.
 
-Finished muse runs do not appear through file-backed session discovery. Its
-transcripts live under `~/.local/share/muse/sessions` in a dated tree with an
-index database that the runtime has no scanner for; resume is unaffected because
-it goes through `--session-id`.
+Muse sessions appear automatically from
+`~/.local/share/muse/sessions/<yyyy>/<mm>/<dd>/<session-id>/session.jsonl`, including
+on Windows. The runtime reads the durable logs directly for session metadata and
+user/assistant history, without running Muse or accessing its index database.
+Override the root with `MUSE_SESSIONS_DIR` or the instance's `sessions_dir`.
+Like Cline and Grok, it scans at startup and watches for later changes. A session
+directory created after startup is picked up within the watcher's five-second
+retry interval. Deleting a discovered session removes its provider-owned session
+directory, so a later scan does not restore it. Resume still uses `--session-id`.
 
 The runtime pins Devin's session mode to match its own permission mode, because
 Devin's default (`accept-edits`) writes files without asking: `skip` runs as
@@ -876,7 +891,7 @@ Currently supported agent transports are:
 Path semantics matter:
 
 - File-backed providers (`claude`, `codex`, `copilot`, `auggie`, `pi`,
-  `cline`, `grok`, `antigravity`) use
+  `cline`, `grok`, `muse`, `antigravity`) use
   host-side discovery paths. `projects_dir` / `sessions_dir` must point to a
   path that the `cats-runtime` host process can read directly.
   Antigravity is the one whose files are not JSON: each conversation is a SQLite

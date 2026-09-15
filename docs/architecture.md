@@ -844,6 +844,26 @@ For file-backed providers:
 4. Docker-backed file providers currently skip host-side file discovery and
    keep using their container-local session paths until Docker file discovery is
    implemented
+5. Cline, Grok, and Muse use the same initial-scan and file-watch lifecycle as
+   the other file-backed CLIs. Missing/recreated directories are retried every
+   five seconds; changes arriving during a scan schedule a follow-up scan.
+   Stopped controllers cannot apply late results or reopen watchers.
+6. Muse discovery reads dated `session.jsonl` durable logs. Session metadata,
+   nested run-start prompts, and committed assistant messages provide the list
+   and history; permission frames, tool output, and reasoning are not chat text.
+
+For agent-backed providers such as Devin:
+
+1. Each configured agent instance is listed asynchronously at startup and at the
+   native discovery interval, independent of the provider's default target.
+2. Enumeration only negotiates capabilities and lists existing sessions. It does
+   not create sessions or block runtime readiness. Unsupported agents stop
+   polling until discovery restarts; failed listings preserve the registry.
+3. ACP pagination must complete before import/prune. Repeated cursors, invalid
+   pages, or page failures discard the listing rather than pruning from a prefix.
+4. Scans do not overlap per target. A result is discarded if the controller
+   stopped or that target's registry identities changed while it was pending,
+   including a user deletion. The next scan reconciles the current provider state.
 
 ## Memory Ownership and Exports
 

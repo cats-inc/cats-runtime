@@ -57,6 +57,18 @@ export interface AgentSessionDiscoveryTarget {
   instanceId: string;
 }
 
+/** Enumerate every configured agent instance, including non-default targets. */
+export function listAgentSessionDiscoveryTargets(
+  config: Pick<CliRuntimeConfig, 'remoteProviderCatalog'>,
+): AgentSessionDiscoveryTarget[] {
+  return Object.entries(config.remoteProviderCatalog?.agent || {}).flatMap(
+    ([provider, instances]) => Object.values(instances).map((instance) => ({
+      provider,
+      instanceId: instance.id,
+    })),
+  );
+}
+
 export interface AgentSessionDiscoveryTargetResult extends AgentSessionDiscoveryTarget {
   /**
    * `unsupported` is a normal outcome, not a failure: session enumeration is an
@@ -154,6 +166,7 @@ type ManualSessionDiscoveryConfig = Pick<
   | 'antigravitySessionsDir'
   | 'clineSessionsDir'
   | 'grokSessionsDir'
+  | 'museSessionsDir'
   | 'remoteProviderCatalog'
 >;
 

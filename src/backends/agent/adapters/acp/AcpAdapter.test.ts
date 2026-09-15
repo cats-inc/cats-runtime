@@ -3717,6 +3717,58 @@ describe('AcpAdapter', () => {
 });
 
 describe('AcpAdapter session enumeration', () => {
+  it('collects all pages and deduplicates session ids before returning a catalog', async () => {
+    const process = new FakeAcpProcess();
+    const params: unknown[] = [];
+    startFakeServer(process, (message) => {
+      let result: unknown;
+      if (message.method === 'initialize') {
+        result = { protocolVersion: 1, agentCapabilities: { sessionCapabilities: { list: {} } } };
+      } else {
+        params.push(message.params);
+        result = params.length === 1
+          ? { sessions: [{ sessionId: 'first' }], nextCursor: 'opaque-next' }
+          : { sessions: [{ sessionId: 'first' }, { sessionId: 'second' }] };
+      }
+      process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result })}\n`);
+    });
+    const adapter = new AcpAdapter({ acpProcessSpawner: createSpawner(process) });
+    const result = await adapter.listSessions(createStdioInstance());
+    expect(result.sessions.map((session) => session.providerSessionId)).toEqual(['first', 'second']);
+    expect(params).toEqual([{}, { cursor: 'opaque-next' }]);
+    expect(process.killed).toBe(true);
+  });
+
+  it.each(['failed page', 'repeated cursor', 'invalid list'])(
+    'rejects an incomplete catalog on %s instead of returning a prefix', async (failure) => {
+      const process = new FakeAcpProcess();
+      let pages = 0;
+      startFakeServer(process, (message) => {
+        let result: unknown;
+        if (message.method === 'initialize') {
+          result = { protocolVersion: 1, agentCapabilities: { sessionCapabilities: { list: {} } } };
+        } else {
+          pages += 1;
+          if (pages === 1) {
+            result = { sessions: [{ sessionId: 'first' }], nextCursor: 'next' };
+          } else if (failure === 'failed page') {
+            process.stdout.write(`${JSON.stringify({
+              jsonrpc: '2.0', id: message.id, error: { code: -32603, message: 'List failed' },
+            })}\n`);
+            return;
+          } else {
+            result = failure === 'repeated cursor' ? { sessions: [], nextCursor: 'next' } : {};
+          }
+        }
+        process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result })}\n`);
+      });
+      const adapter = new AcpAdapter({ acpProcessSpawner: createSpawner(process) });
+      await expect(adapter.listSessions(createStdioInstance())).rejects.toThrow();
+      expect(pages).toBe(2);
+      expect(process.killed).toBe(true);
+    },
+  );
+
   it('lists sessions an agent already owns without creating one', async () => {
     const process = new FakeAcpProcess();
     const methods: string[] = [];
@@ -3869,6 +3921,16 @@ describe('AcpAdapter session deletion', () => {
 
     expect(methods).toContain('session/close');
     expect(methods).not.toContain('session/delete');
+  });
+
+  it('refuses a permanent deletion that background enumeration would immediately restore', async () => {
+    const agentProcess = new FakeAcpProcess();
+    const methods: string[] = [];
+    startCapabilityAgent(agentProcess, { sessionCapabilities: { list: {}, close: {} } }, methods);
+    const adapter = new AcpAdapter({ acpProcessSpawner: createSpawner(agentProcess) });
+    await expect(adapter.close('session-1', createStdioInstance(), state, 'delete'))
+      .rejects.toThrow('does not support permanent session deletion');
+    expect(methods).toEqual(['initialize']);
   });
 
   it('asks for nothing when the agent advertises neither', async () => {

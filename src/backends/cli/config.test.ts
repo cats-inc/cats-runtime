@@ -334,6 +334,47 @@ describe('config platform defaults', () => {
     expect(explicit.grokSessionsDir).toBe('/explicit/grok-sessions');
   });
 
+  it('resolves Muse session directories from defaults, environment and per-instance config', () => {
+    expect(loadConfigWithoutProviderFile({}).museSessionsDir)
+      .toBe('~/.local/share/muse/sessions');
+    const root = mkdtempSync(join(tmpdir(), 'muse-config-'));
+    try {
+      const configuredDir = join(root, 'configured');
+      const explicitDir = join(root, 'explicit');
+      const environment = loadConfigWithoutProviderFile({ MUSE_SESSIONS_DIR: explicitDir });
+      expect(resolveProviderInstance(environment, 'muse').museSessionsDir).toBe(explicitDir);
+      const configPath = join(root, 'config', 'providers.yaml');
+      mkdirSync(join(root, 'config'), { recursive: true });
+      writeFileSync(configPath, `version: 1
+environments:
+  native:
+    kind: native
+backends:
+  cli:
+    providers:
+      muse:
+        default_instance: native
+        discovery:
+          sessions_dir: ${JSON.stringify(configuredDir)}
+        instances:
+          native:
+            environment: native
+            command: muse
+          alternate:
+            environment: native
+            command: muse
+            sessions_dir: ${JSON.stringify(explicitDir)}
+`);
+      const config = loadConfig({
+        HOME: root, USERPROFILE: root, CATS_RUNTIME_DIR: root,
+      });
+      expect(resolveProviderInstance(config, 'muse', 'native').museSessionsDir).toBe(configuredDir);
+      expect(resolveProviderInstance(config, 'muse', 'alternate').museSessionsDir).toBe(explicitDir);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('derives the Kiro database path from the configured runtime mode', () => {
     const nativeConfig = loadConfigWithoutProviderFile({
       KIRO_RUNTIME: 'native',
