@@ -5,6 +5,7 @@ import type { ProviderCommandConfig, ProviderRuntimeConfig } from '../config.js'
 import { resolveRuntimeRoot, resolveRuntimeSessionsDir } from '../../../shared/runtimePaths.js';
 import { resolveWindowsNodeShim } from './windowsNodeShim.js';
 import { resolveWindowsMuseLauncher } from './windowsMuseLauncher.js';
+import { getProviderProcessPolicy } from './providerProcessPolicy.js';
 import {
   getProviderInstallKnowledge,
   resolveExecutionPlatform,
@@ -33,6 +34,7 @@ interface RuntimeExecPayload {
   cwd: string;
   command: string;
   args: string[];
+  env?: Record<string, string>;
   ensureCwd?: boolean;
   tempFiles?: RuntimePayloadFile[];
 }
@@ -162,13 +164,16 @@ export function buildProcessSpawnConfig(
   args: string[],
   cwd: string,
 ): ProcessSpawnConfig {
+  const policy = getProviderProcessPolicy(providerName, args, commandConfig.path);
   if (commandConfig.runtime.mode === 'wsl') {
-    return buildWslSpawnConfig(commandConfig, providerName, args, cwd);
+    return buildWslSpawnConfig(commandConfig, providerName, policy.args, cwd, policy.env);
   }
   if (commandConfig.runtime.mode === 'docker') {
-    return buildDockerSpawnConfig(commandConfig, providerName, args, cwd);
+    return buildDockerSpawnConfig(commandConfig, providerName, policy.args, cwd, policy.env);
   }
-  return buildNativeSpawnConfig(commandConfig, providerName, args, cwd);
+  const config = buildNativeSpawnConfig(commandConfig, providerName, policy.args, cwd);
+  if (policy.env) config.env = { ...config.env, ...policy.env };
+  return config;
 }
 
 export function buildPowerShellCommandScript(): string {
@@ -211,9 +216,10 @@ function buildWslSpawnConfig(
   providerName: string,
   args: string[],
   cwd: string,
+  env?: Record<string, string>,
 ): ProcessSpawnConfig {
   const payload = Buffer.from(JSON.stringify(
-    buildRuntimeExecPayload(commandConfig.runtime, providerName, commandConfig.path, args, cwd),
+    buildRuntimeExecPayload(commandConfig.runtime, providerName, commandConfig.path, args, cwd, env),
   ), 'utf8').toString('base64');
   const wslenv = appendWslenv(process.env.WSLENV, 'CATS_RUNTIME_WSL_EXEC_B64');
   const commandScript = [
@@ -223,6 +229,7 @@ function buildWslSpawnConfig(
     'import os',
     '',
     'payload = json.loads(base64.b64decode(os.environ["CATS_RUNTIME_WSL_EXEC_B64"]).decode("utf-8"))',
+    'os.environ.update(payload.get("env", {}))',
     'if payload.get("ensureCwd"):',
     '    os.makedirs(payload["cwd"], exist_ok=True)',
     'for file in payload.get("tempFiles", []):',
@@ -259,9 +266,10 @@ function buildDockerSpawnConfig(
   providerName: string,
   args: string[],
   cwd: string,
+  env?: Record<string, string>,
 ): ProcessSpawnConfig {
   const payload = Buffer.from(JSON.stringify(
-    buildRuntimeExecPayload(commandConfig.runtime, providerName, commandConfig.path, args, cwd),
+    buildRuntimeExecPayload(commandConfig.runtime, providerName, commandConfig.path, args, cwd, env),
   ), 'utf8').toString('base64');
   const commandScript = [
     'python3 - <<\'PY\'',
@@ -270,6 +278,7 @@ function buildDockerSpawnConfig(
     'import os',
     '',
     'payload = json.loads(base64.b64decode(os.environ["CATS_RUNTIME_DOCKER_EXEC_B64"]).decode("utf-8"))',
+    'os.environ.update(payload.get("env", {}))',
     'os.environ["PATH"] = "/root/.local/bin:" + os.environ.get("PATH", "")',
     'if payload.get("ensureCwd"):',
     '    os.makedirs(payload["cwd"], exist_ok=True)',
@@ -310,6 +319,7 @@ function buildRuntimeExecPayload(
   commandPath: string,
   args: string[],
   cwd: string,
+  env?: Record<string, string>,
 ): RuntimeExecPayload {
   const runtime = createRuntimeAdapter(runtimeConfig);
   const cwdInfo = runtimeConfig.mode === 'docker'
@@ -348,6 +358,7 @@ function buildRuntimeExecPayload(
     cwd: cwdInfo.cwd,
     command: commandPath,
     args: translatedArgs,
+    env,
     ensureCwd: cwdInfo.ensureCwd || undefined,
     tempFiles: tempFiles.length > 0 ? tempFiles : undefined,
   };

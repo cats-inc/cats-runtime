@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createInterface, type Interface as ReadLineInterface } from 'node:readline';
 import { hiddenWindowsSpawnOptions } from '../../../../core/process/windowsSpawn.js';
+import { getProviderProcessPolicy } from '../../../cli/runtime/providerProcessPolicy.js';
 import type { AgentProcessSpawner, AgentSpawnedProcess } from '../../types.js';
 
 export interface AcpJsonRpcErrorPayload {
@@ -46,6 +47,7 @@ export interface AcpSpawnProcessOptions {
 
 export interface AcpStdioClientOptions {
   command: string;
+  providerFamily?: string;
   args?: string[];
   cwd?: string;
   env?: Record<string, string>;
@@ -140,14 +142,17 @@ export class AcpStdioClient {
   private closed = false;
 
   constructor(private readonly options: AcpStdioClientOptions) {
+    const policy = getProviderProcessPolicy(
+      options.providerFamily || '', options.args ? [...options.args] : [], options.command,
+    );
     this.spawnOptions = {
       ...(options.cwd ? { cwd: options.cwd } : {}),
-      ...(options.env ? { env: { ...options.env } } : {}),
+      ...(options.env || policy.env ? { env: { ...options.env, ...policy.env } } : {}),
     };
     const spawnProcess = options.spawnProcess || defaultSpawnProcess;
     this.process = spawnProcess(
       options.command,
-      options.args ? [...options.args] : [],
+      policy.args,
       this.spawnOptions,
     );
     if (!this.process.stdin || !this.process.stdout) {

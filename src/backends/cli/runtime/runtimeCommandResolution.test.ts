@@ -83,7 +83,9 @@ describe('provider command resolution through install knowledge', () => {
     expect(spawnConfig.command).toBe(join(installDir, `muse-bin-${MUSE_VERSION}.exe`));
     expect(spawnConfig.args).toEqual(['exec', '--json', '--', 'Say hi']);
     expect(spawnConfig.shell).toBe(false);
-    expect(spawnConfig.env).toEqual({ MUSE_RELEASE_INFO: '{"channel":"muse-stable"}' });
+    expect(spawnConfig.env).toEqual({
+      MUSE_RELEASE_INFO: '{"channel":"muse-stable"}', MUSE_NO_AUTO_UPDATE: '1',
+    });
   });
 
   it('still reaches a half-installed muse through its launcher', () => {

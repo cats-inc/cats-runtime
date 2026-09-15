@@ -1,8 +1,13 @@
 import { spawn } from 'node:child_process';
 import { access, readFile } from 'node:fs/promises';
-import { isAbsolute, resolve as resolvePath } from 'node:path';
+import { extname, isAbsolute, join, resolve as resolvePath } from 'node:path';
 import type { ProviderRuntimeConfig } from '../../backends/cli/config.js';
-import { createRuntimeAdapter, quoteForBash } from '../../backends/cli/runtime/runtime.js';
+import {
+  buildProcessSpawnConfig,
+  createRuntimeAdapter,
+  quoteForBash,
+} from '../../backends/cli/runtime/runtime.js';
+import { resolveWindowsNpmShim } from '../../backends/cli/runtime/windowsNodeShim.js';
 import { expandNativeEnvPath } from './pathUtils.js';
 
 const DEFAULT_CHECK_TIMEOUT_MS = 3_000;
@@ -116,12 +121,60 @@ async function runCommand(
   args: string[],
   timeoutMs: number,
 ): Promise<RuntimeCheckCommandResult> {
+  if (process.platform === 'win32' && command === 'npm') {
+    return runWindowsNpmInspection(args, timeoutMs);
+  }
   return runSpawnedCommand(command, args, {
     timeoutMs,
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
     shell: false,
   });
+}
+
+async function runWindowsNpmInspection(
+  args: string[],
+  timeoutMs: number,
+): Promise<RuntimeCheckCommandResult> {
+  const startedAt = Date.now();
+  const commandPath = buildProcessSpawnConfig({
+    path: 'npm', runner: 'direct', runtime: { mode: 'native' },
+  }, 'npm', [], process.cwd()).command;
+  if (['.exe', '.com'].includes(extname(commandPath).toLowerCase())) {
+    return runCommand(commandPath, args, timeoutMs);
+  }
+  const target = resolveWindowsNpmShim(commandPath);
+  if (!target) {
+    return {
+      exitCode: null, stdout: '', stderr: '', timedOut: false,
+      durationMs: Date.now() - startedAt,
+      error: 'Cannot inspect the Windows npm launcher without starting a shell.',
+    };
+  }
+  let script = target.args[0]!;
+  if (target.prefixScript) {
+    const prefixResult = await runCommand(target.command, [target.prefixScript], timeoutMs);
+    if (prefixResult.timedOut || prefixResult.error) return prefixResult;
+    const prefix = prefixResult.stdout.trim().split(/\r?\n/).at(-1);
+    if (prefixResult.exitCode === 0 && prefix && isAbsolute(prefix)) {
+      const override = join(prefix, 'node_modules', 'npm', 'bin', 'npm-cli.js');
+      try {
+        await access(override);
+        script = override;
+      } catch {
+        // npm.cmd retains its bundled CLI when the global override is absent.
+      }
+    }
+  }
+  const remainingMs = timeoutMs - (Date.now() - startedAt);
+  if (remainingMs <= 0) {
+    return {
+      exitCode: null, stdout: '', stderr: '', timedOut: true,
+      durationMs: Date.now() - startedAt, error: `Timed out after ${timeoutMs}ms`,
+    };
+  }
+  const result = await runCommand(target.command, [script, ...args], remainingMs);
+  return { ...result, durationMs: Date.now() - startedAt };
 }
 
 export async function runSpawnedCommand(
@@ -251,10 +304,16 @@ export const defaultProviderInstallCheckRunner: ProviderInstallCheckRunner = {
       };
     }
 
-    if (runtime.mode === 'native' && (isAbsolute(command) || hasPathSeparator(command))) {
-      const resolvedPath = isAbsolute(command)
-        ? resolveHomePath(command)
-        : resolvePath(resolveHomePath(command));
+    // Use the same non-executing path resolution as real launches, including
+    // npm directories and installer paths absent from a GUI host's stale PATH.
+    const resolvedCommand = runtime.mode === 'native'
+      ? buildProcessSpawnConfig({ path: command, runner: 'direct', runtime },
+          command, [], process.cwd()).command
+      : command;
+    if (runtime.mode === 'native' && (isAbsolute(resolvedCommand) || hasPathSeparator(resolvedCommand))) {
+      const resolvedPath = isAbsolute(resolvedCommand)
+        ? resolveHomePath(resolvedCommand)
+        : resolvePath(resolveHomePath(resolvedCommand));
       try {
         await access(resolvedPath);
         return {

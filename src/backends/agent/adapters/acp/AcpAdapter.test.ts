@@ -1,6 +1,6 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
 import type {
@@ -971,30 +971,56 @@ describe('AcpAdapter', () => {
     ]);
   });
 
-  it('keeps light stdio health probes command-only', async () => {
+  it.each(['light', undefined] as const)('keeps %s stdio health probes passive', async (mode) => {
     const adapter = new AcpAdapter({
-      cliCommandRunner: createSuccessfulProbeRunner(),
+      cliCommandRunner: async () => { throw new Error('Passive checks must not launch help'); },
       acpProcessSpawner: () => {
         throw new Error('Light ACP health probes must not create a session.');
       },
     });
 
-    const result = await adapter.probe(createStdioInstance(), { mode: 'light' });
+    const result = await adapter.probe({ ...createStdioInstance(), command: process.execPath }, { mode });
 
     expect(result.health).toEqual({
-      status: 'ok',
+      status: 'degraded',
       checkedAt: expect.any(String),
-      details: "ACP stdio help probe succeeded for 'codex-acp serve --help'.",
+      details: 'ACP command is installed; execution has not been verified.',
     });
-    expect(result.liveProbe).toEqual(expect.objectContaining({
-      command: 'codex-acp',
-      args: ['serve', '--help'],
-      timedOut: false,
-    }));
-    expect(result.liveProbe).not.toHaveProperty('bootstrapSession');
+    expect(result.liveProbe).toBeUndefined();
     expect(result.checks).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'acp_session_bootstrap' }),
     ]));
+  });
+
+  it.each(['child-path', 'relative-command', 'relative-cwd'] as const)('finds passive ACP commands through %s without changing the host PATH', async (location) => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-acp-passive-path-'));
+    tempRoots.push(root);
+    const name = process.platform === 'win32' ? 'cats-fixture-acp.cmd' : 'cats-fixture-acp';
+    const path = join(root, name);
+    writeFileSync(path, 'fixture: this command must never be executed');
+    chmodSync(path, 0o755);
+    const previousPath = process.env.PATH;
+    const adapter = new AcpAdapter({
+      env: {
+        PATH: location === 'child-path' ? root
+          : location === 'relative-cwd' && process.platform === 'win32' ? join(root, 'unrelated') : '',
+        PATHEXT: '.CMD;.EXE',
+      },
+      cliCommandRunner: async () => { throw new Error('Passive lookup launched help'); },
+      acpProcessSpawner: () => { throw new Error('Passive lookup launched ACP'); },
+    });
+    const result = await adapter.probe({
+      ...createStdioInstance(),
+      command: location === 'relative-command' ? `./${name}` : 'cats-fixture-acp',
+      cwd: location === 'child-path' ? process.cwd()
+        : location === 'relative-cwd' ? relative(process.cwd(), root) : root,
+    }, { mode: 'light' });
+    expect(result.health.status).toBe('degraded');
+    const resolvedPath = result.checks?.[0]?.details?.resolvedPath as string;
+    expect(process.platform === 'win32' ? resolvedPath.toLowerCase() : resolvedPath)
+      .toBe(process.platform === 'win32' ? path.toLowerCase() : path);
+    expect(result.liveProbe).toBeUndefined();
+    expect(process.env.PATH).toBe(previousPath);
   });
 
   it('runs a stdio help probe for codex ACP Tier 1 targets', async () => {
@@ -1033,7 +1059,7 @@ describe('AcpAdapter', () => {
       acpProcessSpawner: createSpawner(process),
     });
 
-    await expect(adapter.probe(createStdioInstance())).resolves.toEqual({
+    await expect(adapter.probe(createStdioInstance(), { mode: 'live' })).resolves.toEqual({
       health: {
         status: 'ok',
         checkedAt: expect.any(String),
@@ -1127,7 +1153,7 @@ describe('AcpAdapter', () => {
       acpProcessSpawner: createSpawner(process),
     });
 
-    await expect(adapter.probe!(createClaudeStdioInstance())).resolves.toEqual({
+    await expect(adapter.probe!(createClaudeStdioInstance(), { mode: 'live' })).resolves.toEqual({
       health: {
         status: 'ok',
         checkedAt: expect.any(String),
@@ -1211,7 +1237,7 @@ describe('AcpAdapter', () => {
       acpProcessSpawner: createSpawner(process),
     });
 
-    const result = await adapter.probe!(createAntigravityStdioInstance());
+    const result = await adapter.probe!(createAntigravityStdioInstance(), { mode: 'live' });
     expect(result.health.status).toBe('ok');
     expect(result.liveProbe).toEqual(expect.objectContaining({
       profile: 'agy-acp',
@@ -1250,7 +1276,7 @@ describe('AcpAdapter', () => {
       acpProcessSpawner: createSpawner(process),
     });
 
-    const result = await adapter.probe!(createCursorStdioInstance());
+    const result = await adapter.probe!(createCursorStdioInstance(), { mode: 'live' });
     expect(result.health.status).toBe('ok');
     expect(result.liveProbe).toEqual(expect.objectContaining({
       profile: 'cursor-acp',
@@ -1289,7 +1315,7 @@ describe('AcpAdapter', () => {
       acpProcessSpawner: createSpawner(process),
     });
 
-    const result = await adapter.probe!(createCopilotStdioInstance());
+    const result = await adapter.probe!(createCopilotStdioInstance(), { mode: 'live' });
     expect(result.health.status).toBe('ok');
     expect(result.liveProbe).toEqual(expect.objectContaining({
       profile: 'copilot-acp',
@@ -1310,7 +1336,7 @@ describe('AcpAdapter', () => {
       cliCommandRunner: createFailedProbeRunner(),
     });
 
-    await expect(adapter.probe(createStdioInstance())).resolves.toEqual({
+    await expect(adapter.probe(createStdioInstance(), { mode: 'live' })).resolves.toEqual({
       health: {
         status: 'unavailable',
         checkedAt: expect.any(String),
@@ -1378,7 +1404,7 @@ describe('AcpAdapter', () => {
       startupTimeoutMs: 10,
     };
 
-    await expect(adapter.probe(instance)).resolves.toEqual({
+    await expect(adapter.probe(instance, { mode: 'live' })).resolves.toEqual({
       health: {
         status: 'unavailable',
         checkedAt: expect.any(String),

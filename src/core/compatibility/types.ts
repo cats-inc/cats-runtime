@@ -66,7 +66,7 @@ export interface CompatibilityVersionFingerprint {
   major?: number;
   minor?: number;
   patch?: number;
-  source: 'command' | 'unknown';
+  source: 'command' | 'package' | 'unknown';
   detected: boolean;
 }
 

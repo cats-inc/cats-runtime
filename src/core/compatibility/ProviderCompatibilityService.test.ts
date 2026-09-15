@@ -1,10 +1,10 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ProviderTargetDescriptor } from '../providerCatalog.js';
 import { ProviderCompatibilityService } from './ProviderCompatibilityService.js';
-import type { ProviderName } from '../../backends/cli/providers/types.js';
+import { KNOWN_PROVIDERS, type ProviderName } from '../../backends/cli/providers/types.js';
 import type { ProviderInstallCheckRunner } from '../provider-install/ProviderInstallCheckRunner.js';
 
 function createCliTarget(
@@ -105,7 +105,7 @@ describe('ProviderCompatibilityService', () => {
       now: () => Date.parse('2026-03-23T00:00:00.000Z'),
     });
 
-    const assessment = await service.assessCliTarget(createCliTarget('claude'));
+    const assessment = await service.assessCliTarget(createCliTarget('claude'), { probeMode: 'live' });
     expect(assessment.classification).toBe('ready');
     expect(assessment.status).toBe('ok');
     expect(assessment.profile.id).toBe('claude-cli-stream-json-v1');
@@ -145,21 +145,21 @@ describe('ProviderCompatibilityService', () => {
       now: () => Date.parse('2026-03-23T00:00:00.000Z'),
     });
 
-    await service.assessCliTarget(createCliTarget('claude'));
+    await service.assessCliTarget(createCliTarget('claude'), { probeMode: 'live' });
 
     // Overlapping probes let a CLI that self-updates on launch run two
     // concurrent npm writes against the same global tree.
-    expect(runner.run).toHaveBeenCalledTimes(2);
+    expect(runner.run).toHaveBeenCalledTimes(3);
     expect(maxInFlight).toBe(1);
   });
 
-  it('reads an npm-global CLI version from package metadata instead of executing it', async () => {
+  it('reads an npm-global CLI version without running its version command', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-npm-version-'));
     tempDirs.push(root);
     const runner = {
       run: vi.fn(async () => ({
         exitCode: 0,
-        stdout: 'Usage: cline --json --auto-approve --thinking --acp\n',
+        stdout: 'Usage: codex exec --json --sandbox --ask-for-approval\n',
         stderr: '',
         timedOut: false,
         durationMs: 3,
@@ -180,13 +180,114 @@ describe('ProviderCompatibilityService', () => {
       now: () => Date.parse('2026-03-23T00:00:25.000Z'),
     });
 
-    const assessment = await service.assessCliTarget(createCliTarget('cline'));
+    const assessment = await service.assessCliTarget(createCliTarget('codex'));
 
-    expect(runner.run).toHaveBeenCalledTimes(1);
-    expect(runner.run.mock.calls[0]![2]).toEqual(['--help']);
+    expect(runner.run).not.toHaveBeenCalled();
     expect(assessment.fingerprint.version.normalized).toBe('3.0.60');
-    expect(assessment.profile.id).toBe('cline-cli-json-3.0.51');
+    expect(assessment.fingerprint.version.source).toBe('package');
     expect(assessment.setup.version.detected).toBe('3.0.60');
+  });
+
+  it.each(['health', 'setup', 'diagnostics', 'execution'] as const)(
+    'never launches Cline during %s detection, even after metadata failures or repeated scans',
+    async (purpose) => {
+      const root = mkdtempSync(join(tmpdir(), 'cats-runtime-cline-passive-'));
+      tempDirs.push(root);
+      const runner = { run: vi.fn(async () => {
+        throw new Error('A detection scan must not execute Cline or its updater');
+      }) };
+      const checkNpmPackage = vi.fn()
+        .mockResolvedValueOnce({ exists: true, version: '3.1.0', timedOut: false })
+        .mockResolvedValueOnce({ exists: false, timedOut: false })
+        .mockResolvedValueOnce({ exists: false, timedOut: true, error: 'timeout' })
+        .mockResolvedValueOnce({ exists: true, version: 'invalid', timedOut: false });
+      const installCheckRunner = createInstallCheckRunner({ checkNpmPackage });
+      const service = new ProviderCompatibilityService({
+        dataDir: join(root, 'data'),
+        sessionBaseDir: join(root, 'sessions'),
+      }, { runner, installCheckRunner });
+
+      for (let index = 0; index < 4; index += 1) {
+        const assessment = await service.assessCliTarget(createCliTarget('cline'), {
+          purpose,
+          force: true,
+        });
+        expect(assessment.classification).toBe('degraded');
+        expect(assessment.setup.command.status).toBe('ready');
+        expect(assessment.profile).toMatchObject({
+          parserId: 'cline-native-json',
+          confidence: 'fallback',
+        });
+        expect(assessment.probes).toEqual({
+          version: undefined, help: undefined, live: undefined,
+        });
+        expect(assessment.probe.liveValidated).toBe(false);
+        expect(assessment.fingerprint.features).toEqual([]);
+        expect(assessment.fingerprint.version.source).toBe(index === 0 ? 'package' : 'unknown');
+        expect(assessment.checks.map((check) => check.code)).toContain('passive_probe');
+        expect(assessment.checks.map((check) => check.code)).not.toContain('feature_signature_matched');
+      }
+
+      expect(runner.run).not.toHaveBeenCalled();
+      expect(checkNpmPackage).toHaveBeenCalledTimes(4);
+      expect(installCheckRunner.lookupCommand).toHaveBeenCalled();
+      if (purpose === 'health') {
+        expect(installCheckRunner.checkPath).not.toHaveBeenCalled();
+        expect(installCheckRunner.checkShellRcEntry).not.toHaveBeenCalled();
+        expect(installCheckRunner.getNpmPrefix).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it.each(KNOWN_PROVIDERS.flatMap((providerName) =>
+    (['native', 'wsl', 'docker'] as const).map((mode) => ({ providerName, mode })),
+  ))('keeps $providerName background detection passive in $mode', async ({ providerName, mode }) => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-cline-health-live-'));
+    tempDirs.push(root);
+    const runner = { run: vi.fn(async () => {
+      throw new Error('Background checks must never execute a provider');
+    }) };
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'), sessionBaseDir: join(root, 'sessions'),
+    }, { runner, installCheckRunner: createInstallCheckRunner({
+      checkNpmPackage: vi.fn(async () => ({ exists: false, timedOut: true, error: 'timeout' })),
+    }) });
+
+    for (const purpose of ['health', 'setup', 'execution', 'diagnostics'] as const) {
+      for (const probeMode of ['light', 'live'] as const) {
+        if (purpose === 'diagnostics' && probeMode === 'live') continue;
+        const assessment = await service.assessCliTarget(createCliTarget(providerName, 'default', { mode }), {
+          purpose, probeMode, force: true,
+        });
+        expect(assessment.probe.liveValidated).toBe(false);
+        expect(assessment.classification).toBe('degraded');
+        expect(assessment.setup.command.status).toBe('ready');
+        expect(assessment.profile.confidence).not.toBe('exact');
+        expect(assessment.fingerprint.features).toEqual([]);
+        expect(assessment.fingerprint.version.source).toBe('unknown');
+        expect(assessment.probes).toEqual({ version: undefined, help: undefined, live: undefined });
+      }
+    }
+    expect(runner.run).not.toHaveBeenCalled();
+  });
+
+  it.each(KNOWN_PROVIDERS)('does not report missing %s commands as installed', async (providerName) => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-passive-missing-'));
+    tempDirs.push(root);
+    const runner = { run: vi.fn(async () => { throw new Error('Must not execute a missing CLI'); }) };
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'), sessionBaseDir: join(root, 'sessions'),
+    }, { runner, installCheckRunner: createInstallCheckRunner({
+      lookupCommand: vi.fn(async () => ({ available: false, timedOut: false })),
+      checkNpmPackage: vi.fn(async () => ({ exists: true, version: '3.1.0', timedOut: false })),
+    }) });
+    const assessment = await service.assessCliTarget(createCliTarget(providerName), {
+      purpose: 'health',
+    });
+    expect(runner.run).not.toHaveBeenCalled();
+    expect(assessment.probe.liveValidated).toBe(false);
+    expect(assessment.setup.command.status).not.toBe('ready');
+    expect(assessment.classification).toBe('probe_failed');
   });
 
   it('does not treat an npm-recorded version as proof the binary executes', async () => {
@@ -321,7 +422,7 @@ describe('ProviderCompatibilityService', () => {
 
       const assessment = await service.assessCliTarget(
         createCliTarget('kiro', instanceId, runtimeOverride),
-        { force: true },
+        { probeMode: 'live', force: true },
       );
       expect(assessment.classification).toBe('ready');
       expect(runner.run.mock.calls.every((call) => call[4] === expectedTimeoutMs)).toBe(true);
@@ -364,7 +465,7 @@ describe('ProviderCompatibilityService', () => {
       now: () => Date.parse('2026-08-24T00:00:00.000Z'),
     });
 
-    await service.assessCliTarget(createCliTarget('muse'), { force: true });
+    await service.assessCliTarget(createCliTarget('muse'), { probeMode: 'live', force: true });
     expect(runner.run.mock.calls.every((call) => call[4] === 20_000)).toBe(true);
 
     runner.run.mockClear();
@@ -374,12 +475,12 @@ describe('ProviderCompatibilityService', () => {
         container: 'cats-cli-dev',
         environmentId: 'docker-dev',
       }),
-      { force: true },
+      { probeMode: 'live', force: true },
     );
     expect(runner.run.mock.calls.every((call) => call[4] === 45_000)).toBe(true);
 
     runner.run.mockClear();
-    await service.assessCliTarget(createCliTarget('claude'), { force: true });
+    await service.assessCliTarget(createCliTarget('claude'), { probeMode: 'live', force: true });
     expect(runner.run.mock.calls.every((call) => call[4] === 10_000)).toBe(true);
   });
 
@@ -420,7 +521,7 @@ describe('ProviderCompatibilityService', () => {
         installCheckRunner: createInstallCheckRunner(),
         now: () => Date.parse('2026-08-25T00:00:00.000Z'),
       });
-      return service.assessCliTarget(createCliTarget('antigravity'), { force: true });
+      return service.assessCliTarget(createCliTarget('antigravity'), { probeMode: 'live', force: true });
     };
 
     for (const version of ['1.1.20', '1.2.0']) {
@@ -486,7 +587,7 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
         now: () => Date.parse('2026-03-23T00:00:00.250Z'),
       });
 
-      const assessment = await service.assessCliTarget(target);
+      const assessment = await service.assessCliTarget(target, { probeMode: 'live' });
       // What this test is actually about: the direct spawn exited without
       // output, and the shell retry recovered enough to parse a version. The
       // fake help omits the expected feature markers, so diagnostics remain
@@ -553,7 +654,7 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
         },
       ];
 
-    expect(firstHealthAssessment.status).toBe('ok');
+    expect(firstHealthAssessment.status).toBe('degraded');
     expect(firstHealthAssessment.setup.command.status).toBe('ready');
     expect(firstHealthAssessment.setup.prerequisites).toEqual(expectedPrerequisites);
     expect(firstHealthAssessment.setup.pathPersistence.status).not.toBe('missing');
@@ -562,19 +663,19 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
     expect(firstHealthAssessment.evidence).toBeUndefined();
     expect(cachedHealthAssessment.cache.hit).toBe(true);
     expect(service.getCachedAssessment('claude', 'default')).toBeUndefined();
-    expect(installCheckRunner.lookupCommand).not.toHaveBeenCalled();
+    expect(installCheckRunner.lookupCommand).toHaveBeenCalledTimes(1);
     expect(installCheckRunner.checkPath).not.toHaveBeenCalled();
     expect(installCheckRunner.checkNpmPackage).not.toHaveBeenCalled();
     expect(installCheckRunner.checkShellRcEntry).not.toHaveBeenCalled();
     expect(installCheckRunner.getNpmPrefix).not.toHaveBeenCalled();
-    expect(runner.run).toHaveBeenCalledTimes(2);
+    expect(runner.run).not.toHaveBeenCalled();
 
-    const diagnosticsAssessment = await service.assessCliTarget(createCliTarget('claude'));
+    const diagnosticsAssessment = await service.assessCliTarget(createCliTarget('claude'), { probeMode: 'live' });
 
     expect(diagnosticsAssessment.cache.hit).toBe(false);
-    expect(service.getCachedAssessment('claude', 'default')).toBeDefined();
+    expect(service.getCachedAssessment('claude', 'default', 'live')).toBeDefined();
     expect(installCheckRunner.lookupCommand).toHaveBeenCalled();
-    expect(runner.run).toHaveBeenCalledTimes(4);
+    expect(runner.run).toHaveBeenCalledTimes(3);
   });
 
   it('accepts current 0.x CLI families when their compatibility signature matches', async () => {
@@ -618,7 +719,7 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
         now: () => Date.parse('2026-03-23T00:00:01.000Z'),
       });
 
-      const assessment = await service.assessCliTarget(createCliTarget(currentCase.providerName));
+      const assessment = await service.assessCliTarget(createCliTarget(currentCase.providerName), { probeMode: 'live' });
       expect(assessment.classification).toBe('ready');
       expect(assessment.status).toBe('ok');
     }
@@ -633,21 +734,21 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
     }, {
       runner: {
         run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
-          exitCode: null,
+          exitCode: args[0] === 'app-server' ? 0 : null,
           stdout: args[0] === '--version'
             ? 'codex-cli 0.117.0\n'
             : 'Codex CLI\n\nCommands:\n  app-server  [experimental] Run the app server or related tooling\n',
           stderr: '',
-          timedOut: true,
+          timedOut: args[0] !== 'app-server',
           durationMs: 3_500,
-          error: 'Timed out after 3000ms',
+          error: args[0] === 'app-server' ? undefined : 'Timed out after 3000ms',
         })),
       },
       installCheckRunner: createInstallCheckRunner(),
       now: () => Date.parse('2026-03-23T00:00:02.000Z'),
     });
 
-    const assessment = await service.assessCliTarget(createCliTarget('codex'));
+    const assessment = await service.assessCliTarget(createCliTarget('codex'), { probeMode: 'live' });
     expect(assessment.classification).toBe('ready');
     expect(assessment.status).toBe('ok');
     expect(assessment.checks).toEqual(expect.arrayContaining([
@@ -686,12 +787,40 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
       now: () => Date.parse('2026-03-23T00:00:00.000Z'),
     });
 
-    const first = await service.assessCliTarget(createCliTarget('antigravity'));
-    const second = await service.assessCliTarget(createCliTarget('antigravity'));
+    const first = await service.assessCliTarget(createCliTarget('antigravity'), { probeMode: 'live' });
+    const second = await service.assessCliTarget(createCliTarget('antigravity'), { probeMode: 'live' });
     expect(first.cache.hit).toBe(false);
     expect(second.cache.hit).toBe(true);
-    expect(runner.run).toHaveBeenCalledTimes(2);
+    expect(runner.run).toHaveBeenCalledTimes(3);
   });
+
+  it.each(['setup', 'execution', 'health'] as const)(
+    'does not let a passive %s result satisfy later live diagnostics', async (purpose) => {
+      const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-cache-policy-'));
+      tempDirs.push(root);
+      const runner = { run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
+        exitCode: 0,
+        stdout: args[0] === '--version' ? 'claude 1.2.3'
+          : 'Usage: claude --input-format --output-format --include-partial-messages',
+        stderr: '', timedOut: false, durationMs: 1,
+      })) };
+      const service = new ProviderCompatibilityService({
+        dataDir: join(root, 'data'), sessionBaseDir: join(root, 'sessions'),
+      }, { runner, installCheckRunner: createInstallCheckRunner() });
+      const target = createCliTarget('claude');
+      const passive = await service.assessCliTarget(target, { purpose, probeMode: 'live' });
+      expect(passive.probe.mode).toBe('light');
+      expect(service.getCachedAssessment('claude', 'default', 'live')).toBeUndefined();
+      expect(runner.run).not.toHaveBeenCalled();
+
+      const live = await service.assessCliTarget(target, { purpose: 'diagnostics', probeMode: 'live' });
+      expect(live.cache.hit).toBe(false);
+      expect(live.probe.liveValidated).toBe(true);
+      expect(runner.run).toHaveBeenCalledTimes(3);
+      expect((await service.assessCliTarget(target, { probeMode: 'live' })).cache.hit).toBe(true);
+      expect(runner.run).toHaveBeenCalledTimes(3);
+    },
+  );
 
   it('limits concurrent compatibility assessments to the configured slot count', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-limit-'));
@@ -728,9 +857,9 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
       }
     };
 
-    const firstAssessment = service.assessCliTarget(createCliTarget('claude'));
+    const firstAssessment = service.assessCliTarget(createCliTarget('claude'), { probeMode: 'live' });
     await flush();
-    const secondAssessment = service.assessCliTarget(createCliTarget('codex'));
+    const secondAssessment = service.assessCliTarget(createCliTarget('codex'), { probeMode: 'live' });
     await flush();
 
     // Codex waits on the slot, and the probes within one assessment are
@@ -748,18 +877,23 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
     ]);
 
     pendingRuns.get('claude:--help')?.();
+    await flush();
+    pendingRuns.get('claude:--input-format')?.();
     await firstAssessment;
     await flush();
 
     expect(startedProviders).toEqual([
       'claude:--version',
       'claude:--help',
+      'claude:--input-format',
       'codex:--version',
     ]);
 
     pendingRuns.get('codex:--version')?.();
     await flush();
     pendingRuns.get('codex:--help')?.();
+    await flush();
+    pendingRuns.get('codex:app-server')?.();
 
     await Promise.all([firstAssessment, secondAssessment]);
   });
@@ -789,7 +923,7 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
       now: () => Date.parse('2026-03-23T00:00:10.000Z'),
     });
 
-    const assessment = await service.assessCliTarget(createCliTarget('codex'));
+    const assessment = await service.assessCliTarget(createCliTarget('codex'), { probeMode: 'live' });
     expect(assessment.classification).toBe('degraded');
     expect(assessment.evidence?.relativePath).toMatch(/^codex\//);
     expect(assessment.setup.command.status).toBe('ready');
@@ -803,6 +937,14 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
     expect(evidence.classification).toBe('degraded');
     expect(evidence.profile.id).toBe('codex-cli-json-rpc-best-fit');
     expect(evidence.probes.version?.stdoutSample).toContain('codex 0.99.0');
+
+    // Ordinary scans must not displace real failure evidence with empty probes.
+    for (let scan = 0; scan < 3; scan += 1) {
+      const passive = await service.assessCliTarget(createCliTarget('codex'), { purpose: 'setup', force: true });
+      expect(passive.evidence).toBeUndefined();
+    }
+    expect(readdirSync(join(service.getEvidenceDir(), 'codex'))).toEqual([assessment.evidence!.relativePath.split('/').at(-1)]);
+    expect(readFileSync(evidencePath, 'utf8')).toContain('codex 0.99.0');
   });
 
   it('redacts Windows paths and secret-like values in evidence bundles', async () => {
@@ -839,7 +981,7 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
       now: () => Date.parse('2026-03-23T00:00:15.000Z'),
     });
 
-    const assessment = await service.assessCliTarget(createCliTarget('codex'));
+    const assessment = await service.assessCliTarget(createCliTarget('codex'), { probeMode: 'live' });
     const evidencePath = join(service.getEvidenceDir(), assessment.evidence!.relativePath);
     const evidenceText = readFileSync(evidencePath, 'utf8');
     const evidence = JSON.parse(evidenceText) as {
@@ -961,7 +1103,7 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
           }
 
           return {
-            available: false,
+            available: true,
             timedOut: false,
           };
         }),
@@ -970,6 +1112,9 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
     });
 
     const assessment = await service.assessCliTarget(createCliTarget('codex'));
+    expect(assessment.evidence).toBeDefined();
+    expect(assessment.classification).toBe('degraded');
+    expect(assessment.setup.command.status).toBe('ready');
     expect(assessment.setup.prerequisites).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: 'node',
@@ -1011,7 +1156,7 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
       now: () => Date.parse('2026-03-23T00:00:30.000Z'),
     });
 
-    const assessment = await service.assessCliTarget(createCliTarget('claude'));
+    const assessment = await service.assessCliTarget(createCliTarget('claude'), { probeMode: 'live' });
     expect(assessment.setup.auth.status).toBe('missing');
     expect(assessment.setup.remediation.map((step) => step.code)).toContain('authenticate_provider');
     expect(assessment.checks).toEqual(expect.arrayContaining([
@@ -1044,7 +1189,7 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
       now: () => Date.parse('2026-03-23T00:00:32.000Z'),
     });
 
-    const assessment = await service.assessCliTarget(createCliTarget('claude'));
+    const assessment = await service.assessCliTarget(createCliTarget('claude'), { probeMode: 'live' });
     expect(assessment.setup.auth.status).toBe('unknown');
     expect(assessment.checks.find((check) => check.code === 'auth_missing')).toBeUndefined();
   });
@@ -1058,22 +1203,22 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
     }, {
       runner: {
         run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
-          exitCode: args[0] === '--version' ? 0 : null,
+          exitCode: args[0] === '--help' ? null : 0,
           stdout: args[0] === '--version'
             ? '2026.03.25-933d5a6\n'
             : 'Usage: cursor-agent --output-format --stream-partial-output --resume\n'
               + '--api-key <key> (can also use CURSOR_API_KEY env var)\n',
           stderr: '',
-          timedOut: args[0] !== '--version',
+          timedOut: args[0] === '--help',
           durationMs: 4,
-          ...(args[0] !== '--version' ? { error: 'Timed out after 5000ms' } : {}),
+          ...(args[0] === '--help' ? { error: 'Timed out after 5000ms' } : {}),
         })),
       },
       installCheckRunner: createInstallCheckRunner(),
       now: () => Date.parse('2026-03-23T00:00:33.000Z'),
     });
 
-    const assessment = await service.assessCliTarget(createCliTarget('cursor'));
+    const assessment = await service.assessCliTarget(createCliTarget('cursor'), { probeMode: 'live' });
     expect(assessment.classification).toBe('ready');
     expect(assessment.setup.auth.status).toBe('unknown');
     expect(assessment.checks.find((check) => check.code === 'auth_missing')).toBeUndefined();
@@ -1101,7 +1246,7 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
       now: () => Date.parse('2026-03-23T00:00:35.000Z'),
     });
 
-    const assessment = await service.assessCliTarget(createCliTarget('claude'));
+    const assessment = await service.assessCliTarget(createCliTarget('claude'), { probeMode: 'live' });
     expect(assessment.classification).toBe('unsupported_version');
     expect(assessment.setup.version.status).toBe('unsupported');
     expect(assessment.setup.remediation.map((step) => step.code)).toContain('upgrade_provider');
@@ -1130,7 +1275,7 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
       now: () => Date.parse('2026-08-08T00:00:00.000Z'),
     });
 
-    const assessment = await service.assessCliTarget(createCliTarget('grok'));
+    const assessment = await service.assessCliTarget(createCliTarget('grok'), { probeMode: 'live' });
 
     expect(assessment.classification).toBe('ready');
     expect(assessment.profile).toMatchObject({
@@ -1169,7 +1314,7 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
       now: () => Date.parse('2026-08-24T00:00:00.000Z'),
     });
 
-    const assessment = await service.assessCliTarget(createCliTarget('grok'));
+    const assessment = await service.assessCliTarget(createCliTarget('grok'), { probeMode: 'live' });
 
     expect(assessment.classification).toBe('ready');
     expect(assessment.profile).toMatchObject({
@@ -1206,7 +1351,7 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
       now: () => Date.parse('2026-08-08T00:00:01.000Z'),
     });
 
-    const assessment = await service.assessCliTarget(createCliTarget('grok'));
+    const assessment = await service.assessCliTarget(createCliTarget('grok'), { probeMode: 'live' });
 
     expect(assessment.classification).toBe('ready');
     expect(assessment.profile).toMatchObject({
@@ -1243,7 +1388,9 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
       now: () => Date.parse('2026-08-26T00:00:00.000Z'),
     });
 
-    const assessment = await service.assessCliTarget(createCliTarget('cline'));
+    const assessment = await service.assessCliTarget(createCliTarget('cline'), {
+      probeMode: 'live',
+    });
 
     expect(assessment.classification).toBe('ready');
     expect(assessment.profile).toMatchObject({
@@ -1450,13 +1597,13 @@ printf 'Antigravity CLI\\nUsage: agy\\n'
       now: () => now,
     });
 
-    await service.assessCliTarget(createCliTarget('claude'));
+    await service.assessCliTarget(createCliTarget('claude'), { probeMode: 'live' });
     now += 1_500;
 
     const summary = service.getCachedSummary('claude', 'default');
     expect(summary).toEqual(expect.objectContaining({
       probe: expect.objectContaining({
-        mode: 'light',
+        mode: 'live',
       }),
       cache: expect.objectContaining({
         stale: true,

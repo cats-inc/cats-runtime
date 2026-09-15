@@ -83,6 +83,42 @@ describe('AcpStdioClient', () => {
     });
   });
 
+  it.each([
+    ['claude', { DISABLE_AUTOUPDATER: '1' }, ['serve']],
+    ['opencode', { OPENCODE_DISABLE_AUTOUPDATE: 'true' }, ['serve']],
+    ['junie', undefined, ['--skip-update-check', 'serve']],
+  ] as const)('applies the %s process policy to ACP launches', (providerFamily, expectedEnv, expectedArgs) => {
+    const child = new FakeAcpProcess();
+    const inputEnv = { PATH: 'fixture-path' };
+    const client = new AcpStdioClient({
+      command: providerFamily === 'junie' ? 'junie' : 'fixture-acp', providerFamily, args: ['serve'], env: inputEnv,
+      spawnProcess: (command, args, options) => {
+        expect(command).toBe(providerFamily === 'junie' ? 'junie' : 'fixture-acp');
+        expect(args).toEqual(expectedArgs);
+        expect(options.env).toEqual({ ...inputEnv, ...expectedEnv });
+        return child;
+      },
+    });
+    activeClients.push(client);
+    expect(inputEnv).toEqual({ PATH: 'fixture-path' });
+  });
+
+  it.each([
+    ['node', ['/fixtures/junie-acp.js', 'serve']],
+    ['npx', ['--yes', 'junie-acp', 'serve']],
+    ['junie-acp', ['serve']],
+  ])('preserves Junie bridge arguments when launched through %s', (command, args) => {
+    const client = new AcpStdioClient({
+      command: command as string, args: args as string[], providerFamily: 'junie',
+      spawnProcess: (actualCommand, actualArgs) => {
+        expect(actualCommand).toBe(command);
+        expect(actualArgs).toEqual(args);
+        return new FakeAcpProcess();
+      },
+    });
+    activeClients.push(client);
+  });
+
   it('routes notifications to the notification callback', async () => {
     const process = new FakeAcpProcess();
     const received: Array<{ method: string; params?: unknown }> = [];

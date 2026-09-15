@@ -115,7 +115,7 @@ export const defaultKiloModelDiscoveryRunner: KiloModelDiscoveryRunner = {
 
     return runSpawnedCommand(spawnConfig.command, spawnConfig.args, {
       cwd: spawnConfig.cwd,
-      env: spawnConfig.env,
+      env: { ...process.env, ...spawnConfig.env },
       shell: spawnConfig.shell,
       windowsVerbatimArguments: spawnConfig.windowsVerbatimArguments,
       windowsHide: true,

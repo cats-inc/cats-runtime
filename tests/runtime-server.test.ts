@@ -2464,7 +2464,7 @@ backends:
               provider: 'codex',
               target: 'cli/missing',
               status: 'unavailable',
-              summary: expect.stringContaining('Failed to execute compatibility probe'),
+              summary: "Could not resolve 'codex/missing' without executing it",
             }),
           ]),
         },
@@ -6771,6 +6771,30 @@ providers:
         wslDiscoveryStatus: undefined,
       })).not.toThrow();
     } finally {
+      await runtime.close();
+      await cleanup();
+    }
+  });
+
+  it('never starts Goose from startup or periodic discovery', async () => {
+    const { config, cleanup } = createTestConfig();
+    config.nativeDiscoveryIntervalMs = 1_000;
+    expect(Object.keys(config.providerInstances.goose)).not.toHaveLength(0);
+    for (const provider of Object.keys(config.providerInstances)) {
+      if (provider !== 'goose') config.providerInstances[provider as keyof typeof config.providerInstances] = {};
+    }
+    const runtime = createRuntimeServer(config);
+    const listAllSessions = vi.spyOn(runtime.context.gooseNative, 'listAllSessions')
+      .mockRejectedValue(new Error('Background discovery must not execute Goose'));
+    const discovery = createDiscoveryController(runtime.context);
+    vi.useFakeTimers();
+    try {
+      discovery.start();
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(listAllSessions).not.toHaveBeenCalled();
+    } finally {
+      discovery.stop();
+      vi.useRealTimers();
       await runtime.close();
       await cleanup();
     }

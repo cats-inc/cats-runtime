@@ -41,8 +41,13 @@ classes with materially different costs, and the codebase already encodes the re
 distinction: `CompatibilityProbeMode = 'light' | 'live'` and
 `CompatibilityProbeKind = 'version' | 'help' | 'live'` in `src/core/compatibility/types.ts`.
 
-Light probes need no auth, consume no provider quota, and are deterministic. Live probes need
-credentials, consume quota, and are not. ADR-025's caution was really about the live tier.
+The original proposal treated informational CLI flags as deterministic, unauthenticated
+light probes. The September 15 login incident disproved the assumption that executing
+them is side-effect free: Cline started detached npm updates. Under the accepted
+[ADR-035 amendment](./035-never-block-provider-execution-on-exact-cli-version.md),
+local background/light detection now reads installation metadata and cached evidence
+without executing any provider. Executable version/help checks require explicit live
+diagnostics. Upstream release-feed observation remains separate from local CLI execution.
 
 ## Decision
 
