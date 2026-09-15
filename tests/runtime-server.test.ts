@@ -1607,8 +1607,9 @@ backends:
               profile: expect.objectContaining({
                 id: 'codex-cli-json-rpc-best-fit',
               }),
-              evidence: expect.objectContaining({
-                relativePath: expect.stringContaining('codex/'),
+              probe: expect.objectContaining({
+                mode: 'light',
+                liveValidated: false,
               }),
             }),
             checks: expect.arrayContaining([
