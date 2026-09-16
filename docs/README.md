@@ -35,9 +35,13 @@ Runtime, local Platform, and packaged Desktop. Selection is saved before probes;
 missing/invalid configuration requires repair and explicit empty selection is
 idle mode. Revision-aware scans, lifecycle admission, and host integration are
 implemented; PLAN-039 records integrated validation and native OS limits.
+The accepted Runtime Setup UX also retains per-target setup observations with their
+original times across selection edits; changed configurations need detection.
+User testing is complete; PLAN-039 records automated validation and delivery.
 
 - [ADR-039: accepted provider selection boundary](./decisions/039-use-selected-provider-config-as-the-resource-boundary.md)
 - [PLAN-039: Runtime, Platform, and Desktop rollout](./plans/PLAN-039-provider-selection-bootstrap-rollout.md)
+- [Runtime Setup action layout rationale](./research/2026-09-16-setup-action-layout.md)
 
 Provider detection incident: [Cline updates at Windows login and passive detection for all CLIs](./research/2026-08-27-cline-self-update-and-probe-concurrency.md)
 records the September 15 recurrence, shared CLI/ACP policy, Desktop handling,

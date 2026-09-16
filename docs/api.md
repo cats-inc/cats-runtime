@@ -589,7 +589,7 @@ selection/repair without launching provider work.
 
 | Route | Contract |
 |-------|----------|
-| `GET /setup-state` | Read static choices, active selection, repair guidance and revision-scoped observations; no probes |
+| `GET /setup-state` | Read static choices, active selection, repair guidance, revision-scoped scans and per-target observation history; no probes |
 | `PUT /setup-selection` | Save and activate `{expectedRevision, targets}` without requiring detection |
 | `POST /setup-selection/reload` | Validate and activate hand-edited YAML with `{expectedRevision}` |
 | `POST /setup-scan` | Start a scan of selected targets or an explicit selected subset; returns `202` |
@@ -631,8 +631,23 @@ is allowed and does not implicitly select other backends or instances.
 - `scan` and `manualScan`: matching-revision observations or null. Each entry
   has provider/backend/instance, command/auth availability, install metadata
   and remediation. Non-CLI targets do not require CLI installation.
+- `observations`: latest completed evidence per exact target, with the scan-entry
+  fields plus `observedAt`, `scanType`, and `configurationStatus`
+  (`unchanged|changed|not_selected`). The original time and result survive
+  unrelated selection edits and Runtime restart. `available` describes the
+  recorded result, not current execution readiness; changed/unselected history
+  is excluded from active readiness and remediation. New targets may have no
+  record. Matching uses a private command/runtime/endpoint configuration digest,
+  including referenced endpoint environment values; no digest or raw secrets
+  are returned. Reading history performs no provider work.
 - `repair`: `selection_required|scan_required|attention_required|ready`,
   `providersReady`, `providersNeedingAttention`, preferred scan and actions.
+  `observationCoverage` reports selected `observedCount`, `notDetectedCount`,
+  and `configurationChangedCount`. Ready/attention lists use matching retained
+  observations; `preferredScan` counts describe only that scan snapshot.
+  Diagnostic reports use this same retained coverage: missing or changed targets
+  produce `setup_detection_required`; a subset scan cannot imply all selected
+  providers are unavailable.
 - `diagnostics.latestReport`: the retained diagnostic report summary, if any.
 
 Saves validate the whole candidate before atomic replacement. Stale editors,
@@ -640,12 +655,16 @@ external disk changes, and changes to a target with active work return `409`.
 Invalid candidates return `400` without replacing the active configuration.
 A reload uses the same activation and admission checks. Watchers/caches and
 background work are reconciled; historical sessions remain on disk.
+Save and reload responses also include the projected `observations` and `state`,
+so the editor can preserve results immediately without starting another scan.
 
 `POST /setup-scan` accepts `{manual:true, targets:[...]}`; omitted targets mean
 the active selected set. Manual refresh changes freshness, never scope. Missing
 selection returns `409`; an unselected target returns `400`. Identical running
 scans coalesce; different scopes/modes conflict. Poll `GET /setup-state` until
-`state.status` leaves `scanning`. A revision change discards obsolete results.
+`state.status` leaves `scanning`. A revision change discards obsolete in-flight
+results, while completed per-target history remains available. A subset scan
+updates only that subset's historical observations and times.
 Routine CLI detection remains passive. `POST /setup-apply` has been removed.
 
 MCP hosts use `setup_state`, `save_provider_selection`, and `run_setup_scan`
@@ -655,7 +674,10 @@ failure cleanup. Non-cancellable CLI/agent model discovery also holds admission;
 cancellable HTTP model discovery is aborted on activation.
 
 Setup observations persist under `<dataDir>/setup/` in `setup-state.json`,
-`provider-scan.json`, and `provider-manual-scan.json`. None overrides YAML intent.
+`provider-scan.json`, `provider-manual-scan.json`, and `provider-observations.json`.
+Setup JSON files are written with owner-only permissions on POSIX systems.
+History writes are best effort and cannot prevent selection activation; a failed
+write retains observations in memory for that process. None overrides YAML intent.
 
 ### Setup Diagnostic Report
 

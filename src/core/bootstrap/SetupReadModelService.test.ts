@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { SetupReadModelService } from './SetupReadModelService.js';
-import type { BootstrapScanResult } from './BootstrapService.js';
+import type { BootstrapScanResult, ProviderSetupObservation } from './BootstrapService.js';
 import type { ProviderSelectionSnapshot } from './ProviderSelectionService.js';
 
-function readModel(selection: ProviderSelectionSnapshot, scan: BootstrapScanResult | null = null) {
+function readModel(selection: ProviderSelectionSnapshot, scan: BootstrapScanResult | null = null,
+  observations: ProviderSetupObservation[] = (scan?.providers || []).map((entry) => ({
+    ...entry, observedAt: scan!.scannedAt, scanType: scan!.scanType, configurationStatus: 'unchanged',
+  }))) {
   return new SetupReadModelService({
     bootstrapRequired: selection.state === 'missing' || selection.state === 'invalid',
     bootstrapService: {
@@ -12,6 +15,7 @@ function readModel(selection: ProviderSelectionSnapshot, scan: BootstrapScanResu
         appliedAt: null, appliedConfigPath: null, error: null }),
       getLatestScan: async () => scan,
       getLatestManualScan: async () => scan?.scanType === 'manual' ? scan : null,
+      getProviderObservations: () => observations,
       getProviderUniverse: () => [],
     },
   }).read();
@@ -42,5 +46,30 @@ describe('selection-first setup guidance', () => {
     expect(data.repair.providersReady).toEqual([]);
     expect(data.repair.actions.some((action) => action.path === '/setup-apply')).toBe(false);
     expect(data.repair.actions.find((action) => action.kind === 'generate_setup_report')?.body).toEqual({ refreshScan: false });
+  });
+
+  it('reports partial coverage without losing unchanged results or counting removed history', async () => {
+    const targets = ['claude', 'codex', 'pi'].map((provider) => ({
+      provider, backend: 'cli' as const, instance: 'native',
+    }));
+    const observations: ProviderSetupObservation[] = [
+      { ...targets[0]!, family: 'Claude', commandStatus: 'ready', commandPath: 'claude',
+        version: null, authStatus: 'unknown', available: true, install: null, remediation: [],
+        observedAt: '2026-09-16T01:00:00.000Z', scanType: 'manual', configurationStatus: 'unchanged' },
+      { ...targets[1]!, family: 'Codex', commandStatus: 'ready', commandPath: 'codex',
+        version: null, authStatus: 'unknown', available: true, install: null, remediation: [],
+        observedAt: '2026-09-16T01:00:00.000Z', scanType: 'manual', configurationStatus: 'changed' },
+      { provider: 'copilot', backend: 'cli', instance: 'native', family: 'Copilot',
+        commandStatus: 'missing_install', commandPath: null, version: null,
+        authStatus: 'unknown', available: false, install: null, remediation: [],
+        observedAt: '2026-09-16T01:00:00.000Z', scanType: 'manual', configurationStatus: 'not_selected' },
+    ];
+    const data = await readModel({ ...empty, state: 'selected', targets }, null, observations);
+    expect(data.observations).toEqual(observations);
+    expect(data.repair.status).toBe('scan_required');
+    expect(data.repair.providersReady).toEqual([{ provider: 'claude', family: 'Claude' }]);
+    expect(data.repair.providersNeedingAttention).toEqual([]);
+    expect(data.repair.observationCoverage).toEqual({ observedCount: 1, notDetectedCount: 1, configurationChangedCount: 1 });
+    expect(data.repair.preferredScan.providerCount).toBe(0);
   });
 });

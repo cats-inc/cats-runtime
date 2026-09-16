@@ -8,6 +8,7 @@ import type {
   BootstrapService,
   SetupState,
   ProviderUniverseEntry,
+  ProviderSetupObservation,
 } from './BootstrapService.js';
 import type { ProviderSelectionSnapshot } from './ProviderSelectionService.js';
 import {
@@ -22,6 +23,7 @@ export interface SetupStateReadModel {
   state: SetupState;
   scan: SetupStateScanSummary | null;
   manualScan: BootstrapScanResult | null;
+  observations: ProviderSetupObservation[];
   universe: ProviderUniverseEntry[];
   repair: SetupRepairSummary;
   diagnostics: {
@@ -48,7 +50,8 @@ export interface SetupReadModelServiceOptions {
   bootstrapRequired: boolean;
   bootstrapService: Pick<
     BootstrapService,
-    'getSetupState' | 'getLatestScan' | 'getLatestManualScan' | 'getProviderUniverse' | 'getSelection'
+    'getSetupState' | 'getLatestScan' | 'getLatestManualScan' | 'getProviderUniverse'
+    | 'getSelection' | 'getProviderObservations'
   >;
   diagnostics?: Pick<SetupDiagnosticService, 'readLatestReport'>;
 }
@@ -71,6 +74,7 @@ export class SetupReadModelService {
       this.bootstrapService.getLatestManualScan(),
     ]);
     const latestReport = this.diagnostics?.readLatestReport() ?? null;
+    const observations = this.bootstrapService.getProviderObservations();
 
     return {
       bootstrapRequired: this.bootstrapRequired,
@@ -78,12 +82,14 @@ export class SetupReadModelService {
       state,
       scan: summarizeScan(scan),
       manualScan: manualScan ?? null,
+      observations,
       universe: this.bootstrapService.getProviderUniverse(),
       repair: buildRepairSummary({
         bootstrapRequired: this.bootstrapRequired,
         selectedCount: this.bootstrapService.getSelection().targets.length,
         scan,
         manualScan,
+        observations,
       }),
       diagnostics: {
         latestReport: summarizeLatestReport(latestReport),

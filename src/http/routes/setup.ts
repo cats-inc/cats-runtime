@@ -69,7 +69,9 @@ setupRoutes.put('/setup-selection', async (c) => {
   try {
     const selection = ctx.bootstrapService.saveSelection(body.targets, body.expectedRevision);
     ctx.startup.bootstrapRequired = false;
-    return c.json({ status: 'saved', selection, bootstrapRequired: false });
+    return c.json({ status: 'saved', selection, bootstrapRequired: false,
+      observations: ctx.bootstrapService.getProviderObservations(),
+      state: await ctx.bootstrapService.getSetupState() });
   } catch (error) {
     if (error instanceof ProviderSelectionError) return c.json({ error: error.message }, error.status);
     return c.json({ error: 'Could not save provider selection' }, 500);
@@ -83,7 +85,9 @@ setupRoutes.post('/setup-selection/reload', async (c) => {
   try {
     const selection = ctx.bootstrapService.selection.reload(body.expectedRevision);
     ctx.startup.bootstrapRequired = false;
-    return c.json({ status: 'reloaded', selection });
+    return c.json({ status: 'reloaded', selection,
+      observations: ctx.bootstrapService.getProviderObservations(),
+      state: await ctx.bootstrapService.getSetupState() });
   } catch (error) {
     if (error instanceof ProviderSelectionError) return c.json({ error: error.message }, error.status);
     return c.json({ error: 'Could not reload provider selection' }, 500);

@@ -303,13 +303,44 @@ In bootstrap mode:
 The bootstrap flow:
 
 1. Open `http://127.0.0.1:3110/` (or the configured host/port).
-2. Select native CLI, Ollama or OpenClaw targets and click `Save Selection`.
-   Saving no targets is valid idle mode. The static choices require no scan.
-3. Scan the saved selection when you want readiness/remediation information.
-   Missing providers remain selected; install/authenticate only those you need.
-4. Use `Configured Targets` to inspect selected target capabilities.
-5. Hand-edited YAML is activated with `Reload Edited Config`. Conflicting
+2. Choose native CLI, Ollama or OpenClaw targets. First-run checkboxes start
+   empty; existing settings restore your saved choices. Checkboxes express what
+   you want Cats to use, independently of installation or availability.
+3. Click `Apply` to save and activate your choices. The adjacent `Detect after
+   applying` checkbox optionally detects the selected providers after saving.
+   It defaults on for first setup and off when opening an already configured
+   Runtime; your checkbox choice is kept during the page visit.
+   Missing installations or failed detection do
+   not undo the saved selection or keep Runtime in bootstrap mode.
+   A progress banner and spinners cover saving and any requested detection. Choices stay
+   visibly checked while editing is temporarily locked; results appear when
+   the operation finishes. Applying without detection reports only that the
+   choices were saved, preserving unchanged providers' last detection results.
+   Each recorded result shows `Last detected` with its original time. Newly
+   selected targets without history show `Not detected yet`; a changed command
+   or endpoint shows `Needs detection` only for that target. Deselected results
+   remain historical and are excluded from active counts. The same results
+   survive page refresh and Runtime restart when persisted successfully.
+   `Skip for Now` saves empty idle scope when no providers are chosen initially.
+   `Apply` returns a configured Runtime to idle if all choices
+   are removed. The applied selection count and pending additions/removals distinguish active
+   settings from unsaved edits. `Discard Changes` restores the saved choices.
+4. Follow the installation or repair instructions beside each provider, then
+   use `Detect Again` beside `Go to Dashboard` below the provider list. This
+   completion group appears when there are no pending checkbox edits; editing
+   switches the same footer back to `Apply` and its detection option. While
+   detecting again, the button spins in place and Dashboard stays visible but
+   temporarily disabled. CLI installation and login status are shown separately;
+   detected installation does not verify model execution. This page does not
+   yet verify non-CLI endpoint connections and labels those as unverified.
+   Missing providers remain selected. `Go to Dashboard` opens the Runtime dashboard.
+5. Use `Runtime Targets` to inspect selected target capabilities.
+6. Hand-edited YAML is activated with `Reload Edited Configuration`. Reloading
+   discards the checkbox draft; the button says so when edits are pending. Conflicting
    edits and busy targets require resolving the conflict before retrying.
+   If another Setup or Desktop editor changes the saved selection, this page
+   loads the latest choices and asks you to review them. Any interrupted
+   detection is reported explicitly; use `Detect Again` for the new selection.
 
 The active config is the resource boundary for standalone Runtime, Platform,
 and Desktop. A selected target is a provider/backend/instance tuple. Saving or
@@ -322,6 +353,8 @@ Setup artifacts are persisted under `<dataDir>/setup/`:
 - `setup-state.json` — bootstrap workflow state
 - `provider-scan.json` — latest scan results
 - `provider-manual-scan.json` — latest explicit operator-triggered scan results
+- `provider-observations.json` — last completed result and configuration digest
+  per target; historical evidence that cannot enable provider work
 
 When you need a shareable operator/debug snapshot after startup, the runtime
 now also supports a setup diagnostic report:

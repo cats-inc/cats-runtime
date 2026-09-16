@@ -75,6 +75,10 @@ function createBootstrapStub(): SetupDiagnosticBootstrapService {
     }),
     getLatestScan: async () => latest,
     getLatestManualScan: async () => latest,
+    getProviderObservations: () => latest.providers.map((entry) => ({
+      ...entry, backend: 'cli' as const, instance: 'native', observedAt: latest.scannedAt,
+      scanType: latest.scanType, configurationStatus: 'unchanged' as const,
+    })),
     scan: async () => {
       latest = {
         ...latest,

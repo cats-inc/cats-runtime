@@ -263,6 +263,7 @@ describe('runtime MCP facade', () => {
       })),
       getLatestScan: vi.fn(async () => latestScan),
       getLatestManualScan: vi.fn(async () => latestScan),
+      getProviderObservations: vi.fn(() => []),
       getProviderUniverse: vi.fn(() => [
         {
           provider: 'claude',

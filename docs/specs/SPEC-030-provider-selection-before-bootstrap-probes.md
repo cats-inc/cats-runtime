@@ -91,6 +91,71 @@ themselves express selection. Draft checkbox changes are not active until the
 user saves them. The runtime must accept selected targets whose executable or
 endpoint is not currently available; their status explains what remains to do.
 
+### Runtime selection editor UX (accepted 2026-09-16)
+
+- Keep `Bootstrap` as the mode label to match Runtime terminology; it can also
+  represent missing or invalid configuration after an earlier setup.
+- First-run checkboxes start empty. Existing saved targets initialize the
+  editor, including targets that are unavailable; saved empty scope stays empty.
+- Checkboxes edit a draft. Show the saved scope count separately, mark pending
+  additions/removals, and provide a local discard action. Availability badges
+  report observations independently; unchecked or unprobed does not mean missing.
+- Retain the last completed observation per exact target in Runtime, including
+  its original timestamp. Applying without detection preserves unchanged targets'
+  results across page refresh and Runtime restart. New targets without history
+  show `Not detected yet`; changed command/runtime/endpoint settings show
+  `Needs detection`. A row's `Last detected` time refers to its own observation,
+  not the latest scan of another target. Deselected history is labelled as a last
+  result and excluded from active counts and remediation. Selecting it again
+  may reuse that history only when its detection configuration still matches.
+  Save feedback explicitly says no detection ran and previous results were kept.
+- `Apply` saves and activates a changed selection. An adjacent `Detect after
+  applying` checkbox optionally requests detection after the save; there is
+  no separate save-only button. Default it on for first setup and off when
+  opening an already configured Runtime. Preserve the user's choice during
+  the page visit and capture it for each Apply operation. Once choices are
+  applied, `Detect Again` refreshes observations without resaving; pending
+  edits must be applied or discarded first.
+- Keep provider actions together below the list. With no pending edits, put
+  secondary `Detect Again` beside primary `Go to Dashboard`; omit detection
+  for an empty saved selection. Pending edits replace these completion actions
+  with `Discard Changes`, primary `Apply`, and its detection checkbox in the
+  same footer. During a standalone detection, retain both completion controls:
+  the detection button spins in place and Dashboard stays visible but disabled.
+  Keep button widths stable as progress labels change and put progress/results
+  below the action row. See the [action layout rationale](../research/2026-09-16-setup-action-layout.md).
+- When detection is requested, applying and detecting form one visible operation. Show a neutral progress
+  banner with a spinner and separate save/detect stages; do not show success
+  when only the save has finished. Keep the initiating button in place with
+  a spinner and mark selected CLI rows as awaiting detection results. The
+  scan returns a complete snapshot, so do not invent per-provider completion
+  percentages. Reveal final statuses together when the operation settles.
+  Applying without detection finishes after saving and clearly reports that
+  detection was not requested, without implying provider readiness.
+- While editing is locked, preserve checked/unchecked contrast and the master
+  checkbox's checked/indeterminate state. Explain the temporary lock without
+  fading selected checkboxes into the unselected appearance.
+- Show concrete CLI installation outcomes, separate login status, and available
+  remediation instructions/commands. A detected installation is not proof of a
+  working login or model execution. Non-CLI connections remain explicitly
+  unverified by this page; they are not counted as installation failures.
+  Before any result exists, every provider shows `Not detected yet`. Only after
+  detection returns does a non-CLI target show `Connection not checked`, with
+  an explanation that automatic connection checks are not provided by this page.
+- `Skip for Now` is available on empty first-run selection and explicitly saves
+  idle scope. Applying after removing every provider also saves idle scope
+  and performs no detection. `Go to Dashboard` opens `/dashboard` after applying.
+- Saving and checking have separate failure outcomes: a failed check must not
+  imply that a successful save was rolled back. Checking unavailable providers
+  must not remove them from saved scope.
+- Preserve unsaved choices only while the saved configuration revision is
+  unchanged. When another editor changes the selection, load its saved choices
+  and show a review notice. Detection interrupted by that change must not
+  restore old choices or report successful completion for the new revision.
+- The user tested and accepted the Runtime UI on 2026-09-16 and authorized
+  automated validation and PR delivery. See PLAN-039 for validation evidence;
+  broader packaged Desktop and native OS acceptance remains separate.
+
 ## Proposed Bootstrap Flow
 
 ```mermaid
@@ -193,6 +258,10 @@ On an accepted change:
   results from older revisions. Reconcile added/retained workers by target.
 - Preserve historical data. Deselecting a provider does not delete transcripts,
   credentials, binaries, or provider-owned files.
+- Retain completed setup observations separately from revision-scoped scan
+  snapshots. Compare each target's detection configuration fingerprint to mark
+  changed settings; never reassign a cancelled or late result to a new revision.
+  Historical observations cannot authorize provider work or restore selection.
 - Proposed active-session behavior: reject a deselection that affects a running
   provider operation and explain that the user must finish or stop it first.
   Do not save a smaller scope while silently continuing active work outside it.
@@ -274,4 +343,5 @@ platform-specific installation mechanics.
 ---
 
 *Created: 2026-09-16*
-*Implementation status: in progress; validation and host integration pending.*
+*Implementation status: Runtime UX accepted; integrated and native packaged
+acceptance remains tracked in PLAN-039.*
