@@ -110,7 +110,8 @@ Choose validation proportional to the changed surface. Catalog edits require YAM
 with no unexpected normalization warnings, focused catalog and advanced-knowledge tests, and a
 repo-wide exact-fixture search. Run TypeScript checking when TypeScript or tests changed. Separate
 pre-existing environment failures from regressions; do not edit unrelated tests to make them pass.
-Use focused checks during iteration and run required repository commit/CI gates on the final diff.
+Follow the owning repository's Local Validation Scope: reuse relevant passing checks and leave
+full-suite CI gates to CI; commit/PR creation alone does not require a full local suite.
 Follow the scheduling and failure-handling guidance in [catalog surfaces](./references/catalog-surfaces.md).
 
 Keep the following in the evidence note or final report; link the durable note instead of repeating
@@ -129,6 +130,8 @@ authorizes that external mutation.
 
 ## Conditional provider references
 
+- [Antigravity (agy)](./references/providers/antigravity.md): separate picker families/effort from
+  executable model ids, first-item initialization without default claims, and structured selection.
 - [Claude](./references/providers/claude.md): supplied picker fast path, alias/label projection,
   per-model effort, and existing Runtime/Desktop support; compiled extraction is a possible superset.
 - [Codex](./references/providers/codex.md): supplied picker evidence, existing per-model defaults,
