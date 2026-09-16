@@ -49,9 +49,9 @@ The repository owner approved two maintenance groups for Cats Desktop and Runtim
 | Group | CLI providers | Maintained and selectable catalog |
 |---|---|---|
 | Full catalog | Codex, Claude, Antigravity (`agy`), Grok, Muse | Complete evidenced CLI model lists and all applicable effort/options, plus custom model-string input |
-| Shortlist | Cursor Agent CLI, Goose CLI, Junie CLI, Devin CLI, Kiro CLI, GitHub Copilot CLI, OpenCode, Kilo Code CLI, Auggie CLI, Pi, Cline | At most five explicitly selected models per CLI, plus a custom-input action |
+| Shortlist | Cursor Agent CLI, Goose CLI, Junie CLI, Devin CLI, Kiro CLI, GitHub Copilot CLI, OpenCode, Kilo Code CLI, Auggie CLI, Pi, Cline | At most six explicitly selected models per CLI, plus a custom-input action |
 
-The full-catalog group has no five-model cap. The shortlist may contain fewer than five models;
+The full-catalog group has no six-model cap. The shortlist may contain fewer than six models;
 effort choices remain attached to their model and custom input does not consume a model slot.
 Both surfaces shall follow the same policy. Existing evidence, exact-label, per-model applicability,
 and confirmed-default rules continue to apply.

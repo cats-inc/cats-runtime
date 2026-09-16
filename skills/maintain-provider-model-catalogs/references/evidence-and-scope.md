@@ -42,7 +42,7 @@ An unknown version remains `unknown-version`. Do not substitute another machine'
 Apply the maintenance groups in `SKILL.md` before choosing refresh scope. A deliberate shortlist
 is a Cats menu selection, not a claim that the upstream provider offers only those models. Keep
 source completeness separate from shortlist coverage and retain the supporting evidence. A
-five-entry cap alone does not identify which entries to remove; obtain the operator's concrete
+six-entry cap alone does not identify which entries to remove; obtain the operator's concrete
 shortlist before changing membership. Full-catalog providers retain complete evidenced options.
 Custom input in either group does not authorize inventing effort choices or other model metadata.
 
