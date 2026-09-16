@@ -56,13 +56,19 @@ catalog filename, option/control key, and affected ids before editing.
 
 ## Exact bundled-example consumers
 
-Search the whole repository for `curated-model-catalogs.yaml.example`, its runtime path resolver, and
-exact model/label strings being changed. Distinguish:
+Search each affected repository for `curated-model-catalogs.yaml.example`, its runtime path resolver,
+and exact old model/label strings before running expensive gates. Use `rg -n -F 'old label' src tests`
+from each owning checkout; do not limit the search to selector test names. Distinguish:
 
 - tests that read the bundled example;
 - tests with independent inline YAML fixtures;
 - generated/package assertions;
 - runtime static tables that are intentionally separate.
+
+Desktop labels also reach execution chips and audience participants through shared fallback data.
+When that fallback changes, inspect `tests/execution-label.test.js` and
+`tests/audience-participant-builder.test.tsx` alongside selector tests. Classify each exact-string
+match by its data source; leave deliberately supplied historical/inline labels unchanged.
 
 Do not edit an independent fixture merely to resemble the bundled example. When a test, runtime
 output, and curated row disagree, use the conflict procedure in
@@ -86,12 +92,17 @@ Also:
 
 ### Schedule validation once per relevant change
 
+- When PR/release work is authorized, inspect the intended base and integrate required upstream
+  changes before the final local gate. Record the tree tested and expand package scripts once to
+  see which commands already include typecheck/build/test; avoid stacking duplicate phases.
 - Use focused tests while editing; run required full commit/release gates after the final diff is
   ready. This skill does not waive repository gates or substitute a focused pass for a full pass.
 - Serialize heavy Runtime and Desktop builds/full suites on one Windows machine. Independent
   searches can run in parallel; package builds and child-process tests compete for CPU and disk.
 - Record command, scope, exit status, elapsed time, and log path. Keep valid results until another
   change affects what they tested; do not repeat a successful suite merely to reassure yourself.
+  Inspect `npm pack --json` before parsing it: npm versions can return an array or a package-keyed
+  object. Reuse saved output if only the inspection failed; do not repeat a successful pack/build.
 - On failure, retain the assertion output and rerun affected files first to diagnose. A timeout
   under contention is not automatically pre-existing or harmless. A focused retry proves only that
   scope; report the original failure and satisfy any still-required full gate.
@@ -100,3 +111,36 @@ Also:
   emits failure details as they occur.
 - If only this skill's Markdown changes, validate frontmatter, links, diff, and discovery sync.
   Do not run product tests solely for prose edits; any later commit remains subject to repo rules.
+
+### Desktop iteration, only when its consumers change
+
+Read the member's instructions and verify these paths/scripts still exist. Build server output
+once for JavaScript consumers (`npm run build:server`); use `npm run build:test-ui` for TSX consumers.
+Use the official JSX/DOM bundle, not `tsx --test`. Choose affected files from these examples:
+
+```text
+node --test tests/provider-selection.test.js tests/execution-label.test.js
+node --test --test-isolation=none build/test/provider-model-fields.test.js build/test/provider-model-defaults.test.js build/test/provider-model-fields-label-persist.test.js build/test/audience-participant-builder.test.js
+```
+
+Use `--test-reporter=tap` when running a required full Node suite. Package-contract tests can clear
+`build/test`; rebuild that bundle before a later test run if needed. A test-only correction does not
+invalidate unchanged server/host builds, but any required full test gate still needs to pass.
+
+### Authorized PR/release follow-through
+
+Use the owning release guides and current workflow definitions; a catalog refresh alone does not
+authorize publication. Keep only real dependencies on the critical path:
+
+- Submit each ready repository's PR without waiting for the other's local tests. Remote CI can
+  overlap local work; serialize only heavy builds that compete on the same machine.
+- Observe actual merge completion when merge/cleanup is requested. Verify release source commits
+  and pass the intended Runtime commit to Desktop packaging. Start independent authorized npm and
+  preview workflows together; do not wait for registry visibility when packaging uses Git source.
+- Track workflow ids and phase transitions. Report useful progress without treating repeated
+  unchanged polls as new findings. When explaining elapsed time, distinguish local checks, remote
+  jobs, registry propagation, and agent overhead; do not sum overlapping jobs as wall time.
+- After a successful npm publish, verify the exact version, Git commit, and requested dist-tag.
+  Temporary E404/stale tags can be registry propagation: retry reads with bounded backoff while
+  doing independent work, never blindly republish a successful version. If visibility stays
+  unresolved, report that limitation separately from workflow success.
