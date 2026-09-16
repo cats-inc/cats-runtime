@@ -12,6 +12,27 @@ description: >-
 Maintain `cats-runtime` catalog knowledge from observable evidence without flattening
 provider-specific model options or expanding the operator's scope.
 
+## Maintenance and menu policy
+
+The operator-approved policy is recorded in the 2026-09-17 amendment to
+`docs/specs/SPEC-028-provider-model-catalog-maintenance-skill.md` in cats-runtime:
+
+- **Full catalogs:** Codex, Claude, Antigravity (`agy`), Grok, and Muse. Maintain the complete
+  evidenced CLI model lists and applicable effort/options; offer all of them in Desktop and
+  Playground, plus custom model-string input. The five-model limit does not apply to this group.
+- **Shortlists:** Cursor Agent, Goose, Junie, Devin, Kiro, GitHub Copilot, OpenCode, Kilo Code,
+  Auggie, Pi, and Cline. Maintain at most five explicitly selected model entries per CLI, plus
+  custom input. Effort remains attached to its model; the custom-input action is not a model slot.
+- Exact shortlist members/order are pending individual operator decisions. Do not truncate current
+  catalogs or select the first five discovered models from this policy alone. These are product
+  policy groups, not a substitute for deriving the registered inventory during an audit.
+- Custom input remains available for both groups, including API-key-backed use on supported
+  execution paths. Preserve backend-specific identifiers; this policy does not establish new
+  adapter/API support or unknown model capabilities.
+
+This amendment records the intended policy and maintenance scope; menu enforcement is not yet
+implemented. No scheduled refresh cadence or automated refresh job has been specified.
+
 ## Route the request
 
 - **Refresh**: collect evidence and edit only the provider scope the operator authorized.

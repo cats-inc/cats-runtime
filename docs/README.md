@@ -20,6 +20,10 @@ scheduled polling, verified account linkage and durable history remain deferred.
 
 ## Provider Detection
 
+[Approved model-menu maintenance policy](./specs/SPEC-028-provider-model-catalog-maintenance-skill.md#approved-maintenance-and-menu-policy-2026-09-17)
+records complete catalogs for Codex/Claude/agy/Grok/Muse, up to five models for the named other
+CLIs, and custom model input for both groups. Individual shortlists and UI enforcement are pending.
+
 [Grok Build 1.0.34 picker](./research/2026-09-17-grok-model-picker-refresh.md)
 records exact effort labels and first-item initialization in Desktop and Playground
 without default or active markers.
@@ -159,5 +163,5 @@ later passes:
 
 ---
 
-*Last updated: 2026-09-16 (SPEC-030, ADR-039, and PLAN-039 document the accepted
-selection-first bootstrap contract and rollout across Runtime, Platform, and Desktop.)*
+*Last updated: 2026-09-17 (SPEC-028 records the approved full-catalog/shortlist model-menu
+policy; individual shortlists and UI enforcement remain pending.)*

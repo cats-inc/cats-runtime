@@ -50,7 +50,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 |------|-------|--------|--------------|
 | [SPEC-030](./SPEC-030-provider-selection-before-bootstrap-probes.md) | Provider Selection Before Bootstrap Probes | Approved; Runtime UX accepted; integrated acceptance in progress | [PLAN-039](../plans/PLAN-039-provider-selection-bootstrap-rollout.md), [ADR-039](../decisions/039-use-selected-provider-config-as-the-resource-boundary.md) |
 | [SPEC-029](./SPEC-029-provider-account-quota-and-usage-snapshots.md) | Provider Account Quota and Usage Snapshots | Draft — ownership accepted; collectors and snapshot API pending | [PLAN-038](../plans/PLAN-038-provider-account-quota-and-usage-snapshots.md), [ADR-038](../decisions/038-separate-execution-usage-from-provider-account-quota.md) |
-| [SPEC-028](./SPEC-028-provider-model-catalog-maintenance-skill.md) | Provider Model Catalog Maintenance Skill | In Progress (Skill and Sync Implemented; Claude-Owned Doc Remains) | [PLAN-037](../plans/PLAN-037-provider-model-catalog-maintenance-skill.md), [ADR-036](../decisions/036-separate-repository-maintenance-skills-from-runtime-delivered-skills.md) |
+| [SPEC-028](./SPEC-028-provider-model-catalog-maintenance-skill.md) | Provider Model Catalog Maintenance Skill | In Progress (Skill and Sync Implemented; Claude-Owned Doc Remains); 2026-09-17 full-catalog/shortlist policy recorded, rollout pending | [PLAN-037](../plans/PLAN-037-provider-model-catalog-maintenance-skill.md), [ADR-036](../decisions/036-separate-repository-maintenance-skills-from-runtime-delivered-skills.md) |
 | [SPEC-027](./SPEC-027-grok-devin-cline-aider-cli-provider-onboarding.md) | Grok, Devin, Cline, and Aider CLI Provider Onboarding | In Progress — Grok 1.0.0 execution complete; Aider retired by [ADR-037](../decisions/037-adopt-meta-muse-as-an-executable-cli-provider-and-retire-aider.md) | [PLAN-034](../plans/PLAN-034-grok-devin-cline-aider-cli-provider-onboarding.md), [ADR-033](../decisions/033-adopt-grok-devin-cline-aider-as-cli-provider-families.md) |
 | [SPEC-026](./SPEC-026-antigravity-cli-provider-replacing-gemini.md) | Antigravity CLI Provider Replacing Gemini CLI | Draft | [PLAN-033](../plans/PLAN-033-replace-gemini-cli-with-antigravity-cli.md), [ADR-032](../decisions/032-replace-gemini-cli-with-antigravity-cli.md) |
 | [SPEC-025](./SPEC-025-acp-agent-adapters-and-runtime-facade.md) | ACP Agent Adapters and Runtime ACP Facade | In Progress | [PLAN-032](../plans/PLAN-032-acp-agent-adapters-and-runtime-facade.md) |
@@ -102,5 +102,5 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 ---
 
 *See also: [plans/](../plans/) for implementation plans*
-*Last updated: 2026-09-16 (SPEC-030 defines selection before provider work, retained
-per-target setup observations, and the accepted Runtime Setup UX.)*
+*Last updated: 2026-09-17 (SPEC-028 records the approved full-catalog/shortlist model-menu
+policy; individual shortlists and UI enforcement remain pending.)*
