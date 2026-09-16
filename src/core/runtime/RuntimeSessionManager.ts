@@ -219,6 +219,9 @@ export class RuntimeSessionManager {
       guardrail?: RuntimeGuardrailResult;
     } = {},
   ): RuntimeRunInspection {
+    resolveProviderTarget(this.config, session.providerName,
+      session.providerBackend && session.providerInstanceId
+        ? `${session.providerBackend}/${session.providerInstanceId}` : session.providerInstanceId);
     const tracked = this.ensureTrackedState(session.id);
     const wake = extractWakeReason(turn.context || session.context);
     const startedAt = new Date().toISOString();

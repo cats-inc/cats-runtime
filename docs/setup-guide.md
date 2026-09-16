@@ -219,10 +219,10 @@ npx cats-runtime
 ```
 
 If no `providers.yaml` exists, the runtime starts in **bootstrap mode** and
-opens a provider setup page at `http://127.0.0.1:3110/`. The setup page scans
-your machine for installed AI CLI tools and lets you select which to enable.
-Clicking "Apply" writes a minimal `providers.yaml` and the runtime transitions
-to normal mode in the same process.
+opens a provider setup page at `http://127.0.0.1:3110/`. Choose the providers
+Cats may use and save that selection before scanning. Missing installations or
+credentials do not prevent selection; an explicit empty selection allows idle
+use. The runtime activates the saved config in the same process.
 
 ## Installation (Source)
 
@@ -258,8 +258,8 @@ Advanced operators can skip bootstrap by providing a valid config upfront:
 ```powershell
 $runtimeHome = Join-Path $HOME '.cats\runtime'
 New-Item -ItemType Directory -Force -Path (Join-Path $runtimeHome 'config') | Out-Null
-Copy-Item config\providers.yaml.example (Join-Path $runtimeHome 'config\providers.yaml')
-# Edit ~/.cats/runtime/config/providers.yaml to enable only the providers you need
+# Begin idle; use /setup to add targets, or copy only chosen examples.
+Set-Content -LiteralPath (Join-Path $runtimeHome 'config\providers.yaml') -Value 'backends: {}'
 cats-runtime
 ```
 
@@ -291,7 +291,6 @@ The runtime enters bootstrap mode when:
 
 - No valid `providers.yaml` exists at the resolved config path
 - The config file exists but cannot be parsed
-- The config is valid but contains no usable provider targets
 - The operator passes `--bootstrap`
 
 In bootstrap mode:
@@ -303,15 +302,20 @@ In bootstrap mode:
 
 The bootstrap flow:
 
-1. Open `http://127.0.0.1:3110/` (or the configured host/port)
-2. Stay on the `Providers` workspace in the setup rail and click `Scan Providers`
-   to detect installed providers
-3. Review readiness in the provider list, then check the providers you want to enable
-4. Click `Apply Selected` to generate `providers.yaml` and exit bootstrap mode
-   If the generated config cannot be reloaded, setup stays in bootstrap mode
-   and the UI/API reports the reload error instead of partially enabling normal routes
-5. Switch to `Configured Targets` when you want to inspect the runtime-owned
-   behavior of the applied provider targets
+1. Open `http://127.0.0.1:3110/` (or the configured host/port).
+2. Select native CLI, Ollama or OpenClaw targets and click `Save Selection`.
+   Saving no targets is valid idle mode. The static choices require no scan.
+3. Scan the saved selection when you want readiness/remediation information.
+   Missing providers remain selected; install/authenticate only those you need.
+4. Use `Configured Targets` to inspect selected target capabilities.
+5. Hand-edited YAML is activated with `Reload Edited Config`. Conflicting
+   edits and busy targets require resolving the conflict before retrying.
+
+The active config is the resource boundary for standalone Runtime, Platform,
+and Desktop. A selected target is a provider/backend/instance tuple. Saving or
+reloading reconciles provider services; it does not delete history or uninstall
+CLIs. Missing or invalid files start with no provider work. The full example
+is for reference: copy only the targets you intend to use, or use the editor.
 
 Setup artifacts are persisted under `<dataDir>/setup/`:
 
@@ -457,13 +461,12 @@ current latest report without digging through the data directory manually.
 post-bootstrap follow-through:
 
 - `repair.status` / `repair.nextAction` tell operators whether the next step is
-  to scan providers, apply ready providers, or review remediation
-- `repair.providersReadyToApply` surfaces the ready provider ids/families that
-  can be passed directly to `POST /setup-apply`
+  to select providers, scan selected targets, or review remediation
+- `repair.providersReady` describes readiness observations and never changes selection
 - `repair.providersNeedingAttention` now includes bounded remediation previews
   for providers that still need repair
 - `repair.actions` provides ordered runtime-owned follow-up actions using the
-  existing `/setup-scan`, `/setup-apply`, and `/diagnostics/setup-report` routes
+  existing `/setup-scan`, `/setup-selection`, and `/diagnostics/setup-report` routes
 - `diagnostics.latestReport` points at the latest persisted setup report summary
   when one already exists under `<dataDir>/diagnostics/`
 

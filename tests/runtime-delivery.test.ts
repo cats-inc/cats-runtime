@@ -11,7 +11,7 @@ import {
 import type { SessionInfo } from '../src/core/types.js';
 import { createRuntimeServer } from '../src/server.js';
 import {
-  createRuntimeTestEnv,
+  createRuntimeTestEnvWithAllCliProviders,
   createRuntimeTestPaths,
   ensureRuntimeTestDirs,
 } from './support/runtimeTestPaths.js';
@@ -59,7 +59,7 @@ function createService() {
 
 function createRuntimeConfig(root: string) {
   const paths = createRuntimeTestPaths(root);
-  const env = createRuntimeTestEnv(root, {
+  const env = createRuntimeTestEnvWithAllCliProviders(root, {
     CATS_RUNTIME_HOST: '127.0.0.1',
     CATS_RUNTIME_PORT: '3110',
     CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',

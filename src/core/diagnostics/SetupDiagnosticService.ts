@@ -295,6 +295,7 @@ export class SetupDiagnosticService {
     const repair = this.bootstrapService
       ? buildRepairSummary({
           bootstrapRequired: this.startup?.bootstrapRequired ?? false,
+          selectedCount: Object.values(catalog).reduce((count, provider) => count + provider.instances.length, 0),
           scan: latestScan,
           manualScan: latestManualScan,
         })

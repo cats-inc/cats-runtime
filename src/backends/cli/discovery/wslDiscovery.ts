@@ -89,6 +89,7 @@ export interface DiscoveryStatusPayload {
 }
 
 export interface RunWslAwareNativeDiscoveryInput {
+  isCurrent?: () => boolean;
   provider: WslDiscoveryProviderName;
   providerInstanceId?: string;
   listAllSessions: () => Promise<NativeSessionSummary[]>;
@@ -305,11 +306,16 @@ export class WslDiscoveryStatusStore {
 export async function runWslAwareNativeDiscovery(
   input: RunWslAwareNativeDiscoveryInput,
 ): Promise<WslAwareNativeDiscoveryResult> {
+  const isCurrent = input.isCurrent ?? (() => true);
+  const cancelled = { outcome: 'skipped' as const, newCount: 0, syncedCount: 0 };
+  if (!isCurrent()) return cancelled;
   if (input.runtime.mode !== 'wsl') {
+    const sessions = await input.listAllSessions();
+    if (!isCurrent()) return cancelled;
     const result = syncNativeSessions(
       input.registry,
       input.provider,
-      await input.listAllSessions(),
+      sessions,
       input.providerInstanceId,
     );
     return {
@@ -339,6 +345,7 @@ export async function runWslAwareNativeDiscovery(
 
     if (input.policy === 'if_running') {
       wslRunning = await (input.inspector || isWslDistroRunning)(distro);
+      if (!isCurrent()) return cancelled;
       if (!wslRunning) {
         input.statusStore.markSkipped(input.provider, input.providerInstanceId, {
           wslRunning,
@@ -357,10 +364,13 @@ export async function runWslAwareNativeDiscovery(
       message: `Scanning ${providerLabel(input.provider)} sessions in WSL distro '${distro}'`,
     });
 
+    if (!isCurrent()) return cancelled;
+    const sessions = await input.listAllSessions();
+    if (!isCurrent()) return cancelled;
     const result = syncNativeSessions(
       input.registry,
       input.provider,
-      await input.listAllSessions(),
+      sessions,
       input.providerInstanceId,
     );
 

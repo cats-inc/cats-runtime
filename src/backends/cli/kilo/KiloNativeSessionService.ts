@@ -152,6 +152,7 @@ export class KiloNativeSessionService {
   private readonly fetchFn: typeof fetch;
   private readonly launcher: KiloServerLauncher;
   private server: ResolvedServer | null = null;
+  private closed = false;
   private serverPromise: Promise<ResolvedServer | null> | null = null;
 
   constructor(options: KiloNativeSessionServiceOptions) {
@@ -403,6 +404,7 @@ export class KiloNativeSessionService {
   }
 
   async close(): Promise<void> {
+    this.closed = true;
     const current = this.server;
     this.server = null;
     this.serverPromise = null;
@@ -420,7 +422,7 @@ export class KiloNativeSessionService {
     } = {},
   ): Promise<T> {
     const server = await this.resolveServer(options.startIfNeeded ?? true);
-    if (!server) {
+    if (!server || this.closed) {
       throw new Error('Kilo server is not running');
     }
 
@@ -465,6 +467,7 @@ export class KiloNativeSessionService {
   }
 
   private async resolveServer(startIfNeeded: boolean): Promise<ResolvedServer | null> {
+    if (this.closed) throw new Error('Native session service is closed');
     if (this.server) {
       return this.server;
     }
@@ -483,6 +486,7 @@ export class KiloNativeSessionService {
         };
       }
 
+      if (this.closed) throw new Error('Native session service is closed');
       if (!startIfNeeded) {
         return null;
       }
@@ -502,6 +506,10 @@ export class KiloNativeSessionService {
 
     try {
       const server = await this.serverPromise;
+      if (this.closed) {
+        if (server?.managed) server.close();
+        throw new Error('Native session service closed during startup');
+      }
       if (server) {
         this.server = server;
       }

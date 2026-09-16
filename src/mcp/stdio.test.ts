@@ -277,7 +277,7 @@ describe('MCP stdio transport', () => {
             expect.objectContaining({ name: 'read_setup_diagnostic_report' }),
             expect.objectContaining({ name: 'setup_state' }),
             expect.objectContaining({ name: 'run_setup_scan' }),
-            expect.objectContaining({ name: 'apply_setup_config' }),
+            expect.objectContaining({ name: 'save_provider_selection' }),
             expect.objectContaining({ name: 'list_wakeups' }),
             expect.objectContaining({ name: 'read_wakeup' }),
             expect.objectContaining({ name: 'create_wakeup' }),

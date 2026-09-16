@@ -47,7 +47,8 @@ function createRuntimeManager(
   manager: ApiBackendManager,
 ): RuntimeSessionManager {
   return new RuntimeSessionManager(
-    { sessionBaseDir } as never,
+    { sessionBaseDir, providerInstances: {}, providerDefaultTargets: { codex: { backend: 'api', instance: 'gateway' } },
+      remoteProviderCatalog: { api: { codex: { gateway: createTarget().remoteInstance } }, local: {}, agent: {} } } as never,
     {
       get: vi.fn(),
       spawn: vi.fn(),

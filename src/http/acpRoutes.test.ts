@@ -1,3 +1,4 @@
+import { withSelectedCliProviders } from '../../tests/support/selectedCliFixture.js';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,7 +16,7 @@ import type { StreamEvent, TurnInput } from '../core/types.js';
 import { createRuntimeStartupState } from '../startup.js';
 
 function makeConfig(sessionBaseDir: string, dataDir: string): CliRuntimeConfig {
-  return {
+  return withSelectedCliProviders({
     host: '127.0.0.1',
     port: 3100,
     apiKey: '',
@@ -67,7 +68,7 @@ function makeConfig(sessionBaseDir: string, dataDir: string): CliRuntimeConfig {
       opencode: { path: 'opencode', runner: 'auto', runtime: { mode: 'native' } },
       pi: { path: 'pi', runner: 'auto', runtime: { mode: 'native' } },
     },
-  } as unknown as CliRuntimeConfig;
+  } as unknown as CliRuntimeConfig);
 }
 
 function parseNdjsonBody(value: string): unknown[] {

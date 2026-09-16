@@ -115,6 +115,7 @@ export interface ProviderModelCatalogSummary {
 }
 
 interface ProviderModelCatalogServiceOptions {
+  beginProviderOperation?: (target: ProviderTargetDescriptor) => () => void;
   agentBackend?: AgentBackendManager;
   fetch?: typeof fetch;
   env?: NodeJS.ProcessEnv;
@@ -815,6 +816,8 @@ function isProviderModelCatalogEntry(value: unknown): value is ProviderModelCata
 }
 
 export class ProviderModelCatalogService {
+  private generation = 0;
+  private discoveryController = new AbortController();
   private readonly fetchImpl: typeof fetch;
   private readonly env: NodeJS.ProcessEnv;
   private readonly ttlMs: number;
@@ -844,6 +847,20 @@ export class ProviderModelCatalogService {
   ): Promise<ProviderModelCatalogResult> {
     const target = resolveProviderTarget(this.config, providerName, requestedInstance);
     return this.getCatalogForTarget(target, options);
+  }
+
+  invalidate(): void {
+    this.generation += 1;
+    this.discoveryController.abort();
+    this.discoveryController = new AbortController();
+    this.dynamicCache.clear();
+    this.persistedSnapshots.clear();
+    this.refreshBackoff.clear();
+  }
+
+  private assertTarget(target: ProviderTargetDescriptor): void {
+    const current = resolveProviderTarget(this.config, target.providerName, `${target.backend}/${target.instanceId}`);
+    if (JSON.stringify(current) !== JSON.stringify(target)) throw new Error('Provider configuration changed');
   }
 
   getImmediateCatalog(
@@ -926,6 +943,7 @@ export class ProviderModelCatalogService {
   private getImmediateCatalogForTarget(
     target: ProviderTargetDescriptor,
   ): ProviderModelCatalogResult {
+    this.assertTarget(target);
     const defaultModel = resolveDefaultModel(target, this.env);
     const warnings: string[] = [];
     const cachedDynamic = this.getCachedDynamicCatalog(target, defaultModel, warnings);
@@ -958,9 +976,12 @@ export class ProviderModelCatalogService {
     target: ProviderTargetDescriptor,
     options: ProviderModelCatalogRequestOptions = {},
   ): Promise<ProviderModelCatalogResult> {
+    this.assertTarget(target);
+    const generation = this.generation;
     const defaultModel = resolveDefaultModel(target, this.env);
     const warnings: string[] = [];
     const dynamic = await this.tryDynamicCatalog(target, defaultModel, warnings, options);
+    if (generation !== this.generation) throw new Error('Provider selection changed');
     if (dynamic) {
       return dynamic;
     }
@@ -975,7 +996,7 @@ export class ProviderModelCatalogService {
   }
 
   private cacheKey(target: ProviderTargetDescriptor): string {
-    return `${target.providerName}:${target.backend}:${target.instanceId}`;
+    return `${target.providerName}:${target.backend}:${target.instanceId}:${this.config.providerSelectionRevision ?? 'injected'}`;
   }
 
   private getCachedDynamicCatalog(
@@ -1039,6 +1060,7 @@ export class ProviderModelCatalogService {
     warnings: string[],
     options: ProviderModelCatalogRequestOptions = {},
   ): Promise<ProviderModelCatalogResult | null> {
+    const generation = this.generation;
     const key = this.cacheKey(target);
     const cached = this.dynamicCache.get(key);
     const persistedSnapshot = this.persistedSnapshots.get(key);
@@ -1107,6 +1129,7 @@ export class ProviderModelCatalogService {
 
     try {
       const loaded = await this.loadDynamicModels(target, options);
+      if (generation !== this.generation) throw new Error('Provider selection changed');
       if (!loaded) {
         return null;
       }
@@ -1141,6 +1164,7 @@ export class ProviderModelCatalogService {
         warnings: [...warnings, ...dynamicWarnings],
       });
     } catch (error) {
+      if (generation !== this.generation) throw new Error('Provider selection changed');
       const errorMessage = `Dynamic model discovery failed for ${target.providerName}/${target.backend}/${target.instanceId}: ${
         error instanceof Error ? error.message : String(error)
       }`;
@@ -1262,8 +1286,15 @@ export class ProviderModelCatalogService {
     target: ProviderTargetDescriptor,
     options: ProviderModelCatalogRequestOptions = {},
   ): Promise<DynamicCatalogLoadResult | null> {
+    const signal = this.discoveryController.signal;
+    signal.throwIfAborted();
+    // CLI/agent discovery cannot always be cancelled. Keep its selected target
+    // admitted until completion so deselection cannot strand provider work.
+    const release = target.backend === 'cli' || target.backend === 'agent'
+      ? this.options.beginProviderOperation?.(target) : undefined;
+    try {
     if (target.backend === 'api' && target.remoteInstance) {
-      return this.listRemoteApiModels(target.remoteInstance);
+      return this.listRemoteApiModels(target.remoteInstance, signal);
     }
 
     if (target.backend === 'cli' && target.providerName === 'pi' && target.cliInstance) {
@@ -1317,7 +1348,7 @@ export class ProviderModelCatalogService {
     }
 
     if (target.backend === 'local' && target.remoteInstance?.transport === 'ollama') {
-      return this.listOllamaModels(target.remoteInstance);
+      return this.listOllamaModels(target.remoteInstance, signal);
     }
 
     if (target.backend === 'agent' && target.remoteInstance && this.options.agentBackend) {
@@ -1330,10 +1361,11 @@ export class ProviderModelCatalogService {
     }
 
     return null;
+    } finally { release?.(); }
   }
 
   private async listRemoteApiModels(
-    instance: RemoteProviderInstanceConfig,
+    instance: RemoteProviderInstanceConfig, signal: AbortSignal,
   ): Promise<DynamicCatalogLoadResult | null> {
     const request = buildRemoteModelDiscoveryRequest(instance, this.env);
     if (!request || request.target !== 'models') {
@@ -1345,33 +1377,35 @@ export class ProviderModelCatalogService {
     }
 
     if (instance.transport === 'openai') {
-      return this.listOpenAiModels(request);
+      return this.listOpenAiModels(request, signal);
     }
 
     if (instance.transport === 'anthropic') {
-      return this.listAnthropicModels(request);
+      return this.listAnthropicModels(request, signal);
     }
 
     if (instance.transport === 'google' || instance.transport === 'gemini') {
-      return this.listGeminiModels(request);
+      return this.listGeminiModels(request, signal);
     }
 
     return null;
   }
 
   private async fetchRemoteDiscoveryPayload(
-    request: RemoteModelDiscoveryHttpRequest,
+    request: RemoteModelDiscoveryHttpRequest, signal: AbortSignal,
   ): Promise<Record<string, unknown>> {
     try {
-      const { response } = await fetchRemoteModelDiscovery(request, {
+      signal.throwIfAborted();
+      const { response, payload } = await fetchRemoteModelDiscovery(request, {
         fetch: this.fetchImpl,
         timeoutMs: this.remoteDiscoveryTimeoutMs,
+        signal, readJson: true,
       });
       if (!response.ok) {
         throw new Error(`Remote model list failed with status ${response.status}`);
       }
 
-      const payload = await response.json();
+      signal.throwIfAborted();
       if (!payload || typeof payload !== 'object') {
         throw new Error('Remote model list returned a non-object JSON payload');
       }
@@ -1389,9 +1423,9 @@ export class ProviderModelCatalogService {
   }
 
   private async listOpenAiModels(
-    request: RemoteModelDiscoveryRequest,
+    request: RemoteModelDiscoveryRequest, signal: AbortSignal,
   ): Promise<DynamicCatalogLoadResult> {
-    const payload = await this.fetchRemoteDiscoveryPayload(request);
+    const payload = await this.fetchRemoteDiscoveryPayload(request, signal);
     const discovered = dedupeModels(
       (Array.isArray(payload.data) ? payload.data : []).flatMap((entry) => {
         if (!entry || typeof entry !== 'object') {
@@ -1415,9 +1449,9 @@ export class ProviderModelCatalogService {
   }
 
   private async listAnthropicModels(
-    request: RemoteModelDiscoveryRequest,
+    request: RemoteModelDiscoveryRequest, signal: AbortSignal,
   ): Promise<DynamicCatalogLoadResult> {
-    const payload = await this.fetchRemoteDiscoveryPayload(request);
+    const payload = await this.fetchRemoteDiscoveryPayload(request, signal);
     const discovered = dedupeModels(
       (Array.isArray(payload.data) ? payload.data : []).flatMap((entry) => {
         if (!entry || typeof entry !== 'object') {
@@ -1442,7 +1476,7 @@ export class ProviderModelCatalogService {
   }
 
   private async listGeminiModels(
-    request: RemoteModelDiscoveryRequest,
+    request: RemoteModelDiscoveryRequest, signal: AbortSignal,
   ): Promise<DynamicCatalogLoadResult> {
     const warnings: string[] = [];
     const discovered: ProviderModelCatalogEntry[] = [];
@@ -1460,7 +1494,7 @@ export class ProviderModelCatalogService {
             url: pageUrl.toString(),
             displayUrl: sanitizeRemoteModelDiscoveryUrl(pageUrl.toString()),
           };
-      const payload = await this.fetchRemoteDiscoveryPayload(pageRequest);
+      const payload = await this.fetchRemoteDiscoveryPayload(pageRequest, signal);
       const models = Array.isArray(payload.models) ? payload.models : [];
       for (const entry of models) {
         if (!entry || typeof entry !== 'object') {
@@ -1501,7 +1535,7 @@ export class ProviderModelCatalogService {
   }
 
   private async listOllamaModels(
-    instance: RemoteProviderInstanceConfig,
+    instance: RemoteProviderInstanceConfig, signal: AbortSignal,
   ): Promise<DynamicCatalogLoadResult> {
     const baseUrl = resolveBaseUrl(instance, this.env, 'http://127.0.0.1:11434').replace(/\/$/, '');
     const warnings: string[] = [];
@@ -1511,7 +1545,7 @@ export class ProviderModelCatalogService {
       method: 'GET' as const,
       headers: {},
     };
-    const payload = await this.fetchRemoteDiscoveryPayload(tagsRequest) as {
+    const payload = await this.fetchRemoteDiscoveryPayload(tagsRequest, signal) as {
       models?: Array<{ name?: unknown; model?: unknown }>;
     };
     const entries = Array.isArray(payload.models) ? payload.models : [];
@@ -1527,7 +1561,7 @@ export class ProviderModelCatalogService {
         method: 'GET',
         headers: {},
       };
-      const runningPayload = await this.fetchRemoteDiscoveryPayload(runningRequest) as {
+      const runningPayload = await this.fetchRemoteDiscoveryPayload(runningRequest, signal) as {
         models?: Array<{ name?: unknown; model?: unknown }>;
       };
       if (runningPayload) {

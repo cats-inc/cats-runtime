@@ -21,11 +21,11 @@ describe('provider setup page runtime shell sync', () => {
   it('reports the runtime error for a failed scan rather than a transport status', () => {
     const html = readFileSync(new URL('../public/provider-setup.html', import.meta.url), 'utf8');
 
-    expect(html).toContain("data.state.status === 'error'");
+    expect(html).toContain("data.state?.status === 'error'");
     expect(html).toContain('data.state.error');
   });
 
-  it('renders apply feedback below the Apply Selected action', () => {
+  it('renders save feedback below the Save Selection action', () => {
     const html = readFileSync(new URL('../public/provider-setup.html', import.meta.url), 'utf8');
 
     expect(html.indexOf('id="applyBtn"')).toBeLessThan(html.indexOf('id="resultPanel"'));

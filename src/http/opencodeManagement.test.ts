@@ -1,3 +1,4 @@
+import { withSelectedCliProviders } from '../../tests/support/selectedCliFixture.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -16,7 +17,7 @@ describe('OpenCode native session management', () => {
   let dataDir = '';
   let sessionBaseDir = '';
 
-  const makeConfig = (): CliRuntimeConfig => ({
+  const makeConfig = (): CliRuntimeConfig => withSelectedCliProviders(({
     host: '127.0.0.1',
     port: 3100,
     apiKey: '',
@@ -60,7 +61,7 @@ describe('OpenCode native session management', () => {
       kiro: { path: 'kiro-cli', runner: 'auto', runtime: { mode: 'native' } },
       opencode: { path: 'opencode', runner: 'auto', runtime: { mode: 'native' } },
     },
-  });
+  }));
 
   let registry: SessionRegistry;
   let pool: WorkerPool;

@@ -7,11 +7,11 @@
 
 Accepted
 
-Proposed amendment (2026-09-16):
-[ADR-039](./039-use-selected-provider-config-as-the-resource-boundary.md) moves
-provider detection after saved selection while retaining static catalog access
-and bootstrap without a preexisting config. That proposal is not yet accepted;
-this record's current status remains unchanged.
+Accepted amendment (2026-09-16):
+[ADR-039](./039-use-selected-provider-config-as-the-resource-boundary.md) requires
+saving provider selection before detection. It permits valid empty idle configs,
+preserves retained custom options, and replaces scan-derived config generation.
+The original record below describes the historical scan-first design.
 
 ## Date
 

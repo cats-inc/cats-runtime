@@ -68,6 +68,11 @@ Current capabilities:
 
 ## Current Status
 
+- [x] Make active provider configuration the selection/resource boundary for
+      Runtime, Platform, and Desktop; save choices before scanning, support
+      explicit empty idle mode, and reconcile work on revision changes. Native
+      OS acceptance is tracked in [PLAN-039](./docs/plans/PLAN-039-provider-selection-bootstrap-rollout.md).
+
 - [x] Bootstrap the subproject
 - [x] Embed the CLI runtime into `cats-runtime`
 - [x] Remove the external HTTP hop

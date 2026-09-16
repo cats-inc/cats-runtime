@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft; implementation has not started |
+| **Status** | In progress; implementation authorized 2026-09-16 |
 | **Owner** | User |
 | **Implementation ownership** | cats-runtime core contract; cats-platform host integration |
 | **Assigned to** | Unassigned |
@@ -16,10 +16,10 @@
 - [SPEC-030](../specs/SPEC-030-provider-selection-before-bootstrap-probes.md)
   defines behavior and acceptance cases.
 - [ADR-039](../decisions/039-use-selected-provider-config-as-the-resource-boundary.md)
-  proposes selection as the resource boundary and amends part of ADR-021.
+  accepts selection as the resource boundary and amends part of ADR-021.
 
-This plan is drafted alongside the proposed design. Its checklist records future
-work, not approval or delivered behavior. It is the shared delivery track for
+The user approved the design and proposed defaults on 2026-09-16. The checklist
+records delivery progress and outstanding validation. This is the shared delivery track for
 Runtime, Platform, and Desktop; avoid a second plan with competing contracts.
 
 ## Overview and Sequence
@@ -42,18 +42,19 @@ this first delivery; existing configured variants must still obey scope.
 Phases 3 and 4 may be implemented independently after the shared contract is
 stable. Intermediate changes are not a completed rollout.
 
-## Proposed API Contract
+## Implemented API Contract
 
-These are proposed changes, not descriptions of the current API. Keep setup
-authentication and first-run accessibility consistent with existing policy.
+The following contract is implemented in both repositories. Setup authentication
+and first-run accessibility follow existing policy.
 
-| Surface | Proposed responsibility |
+| Surface | Responsibility |
 |---------|-------------------------|
 | `GET /setup-state` | Return static catalog, config state, effective selected targets, revision, and scoped observations/progress; polling performs no probes |
 | `PUT /setup-selection` | Validate and save desired targets with `expectedRevision`; preserve retained config; return activated selection/revision without waiting for detection |
 | `POST /setup-scan` | Start a bounded asynchronous scan of the selection or an explicit subset; return `202`; results and progress are associated with a revision |
 | `GET /providers/config` | Project configured execution targets with the same revision for normal consumers; no separate selection authority |
-| `POST /setup-apply` | Replace the existing scan-result/minimal-config writer with the selection operation and remove the old route in the coordinated consumer update |
+| `POST /setup-selection/reload` | Validate hand edits and activate through the same revision/admission boundary |
+| `POST /setup-operations`, `DELETE /setup-operations/:id` | Hold exact target admission during host helpers; UUID receipts support retry/release |
 
 Selection entries identify `(provider, backend, instance)`. Retained entries may
 refer to existing config; new entries supply any required validated configuration
@@ -78,12 +79,12 @@ reachable endpoint. Readiness remains an observation; it cannot rewrite scope.
 
 ### Phase 0: Resolve the contract and establish evidence
 
-- [ ] Resolve SPEC-030's open choices: explicit empty selection, busy-target
+- [x] Resolve SPEC-030's open choices: explicit empty selection, busy-target
   removal, and first-editor backend coverage. Proposed defaults are empty idle
   allowed, removal rejected until idle, and scope enforced for every backend.
-- [ ] Agree the API shapes above across Runtime and Platform, including revision
+- [x] Agree the API shapes above across Runtime and Platform, including revision
   conflicts, scoped job progress, and host installer activity during deselection.
-- [ ] Inventory all provider work entry points, including timers, persisted jobs,
+- [x] Inventory all provider work entry points, including timers, persisted jobs,
   direct execution, startup priming, and host helpers; assign a scope gate to each.
 - [ ] Record a baseline in isolated fixtures: basic service-ready time, selected
   status-ready time, provider reads/processes/requests, jobs, and memory. Separate
@@ -93,22 +94,22 @@ reachable endpoint. Readiness remains an observation; it cannot rewrite scope.
 
 ### Phase 1: Authoritative selection and safe activation
 
-- [ ] Represent missing, invalid, valid-empty, and valid-selected configuration
+- [x] Represent missing, invalid, valid-empty, and valid-selected configuration
   distinctly. Remove implicit all-provider defaults from these bootstrap paths.
-- [ ] Expose a static catalog for CLI/local/API/agent targets without inspecting
-  provider installations or contacting endpoints.
-- [ ] Implement selection writes and effective read models. Preserve retained
+- [x] Expose static native CLI/local/agent choices without inspecting provider
+  installations or endpoints; retain existing advanced/API/WSL/Docker targets.
+- [x] Implement selection writes and effective read models. Preserve retained
   commands/options/credential references, unrelated config, and valid routing;
   reject invalid routing references with repair detail before writing.
-- [ ] Validate the whole candidate and expected revision before atomic replacement.
+- [x] Validate the whole candidate and expected revision before atomic replacement.
   Disk write failure keeps the current file and effective selection unchanged.
-- [ ] Coordinate activation with admission: prevent new work on removed targets,
-  reject removal of active operations under the proposed policy, cancel removed
+- [x] Coordinate activation with admission: prevent new work on removed targets,
+  reject removal of active operations until completion, cancel removed
   background tasks, and publish the effective revision consistently.
-- [ ] Use the same activation path for explicit YAML reload. Report rejected
+- [x] Use the same activation path for explicit YAML reload. Report rejected
   external edits and the still-active revision; cold start with invalid YAML
   starts repair with no effective targets. Never substitute the example/defaults.
-- [ ] Surface worker activation failures as degraded selected-target status and
+- [x] Surface worker activation failures as degraded selected-target status and
   reconcile deterministically; never report success with a silently broader scope.
 
 **Deliverable:** Selection persists before any provider probe, with predictable
@@ -116,20 +117,20 @@ write conflicts and reload behavior.
 
 ### Phase 2: Enforce scope throughout Runtime
 
-- [ ] Make bootstrap scans iterate selected targets rather than known families.
+- [x] Make bootstrap scans iterate selected targets rather than known families.
   Support local and agent observations without requiring a CLI scan success.
-- [ ] Gate diagnostics/priming, model discovery, session discovery/import,
+- [x] Gate diagnostics/priming, model discovery, session discovery/import,
   watchers, quota refresh, compatibility/evolution work, and service warmups.
   Static history reads must not trigger discovery of an unselected provider.
-- [ ] Revalidate selection for new/resumed execution and queued/retried work;
+- [x] Revalidate selection for new/resumed execution and queued/retried work;
   routing and cached session metadata cannot bypass current admission.
-- [ ] Key observations and in-flight jobs by target and revision, coalesce
+- [x] Key observations and in-flight jobs by target and revision, coalesce
   duplicate refreshes, bound concurrency, and discard outdated results.
-- [ ] Reconcile added/retained/removed workers on activation. Stop removed
+- [x] Reconcile added/retained/removed workers on activation. Stop removed
   watchers and timers without deleting user history or uninstalling providers.
-- [ ] Keep routine detection passive and polling read-only. Preserve manual
+- [x] Keep routine detection passive and polling read-only. Preserve manual
   triggers for expensive/live work and avoid exact-version execution gates.
-- [ ] Decouple basic service readiness from provider work; expose progress so
+- [x] Decouple basic service readiness from provider work; expose progress so
   one slow selected provider does not block another usable selected provider.
 
 **Deliverable:** Instrumented tests demonstrate zero provider-specific work
@@ -137,13 +138,13 @@ outside selection, including during reload and stale job completion.
 
 ### Phase 3: Standalone Runtime setup
 
-- [ ] Show static choices first; save selection before requesting status refresh.
+- [x] Show static choices first; save selection before requesting status refresh.
   Do not auto-select installed providers or disable selection of missing ones.
-- [ ] Reuse the editor for existing configs and preserve advanced target options.
+- [x] Reuse the editor for existing configs and preserve advanced target options.
   Distinguish selection changes from observations and installation/authentication.
-- [ ] Display missing/invalid/empty states, conflicts, and per-target progress;
+- [x] Display missing/invalid/empty states, conflicts, and per-target progress;
   selected but unavailable providers retain remediation actions.
-- [ ] Generate the public setup page through the existing UI build and replace
+- [x] Generate the public setup page through the existing UI build and replace
   all standalone calls to the superseded setup-apply contract.
 
 **Deliverable:** Fresh and existing standalone roots work without copying the
@@ -151,16 +152,16 @@ complete example or performing an unscoped initial scan.
 
 ### Phase 4: Local Platform and ordinary provider selectors
 
-- [ ] Update runtime client types, setup summaries, proxy routes, and auth policy
+- [x] Update runtime client types, setup summaries, proxy routes, and auth policy
   for the shared contract. Platform reads its connected runtime's selection.
-- [ ] Save setup/settings selection before scanning; never derive intent from
+- [x] Save setup/settings selection before scanning; never derive intent from
   whichever providers happen to be detected as available.
-- [ ] Bound Chat/Code/Work/model choices and routing to compatible selected
+- [x] Bound Chat/Code/Work/model choices and routing to compatible selected
   targets. Keep unavailable selected targets visible in remediation surfaces.
-- [ ] Reconcile provider caches by revision. Diagnostics-only and stale fallback
+- [x] Reconcile provider caches by revision. Diagnostics-only and stale fallback
   data cannot restore deselected targets; unavailable runtime connectivity must
   not present cached choices as current execution authorization.
-- [ ] Verify separate runtime roots and remote connections; a local YAML or
+- [x] Verify separate runtime roots and remote connections; a local YAML or
   Desktop helper catalog cannot override the connected runtime's selection.
 
 **Deliverable:** Local Platform setup and normal use consume one runtime source
@@ -168,19 +169,19 @@ of intent, including after changes and reconnects.
 
 ### Phase 5: Packaged Desktop bootstrap and repair
 
-- [ ] Persist the first-run choice through Runtime before inventory, scans, or
+- [x] Persist the first-run choice through Runtime before inventory, scans, or
   provider helpers. Reopening setup loads that choice rather than resetting it.
-- [ ] Filter inventory probes, installer checks/actions, and provider-only
+- [x] Filter inventory probes, installer checks/actions, and provider-only
   prerequisites by selected target. Deduplicate shared prerequisites and keep
   general app prerequisites independent of provider availability.
-- [ ] Coordinate host helper activity with runtime admission and config changes.
+- [x] Coordinate host helper activity with runtime admission and config changes.
   A queued helper must revalidate before launch; running helpers count as active
   provider operations for removal conflicts. Do not rely on a stale UI snapshot.
-- [ ] Rescan only selected targets after install/repair; keep helper catalog
+- [x] Rescan only selected targets after install/repair; keep helper catalog
   metadata available for adding providers without running helper checks.
-- [ ] Remove the bootstrap assumption that at least one CLI must be ready;
-  support Ollama-only, OpenClaw-only, and the proposed explicit empty idle state.
-- [ ] Preserve user-authored configs across packaging/upgrades; never seed active
+- [x] Remove the bootstrap assumption that at least one CLI must be ready;
+  support Ollama-only, OpenClaw-only, and explicit empty idle state.
+- [x] Preserve user-authored configs across packaging/upgrades; never seed active
   selection from the full example or expand it when new helpers are bundled.
 
 **Deliverable:** Desktop has the same scope semantics on Windows, macOS, and
@@ -195,7 +196,7 @@ Linux, with platform-specific installation mechanics remaining host-owned.
   results with fixture and platform context, without inventing an unmeasured SLA.
 - [ ] Run affected tests and required builds/checks in both repositories; verify
   packaged assets contain the matching runtime contract and generated setup UI.
-- [ ] Update API/setup/deployment docs and amend ADR-021/SPEC-017 plus Platform's
+- [x] Update API/setup/deployment docs and amend ADR-021/SPEC-017 plus Platform's
   ADR-046/SPEC-093 at acceptance/implementation, with accurate delivery status.
 - [ ] Coordinate removal of old callers/routes and package dependency updates.
   Report incompatible external runtimes explicitly; do not silently fall back
@@ -239,7 +240,7 @@ real providers, change their config, or make paid/live provider calls.
 | Unknown/unselected target or force flag | Explicit rejection; no bypass or outside-scope side effect |
 | Deselect with late results/queued jobs | Workers stop; stale results cannot restore options or start execution |
 | Concurrent edits/write failure/invalid reload | No lost valid edits, partial config, or fallback to all providers |
-| Remove target with active execution/helper | Conflict under proposed policy; accepted scope remains intact |
+| Remove target with active execution/helper | Conflict until the operation finishes; accepted scope remains intact |
 | Retained custom settings and routing | Valid settings survive; broken references fail before save |
 | Separate roots/remote runtime/reconnect | Each client follows its connected runtime's current effective selection |
 
@@ -264,6 +265,44 @@ explicitly unverified, never counted as passing.
 | Date | Update |
 |------|--------|
 | 2026-09-16 | Drafted shared Runtime/Platform/Desktop delivery plan from source inspection and SPEC-030; no implementation or performance measurements completed. |
+| 2026-09-16 | User authorized the defaults. Selection API/UI, revision-aware Runtime lifecycle, Platform caches/qualified selectors, and Desktop inventory/helper admission are implemented. Full regression/build validation is underway; native packaged OS acceptance and elapsed-time baselines remain unverified. |
+
+## Implementation Evidence and Remaining Acceptance
+
+- Built-page Chromium checks on Windows passed for standalone Runtime selection,
+  Platform's connected-Runtime proxy, and the Desktop bootstrap page. OpenClaw-only
+  and explicit empty saves work; separate Runtime roots remain independent.
+  The browser recorded no page errors. Test services used temporary roots and
+  memory stores, with no user-state writes or live provider execution.
+- Full local regression runs were followed by focused rechecks of every failure:
+  legacy test fixtures now declare their selected targets. Slow complete-build
+  tests have a 180-second budget; package cleanup assertions remain unchanged.
+  Required CI and native packaged acceptance are separate delivery gates.
+- Platform Relay defaults derive from the current Runtime selection. Fan-out
+  revalidates exact targets before creating dispatches; empty/offline selection
+  cannot create a thread with a permanently empty roster.
+- Runtime entry points are gated at configuration/catalog resolution and current
+  revision: bootstrap, diagnostics, models, quota, session create/resume/messages,
+  native/WSL discovery, watchers, compatibility, and native service lifecycle.
+- Model/diagnostic/helper work that cannot be cancelled retains an operation
+  receipt until completion. Removed background jobs/caches reject stale results.
+- Automatic and manual agent session enumeration retain the same receipt through
+  all adapter work; regression checks reject deselection until enumeration ends.
+- Desktop pauses helper admission and drains active helpers before managed
+  Runtime retry/restart, shutdown, and update handoff. Its supervisor does not
+  automatically restart a crashed Runtime.
+- Instrumented fake-CLI scans assert zero, one, or N assessment calls for zero,
+  one, or N selected targets on both routine and explicit refresh. The installed
+  support catalog does not change those counts. This is work-count evidence,
+  not a measured end-to-end latency or memory comparison with the old flow.
+- Runtime and Platform share this plan; Platform
+  [ADR-115](../../../cats-platform/docs/decisions/115-bound-bootstrap-and-provider-choices-by-runtime-selection.md)
+  records host ownership. Old setup apply/MCP callers are removed together.
+- Desktop packaging builds the sibling Runtime checkout; release automation must
+  pin the matching Runtime revision. No package publication is part of this task.
+- Windows/macOS/Linux helper scope is tested with platform fixtures. Physical
+  macOS/Linux installer runs and native provider installation are not performed
+  in this Windows development session. Full packaged acceptance remains open.
 
 ---
 

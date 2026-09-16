@@ -11,6 +11,7 @@ import {
 import { getPeerDiscoverySnapshot } from '../../core/peers/discoverySnapshot.js';
 import {
   listProviderCatalog,
+  resolveProviderTarget,
   type ProviderTargetDescriptor,
 } from '../../core/providerCatalog.js';
 import {
@@ -1306,9 +1307,15 @@ async function diagnoseAgentTarget(
 
   if (probeMode === 'live') {
     await appendModelCatalogDiagnostics(ctx, target, checks, config);
+    const currentTarget = resolveProviderTarget(ctx.config, target.providerName, `${target.backend}/${target.instanceId}`);
+    if (JSON.stringify(currentTarget) !== JSON.stringify(target)) throw new Error('Provider selection changed');
     const effectiveToolCatalogRequested = toolCatalogContext?.scope === 'effective';
     const useEffectiveToolCatalog = effectiveToolCatalogRequested
       && agentRuntime.capabilities.effectiveToolCatalog;
+    const selection = ctx.bootstrapService?.selection;
+    const operationId = selection?.acquireOperation({
+      provider: target.providerName, backend: target.backend, instance: target.instanceId,
+    }, ctx.config.providerSelectionRevision);
     const toolCatalog = await loadProviderRemoteToolCatalog(target, {
       agentRuntime,
       agentBackend: ctx.agentBackend,
@@ -1318,7 +1325,7 @@ async function diagnoseAgentTarget(
           sessionKey: toolCatalogContext.sessionKey,
         },
       } : {}),
-    });
+    }).finally(() => { if (operationId) selection!.releaseOperation(operationId); });
     if (toolCatalog) {
       config.toolCatalog = {
         source: toolCatalog.source,
@@ -1656,6 +1663,7 @@ async function collectProviderDiagnostics(
   filters: ProviderDiagnosticsFilters = { defaultOnly: false, toolCatalogScope: 'catalog' },
   options: ProviderDiagnosticsCollectionOptions = {},
 ): Promise<ProviderDiagnosticsCollectionResult> {
+  const revision = ctx.config.providerSelectionRevision;
   const fullCatalog = listProviderCatalog(ctx.config);
   const catalog = filterProviderDiagnosticsCatalog(fullCatalog, filters);
   const toolCatalogContext = buildProviderDiagnosticToolCatalogContext(filters);
@@ -1681,10 +1689,10 @@ async function collectProviderDiagnostics(
       )),
   );
 
-  return {
-    catalog,
-    providers,
-  };
+  if (revision !== ctx.config.providerSelectionRevision) {
+    throw new Error('Provider selection changed during diagnostics');
+  }
+  return { catalog, providers };
 }
 
 function getAvailabilityDiagnosticsCacheMap(
@@ -1696,6 +1704,10 @@ function getAvailabilityDiagnosticsCacheMap(
     availabilityDiagnosticsCache.set(ctx, cache);
   }
   return cache;
+}
+
+export function invalidateProviderAvailabilityDiagnosticsCache(ctx: AppContext): void {
+  availabilityDiagnosticsCache.delete(ctx);
 }
 
 function createAvailabilityDiagnosticsCacheKey(
@@ -1766,6 +1778,7 @@ function startAvailabilityDiagnosticsRefresh(
   env: Readonly<NodeJS.ProcessEnv>,
   filters: ProviderDiagnosticsFilters,
 ): Promise<ProviderDiagnosticsCollectionResult> {
+  const revision = ctx.config.providerSelectionRevision;
   const refresh = collectProviderDiagnostics(
     ctx,
     probeMode,
@@ -1777,6 +1790,9 @@ function startAvailabilityDiagnosticsRefresh(
       compatibilityPurpose: 'health',
     },
   ).then((result) => {
+    if (revision !== ctx.config.providerSelectionRevision) {
+      throw new Error('Provider selection changed during diagnostics');
+    }
     const now = Date.now();
     entry.snapshot = result;
     entry.cachedAtMs = now;

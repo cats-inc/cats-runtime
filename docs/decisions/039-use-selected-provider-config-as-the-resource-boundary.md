@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Implementation has not started. This proposes a narrow amendment to
+Accepted on 2026-09-16; implementation is in progress. This makes a narrow amendment to
 [ADR-021](./021-treat-providers-yaml-as-generated-config-and-bootstrap-without-it.md);
 it does not supersede that record in full.
 
@@ -27,7 +27,7 @@ of selection. Installed, authenticated, reachable, and selected are different
 facts: a user must be able to select a provider before installing it or starting
 its endpoint.
 
-## Proposed Decision
+## Decision
 
 ### 1. One persisted source of provider intent per runtime root
 
@@ -96,7 +96,7 @@ does not uninstall binaries or delete credentials, transcripts, or other
 provider-owned data. Hand-authored YAML uses the same validation and activation
 path on reload or restart.
 
-The proposed default rejects removal while a target has a running provider
+The accepted policy rejects removal while a target has a running provider
 operation. Its owner must finish or stop that operation before removal; setup
 must not silently cancel it or leave it running outside the accepted scope.
 
@@ -104,7 +104,7 @@ must not silently cancel it or leave it running outside the accepted scope.
 
 ADR-021's static provider knowledge, bootstrap without a preexisting config,
 runtime-owned setup semantics, host-owned presentation, and generated or
-hand-authored YAML remain valid. This proposal changes machine detection from
+hand-authored YAML remain valid. This decision changes machine detection from
 config-independent to selected-target-scoped. Selection creates the initial
 config before detection, resolving first-run setup without a full machine scan.
 
@@ -136,16 +136,15 @@ config before detection, resolving first-run setup without a full machine scan.
 | Persist an additional host or ROI selection file | Creates conflicting ownership and synchronization between clients |
 | Derive selection from installed or ready providers | Cannot express intent before installation and changes with transient availability |
 
-## Product Choices Still Open
+## Accepted Product Choices
 
-The defaults below are proposals, not accepted decisions:
+The user authorized implementation using the proposed defaults on 2026-09-16:
 
 - Allow an explicitly saved empty selection as a valid idle state, distinct
   from missing or invalid config.
 - Reject removal of targets with running operations until they become idle.
-- Initially expose native CLI, Ollama, and OpenClaw, or expose every backend
-  in the editor. Either choice must preserve manually configured API targets
-  and enforce scope for every backend.
+- Initially expose native CLI, Ollama, and OpenClaw in the editor. Preserve
+  manually configured API targets and enforce scope for every backend.
 
 ## References
 
@@ -157,4 +156,4 @@ The defaults below are proposals, not accepted decisions:
 
 ---
 
-*Proposed: 2026-09-16*
+*Accepted: 2026-09-16*

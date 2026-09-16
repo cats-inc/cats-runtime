@@ -203,6 +203,7 @@ export function listManualSessionDiscoveryTargets(
 async function runAgentSessionDiscovery(
   registry: SessionRegistry,
   runner: AgentSessionDiscoveryRunner | undefined,
+  isCurrent: () => boolean,
 ): Promise<AgentSessionDiscoveryTargetResult[]> {
   if (!runner) {
     return [];
@@ -210,8 +211,10 @@ async function runAgentSessionDiscovery(
 
   const results: AgentSessionDiscoveryTargetResult[] = [];
   for (const target of runner.listTargets()) {
+    if (!isCurrent()) break;
     try {
       const catalog = await runner.listSessions(target);
+      if (!isCurrent()) break;
       if (!catalog.supported) {
         results.push({
           ...target,
@@ -249,13 +252,17 @@ export async function runManualSessionDiscovery(input: {
   registry: SessionRegistry;
   runner: ManualSessionDiscoveryRunner;
   agentRunner?: AgentSessionDiscoveryRunner;
+  isCurrent?: () => boolean;
 }): Promise<ManualSessionDiscoveryResult> {
+  const isCurrent = input.isCurrent ?? (() => true);
   const targets = listManualSessionDiscoveryTargets(input.config);
   const results: ManualSessionDiscoveryTargetResult[] = [];
 
   for (const target of targets) {
+    if (!isCurrent()) break;
     try {
       const sessions = await input.runner.listSessions(target);
+      if (!isCurrent()) break;
       const sync = syncNativeSessions(
         input.registry,
         target.provider,
@@ -284,7 +291,7 @@ export async function runManualSessionDiscovery(input: {
     }
   }
 
-  const agentResults = await runAgentSessionDiscovery(input.registry, input.agentRunner);
+  const agentResults = await runAgentSessionDiscovery(input.registry, input.agentRunner, isCurrent);
 
   // An agent that does not advertise enumeration counts as a scanned target
   // rather than a failed one, so a mixed scan still reads as completed.

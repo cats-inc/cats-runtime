@@ -15,6 +15,7 @@ export class QuotaRefreshService {
   private nextRefresh = new Map<string, number>();
   private active?: { key: string; controller: AbortController; result: Promise<QuotaRefreshResult> };
   private closed = false;
+  private generation = 0;
 
   constructor(private options: {
     collect: (target: UsageTarget, signal: AbortSignal) => Promise<QuotaCollectionResult>;
@@ -31,13 +32,16 @@ export class QuotaRefreshService {
     const next = this.nextRefresh.get(key) ?? 0;
     if (next > now) return Promise.resolve({ status: 'cooldown', nextRefreshAt: new Date(next).toISOString() });
     const controller = new AbortController();
+    const generation = this.generation;
     const result = Promise.resolve().then(async (): Promise<QuotaRefreshResult> => {
       let read: QuotaCollectionResult;
+      if (this.closed || generation !== this.generation) return { status: 'unavailable' as const, nextRefreshAt: null };
       try { read = await this.options.collect(target, controller.signal); } catch { read = { status: 'error' }; }
       const completed = this.options.now?.() ?? Date.now();
-      if (!this.closed && read.status === 'updated' && read.quota) {
+      if (!this.closed && generation === this.generation && read.status === 'updated' && read.quota) {
         this.options.observe({ ...target, observedAt: new Date(completed).toISOString(), quota: read.quota });
       }
+      if (generation !== this.generation) return { status: 'unavailable', nextRefreshAt: null };
       this.nextRefresh.delete(key);
       this.nextRefresh.set(key, completed + 60_000);
       if (this.nextRefresh.size > 1000) this.nextRefresh.delete(this.nextRefresh.keys().next().value!);
@@ -51,5 +55,11 @@ export class QuotaRefreshService {
     this.closed = true;
     this.active?.controller.abort();
     await this.active?.result;
+  }
+
+  invalidate(): void {
+    this.generation += 1;
+    this.active?.controller.abort();
+    this.nextRefresh.clear();
   }
 }

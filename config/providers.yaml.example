@@ -1,3 +1,6 @@
+# Reference catalog only: copying this whole file selects every listed target.
+# Prefer /setup to save only the providers you want. Missing config never loads this file.
+# A minimal idle configuration is: backends: {}
 version: 1
 
 # Environments describe isolated execution/login contexts.

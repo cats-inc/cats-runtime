@@ -8,6 +8,13 @@
 | **Owner** | Codex |
 | **Reviewer** | User / runtime setup workstream |
 
+## Selection-first amendment (2026-09-16)
+
+[SPEC-030](./SPEC-030-provider-selection-before-bootstrap-probes.md) and ADR-039
+replace this spec's scan-first/apply workflow. Selection precedes probes; an
+empty selection is valid, and retained target settings are preserved. The older
+flow below remains historical design context.
+
 ## Summary
 
 `cats-runtime` currently assumes a configured runtime topology exists before the

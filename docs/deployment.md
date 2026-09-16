@@ -23,7 +23,17 @@ npm run dev
 ```
 
 If no valid `providers.yaml` exists, the runtime enters bootstrap mode and
-lets the operator generate one from the setup page.
+shows static provider choices on the setup page. Save the desired targets before
+provider scans begin. The default active path is
+`~/.cats/runtime/config/providers.yaml`; `CATS_RUNTIME_DIR` chooses the Runtime
+root. A valid empty configuration starts in idle mode. The bundled example is
+reference material and must not be copied into every new root automatically.
+
+Deploy selection-aware Runtime and Platform/Desktop revisions together (see
+[PLAN-039](./plans/PLAN-039-provider-selection-bootstrap-rollout.md)). The replaced
+setup apply route is removed; an old external Runtime cannot satisfy the new
+selection contract. Desktop packaging builds its sibling Runtime checkout, so
+release automation must select the matching Runtime revision explicitly.
 
 ### 2. Built standalone run
 

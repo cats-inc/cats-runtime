@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { SetupReadModelService } from '../../core/bootstrap/SetupReadModelService.js';
 import { SetupDiagnosticService } from '../../core/diagnostics/SetupDiagnosticService.js';
 import type { AppContext } from '../app.js';
+import { ProviderSelectionError } from '../../core/bootstrap/ProviderSelectionService.js';
 
 export const setupRoutes = new Hono();
 
@@ -40,7 +41,13 @@ setupRoutes.post('/setup-scan', async (c) => {
     || c.req.query('manual') === 'true'
     || c.req.query('manual') === '1';
 
-  const { started } = ctx.bootstrapService.startScan({ manual });
+  let started: boolean;
+  try {
+    ({ started } = ctx.bootstrapService.startScan({ manual, targets: body.targets }));
+  } catch (error) {
+    if (error instanceof ProviderSelectionError) return c.json({ error: error.message }, error.status);
+    throw error;
+  }
 
   // 202, not the finished scan: the probes outlive any timeout a caller in
   // front of this route is willing to hold. Callers poll /setup-state, which
@@ -52,45 +59,52 @@ setupRoutes.post('/setup-scan', async (c) => {
   }, 202);
 });
 
-setupRoutes.post('/setup-apply', async (c) => {
+setupRoutes.put('/setup-selection', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   if (!ctx.bootstrapService) {
     return c.json({ error: 'Bootstrap service is not available' }, 503);
   }
 
   const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
-  const providers = body.providers;
-  if (!Array.isArray(providers) || providers.length === 0) {
-    return c.json({ error: 'providers must be a non-empty array of provider names' }, 400);
-  }
-
-  let result: { configPath: string };
   try {
-    result = await ctx.bootstrapService.applyConfig(providers as string[]);
+    const selection = ctx.bootstrapService.saveSelection(body.targets, body.expectedRevision);
+    ctx.startup.bootstrapRequired = false;
+    return c.json({ status: 'saved', selection, bootstrapRequired: false });
   } catch (error) {
-    return c.json({
-      error: error instanceof Error ? error.message : String(error),
-    }, 400);
+    if (error instanceof ProviderSelectionError) return c.json({ error: error.message }, error.status);
+    return c.json({ error: 'Could not save provider selection' }, 500);
   }
+});
 
+setupRoutes.post('/setup-selection/reload', async (c) => {
+  const ctx = c.get('ctx' as never) as AppContext;
+  if (!ctx.bootstrapService) return c.json({ error: 'Bootstrap service is not available' }, 503);
+  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
   try {
-    // In-process transition: reload config from the new providers.yaml,
-    // clear bootstrap flag, and start subsystems that were skipped.
-    if (ctx.completeBootstrap) {
-      ctx.completeBootstrap();
-    } else {
-      ctx.startup.bootstrapRequired = false;
-    }
+    const selection = ctx.bootstrapService.selection.reload(body.expectedRevision);
+    ctx.startup.bootstrapRequired = false;
+    return c.json({ status: 'reloaded', selection });
   } catch (error) {
-    return c.json({
-      error: error instanceof Error ? error.message : String(error),
-    }, 500);
+    if (error instanceof ProviderSelectionError) return c.json({ error: error.message }, error.status);
+    return c.json({ error: 'Could not reload provider selection' }, 500);
   }
+});
 
-  return c.json({
-    status: 'applied',
-    configPath: result.configPath,
-    bootstrapRequired: false,
-    restart: false,
-  });
+setupRoutes.post('/setup-operations', async (c) => {
+  const ctx = c.get('ctx' as never) as AppContext;
+  if (!ctx.bootstrapService) return c.json({ error: 'Bootstrap service is not available' }, 503);
+  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  try {
+    const operationId = ctx.bootstrapService.selection.acquireOperation(body.target, body.expectedRevision, body.operationId);
+    return c.json({ operationId }, 201);
+  } catch (error) {
+    if (error instanceof ProviderSelectionError) return c.json({ error: error.message }, error.status);
+    throw error;
+  }
+});
+
+setupRoutes.delete('/setup-operations/:id', (c) => {
+  const ctx = c.get('ctx' as never) as AppContext;
+  ctx.bootstrapService?.selection.releaseOperation(c.req.param('id'));
+  return c.body(null, 204);
 });

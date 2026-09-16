@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from './config.js';
+import { KNOWN_PROVIDERS } from '../backends/cli/providers/types.js';
 import {
   listConfiguredProviders,
   listProviderCatalog,
@@ -11,7 +12,7 @@ describe('provider catalog ordering', () => {
     const config = loadConfig({
       HOME: '/tmp/cats-runtime-provider-order',
       USERPROFILE: '/tmp/cats-runtime-provider-order',
-    });
+    }, { providerYaml: JSON.stringify({ providers: Object.fromEntries(KNOWN_PROVIDERS.map((provider) => [provider, { instances: { native: {} } }])) }) });
 
     config.remoteProviderCatalog.local.ollama = {
       local: {
@@ -80,7 +81,7 @@ describe('provider catalog ordering', () => {
     const config = loadConfig({
       HOME: '/tmp/cats-runtime-provider-default-alias',
       USERPROFILE: '/tmp/cats-runtime-provider-default-alias',
-    });
+    }, { providerYaml: 'providers: { cursor: { instances: { native: {} } } }' });
     const nativeCursor = config.providerInstances.cursor?.native;
     expect(nativeCursor).toBeDefined();
 

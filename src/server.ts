@@ -56,6 +56,7 @@ import {
 import { ensureSessionAwake } from './core/runtime/sessionWakeup.js';
 import { ProviderModelCatalogService } from './core/models/providerModelCatalog.js';
 import { BootstrapService } from './core/bootstrap/BootstrapService.js';
+import { ProviderSelectionError, providerSelectionKey, type SelectedProviderTarget } from './core/bootstrap/ProviderSelectionService.js';
 import { ProviderCompatibilityService } from './core/compatibility/ProviderCompatibilityService.js';
 import { RuntimeWakeupService } from './core/wakeup/RuntimeWakeupService.js';
 import { RuntimeBrowserService } from './core/browser/RuntimeBrowserService.js';
@@ -78,7 +79,7 @@ import { readCopilotQuota } from './backends/cli/usage/copilotQuota.js';
 import { readClaudeQuota } from './backends/cli/usage/claudeQuota.js';
 import { readAntigravityQuota } from './backends/cli/usage/antigravityQuota.js';
 import { readCodexQuota } from './backends/cli/usage/codexQuota.js';
-import { primeProviderAvailabilityDiagnosticsCache } from './http/routes/diagnostics.js';
+import { primeProviderAvailabilityDiagnosticsCache, invalidateProviderAvailabilityDiagnosticsCache } from './http/routes/diagnostics.js';
 import { executeRetainedWorktreeCleanup } from './http/routes/sessions.js';
 import type { ProviderName } from './backends/cli/providers/types.js';
 import type { ApiBackendOptions } from './backends/api/types.js';
@@ -585,7 +586,7 @@ export function createDiscoveryController(
       : `${name}@${instanceId}`;
 
     const scan = async (): Promise<void> => {
-      if (running) return;
+      if (running || !started) return;
       running = true;
 
       try {
@@ -605,6 +606,7 @@ export function createDiscoveryController(
               policy: wslDiscoveryPolicy,
               statusStore: wslDiscoveryStatus,
               inspector: wslDistroInspector,
+              isCurrent: () => started,
             });
             if (result.outcome === 'scanned' && result.newCount > 0) {
               console.log(
@@ -639,6 +641,7 @@ export function createDiscoveryController(
         }
 
         const sessions = await listAllSessions();
+        if (!started) return;
         const { newCount } = syncNativeSessions(
           ctx.registry,
           name,
@@ -701,7 +704,11 @@ export function createDiscoveryController(
           const scan = async () => {
             if (running || unsupported || !started || generation !== activeGeneration) return;
             running = true;
+            const selection = ctx.bootstrapService?.selection;
+            let operationId: string | undefined;
             try {
+              operationId = selection?.acquireOperation({ provider: target.provider,
+                backend: 'agent', instance: target.instanceId }, ctx.config.providerSelectionRevision);
               const before = sessionIdentities();
               const catalog = await agentBackend.listSessions(resolveProviderTarget(
                 ctx.config, target.provider, `agent/${target.instanceId}`,
@@ -722,6 +729,7 @@ export function createDiscoveryController(
                 error instanceof Error ? error.message : String(error),
               );
             } finally {
+              if (operationId) selection?.releaseOperation(operationId);
               running = false;
             }
           };
@@ -933,6 +941,9 @@ export function createRuntimeServer(
     }),
   );
   const compatibility = options.compatibility ?? new ProviderCompatibilityService(config);
+  compatibility.setTargetGuard((target) => {
+    resolveProviderTarget(config, target.providerName, `${target.backend}/${target.instanceId}`);
+  });
   const pool = new WorkerPool(
     config,
     registry,
@@ -967,6 +978,12 @@ export function createRuntimeServer(
     agentBackend,
     fetch: options.apiBackend?.fetch,
     env: options.apiBackend?.env,
+    beginProviderOperation: (target) => {
+      const selection = context.bootstrapService!.selection;
+      const id = selection.acquireOperation({ provider: target.providerName,
+        backend: target.backend, instance: target.instanceId }, config.providerSelectionRevision);
+      return () => selection.releaseOperation(id);
+    },
   });
   const browser = new RuntimeBrowserService({
     drivers: createRuntimeBrowserDrivers(config),
@@ -1086,6 +1103,77 @@ export function createRuntimeServer(
     observe: (observation) => context.metering!.observeQuota(observation),
   });
 
+  let activeDiscovery: ReturnType<typeof createDiscoveryController> | null = null;
+  let changedTargets = new Set<string>();
+  const sessionTargetKey = (session: ReturnType<SessionRegistry['list']>[number]): string =>
+    providerSelectionKey({ provider: session.providerName, backend: session.providerBackend || 'cli',
+      instance: session.providerInstanceId || getProviderDefaultInstanceId(config, session.providerName as ProviderName) });
+
+  function reconcileServices<T>(
+    provider: ProviderName, services: Map<string, T>,
+    create: (instance: ReturnType<typeof listProviderInstances>[number]) => T,
+    close?: (service: T) => void,
+  ): void {
+    const instances = listProviderInstances(config, provider);
+    for (const [id, service] of services) {
+      if (!instances.some((instance) => instance.id === id)
+        || changedTargets.has(providerSelectionKey({ provider, backend: 'cli', instance: id }))) {
+        close?.(service);
+        services.delete(id);
+      }
+    }
+    for (const instance of instances) {
+      if (!services.has(instance.id)) services.set(instance.id, create(instance));
+    }
+  }
+
+  function activateSelection(): void {
+    activeDiscovery?.stop();
+    compatibility.invalidate();
+    providerModelCatalog.invalidate();
+    context.quotaRefresh?.invalidate();
+    invalidateProviderAvailabilityDiagnosticsCache(context);
+    for (const session of registry.list()) {
+      if (changedTargets.has(sessionTargetKey(session))) runtime.kill(session.id);
+    }
+    for (const request of wakeup.list({ status: 'scheduled' })) {
+      const session = registry.get(request.target.sessionId);
+      if (session && changedTargets.has(sessionTargetKey(session))) wakeup.cancel(request.id);
+    }
+    reconcileServices('auggie', auggieSessionsByInstance, (instance) => createAuggieSessionService(config, instance.id));
+    reconcileServices('cursor', cursorNativeByInstance, (instance) => new CursorNativeSessionService({
+      command: instance.commandConfig.path, chatsDir: instance.cursorChatsDir || config.cursorChatsDir,
+      runtime: createRuntimeAdapter(instance.commandConfig.runtime),
+    }));
+    reconcileServices('kiro', kiroNativeByInstance, (instance) => new KiroNativeSessionService({
+      command: instance.commandConfig.path, dbPath: instance.kiroDbPath || config.kiroDbPath,
+      runtime: createRuntimeAdapter(instance.commandConfig.runtime),
+    }));
+    reconcileServices('goose', gooseNativeByInstance, (instance) => new GooseNativeSessionService({
+      command: instance.commandConfig.path,
+    }));
+    reconcileServices('kilo', kiloNativeByInstance, (instance) => new KiloNativeSessionService({
+      command: instance.commandConfig.path, commandConfig: instance.commandConfig,
+      hostname: instance.kiloServerHost || config.kiloServerHost,
+      port: instance.kiloServerPort || config.kiloServerPort,
+      startupTimeoutMs: instance.kiloServerStartupTimeoutMs || config.kiloServerStartupTimeoutMs,
+    }), (service) => { void service.close().catch(() => undefined); });
+    reconcileServices('opencode', opencodeNativeByInstance, (instance) => new OpencodeNativeSessionService({
+      command: instance.commandConfig.path, commandConfig: instance.commandConfig,
+      hostname: instance.opencodeServerHost || config.opencodeServerHost,
+      port: instance.opencodeServerPort || config.opencodeServerPort,
+      startupTimeoutMs: instance.opencodeServerStartupTimeoutMs || config.opencodeServerStartupTimeoutMs,
+    }), (service) => { void service.close().catch(() => undefined); });
+    startup.bootstrapRequired = false;
+    activeDiscovery = createDiscoveryController(context, options);
+    activeDiscovery.start();
+    peerDiscovery.start();
+    wakeup.start();
+    browserMaintenance.start();
+    worktreeMaintenance.start();
+    primeProviderAvailabilityDiagnosticsCache(context);
+  }
+
   // Bootstrap service is always created so setup routes can function.
   const paths = getRuntimeResolvedPaths(config);
   const configPathForBootstrap = config.configPath;
@@ -1094,47 +1182,21 @@ export function createRuntimeServer(
     configPath: configPathForBootstrap,
     config,
     compatibility,
+    beforeActivate: (_candidate: RuntimeConfig, changed: SelectedProviderTarget[]) => {
+      const keys = new Set(changed.map(providerSelectionKey));
+      for (const session of registry.list()) {
+        if (keys.has(sessionTargetKey(session)) && (runtime.get(session.id)?.busy
+          || session.status === 'initializing' || session.status === 'busy')) {
+          throw new ProviderSelectionError('Finish or stop the running session before changing its provider', 409);
+        }
+      }
+      changedTargets = keys;
+    },
+    activated: activateSelection,
+    activationRequired: () => startup.bootstrapRequired,
   });
-
-  // completeBootstrap reloads config and starts subsystems that were skipped.
-  let activeDiscovery: ReturnType<typeof createDiscoveryController> | null = null;
-  context.completeBootstrap = () => {
-    // Reload config from the newly written providers.yaml.
-    const reloaded = loadConfig(getRuntimeConfigEnv(config));
-    Object.assign(config, reloaded);
-    copyRuntimeConfigEnv(config, reloaded);
-    context.config = config;
-
-    let startedDiscovery = false;
-    let startedPeerDiscovery = false;
-    try {
-      if (!activeDiscovery) {
-        activeDiscovery = createDiscoveryController(context, options);
-      }
-      activeDiscovery.start();
-      startedDiscovery = true;
-      peerDiscovery.start();
-      startedPeerDiscovery = true;
-      wakeup.start();
-      browserMaintenance.start();
-      worktreeMaintenance.start();
-    } catch (error) {
-      worktreeMaintenance.close();
-      browserMaintenance.close();
-      wakeup.close();
-      if (startedDiscovery && activeDiscovery) {
-        activeDiscovery.stop();
-      }
-      if (startedPeerDiscovery) {
-        peerDiscovery.stop();
-      }
-      throw error;
-    }
-
-    startup.bootstrapRequired = false;
-
-    primeProviderAvailabilityDiagnosticsCache(context);
-  };
+  const selectionState = context.bootstrapService.getSelection().state;
+  if (selectionState === 'missing' || selectionState === 'invalid') startup.bootstrapRequired = true;
 
   const app = createRuntimeApp(context);
   const server = createAdaptorServer({ fetch: app.fetch }) as Server;
@@ -1163,20 +1225,6 @@ export function createRuntimeServer(
           host: config.host,
           port: config.port,
         });
-        if (activeDiscovery) {
-          activeDiscovery.start();
-          startupTrace?.trace('server.discovery.started', {
-            bootstrapRequired: startup.bootstrapRequired,
-          });
-        }
-        if (!startup.bootstrapRequired) {
-          peerDiscovery.start();
-          wakeup.start();
-          browserMaintenance.start();
-          worktreeMaintenance.start();
-          startupTrace?.trace('server.runtime_services.started');
-        }
-
         try {
           if (startup.phase !== 'starting') {
             throw new Error('cats-runtime closed during startup');
@@ -1195,9 +1243,19 @@ export function createRuntimeServer(
           }
 
           if (!startup.bootstrapRequired) {
-            startupTrace?.trace('server.provider_diagnostics_prime.begin');
-            primeProviderAvailabilityDiagnosticsCache(context);
-            startupTrace?.trace('server.provider_diagnostics_prime.scheduled');
+            peerDiscovery.start();
+            wakeup.start();
+            browserMaintenance.start();
+            worktreeMaintenance.start();
+            startupTrace?.trace('server.runtime_services.started');
+            // Publish service readiness before scheduling selected-provider I/O.
+            setImmediate(() => {
+              if (startup.phase !== 'ready' || startup.bootstrapRequired) return;
+              activeDiscovery?.start();
+              startupTrace?.trace('server.provider_diagnostics_prime.begin');
+              primeProviderAvailabilityDiagnosticsCache(context);
+              startupTrace?.trace('server.provider_diagnostics_prime.scheduled');
+            });
           }
 
           if (startup.phase !== 'starting') {

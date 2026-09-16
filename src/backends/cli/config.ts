@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { isAbsolute, join, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { KNOWN_PROVIDERS, type ProviderName } from './providers/types.js';
@@ -41,6 +42,8 @@ export type BackendKind = 'cli' | 'api' | 'local' | 'agent';
 
 export interface LoadConfigOptions {
   skipProviderFile?: boolean;
+  /** Validate a candidate without writing it or reading the active file. */
+  providerYaml?: string;
 }
 
 export interface ProviderRuntimeConfig {
@@ -167,6 +170,7 @@ export interface RuntimeMeteringConfig {
 }
 
 export interface CliRuntimeConfig {
+  providerSelectionRevision?: string;
   host: string;
   port: number;
   apiKey: string;
@@ -446,11 +450,14 @@ export function loadConfig(
   const legacy = buildLegacyRuntimeShape(env, env.HOME || env.USERPROFILE || '');
   const configPath = resolveConfigPath(env.HOME || env.USERPROFILE || '', env);
   const hasProviderFile = !options.skipProviderFile && existsSync(configPath);
-  const configured = hasProviderFile
-    ? applyFileBasedProviderConfig(configPath, legacy)
-    : legacy;
+  const providerYaml = options.providerYaml
+    ?? (hasProviderFile ? readFileSync(configPath, 'utf8') : null);
+  const configured = applyFileBasedProviderConfig(
+    configPath, legacy, providerYaml ?? 'version: 1\nbackends: {}\n',
+  );
 
   return {
+    providerSelectionRevision: providerConfigRevision(providerYaml),
     host,
     port,
     apiKey,
@@ -598,14 +605,11 @@ export function listProviderInstances(
     return Object.values(configured);
   }
 
-  return [
-    buildLegacyProviderInstance(
-      provider,
-      getProviderDefaultInstanceId(config, provider),
-      config.providerCommands[provider],
-      config,
-    ),
-  ];
+  return [];
+}
+
+export function providerConfigRevision(yaml: string | null): string {
+  return yaml === null ? 'missing' : createHash('sha256').update(yaml).digest('hex');
 }
 
 export function isUnknownProviderInstanceError(
@@ -1077,8 +1081,9 @@ function buildLegacyProviderInstance(
 function applyFileBasedProviderConfig(
   filePath: string,
   legacy: LegacyRuntimeShape,
+  source: string,
 ): LegacyRuntimeShape {
-  const raw = parse(readFileSync(filePath, 'utf-8'));
+  const raw = parse(source);
   const doc = asObject(raw, `Invalid provider config '${filePath}'`);
   const version = doc.version;
   if (version !== undefined && version !== 1) {
@@ -1115,6 +1120,15 @@ function applyFileBasedProviderConfig(
   if (doc.backends !== undefined && !rawBackends) {
     throw new Error(`Invalid backends block in '${filePath}'`);
   }
+  for (const [backend, value] of Object.entries(rawBackends ?? {})) {
+    if (!['cli', 'api', 'local', 'agent'].includes(backend)) {
+      throw new Error(`Unknown backend '${backend}' in '${filePath}'`);
+    }
+    const backendDoc = asObject(value, `Invalid backends.${backend} block in '${filePath}'`);
+    if (backendDoc.providers !== undefined) {
+      asObject(backendDoc.providers, `Invalid backends.${backend}.providers block in '${filePath}'`);
+    }
+  }
   if (rawBackends && doc.providers !== undefined) {
     throw new Error(
       `Cannot mix top-level providers with backends.* in '${filePath}'. `
@@ -1122,6 +1136,10 @@ function applyFileBasedProviderConfig(
     );
   }
   const usesSeparatedBackends = rawBackends !== undefined;
+
+  if (!usesSeparatedBackends && doc.providers === undefined) {
+    throw new Error(`Provider config '${filePath}' must define backends or providers`);
+  }
 
   if (usesSeparatedBackends) {
     for (const known of KNOWN_PROVIDERS) {

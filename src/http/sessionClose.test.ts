@@ -1,3 +1,4 @@
+import { withSelectedCliProviders } from '../../tests/support/selectedCliFixture.js';
 import { EventEmitter } from 'node:events';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -24,7 +25,7 @@ function parseSse(text: string): Array<Record<string, unknown>> {
 }
 
 describe('session close route', () => {
-  const makeConfig = (): CliRuntimeConfig => ({
+  const makeConfig = (): CliRuntimeConfig => withSelectedCliProviders(({
     host: '127.0.0.1',
     port: 3100,
     apiKey: '',
@@ -67,7 +68,7 @@ describe('session close route', () => {
       kiro: { path: 'kiro-cli', runner: 'auto', runtime: { mode: 'native' } },
       opencode: { path: 'opencode', runner: 'auto', runtime: { mode: 'native' } },
     },
-  });
+  }));
 
   let registry: SessionRegistry;
   let pool: WorkerPool;

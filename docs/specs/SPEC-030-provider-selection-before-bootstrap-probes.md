@@ -4,12 +4,12 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft for discussion; implementation has not started |
+| **Status** | Approved; implementation in progress |
 | **Owner** | User |
 | **Reviewer** | User |
 | **Last updated** | 2026-09-16 |
-| **Related ADR** | [ADR-039](../decisions/039-use-selected-provider-config-as-the-resource-boundary.md) (Proposed) |
-| **Delivery plan** | [PLAN-039](../plans/PLAN-039-provider-selection-bootstrap-rollout.md) (Draft) |
+| **Related ADR** | [ADR-039](../decisions/039-use-selected-provider-config-as-the-resource-boundary.md) (Accepted) |
+| **Delivery plan** | [PLAN-039](../plans/PLAN-039-provider-selection-bootstrap-rollout.md) (In progress) |
 
 ## Summary
 
@@ -233,16 +233,14 @@ Acceptance cases include:
 - Existing selected-target commands, options, credentials references, and
   routing survive edits to other selections.
 
-## Open Product Decisions
+## Product Decisions Accepted on 2026-09-16
 
-- Should an explicitly saved empty selection be a supported idle state? The
-  proposed default is yes, with provider-dependent actions disabled and a clear
-  add-provider entry. Missing, invalid, and intentionally empty must differ.
-- Confirm the proposed running-operation rule: finish/stop before deselection,
-  rather than implicitly cancelling work or allowing a grace period.
-- Confirm whether the first delivered editor includes all backend types, or
-  exposes native CLI/Ollama/OpenClaw first while preserving manually configured
-  API targets. The runtime scope contract must cover every backend either way.
+- Explicitly empty selection is a supported idle state, with provider-dependent
+  actions disabled and a clear add-provider entry. Missing, invalid, and
+  intentionally empty must differ.
+- Finish or stop running provider operations before deselection.
+- The first editor exposes native CLI/Ollama/OpenClaw and preserves manually
+  configured API targets. Runtime enforces scope for every backend.
 
 ## Related Architecture and Implementation Seams
 
@@ -265,7 +263,7 @@ platform-specific installation mechanics.
 
 ## References
 
-- [ADR-039: proposed selection boundary](../decisions/039-use-selected-provider-config-as-the-resource-boundary.md)
+- [ADR-039: accepted selection boundary](../decisions/039-use-selected-provider-config-as-the-resource-boundary.md)
 - [PLAN-039: shared implementation sequence](../plans/PLAN-039-provider-selection-bootstrap-rollout.md)
 - [ADR-021: generated provider config and standalone bootstrap](../decisions/021-treat-providers-yaml-as-generated-config-and-bootstrap-without-it.md)
 - [SPEC-017: current standalone bootstrap](./SPEC-017-standalone-provider-bootstrap-and-generated-config.md)
@@ -276,4 +274,4 @@ platform-specific installation mechanics.
 ---
 
 *Created: 2026-09-16*
-*Implementation status: design draft only; no runtime behavior changed.*
+*Implementation status: in progress; validation and host integration pending.*

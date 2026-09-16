@@ -248,7 +248,7 @@ Current curated tools:
 - `read_setup_diagnostic_report`
 - `setup_state`
 - `run_setup_scan`
-- `apply_setup_config`
+- `save_provider_selection`
 - `observe_session`
 - `list_wakeups`
 - `read_wakeup`
@@ -344,8 +344,8 @@ the standalone CLI entry.
 MCP hosts can inspect bootstrap-required status, preferred scan source,
 actionable repair actions, and latest setup-report summary metadata without
 inventing a second setup orchestration contract.
-`run_setup_scan` and `apply_setup_config` reuse the same bounded setup workflow
-mutation seams as `POST /setup-scan` and `POST /setup-apply`, so MCP hosts can
+`run_setup_scan` and `save_provider_selection` reuse the same bounded setup workflow
+mutation seams as `POST /setup-scan` and `PUT /setup-selection`, so MCP hosts can
 request a manual scan or apply a generated provider config without inventing an
 MCP-only bootstrap lifecycle.
 `runtime_diagnostics` and `health_diagnostics` reuse the same runtime-owned
@@ -569,7 +569,6 @@ The runtime enters bootstrap mode when:
 
 - No valid `providers.yaml` exists at the resolved config path
 - The config file exists but cannot be parsed
-- The config is valid but contains no usable provider targets
 - The operator passes `--bootstrap` on the command line
 
 In bootstrap mode:
@@ -582,66 +581,81 @@ In bootstrap mode:
 
 ### Provider Setup
 
-```text
-GET  /setup-state
-POST /setup-scan
-POST /setup-apply
+The connected Runtime owns provider intent. The active config defaults to
+`~/.cats/runtime/config/providers.yaml`, under the root selected by
+`CATS_RUNTIME_DIR`. The complete example is reference material, not a default
+selection. Valid empty config is idle mode; missing or invalid config requires
+selection/repair without launching provider work.
+
+| Route | Contract |
+|-------|----------|
+| `GET /setup-state` | Read static choices, active selection, repair guidance and revision-scoped observations; no probes |
+| `PUT /setup-selection` | Save and activate `{expectedRevision, targets}` without requiring detection |
+| `POST /setup-selection/reload` | Validate and activate hand-edited YAML with `{expectedRevision}` |
+| `POST /setup-scan` | Start a scan of selected targets or an explicit selected subset; returns `202` |
+| `POST /setup-operations` | Admit host work with `{expectedRevision, target, operationId?}`; returns `{operationId}` |
+| `DELETE /setup-operations/:operationId` | Release a completed host operation; returns `204` |
+
+Hosts may supply a UUID `operationId` before admission so a lost response can
+still be released. Repeating admission for the same active ID/target is
+idempotent; reusing it for another target or after release returns a conflict.
+Release is idempotent and also rejects a delayed admission arriving afterward.
+Hosts retry unsuccessful releases and wait for non-cancellable helpers before
+restarting Runtime; receipts belong to the running Runtime process.
+
+All setup APIs require the configured Runtime bearer token, including during
+bootstrap. The setup page exposes an API key input without persisting it.
+
+Selection uses exact tuples, for example:
+
+```json
+{"expectedRevision":"missing","targets":[{"provider":"codex","backend":"cli","instance":"native"}]}
 ```
 
-`GET /setup-state` returns the current setup state, latest scan
-snapshot, provider universe (known provider families), and latest manual scan
-snapshot. Response shape:
+An empty `targets` array is valid. Built-in templates cover native CLI targets,
+Devin ACP, local Ollama and OpenClaw. Existing custom/API/advanced targets retain
+their settings and comments; a new custom target supplies a `configuration`
+object. Credential references remain in YAML. Selecting an unavailable provider
+is allowed and does not implicitly select other backends or instances.
 
-- `bootstrapRequired` — whether the runtime is in bootstrap mode
-- `state` — setup workflow state (`status`, `lastScanAt`, `lastManualScanAt`, `appliedAt`, `appliedConfigPath`, `error`)
-- `scan` — latest scan snapshot (auto or manual), or `null` if no scan has been run
-  - `scannedAt`, `scanType`, `providerCount`, `availableCount` — summary fields
-  - `providers` — full `ProviderScanEntry[]` with per-provider `commandStatus`, `commandPath`, `version`, `authStatus`, `available`, `install`, and `remediation` details
-- `manualScan` — latest explicit manual scan snapshot (`BootstrapScanResult` with full provider detail), or `null` if no manual scan has been run
-- `universe` — known provider families with `provider`, `familyLabel`, and `binaryName`
-- `repair` — shared runtime-owned repair summary for dashboard/provider-setup follow-through
-  - `status` — `ready`, `scan_required`, or `attention_required`
-  - `preferredScan` — which persisted snapshot currently drives repair guidance (`scan`, `manualScan`, or `none`)
-  - `providersReadyToApply` — compact list of currently ready provider ids/families that can be passed directly to `POST /setup-apply`
-  - `providersNeedingAttention` — compact list of provider ids/families that still need repair, including bounded `remediationPreview`
-  - `nextAction` — operator-facing runtime action metadata such as `run_manual_scan`, `apply_config`, or `review_remediation`
-  - `actions` — ordered runtime-owned follow-up actions using the existing setup/diagnostics routes, including ready-to-send request bodies where the runtime can supply them honestly
-- `diagnostics.latestReport` — latest persisted setup diagnostic report summary when a setup report artifact already exists
-    - includes `artifactId`, `artifactPath`, `generatedAt`, summary `status`, `issueCounts`, a short `headline`, and bounded `highlights`
+`GET /setup-state` includes:
 
-Both `scan.providers` and `manualScan` expose the full persisted scan data so
-that UI consumers (dashboard, provider-setup) can render provider status without
-forcing a fresh scan on page load.
+- `selection`: `state` (`missing|invalid|empty|selected`), opaque `revision`,
+  exact `targets`, `diskChanged`, and `error`. `nativeSetupTargets` is the
+  subset eligible for bundled local installers; remote/WSL/Docker targets do
+  not become installer candidates merely because their instance is named native.
+- `universe`: static provider templates with tuple identity, family label,
+  binary name and installer metadata. Reading it never detects providers.
+- `state`: workflow status and timestamps; scan metadata is an observation,
+  never a source of selected targets.
+- `scan` and `manualScan`: matching-revision observations or null. Each entry
+  has provider/backend/instance, command/auth availability, install metadata
+  and remediation. Non-CLI targets do not require CLI installation.
+- `repair`: `selection_required|scan_required|attention_required|ready`,
+  `providersReady`, `providersNeedingAttention`, preferred scan and actions.
+- `diagnostics.latestReport`: the retained diagnostic report summary, if any.
 
-`/setup-*` API routes go through global bearer auth.  When
-`CATS_RUNTIME_API_KEY` is set, callers must provide a valid token even during
-bootstrap.  The dashboard, playground, and provider-setup page each expose
-their own API key input and do not persist the key across pages.
+Saves validate the whole candidate before atomic replacement. Stale editors,
+external disk changes, and changes to a target with active work return `409`.
+Invalid candidates return `400` without replacing the active configuration.
+A reload uses the same activation and admission checks. Watchers/caches and
+background work are reconciled; historical sessions remain on disk.
 
-`POST /setup-scan` starts a provider scan and returns `202` immediately with
-`{"status": "scanning", "started": <bool>, "state": <setup state>}`. Pass
-`{"manual": true}` in the body for an explicit manual scan. `started` is `false`
-when a scan was already running; a second start is refused rather than queued.
+`POST /setup-scan` accepts `{manual:true, targets:[...]}`; omitted targets mean
+the active selected set. Manual refresh changes freshness, never scope. Missing
+selection returns `409`; an unselected target returns `400`. Identical running
+scans coalesce; different scopes/modes conflict. Poll `GET /setup-state` until
+`state.status` leaves `scanning`. A revision change discards obsolete results.
+Routine CLI detection remains passive. `POST /setup-apply` has been removed.
 
-The scan itself is not awaited by the request: it takes as long as the host's
-provider CLIs take to answer, which is longer than callers in front of the
-runtime are willing to hold a connection open. Poll `GET /setup-state` until
-`state.status` leaves `scanning`; the run then settles into `ready` with the
-snapshot in `scan` (and `manualScan` for a manual run), or into `error` with the
-reason in `state.error`. A runtime that dies mid-scan clears the stranded
-`scanning` status on its next start.
+MCP hosts use `setup_state`, `save_provider_selection`, and `run_setup_scan`
+with these same contracts. The former `apply_setup_config` tool is removed.
+Host installers must hold an operation admission until completion, including
+failure cleanup. Non-cancellable CLI/agent model discovery also holds admission;
+cancellable HTTP model discovery is aborted on activation.
 
-`POST /setup-apply` accepts `{"providers": ["claude", "codex", ...]}`
-and writes a minimal `providers.yaml` with only the selected providers. On
-success the runtime exits bootstrap mode in-process and session routes become
-available. If config reload fails after writing the file, the route returns
-`500`, bootstrap mode stays active, and normal session routes remain blocked.
-
-Setup artifacts are persisted under `<dataDir>/setup/`:
-
-- `setup-state.json` — resumable setup workflow state
-- `provider-scan.json` — latest scan results
-- `provider-manual-scan.json` — latest explicit manual scan results
+Setup observations persist under `<dataDir>/setup/` in `setup-state.json`,
+`provider-scan.json`, and `provider-manual-scan.json`. None overrides YAML intent.
 
 ### Setup Diagnostic Report
 

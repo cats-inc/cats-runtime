@@ -1,35 +1,8 @@
 import type { ProviderRemediationStep } from '../provider-install/types.js';
-import type { BootstrapScanResult, ProviderScanEntry } from './BootstrapService.js';
-
-const MAX_REMEDIATION_PREVIEW_STEPS = 3;
-
-export interface SetupRepairSummary {
-  status: 'ready' | 'scan_required' | 'attention_required';
-  summary: string;
-  preferredScan: {
-    source: 'scan' | 'manualScan' | 'none';
-    scannedAt: string | null;
-    providerCount: number;
-    availableCount: number;
-    unavailableCount: number;
-    remediationCount: number;
-  };
-  providersReadyToApply: Array<{
-    provider: string;
-    family: string;
-  }>;
-  providersNeedingAttention: Array<{
-    provider: string;
-    family: string;
-    remediationCount: number;
-    remediationPreview: ProviderRemediationStep[];
-  }>;
-  nextAction: SetupReadModelAction;
-  actions: SetupReadModelAction[];
-}
+import type { BootstrapScanResult } from './BootstrapService.js';
 
 export interface SetupReadModelAction {
-  kind: 'none' | 'run_manual_scan' | 'apply_config' | 'review_remediation' | 'generate_setup_report';
+  kind: 'none' | 'run_manual_scan' | 'manage_selection' | 'review_remediation' | 'generate_setup_report';
   label: string;
   summary: string;
   path?: string;
@@ -38,211 +11,67 @@ export interface SetupReadModelAction {
   providers?: string[];
 }
 
+export interface SetupRepairSummary {
+  status: 'ready' | 'selection_required' | 'scan_required' | 'attention_required';
+  summary: string;
+  preferredScan: { source: 'scan' | 'manualScan' | 'none'; scannedAt: string | null;
+    providerCount: number; availableCount: number; unavailableCount: number; remediationCount: number };
+  providersReady: Array<{ provider: string; family: string }>;
+  providersNeedingAttention: Array<{ provider: string; family: string;
+    remediationCount: number; remediationPreview: ProviderRemediationStep[] }>;
+  nextAction: SetupReadModelAction;
+  actions: SetupReadModelAction[];
+}
+
 export function buildRepairSummary(input: {
   bootstrapRequired: boolean;
   scan: BootstrapScanResult | null;
   manualScan: BootstrapScanResult | null;
+  selectedCount?: number;
 }): SetupRepairSummary {
-  const preferredScan = pickPreferredScan(input.scan, input.manualScan);
-  if (!preferredScan) {
-    const actions = [
-      createRunManualScanAction(),
-      createGenerateSetupReportAction(true),
-    ];
-    return {
-      status: 'scan_required',
-      summary: 'No persisted setup scan is available yet. Run Scan Providers to capture current provider readiness and remediation.',
-      preferredScan: {
-        source: 'none',
-        scannedAt: null,
-        providerCount: 0,
-        availableCount: 0,
-        unavailableCount: 0,
-        remediationCount: 0,
-      },
-      providersReadyToApply: [],
-      providersNeedingAttention: [],
-      nextAction: actions[0]!,
-      actions,
-    };
-  }
-
-  const readyProviders = preferredScan.scan.providers.filter((provider) => provider.available);
-  const unavailableProviders = preferredScan.scan.providers.filter((provider) => !provider.available);
-  const remediationCount = preferredScan.scan.providers.reduce(
-    (count, provider) => count + provider.remediation.length,
-    0,
-  );
-  const availableCount = preferredScan.scan.providers.length - unavailableProviders.length;
-  const providersReadyToApply = readyProviders.map((provider) => ({
-    provider: provider.provider,
-    family: provider.family,
-  }));
-
-  if (unavailableProviders.length === 0) {
-    const actions = input.bootstrapRequired
-      ? [
-          createApplyConfigAction(readyProviders),
-          createGenerateSetupReportAction(false),
-        ]
-      : [
-          createGenerateSetupReportAction(false),
-        ];
-    return {
-      status: 'ready',
-      summary: input.bootstrapRequired
-        ? 'Ready providers are available. Select one or more providers and apply the generated config to exit bootstrap mode.'
-        : 'All providers in the latest setup scan are currently available.',
-      preferredScan: {
-        source: preferredScan.source,
-        scannedAt: preferredScan.scan.scannedAt,
-        providerCount: preferredScan.scan.providers.length,
-        availableCount,
-        unavailableCount: 0,
-        remediationCount,
-      },
-      providersReadyToApply,
-      providersNeedingAttention: [],
-      nextAction: input.bootstrapRequired ? actions[0]! : createNoAction(),
-      actions,
-    };
-  }
-
-  const providersNeedingAttention = unavailableProviders.map((provider) =>
-    summarizeAttentionProvider(provider),
-  );
-  const actions = [
-    ...(input.bootstrapRequired && availableCount > 0 ? [createApplyConfigAction(readyProviders)] : []),
-    createReviewRemediationAction(unavailableProviders),
-    createGenerateSetupReportAction(false),
-    ...(input.bootstrapRequired && availableCount === 0 ? [createRunManualScanAction()] : []),
-  ];
-
+  const scan = input.manualScan && (!input.scan || Date.parse(input.manualScan.scannedAt) >= Date.parse(input.scan.scannedAt))
+    ? input.manualScan : input.scan;
+  const ready = scan?.providers.filter((provider) => provider.available) || [];
+  const attention = scan?.providers.filter((provider) => !provider.available) || [];
+  const manage: SetupReadModelAction = {
+    kind: 'manage_selection', label: 'Choose Providers',
+    summary: 'Save the providers you want Cats to manage before checking availability.', path: '/setup', method: 'GET',
+  };
+  const refresh: SetupReadModelAction = {
+    kind: 'run_manual_scan', label: 'Check Selected Providers',
+    summary: 'Refresh only the saved provider selection.', path: '/setup-scan', method: 'POST', body: { manual: true },
+  };
+  const report: SetupReadModelAction = {
+    kind: 'generate_setup_report', label: 'Generate Setup Report',
+    summary: 'Capture a redacted report of the current setup state.',
+    path: '/diagnostics/setup-report', method: 'POST', body: { refreshScan: false },
+  };
+  const idle = input.selectedCount === 0 && !input.bootstrapRequired;
+  const status = input.bootstrapRequired ? 'selection_required' : idle ? 'ready'
+    : !scan ? 'scan_required' : attention.length ? 'attention_required' : 'ready';
+  const nextAction: SetupReadModelAction = input.bootstrapRequired ? manage
+    : idle ? manage : !scan ? refresh : attention.length ? {
+      kind: 'review_remediation', label: 'Review Selected Providers',
+      summary: 'Selected providers retain their selection while unavailable.', providers: attention.map((entry) => entry.provider),
+    } : { kind: 'none', label: 'No Action Needed', summary: 'Selected provider checks are complete.' };
   return {
-    status: 'attention_required',
-    summary: unavailableProviders.length === preferredScan.scan.providers.length
-      ? 'Every provider in the latest setup scan needs repair or reconfiguration before it can be used.'
-      : `${unavailableProviders.length} provider(s) in the latest setup scan still need repair or reconfiguration.`,
+    status,
+    summary: input.bootstrapRequired ? 'Choose providers to finish runtime setup.'
+      : idle ? 'No providers selected. Runtime is idle.'
+      : !scan ? 'Provider selection is saved. Check selected providers when ready.'
+      : attention.length ? `${attention.length} selected provider(s) need attention or have unknown availability.`
+      : 'All checked selected providers are available.',
     preferredScan: {
-      source: preferredScan.source,
-      scannedAt: preferredScan.scan.scannedAt,
-      providerCount: preferredScan.scan.providers.length,
-      availableCount,
-      unavailableCount: unavailableProviders.length,
-      remediationCount,
+      source: scan === input.manualScan && scan ? 'manualScan' : scan ? 'scan' : 'none',
+      scannedAt: scan?.scannedAt ?? null, providerCount: scan?.providers.length ?? 0,
+      availableCount: ready.length, unavailableCount: attention.length,
+      remediationCount: scan?.providers.reduce((sum, entry) => sum + entry.remediation.length, 0) ?? 0,
     },
-    providersReadyToApply,
-    providersNeedingAttention,
-    nextAction: actions[0]!,
-    actions,
+    providersReady: ready.map(({ provider, family }) => ({ provider, family })),
+    providersNeedingAttention: attention.map(({ provider, family, remediation }) => ({
+      provider, family, remediationCount: remediation.length, remediationPreview: remediation.slice(0, 3),
+    })),
+    nextAction,
+    actions: input.bootstrapRequired || idle ? [manage, report] : [manage, refresh, report],
   };
-}
-
-function summarizeAttentionProvider(
-  provider: ProviderScanEntry,
-): SetupRepairSummary['providersNeedingAttention'][number] {
-  return {
-    provider: provider.provider,
-    family: provider.family,
-    remediationCount: provider.remediation.length,
-    remediationPreview: provider.remediation.slice(0, MAX_REMEDIATION_PREVIEW_STEPS),
-  };
-}
-
-function createNoAction(): SetupReadModelAction {
-  return {
-    kind: 'none',
-    label: 'No Action Needed',
-    summary: 'No provider repair action is currently required.',
-  };
-}
-
-function createRunManualScanAction(): SetupReadModelAction {
-  return {
-    kind: 'run_manual_scan',
-    label: 'Scan Providers',
-    summary: 'Scan all known provider CLIs and persist the latest readiness snapshot.',
-    path: '/setup-scan',
-    method: 'POST',
-    body: {
-      manual: true,
-    },
-  };
-}
-
-function createApplyConfigAction(
-  providers: ProviderScanEntry[],
-): SetupReadModelAction {
-  const providerIds = providers.map((provider) => provider.provider);
-  return {
-    kind: 'apply_config',
-    label: providerIds.length > 0 ? 'Apply Ready Providers' : 'Apply Config',
-    summary: providerIds.length > 0
-      ? 'Apply the currently ready providers now using the generated providers.yaml contract.'
-      : 'Choose the ready providers you want to enable and apply the generated providers.yaml.',
-    path: '/setup-apply',
-    method: 'POST',
-    ...(providerIds.length > 0
-      ? {
-          providers: providerIds,
-          body: {
-            providers: providerIds,
-          },
-        }
-      : {}),
-  };
-}
-
-function createReviewRemediationAction(
-  providers: ProviderScanEntry[],
-): SetupReadModelAction {
-  const providerIds = providers.map((provider) => provider.provider);
-  return {
-    kind: 'review_remediation',
-    label: 'Review Remediation',
-    summary: 'Review the per-provider remediation hints from the latest setup scan before the next retry.',
-    ...(providerIds.length > 0 ? { providers: providerIds } : {}),
-  };
-}
-
-function createGenerateSetupReportAction(refreshScan: boolean): SetupReadModelAction {
-  return {
-    kind: 'generate_setup_report',
-    label: 'Generate Setup Report',
-    summary: refreshScan
-      ? 'Capture a redacted setup diagnostic report and refresh the shared setup scan first.'
-      : 'Capture a redacted setup diagnostic report for operator review or sharing.',
-    path: '/diagnostics/setup-report',
-    method: 'POST',
-    body: {
-      refreshScan,
-    },
-  };
-}
-
-function pickPreferredScan(
-  scan: BootstrapScanResult | null,
-  manualScan: BootstrapScanResult | null,
-): { source: 'scan' | 'manualScan'; scan: BootstrapScanResult } | null {
-  if (scan && manualScan) {
-    return Date.parse(manualScan.scannedAt) >= Date.parse(scan.scannedAt)
-      ? { source: 'manualScan', scan: manualScan }
-      : { source: 'scan', scan };
-  }
-
-  if (manualScan) {
-    return {
-      source: 'manualScan',
-      scan: manualScan,
-    };
-  }
-
-  if (scan) {
-    return {
-      source: 'scan',
-      scan,
-    };
-  }
-
-  return null;
 }

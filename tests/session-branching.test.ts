@@ -8,7 +8,7 @@ import { SessionRegistry } from '../src/backends/cli/pool/SessionRegistry.js';
 import type { WorkerPool } from '../src/backends/cli/pool/WorkerPool.js';
 import type { ProviderCapabilities } from '../src/core/types.js';
 import {
-  createRuntimeTestEnv,
+  createRuntimeTestEnvWithAllCliProviders,
   createRuntimeTestPaths,
   ensureRuntimeTestDirs,
 } from './support/runtimeTestPaths.js';
@@ -16,7 +16,7 @@ import {
 function createTestConfig() {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-branch-'));
   const paths = createRuntimeTestPaths(root);
-  const env = createRuntimeTestEnv(root, {
+  const env = createRuntimeTestEnvWithAllCliProviders(root, {
     CATS_RUNTIME_HOST: '127.0.0.1',
     CATS_RUNTIME_PORT: '3110',
     CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
