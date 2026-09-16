@@ -34,8 +34,9 @@ session model. Catalog-maintenance intent must also be present.
    evidence. A provider-scoped request does not authorize global catalog cleanup.
 4. Read [evidence and scope](./references/evidence-and-scope.md). Read
    [catalog surfaces](./references/catalog-surfaces.md) when inventorying, editing, or auditing.
-5. If raw terminal output is present, read [paste intake](./references/paste-intake.md) before
-   interpreting it. Load a provider reference only when that provider is in scope.
+5. For supplied picker text, screenshots, or transcription, read
+   [paste intake](./references/paste-intake.md) before interpreting it. Load a provider reference
+   only when that provider is in scope.
 
 ## Select the interaction policy from plain language
 
@@ -137,6 +138,8 @@ authorizes that external mutation.
 - [Codex](./references/providers/codex.md): supplied picker evidence, existing per-model defaults,
   exact display labels, fallback locations, and focused Runtime/Desktop validation.
 - [Copilot](./references/providers/copilot.md): account-resolved interactive model list.
+- [Grok](./references/providers/grok.md): screenshot/transcription evidence, retained effort-token
+  mappings, and first-item selection that reaches the execution arguments.
 - [Kiro](./references/providers/kiro.md): authenticated, account-gated model listing and effort.
 - [Kilo](./references/providers/kilo.md): distinguish the gateway catalog from the picker.
 - [Muse](./references/providers/muse.md): no CLI listing at all; the catalog comes from

@@ -4,6 +4,13 @@ Read this whenever catalog evidence arrives as copied terminal output. The opera
 paste what the CLI displayed and, when known, name the provider and command/screen. Never ask the
 operator to author JSON/YAML, strip ANSI, align columns, remove picker chrome, or unwrap lines.
 
+When the TUI cannot copy text, accept screenshots plus the operator's transcription. Inspect the
+images and label the resulting text as a transcription, not verbatim terminal output. Preserve
+per-screen model context, spelling, order, descriptions, and visible markers in the evidence;
+record any authorized display projection separately. Ask only about material ambiguity, such as
+a repeated model heading that leaves an effort menu's owner uncertain. Apply the same observation
+and decision workflow below; the normalizer processes the transcription, not image pixels.
+
 ## 1. Establish intent without misrouting
 
 - A bare paste believed to be catalog evidence selects **capture/preview** and authorizes no edit.
