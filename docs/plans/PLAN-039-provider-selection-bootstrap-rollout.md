@@ -274,6 +274,16 @@ explicitly unverified, never counted as passing.
 
 ## Implementation Evidence and Remaining Acceptance
 
+- Desktop's shared provider manager is specified in Platform ADR-116/SPEC-116/
+  PLAN-107. Runtime now supports revision-checked, identified scans with progress,
+  opt-in Ollama/OpenClaw connection observations and narrow safe endpoint edits.
+  Apply still saves valid empty or unavailable intent without requiring probes.
+  Passive checks retain prior endpoint evidence. Native installation eligibility
+  resolves environment overrides before deciding whether Ollama is local.
+  Focused bootstrap/connection coverage passed (66 tests), plus TypeScript
+  checking. HTTP contracts passed (26 tests) and existing standalone save/detect
+  interactions passed (7 tests), using isolated state.
+
 - The accepted Runtime Setup UX preserves per-target detection history across
   selection edits and restart, displays original detection times, marks changed
   configurations for detection, and excludes deselected history from active
@@ -286,6 +296,13 @@ explicitly unverified, never counted as passing.
   A focused MCP/Git case initially timed out, then passed both an isolated
   rerun and the complete suite without changing its timeout or assertions.
   No real developer service was started or restarted for this pass.
+
+- Desktop follow-through: explicit Ollama checks refresh Windows PATH before
+  resolving the newly installed command. Native Cursor knowledge follows
+  `%LOCALAPPDATA%/cursor-agent`. Connection tests (6) and installation knowledge
+  tests (20) passed, as did TypeScript checking. Runtime version 0.1.24 is the
+  coordinated source for the Desktop 0.2.9 unsigned preview; publication pins
+  the eventual merged Runtime commit, rather than following a moving branch.
 
 - Built-page Chromium checks on Windows passed for standalone Runtime selection,
   Platform's connected-Runtime proxy, and the Desktop bootstrap page. OpenClaw-only

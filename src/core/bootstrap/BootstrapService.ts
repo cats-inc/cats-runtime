@@ -13,6 +13,7 @@ import {
   type ProviderSelectionSnapshot, type SelectedProviderTarget,
 } from './ProviderSelectionService.js';
 import { refreshWindowsProcessPath } from './windowsEnvironmentPath.js';
+import { readSetupConnections, type SetupConnection } from './setupConnections.js';
 
 export interface ProviderUniverseEntry extends SelectedProviderTarget {
   familyLabel: string;
@@ -29,6 +30,8 @@ export interface ProviderScanEntry extends SelectedProviderTarget {
   available: boolean;
   install: ProviderInstallCatalogView | null;
   remediation: ProviderRemediationStep[];
+  connectionStatus?: 'connected' | 'failed' | 'not_checked';
+  detail?: string;
 }
 
 export interface BootstrapScanResult {
@@ -64,6 +67,9 @@ export interface SetupState {
   appliedAt: string | null;
   appliedConfigPath: string | null;
   error: string | null;
+  scanId?: string;
+  scanCompleted?: number;
+  scanTotal?: number;
 }
 
 function defaultSetupState(): SetupState {
@@ -82,7 +88,7 @@ function writeJsonAtomic(path: string, data: unknown): void {
   renameSync(temporary, path);
 }
 
-interface ScanOptions { manual?: boolean; targets?: unknown }
+interface ScanOptions { manual?: boolean; targets?: unknown; expectedRevision?: unknown; includeConnections?: boolean }
 
 export class BootstrapService {
   readonly selection: ProviderSelectionService;
@@ -105,6 +111,7 @@ export class BootstrapService {
     beforeActivate?: (candidate: RuntimeConfig, changed: SelectedProviderTarget[]) => void;
     activated?: () => void;
     activationRequired?: () => boolean;
+    probeNonCliTarget?: (target: ProviderTargetDescriptor, options: { includeConnections: boolean }) => Promise<Partial<ProviderScanEntry> | null>;
   }) {
     this.setupStatePath = join(opts.dataDir, 'setup', 'setup-state.json');
     this.scanPath = join(opts.dataDir, 'setup', 'provider-scan.json');
@@ -138,6 +145,7 @@ export class BootstrapService {
   }
 
   getSelection(): ProviderSelectionSnapshot { return this.selection.getSnapshot(); }
+  getConnections(): SetupConnection[] { return readSetupConnections(this.opts.config); }
 
   saveSelection(targets: unknown, expectedRevision: unknown): ProviderSelectionSnapshot {
     const result = this.selection.save(targets, expectedRevision);
@@ -149,18 +157,20 @@ export class BootstrapService {
     return result;
   }
 
-  startScan(options: ScanOptions = {}): { started: boolean } {
+  startScan(options: ScanOptions = {}): { started: boolean; scanId?: string } {
     // Validate before coalescing so another scan cannot accept an invalid scope.
+    if (options.expectedRevision !== undefined) this.selection.assertRevision(options.expectedRevision);
     const targets = this.selection.resolveTargets(options.targets);
     if (this.inFlightScan) {
       this.assertScanScope(targets, options);
-      return { started: false };
+      return { started: false, scanId: this.readSetupState().scanId };
     }
     void this.scan(options).catch(() => undefined);
-    return { started: true };
+    return { started: true, scanId: this.readSetupState().scanId };
   }
 
   scan(options: ScanOptions = {}): Promise<BootstrapScanResult> {
+    if (options.expectedRevision !== undefined) this.selection.assertRevision(options.expectedRevision);
     const targets = this.selection.resolveTargets(options.targets);
     if (this.inFlightScan) {
       this.assertScanScope(targets, options);
@@ -171,7 +181,8 @@ export class BootstrapService {
     const revision = this.getSelection().revision;
     const state = this.readSetupState();
     this.volatileState = null;
-    writeJsonAtomic(this.setupStatePath, { ...state, status: 'scanning', error: null });
+    writeJsonAtomic(this.setupStatePath, { ...state, status: 'scanning', error: null,
+      scanId: randomUUID(), scanCompleted: 0, scanTotal: targets.length });
     const running = this.runScan(targets, revision, generation, options).finally(() => {
       if (this.inFlightScan === running) { this.inFlightScan = null; this.inFlightScope = null; }
     });
@@ -192,7 +203,8 @@ export class BootstrapService {
   }
 
   private scanScope(targets: ProviderTargetDescriptor[], options: ScanOptions): string {
-    return JSON.stringify([options.manual === true, targets.map((target) => providerSelectionKey(selectedTarget(target))).sort()]);
+    return JSON.stringify([options.manual === true, options.includeConnections === true,
+      targets.map((target) => providerSelectionKey(selectedTarget(target))).sort()]);
   }
 
   private assertScanScope(targets: ProviderTargetDescriptor[], options: ScanOptions): void {
@@ -248,6 +260,7 @@ export class BootstrapService {
     for (const path of [this.manualScanPath, this.scanPath]) {
       const scan = this.readScan(path);
       for (const entry of scan?.providers ?? []) {
+        if (entry.commandStatus === 'unknown' && !entry.connectionStatus) continue;
         const key = providerSelectionKey(entry);
         const target = targets.get(key);
         const previous = records.get(key);
@@ -271,7 +284,8 @@ export class BootstrapService {
   ): Promise<BootstrapScanResult> {
     const current = () => generation === this.generation && revision === this.getSelection().revision;
     try {
-      if (targets.some((target) => target.backend === 'cli' || target.remoteInstance?.command)) {
+      if (targets.some((target) => target.backend === 'cli' || target.remoteInstance?.command
+        || (options.includeConnections && target.remoteInstance?.transport === 'ollama'))) {
         await refreshWindowsProcessPath().catch(() => undefined);
       }
       const entries = new Array<ProviderScanEntry>(targets.length);
@@ -280,7 +294,8 @@ export class BootstrapService {
       await Promise.all(Array.from({ length: Math.min(concurrency, targets.length) }, async () => {
         while (current() && next < targets.length) {
           const index = next++;
-          entries[index] = await this.probeProvider(targets[index]!, options.manual === true);
+          entries[index] = await this.probeProvider(targets[index]!, options);
+          if (current()) this.volatileState = { ...this.readSetupState(), scanCompleted: entries.filter(Boolean).length };
         }
       }));
       const result: BootstrapScanResult = {
@@ -289,25 +304,31 @@ export class BootstrapService {
       };
       if (!current()) return result;
       const records = this.collectObservations();
-      entries.forEach((entry, index) => records.set(providerSelectionKey(entry), {
-        ...entry, observedAt: result.scannedAt, scanType: result.scanType,
-        configurationFingerprint: this.targetFingerprint(targets[index]!),
-      }));
+      entries.forEach((entry, index) => {
+        // A passive run must not replace an actual endpoint observation with unknown.
+        if (entry.commandStatus === 'unknown' && !entry.connectionStatus) return;
+        records.set(providerSelectionKey(entry), {
+          ...entry, observedAt: result.scannedAt, scanType: result.scanType,
+          configurationFingerprint: this.targetFingerprint(targets[index]!),
+        });
+      });
       writeJsonAtomic(this.scanPath, result);
       if (options.manual) writeJsonAtomic(this.manualScanPath, result);
       this.persistObservations(records);
-      writeJsonAtomic(this.setupStatePath, { ...this.readSetupState(), status: 'ready', error: null,
-        lastScanAt: result.scannedAt, ...(options.manual ? { lastManualScanAt: result.scannedAt } : {}) });
+      this.volatileState = { ...this.readSetupState(), status: 'ready', error: null,
+        lastScanAt: result.scannedAt, ...(options.manual ? { lastManualScanAt: result.scannedAt } : {}) };
+      writeJsonAtomic(this.setupStatePath, this.volatileState);
       return result;
     } catch (error) {
-      if (current()) writeJsonAtomic(this.setupStatePath, {
-        ...this.readSetupState(), status: 'error', error: 'Selected provider scan failed. Retry the scan.',
-      });
+      if (current()) {
+        this.volatileState = { ...this.readSetupState(), status: 'error', error: 'Selected provider scan failed. Retry the scan.' };
+        writeJsonAtomic(this.setupStatePath, this.volatileState);
+      }
       throw error;
     }
   }
 
-  private async probeProvider(target: ProviderTargetDescriptor, manual: boolean): Promise<ProviderScanEntry> {
+  private async probeProvider(target: ProviderTargetDescriptor, options: ScanOptions): Promise<ProviderScanEntry> {
     const entry = this.getProviderUniverse().find((candidate) => candidate.provider === target.providerName);
     const base: ProviderScanEntry = {
       ...selectedTarget(target), family: entry?.familyLabel ?? target.providerName,
@@ -320,10 +341,17 @@ export class BootstrapService {
     };
     // Reachability belongs to selected-target diagnostics. Polling setup must
     // not contact endpoints or require local/agent targets to pass a CLI gate.
-    if (target.backend !== 'cli') return base;
+    if (target.backend !== 'cli') {
+      try {
+        const observation = await this.opts.probeNonCliTarget?.(target, { includeConnections: options.includeConnections === true });
+        return observation ? { ...base, ...observation } : base;
+      } catch {
+        return { ...base, commandStatus: 'probe_failed', detail: 'Provider check failed. Check the service settings and retry.' };
+      }
+    }
     try {
       const assessment = await this.opts.compatibility.assessCliTarget(target, {
-        force: manual, purpose: 'setup', probeMode: 'light',
+        force: options.manual === true, purpose: 'setup', probeMode: 'light',
       });
       return { ...base, commandStatus: assessment.setup.command.status,
         commandPath: assessment.setup.command.resolvedCommand || target.cliInstance!.commandConfig.path,

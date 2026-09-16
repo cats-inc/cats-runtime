@@ -658,14 +658,29 @@ background work are reconciled; historical sessions remain on disk.
 Save and reload responses also include the projected `observations` and `state`,
 so the editor can preserve results immediately without starting another scan.
 
-`POST /setup-scan` accepts `{manual:true, targets:[...]}`; omitted targets mean
+`POST /setup-scan` accepts `{manual:true, targets:[...], expectedRevision?, includeConnections?:boolean}`; omitted targets mean
 the active selected set. Manual refresh changes freshness, never scope. Missing
 selection returns `409`; an unselected target returns `400`. Identical running
-scans coalesce; different scopes/modes conflict. Poll `GET /setup-state` until
-`state.status` leaves `scanning`. A revision change discards obsolete in-flight
+scans coalesce; different scopes/modes/connection policies conflict. The response
+includes `scanId`; poll `GET /setup-state` for that same `state.scanId`, with
+`scanCompleted`/`scanTotal` progress, until `state.status` leaves `scanning`.
+A supplied stale revision returns `409` before coalescing or probing. A revision change discards obsolete in-flight
 results, while completed per-target history remains available. A subset scan
 updates only that subset's historical observations and times.
-Routine CLI detection remains passive. `POST /setup-apply` has been removed.
+Routine CLI detection remains passive. `includeConnections:true` explicitly checks
+selected Ollama (`/api/tags`, without loading a model) and OpenClaw (WebSocket
+health/auth handshake) endpoints. Connection observations report `connected` or
+`failed`; passive scans never erase a retained connection observation. Local
+Ollama command lookup and endpoint connection remain separate evidence.
+`POST /setup-apply` has been removed.
+
+`GET /setup-state.connections` exposes safe editable endpoint URLs for configured
+Ollama/OpenClaw targets. Environment-owned endpoints and URLs with private fields
+are read-only and their values are withheld. A selection entry may include
+`endpoint` to patch only its endpoint, retaining authentication and other instance
+settings. Ollama accepts HTTP(S); OpenClaw accepts WS(S). Embedded credentials,
+query strings and fragments are rejected. Detection failures never echo secret
+URL/authentication values.
 
 MCP hosts use `setup_state`, `save_provider_selection`, and `run_setup_scan`
 with these same contracts. The former `apply_setup_config` tool is removed.

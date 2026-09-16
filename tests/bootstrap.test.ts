@@ -441,7 +441,7 @@ describe('selection-first bootstrap HTTP contract', () => {
     // Activation can prime scoped compatibility diagnostics, but saves/reads
     // must not run another bootstrap scan or replace the retained observation.
     expect(setupScan).toHaveBeenCalledTimes(1);
-    expect(setupScan).toHaveBeenCalledWith({ manual: true, targets: undefined });
+    expect(setupScan).toHaveBeenCalledWith({ manual: true, targets: undefined, expectedRevision: undefined, includeConnections: false });
     setupScan.mockRestore();
     assessment.mockRestore();
   });
@@ -477,7 +477,11 @@ describe('selection-first bootstrap HTTP contract', () => {
     });
     const scan = await write(app, '/setup-scan', { manual: true }, 'POST');
     expect(scan.status).toBe(202);
-    expect((await scan.json()).state.status).toBe('scanning');
+    const started = await scan.json();
+    expect(started.state.status).toBe('scanning');
+    expect(started.scanId).toEqual(expect.any(String));
+    expect(started.state.scanId).toBe(started.scanId);
+    expect((await write(app, '/setup-scan', { manual: true, expectedRevision: 'stale' }, 'POST')).status).toBe(409);
     release();
     const state = await waitForSetupScanToSettle(runtime);
     expect((state.scan as { providers: unknown[] }).providers).toHaveLength(1);

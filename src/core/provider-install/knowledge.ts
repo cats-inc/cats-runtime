@@ -358,11 +358,16 @@ const INSTALL_KNOWLEDGE: Record<ProviderName, ProviderInstallKnowledge> = {
       helpArgs: ['--help'],
       prerequisites: createNativeInstallerPrerequisites('Cursor Agent CLI'),
       expectedPaths: {
-        windows: '~/.local/bin/cursor-agent.exe',
+        windows: '%LOCALAPPDATA%/cursor-agent/cursor-agent.cmd',
         macos: '~/.local/bin/cursor-agent',
         linux: '~/.local/bin/cursor-agent',
       },
-      pathHints: createLocalBinPathHints('cursor-agent', { alias: 'ca' }),
+      pathHints: { ...createLocalBinPathHints('cursor-agent', { alias: 'ca' }), windows: {
+        expectedPath: '%LOCALAPPDATA%/cursor-agent/cursor-agent.cmd',
+        directoryHint: '%LOCALAPPDATA%/cursor-agent',
+        exportCommand: 'setx PATH "%LOCALAPPDATA%\\cursor-agent;%PATH%"',
+        reloadHint: 'Open a new terminal after adding the Cursor Agent install directory to PATH.',
+      } },
     },
     auth: {
       requiredAfterInstall: true,
@@ -380,7 +385,7 @@ const INSTALL_KNOWLEDGE: Record<ProviderName, ProviderInstallKnowledge> = {
         docsUrl: 'https://cursor.com',
         notes: ['Cursor installs into ~/.local/bin and may add a ca alias.'],
         windowsNotes: [
-          'Cursor installs into %USERPROFILE%\\.local\\bin\\cursor-agent.exe.',
+          'Cursor installs into %LOCALAPPDATA%\\cursor-agent with cursor-agent/agent command shims and versioned binaries.',
           'If the official installer fails under PowerShell 7, retry with Windows PowerShell 5.1.',
         ],
       },
