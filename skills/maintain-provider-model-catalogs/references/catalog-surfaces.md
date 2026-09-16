@@ -54,6 +54,10 @@ native-installed providers may expose dynamic enumeration.
 Do not assume these paths will stay exhaustive. Use repo-wide search for the provider name, exact
 catalog filename, option/control key, and affected ids before editing.
 
+On Windows, pass file globs through `rg -g '*.test.ts' src tests`, not positional paths such as
+`src/core/models/*.test.ts`; `rg` receives the latter literally in PowerShell. Keep output bounded
+to relevant files/sections so truncation does not force repeated reads.
+
 ## Exact bundled-example consumers
 
 Search each affected repository for `curated-model-catalogs.yaml.example`, its runtime path resolver,
@@ -128,6 +132,12 @@ node --test --test-isolation=none build/test/provider-model-fields.test.js build
 Mounted selector tests must wait for catalog loading and initial target reconciliation before
 changing model/effort. Wait for the observable target/control state, not an arbitrary delay; an
 early change can be overwritten by initialization and produce a misleading default-selection failure.
+
+For first-item initialization, assert both the visible value and the emitted/persisted selection
+before any manual effort change, then verify the corresponding execution argument. A select can
+display its first option while the saved control remains absent, leaving execution to a different
+CLI default. Keep this UI initialization separate from provider-default metadata and labels;
+also cover model switches and restoration of an explicit saved value.
 
 Use `--test-reporter=tap` when running a required full Node suite. Package-contract tests can clear
 `build/test`; rebuild that bundle before a later test run if needed. A test-only correction does not
