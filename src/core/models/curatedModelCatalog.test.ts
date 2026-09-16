@@ -193,7 +193,7 @@ describe('curatedModelCatalog', () => {
       expect(catalog?.models).toHaveLength(6);
       expect(catalog?.models?.[0]).toEqual({
         name: 'grok-4.6[effort=xhigh,fast=true]',
-        label: 'Cursor Grok 4.6 — Extra High, Fast',
+        label: 'Cursor Grok 4.6 — Extra High Fast',
       });
       expect(catalog?.models?.every(model => model.default === undefined && !model.options)).toBe(true);
       expect(catalog?.models?.map(model => model.name)).toContain(

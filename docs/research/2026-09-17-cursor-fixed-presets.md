@@ -8,12 +8,12 @@ effort, reasoning, thinking, and fast controls were explicitly declined for this
 
 | Order | Menu label | Fixed settings |
 |---|---|---|
-| 1 | Cursor Grok 4.6 | Extra High, Fast |
+| 1 | Cursor Grok 4.6 | Extra High Fast |
 | 2 | Composer 2.5 | Fast |
-| 3 | Claude Opus 5 | 300K, High, Thinking; Fast off |
-| 4 | GPT-5.6 Sol | 272K, Medium; Fast off |
+| 3 | Claude Opus 5 | 300K High Thinking; Fast off |
+| 4 | GPT-5.6 Sol | 272K Medium; Fast off |
 | 5 | Gemini 3.8 Flash | High |
-| 6 | Muse Spark 1.3 | 300K, High |
+| 6 | Muse Spark 1.3 | 300K High |
 
 The menu combines the exact model label and the approved settings with an em dash. There
 are no default markers. New selections start with the first entry; saved explicit choices
@@ -45,6 +45,10 @@ console output, which the CLI suppressed; the second capture wrote the same meta
 temporary file. Only redacted model metadata is retained here.
 
 ## Implementation
+
+The owner clarified after Playground review that commas only separated fields in the supplied
+combinations. Display labels therefore join parameters with spaces; execution expressions retain
+their original commas and exact values.
 
 The curated schema supports `selection_mode: shortlist`. Such a CLI catalog is the selectable
 menu on initial reads and explicit refresh, ahead of live or persisted discovery snapshots.

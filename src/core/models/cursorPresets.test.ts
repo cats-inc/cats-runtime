@@ -71,7 +71,7 @@ describe('Cursor fixed preset execution', () => {
 
       // Explicit refresh reloads edited curator data, rather than cached live results.
       const yaml = readFileSync(join(packageRoot, 'config/curated-model-catalogs.yaml.example'), 'utf8');
-      writeFileSync(paths.curatedModelCatalogPath, yaml.replace('Cursor Grok 4.6 — Extra High, Fast', 'Updated preset label'));
+      writeFileSync(paths.curatedModelCatalogPath, yaml.replace('Cursor Grok 4.6 — Extra High Fast', 'Updated preset label'));
       expect((await service.getCatalog('cursor', undefined, { forceRefresh: true })).models[0].label)
         .toBe('Updated preset label');
     } finally {

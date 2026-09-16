@@ -4,7 +4,7 @@
   "presets": [
     {
       "id": "grok-4.6[effort=xhigh,fast=true]",
-      "label": "Cursor Grok 4.6 — Extra High, Fast",
+      "label": "Cursor Grok 4.6 — Extra High Fast",
       "model": "grok-4.6",
       "parameters": [
         {
@@ -108,7 +108,7 @@
     },
     {
       "id": "claude-opus-5[thinking=true,context=300k,effort=high,fast=false]",
-      "label": "Claude Opus 5 — 300K, High, Thinking",
+      "label": "Claude Opus 5 — 300K High Thinking",
       "model": "claude-opus-5",
       "parameters": [
         {
@@ -229,7 +229,7 @@
     },
     {
       "id": "gpt-5.6-sol[context=272k,reasoning=medium,fast=false]",
-      "label": "GPT-5.6 Sol — 272K, Medium",
+      "label": "GPT-5.6 Sol — 272K Medium",
       "model": "gpt-5.6-sol",
       "parameters": [
         {
@@ -375,7 +375,7 @@
     },
     {
       "id": "muse-spark-1.3[context=300k,effort=high]",
-      "label": "Muse Spark 1.3 — 300K, High",
+      "label": "Muse Spark 1.3 — 300K High",
       "model": "muse-spark-1.3",
       "parameters": [
         {

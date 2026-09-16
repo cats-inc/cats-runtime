@@ -294,12 +294,12 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'Grok 4.1 Fast Reasoning', label: 'Grok 4.1 Fast Reasoning' },
   ],
   cursor: [
-    { id: 'grok-4.6[effort=xhigh,fast=true]', label: 'Cursor Grok 4.6 — Extra High, Fast' },
+    { id: 'grok-4.6[effort=xhigh,fast=true]', label: 'Cursor Grok 4.6 — Extra High Fast' },
     { id: 'composer-2.5[fast=true]', label: 'Composer 2.5 — Fast' },
-    { id: 'claude-opus-5[thinking=true,context=300k,effort=high,fast=false]', label: 'Claude Opus 5 — 300K, High, Thinking' },
-    { id: 'gpt-5.6-sol[context=272k,reasoning=medium,fast=false]', label: 'GPT-5.6 Sol — 272K, Medium' },
+    { id: 'claude-opus-5[thinking=true,context=300k,effort=high,fast=false]', label: 'Claude Opus 5 — 300K High Thinking' },
+    { id: 'gpt-5.6-sol[context=272k,reasoning=medium,fast=false]', label: 'GPT-5.6 Sol — 272K Medium' },
     { id: 'gemini-3.8-flash[reasoning_effort=high]', label: 'Gemini 3.8 Flash — High' },
-    { id: 'muse-spark-1.3[context=300k,effort=high]', label: 'Muse Spark 1.3 — 300K, High' },
+    { id: 'muse-spark-1.3[context=300k,effort=high]', label: 'Muse Spark 1.3 — 300K High' },
   ],
   goose: [
     { id: 'openai/gpt-5-codex', label: 'openai/gpt-5-codex', default: true },
