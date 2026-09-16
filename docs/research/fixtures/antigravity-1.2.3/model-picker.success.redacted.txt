@@ -1,0 +1,75 @@
+# Source: operator-supplied /model and per-model effort screens
+# Observed: 2026-09-16; CLI version: 1.2.3
+# Scope: operator account; complete seven-model menu and every effort screen
+# Redaction: no account identifiers, paths, or credentials present
+# Raw ids are NOT displayed here; retain separate 1.1.24 machine enumeration provenance.
+
+Antigravity CLI 1.2.3
+
+輸入"/model"出現:
+
+Switch Model
+
+  Gemini 3.8 Flash
+  Gemini 3.7 Flash
+  Gemini 3.6 Flash
+  Gemini 3.1 Pro
+  Claude Sonnet 4.6 (Thinking)
+  Claude Opus 4.6 (Thinking)
+  GPT-OSS 120B (Medium)
+
+選擇Gemini 3.8 Flash時, 下方出現可以左右切換的efforts:
+
+  Effort  ◂        ◉──────────────○──────────────○        ▸
+                  low          medium          high
+            Faster responses, lighter reasoning — great for simpler tasks
+
+  Effort  ◂        ●━━━━━━━━━━━━━━◉──────────────○        ▸
+                  low          medium          high
+            Balanced speed and reasoning quality for most tasks
+
+  Effort  ◂        ●━━━━━━━━━━━━━━●━━━━━━━━━━━━━━◉        ▸
+                  low          medium          high
+            Deepest reasoning for complex problems — slower but strongest
+
+選擇Gemini 3.7 Flash時, 下方出現可以左右切換的efforts:
+
+  Effort  ◂        ◉──────────────○──────────────○        ▸
+                  low          medium          high
+            Faster responses, lighter reasoning — great for simpler tasks
+
+  Effort  ◂        ●━━━━━━━━━━━━━━◉──────────────○        ▸
+                  low          medium          high
+            Balanced speed and reasoning quality for most tasks
+
+  Effort  ◂        ●━━━━━━━━━━━━━━●━━━━━━━━━━━━━━◉        ▸
+                  low          medium          high
+            Deepest reasoning for complex problems — slower but strongest
+
+選擇Gemini 3.6 Flash時, 下方出現可以左右切換的efforts:
+
+  Effort  ◂        ◉──────────────○──────────────○        ▸
+                  low          medium          high
+            Faster responses, lighter reasoning — great for simpler tasks
+
+  Effort  ◂        ●━━━━━━━━━━━━━━◉──────────────○        ▸
+                  low          medium          high
+            Balanced speed and reasoning quality for most tasks
+
+  Effort  ◂        ●━━━━━━━━━━━━━━●━━━━━━━━━━━━━━◉        ▸
+                  low          medium          high
+            Deepest reasoning for complex problems — slower but strongest
+
+選擇Gemini 3.1 Pro時, 下方出現可以左右切換的efforts:
+
+  Effort  ◂            ◉──────────────────────○            ▸
+                      low                   high
+            Faster responses, lighter reasoning — great for simpler tasks
+
+  Effort  ◂            ●━━━━━━━━━━━━━━━━━━━━━━◉            ▸
+                      low                   high
+            Deepest reasoning for complex problems — slower but strongest
+
+選擇剩下的3個選項, 下方不會有effort可以選.
+
+目前看起來, agy的model/effort都沒有指定的default, 我們cats runtime playground及cats desktop也不用擅自決定多印上default, 就用列表中的第一個項目當成UI預設的選擇即可.

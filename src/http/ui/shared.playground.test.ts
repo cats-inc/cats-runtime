@@ -1,7 +1,10 @@
 import vm from 'node:vm';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { SHARED_UI_SCRIPT } from './shared.js';
+import { buildProviderAdvancedKnowledge } from '../../core/models/providerAdvancedKnowledge.js';
+import { getStaticProviderModels } from '../../core/models/providerModelCatalog.js';
 
 function createCatsUI() {
   const window = {
@@ -30,6 +33,41 @@ function createCatsUI() {
 }
 
 describe('shared playground selection helpers', () => {
+  it('renders the Antigravity first effort without default labels and preserves saved effort', () => {
+    const catsUI = createCatsUI();
+    const target = { providerName: 'antigravity', backend: 'cli' as const,
+      instanceId: 'native', defaultTarget: true };
+    const { catalog } = buildProviderAdvancedKnowledge(target, {
+      provider: 'antigravity', backend: 'cli', instance: 'native', defaultModel: null,
+      source: 'static', cache: null, models: getStaticProviderModels(target), warnings: [],
+    });
+    const html = readFileSync(new URL('./pages/playground.html', import.meta.url), 'utf8');
+    const start = html.indexOf('function renderAgentModelControls(');
+    const end = html.indexOf('function applyAgentModelControlValues(', start);
+    const controls = { innerHTML: '' };
+    const context = { window: { CatsUI: catsUI }, escapeHtml: String,
+      div: { querySelector: () => controls }, catalog, entryId: '' };
+    vm.createContext(context);
+    vm.runInContext(html.slice(start, end), context);
+    expect(catsUI.getAdvancedCatalogDefaultEntryId(catalog)).toBe('gemini-3.8-flash-low');
+    for (const entry of catalog.entries) {
+      context.entryId = entry.id;
+      vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
+      expect(controls.innerHTML).not.toMatch(/default/i);
+      const values = [...controls.innerHTML.matchAll(/<option value="([^"]+)"/g)].map((match) => match[1]);
+      if (entry.id.includes('flash')) expect(values).toEqual(['low', 'medium', 'high']);
+      else if (entry.id.includes('pro')) expect(values).toEqual(['low', 'high']);
+      else expect(values).toEqual([]);
+      if (values.length) expect(controls.innerHTML).toContain('<option value="low" selected>low</option>');
+    }
+    expect(catsUI.normalizePlaygroundAgentSelection({
+      provider: 'antigravity', modelSelection: { entryId: 'gemini-3.8-flash-low',
+        entryMode: 'explicit', controls: { 'antigravity.effort': 'high' } },
+      selectableProviders: ['antigravity'], providerOrder: ['antigravity'],
+      advancedCatalogs: { antigravity: catalog },
+    }).modelSelection.controls).toEqual({ 'antigravity.effort': 'high' });
+  });
+
   it('selects each Codex entry default and preserves explicit saved effort on reload', () => {
     const catsUI = createCatsUI();
     const catalog = {
