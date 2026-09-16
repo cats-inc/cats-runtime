@@ -156,6 +156,7 @@ export interface ProviderInstanceConfig {
   piInstructionsFile?: string;
   clineSessionsDir?: string;
   grokSessionsDir?: string;
+  museSessionsDir?: string;
   antigravitySessionsDir?: string;
 }
 
@@ -205,6 +206,7 @@ export interface CliRuntimeConfig {
   piSessionsDir: string;
   clineSessionsDir: string;
   grokSessionsDir: string;
+  museSessionsDir: string;
   antigravitySessionsDir: string;
   wslDiscoveryPolicy?: WslDiscoveryPolicy;
   dockerDiscoveryPolicy?: DockerDiscoveryPolicy;
@@ -247,6 +249,7 @@ interface LegacyRuntimeShape {
   piSessionsDir: string;
   clineSessionsDir: string;
   grokSessionsDir: string;
+  museSessionsDir: string;
   antigravitySessionsDir: string;
   providerDefaultTargets: Record<string, ProviderDefaultTarget>;
   remoteProviderCatalog: RemoteProviderCatalog;
@@ -329,6 +332,10 @@ export function defaultPiSessionsDir(): string {
 
 export function defaultClineSessionsDir(): string {
   return '~/.cline/data/sessions';
+}
+
+export function defaultMuseSessionsDir(): string {
+  return '~/.local/share/muse/sessions';
 }
 
 export function defaultAntigravitySessionsDir(): string {
@@ -487,6 +494,7 @@ export function loadConfig(
     piSessionsDir: configured.piSessionsDir,
     clineSessionsDir: configured.clineSessionsDir,
     grokSessionsDir: configured.grokSessionsDir,
+    museSessionsDir: configured.museSessionsDir,
     antigravitySessionsDir: configured.antigravitySessionsDir,
     wslDiscoveryPolicy: parseWslDiscoveryPolicy(
       env.CATS_RUNTIME_WSL_DISCOVERY_POLICY,
@@ -580,6 +588,7 @@ export function listProviderInstances(
     | 'piSessionsDir'
     | 'clineSessionsDir'
     | 'grokSessionsDir'
+    | 'museSessionsDir'
     | 'antigravitySessionsDir'
   >,
   provider: ProviderName,
@@ -626,6 +635,7 @@ export function resolveProviderInstance(
     | 'piSessionsDir'
     | 'clineSessionsDir'
     | 'grokSessionsDir'
+    | 'museSessionsDir'
     | 'antigravitySessionsDir'
   >,
   provider: ProviderName,
@@ -788,6 +798,7 @@ function buildLegacyRuntimeShape(
         id: 'native',
         providerName: 'muse',
         commandConfig: providerCommands.muse,
+        museSessionsDir: env.MUSE_SESSIONS_DIR || defaultMuseSessionsDir(),
       },
     },
     copilot: {
@@ -879,6 +890,7 @@ function buildLegacyRuntimeShape(
     piSessionsDir: env.PI_SESSIONS_DIR || defaultPiSessionsDir(),
     clineSessionsDir: env.CLINE_SESSIONS_DIR || defaultClineSessionsDir(),
     grokSessionsDir: env.GROK_SESSIONS_DIR || defaultGrokSessionsDir(env.GROK_HOME),
+    museSessionsDir: env.MUSE_SESSIONS_DIR || defaultMuseSessionsDir(),
     antigravitySessionsDir: env.ANTIGRAVITY_SESSIONS_DIR || defaultAntigravitySessionsDir(),
     providerDefaultTargets,
     remoteProviderCatalog: {
@@ -1030,6 +1042,7 @@ function buildLegacyProviderInstance(
     | 'piSessionsDir'
     | 'clineSessionsDir'
     | 'grokSessionsDir'
+    | 'museSessionsDir'
     | 'antigravitySessionsDir'
   >,
 ): ProviderInstanceConfig {
@@ -1056,6 +1069,7 @@ function buildLegacyProviderInstance(
     piSessionsDir: provider === 'pi' ? config.piSessionsDir : undefined,
     clineSessionsDir: provider === 'cline' ? config.clineSessionsDir : undefined,
     grokSessionsDir: provider === 'grok' ? config.grokSessionsDir : undefined,
+    museSessionsDir: provider === 'muse' ? config.museSessionsDir : undefined,
     antigravitySessionsDir: provider === 'antigravity' ? config.antigravitySessionsDir : undefined,
   };
 }
@@ -1094,6 +1108,7 @@ function applyFileBasedProviderConfig(
   let piSessionsDir = legacy.piSessionsDir;
   let clineSessionsDir = legacy.clineSessionsDir;
   let grokSessionsDir = legacy.grokSessionsDir;
+  let museSessionsDir = legacy.museSessionsDir;
   let antigravitySessionsDir = legacy.antigravitySessionsDir;
   let piInstructionsFile: string | undefined;
   const rawBackends = asOptionalObject(doc.backends);
@@ -1162,6 +1177,11 @@ function applyFileBasedProviderConfig(
           grokSessionsDir = readString(discovery?.sessions_dir)
             || readString(providerDoc.sessions_dir)
             || grokSessionsDir;
+          break;
+        case 'muse':
+          museSessionsDir = readString(discovery?.sessions_dir)
+            || readString(providerDoc.sessions_dir)
+            || museSessionsDir;
           break;
         case 'cline':
           clineSessionsDir = readString(discovery?.sessions_dir)
@@ -1307,6 +1327,10 @@ function applyFileBasedProviderConfig(
               || fallback.grokSessionsDir
               || grokSessionsDir
             : undefined,
+          museSessionsDir: provider === 'muse'
+            ? readString(instanceDoc.sessions_dir)
+              || museSessionsDir
+            : undefined,
           antigravitySessionsDir: provider === 'antigravity'
             ? readString(instanceDoc.sessions_dir)
               || fallback.antigravitySessionsDir
@@ -1381,6 +1405,9 @@ function applyFileBasedProviderConfig(
       }
       if (provider === 'grok') {
         grokSessionsDir = nextInstances[defaultInstance].grokSessionsDir || grokSessionsDir;
+      }
+      if (provider === 'muse') {
+        museSessionsDir = nextInstances[defaultInstance].museSessionsDir || museSessionsDir;
       }
       if (provider === 'antigravity') {
         antigravitySessionsDir = nextInstances[defaultInstance].antigravitySessionsDir
@@ -1476,6 +1503,9 @@ function applyFileBasedProviderConfig(
     if (provider === 'grok') {
       grokSessionsDir = instance.grokSessionsDir || grokSessionsDir;
     }
+    if (provider === 'muse') {
+      museSessionsDir = instance.museSessionsDir || museSessionsDir;
+    }
     if (provider === 'antigravity') {
       antigravitySessionsDir = instance.antigravitySessionsDir || antigravitySessionsDir;
     }
@@ -1502,6 +1532,7 @@ function applyFileBasedProviderConfig(
     piSessionsDir,
     clineSessionsDir,
     grokSessionsDir,
+    museSessionsDir,
     antigravitySessionsDir,
     providerDefaultTargets,
     remoteProviderCatalog,

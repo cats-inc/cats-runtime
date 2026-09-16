@@ -8,7 +8,7 @@ import {
 
 type FileBackedProviderName = Extract<
   ProviderName,
-  'antigravity' | 'auggie' | 'claude' | 'cline' | 'codex' | 'copilot' | 'grok' | 'pi'
+  'antigravity' | 'auggie' | 'claude' | 'cline' | 'codex' | 'copilot' | 'grok' | 'muse' | 'pi'
 >;
 
 type FileBackedInstancePathField = Extract<
@@ -20,6 +20,7 @@ type FileBackedInstancePathField = Extract<
   | 'codexSessionsDir'
   | 'copilotSessionsDir'
   | 'grokSessionsDir'
+  | 'museSessionsDir'
   | 'piSessionsDir'
 >;
 
@@ -32,6 +33,7 @@ type FileBackedConfigPathField = Extract<
   | 'codexSessionsDir'
   | 'copilotSessionsDir'
   | 'grokSessionsDir'
+  | 'museSessionsDir'
   | 'piSessionsDir'
 >;
 
@@ -69,6 +71,11 @@ const FILE_BACKED_PROVIDER_PATHS = {
   grok: {
     instanceField: 'grokSessionsDir',
     configField: 'grokSessionsDir',
+    configKey: 'sessions_dir',
+  },
+  muse: {
+    instanceField: 'museSessionsDir',
+    configField: 'museSessionsDir',
     configKey: 'sessions_dir',
   },
   pi: {

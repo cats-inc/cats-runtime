@@ -946,7 +946,7 @@
             <span id="sessionCount" class="runtime-auth-badge" data-state="idle">0</span>
           </div>
           <div class="flex gap-2">
-            <button class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0" id="scanSessionsBtn" onclick="manualScanSessions()" title="Scan WSL and Docker sessions" aria-label="Scan WSL and Docker sessions">
+            <button class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0" id="scanSessionsBtn" onclick="manualScanSessions()" title="Scan WSL, Docker and agent sessions" aria-label="Scan WSL, Docker and agent sessions">
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M3 12a9 9 0 0 1 15.5-6.36L21 8" />
                 <path d="M21 3v5h-5" />
@@ -1470,8 +1470,9 @@ function manualSessionDiscoveryTargets() {
 function agentSessionDiscoveryTargets() {
   if (!providerCatalog?.providers) return [];
 
-  return configuredProviderNames().filter((providerName) => (
-    providerMeta(providerName)?.defaultBackend === 'agent'
+  return configuredProviderNames().flatMap((providerName) => (
+    (providerMeta(providerName)?.instances || [])
+      .filter((instance) => instance.backend === 'agent')
   ));
 }
 

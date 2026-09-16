@@ -31,6 +31,11 @@ export class FileWatcher extends EventEmitter<FileWatcherEvents> {
   private providerInstanceId?: string;
   private watcher: FSWatcher | null = null;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private retryTimer: ReturnType<typeof setInterval> | null = null;
+  private started = false;
+  private scanning = false;
+  private rescanRequested = false;
+  private generation = 0;
   private debounceMs = 2000;
 
   constructor(
@@ -50,63 +55,91 @@ export class FileWatcher extends EventEmitter<FileWatcherEvents> {
 
   /** Run initial scan and start watching */
   async start(): Promise<void> {
+    if (this.started) return;
+    this.started = true;
+    this.generation += 1;
+    // A newly installed CLI may not create its session directory until its
+    // first conversation. Reattach when it appears (or is recreated).
+    this.retryTimer = setInterval(() => {
+      if (!this.watcher) void this.scanAndWatch().catch((err) => this.reportError(err));
+    }, 5000);
+    this.retryTimer.unref();
+    await this.scanAndWatch();
+  }
+
+  private async scanAndWatch(): Promise<void> {
+    if (!this.started) return;
+    if (this.scanning) {
+      this.rescanRequested = true;
+      return;
+    }
+    this.scanning = true;
+    this.rescanRequested = false;
+    const generation = this.generation;
     try {
-      await this.scanAndMerge();
+      await this.scanAndMerge(generation);
+      if (!this.started || generation !== this.generation) return;
+      if (!existsSync(this.watchDir)) {
+        this.closeWatcher();
+        return;
+      }
+      if (this.watcher) return;
+
+      this.watcher = watch(this.watchDir, { recursive: true }, () => {
+        if (!this.started || generation !== this.generation) return;
+        if (this.debounceTimer) clearTimeout(this.debounceTimer);
+        this.debounceTimer = setTimeout(() => {
+          this.debounceTimer = null;
+          void this.scanAndWatch().catch((err) => this.reportError(err));
+        }, this.debounceMs);
+      });
+      this.watcher.on('error', (err) => {
+        this.closeWatcher();
+        this.reportError(err);
+      });
     } catch (err) {
       if (isMissingPathError(err)) {
+        this.closeWatcher();
         return;
       }
       throw err;
-    }
-
-    if (!existsSync(this.watchDir)) {
-      return;
-    }
-
-    try {
-      this.watcher = watch(this.watchDir, { recursive: true }, (_eventType, _filename) => {
-        // Debounce: multiple file changes happen rapidly
-        if (this.debounceTimer) clearTimeout(this.debounceTimer);
-        this.debounceTimer = setTimeout(() => {
-          this.scanAndMerge().catch((err) => {
-            if (isMissingPathError(err)) {
-              this.stop();
-              return;
-            }
-            this.emit('error', err);
-          });
-        }, this.debounceMs);
-      });
-
-      this.watcher.on('error', (err) => {
-        if (isMissingPathError(err)) {
-          this.stop();
-          return;
-        }
-        this.emit('error', err);
-      });
-    } catch (err) {
-      if (isMissingPathError(err)) {
-        return;
+    } finally {
+      this.scanning = false;
+      if (this.started && this.rescanRequested) {
+        void this.scanAndWatch().catch((err) => this.reportError(err));
       }
-      // fs.watch may fail on some platforms/paths — non-fatal
-      console.warn(`[discovery] Could not watch ${this.watchDir}:`, err);
     }
   }
 
+  private reportError(error: Error): void {
+    if (this.started && !isMissingPathError(error)) this.emit('error', error);
+  }
+
   stop(): void {
+    this.started = false;
+    this.rescanRequested = false;
+    this.generation += 1;
+    if (this.retryTimer) {
+      clearInterval(this.retryTimer);
+      this.retryTimer = null;
+    }
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
+    this.closeWatcher();
+  }
+
+  private closeWatcher(): void {
     if (this.watcher) {
       this.watcher.close();
       this.watcher = null;
     }
   }
 
-  private async scanAndMerge(): Promise<void> {
+  private async scanAndMerge(generation: number): Promise<void> {
     const discovered = await this.scanner.scan();
+    if (!this.started || generation !== this.generation) return;
     const newlyImported = new Set<string>();
 
     const liveStatuses = new Set(['initializing', 'ready', 'busy']);

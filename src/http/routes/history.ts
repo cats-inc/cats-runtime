@@ -29,6 +29,7 @@ import {
   loadClineSessionHistory,
   loadGrokSessionHistory,
 } from '../../backends/cli/discovery/NativeFileHistory.js';
+import { readMuseTranscript } from '../../backends/cli/discovery/MuseSessionScanner.js';
 
 export const historyRoutes = new Hono();
 
@@ -50,6 +51,7 @@ interface HistoryTranscriptMetadata {
     | 'generic_jsonl'
     | 'cline_native'
     | 'grok_native'
+    | 'muse_native'
     | 'pi_native'
     | 'none';
   sources?: HistoryTranscriptSourceMetadata[];
@@ -479,6 +481,19 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
         continue;
       } catch {
         // Fall through for old registry entries that still point at summary.json.
+      }
+    }
+
+    if (session.providerName === 'muse' && filePath === session.providerSourcePath) {
+      try {
+        const history = await readMuseTranscript(filePath, true);
+        messages.push(...history.messages);
+        const source = { ownership: 'provider', source: 'jsonl', parser: 'muse_native' } as const;
+        transcript = source;
+        transcriptSources.push(buildTranscriptSource(filePath, history.messages.length, source));
+        continue;
+      } catch {
+        // The provider may have removed the log since the last discovery scan.
       }
     }
 

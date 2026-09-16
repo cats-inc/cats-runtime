@@ -4409,6 +4409,13 @@ remains `true`.
 
 ### Agent Session Discovery
 
+Configured agent instances are also listed automatically on runtime startup and
+at `CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS` (default `5000`; `0` disables
+background agent discovery). `GET /sessions` remains a registry read; callers do
+not need to trigger discovery to see these sessions once the scan completes.
+`POST /sessions/discover` performs an explicit scan of every configured agent
+instance, including instances that are not the provider's default target.
+
 ```text
 POST /agent/sessions/discover
 ```
@@ -4452,6 +4459,15 @@ When it is supported, each entry is imported into the session registry with
 `updatedAt` onto the runtime's `providerSessionId`, `cwd`, `summary`, and
 `lastActivity`. Discovery never issues `session/new`, so enumerating sessions
 does not create one. Verified against Devin 3000.5.20.
+
+ACP enumeration follows `nextCursor` until all pages have been read. Failed or
+invalid pages do not import/prune a partial result. For agents that advertise
+listing but not deletion, `DELETE /sessions/{id}` fails and keeps the registry
+entry: closing the agent session alone would make it reappear on the next scan.
+
+File-backed Cline, Grok, and Muse sessions are discovered at startup and on file
+changes. Muse history uses transcript parser `muse_native`, with durable
+run-start and committed assistant text from the provider's `session.jsonl`.
 
 ## Error Responses
 

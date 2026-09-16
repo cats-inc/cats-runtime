@@ -1904,10 +1904,32 @@ export class AcpAdapter implements AgentAdapter {
       }
 
       // No session/new here: enumeration must not create the session it lists.
-      const listResult = parseRecord(
-        await client.request('session/list', {}, { timeoutMs }),
-      );
-      const sessions = parseDiscoveredAcpSessions(listResult?.sessions);
+      const sessionsById = new Map<string, AgentAdapterDiscoveredSession>();
+      const cursors = new Set<string>();
+      const deadline = Date.now() + timeoutMs;
+      let cursor: string | undefined;
+      do {
+        const remainingMs = deadline - Date.now();
+        if (remainingMs <= 0) throw new Error('ACP session enumeration timed out.');
+        const listResult = parseRecord(await client.request(
+          'session/list', cursor === undefined ? {} : { cursor }, { timeoutMs: remainingMs },
+        ));
+        if (!Array.isArray(listResult?.sessions)) {
+          throw new Error('ACP session enumeration returned an invalid session list.');
+        }
+        for (const session of parseDiscoveredAcpSessions(listResult.sessions)) {
+          sessionsById.set(session.providerSessionId, session);
+        }
+        const nextCursor = listResult.nextCursor;
+        if (nextCursor === undefined || nextCursor === null) break;
+        if (typeof nextCursor !== 'string' || cursors.has(nextCursor)) {
+          throw new Error('ACP session enumeration returned an invalid or repeated cursor.');
+        }
+        cursors.add(nextCursor);
+        cursor = nextCursor;
+      } while (true);
+      // Import/prune only a complete listing, never a successfully fetched prefix.
+      const sessions = Array.from(sessionsById.values());
       return {
         supported: true,
         summary: `ACP target '${instance.providerName}/${instance.id}' reported `
@@ -2365,6 +2387,13 @@ export class AcpAdapter implements AgentAdapter {
           timeoutMs: bootstrapTimeoutMs,
         });
         return;
+      }
+
+      if (reason === 'delete' && readAcpSessionCapability(agentCapabilities, 'list')) {
+        throw new Error(
+          'This ACP agent can list sessions but does not support permanent session deletion. '
+          + 'Delete the session in the provider before refreshing the runtime.',
+        );
       }
 
       if (!supportsCloseSession(agentCapabilities)) {

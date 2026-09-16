@@ -24,6 +24,7 @@ import { SessionScanner } from './backends/cli/discovery/SessionScanner.js';
 import { AntigravitySessionScanner } from './backends/cli/discovery/AntigravitySessionScanner.js';
 import { ClineSessionScanner } from './backends/cli/discovery/ClineSessionScanner.js';
 import { GrokSessionScanner } from './backends/cli/discovery/GrokSessionScanner.js';
+import { MuseSessionScanner } from './backends/cli/discovery/MuseSessionScanner.js';
 import { CodexSessionScanner } from './backends/cli/discovery/CodexSessionScanner.js';
 import { CopilotSessionScanner } from './backends/cli/discovery/CopilotSessionScanner.js';
 import { PiSessionScanner } from './backends/cli/discovery/PiSessionScanner.js';
@@ -47,6 +48,11 @@ import { ApiBackendManager } from './backends/api/runtime/ApiBackendManager.js';
 import { AgentBackendManager } from './backends/agent/runtime/AgentBackendManager.js';
 import { WorkerPool } from './backends/cli/pool/WorkerPool.js';
 import { RuntimeSessionManager } from './core/runtime/RuntimeSessionManager.js';
+import { resolveProviderTarget } from './core/providerCatalog.js';
+import {
+  importAgentSessions,
+  listAgentSessionDiscoveryTargets,
+} from './core/runtime/manualSessionDiscovery.js';
 import { ensureSessionAwake } from './core/runtime/sessionWakeup.js';
 import { ProviderModelCatalogService } from './core/models/providerModelCatalog.js';
 import { BootstrapService } from './core/bootstrap/BootstrapService.js';
@@ -375,6 +381,24 @@ export function createDiscoveryController(
         instance.id,
       ),
     })),
+    ...listProviderInstances(ctx.config, 'muse')
+      .filter((instance) => supportsHostFileBackedProviderDiscovery(ctx.config, 'muse', instance.id))
+      .map((instance) => ({
+      provider: 'muse' as const,
+      instanceId: instance.id,
+      name: instance.id === getProviderDefaultInstanceId(ctx.config, 'muse')
+        ? 'muse'
+        : `muse@${instance.id}`,
+      watchDir: resolveFileBackedProviderPath(ctx.config, 'muse', instance.id),
+      normalizedWatchDir: normalizeFileBackedProviderPath(ctx.config, 'muse', instance.id),
+      createWatcher: () => new FileWatcher(
+        resolveFileBackedProviderPath(ctx.config, 'muse', instance.id),
+        new MuseSessionScanner(resolveFileBackedProviderPath(ctx.config, 'muse', instance.id)),
+        'muse',
+        ctx.registry,
+        instance.id,
+      ),
+    })),
     ...listProviderInstances(ctx.config, 'antigravity')
       .filter((instance) => (
         supportsHostFileBackedProviderDiscovery(ctx.config, 'antigravity', instance.id)
@@ -496,6 +520,7 @@ export function createDiscoveryController(
 
   const timers: Array<ReturnType<typeof setInterval>> = [];
   let started = false;
+  let generation = 0;
   const wslDistroInspector = options.wslDistroInspector || isWslDistroRunning;
   const wslDiscoveryPolicy = ctx.config.wslDiscoveryPolicy ?? 'always';
   const dockerDiscoveryPolicy = ctx.config.dockerDiscoveryPolicy ?? 'if_running';
@@ -658,9 +683,51 @@ export function createDiscoveryController(
     start() {
       if (started) return;
       started = true;
+      const activeGeneration = ++generation;
 
       for (const entry of watcherEntries) {
         startWatcher(entry.name, entry.watcher);
+      }
+
+      const agentBackend = ctx.agentBackend;
+      if (agentBackend && ctx.config.nativeDiscoveryIntervalMs > 0) {
+        for (const target of listAgentSessionDiscoveryTargets(ctx.config)) {
+          let running = false;
+          let unsupported = false;
+          const sessionIdentities = () => JSON.stringify(ctx.registry.list({ provider: target.provider })
+            .filter((session) => session.providerBackend === 'agent'
+              && (session.providerInstanceId || 'default') === target.instanceId)
+            .map((session) => [session.id, session.providerSessionId]).sort());
+          const scan = async () => {
+            if (running || unsupported || !started || generation !== activeGeneration) return;
+            running = true;
+            try {
+              const before = sessionIdentities();
+              const catalog = await agentBackend.listSessions(resolveProviderTarget(
+                ctx.config, target.provider, `agent/${target.instanceId}`,
+              ));
+              if (!started || generation !== activeGeneration) return;
+              // A delete or another discovery may finish while the provider is
+              // answering. Let the next scan reconcile instead of reviving or
+              // pruning sessions using a result older than that local change.
+              if (sessionIdentities() !== before) return;
+              if (!catalog.supported) {
+                unsupported = true;
+                return;
+              }
+              importAgentSessions(ctx.registry, target, catalog.sessions);
+            } catch (error) {
+              console.warn(
+                `[discovery:${target.provider}@${target.instanceId}] Agent scan failed:`,
+                error instanceof Error ? error.message : String(error),
+              );
+            } finally {
+              running = false;
+            }
+          };
+          void scan();
+          timers.push(setInterval(() => { void scan(); }, ctx.config.nativeDiscoveryIntervalMs));
+        }
       }
 
       for (const instance of listProviderInstances(ctx.config, 'cursor')) {
@@ -705,6 +772,7 @@ export function createDiscoveryController(
     stop() {
       if (!started) return;
       started = false;
+      generation += 1;
       for (const entry of watcherEntries) {
         entry.watcher.stop();
       }

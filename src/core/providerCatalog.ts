@@ -126,6 +126,7 @@ export function getProviderDefaultTarget(
     | 'antigravitySessionsDir'
   | 'clineSessionsDir'
     | 'grokSessionsDir'
+    | 'museSessionsDir'
     | 'remoteProviderCatalog'
   >,
   providerName: string,
@@ -218,6 +219,7 @@ export function listConfiguredProviders(
     | 'antigravitySessionsDir'
   | 'clineSessionsDir'
     | 'grokSessionsDir'
+    | 'museSessionsDir'
     | 'remoteProviderCatalog'
   >,
 ): string[] {
@@ -269,6 +271,7 @@ export function listProviderCatalog(
     | 'antigravitySessionsDir'
   | 'clineSessionsDir'
     | 'grokSessionsDir'
+    | 'museSessionsDir'
     | 'remoteProviderCatalog'
   >,
 ): Record<string, ProviderCatalogEntry> {
@@ -351,6 +354,7 @@ export function resolveProviderTarget(
     | 'antigravitySessionsDir'
   | 'clineSessionsDir'
     | 'grokSessionsDir'
+    | 'museSessionsDir'
     | 'remoteProviderCatalog'
   >,
   providerName: string,

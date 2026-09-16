@@ -60,6 +60,7 @@ import {
 import { AntigravitySessionScanner } from '../../backends/cli/discovery/AntigravitySessionScanner.js';
 import { ClineSessionScanner } from '../../backends/cli/discovery/ClineSessionScanner.js';
 import { GrokSessionScanner } from '../../backends/cli/discovery/GrokSessionScanner.js';
+import { MuseSessionScanner } from '../../backends/cli/discovery/MuseSessionScanner.js';
 import {
   resolveFileBackedProviderPath,
 } from '../../backends/cli/providerPaths.js';
@@ -103,7 +104,7 @@ import {
 } from '../../core/runtime/sessionCompaction.js';
 import {
   runManualSessionDiscovery,
-  type AgentSessionDiscoveryTarget,
+  listAgentSessionDiscoveryTargets,
   type ManualSessionDiscoveryTarget,
 } from '../../core/runtime/manualSessionDiscovery.js';
 import type { ProviderModelSelection } from '../../core/models/providerSelectionResolution.js';
@@ -365,28 +366,6 @@ function serializeSessions(
       ...(lineage ? { lineage } : {}),
     };
   });
-}
-
-/**
- * Every configured provider whose default target is agent-backed.
- *
- * The scan asks each one whether it can enumerate rather than keeping a list of
- * agents that can, so a newly capable agent needs no change here.
- */
-function listAgentSessionDiscoveryTargets(ctx: AppContext): AgentSessionDiscoveryTarget[] {
-  const targets: AgentSessionDiscoveryTarget[] = [];
-  for (const providerName of listConfiguredProviders(ctx.config)) {
-    try {
-      const target = resolveProviderTarget(ctx.config, providerName);
-      if (target.backend === 'agent' && target.remoteInstance) {
-        targets.push({ provider: target.providerName, instanceId: target.instanceId });
-      }
-    } catch {
-      // A provider that cannot resolve a default target has nothing to scan.
-    }
-  }
-
-  return targets;
 }
 
 async function listManualDiscoverySessions(
@@ -2057,6 +2036,7 @@ function tracksProviderDiscoveryState(session: SessionInfo): boolean {
       || session.providerName === 'pi'
       || session.providerName === 'junie'
       || session.providerName === 'cline'
+      || session.providerName === 'muse'
       || session.providerName === 'grok'),
   );
 }
@@ -2071,7 +2051,8 @@ function collectProviderDiscoveryArtifactPaths(ctx: AppContext, session: Session
     if (!sourcePath) continue;
     if (sourcePath.startsWith(ctx.config.sessionBaseDir)) continue;
 
-    if (session.providerName === 'cline' || session.providerName === 'grok') {
+    if (session.providerName === 'cline' || session.providerName === 'grok'
+      || session.providerName === 'muse') {
       const sessionDir = dirname(sourcePath);
       if (isProviderSessionDirectory(ctx, session, sessionDir)) {
         artifactPaths.add(sessionDir);
@@ -2114,7 +2095,7 @@ function isProviderSessionDirectory(
   try {
     const providerRoot = resolveFileBackedProviderPath(
       ctx.config,
-      session.providerName as 'cline' | 'grok',
+      session.providerName as 'cline' | 'grok' | 'muse',
       session.providerInstanceId,
     );
     const pathFromRoot = relative(resolve(providerRoot), resolve(sessionDir));
@@ -2265,6 +2246,13 @@ async function scanProviderDiscoveryArtifactsForDelete(
         return {
           items: await new GrokSessionScanner(
             resolveFileBackedProviderPath(ctx.config, 'grok', session.providerInstanceId),
+          ).scan(),
+          scanFailed: false,
+        };
+      case 'muse':
+        return {
+          items: await new MuseSessionScanner(
+            resolveFileBackedProviderPath(ctx.config, 'muse', session.providerInstanceId),
           ).scan(),
           scanFailed: false,
         };
@@ -3260,9 +3248,9 @@ sessionRoutes.post('/sessions/discover', async (c) => {
     },
     ...(agentBackend ? {
       agentRunner: {
-        listTargets: () => listAgentSessionDiscoveryTargets(ctx),
+        listTargets: () => listAgentSessionDiscoveryTargets(ctx.config),
         listSessions: (target) => agentBackend.listSessions(
-          resolveProviderTarget(ctx.config, target.provider, target.instanceId),
+          resolveProviderTarget(ctx.config, target.provider, `agent/${target.instanceId}`),
         ),
       },
     } : {}),
