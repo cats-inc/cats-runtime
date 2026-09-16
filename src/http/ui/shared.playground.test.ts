@@ -1,5 +1,10 @@
 import vm from 'node:vm';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createRuntimeTestEnv } from '../../../tests/support/runtimeTestPaths.js';
+import { cleanupTempDirWithRetries } from '../../../tests/tempCleanup.js';
 import { describe, expect, it } from 'vitest';
 
 import { SHARED_UI_SCRIPT } from './shared.js';
@@ -33,6 +38,50 @@ function createCatsUI() {
 }
 
 describe('shared playground selection helpers', () => {
+  it('renders Grok model-specific effort in picker order without active or default markers', () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-grok-playground-'));
+    try {
+      const catsUI = createCatsUI();
+      const target = { providerName: 'grok', backend: 'cli' as const,
+        instanceId: 'native', defaultTarget: true };
+      const { catalog } = buildProviderAdvancedKnowledge(target, {
+        provider: 'grok', backend: 'cli', instance: 'native', defaultModel: null,
+        source: 'static', cache: null, models: getStaticProviderModels(target), warnings: [],
+      }, { env: createRuntimeTestEnv(root, {
+        CATS_RUNTIME_PACKAGE_ROOT: fileURLToPath(new URL('../../../', import.meta.url)),
+      }) });
+      const html = readFileSync(new URL('./pages/playground.html', import.meta.url), 'utf8');
+      const start = html.indexOf('function renderAgentModelControls(');
+      const end = html.indexOf('function applyAgentModelControlValues(', start);
+      const controls = { innerHTML: '' };
+      const context = { window: { CatsUI: catsUI }, escapeHtml: String,
+        div: { querySelector: () => controls }, catalog, entryId: '' };
+      vm.createContext(context);
+      vm.runInContext(html.slice(start, end), context);
+      expect(catsUI.getAdvancedCatalogDefaultEntryId(catalog)).toBe('grok-4.6');
+      for (const entry of catalog.entries) {
+        context.entryId = entry.id;
+        vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
+        expect(controls.innerHTML).not.toMatch(/default|active/i);
+        const options = [...controls.innerHTML.matchAll(/<option value="([^"]+)"[^>]*>([^<]+)<\/option>/g)]
+          .map((match) => [match[1], match[2]]);
+        expect(options).toEqual([
+          ...(entry.id === 'grok-4.6' ? [['xhigh', 'Extra High Effort']] : []),
+          ['high', 'High Effort'], ['medium', 'Medium Effort'], ['low', 'Low Effort'],
+        ]);
+        const [value, label] = options[0];
+        expect(controls.innerHTML).toContain(`<option value="${value}" selected>${label}</option>`);
+      }
+      expect(catsUI.normalizePlaygroundAgentSelection({
+        provider: 'grok', modelSelection: { entryId: 'grok-4.6', entryMode: 'explicit',
+          controls: { 'grok.reasoning_effort': 'low' } },
+        selectableProviders: ['grok'], providerOrder: ['grok'], advancedCatalogs: { grok: catalog },
+      }).modelSelection.controls).toEqual({ 'grok.reasoning_effort': 'low' });
+    } finally {
+      cleanupTempDirWithRetries(root);
+    }
+  });
+
   it('renders the Antigravity first effort without default labels and preserves saved effort', () => {
     const catsUI = createCatsUI();
     const target = { providerName: 'antigravity', backend: 'cli' as const,

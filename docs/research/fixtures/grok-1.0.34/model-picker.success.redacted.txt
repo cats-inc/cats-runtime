@@ -1,0 +1,16 @@
+Grok Build 1.0.34
+Source: operator transcription of /model and two supplied screenshots, 2026-09-17.
+Models in picker order:
+  Grok 4.6      SpaceXAI's latest frontier model
+  Grok 4.5
+Grok 4.6 effort (Image #1):
+  Extra High Effort  Highest effort and reasoning level
+  High Effort        Higher implementation quality with extensive reasoning
+  Medium Effort      Balanced effort with standard implementation and testing
+  Low Effort         Quick, fast implementations
+Grok 4.5 effort (Image #2):
+  High Effort (active)  Highest implementation quality with extensive reasoning
+  Medium Effort        Balanced effort with standard implementation and testing
+  Low Effort           Quick, fast implementations
+Operator confirmed the repeated Grok 4.6 heading in the original message was a typo for Grok 4.5.
+No default is declared by the supplied picker. Operator explicitly requests first-item UI initialization without default or active labels.
