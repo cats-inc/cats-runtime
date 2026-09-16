@@ -406,7 +406,7 @@ const PROVIDER_COLORS = {
 const AVAILABLE_TAGS = ['orchestrator','pm','researcher','designer','architect','coder','tester','reviewer','security','qa','tech_writer','marketer'];
 const ROLE_LABELS = { orchestrator:'CEO',pm:'PM',researcher:'Researcher',designer:'Designer',architect:'Architect',coder:'Coder',tester:'Tester',reviewer:'Reviewer',security:'Security',qa:'QA',tech_writer:'Tech Writer',marketer:'Marketer' };
 const PROVIDER_MODELS = {
-  claude:[{value:'opus',label:'opus (default)'},{value:'sonnet',label:'sonnet'},{value:'haiku',label:'haiku'}],
+  claude:[{value:'opus',label:'Opus 5 with 1M context (default)'},{value:'fable',label:'Fable 5.1'},{value:'sonnet',label:'Sonnet 5'},{value:'haiku',label:'Haiku 4.5'}],
   codex:[{value:'gpt-6-astra',label:'gpt-6-astra (default)'},{value:'gpt-5.6-sol',label:'gpt-5.6-sol'},{value:'gpt-5.6-terra',label:'gpt-5.6-terra'},{value:'gpt-5.6-luna',label:'gpt-5.6-luna'},{value:'gpt-5.5',label:'gpt-5.5'}],
   antigravity:[{value:'antigravity-default',label:'Antigravity default'}],
   copilot:[{value:'gpt-5.4',label:'gpt-5.4 (default)'},{value:'claude-opus-4.6',label:'claude-opus-4.6'},{value:'gemini-3-pro-preview',label:'gemini-3-pro-preview'}],
@@ -2021,9 +2021,9 @@ async function loadProviderOptions() {
             PROVIDER_ADVANCED_CATALOGS[name] = normalized;
             const entries = Array.isArray(normalized.entries) ? normalized.entries : [];
             if (entries.length > 0) {
-              PROVIDER_MODELS[name] = entries.map((entry, index) => ({
+              PROVIDER_MODELS[name] = entries.map((entry) => ({
                 value: entry.id,
-                label: entry.label || (index === 0 ? `${entry.id} (default)` : entry.id),
+                label: window.CatsUI.formatAdvancedDefaultLabel(entry.label || entry.id, entry.default),
               }));
             }
             return;
@@ -2042,13 +2042,15 @@ async function loadProviderOptions() {
           if (Array.isArray(models) && models.length) {
             const mapped = models.map((m, i) => {
               const value = typeof m === 'string' ? m : (m.id || m.value || m.name);
-              const defaultFlag = typeof m === 'object' && m !== null && (m.default === true || m.isDefault === true);
+              const defaultFlag = typeof m === 'string'
+                ? i === 0
+                : m !== null && (m.default === true || m.isDefault === true);
               const label = typeof m === 'string'
                 ? (i === 0 ? `${m} (default)` : m)
                 : (m.label || m.id || m.name);
               return {
                 value,
-                label: defaultFlag && !String(label).includes('(default)') ? `${label} (default)` : label,
+                label: window.CatsUI.formatAdvancedDefaultLabel(label, defaultFlag),
                 default: defaultFlag,
               };
             });

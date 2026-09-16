@@ -40,20 +40,20 @@ schema_version: 1
 
 catalogs:
   - cli: Claude
-    version: 2.1.257
-    last_updated: 2026-09-02
+    version: 2.1.273
+    last_updated: 2026-09-16
     notes:
-      - "Model list re-read 2026-09-02 from the operator-pasted interactive `/model` picker on Claude Code 2.1.257; the operator confirmed all five visible rows were present with nothing scrolled off"
-      - "Evidence: docs/research/fixtures/claude-2.1.257/model-picker.success.redacted.txt"
-      - "The picker rows were Default (recommended), Opus (1M context), Fable, Sonnet, and Haiku, in that order. `Default` is a provider-default null sentinel and is retained in evidence rather than projected into a model id that the runtime would pass through `--model`. The `√` marker is recorded only as the current picker selection and is not interpreted as an account-default claim."
-      - "Picker descriptions identify Opus 5, Fable 5.1, Sonnet 5, and Haiku 4.5. The `opus`, `sonnet`, and `haiku` aliases remain grounded in the earlier 2.1.246 static extraction; read-only `--help` and static extraction from the locally installed 2.1.258 executable independently expose `fable` and `claude-fable-5-1`. That newer artifact is raw-token evidence only, not account-entitlement evidence for 2.1.257."
-      - "For Default, Opus, Fable, and Sonnet, the operator observed the complete ordered effort set Low, Medium, High, xHigh, Max, Ultracode, with High marked `(default)`. Haiku instead displayed `Effort not supported for Haiku`. The Default sentinel's effort branch remains evidence-only; the other three branches are represented per model."
-      - "The locally installed 2.1.258 artifact maps the picker-visible Ultracode choice to the raw `ultracode` session value and describes it as xHigh effort plus dynamic workflow orchestration. A read-only `claude --effort ultracode --version` parser check accepted that token and returned 2.1.258; the top-level `--help` list itself still stops at Max."
-      - "Opus 1M context was re-observed in the picker. Sonnet 1M and Haiku 200K context values are retained from the 2.1.246 static extraction and were not re-observed; Fable context is omitted because the 2.1.257 picker row did not state one."
-      - "`default: true` on Opus is retained from the account-resolved 2026-04-17 snapshot. The 2.1.257 `√` marker was on the Default sentinel, so this refresh neither re-verifies nor removes that older explicit-alias default."
+      - "Model list and every model's effort screen re-read 2026-09-16 from the operator-pasted `/model` picker on Claude Code 2.1.273. The operator requested exactly four Cats model rows, with the duplicate Default/Opus presentation collapsed to Opus. Scope is the operator's account; entitlement elsewhere is unverified."
+      - "Evidence: docs/research/fixtures/claude-2.1.273/model-picker.success.redacted.txt"
+      - "The five source rows are Default (recommended), Opus (1M context), Fable, Sonnet, and Haiku. Default is a provider-default sentinel, not an executable model id. Its row and effort branch remain in evidence; Cats exposes only the four explicit model aliases, with Opus selected by default as the operator requested. This does not claim a provider-default alias will always resolve to Opus."
+      - "Display names follow the operator's version-bearing projection of the picker descriptions: Opus 5 with 1M context, Fable 5.1, Sonnet 5, and Haiku 4.5. Cats adds the status suffix ` (default)` in lowercase across model and effort menus; it is not part of the model name."
+      - "Raw alias mappings are unchanged: `opus`, `sonnet`, and `haiku` retain their 2.1.246 static-extraction provenance; `fable` and `claude-fable-5-1` retain the 2.1.258 help/static-artifact evidence. The existing Claude normalizers map these labels and all six effort values. No raw token is inferred from the new paste."
+      - "For Default, Opus, Fable, and Sonnet separately, the complete ordered effort set is Low, Medium, High, xHigh, Max, Ultracode, with High explicitly marked `(default)`. Haiku displays `Effort not supported for Haiku` and keeps `options: []`. The Max usage warning is retained per model."
+      - "Older effort descriptions remain with their earlier provenance; they were not re-observed in 2.1.273. In particular, the 2.1.258 static artifact maps Ultracode to `ultracode` and describes xHigh effort plus dynamic workflow orchestration; the earlier read-only `claude --effort ultracode --version` parser check accepted that token. This refresh does not repeat execution probes."
+      - "Opus 1M context was re-observed. Sonnet 1M and Haiku 200K context values remain from the 2.1.246 static extraction and were not re-observed; Fable context remains unknown and omitted."
     models:
       - name: Opus
-        label: Opus 5 (1M context)
+        label: Opus 5 with 1M context
         notes:
           - "Picker description: Opus 5 with 1M context - best for everyday, complex tasks"
         default: true

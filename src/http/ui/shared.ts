@@ -1202,7 +1202,7 @@ export const SHARED_UI_SCRIPT = `
   }
 
   function formatAdvancedDefaultLabel(label, isDefault) {
-    if (typeof isDefault !== 'boolean') return String(label);
+    if (typeof isDefault !== 'boolean') return String(label).replace(/\\(default\\)/giu, '(default)');
     var plainLabel = String(label).replace(/\\s*\\(default\\)/giu, '');
     return isDefault ? plainLabel + ' (default)' : plainLabel;
   }

@@ -1,0 +1,81 @@
+# Source: operator-pasted Claude Code /model and per-model effort screens
+# Version: 2.1.273
+# Observed: 2026-09-16
+# Scope: operator account; account identity and capture platform not supplied
+# Completeness: five visible rows and every row effort screen supplied; operator requests exactly four Cats model rows
+# Redaction: no sensitive identifiers present; screen separators below are editorial
+
+Version:                 2.1.273
+
+  Select model
+  Switch between Claude models. Your pick becomes the default for new sessions. For other/previous model names, specify with --model.
+
+    1. Default (recommended)    Opus 5 with 1M context · Best for everyday, complex tasks
+    2. Opus (1M context)    Opus 5 with 1M context · Best for everyday, complex tasks
+    3. Fable    Fable 5.1 · Most capable for your hardest and longest-running tasks
+    4. Sonnet    Sonnet 5 · Efficient for routine tasks
+    5. Haiku    Haiku 4.5 · Fastest for quick answers
+
+# Selected: Default (recommended)
+
+  ○ Low effort ←/→ to adjust
+
+  ◐ Medium effort ←/→ to adjust
+
+  ● High effort (default) ←/→ to adjust
+
+  ◉ xHigh effort ←/→ to adjust
+
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+  ✦ Ultracode effort ←/→ to adjust
+
+# Selected: Opus (1M context)
+
+  ○ Low effort ←/→ to adjust
+
+  ◐ Medium effort ←/→ to adjust
+
+  ● High effort (default) ←/→ to adjust
+
+  ◉ xHigh effort ←/→ to adjust
+
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+  ✦ Ultracode effort ←/→ to adjust
+
+# Selected: Fable
+
+  ○ Low effort ←/→ to adjust
+
+  ◐ Medium effort ←/→ to adjust
+
+  ● High effort (default) ←/→ to adjust
+
+  ◉ xHigh effort ←/→ to adjust
+
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+  ✦ Ultracode effort ←/→ to adjust
+
+# Selected: Sonnet
+
+  ○ Low effort ←/→ to adjust
+
+  ◐ Medium effort ←/→ to adjust
+
+  ● High effort (default) ←/→ to adjust
+
+  ◉ xHigh effort ←/→ to adjust
+
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+  ✦ Ultracode effort ←/→ to adjust
+
+# Selected: Haiku
+
+  ○ Effort not supported for Haiku

@@ -3,6 +3,23 @@
 > How to publish `cats-runtime` to npm and evolve from a manual beta release to
 > trusted CI publishing.
 
+## 0.1.23 prerelease preparation (2026-09-16)
+
+This release carries the Claude Code 2.1.273 catalog refresh, version-bearing
+model labels, and lowercase Cats default markers. It also includes the merged
+Codex 0.154.0 catalog/defaults, initial native-session discovery fixes, and the
+selected-provider bootstrap boundary now on `main`.
+
+Publish `@cats-inc/cats-runtime@0.1.23` through this repository's
+`.github/workflows/npm-publish.yml` with `dist_tag=next` after the preparation PR
+merges and passes its release gate. The current workflow and `package.json` are
+authoritative for the scoped package identity; the older first-release planning
+sections below retain historical names and workflow paths.
+
+Cats Desktop 0.2.8 will package the exact merged Runtime commit through its
+manual unsigned-preview workflow. Keep that immutable Runtime revision in the
+dispatch input so all three OS packages embed the same changes.
+
 ## Purpose
 
 `cats-runtime` is an executable-first npm package:
