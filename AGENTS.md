@@ -432,11 +432,46 @@ tests/
 └── streamEventTestUtils.ts     # shared stream/event assertions
 ```
 
+### Local Validation Scope
+
+This is the shared testing policy for all agents, adopted 2026-09-16.
+Agent-specific instructions and handoff checklists MUST use this scope.
+
+- Before commit or handoff, run the smallest validation that covers the changed
+  behavior and its affected consumers. A commit or PR alone MUST NOT trigger a
+  local `npm test` or `npm run release:check`.
+- Choose local checks by impact:
+
+  | Change | Local validation |
+  |--------|------------------|
+  | Documentation, rules, or comments only | Review the diff, links, and stated commands; no application tests or builds unless executable behavior is also changed |
+  | Localized logic or one provider | Relevant regression tests and the affected TypeScript/build checks |
+  | Setup/dashboard UI | Relevant behavior/route tests; regenerate UI assets before tests that consume them |
+  | Startup/bootstrap, shared config, storage, auth, provider contracts, or cross-layer routing | Expand to the affected integration and consumer suites, including another repository when its contract changes |
+  | Dependencies, packaging, entrypoints, or OS helpers | Relevant build, package/install, or process/OS checks for the changed surface |
+
+- Select tests using both code dependencies and explicit contracts. Include
+  HTML, YAML, filesystem-loaded assets, and generated outputs; import analysis
+  alone cannot identify every affected test.
+- Run a full local suite only when explicitly requested, when a failure needs
+  full-suite reproduction, or when the affected scope cannot be bounded with
+  confidence. State the reason before expanding the run.
+- Reuse passing checks while their inputs, generated artifacts, and relevant
+  environment remain unchanged. Rebuild stale required artifacts, but do not
+  repeat a passing build or suite merely to advance from review to commit/PR.
+- Record the checks actually run, their results, and any relevant validation
+  left to CI or unavailable OSes. Focused validation MUST NOT be described as
+  a full-suite pass.
+- PR and release CI remain the full-suite gates. `release-preflight` still runs
+  `npm run release:check`; version bumps and publication candidates must satisfy
+  the existing release checks. Passing CI for the candidate does not require a
+  duplicate full local run. A version bump is not the only reason to expand
+  validation of a core or packaging change.
+
 ### Testing Rules
 
-1. **Before Commit**: `npm test` must pass. `npm run release:check`
-   (`verify:skills` + `test` + `npm pack --dry-run`) is the fuller gate and mirrors
-   the CI preflight workflow.
+1. **Before Commit**: The checks selected under **Local Validation Scope** must
+   pass. Full local `npm test` / `npm run release:check` is not a blanket prerequisite.
 2. **Isolation from user state**: tests **MUST NOT** read or write the real
    `~/.cats/runtime`. Use `createRuntimeTestEnv` / `createRuntimeTestPaths` from
    `tests/support/runtimeTestPaths.ts`, which repoint `HOME`, `USERPROFILE`, and
@@ -452,7 +487,8 @@ tests/
 6. **Generated UI artifacts**: `tests/runtime-ui-build.test.ts` fails when
    `public/*.html` drifts from `src/http/ui/pages/*.html` or is left uncommitted.
    Run `npm run build:ui` and commit the result after touching `src/http/ui/**`.
-7. **CI Requirement**: all tests must pass before merge.
+7. **CI Requirement**: The required `release-preflight` full-suite gate must pass
+   before merge. Focused local validation does not waive CI.
 
 ### What to Test
 
@@ -508,7 +544,7 @@ docs(readme): update installation instructions
 Before submitting a PR, ensure:
 
 - [ ] Code follows project coding conventions
-- [ ] All tests pass locally
+- [ ] Scoped local validation passed; actual checks and results are recorded
 - [ ] New code has appropriate test coverage
 - [ ] Documentation is updated (if applicable)
 - [ ] No secrets or credentials in code

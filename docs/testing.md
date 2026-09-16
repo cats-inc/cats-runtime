@@ -29,9 +29,30 @@ locally in the same service that ships them.
 - **Framework**: N/A
 - **Scope**: local verification against installed provider CLIs and the embedded dashboard
 
+## Choosing Local Validation
+
+[AGENTS.md: Local Validation Scope](../AGENTS.md#local-validation-scope) is the
+canonical policy for all agents. Local commit/handoff checks cover the affected
+behavior and consumers; a full local suite is not a routine prerequisite.
+Documentation/rules-only changes use diff and reference review.
+
+For a focused Runtime run, use the existing single-threaded runner:
+
+```bash
+npx vitest run tests/<name>.test.ts --pool=threads --poolOptions.threads.singleThread
+```
+
+Build required artifacts first when the selected tests read generated UI or
+`build/runtime/` output. Reuse passing checks for unchanged inputs; expand the
+scope for shared contracts or failures as described in AGENTS.md. Full local
+`npm test` and `npm run release:check` remain available for explicit requests,
+full-suite diagnosis, or changes whose impact cannot be bounded confidently.
+
 ## Running Tests
 
 ### All Tests
+
+This is the full suite, used by CI and when local scope warrants it:
 
 ```bash
 npm test
@@ -112,11 +133,18 @@ describe('ComponentName', () => {
 ## CI/CD Integration
 
 - Tests run automatically on:
-  - [x] Local pre-commit verification
-  - [ ] Pull requests
-  - [ ] Main branch commits
+  - [x] Pull requests (`release-preflight`)
+  - [x] Main branch commits
+  - [x] Manual npm publishing (release gate before publication)
   - [ ] Scheduled (nightly)
+
+These workflows still run `npm run release:check` (build/skill verification,
+full tests, and package dry-run). Scoped local validation does not change the
+required CI checks. Version bumps and release candidates keep this full gate;
+successful candidate CI does not require a second full run on the developer's
+machine. Automatic selection of CI tests and build deduplication are separate
+workflow changes, not implemented by this policy update.
 
 ---
 
-*Last updated: 2026-03-27*
+*Last updated: 2026-09-16*
