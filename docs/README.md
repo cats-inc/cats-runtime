@@ -22,7 +22,8 @@ scheduled polling, verified account linkage and durable history remain deferred.
 
 [Claude 2.1.273 catalog refresh](./research/2026-09-16-claude-model-picker-refresh.md)
 records the four version-bearing model names, per-model efforts, and consistent
-lowercase default markers in Desktop and Playground.
+lowercase default markers in Desktop and Playground, with a delivery timing
+retrospective feeding the canonical catalog-maintenance skill.
 
 [Codex 0.154.0 catalog and selector defaults](./research/2026-09-16-codex-model-picker-defaults.md)
 records the September 16 picker refresh and the per-entry defaults consumed by

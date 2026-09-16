@@ -87,23 +87,9 @@ do not mistake expected uncommitted output for a generator defect or claim that 
 ### Desktop, only when its fallback or consumer behavior changes
 
 For catalog/selection logic, build the server once and run the focused test:
-
-```text
-npm run build:server
-node --test tests/provider-selection.test.js
-```
-
-For mounted selector behavior, use the repository's JSX/DOM bundling path:
-
-```text
-npm run build:test-ui
-node --test --test-isolation=none build/test/provider-model-fields.test.js build/test/provider-model-defaults.test.js build/test/provider-model-fields-label-persist.test.js
-```
-
-Do not substitute `tsx --test` for these TSX tests; their setup depends on the official bundle.
-If a full Node suite is required, use `--test-reporter=tap` to retain timely assertion details.
-Package-contract tests invoke synchronous builds/installations, may be quiet for minutes, and can
-clear `build/test`; rebuild UI tests before a later focused run if that directory was removed.
+`tests/provider-selection.test.js`. For labels, also check non-selector consumers; use the shared
+[Desktop iteration guidance](../catalog-surfaces.md#desktop-iteration-only-when-its-consumers-change)
+for builds, mounted selector tests, label consumers, and bundle invalidation.
 
 Run heavy cross-repository gates serially and preserve their logs. Report whether validation used
 source/tests, a running development UI, or an installed Desktop build; these are distinct claims.

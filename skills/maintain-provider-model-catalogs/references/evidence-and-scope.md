@@ -58,6 +58,10 @@ from a paste is not removal evidence because scrolling, entitlement, or truncati
   Keep unobserved metadata (for example, context limits) with its earlier provenance; do not infer
   it for new rows or treat an older label as unobserved when the new picker actually shows it.
 - Preserve visible generation/version text; do not strip it to resolve ambiguity.
+- Keep raw evidence verbatim even when the operator specifies a Cats display projection (such as
+  including a version from the description). Record that projection once. Cats standardizes only
+  the status suffix to ` (default)` across model/effort menus; this does not authorize changing the
+  model name's case or inferring which row is default.
 - Do not map an option label such as `Extra high` to a token such as `xhigh` without an observed
   mapping or the relevant normalizer proving it.
 - A selection marker is not an account default until its meaning is confirmed. It may identify only

@@ -6,7 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
-| [2026-09-16-claude-model-picker-refresh](./2026-09-16-claude-model-picker-refresh.md) | Claude 2.1.273 catalog refresh | Four version-bearing model names, Opus/High defaults, complete per-model efforts, and lowercase Cats default markers |
+| [2026-09-16-claude-model-picker-refresh](./2026-09-16-claude-model-picker-refresh.md) | Claude 2.1.273 catalog refresh | Four version-bearing names, per-model defaults/efforts, lowercase default markers, and measured delivery retrospective feeding the maintenance skill |
 | [2026-09-16-codex-model-picker-defaults](./2026-09-16-codex-model-picker-defaults.md) | Codex 0.154.0 catalog and selector defaults | Complete operator-confirmed five-model picker, model-specific reasoning, authorized flat menus, and Desktop/Playground default propagation |
 | [2026-09-11-additional-cli-quota-queries](./2026-09-11-additional-cli-quota-queries.md) | Copilot / Claude / Antigravity account reads | CLI-owned auth, live numbers, bounded non-model protocols, native quantity semantics, Kiro auth blocker and no-release boundary |
 | [2026-09-11-codex-cli-explicit-quota-read](./2026-09-11-codex-cli-explicit-quota-read.md) | Explicit Codex CLI quota read | Native Windows CLI-only account read and built Usage/SDK/Host/Runtime proof; no credential extraction, provider HTTP client or model turns; bounded refresh and unsupported remote transports |

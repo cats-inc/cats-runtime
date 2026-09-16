@@ -80,8 +80,9 @@ author that artifact.
    demonstrated behavior gap that needs separately scoped implementation; reuse existing support.
 5. Apply only the authorized, representable subset. Partial evidence never removes existing data
    or propagates one model's options to another model.
-6. Search the whole repository for consumers of the exact bundled example before changing tests or
-   assertions.
+6. Before the final gate, search each affected repository for the exact old labels/ids and bundled
+   example consumers, including display consumers outside model selectors. Follow the consumer
+   classification in [catalog surfaces](./references/catalog-surfaces.md).
 
 ### Review
 
@@ -128,8 +129,8 @@ authorizes that external mutation.
 
 ## Conditional provider references
 
-- [Claude](./references/providers/claude.md): picker-first evidence; compiled extraction is a
-  possible superset.
+- [Claude](./references/providers/claude.md): supplied picker fast path, alias/label projection,
+  per-model effort, and existing Runtime/Desktop support; compiled extraction is a possible superset.
 - [Codex](./references/providers/codex.md): supplied picker evidence, existing per-model defaults,
   exact display labels, fallback locations, and focused Runtime/Desktop validation.
 - [Copilot](./references/providers/copilot.md): account-resolved interactive model list.

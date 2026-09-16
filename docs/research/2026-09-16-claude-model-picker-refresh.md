@@ -102,3 +102,49 @@ On the integrated 0.1.23 release tree, `npm test -- --reporter=verbose` passed:
 runtime contract checks. The shipped skill verifier accepted all 33 runtime-owned
 packages, and a separate `npm pack --dry-run --ignore-scripts --json` inspected the
 already-built 0.1.23 package without repeating the build/test gate.
+
+## Delivery retrospective
+
+The catalog refresh and the later authorized release are distinct phases. The local logs and
+GitHub job timestamps establish the following costs; concurrent rows must not be added together
+as elapsed delivery time. They do not provide a complete accounting of reading, edits, user
+interaction, or tool overhead.
+
+| Phase | Measured time | Result / interpretation |
+|---|---|---|
+| Runtime focused tests | 5.1s test runner | 95 passed; catalog checks themselves were cheap |
+| Desktop focused typecheck/build/tests | 266.6s | 68 passed; only 11.4s was test execution |
+| Runtime final local gate | 423.8s | 2,166 passed; required release preparation |
+| Desktop first local gate | 864.5s | 4,566 passed, 5 skipped, 5 stale label assertions failed |
+| Desktop full test retry | 568.3s | 4,571 passed, 5 skipped; avoidable after a complete consumer search |
+| Desktop PR CI | 7m 41s | [Run 35063467440](https://github.com/cats-inc/cats-platform/actions/runs/35063467440), 06:23:10–06:30:51 UTC |
+| Desktop npm workflow | 8m 08s | [Run 35064162064](https://github.com/cats-inc/cats-platform/actions/runs/35064162064), 06:32:17–06:40:25 UTC |
+| Desktop preview workflow | 4m 46s | [Run 35064175632](https://github.com/cats-inc/cats-platform/actions/runs/35064175632), overlapped npm publication |
+
+The clearest agent-caused waste was incomplete impact discovery. Updating the shared Opus fallback
+also changed execution chips and audience participants, but the focused selection checks missed
+their two assertion files. A pre-gate exact-old-label search in both repositories would have found
+them and avoided the 568.3s full retry plus its diagnosis/rebundling. Independent runtime-response
+fixtures correctly retained their supplied historical labels; a blanket replacement is not the fix.
+
+The Claude reference still described evidence collection without the supplied-paste fast path
+already available for Codex. It now starts with the supplied model/effort screens, approved label
+projection and duplicate-row collapse, existing alias/default/empty-control support, and the local
+override. Common consumer searches and Desktop test commands now live in the shared surface guide.
+Current versions and option sets remain in evidence/catalog data rather than procedural instructions.
+
+Release work also integrated independently merged provider-bootstrap changes. Final gates needed
+that integrated tree, but earlier focused results remain valid only for their original scope. The
+skill now calls for identifying the intended base and expanded build/test scripts before the final
+gate, retaining valid phase results, and overlapping independent remote jobs with local work.
+
+Runtime npm publication succeeded before registry reads exposed the new version; eventual metadata
+and the downloaded tarball verified 0.1.23. This propagation delay was observed during Desktop work,
+not an extra sequential delivery phase. A separate inspection assumed npm pack JSON was an array;
+the saved package-keyed output was sufficient to recover without another build. Both cases are now
+documented as read/inspection retries rather than reasons to republish or rebuild.
+
+Repeated status messages and overlarge instruction/search output also added interaction overhead.
+No reliable duration is assigned to those costs. The procedural update favors relevant references,
+existing evidence, and phase-transition reporting. It does not bypass current commit/CI gates or
+change CI workflows; deduplicating CI versus publication tests would require a separate change.
