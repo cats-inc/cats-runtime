@@ -16,6 +16,9 @@ operator to author JSON/YAML, strip ANSI, align columns, remove picker chrome, o
   plain-language source question rather than guessing.
 
 Record the selected policy, every material question, and the operator's answer.
+Reuse normalized evidence and the observation tree while the paste is unchanged. After an answer,
+update the relevant completeness/decision facts and rerun `assess`; do not re-normalize the same
+capture or ask again about a proposed change the operator already explicitly resolved.
 
 ## 2. Normalize mechanically
 

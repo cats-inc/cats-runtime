@@ -4,6 +4,9 @@ Use current repository sources instead of a provider list copied into this skill
 
 ## Build the inventory
 
+Use this full inventory for an audit. For a provider-scoped refresh, start at that provider's
+reference and catalog section, then follow only its actual consumers and affected identifiers.
+
 Start with repository searches such as:
 
 ```text
@@ -42,8 +45,11 @@ native-installed providers may expose dynamic enumeration.
 | Static fallback and routing | `src/core/models/providerModelCatalog.ts` | `STATIC_PROVIDER_MODELS`, default resolution, dynamic branches |
 | Dynamic CLI discovery | `src/backends/cli/**/models.ts` and agent adapters | command, parser, account scope, refresh behavior |
 | Advanced controls | `src/core/models/providerAdvancedKnowledge.ts` | controls/presets and verified provenance |
+| Public per-model defaults | `src/core/models/providerAdvancedCatalog.ts` | `entries[].controlDefaults` alongside catalog defaults |
 | Selection resolution | `src/core/models/providerSelectionResolution.ts` | whether curated defaults/options are honored |
 | Provider adapter | `src/backends/cli/providers/<provider>.ts` | accepted model/control argv and execution support |
+| Playground | `src/http/ui/shared.ts`, `src/http/ui/pages/playground.html` | labels, per-model defaults, static fallback; generate `public/playground.html` with `npm run build:ui` |
+| Desktop consumer | `cats-platform` provider catalog/selector modules | only inspect/change when fallback data or consumer behavior is affected; read that member's instructions first |
 
 Do not assume these paths will stay exhaustive. Use repo-wide search for the provider name, exact
 catalog filename, option/control key, and affected ids before editing.
@@ -78,5 +84,19 @@ Also:
 - run the wider suite when risk or repository rules require it;
 - use `git diff --check` and inspect the final diff/status.
 
-If an environment-sensitive suite fails for a pre-existing reason, retain the output and distinguish
-that failure from a regression. Do not change unrelated assertions to obtain a green run.
+### Schedule validation once per relevant change
+
+- Use focused tests while editing; run required full commit/release gates after the final diff is
+  ready. This skill does not waive repository gates or substitute a focused pass for a full pass.
+- Serialize heavy Runtime and Desktop builds/full suites on one Windows machine. Independent
+  searches can run in parallel; package builds and child-process tests compete for CPU and disk.
+- Record command, scope, exit status, elapsed time, and log path. Keep valid results until another
+  change affects what they tested; do not repeat a successful suite merely to reassure yourself.
+- On failure, retain the assertion output and rerun affected files first to diagnose. A timeout
+  under contention is not automatically pre-existing or harmless. A focused retry proves only that
+  scope; report the original failure and satisfy any still-required full gate.
+- Quiet package/build tests can run synchronous subprocesses for minutes. Check process/log
+  progress before interrupting; silence alone is not evidence of a hang. Prefer a reporter that
+  emits failure details as they occur.
+- If only this skill's Markdown changes, validate frontmatter, links, diff, and discovery sync.
+  Do not run product tests solely for prose edits; any later commit remains subject to repo rules.
