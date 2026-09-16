@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-09-17-grok-model-picker-refresh](./2026-09-17-grok-model-picker-refresh.md) | Grok Build 1.0.34 picker | Exact model/effort labels, seven executable combinations, first-item UI initialization without default or active markers |
 | [2026-09-16-antigravity-model-picker-refresh](./2026-09-16-antigravity-model-picker-refresh.md) | Antigravity 1.2.3 picker | Seven families with per-model effort, verified raw-id mapping and first-item initialization without default claims |
 | [2026-09-16-claude-model-picker-refresh](./2026-09-16-claude-model-picker-refresh.md) | Claude 2.1.273 catalog refresh | Four version-bearing names, per-model defaults/efforts, lowercase default markers, and measured delivery retrospective feeding the maintenance skill |
 | [2026-09-16-setup-action-layout](./2026-09-16-setup-action-layout.md) | Runtime Setup action layout | Accepted footer actions, a single primary action, and stable detection controls |

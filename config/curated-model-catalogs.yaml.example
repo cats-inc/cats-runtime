@@ -263,59 +263,52 @@ catalogs:
         options: []
 
   - cli: Grok
-    version: 1.0.13
-    last_updated: 2026-09-03
+    version: 1.0.34
+    last_updated: 2026-09-17
     notes:
-      - "First curated Grok entry; before 2026-09-03 the runtime carried only the 1.0.0 static fallback row `grok-4.5`."
-      - "Model list read 2026-09-03 from the CLI's own account-resolved manifest at ~/.grok/models_cache.json, fetched 2026-09-02T17:48:31Z from https://cli-chat-proxy.grok.com/v1/models by Grok Build 1.0.13 with session auth. The manifest holds exactly these two models, so the list is complete for this account."
-      - "Evidence: docs/research/fixtures/grok-1.0.13/models-cache.success.redacted.json"
-      - "Corroborated the same day by `grok models` on 1.0.13, which printed both ids and exited 0, and by the operator-pasted interactive `/model` picker. Evidence: docs/research/fixtures/grok-1.0.13/models-command.success.redacted.txt and docs/research/fixtures/grok-1.0.13/model-picker.success.redacted.txt"
-      - "`name` is the raw id `grok --model` accepts, taken from the manifest `id` field; `label` is the manifest `name` field, which is also what the picker renders."
-      - "No entry is marked default. The manifest carries no default field at all; `grok models` prints `Default model: grok-4.6` and a `(default)` marker, but ~/.grok/config.toml on the observed machine sets `[models] default = \"grok-4.6\"`, so that marker reports a per-user preference rather than an account or vendor default. The adapter already omits `--model` when nothing is selected, so claiming one here would override a preference the runtime cannot see. This supersedes the older `grok-4.5 default: true` claim, which came from the 1.0.0 probe reading the same config-derived marker."
-      - "Both models advertise `supports_reasoning_effort: true` and a per-model `reasoning_efforts` menu. Option value names below are the raw tokens `grok --reasoning-effort` (alias `--effort`) accepts, taken from the manifest `value` field; each value's note carries the menu label and description verbatim. The menus differ per model and are never shared: grok-4.6 offers four levels including `xhigh`, grok-4.5 only three."
-      - "Effort menus were re-captured 2026-09-03 as per-model picker screens that each show the `/model <name>` prompt line, and they agree line for line with the manifest. Bundled `~/.grok/README.md` documents the wider flag vocabulary `none, minimal, low, medium, high, xhigh, max` plus per-model menu ids; only the account-resolved per-model menus are curated here."
-      - "`default: high` on both models is the manifest's own `default: true` entry, not a picker marker. The observed machine's `~/.grok/config.toml` sets `default_reasoning_effort = \"xhigh\"`, which is why the picker showed Extra High as `(active)` for grok-4.6; that per-user override is deliberately not encoded here."
-      - "`context: 500000` for both models is the manifest `context_window` field. `max_completion_tokens` is null upstream and is therefore omitted rather than guessed."
+      - "Complete two-model /model list and per-model effort menus supplied 2026-09-17 for Grok Build 1.0.34 as operator transcription and screenshots (the TUI cannot copy text). Evidence: docs/research/fixtures/grok-1.0.34/model-picker.success.redacted.txt and effort-grok-4.6.redacted.png / effort-grok-4.5.redacted.png in the same directory."
+      - "The operator confirmed the repeated Grok 4.6 heading on the three-effort screen meant Grok 4.5. Preserve picker order and visible spelling; omit the session-only (active) marker from labels."
+      - "No model or effort default is declared by the supplied picker. Per explicit operator policy, Cats initializes each menu from its first applicable item without marking any item default. This supersedes the earlier curated High effort defaults from the 1.0.13 manifest; it does not claim the upstream manifest defaults changed."
+      - "Raw model ids and effort label-to-token mappings are retained from the 2026-09-03 Grok 1.0.13 manifest: docs/research/fixtures/grok-1.0.13/models-cache.success.redacted.txt. The existing normalizer maps Extra High Effort / High Effort / Medium Effort / Low Effort to xhigh / high / medium / low for --reasoning-effort; the mapping was not re-enumerated on 1.0.34."
+      - "Per-model descriptions from both screenshots remain in option notes, including Higher (Grok 4.6) versus Highest (Grok 4.5) for High Effort. Context 500000 is retained from the 1.0.13 manifest; no context or output limit was re-observed in this picker."
     models:
       - name: grok-4.6
         label: Grok 4.6
         notes:
-          - "Manifest description: SpaceXAI's latest frontier model"
+          - "Picker description: SpaceXAI's latest frontier model"
         context: 500000
         options:
           - name: Effort
             values:
-              - name: xhigh
+              - name: Extra High Effort
                 notes:
                   - "Extra High Effort - Highest effort and reasoning level"
-              - name: high
+              - name: High Effort
                 notes:
                   - "High Effort - Higher implementation quality with extensive reasoning"
-              - name: medium
+              - name: Medium Effort
                 notes:
                   - "Medium Effort - Balanced effort with standard implementation and testing"
-              - name: low
+              - name: Low Effort
                 notes:
                   - "Low Effort - Quick, fast implementations"
-            default: high
       - name: grok-4.5
         label: Grok 4.5
         notes:
-          - "The manifest carries no description for this model; the picker row shows the label alone."
+          - "The 1.0.34 picker row shows the label alone."
         context: 500000
         options:
           - name: Effort
             values:
-              - name: high
+              - name: High Effort
                 notes:
                   - "High Effort - Highest implementation quality with extensive reasoning"
-              - name: medium
+              - name: Medium Effort
                 notes:
                   - "Medium Effort - Balanced effort with standard implementation and testing"
-              - name: low
+              - name: Low Effort
                 notes:
                   - "Low Effort - Quick, fast implementations"
-            default: high
 
   - cli: Muse
     version: 1.0.3-R2198.1

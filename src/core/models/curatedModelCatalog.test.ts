@@ -251,8 +251,8 @@ describe('curatedModelCatalog', () => {
       expect(result.warnings).toEqual([]);
 
       const catalog = findCuratedCliCatalog(result.document, 'grok');
-      expect(catalog?.version).toBe('1.0.13');
-      expect(catalog?.lastUpdated).toBe('2026-09-03');
+      expect(catalog?.version).toBe('1.0.34');
+      expect(catalog?.lastUpdated).toBe('2026-09-17');
 
       const scope = resolveCuratedCatalogScope(catalog!, 'grok');
       expect(scope?.models.map((model) => model.name)).toEqual(['grok-4.6', 'grok-4.5']);
@@ -260,24 +260,23 @@ describe('curatedModelCatalog', () => {
       // per-user config.toml preference, so the catalog must not claim one.
       expect(scope?.models.some((model) => model.default)).toBe(false);
 
-      // Option values are the raw `--reasoning-effort` tokens. grok-4.6 has an
-      // xhigh level that grok-4.5 does not, so the menus must not be shared.
+      // Picker labels normalize to verified CLI tokens; preserve per-model menus.
       const effortFor = (name: string) => resolveEffectiveCuratedModelOptions(
         scope!.sharedOptions,
         scope!.models.find((model) => model.name === name)!,
       ).find((option) => option.name === 'Effort');
 
       expect(effortFor('grok-4.6')?.values?.map((value) => value.name))
-        .toEqual(['xhigh', 'high', 'medium', 'low']);
+        .toEqual(['Extra High Effort', 'High Effort', 'Medium Effort', 'Low Effort']);
       expect(effortFor('grok-4.5')?.values?.map((value) => value.name))
-        .toEqual(['high', 'medium', 'low']);
-      expect(effortFor('grok-4.6')?.default).toBe('high');
-      expect(effortFor('grok-4.5')?.default).toBe('high');
+        .toEqual(['High Effort', 'Medium Effort', 'Low Effort']);
+      expect(effortFor('grok-4.6')?.default).toBeUndefined();
+      expect(effortFor('grok-4.5')?.default).toBeUndefined();
       // The two models describe `high` differently upstream; that wording is
       // what distinguishes their picker screens and must survive verbatim.
-      expect(effortFor('grok-4.6')?.values?.find((value) => value.name === 'high')?.notes)
+      expect(effortFor('grok-4.6')?.values?.find((value) => value.name === 'High Effort')?.notes)
         .toEqual(['High Effort - Higher implementation quality with extensive reasoning']);
-      expect(effortFor('grok-4.5')?.values?.find((value) => value.name === 'high')?.notes)
+      expect(effortFor('grok-4.5')?.values?.find((value) => value.name === 'High Effort')?.notes)
         .toEqual(['High Effort - Highest implementation quality with extensive reasoning']);
     } finally {
       runtime.cleanup();

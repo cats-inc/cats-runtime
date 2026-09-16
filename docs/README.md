@@ -20,6 +20,10 @@ scheduled polling, verified account linkage and durable history remain deferred.
 
 ## Provider Detection
 
+[Grok Build 1.0.34 picker](./research/2026-09-17-grok-model-picker-refresh.md)
+records exact effort labels and first-item initialization in Desktop and Playground
+without default or active markers.
+
 [Antigravity 1.2.3 model and effort picker](./research/2026-09-16-antigravity-model-picker-refresh.md)
 records the seven-family menu, execution mapping and first-item initialization
 without provider-default claims.
