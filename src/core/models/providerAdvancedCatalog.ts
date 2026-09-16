@@ -30,6 +30,7 @@ export interface ProviderAdvancedCatalogEntry {
   id: string;
   label: string;
   default?: boolean;
+  controlDefaults?: Record<string, ProviderAdvancedControlValue>;
   status?: 'configured' | 'available' | 'running';
   capabilityTags?: string[];
   limits?: ProviderAdvancedCatalogEntryLimits;

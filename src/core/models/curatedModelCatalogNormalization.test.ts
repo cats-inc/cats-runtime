@@ -100,6 +100,7 @@ describe('curatedModelCatalogNormalization', () => {
   });
 
   it('normalizes Codex curated catalog ids from the curated YAML allowlist', () => {
+    expect(normalizeCodexCuratedModelId({ name: 'gpt-6-astra' })).toBe('gpt-6-astra');
     expect(normalizeCodexCuratedModelId({ name: 'gpt-5.6-sol' }))
       .toBe('gpt-5.6-sol');
     expect(normalizeCodexCuratedModelId({ label: 'GPT-5.6-Terra' }))

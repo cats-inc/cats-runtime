@@ -1157,6 +1157,12 @@ export const SHARED_UI_SCRIPT = `
     var normalized = normalizeAdvancedCatalog(catalog);
     if (!normalized || !entryId) return {};
     var defaults = {};
+    var entry = findAdvancedCatalogEntry(normalized, entryId);
+    if (entry && entry.controlDefaults && typeof entry.controlDefaults === 'object') {
+      for (var entryKey in entry.controlDefaults) {
+        defaults[entryKey] = entry.controlDefaults[entryKey];
+      }
+    }
     var preset = presetId ? findApplicableAdvancedPreset(normalized, entryId, presetId) : null;
     if (preset && preset.controlDefaults && typeof preset.controlDefaults === 'object') {
       for (var presetKey in preset.controlDefaults) {
@@ -1193,6 +1199,12 @@ export const SHARED_UI_SCRIPT = `
       }
     }
     return filtered;
+  }
+
+  function formatAdvancedDefaultLabel(label, isDefault) {
+    if (typeof isDefault !== 'boolean') return String(label);
+    var plainLabel = String(label).replace(/\\s*\\(default\\)/giu, '');
+    return isDefault ? plainLabel + ' (default)' : plainLabel;
   }
 
   function closeRuntimeSurfaceMenus() {
@@ -1476,6 +1488,7 @@ export const SHARED_UI_SCRIPT = `
     resolveAdvancedCatalogChoice: resolveAdvancedCatalogChoice,
     getAdvancedChoiceControlDefaults: getAdvancedChoiceControlDefaults,
     getAdvancedEntryControlDefaults: getAdvancedEntryControlDefaults,
+    formatAdvancedDefaultLabel: formatAdvancedDefaultLabel,
     listApplicableEnumControlOptions: listApplicableEnumControlOptions,
     listStoredAdvancedControls: listStoredAdvancedControls,
     setRuntimeTooltip: setRuntimeTooltip,

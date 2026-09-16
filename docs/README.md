@@ -20,6 +20,10 @@ scheduled polling, verified account linkage and durable history remain deferred.
 
 ## Provider Detection
 
+[Codex 0.154.0 catalog and selector defaults](./research/2026-09-16-codex-model-picker-defaults.md)
+records the September 16 picker refresh and the per-entry defaults consumed by
+Desktop and Playground.
+
 Provider detection incident: [Cline updates at Windows login and passive detection for all CLIs](./research/2026-08-27-cline-self-update-and-probe-concurrency.md)
 records the September 15 recurrence, shared CLI/ACP policy, Desktop handling,
 and regression scope.

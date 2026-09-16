@@ -4151,6 +4151,14 @@ their own.
 underlying catalog refresh behavior before layering advanced selection/control
 metadata on top.
 
+Advanced `entries[].controlDefaults` contains that model's known control defaults
+(for example, `{ "codex.reasoning_effort": "low" }`). `defaultSelection` describes
+the target's default model/preset only; it must not be reused for other entries.
+Selectors mark `entries[].default` and each selected entry's default enum value
+with `(default)`. Switching models starts from the new entry's defaults; explicit
+saved choices override defaults when reopening a selection. Preset defaults take
+precedence over entry defaults. Missing metadata means no known default.
+
 The same usability warning applies to the advanced route: advanced entries,
 presets, and controls are runtime-owned model metadata, not a guarantee that
 the underlying target is currently healthy. Selector UIs that must only show

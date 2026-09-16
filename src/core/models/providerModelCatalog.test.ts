@@ -1465,6 +1465,7 @@ describe('ProviderModelCatalogService', () => {
         {
           id: 'gpt-5.4',
           label: 'gpt-5.4',
+          controlDefaults: { 'openai.reasoning_effort': 'medium' },
           default: true,
           status: 'configured',
           capabilityTags: ['tool_use', 'reasoning'],
@@ -2026,6 +2027,7 @@ describe('ProviderModelCatalogService', () => {
           {
             id: 'opus',
             label: 'Opus 4.6 with 1M context',
+            controlDefaults: { 'claude.reasoning_effort': 'medium' },
             default: true,
             capabilityTags: ['tool_use', 'reasoning'],
             limits: {
@@ -2037,6 +2039,7 @@ describe('ProviderModelCatalogService', () => {
           {
             id: 'sonnet',
             label: 'Sonnet 4.6',
+            controlDefaults: { 'claude.reasoning_effort': 'medium' },
             default: false,
             capabilityTags: ['tool_use'],
             notes: ['Best for everyday tasks.'],
@@ -2708,29 +2711,34 @@ describe('ProviderModelCatalogService', () => {
           {
             id: 'gpt-5.4',
             label: 'GPT-5.4',
+            controlDefaults: { 'copilot.reasoning_effort': 'medium' },
             default: true,
             capabilityTags: ['reasoning'],
           },
           {
             id: 'gpt-5.4-mini',
             label: 'GPT-5.4 mini',
+            controlDefaults: { 'copilot.reasoning_effort': 'medium' },
             default: false,
             capabilityTags: ['reasoning', 'latency_optimized'],
           },
           {
             id: 'gpt-5.2-codex',
             label: 'GPT-5.2-Codex',
+            controlDefaults: { 'copilot.reasoning_effort': 'high' },
             default: false,
           },
           {
             id: 'claude-opus-4.6',
             label: 'Claude Opus 4.6',
+            controlDefaults: { 'copilot.reasoning_effort': 'high' },
             default: false,
             capabilityTags: ['reasoning'],
           },
           {
             id: 'claude-sonnet-4',
             label: 'Claude Sonnet 4',
+            controlDefaults: { 'copilot.reasoning_effort': 'medium' },
             default: false,
           },
         ],
@@ -3393,6 +3401,7 @@ describe('ProviderModelCatalogService', () => {
         {
           id: 'gpt-5.4',
           label: 'gpt-5.4',
+          controlDefaults: { 'openai.reasoning_effort': 'medium' },
           default: true,
           status: 'available',
           capabilityTags: ['tool_use', 'reasoning'],

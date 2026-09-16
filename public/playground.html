@@ -407,7 +407,7 @@ const AVAILABLE_TAGS = ['orchestrator','pm','researcher','designer','architect',
 const ROLE_LABELS = { orchestrator:'CEO',pm:'PM',researcher:'Researcher',designer:'Designer',architect:'Architect',coder:'Coder',tester:'Tester',reviewer:'Reviewer',security:'Security',qa:'QA',tech_writer:'Tech Writer',marketer:'Marketer' };
 const PROVIDER_MODELS = {
   claude:[{value:'opus',label:'opus (default)'},{value:'sonnet',label:'sonnet'},{value:'haiku',label:'haiku'}],
-  codex:[{value:'gpt-5.4',label:'gpt-5.4 (default)'},{value:'gpt-5.4-mini',label:'gpt-5.4-mini'},{value:'gpt-5.3-codex',label:'gpt-5.3-codex'},{value:'gpt-5.3-codex-spark',label:'gpt-5.3-codex-spark'},{value:'gpt-5.2-codex',label:'gpt-5.2-codex'},{value:'gpt-5.2',label:'gpt-5.2'},{value:'gpt-5.1-codex-max',label:'gpt-5.1-codex-max'},{value:'gpt-5.1-codex-mini',label:'gpt-5.1-codex-mini'}],
+  codex:[{value:'gpt-6-astra',label:'gpt-6-astra (default)'},{value:'gpt-5.6-sol',label:'gpt-5.6-sol'},{value:'gpt-5.6-terra',label:'gpt-5.6-terra'},{value:'gpt-5.6-luna',label:'gpt-5.6-luna'},{value:'gpt-5.5',label:'gpt-5.5'}],
   antigravity:[{value:'antigravity-default',label:'Antigravity default'}],
   copilot:[{value:'gpt-5.4',label:'gpt-5.4 (default)'},{value:'claude-opus-4.6',label:'claude-opus-4.6'},{value:'gemini-3-pro-preview',label:'gemini-3-pro-preview'}],
   opencode:[{value:'opencode-go/glm-5',label:'opencode-go/glm-5 (default)'},{value:'opencode-go/kimi-k2.5',label:'opencode-go/kimi-k2.5'}],
@@ -1531,7 +1531,13 @@ function renderAgentModelControls(div,catalog,entryId,presetId){
             return v.applicableEntryIds.includes(entryId);
           });
       const curVal=defaults[control.key]!==undefined?String(defaults[control.key]):'';
-      const opts=valueOptions.map(v=>`<option value="${escapeHtml(v.value)}" ${String(v.value)===curVal?'selected':''}>${escapeHtml(v.label||v.value)}</option>`).join('');
+      const opts=valueOptions.map(v=>{
+        const optionLabel=window.CatsUI.formatAdvancedDefaultLabel(
+          v.label||v.value,
+          defaults[control.key]!==undefined?String(v.value)===curVal:undefined,
+        );
+        return `<option value="${escapeHtml(v.value)}" ${String(v.value)===curVal?'selected':''}>${escapeHtml(optionLabel)}</option>`;
+      }).join('');
       return `<div><label class="block text-xs text-slate-400">${label}</label><select class="agent-model-control w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" data-model-control-kind="enum" data-model-control-key="${safeKey}">${opts}</select></div>`;
     }
     if(control.kind==='boolean'){
@@ -1664,7 +1670,10 @@ function syncAgentModelField(div,options={}){
     normalizedState.model,
     normalizedState.modelSelection,
   );
-  const entryOptions=entries.map(entry=>({ value:entry.id, label:entry.label||entry.id }));
+  const entryOptions=entries.map(entry=>({
+    value:entry.id,
+    label:window.CatsUI.formatAdvancedDefaultLabel(entry.label||entry.id,entry.default),
+  }));
   const defaultEntryId=getAgentDefaultEntryId(catalog,entries)||entries[0]?.id||'';
   const nextEntryId=renderAgentRoutingSelectOptions(
     select,

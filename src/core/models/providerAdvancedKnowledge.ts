@@ -1249,6 +1249,11 @@ function buildCodexCliControls(
 
   const sparkEntryIds = applicableEntryIds.filter((entryId) => entryId === 'gpt-5.3-codex-spark');
   const nonSparkEntryIds = applicableEntryIds.filter((entryId) => entryId !== 'gpt-5.3-codex-spark');
+  const solEntryIds = applicableEntryIds.filter((entryId) => entryId === 'gpt-5.6-sol');
+  // Codex 0.154.0 picker evidence; legacy ids keep their earlier profiles.
+  const maxEntryIds = applicableEntryIds.filter((entryId) =>
+    ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'].includes(entryId));
+  const ultraEntryIds = maxEntryIds.filter((entryId) => entryId !== 'gpt-5.6-luna');
   return {
     controls: [{
       key: 'codex.reasoning_effort',
@@ -1267,13 +1272,13 @@ function buildCodexCliControls(
           value: 'medium',
           label: 'Medium (default)',
           description: 'Balances speed and reasoning depth for everyday tasks.',
-          applicableEntryIds: nonSparkEntryIds,
+          applicableEntryIds: nonSparkEntryIds.filter((entryId) => entryId !== 'gpt-5.6-sol'),
         },
         {
           value: 'medium',
           label: 'Medium',
           description: 'Balances speed and reasoning depth for everyday tasks.',
-          applicableEntryIds: sparkEntryIds,
+          applicableEntryIds: [...sparkEntryIds, ...solEntryIds],
         },
         {
           value: 'high',
@@ -1293,7 +1298,19 @@ function buildCodexCliControls(
           description: 'Extra high reasoning depth for complex problems.',
           applicableEntryIds,
         },
-      ]),
+        ...(maxEntryIds.length > 0 ? [{
+          value: 'max',
+          label: 'Max',
+          description: 'For difficult problems when quality matters more than speed · higher usage',
+          applicableEntryIds: maxEntryIds,
+        }] : []),
+        ...(ultraEntryIds.length > 0 ? [{
+          value: 'ultra',
+          label: 'Ultra',
+          description: 'For demanding work using multiple agents · highest usage',
+          applicableEntryIds: ultraEntryIds,
+        }] : []),
+      ].filter((option) => option.applicableEntryIds.length > 0)),
       applicableEntryIds,
       semanticTags: ['reasoning_intensity'],
     }],
@@ -1303,7 +1320,7 @@ function buildCodexCliControls(
         {
           'codex.reasoning_effort': entryId === 'gpt-5.3-codex-spark'
             ? 'high' as ProviderAdvancedControlValue
-            : 'medium' as ProviderAdvancedControlValue,
+            : entryId === 'gpt-5.6-sol' ? 'low' : 'medium',
         },
       ]),
     ),
@@ -1744,7 +1761,12 @@ export function buildProviderAdvancedKnowledge(
     defaultModel: modelCatalog.defaultModel,
     source: modelCatalog.source,
     cache: modelCatalog.cache,
-    entries,
+    entries: entries.map((entry) => ({
+      ...entry,
+      ...(manifestCatalog.entryDefaults[entry.id]
+        ? { controlDefaults: cloneProviderControls(manifestCatalog.entryDefaults[entry.id]) }
+        : {}),
+    })),
     presets: manifestCatalog.presets,
     controls: manifestCatalog.controls,
     defaultSelection: manifestCatalog.defaultSelection,

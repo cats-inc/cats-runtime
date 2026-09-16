@@ -344,28 +344,26 @@ describe('curatedModelCatalog', () => {
 
       expect(result.warnings).toEqual([]);
       const catalog = findCuratedCliCatalog(result.document, 'codex');
-      expect(catalog?.version).toBe('0.152.0');
-      expect(catalog?.lastUpdated).toBe('2026-09-02');
+      expect(catalog?.version).toBe('0.154.0');
+      expect(catalog?.lastUpdated).toBe('2026-09-16');
 
       const scope = resolveCuratedCatalogScope(catalog!, 'codex');
       expect(scope?.models.map((model) => model.name)).toEqual([
+        'gpt-6-astra',
         'gpt-5.6-sol',
         'gpt-5.6-terra',
         'gpt-5.6-luna',
         'gpt-5.5',
-        'gpt-5.4',
-        'gpt-5.4-mini',
-        'gpt-5.3-codex-spark',
       ]);
       expect(scope?.models[0]).toMatchObject({
         default: true,
-        context: 272000,
       });
+      expect(scope?.models[0].context).toBeUndefined();
       expect(resolveEffectiveCuratedModelOptions(scope!.sharedOptions, scope!.models[0]))
         .toEqual([
           expect.objectContaining({
             name: 'Reasoning Level',
-            default: 'Low',
+            default: 'Medium',
             values: expect.arrayContaining([
               {
                 name: 'Max',
@@ -378,7 +376,9 @@ describe('curatedModelCatalog', () => {
             ]),
           }),
         ]);
-      expect(resolveEffectiveCuratedModelOptions(scope!.sharedOptions, scope!.models[2]))
+      expect(resolveEffectiveCuratedModelOptions(scope!.sharedOptions, scope!.models[1])[0].default)
+        .toBe('Low');
+      expect(resolveEffectiveCuratedModelOptions(scope!.sharedOptions, scope!.models[3]))
         .toEqual([
           expect.objectContaining({
             name: 'Reasoning Level',
@@ -393,8 +393,8 @@ describe('curatedModelCatalog', () => {
           }),
         ]);
       expect(scope?.models.at(-1)).toMatchObject({
-        name: 'gpt-5.3-codex-spark',
-        context: 128000,
+        name: 'gpt-5.5',
+        context: 272000,
       });
     } finally {
       runtime.cleanup();
