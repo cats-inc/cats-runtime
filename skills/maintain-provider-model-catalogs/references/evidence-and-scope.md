@@ -52,6 +52,11 @@ from a paste is not removal evidence because scrolling, entitlement, or truncati
 ## Identity and defaults
 
 - Preserve raw selectable ids and picker-visible labels separately.
+- Preserve the observed display label's exact spelling and case. When the picker displays only a
+  verified raw id, use that id as the display text; do not invent title case or a static pretty-name
+  mapping. A fresh observation of a label replaces an older label override for that same row/scope.
+  Keep unobserved metadata (for example, context limits) with its earlier provenance; do not infer
+  it for new rows or treat an older label as unobserved when the new picker actually shows it.
 - Preserve visible generation/version text; do not strip it to resolve ambiguity.
 - Do not map an option label such as `Extra high` to a token such as `xhigh` without an observed
   mapping or the relevant normalizer proving it.

@@ -55,6 +55,10 @@ No policy bypasses a hard gate. Stop for confirmation when a proposed edit depen
 - choosing between conflicting evidence;
 - deleting a row, expanding scope, or projecting away observed hierarchy.
 
+Check the conversation before asking: an explicit answer already covering the same evidence and
+proposed change satisfies that question. Group remaining uncertainties into one compact delta;
+do not restart intake after each answer or extend old authorization to new removals.
+
 For paste-driven edits, create the agent-owned decision artifact described in
 [paste intake](./references/paste-intake.md), run its `assess` command, and honor the resulting
 ready, confirmation-required, omitted, and deferred classifications. Never ask the operator to
@@ -64,14 +68,16 @@ author that artifact.
 
 ### Refresh
 
-1. Derive the current provider inventory and applicable catalog path from repository code; never
-   use a fixed provider count or list stored in this skill.
-2. Acquire the strongest available in-scope evidence. Authentication, paid probes, or quota use
-   require explicit authorization.
+1. Locate the requested provider's catalog path using its reference and current code. Reserve the
+   full provider inventory for an audit; a single-provider refresh does not require one.
+2. Use sufficient supplied evidence before collecting more. Do not launch a CLI, research unrelated
+   providers, or repeat a capture merely to corroborate a complete, unambiguous picker paste.
+   Authentication, paid probes, or quota use require explicit authorization.
 3. Preserve raw ids separately from visible labels. Build a lossless ordered observation tree for
    pasted evidence before considering YAML.
 4. Inspect the typed curated schema and the relevant normalizer. Loss-check every observation-tree
-   branch against the schema.
+   branch against the schema. Distinguish a data refresh using existing defaults/options from a
+   demonstrated behavior gap that needs separately scoped implementation; reuse existing support.
 5. Apply only the authorized, representable subset. Partial evidence never removes existing data
    or propagates one model's options to another model.
 6. Search the whole repository for consumers of the exact bundled example before changing tests or
@@ -103,8 +109,12 @@ Choose validation proportional to the changed surface. Catalog edits require YAM
 with no unexpected normalization warnings, focused catalog and advanced-knowledge tests, and a
 repo-wide exact-fixture search. Run TypeScript checking when TypeScript or tests changed. Separate
 pre-existing environment failures from regressions; do not edit unrelated tests to make them pass.
+Use focused checks during iteration and run required repository commit/CI gates on the final diff.
+Follow the scheduling and failure-handling guidance in [catalog surfaces](./references/catalog-surfaces.md).
 
-The final report must include:
+Keep the following in the evidence note or final report; link the durable note instead of repeating
+the entire intake history in chat. The final response should summarize the delta, validation, and
+any unresolved limitation:
 
 - mode, provider/file scope, and interaction policy;
 - observations and their sources, versions, account scope, and completeness;
@@ -120,6 +130,8 @@ authorizes that external mutation.
 
 - [Claude](./references/providers/claude.md): picker-first evidence; compiled extraction is a
   possible superset.
+- [Codex](./references/providers/codex.md): supplied picker evidence, existing per-model defaults,
+  exact display labels, fallback locations, and focused Runtime/Desktop validation.
 - [Copilot](./references/providers/copilot.md): account-resolved interactive model list.
 - [Kiro](./references/providers/kiro.md): authenticated, account-gated model listing and effort.
 - [Kilo](./references/providers/kilo.md): distinguish the gateway catalog from the picker.
