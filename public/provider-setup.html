@@ -106,6 +106,143 @@
     line-height: 1.6;
     color: rgb(148 163 184);
   }
+  .setup-provider-status {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.4rem;
+    text-align: right;
+  }
+  .setup-provider-intent {
+    font-size: 0.75rem;
+    color: rgb(148 163 184);
+  }
+  .setup-provider-intent[data-pending="true"] {
+    color: rgb(252 211 77);
+  }
+  .provider-check, #selectAllCheckbox, #detectAfterApplyCheckbox {
+    appearance: none;
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    border: 1px solid rgb(100 116 139);
+    border-radius: 0.25rem;
+    background: rgb(2 6 23);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 0.8rem;
+  }
+  .provider-check:checked, #selectAllCheckbox:checked, #detectAfterApplyCheckbox:checked {
+    border-color: rgb(96 165 250);
+    background-color: rgb(37 99 235);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3 8 3 3 7-7' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+  #selectAllCheckbox:indeterminate {
+    border-color: rgb(96 165 250);
+    background-color: rgb(37 99 235);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8h10' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  }
+  .provider-check:disabled, #selectAllCheckbox:disabled, #detectAfterApplyCheckbox:disabled {
+    opacity: 1;
+    filter: none;
+    cursor: wait;
+  }
+  .provider-check:focus-visible, #selectAllCheckbox:focus-visible, #detectAfterApplyCheckbox:focus-visible {
+    outline: 2px solid rgb(147 197 253);
+    outline-offset: 3px;
+  }
+  .provider-selection-row[data-selected="true"] {
+    box-shadow: inset 3px 0 rgb(59 130 246);
+  }
+  .provider-selection-row[data-processing="true"] label {
+    cursor: wait;
+  }
+  .setup-spinner {
+    display: inline-block;
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgb(96 165 250 / 0.3);
+    border-top-color: rgb(147 197 253);
+    border-radius: 50%;
+    animation: setup-spin 0.8s linear infinite;
+  }
+  @keyframes setup-spin {
+    to { transform: rotate(360deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .setup-spinner { animation-duration: 2.5s; }
+  }
+  @media (forced-colors: active) {
+    .provider-check, #selectAllCheckbox, #detectAfterApplyCheckbox { appearance: auto; }
+  }
+  .setup-spinner[hidden], .setup-provider-progress[hidden] {
+    display: none !important;
+  }
+  .setup-provider-progress {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: rgb(147 197 253);
+    font-size: 0.8125rem;
+  }
+  .provider-selection-row[data-processing="true"] .setup-provider-observation,
+  .provider-selection-row[data-processing="true"] .setup-provider-guidance {
+    display: none;
+  }
+  .runtime-btn.setup-working-control:disabled {
+    opacity: 1;
+    color: rgb(219 234 254);
+    border-color: rgb(59 130 246 / 0.6);
+    cursor: wait;
+  }
+  .setup-provider-command {
+    display: block;
+    margin-top: 0.25rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: rgb(203 213 225);
+  }
+  .setup-provider-instructions {
+    color: rgb(96 165 250);
+    text-decoration: underline;
+  }
+  .setup-selection-footer {
+    display: grid;
+    gap: 1rem;
+    border-top: 1px solid rgb(30 41 59);
+    padding-top: 1rem;
+  }
+  .setup-selection-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+  }
+  .setup-selection-actions #applyBtn, .setup-selection-actions #scanBtn {
+    min-width: 8.25rem;
+  }
+  .setup-selection-actions a[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: wait;
+  }
+  .setup-apply-controls, .setup-detect-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .setup-apply-controls {
+    flex-wrap: wrap;
+  }
+  .setup-detect-option {
+    font-size: 0.8125rem;
+    color: rgb(203 213 225);
+    cursor: pointer;
+  }
+  .setup-selection-actions [hidden] {
+    display: none !important;
+  }
   .setup-workflow-heading {
     min-height: 2rem;
   }
@@ -356,6 +493,30 @@
     border-color: rgb(185 28 28 / 0.55);
     background: rgb(127 29 29 / 0.16);
   }
+  .setup-result-banner[data-variant="attention"] {
+    border-color: rgb(146 64 14 / 0.65);
+    background: rgb(120 53 15 / 0.16);
+  }
+  .setup-result-banner[data-variant="progress"] {
+    border-color: rgb(59 130 246 / 0.65);
+    background: rgb(30 58 138 / 0.2);
+  }
+  .setup-result-banner[data-variant="progress"] .setup-result-title {
+    font-size: 1rem;
+    line-height: 1.5;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+  .setup-result-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  #resultSpinner {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-width: 3px;
+  }
   .setup-result-title {
     font-size: 0.75rem;
     line-height: 1rem;
@@ -482,26 +643,22 @@
             <section class="runtime-card">
               <div class="runtime-card-header">
                 <div>
-                  <h2 class="runtime-card-title">Providers</h2>
-                  <p class="runtime-card-copy">
-                    Scan local provider CLIs, review readiness, and select the
-                    providers you want to write into this runtime config.
+                  <h2 class="runtime-card-title">Choose Your Providers</h2>
+                  <p id="providerSelectionHelp" class="runtime-card-copy">
+                    Choose the providers you want Cats to use, even if they are not installed yet.
+                    Apply your choices to save them. Select Detect after applying to also check installation status.
+                    Missing installations do not prevent your choices from taking effect.
                   </p>
                 </div>
                 <span id="providersWorkspaceStatus" class="status-badge status-badge-bootstrap">Bootstrap</span>
               </div>
               <div class="space-y-4 p-4 sm:p-5">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <span id="providersWorkspaceSummary" class="text-sm text-slate-400">Loading provider readiness...</span>
-                  <div class="flex justify-end">
-                    <button id="scanBtn" class="runtime-btn runtime-btn-primary" onclick="runScan()">Scan Providers</button>
-                  </div>
-                </div>
+                <p id="providersWorkspaceSummary" class="text-sm text-slate-400">Loading provider readiness...</p>
                 <div class="setup-summary-grid">
                   <div class="setup-summary-panel">
-                    <span class="setup-summary-label">Latest Snapshot</span>
-                    <span id="providersMetricSnapshotValue" class="setup-summary-value">Not scanned</span>
-                    <span id="providersMetricSnapshotDetail" class="setup-summary-secondary">Run Scan Providers to capture current readiness.</span>
+                    <span class="setup-summary-label">Last Detection</span>
+                    <span id="providersMetricSnapshotValue" class="setup-summary-value">Not detected yet</span>
+                    <span id="providersMetricSnapshotDetail" class="setup-summary-secondary">Choose whether to detect installation status when applying.</span>
                   </div>
                   <div class="setup-summary-panel">
                     <span class="setup-summary-label">Need Attention</span>
@@ -509,9 +666,9 @@
                     <span id="providersMetricAttentionDetail" class="setup-summary-secondary">Missing installs or probe failures appear here.</span>
                   </div>
                   <div class="setup-summary-panel">
-                    <span class="setup-summary-label">Selected</span>
+                    <span class="setup-summary-label">Applied Selection</span>
                     <span id="providersMetricSelectedValue" class="setup-summary-value">0</span>
-                    <span id="providersMetricSelectedDetail" class="setup-summary-secondary">Selection stays in this workspace.</span>
+                    <span id="providersMetricSelectedDetail" class="setup-summary-secondary">No selection saved yet.</span>
                   </div>
                 </div>
                 <div id="providerList" class="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/50">
@@ -528,24 +685,40 @@
                         aria-controls="providerListItems"
                         disabled
                       />
-                      <span>Select all available providers</span>
+                      <span>Select all listed providers</span>
                     </span>
-                    <span id="selectionStatusBadge" class="status-badge status-badge-unknown">0 selected</span>
+                    <span id="selectionStatusBadge" class="status-badge status-badge-unknown">0 chosen</span>
                   </label>
                   <div id="providerListItems">
                   <div class="px-6 py-12 text-center text-sm text-slate-500">Loading provider catalog...</div>
                   </div>
                 </div>
-                <div class="flex justify-end pt-1">
-                  <button id="applyBtn" class="runtime-btn runtime-btn-primary" onclick="applyConfig()" disabled>Save Selection</button>
-                  <button id="reloadSelectionBtn" class="runtime-btn" onclick="reloadProviderSelection()" hidden>Reload edited configuration</button>
-                </div>
-                <section id="resultPanel" class="setup-result-banner hidden" hidden aria-live="polite">
-                  <div>
-                    <h3 id="resultTitle" class="setup-result-title">Result</h3>
-                    <p id="resultBody" class="setup-result-copy"></p>
+                <div class="setup-selection-footer">
+                  <p id="selectionDraftStatus" class="setup-selection-copy" role="status" aria-live="polite">Loading saved selection...</p>
+                  <div class="setup-selection-actions" role="group" aria-label="Provider selection actions" aria-describedby="selectionDraftStatus">
+                    <button id="reloadSelectionBtn" class="runtime-btn" onclick="reloadProviderSelection()" hidden>Reload edited configuration</button>
+                    <button id="discardSelectionBtn" class="runtime-btn runtime-btn-ghost" onclick="discardProviderSelection()" hidden>Discard Changes</button>
+                    <button id="skipSelectionBtn" class="runtime-btn" onclick="skipProviderSelection()" disabled hidden>Skip for Now</button>
+                    <div id="applyControls" class="setup-apply-controls">
+                      <button id="applyBtn" class="runtime-btn runtime-btn-primary" onclick="applyConfig()" disabled>Apply</button>
+                      <label id="detectAfterApplyOption" class="setup-detect-option">
+                        <input id="detectAfterApplyCheckbox" type="checkbox" onchange="updateProvidersWorkspaceMetrics()" disabled />
+                        <span>Detect after applying</span>
+                      </label>
+                    </div>
+                    <button id="scanBtn" class="runtime-btn runtime-btn-secondary" onclick="runScan()" disabled hidden>Detect Again</button>
+                    <a id="openRuntimeLink" class="runtime-btn runtime-btn-primary" href="/dashboard" role="link" hidden>Go to Dashboard</a>
                   </div>
-                </section>
+                  <section id="resultPanel" class="setup-result-banner hidden" hidden aria-live="polite">
+                    <div>
+                      <div class="setup-result-heading">
+                        <span id="resultSpinner" class="setup-spinner" aria-hidden="true" hidden></span>
+                        <h3 id="resultTitle" class="setup-result-title">Result</h3>
+                      </div>
+                      <p id="resultBody" class="setup-result-copy"></p>
+                    </div>
+                  </section>
+                </div>
               </div>
             </section>
           </div>
@@ -659,8 +832,11 @@
 </div>
 
 <script>
-let scanData = null;
 let latestSetupState = null;
+let selectionOperation = null;
+let applyingSelection = false;
+let applyDetectionRequested = false;
+let detectAfterApplyInitialized = false;
 let configuredTargetCatalog = null;
 let activeSetupWorkspace = 'providers';
 let configuredTargetsState = {
@@ -712,39 +888,22 @@ function pluralize(count, noun) {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
 }
 
-function scanAvailableCount(scan) {
-  if (!scan) {
-    return 0;
-  }
-  if (typeof scan.availableCount === 'number') {
-    return scan.availableCount;
-  }
-  return Array.isArray(scan.providers)
-    ? scan.providers.filter((provider) => provider.available).length
-    : 0;
-}
-
 function deriveSetupLifecycle(data) {
   if (!data?.bootstrapRequired) {
+    const idle = (data?.selection?.targets || []).length === 0;
     return {
-      label: 'Configured',
+      label: idle ? 'Idle' : 'Configured',
       state: 'active',
-      message: 'Runtime configuration is available for normal operation.',
-    };
-  }
-
-  if (scanAvailableCount(data?.scan) > 0) {
-    return {
-      label: 'Pending Apply',
-      state: 'warning',
-      message: 'Scan complete. Apply at least one available provider to finish setup.',
+      message: idle
+        ? 'No providers selected. You can add providers whenever you are ready.'
+        : 'Your saved selection controls which providers Cats may check and use.',
     };
   }
 
   return {
     label: 'Setup Required',
     state: 'idle',
-    message: 'Scan providers to discover what can be configured for this runtime.',
+    message: 'Choose the providers you want to use, or skip for now to keep Runtime idle.',
   };
 }
 
@@ -787,98 +946,232 @@ function selectableProviderCheckboxes() {
 function providerSelectionSummary() {
   const selectedProviders = currentSelectedProviders();
   const selectedSet = new Set(selectedProviders);
-  const readySelected = Array.isArray(scanData?.providers)
-    ? scanData.providers.filter((provider) => selectedSet.has(selectionTargetKey(provider)) && provider.available).length
-    : 0;
-  const blockedSelected = Array.isArray(scanData?.providers)
-    ? selectedProviders.length - readySelected
-    : 0;
+  const savedProviders = (latestSetupState?.selection?.targets || []).map(selectionTargetKey);
+  const savedSet = new Set(savedProviders);
+  const addedCount = selectedProviders.filter((key) => !savedSet.has(key)).length;
+  const removedCount = savedProviders.filter((key) => !selectedSet.has(key)).length;
 
   return {
     selectedProviders,
     selectedCount: selectedProviders.length,
-    readySelected,
-    blockedSelected,
+    savedSet,
+    savedCount: savedProviders.length,
+    addedCount,
+    removedCount,
+    dirty: addedCount > 0 || removedCount > 0,
   };
 }
 
-function selectableProviderSummary() {
-  const selection = providerSelectionSummary();
+function providerDetectionSummary() {
+  const observations = providerObservationMap();
+  const selectedObservations = (latestSetupState?.selection?.targets || [])
+    .map((target) => observations.get(selectionTargetKey(target))).filter(Boolean);
+  const statuses = (latestSetupState?.selection?.targets || []).map((target) =>
+    describeProviderObservation(target, observations.get(selectionTargetKey(target))));
+  const timestamps = selectedObservations.filter((entry) => entry.configurationStatus === 'unchanged')
+    .map((entry) => entry.observedAt).sort();
   return {
-    ...selection,
-    applyableCount: selection.selectedCount,
+    installedCount: statuses.filter((status) => status.installationDetected).length,
+    attentionCount: statuses.filter((status) => status.needsAttention).length,
+    unverifiedCount: statuses.filter((status) => status.unverified).length,
+    notDetectedCount: statuses.filter((status) => status.notDetected).length,
+    configurationChangedCount: statuses.filter((status) => status.configurationChanged).length,
+    latestObservedAt: timestamps.at(-1) || null,
   };
+}
+
+function providerObservationMap() {
+  return new Map((latestSetupState?.observations || []).map((entry) => [selectionTargetKey(entry), entry]));
+}
+
+function detectionResultMessage() {
+  const { installedCount, attentionCount, unverifiedCount } = providerDetectionSummary();
+  return `Installation detected for ${pluralize(installedCount, 'CLI')}. `
+    + (attentionCount > 0 ? `${pluralize(attentionCount, 'provider')} need attention; follow the steps below and use Detect Again. ` : '')
+    + (unverifiedCount > 0 ? `${pluralize(unverifiedCount, 'provider')} remain unverified. ` : '')
+    + 'Your choices stay applied. Login and connection status are shown separately where known.';
+}
+
+function showDetectionResult(title) {
+  showResult(title, detectionResultMessage(), false);
+  const { attentionCount, unverifiedCount } = providerDetectionSummary();
+  if (attentionCount > 0 || unverifiedCount > 0) {
+    document.getElementById('resultPanel').dataset.variant = 'attention';
+  }
+}
+
+function showSelectionProgress() {
+  const targets = latestSetupState?.selection?.targets || [];
+  const cliCount = targets.filter((target) => target.backend === 'cli').length;
+  const detecting = selectionOperation === 'check';
+  const title = detecting ? 'Detecting your selected providers'
+    : selectionOperation === 'reload' ? 'Reloading your selection' : 'Applying your selection';
+  const detail = detecting
+    ? `${applyingSelection && applyDetectionRequested ? 'Step 2 of 2 — Your choices are saved. ' : ''}`
+      + (cliCount > 0 ? `Checking installation for ${pluralize(cliCount, 'CLI provider')}. `
+        : 'Preparing the status summary; automatic connection checks are not provided for these targets. ')
+      + 'Results will appear here when detection finishes. Your choices remain selected while editing is temporarily locked.'
+    : selectionOperation === 'reload'
+      ? 'Loading your saved configuration. Your choices will update when this finishes.'
+      : currentSelectedProviders().length > 0
+        ? applyDetectionRequested
+          ? 'Step 1 of 2 — Saving your choices. Installation detection starts next.'
+          : 'Saving your choices. You can run installation detection later.'
+        : 'Saving an empty selection. Runtime will be idle.';
+  showResult(title, detail, false, false, 'progress');
+}
+
+function setSelectionButtonProgress(button, label, working) {
+  button.innerHTML = (working ? '<span class="setup-spinner" aria-hidden="true"></span> ' : '') + escapeHtml(label);
+  button.classList.toggle('setup-working-control', working);
+  button.setAttribute('aria-busy', String(working));
 }
 
 function updateProvidersWorkspaceMetrics() {
-  const hasScan = Array.isArray(scanData?.providers);
-  const providerCount = hasScan
-    ? scanData.providers.length
-    : Array.isArray(latestSetupState?.universe)
-      ? latestSetupState.universe.length
-      : 0;
-  const readyCount = hasScan
-    ? scanData.providers.filter((provider) => provider.available).length
-    : 0;
-  const attentionCount = hasScan ? providerCount - readyCount : 0;
-  const selection = selectableProviderSummary();
+  const selection = providerSelectionSummary();
+  const bootstrapRequired = currentBootstrapRequired();
+  const detectAfterApply = document.getElementById('detectAfterApplyCheckbox');
+  if (!detectAfterApplyInitialized && latestSetupState?.selection) {
+    detectAfterApply.checked = bootstrapRequired;
+    detectAfterApplyInitialized = true;
+  }
+  const { installedCount, attentionCount, unverifiedCount, notDetectedCount,
+    configurationChangedCount, latestObservedAt } = providerDetectionSummary();
+  const hasObservations = Boolean(latestObservedAt);
+  const detecting = selectionOperation === 'check';
   const providersWorkspaceStatus = document.getElementById('providersWorkspaceStatus');
 
   if (providersWorkspaceStatus) {
-    const bootstrapRequired = currentBootstrapRequired();
-    providersWorkspaceStatus.className = `status-badge ${bootstrapRequired ? 'status-badge-bootstrap' : 'status-badge-ready'}`;
-    providersWorkspaceStatus.textContent = bootstrapRequired ? 'Bootstrap' : 'Operational';
+    providersWorkspaceStatus.className = `status-badge ${selectionOperation ? 'status-badge-unknown' : bootstrapRequired ? 'status-badge-bootstrap' : 'status-badge-ready'}`;
+    providersWorkspaceStatus.textContent = detecting ? 'Detecting' : selectionOperation ? 'Applying'
+      : bootstrapRequired ? 'Bootstrap' : selection.savedCount ? 'Configured' : 'Idle';
   }
 
-  const workspaceSummary = hasScan
+  document.getElementById('providersWorkspaceSummary').textContent = selectionOperation === 'check'
+    ? 'Your choices are applied. Detecting installation status...'
+    : selectionOperation === 'save'
+      ? 'Applying your choices...'
+    : bootstrapRequired
+      ? 'Nothing is selected for you. Choose what you want to use, or skip for now.'
+      : selection.savedCount === 0
+        ? 'Runtime is idle. Choose providers whenever you are ready.'
+        : `Cats may use your ${pluralize(selection.savedCount, 'selected provider')}. Follow any setup steps below, then detect again.`;
+
+  document.getElementById('providersMetricSnapshotValue').textContent = detecting ? 'In progress' : hasObservations
+    ? formatTimestamp(latestObservedAt)
+    : configurationChangedCount > 0 ? 'Needs detection' : 'Not detected yet';
+  document.getElementById('providersMetricSnapshotDetail').textContent = detecting
+    ? 'Waiting for detection to finish. Your choices are already applied.'
+    : `Installation previously detected for ${pluralize(installedCount, 'CLI')}. `
+      + (notDetectedCount > 0 ? `${pluralize(notDetectedCount, 'provider')} not detected yet. ` : '')
+      + (configurationChangedCount > 0 ? `${pluralize(configurationChangedCount, 'provider')} need detection after configuration changes. ` : '')
+      + 'Each result shows its own detection time.';
+
+  document.getElementById('providersMetricAttentionValue').textContent = detecting ? '--' : hasObservations ? String(attentionCount) : '--';
+  document.getElementById('providersMetricAttentionDetail').textContent = detecting
+    ? 'Detection is still running. Results will appear when it finishes.' : hasObservations
     ? attentionCount > 0
-      ? `${pluralize(readyCount, 'provider')} available and ${pluralize(attentionCount, 'provider')} still need attention.`
-      : providerCount > 0
-        ? `${providerCount} ${providerCount === 1 ? 'provider is' : 'providers are'} available from the latest snapshot.`
-        : 'No provider results were returned by the latest scan.'
-    : providerCount > 0
-      ? 'Choose the providers you want Cats to manage. Save your selection before checking availability.'
-      : 'No provider catalog entries are available yet.';
-  document.getElementById('providersWorkspaceSummary').textContent = workspaceSummary;
+      ? 'Last results reported issues. Follow the setup steps below, then detect again.'
+      : unverifiedCount > 0 ? 'Some providers remain unverified. See their status below.'
+        : 'Last results reported no installation issues. Login and model execution are not verified.'
+    : 'Run detection to check missing installations or configuration changes.';
 
-  document.getElementById('providersMetricSnapshotValue').textContent = hasScan
-    ? formatTimestamp(scanData.scannedAt)
-    : 'Not scanned';
-  document.getElementById('providersMetricSnapshotDetail').textContent = hasScan
-    ? `${scanData.scanType === 'manual' ? 'Manual' : 'Auto'} snapshot across ${pluralize(providerCount, 'provider')}.`
-    : providerCount > 0
-      ? 'Only saved selections are checked. Other catalog entries remain untouched.'
-      : 'Waiting for setup-state data.';
-
-  document.getElementById('providersMetricAttentionValue').textContent = hasScan ? String(attentionCount) : '--';
-  document.getElementById('providersMetricAttentionDetail').textContent = hasScan
-    ? attentionCount > 0
-      ? 'Providers still blocked by missing installs or probe failures.'
-      : 'No repair action is required by the latest snapshot.'
-    : 'Missing installs or probe failures appear here after a scan.';
-
-  document.getElementById('providersMetricSelectedValue').textContent = String(selection.selectedCount);
-  document.getElementById('providersMetricSelectedDetail').textContent = selection.selectedCount > 0
-    ? hasScan
-      ? `${selection.readySelected} available${selection.blockedSelected > 0 ? ` · ${selection.blockedSelected} need attention` : ''}`
-      : 'Save the selection to begin checking these providers.'
-    : 'Save an empty selection to keep Runtime idle.';
+  document.getElementById('providersMetricSelectedValue').textContent = String(selection.savedCount);
+  document.getElementById('providersMetricSelectedDetail').textContent = bootstrapRequired
+    ? 'No selection saved yet.'
+    : selection.savedCount > 0
+      ? 'Currently allowed for Cats. Checkbox edits take effect when applied.'
+      : 'Empty selection saved. Runtime is idle.';
 
   const selectionStatusBadge = document.getElementById('selectionStatusBadge');
-  selectionStatusBadge.className = `status-badge ${selection.selectedCount > 0 ? 'status-badge-ready' : 'status-badge-unknown'}`;
-  selectionStatusBadge.textContent = `${selection.selectedCount} selected`;
+  selectionStatusBadge.className = 'status-badge status-badge-unknown';
+  selectionStatusBadge.textContent = `${selection.selectedCount} chosen${detecting ? ' · Detecting' : selection.dirty ? ' · Not applied' : ''}`;
+  document.getElementById('selectionDraftStatus').textContent = selectionOperation
+    ? 'Your choices stay selected. Editing is temporarily locked until this operation finishes.'
+    : selection.dirty
+    ? `Changes to apply: ${selection.addedCount} to add, ${selection.removedCount} to remove. ${selection.selectedCount === 0
+      ? 'Applying this empty selection will leave Runtime idle.'
+      : detectAfterApply.checked ? 'Apply saves your choices, then detects installation status.'
+        : 'Apply saves your choices. You can run detection later.'}`
+    : bootstrapRequired
+      ? 'Choose providers to get started. Skip for Now saves an empty selection; you can add providers later.'
+      : selection.savedCount === 0
+        ? 'Runtime is idle. Choose providers whenever you are ready.'
+        : 'Your choices are applied. After installing or fixing a provider, use Detect Again.';
 
-  document.getElementById('providersRailBadge').textContent = hasScan ? `${readyCount} available` : 'Not scanned';
-  document.getElementById('providersRailSummary').textContent = hasScan
-    ? attentionCount > 0
-      ? `${attentionCount} provider(s) still need attention in the latest snapshot.`
-      : `Latest snapshot shows ${pluralize(providerCount, 'provider')} available to use.`
-    : providerCount > 0
-      ? `Review ${pluralize(providerCount, 'provider')} and decide what to apply.`
-      : 'Load setup state to inspect local provider candidates.';
-  document.getElementById('providersRailMeta').textContent = hasScan
-    ? 'Use the main workspace to choose providers and apply runtime config.'
-    : 'Scan and apply stay in the main workspace.';
+  document.getElementById('providersRailBadge').textContent = detecting ? 'Detecting' : bootstrapRequired ? 'Not saved' : `${selection.savedCount} saved`;
+  document.getElementById('providersRailSummary').textContent = 'Choose which providers Cats may check and use.';
+  document.getElementById('providersRailMeta').textContent = selection.dirty
+    ? 'You have changes to apply.'
+    : 'Installation and login status are shown separately from your choices.';
+  updateProviderSelectionControls(selection);
+}
+
+function updateProviderSelectionControls(selection = providerSelectionSummary()) {
+  const busy = selectionOperation !== null;
+  const loaded = Boolean(latestSetupState?.selection);
+  const bootstrapRequired = currentBootstrapRequired();
+  const canSave = loaded && (bootstrapRequired || selection.dirty);
+  document.getElementById('providerList').setAttribute('aria-busy', String(busy));
+  document.querySelectorAll('.provider-check').forEach((checkbox) => {
+    checkbox.disabled = busy;
+    const saved = selection.savedSet.has(checkbox.value);
+    const pending = checkbox.checked !== saved;
+    const row = checkbox.closest('.provider-selection-row');
+    row.dataset.selected = String(checkbox.checked);
+    const detecting = selectionOperation === 'check' && saved && row.dataset.backend === 'cli';
+    const processing = detecting || (selectionOperation === 'save' && (checkbox.checked || pending));
+    row.dataset.processing = String(processing);
+    const progress = row.querySelector('.setup-provider-progress');
+    progress.hidden = !processing;
+    progress.querySelector('.setup-provider-progress-label').textContent = detecting ? 'Waiting for detection' : 'Applying selection';
+    const intent = row.querySelector('.setup-provider-intent');
+    intent.dataset.pending = String(pending);
+    intent.textContent = pending
+      ? checkbox.checked ? 'Will be added' : 'Will be removed'
+      : saved ? 'Selected for Cats' : 'Not selected';
+  });
+  const applyBtn = document.getElementById('applyBtn');
+  applyBtn.disabled = busy || !canSave;
+  applyBtn.hidden = !applyingSelection && ((bootstrapRequired && selection.selectedCount === 0) || (!bootstrapRequired && !selection.dirty));
+  setSelectionButtonProgress(applyBtn, applyingSelection
+    ? selectionOperation === 'check' ? 'Detecting' : 'Applying'
+    : 'Apply', applyingSelection);
+  document.getElementById('applyControls').hidden = applyBtn.hidden;
+  document.getElementById('detectAfterApplyOption').hidden = selection.selectedCount === 0;
+  document.getElementById('detectAfterApplyCheckbox').disabled = busy || !loaded || selection.selectedCount === 0;
+  const scanBtn = document.getElementById('scanBtn');
+  scanBtn.hidden = applyingSelection || bootstrapRequired || selection.savedCount === 0 || selection.dirty;
+  scanBtn.disabled = busy || !loaded || bootstrapRequired || selection.savedCount === 0 || selection.dirty;
+  setSelectionButtonProgress(scanBtn, selectionOperation === 'check' ? 'Detecting' : 'Detect Again', selectionOperation === 'check' && !applyingSelection);
+  const discardBtn = document.getElementById('discardSelectionBtn');
+  discardBtn.hidden = !selection.dirty;
+  discardBtn.disabled = busy;
+  const skipBtn = document.getElementById('skipSelectionBtn');
+  skipBtn.hidden = !bootstrapRequired || selection.selectedCount > 0;
+  skipBtn.disabled = busy || !loaded;
+  const reloadBtn = document.getElementById('reloadSelectionBtn');
+  reloadBtn.disabled = busy;
+  reloadBtn.textContent = selection.dirty ? 'Reload File & Discard Changes' : 'Reload Edited Configuration';
+  const dashboardLink = document.getElementById('openRuntimeLink');
+  dashboardLink.hidden = !loaded || bootstrapRequired || selection.dirty || applyingSelection;
+  if (busy) {
+    dashboardLink.setAttribute('aria-disabled', 'true');
+    dashboardLink.setAttribute('tabindex', '-1');
+    dashboardLink.removeAttribute('href');
+  } else {
+    dashboardLink.removeAttribute('aria-disabled');
+    dashboardLink.removeAttribute('tabindex');
+    dashboardLink.setAttribute('href', '/dashboard');
+  }
+  updateSelectAllCheckbox();
+}
+
+function discardProviderSelection() {
+  if (selectionOperation) return;
+  restoreProviderSelection((latestSetupState?.selection?.targets || []).map(selectionTargetKey));
+  hideResult();
+  updateProvidersWorkspaceMetrics();
 }
 
 function updateSelectAllCheckbox() {
@@ -887,13 +1180,12 @@ function updateSelectAllCheckbox() {
     return;
   }
 
-  const selectable = selectableProviderCheckboxes();
-  const checkedCount = selectable.filter((checkbox) => checkbox.checked).length;
-  const hasSelectable = selectable.length > 0;
+  const all = Array.from(document.querySelectorAll('.provider-check'));
+  const checkedCount = all.filter((entry) => entry.checked).length;
 
-  checkbox.disabled = !hasSelectable;
-  checkbox.checked = hasSelectable && checkedCount === selectable.length;
-  checkbox.indeterminate = checkedCount > 0 && checkedCount < selectable.length;
+  checkbox.disabled = selectionOperation !== null || all.length === 0;
+  checkbox.checked = all.length > 0 && checkedCount === all.length;
+  checkbox.indeterminate = checkedCount > 0 && checkedCount < all.length;
 }
 
 function toggleSelectAllProviders() {
@@ -908,7 +1200,7 @@ function toggleSelectAllProviders() {
     checkbox.checked = shouldSelectAll;
   });
 
-  document.getElementById('applyBtn').disabled = false;
+  hideResult();
   updateProvidersWorkspaceMetrics();
   updateSelectAllCheckbox();
 }
@@ -991,6 +1283,12 @@ function restoreProviderSelection(selectedProviders) {
 }
 
 function applySetupStateReadModel(data, selectedProviders) {
+  const sameRevision = latestSetupState?.selection?.revision === data.selection?.revision;
+  const hasPendingChanges = latestSetupState && providerSelectionSummary().dirty;
+  const replacedDraft = selectedProviders === undefined && hasPendingChanges && !sameRevision;
+  const draft = selectedProviders ?? (sameRevision && hasPendingChanges
+    ? currentSelectedProviders()
+    : (data.selection?.targets || []).map(selectionTargetKey));
   latestSetupState = data;
   if (
     typeof data?.bootstrapRequired === 'boolean'
@@ -1000,20 +1298,16 @@ function applySetupStateReadModel(data, selectedProviders) {
     window.CatsUI.syncRuntimeBootstrapState(data.bootstrapRequired);
   }
   updateStatusBar(data);
-  if (data.scan && data.scan.providers) {
-    renderScanResults(data.scan);
-  } else {
-    scanData = null;
-    renderUniverse(data.universe || []);
-  }
-  restoreProviderSelection(selectedProviders ?? (data.selection?.targets || []).map(selectionTargetKey));
-  const applyBtn = document.getElementById('applyBtn');
-  if (applyBtn) {
-    applyBtn.disabled = !data.selection;
-  }
+  renderUniverse(data.universe || []);
+  restoreProviderSelection(draft);
   document.getElementById('reloadSelectionBtn').hidden = !data.selection?.diskChanged;
   updateProvidersWorkspaceMetrics();
   updateSelectAllCheckbox();
+  if (replacedDraft) {
+    showResult('Selection changed elsewhere',
+      'The latest saved choices have been loaded. Review them and make your changes again before applying.',
+      false, false, 'attention');
+  }
 }
 
 async function fetchState() {
@@ -2113,6 +2407,80 @@ function selectionTargetKey(target) {
   return JSON.stringify([target.provider, target.backend, target.instance]);
 }
 
+function describeProviderObservation(target, observed) {
+  const unknown = {
+    label: 'Not detected yet', detail: '', tone: 'unknown',
+    installationDetected: false, needsAttention: false, unverified: true,
+    notDetected: !observed, configurationChanged: false,
+  };
+  if (!observed) return unknown;
+  if (observed.configurationStatus === 'changed') {
+    return {
+      ...unknown, label: 'Needs detection', configurationChanged: true,
+      detail: 'Configuration changed since the last detection. Use Detect Again to check the new configuration.',
+    };
+  }
+  if (target.backend !== 'cli') {
+    return {
+      ...unknown, label: 'Connection not checked',
+      detail: 'Your choice is applied. This page does not yet check this provider\'s connection automatically.',
+    };
+  }
+  const labels = {
+    ready: 'Installation detected',
+    missing_install: 'Not installed',
+    missing_path: 'Command not on PATH',
+    misconfigured_command: 'Command needs configuration',
+    probe_failed: 'Detection failed',
+  };
+  const details = {
+    missing_install: 'Install this provider using the instructions below, then select Detect Again.',
+    missing_path: 'Make the provider command available on PATH, then select Detect Again.',
+    misconfigured_command: 'Check the configured provider command, then select Detect Again.',
+    probe_failed: 'Installation status could not be determined. Retry with Detect Again.',
+  };
+  const installationDetected = observed.commandStatus === 'ready';
+  const commandNeedsAttention = Object.hasOwn(details, observed.commandStatus);
+  const needsAttention = commandNeedsAttention || observed.authStatus === 'missing'
+    || (observed.remediation || []).length > 0;
+  return {
+    label: labels[observed.commandStatus] || 'Installation not verified',
+    detail: details[observed.commandStatus] || '',
+    tone: needsAttention ? 'degraded' : installationDetected ? 'ready' : 'unknown',
+    installationDetected,
+    needsAttention,
+    unverified: !installationDetected && !commandNeedsAttention,
+  };
+}
+
+function setupInstructionsLink(url) {
+  if (!url) return '';
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+    return `<a class="setup-provider-instructions" href="${escapeHtml(parsed.href)}" target="_blank" rel="noopener noreferrer">Instructions</a>`;
+  } catch {
+    return '';
+  }
+}
+
+function renderProviderGuidance(entry, observed) {
+  if (!observed || entry.backend !== 'cli') return '';
+  const steps = [...(observed.remediation || [])];
+  const install = observed.install || entry.install;
+  if (observed.commandStatus === 'missing_install' && !steps.some((step) => step.code === 'install_provider')) {
+    steps.push({
+      summary: 'Install this provider, then select Detect Again.',
+      command: install?.install?.command,
+      docsUrl: install?.install?.docsUrl,
+    });
+  }
+  return steps.map((step) => `<div class="mt-2 text-xs text-amber-300">
+    <div>${escapeHtml(step.summary)} ${setupInstructionsLink(step.docsUrl)}</div>
+    ${step.command ? `<code class="setup-provider-command">${escapeHtml(step.command)}</code>` : ''}
+  </div>`).join('');
+}
+
 function renderUniverse(universe) {
   const selected = new Set((latestSetupState?.selection?.targets || []).map(selectionTargetKey));
   const entries = new Map(universe.map((entry) => [selectionTargetKey(entry), entry]));
@@ -2121,40 +2489,48 @@ function renderUniverse(universe) {
       entries.set(selectionTargetKey(target), { ...target, familyLabel: target.provider, binaryName: '' });
     }
   }
-  const observations = new Map((scanData?.providers || []).map((entry) => [selectionTargetKey(entry), entry]));
+  const observations = providerObservationMap();
   document.getElementById('providerListItems').innerHTML = Array.from(entries.entries()).map(([key, entry]) => {
     const observed = observations.get(key);
-    const status = observed?.available ? 'Ready' : observed ? observed.commandStatus : selected.has(key) ? 'Not checked' : 'Not selected';
-    const remediation = (observed?.remediation || []).map((step) => `<div class="mt-2 text-xs text-amber-300">${escapeHtml(step.summary)}</div>`).join('');
-    return `<label class="flex cursor-pointer items-start gap-4 border-b border-slate-800 px-4 py-4 last:border-b-0 hover:bg-slate-900/40">
-      <input type="checkbox" value="${escapeHtml(key)}" class="provider-check mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500" ${selected.has(key) ? 'checked' : ''} />
-      <div class="min-w-0 flex-1">
-        <div class="text-sm font-semibold text-slate-100">${escapeHtml(entry.familyLabel)}</div>
-        <div class="mt-1 text-xs text-slate-500">${escapeHtml(entry.backend + '/' + entry.instance)}</div>
-        ${remediation}
+    const status = describeProviderObservation(entry, observed);
+    const historical = observed?.configurationStatus === 'not_selected';
+    const authLabel = observed?.configurationStatus === 'unchanged' && observed.commandStatus === 'ready' && entry.backend === 'cli'
+      ? observed.authStatus === 'missing' ? 'Login required'
+        : observed.authStatus === 'not_required' ? 'Login not required' : 'Login not verified'
+      : '';
+    return `<div data-backend="${escapeHtml(entry.backend)}" class="provider-selection-row border-b border-slate-800 px-4 py-4 last:border-b-0 hover:bg-slate-900/40">
+      <div class="flex items-start gap-4">
+        <label class="flex min-w-0 flex-1 cursor-pointer items-start gap-4">
+          <input type="checkbox" value="${escapeHtml(key)}" aria-label="${escapeHtml('Use ' + entry.familyLabel + ' (' + entry.backend + '/' + entry.instance + ') in Cats')}" aria-describedby="providerSelectionHelp" class="provider-check mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500" ${selected.has(key) ? 'checked' : ''} />
+          <div class="min-w-0">
+            <div class="text-sm font-semibold text-slate-100">${escapeHtml(entry.familyLabel)}</div>
+            <div class="mt-1 text-xs text-slate-500">${escapeHtml(entry.backend + '/' + entry.instance)}</div>
+          </div>
+        </label>
+        <div class="setup-provider-status">
+          <span class="setup-provider-intent">${selected.has(key) ? 'Selected for Cats' : 'Not selected'}</span>
+          <span class="setup-provider-progress" hidden><span class="setup-spinner" aria-hidden="true"></span><span class="setup-provider-progress-label"></span></span>
+          <span class="setup-provider-observation status-badge status-badge-${historical ? 'unknown' : status.tone}">${escapeHtml((historical ? 'Last result: ' : '') + status.label)}</span>
+          ${observed ? `<span class="setup-provider-observation text-xs text-slate-400" title="${escapeHtml(observed.observedAt)}">Last detected: ${escapeHtml(formatTimestamp(observed.observedAt))}</span>` : ''}
+          ${authLabel ? `<span class="setup-provider-observation text-xs text-slate-400">${escapeHtml(authLabel)}</span>` : ''}
+        </div>
       </div>
-      <span class="status-badge ${observed?.available ? 'status-badge-ready' : 'status-badge-unknown'}">${escapeHtml(status)}</span>
-    </label>`;
+      <div class="setup-provider-guidance">
+        ${selected.has(key) && status.detail ? `<p class="mt-2 text-xs text-slate-400">${escapeHtml(status.detail)}</p>` : ''}
+        ${observed?.configurationStatus === 'unchanged' ? renderProviderGuidance(entry, observed) : ''}
+      </div>
+    </div>`;
   }).join('');
   bindCheckboxes();
 }
 
-function renderScanResults(scan) {
-  scanData = scan;
-  renderUniverse(latestSetupState?.universe || []);
-}
-
 function bindCheckboxes() {
   const checks = document.querySelectorAll('.provider-check');
-  const applyBtn = document.getElementById('applyBtn');
   const update = () => {
-    const selection = selectableProviderSummary();
-    applyBtn.disabled = !latestSetupState?.selection;
+    hideResult();
     updateProvidersWorkspaceMetrics();
-    updateSelectAllCheckbox();
   };
   checks.forEach((checkbox) => checkbox.addEventListener('change', update));
-  update();
 }
 
 const SCAN_POLL_INTERVAL_MS = 1000;
@@ -2177,26 +2553,27 @@ async function waitForScanToSettle(fetchFn) {
   }
 }
 
-async function saveProviderSelection(fetchFn) {
+async function saveProviderSelection(fetchFn, targets) {
   if (!latestSetupState?.selection) throw new Error('Reload setup before saving selection.');
-  const targets = currentSelectedProviders().map((value) => {
-    const [provider, backend, instance] = JSON.parse(value);
-    return { provider, backend, instance };
-  });
   const res = await fetchFn('/setup-selection', {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ targets, expectedRevision: latestSetupState.selection.revision }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || `Could not save selection (${res.status}).`);
-  latestSetupState.selection = data.selection;
-  latestSetupState.bootstrapRequired = false;
+  applySetupStateReadModel({
+    ...latestSetupState, selection: data.selection, bootstrapRequired: false,
+    observations: data.observations, state: data.state, scan: null, manualScan: null,
+  }, data.selection.targets.map(selectionTargetKey));
   return data;
 }
 
 async function reloadProviderSelection() {
-  const button = document.getElementById('reloadSelectionBtn');
-  button.disabled = true;
+  if (selectionOperation || !latestSetupState?.selection) return;
+  if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
+  selectionOperation = 'reload';
+  updateProvidersWorkspaceMetrics();
+  showSelectionProgress();
   try {
     const fetchFn = window.CatsUI?.apiFetch || fetch;
     const response = await fetchFn('/setup-selection/reload', {
@@ -2205,66 +2582,114 @@ async function reloadProviderSelection() {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Could not reload provider selection');
+    applySetupStateReadModel({
+      ...latestSetupState, selection: result.selection, bootstrapRequired: false,
+      observations: result.observations, state: result.state, scan: null, manualScan: null,
+    }, result.selection.targets.map(selectionTargetKey));
     await fetchState();
+    showResult('Selection reloaded', 'Your saved choices are now applied.', false);
+    void loadConfiguredTargetCapabilities();
   } catch (error) {
     showResult('Could not reload selection', error.message, true);
-  } finally { button.disabled = false; }
+  } finally {
+    selectionOperation = null;
+    updateProvidersWorkspaceMetrics();
+  }
+}
+
+async function checkSavedProviders(fetchFn) {
+  const revision = latestSetupState.selection.revision;
+  selectionOperation = 'check';
+  updateProvidersWorkspaceMetrics();
+  showSelectionProgress();
+  const res = await fetchFn('/setup-scan', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ manual: true }),
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || `HTTP ${res.status}`);
+  }
+  const data = await waitForScanToSettle(fetchFn);
+  applySetupStateReadModel(data, (data.selection?.targets || []).map(selectionTargetKey));
+  if (data.selection?.revision !== revision) {
+    showResult('Selection changed elsewhere',
+      'Detection was interrupted by a configuration change. The latest saved choices have been loaded; use Detect Again to check them.',
+      false, false, 'attention');
+    return false;
+  }
+  if (data.state?.status === 'error') throw new Error(data.state.error || 'Provider check failed.');
+  if (data.state?.status !== 'ready' || data.scan?.revision !== revision) {
+    throw new Error('Detection did not complete. Use Detect Again to retry.');
+  }
+  return true;
 }
 
 async function runScan() {
+  if (selectionOperation || currentBootstrapRequired() || !latestSetupState?.selection?.targets.length
+    || providerSelectionSummary().dirty) return;
   if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
   setActiveSetupWorkspace('providers');
-  const scanBtn = document.getElementById('scanBtn');
-  scanBtn.disabled = true;
-  document.getElementById('applyBtn').disabled = true;
   hideResult();
   try {
     const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
-    await saveProviderSelection(fetchFn);
-    document.getElementById('providersWorkspaceSummary').textContent = 'Checking selected providers...';
-    const res = await fetchFn('/setup-scan', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ manual: true }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await waitForScanToSettle(fetchFn);
-    if (data.state?.status === 'error') throw new Error(data.state.error || 'Provider check failed.');
-    applySetupStateReadModel(data);
-    await loadConfiguredTargetCapabilities();
+    if (await checkSavedProviders(fetchFn)) showDetectionResult('Detection results');
   } catch (err) {
-    showResult('Provider check failed', err.message, true);
+    showResult('Detection failed', `Your choices are still applied. ${err.message} Use Detect Again to retry.`, true);
   } finally {
-    scanBtn.disabled = false;
-    document.getElementById('applyBtn').disabled = false;
+    selectionOperation = null;
+    updateProvidersWorkspaceMetrics();
+    void loadConfiguredTargetCapabilities();
   }
 }
 
-async function applyConfig() {
+async function applyConfig(targets = null) {
+  if (selectionOperation || !latestSetupState?.selection) return;
   if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
-  const button = document.getElementById('applyBtn');
-  button.disabled = true;
-  button.textContent = 'Saving...';
-  hideResult();
+  const chosenTargets = targets ?? currentSelectedProviders().map((value) => {
+    const [provider, backend, instance] = JSON.parse(value);
+    return { provider, backend, instance };
+  });
+  selectionOperation = 'save';
+  applyingSelection = true;
+  applyDetectionRequested = chosenTargets.length > 0 && document.getElementById('detectAfterApplyCheckbox').checked;
+  updateProvidersWorkspaceMetrics();
+  showSelectionProgress();
+  let saved = false;
   try {
     const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
-    const saved = await saveProviderSelection(fetchFn);
-    const response = await fetchFn('/setup-state');
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    scanData = null;
-    applySetupStateReadModel(await response.json());
-    await loadConfiguredTargetCapabilities();
-    showResult('Selection saved', saved.selection.targets.length
-      ? 'Cats will check and use only the selected providers.'
-      : 'Runtime is idle. Add providers whenever you are ready.', false);
+    const result = await saveProviderSelection(fetchFn, chosenTargets);
+    saved = true;
+    if (applyDetectionRequested && result.selection.targets.length > 0) {
+      if (await checkSavedProviders(fetchFn)) showDetectionResult('Choices applied — detection results');
+    } else if (result.selection.targets.length > 0) {
+      const { notDetectedCount, configurationChangedCount } = providerDetectionSummary();
+      const needsDetection = notDetectedCount + configurationChangedCount;
+      showResult('Choices applied', 'Your choices are saved. No detection was run; previous results are retained for unchanged providers. '
+        + (needsDetection > 0 ? `${pluralize(needsDetection, 'provider')} still need detection. ` : '')
+        + 'Use Detect Again whenever you want to refresh the results.', false);
+    } else {
+      showResult('Runtime is idle', 'Go to Dashboard to continue, or add providers whenever you are ready.', false);
+    }
   } catch (err) {
-    showResult('Could not save selection', err.message, true);
+    showResult(saved ? 'Choices applied; detection failed' : 'Could not apply choices', saved
+      ? `Your selection is saved and active. ${err.message} Use Detect Again to retry.`
+      : err.message, true);
   } finally {
-    button.disabled = false;
-    button.textContent = 'Save Selection';
+    selectionOperation = null;
+    applyingSelection = false;
+    applyDetectionRequested = false;
+    updateProvidersWorkspaceMetrics();
+    if (saved) void loadConfiguredTargetCapabilities();
   }
 }
 
-function showResult(title, body, isError, allowHtml) {
+async function skipProviderSelection() {
+  if (!currentBootstrapRequired() || currentSelectedProviders().length > 0) return;
+  await applyConfig([]);
+}
+
+function showResult(title, body, isError, allowHtml, variant) {
   const panel = document.getElementById('resultPanel');
   const titleEl = document.getElementById('resultTitle');
   const bodyEl = document.getElementById('resultBody');
@@ -2277,7 +2702,8 @@ function showResult(title, body, isError, allowHtml) {
   } else {
     bodyEl.textContent = body;
   }
-  panel.dataset.variant = isError ? 'error' : 'success';
+  panel.dataset.variant = variant || (isError ? 'error' : 'success');
+  document.getElementById('resultSpinner').hidden = panel.dataset.variant !== 'progress';
   panel.hidden = false;
   panel.classList.remove('hidden');
 }
@@ -2289,6 +2715,7 @@ function hideResult() {
   }
   panel.hidden = true;
   panel.classList.add('hidden');
+  document.getElementById('resultSpinner').hidden = true;
   delete panel.dataset.variant;
 }
 

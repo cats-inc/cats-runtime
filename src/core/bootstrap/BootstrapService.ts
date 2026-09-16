@@ -1,15 +1,15 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { KNOWN_PROVIDERS, type ProviderName } from '../../backends/cli/providers/types.js';
 import { buildProviderInstallCatalogView } from '../provider-install/knowledge.js';
 import type { ProviderInstallCatalogView, ProviderRemediationStep } from '../provider-install/types.js';
 import type { ProviderCompatibilityService } from '../compatibility/ProviderCompatibilityService.js';
 import type { ProviderTargetDescriptor } from '../providerCatalog.js';
-import type { RuntimeConfig } from '../config.js';
+import { getRuntimeConfigEnv, type RuntimeConfig } from '../config.js';
 import {
   ProviderSelectionService, providerSelectionCatalog, selectedTarget,
-  ProviderSelectionError, providerSelectionKey,
+  ProviderSelectionError, providerSelectionKey, configuredTargets,
   type ProviderSelectionSnapshot, type SelectedProviderTarget,
 } from './ProviderSelectionService.js';
 import { refreshWindowsProcessPath } from './windowsEnvironmentPath.js';
@@ -38,6 +38,25 @@ export interface BootstrapScanResult {
   providers: ProviderScanEntry[];
 }
 
+export interface ProviderSetupObservation extends ProviderScanEntry {
+  observedAt: string;
+  scanType: BootstrapScanResult['scanType'];
+  configurationStatus: 'unchanged' | 'changed' | 'not_selected';
+}
+
+interface StoredProviderObservation extends Omit<ProviderSetupObservation, 'configurationStatus'> {
+  configurationFingerprint: string;
+}
+
+function canonicalConfiguration(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalConfiguration);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+      .map(([key, entry]) => [key, canonicalConfiguration(entry)]));
+  }
+  return value;
+}
+
 export interface SetupState {
   status: 'pending' | 'scanning' | 'ready' | 'applied' | 'error';
   lastScanAt: string | null;
@@ -59,7 +78,7 @@ function readJsonSafe<T>(path: string): T | null {
 function writeJsonAtomic(path: string, data: unknown): void {
   mkdirSync(dirname(path), { recursive: true });
   const temporary = `${path}.${randomUUID()}.tmp`;
-  writeFileSync(temporary, JSON.stringify(data, null, 2), 'utf8');
+  writeFileSync(temporary, JSON.stringify(data, null, 2), { encoding: 'utf8', flag: 'wx', mode: 0o600 });
   renameSync(temporary, path);
 }
 
@@ -70,6 +89,8 @@ export class BootstrapService {
   private readonly setupStatePath: string;
   private readonly scanPath: string;
   private readonly manualScanPath: string;
+  private readonly observationsPath: string;
+  private observations: StoredProviderObservation[] | null = null;
   private inFlightScan: Promise<BootstrapScanResult> | null = null;
   private inFlightScope: string | null = null;
   private volatileState: SetupState | null = null;
@@ -88,8 +109,15 @@ export class BootstrapService {
     this.setupStatePath = join(opts.dataDir, 'setup', 'setup-state.json');
     this.scanPath = join(opts.dataDir, 'setup', 'provider-scan.json');
     this.manualScanPath = join(opts.dataDir, 'setup', 'provider-manual-scan.json');
+    this.observationsPath = join(opts.dataDir, 'setup', 'provider-observations.json');
     this.selection = new ProviderSelectionService({
       ...opts,
+      beforeActivate: (candidate, changed) => {
+        opts.beforeActivate?.(candidate, changed);
+        // Capture completed results against the still-active configuration.
+        // Historical observations never grant admission to a removed target.
+        this.persistObservations(this.collectObservations());
+      },
       activated: () => {
         this.cancelScan();
         opts.activated?.();
@@ -113,7 +141,7 @@ export class BootstrapService {
 
   saveSelection(targets: unknown, expectedRevision: unknown): ProviderSelectionSnapshot {
     const result = this.selection.save(targets, expectedRevision);
-    this.volatileState = { ...defaultSetupState(), status: 'applied',
+    this.volatileState = { ...this.readSetupState(), status: 'applied', error: null,
       appliedAt: new Date().toISOString(), appliedConfigPath: this.opts.configPath };
     // Setup progress is best effort; it cannot roll back or prevent activation
     // of an already committed, authoritative provider configuration.
@@ -155,7 +183,7 @@ export class BootstrapService {
     this.generation += 1;
     this.inFlightScan = null;
     this.inFlightScope = null;
-    this.volatileState = defaultSetupState();
+    this.volatileState = { ...this.readSetupState(), status: 'pending', error: null };
   }
 
   async getSetupState(): Promise<SetupState> { return this.readSetupState(); }
@@ -180,6 +208,64 @@ export class BootstrapService {
     return result?.revision === this.getSelection().revision ? result : null;
   }
 
+  getProviderObservations(): ProviderSetupObservation[] {
+    const targets = new Map(configuredTargets(this.opts.config).map((target) =>
+      [providerSelectionKey(selectedTarget(target)), target]));
+    return [...this.collectObservations().values()].map(({ configurationFingerprint, ...entry }) => {
+      const target = targets.get(providerSelectionKey(entry));
+      return {
+        ...entry,
+        configurationStatus: !target ? 'not_selected'
+          : configurationFingerprint === this.targetFingerprint(target) ? 'unchanged' : 'changed',
+      };
+    });
+  }
+
+  private targetFingerprint(target: ProviderTargetDescriptor): string {
+    const remote = target.remoteInstance;
+    const env = getRuntimeConfigEnv(this.opts.config);
+    const envNames = remote ? [remote.urlEnv, remote.baseUrlEnv, remote.apiKeyEnv,
+      remote.authTokenEnv, remote.passwordEnv, remote.organizationEnv, remote.projectEnv] : [];
+    const configuration = {
+      command: target.cliInstance?.commandConfig,
+      remote,
+      environment: envNames.filter((name): name is string => Boolean(name))
+        .map((name) => [name, env[name] ?? null]),
+    };
+    // Persist only the digest, never endpoint credentials or environment values.
+    return createHash('sha256').update(JSON.stringify(canonicalConfiguration(configuration))).digest('hex');
+  }
+
+  private collectObservations(): Map<string, StoredProviderObservation> {
+    const stored = this.observations
+      ?? readJsonSafe<StoredProviderObservation[]>(this.observationsPath);
+    const records = new Map((Array.isArray(stored) ? stored : [])
+      .map((entry) => [providerSelectionKey(entry), entry]));
+    const targets = new Map(configuredTargets(this.opts.config).map((target) =>
+      [providerSelectionKey(selectedTarget(target)), target]));
+    // Current-revision scan snapshots are also completed evidence. Reading is
+    // passive; archive them before activation makes those snapshots obsolete.
+    for (const path of [this.manualScanPath, this.scanPath]) {
+      const scan = this.readScan(path);
+      for (const entry of scan?.providers ?? []) {
+        const key = providerSelectionKey(entry);
+        const target = targets.get(key);
+        const previous = records.get(key);
+        if (!target || (previous && previous.observedAt >= scan!.scannedAt)) continue;
+        records.set(key, { ...entry, observedAt: scan!.scannedAt, scanType: scan!.scanType,
+          configurationFingerprint: this.targetFingerprint(target) });
+      }
+    }
+    return records;
+  }
+
+  private persistObservations(records: Map<string, StoredProviderObservation>): void {
+    if (records.size === 0) return;
+    this.observations = [...records.values()];
+    // Like setup progress, history persistence must not prevent an intent save.
+    try { writeJsonAtomic(this.observationsPath, this.observations); } catch { /* Retain in memory. */ }
+  }
+
   private async runScan(
     targets: ProviderTargetDescriptor[], revision: string, generation: number, options: ScanOptions,
   ): Promise<BootstrapScanResult> {
@@ -202,8 +288,14 @@ export class BootstrapService {
         scanType: options.manual ? 'manual' : 'auto', providers: current() ? entries : [],
       };
       if (!current()) return result;
+      const records = this.collectObservations();
+      entries.forEach((entry, index) => records.set(providerSelectionKey(entry), {
+        ...entry, observedAt: result.scannedAt, scanType: result.scanType,
+        configurationFingerprint: this.targetFingerprint(targets[index]!),
+      }));
       writeJsonAtomic(this.scanPath, result);
       if (options.manual) writeJsonAtomic(this.manualScanPath, result);
+      this.persistObservations(records);
       writeJsonAtomic(this.setupStatePath, { ...this.readSetupState(), status: 'ready', error: null,
         lastScanAt: result.scannedAt, ...(options.manual ? { lastManualScanAt: result.scannedAt } : {}) });
       return result;

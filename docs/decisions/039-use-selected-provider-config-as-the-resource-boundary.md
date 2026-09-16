@@ -100,6 +100,21 @@ The accepted policy rejects removal while a target has a running provider
 operation. Its owner must finish or stop that operation before removal; setup
 must not silently cancel it or leave it running outside the accepted scope.
 
+#### Retained setup observations (2026-09-16 amendment)
+
+User acceptance of save-without-detection requires preserving completed evidence
+for unchanged targets. Runtime retains the latest observation per exact target,
+its original time, and a private digest of the detection configuration. This is
+history, not another source of provider intent or a live readiness guarantee.
+Removed targets remain historical only; new targets have no observation, and
+changed command/runtime/endpoint settings require detection for that target.
+
+Current scan snapshots and in-flight completion still require the active whole
+configuration revision. Completed current snapshots can contribute to history
+before activation changes that revision; cancelled or late results cannot.
+Read-only observation projections perform no probes. Fingerprints contain no
+raw configuration values and are not exposed through the setup read model.
+
 ### 5. Amend only the detection-before-config part of ADR-021
 
 ADR-021's static provider knowledge, bootstrap without a preexisting config,

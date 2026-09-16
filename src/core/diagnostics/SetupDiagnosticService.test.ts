@@ -70,6 +70,10 @@ function createBootstrapStub(): SetupDiagnosticBootstrapService {
     }),
     getLatestScan: async () => latest,
     getLatestManualScan: async () => latest,
+    getProviderObservations: () => latest.providers.map((entry) => ({
+      ...entry, backend: 'cli' as const, instance: 'native', observedAt: latest.scannedAt,
+      scanType: latest.scanType, configurationStatus: 'unchanged' as const,
+    })),
     scan: async () => latest,
   };
 }
@@ -147,6 +151,35 @@ function createCompatibilityEvidenceArtifact(root: string): void {
 }
 
 describe('SetupDiagnosticService', () => {
+  it.each([false, true])('uses retained coverage when the latest snapshot is absent or partial (partial: %s)', async (partial) => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const providers = partial ? ['claude', 'codex'] : ['claude'];
+      const config = loadConfig(createTestEnv(root), { providerYaml: JSON.stringify({
+        version: 1, backends: { cli: { providers: Object.fromEntries(providers.map((provider) =>
+          [provider, { instances: { native: { command: provider, runtime: 'native' } } }])) } },
+      }) });
+      const bootstrap = createBootstrapStub();
+      const ready = bootstrap.getProviderObservations()[0]!;
+      const missing = { ...ready, provider: 'codex', family: 'Codex', available: false,
+        commandStatus: 'missing_install', commandPath: null };
+      const latest = partial ? { revision: 'current', scannedAt: ready.observedAt,
+        scanType: 'manual' as const, providers: [missing] } : null;
+      bootstrap.getLatestScan = async () => latest;
+      bootstrap.getLatestManualScan = async () => latest;
+      bootstrap.getProviderObservations = () => partial ? [ready, missing] : [ready];
+      const service = new SetupDiagnosticService({ config, bootstrapService: bootstrap });
+      const { report } = await service.generateReport();
+      expect(report.setup.repair?.providersReady).toEqual([{ provider: 'claude', family: 'Claude' }]);
+      expect(report.setup.repair?.status).toBe(partial ? 'attention_required' : 'ready');
+      expect(report.issues.map((issue) => issue.code)).not.toContain('setup_detection_required');
+      expect(report.issues.map((issue) => issue.code)).not.toContain('provider_scan_all_unavailable');
+      expect(report.issues.some((issue) => issue.code === 'provider_scan_unavailable')).toBe(partial);
+    } finally {
+      cleanup();
+    }
+  });
+
   it('lists retained reports newest-first and reads specific artifacts by id', async () => {
     const { root, cleanup } = createTestRoot();
     const timestamps = [

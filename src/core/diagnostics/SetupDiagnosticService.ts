@@ -33,6 +33,7 @@ import type { ProviderEvolutionProbeArtifactSummary } from '../compatibility/pro
 import type {
   BootstrapScanResult,
   ProviderUniverseEntry,
+  ProviderSetupObservation,
   SetupState,
 } from '../bootstrap/BootstrapService.js';
 import { buildRepairSummary, type SetupRepairSummary } from '../bootstrap/setupRepair.js';
@@ -187,6 +188,7 @@ export interface SetupDiagnosticBootstrapService {
   getSetupState(): Promise<SetupState>;
   getLatestScan(): Promise<BootstrapScanResult | null>;
   getLatestManualScan(): Promise<BootstrapScanResult | null>;
+  getProviderObservations(): ProviderSetupObservation[];
   scan(options?: { manual?: boolean }): Promise<BootstrapScanResult>;
 }
 
@@ -251,6 +253,7 @@ export class SetupDiagnosticService {
     let state: SetupState | null = null;
     let latestScan: BootstrapScanResult | null = null;
     let latestManualScan: BootstrapScanResult | null = null;
+    let observations: ProviderSetupObservation[] = [];
     let refreshError: unknown;
 
     if (this.bootstrapService) {
@@ -267,6 +270,7 @@ export class SetupDiagnosticService {
       state = await this.bootstrapService.getSetupState();
       latestScan = latestScan ?? await this.bootstrapService.getLatestScan();
       latestManualScan = await this.bootstrapService.getLatestManualScan();
+      observations = this.bootstrapService.getProviderObservations();
       if (!options.refreshScan && latestScan) {
         scanSource = 'existing';
       }
@@ -276,7 +280,8 @@ export class SetupDiagnosticService {
     appendConfigLoadIssues(issues, this.configLoadError, inspection.configPath);
     appendDiscoveryIssues(issues, discovery);
     appendGitIssues(issues, git);
-    appendScanIssues(issues, latestScan, scanSource, refreshError);
+    const selectedCount = Object.values(catalog).reduce((count, provider) => count + provider.instances.length, 0);
+    appendScanIssues(issues, observations, selectedCount, scanSource, refreshError);
     if (!this.bootstrapService) {
       issues.push({
         code: 'setup_substrate_unavailable',
@@ -295,9 +300,10 @@ export class SetupDiagnosticService {
     const repair = this.bootstrapService
       ? buildRepairSummary({
           bootstrapRequired: this.startup?.bootstrapRequired ?? false,
-          selectedCount: Object.values(catalog).reduce((count, provider) => count + provider.instances.length, 0),
+          selectedCount,
           scan: latestScan,
           manualScan: latestManualScan,
+          observations,
         })
       : null;
 
@@ -555,7 +561,8 @@ function appendGitIssues(
 
 function appendScanIssues(
   issues: SetupDiagnosticIssue[],
-  latestScan: BootstrapScanResult | null,
+  observations: ProviderSetupObservation[],
+  selectedCount: number,
   scanSource: SetupDiagnosticReport['setup']['scan']['source'],
   refreshError: unknown,
 ): void {
@@ -567,31 +574,36 @@ function appendScanIssues(
     });
   }
 
-  if (!latestScan) {
+  if (selectedCount === 0) return;
+  const matching = observations.filter((entry) => entry.configurationStatus === 'unchanged');
+  const needsDetection = Math.max(0, selectedCount - matching.length);
+  if (needsDetection > 0) {
     issues.push({
-      code: 'setup_scan_missing',
+      code: 'setup_detection_required',
       severity: 'warning',
-      message: 'No setup scan snapshot is currently available.',
+      message: `${needsDetection} selected provider(s) need detection for their current configuration.`,
     });
-    return;
   }
 
-  const availableCount = latestScan.providers.filter((provider) => provider.available).length;
-  if (availableCount === 0) {
+  const availableCount = matching.filter((provider) => provider.available).length;
+  if (availableCount === 0 && needsDetection === 0) {
     issues.push({
       code: 'provider_scan_all_unavailable',
       severity: 'error',
-      message: 'The latest setup scan did not find any ready providers.',
+      message: 'The last observations did not find any available selected providers.',
     });
   }
 
-  for (const provider of latestScan.providers.filter((entry) => !entry.available)) {
+  for (const provider of matching.filter((entry) => !entry.available)) {
     issues.push({
       code: 'provider_scan_unavailable',
       severity: 'warning',
-      message: `${provider.provider} is not ready in the latest setup scan.`,
+      message: `${provider.provider} was unavailable in its last observation.`,
       details: {
         provider: provider.provider,
+        backend: provider.backend,
+        instance: provider.instance,
+        observedAt: provider.observedAt,
         commandStatus: provider.commandStatus,
         authStatus: provider.authStatus,
       },

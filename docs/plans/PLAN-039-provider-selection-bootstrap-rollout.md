@@ -266,8 +266,26 @@ explicitly unverified, never counted as passing.
 |------|--------|
 | 2026-09-16 | Drafted shared Runtime/Platform/Desktop delivery plan from source inspection and SPEC-030; no implementation or performance measurements completed. |
 | 2026-09-16 | User authorized the defaults. Selection API/UI, revision-aware Runtime lifecycle, Platform caches/qualified selectors, and Desktop inventory/helper admission are implemented. Full regression/build validation is underway; native packaged OS acceptance and elapsed-time baselines remain unverified. |
+| 2026-09-16 | Follow-up Runtime `/setup` UX trial separates draft intent, applied selection, and observations. A single `Apply` button has an adjacent `Detect after applying` checkbox; it defaults on for first setup and off for an already configured Runtime. `Detect Again` refreshes results later. Missing installs retain selection and show repair instructions; non-CLI connections stay explicitly unverified. First-run skip and clearing all targets save idle scope. `Go to Dashboard` names the completion destination. Pending user acceptance. Automated and browser tests are deferred at the user's request; only UI assets are built for local use. |
+| 2026-09-16 | Refined in-flight feedback after user testing: a blue progress banner and button/row spinners cover saving through detection, with no premature success banner. Locked checkboxes retain their selected appearance, including the master checkbox state. Awaiting user validation; no automated or browser tests run. |
+| 2026-09-16 | Grouped provider actions in one footer below the list. Applied choices show secondary `Detect Again` beside primary `Go to Dashboard`; pending edits show `Apply` and its detection checkbox in the same area. Standalone detection retains both button positions, with a spinner and temporarily disabled Dashboard link. UI trial remains pending user acceptance; automated/browser tests and service startup are deferred at the user's request. |
+| 2026-09-16 | User completed local Runtime UX testing and authorized automated validation and PR delivery. Review found and fixed cross-editor revision races: changed selections replace stale drafts, and interrupted scans load current choices without a false completion banner. Added built-page script interaction tests and API save/read/reload observation coverage. |
+| 2026-09-16 | Runtime `npm run release:check` passed on Windows: 33 runtime skill packages verified, 217 test files / 2,181 cases passed, 2 files / 10 cases skipped by existing conditions, and package dry-run passed. Final cross-review found no blockers. |
 
 ## Implementation Evidence and Remaining Acceptance
+
+- The accepted Runtime Setup UX preserves per-target detection history across
+  selection edits and restart, displays original detection times, marks changed
+  configurations for detection, and excludes deselected history from active
+  counts. Automated validation now covers retained history, partial scans,
+  changed configuration, late-result rejection, repair/diagnostic coverage,
+  HTTP response consistency, and save/detect/failure interactions. The user's
+  earlier test deferral ended after local acceptance. `npm run release:check`
+  passed on Windows, including builds, skill verification, the complete test
+  suite (217 files / 2,181 cases passed; 10 cases skipped), and package dry-run.
+  A focused MCP/Git case initially timed out, then passed both an isolated
+  rerun and the complete suite without changing its timeout or assertions.
+  No real developer service was started or restarted for this pass.
 
 - Built-page Chromium checks on Windows passed for standalone Runtime selection,
   Platform's connected-Runtime proxy, and the Desktop bootstrap page. OpenClaw-only

@@ -237,6 +237,7 @@ routing: {providers: {claude: {default_target: {${alias}: native}}}}
     expect((await scan).providers).toEqual([]);
     expect(assessCliTarget).toHaveBeenCalledTimes(1);
     expect(await bootstrap.getLatestScan()).toBeNull();
+    expect(bootstrap.getProviderObservations()).toEqual([]);
     await bootstrap.scan({ manual: true });
     expect(assessCliTarget).toHaveBeenCalledTimes(2);
     expect((await bootstrap.getLatestScan())!.providers.map((target) => target.provider)).toEqual(['codex']);

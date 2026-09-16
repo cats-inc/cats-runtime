@@ -405,6 +405,47 @@ describe('selection-first bootstrap HTTP contract', () => {
     expect((await reloaded.json()).selection.targets).toEqual([{ provider: 'ollama', backend: 'local', instance: 'local' }]);
   });
 
+  it('returns retained observations consistently from saves, reads and configuration reloads', async () => {
+    const { app, runtime, root } = fixture();
+    const claude = { provider: 'claude', backend: 'cli', instance: 'native' };
+    const codex = { provider: 'codex', backend: 'cli', instance: 'native' };
+    const assessment = vi.spyOn(runtime.context.compatibility!, 'assessCliTarget').mockResolvedValue({
+      setup: { command: { status: 'ready' }, version: {}, auth: { status: 'unknown' }, remediation: [] },
+    } as never);
+    const setupScan = vi.spyOn(runtime.context.bootstrapService!, 'scan');
+    const first = await (await write(app, '/setup-selection', { targets: [claude], expectedRevision: 'missing' })).json();
+    expect(first.observations).toEqual([]);
+    expect((await write(app, '/setup-scan', { manual: true }, 'POST')).status).toBe(202);
+    const detected = await waitForSetupScanToSettle(runtime);
+    const savedResponse = await write(app, '/setup-selection', { targets: [claude, codex], expectedRevision: first.selection.revision });
+    expect(savedResponse.status).toBe(200);
+    const saved = await savedResponse.json();
+    expect(saved.observations).toEqual(detected.observations);
+    expect(saved.observations).toEqual([expect.objectContaining({
+      ...claude, available: true, configurationStatus: 'unchanged',
+    })]);
+    expect(saved.state.status).toBe('applied');
+    expect(JSON.stringify(saved)).not.toContain('configurationFingerprint');
+    const reread = await (await app.request('/setup-state')).json();
+    expect(reread.observations).toEqual(saved.observations);
+    expect(reread.repair.observationCoverage).toEqual({ observedCount: 1, notDetectedCount: 1, configurationChangedCount: 0 });
+    const path = createRuntimeTestPaths(root).configPath;
+    writeFileSync(path, readFileSync(path, 'utf8').replace('command: claude', 'command: changed-claude'));
+    const reloadResponse = await write(app, '/setup-selection/reload', { expectedRevision: saved.selection.revision }, 'POST');
+    expect(reloadResponse.status).toBe(200);
+    const reloaded = await reloadResponse.json();
+    expect(reloaded.observations).toEqual([expect.objectContaining({
+      ...claude, configurationStatus: 'changed', observedAt: saved.observations[0].observedAt,
+    })]);
+    expect(JSON.stringify(reloaded)).not.toContain('configurationFingerprint');
+    // Activation can prime scoped compatibility diagnostics, but saves/reads
+    // must not run another bootstrap scan or replace the retained observation.
+    expect(setupScan).toHaveBeenCalledTimes(1);
+    expect(setupScan).toHaveBeenCalledWith({ manual: true, targets: undefined });
+    setupScan.mockRestore();
+    assessment.mockRestore();
+  });
+
   it('blocks target removal during an admitted helper, then allows it after release', async () => {
     const { app } = fixture();
     const target = { provider: 'ollama', backend: 'local', instance: 'local' };
