@@ -95,8 +95,10 @@ Also:
 - When PR/release work is authorized, inspect the intended base and integrate required upstream
   changes before the final local gate. Record the tree tested and expand package scripts once to
   see which commands already include typecheck/build/test; avoid stacking duplicate phases.
-- Use focused tests while editing; run required full commit/release gates after the final diff is
-  ready. This skill does not waive repository gates or substitute a focused pass for a full pass.
+- Follow the owning repository's Local Validation Scope for the final diff too. Commit/PR creation
+  alone does not require a full local suite. Reuse passing checks with unchanged inputs; full local
+  runs need the reasons defined by that policy. Required full CI/release gates still apply, and a
+  focused local pass must be reported as focused.
 - Serialize heavy Runtime and Desktop builds/full suites on one Windows machine. Independent
   searches can run in parallel; package builds and child-process tests compete for CPU and disk.
 - Record command, scope, exit status, elapsed time, and log path. Keep valid results until another
@@ -110,7 +112,7 @@ Also:
   progress before interrupting; silence alone is not evidence of a hang. Prefer a reporter that
   emits failure details as they occur.
 - If only this skill's Markdown changes, validate frontmatter, links, diff, and discovery sync.
-  Do not run product tests solely for prose edits; any later commit remains subject to repo rules.
+  Do not run product tests solely for prose edits or the later commit/PR step.
 
 ### Desktop iteration, only when its consumers change
 
@@ -122,6 +124,10 @@ Use the official JSX/DOM bundle, not `tsx --test`. Choose affected files from th
 node --test tests/provider-selection.test.js tests/execution-label.test.js
 node --test --test-isolation=none build/test/provider-model-fields.test.js build/test/provider-model-defaults.test.js build/test/provider-model-fields-label-persist.test.js build/test/audience-participant-builder.test.js
 ```
+
+Mounted selector tests must wait for catalog loading and initial target reconciliation before
+changing model/effort. Wait for the observable target/control state, not an arbitrary delay; an
+early change can be overwritten by initialization and produce a misleading default-selection failure.
 
 Use `--test-reporter=tap` when running a required full Node suite. Package-contract tests can clear
 `build/test`; rebuild that bundle before a later test run if needed. A test-only correction does not
