@@ -1042,7 +1042,7 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
-  it('adds an honest warning when Cursor is still serving the curated static fallback', async () => {
+  it('serves the bundled Cursor shortlist without promising upstream expansion', async () => {
     const runtime = createRuntimeRoot();
 
     try {
@@ -1089,12 +1089,9 @@ describe('ProviderModelCatalogService', () => {
 
       expect(service.inspectSummary('cursor')).toEqual({
         source: 'static',
-        // `cursor-agent models` marks `auto` as the default on 2026.08.11.
-        defaultModel: 'auto',
+        defaultModel: null,
         modelCount: cursorStaticModelCount,
-        warnings: [
-          'Live model discovery is available for cursor/cli/default via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
-        ],
+        warnings: [],
         statusCounts: {
           configured: 0,
           available: 0,
@@ -1107,7 +1104,12 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
-  it('loads dynamic Cursor model catalogs through cursor-agent --list-models', async () => {
+  it('loads dynamic Cursor model catalogs through cursor-agent --list-models', async ({ onTestFinished }) => {
+    const runtime = createRuntimeRoot();
+    onTestFinished(runtime.cleanup);
+    // Exercise discovery without an opted-in shortlist, independent of the
+    // bundled policy and the developer's personal catalog.
+    writeFileSync(runtime.paths.curatedModelCatalogPath, 'schema_version: 1\ncatalogs: []\n');
     const cursorModelDiscoveryRunner = {
       run: vi.fn(async () => ({
         exitCode: 0,
@@ -1130,6 +1132,8 @@ describe('ProviderModelCatalogService', () => {
 
     const config = {
       ...createCatalogConfig(),
+      configPath: runtime.paths.configPath,
+      sessionBaseDir: runtime.paths.sessionBaseDir,
       providerDefaultTargets: {
         cursor: { backend: 'cli', instance: 'default' },
       },
@@ -1159,6 +1163,7 @@ describe('ProviderModelCatalogService', () => {
 
     const service = new ProviderModelCatalogService(config as never, {
       cursorModelDiscoveryRunner,
+      env: runtime.env,
       ttlMs: 60_000,
     });
 

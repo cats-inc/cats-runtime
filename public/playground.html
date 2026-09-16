@@ -415,7 +415,7 @@ const PROVIDER_MODELS = {
   auggie:[{value:'gpt-5.4',label:'gpt-5.4 (default)'},{value:'claude opus 4.6',label:'claude opus 4.6'},{value:'sonnet 4.6',label:'sonnet 4.6'}],
   pi:[{value:'openai-codex/gpt-5.4',label:'openai-codex/gpt-5.4 (default)'}],
   junie:[{value:'Gemini 3 Flash',label:'Gemini 3 Flash (default)'},{value:'Claude Opus 4.6',label:'Claude Opus 4.6'},{value:'Claude Opus 4.7',label:'Claude Opus 4.7'},{value:'Claude Sonnet 4.6',label:'Claude Sonnet 4.6'},{value:'Gemini 3.1 Flash Lite',label:'Gemini 3.1 Flash Lite'},{value:'Gemini 3.1 Pro Preview',label:'Gemini 3.1 Pro Preview'},{value:'GPT-5',label:'GPT-5'},{value:'GPT-5.2',label:'GPT-5.2'},{value:'GPT-5.3-codex',label:'GPT-5.3-codex'},{value:'GPT-5.4',label:'GPT-5.4'},{value:'Grok 4.1 Fast Reasoning',label:'Grok 4.1 Fast Reasoning'}],
-  cursor:[{value:'auto',label:'Auto (default)'},{value:'composer-2-fast',label:'Composer 2 Fast'},{value:'gpt-5.4-medium',label:'GPT-5.4 1M'},{value:'claude-4.6-opus-high-thinking',label:'Opus 4.6 1M Thinking'},{value:'gemini-3-flash',label:'Gemini 3 Flash'}],
+  cursor:[{value:'grok-4.6[effort=xhigh,fast=true]',label:'Cursor Grok 4.6 — Extra High, Fast'},{value:'composer-2.5[fast=true]',label:'Composer 2.5 — Fast'},{value:'claude-opus-5[thinking=true,context=300k,effort=high,fast=false]',label:'Claude Opus 5 — 300K, High, Thinking'},{value:'gpt-5.6-sol[context=272k,reasoning=medium,fast=false]',label:'GPT-5.6 Sol — 272K, Medium'},{value:'gemini-3.8-flash[reasoning_effort=high]',label:'Gemini 3.8 Flash — High'},{value:'muse-spark-1.3[context=300k,effort=high]',label:'Muse Spark 1.3 — 300K, High'}],
   kiro:[{value:'auto',label:'auto (default)'},{value:'claude-opus-4.6',label:'claude-opus-4.6'},{value:'claude-sonnet-4.6',label:'claude-sonnet-4.6'},{value:'claude-opus-4.5',label:'claude-opus-4.5'},{value:'claude-sonnet-4.5',label:'claude-sonnet-4.5'},{value:'claude-sonnet-4',label:'claude-sonnet-4'},{value:'claude-haiku-4.5',label:'claude-haiku-4.5'},{value:'deepseek-3.2',label:'deepseek-3.2'},{value:'minimax-m2.5',label:'minimax-m2.5'},{value:'minimax-m2.1',label:'minimax-m2.1'},{value:'glm-5',label:'glm-5'},{value:'qwen3-coder-next',label:'qwen3-coder-next'}],
   grok:[{value:'grok-4.6',label:'Grok 4.6'},{value:'grok-4.5',label:'Grok 4.5'}],
   cline:[{value:'cline-default',label:'Cline default'}],
@@ -457,7 +457,7 @@ function normalizeSelectableProvider(provider) {
   return selectable[0] || provider || '';
 }
 function normalizeAgentSelectionState(provider,model='',modelSelection=null,options={}) {
-  const allowLegacyModel=options.allowLegacyModel===true;
+  const allowLegacyModel=provider==='cursor'||options.allowLegacyModel===true;
   const normalized=window.CatsUI?.normalizePlaygroundAgentSelection
     ? window.CatsUI.normalizePlaygroundAgentSelection({
       provider,
@@ -1448,6 +1448,9 @@ function readAgentModelControlValues(div){
 function readAgentModelState(div){
   const provider=div.querySelector('.agent-provider')?.value||'';
   const entryId=div.querySelector('.agent-entry-choice')?.value||'';
+  if(provider==='cursor'&&entryId==='__custom_model__'){
+    return { model:div.querySelector('.agent-custom-model')?.value.trim()||'', modelSelection:null };
+  }
   const presetId=div.querySelector('.agent-preset-choice')?.value||'';
   const catalog=getProviderAdvancedCatalog(provider);
   if(catalog&&entryId){
@@ -1579,6 +1582,14 @@ function renderAgentModelChoice(div){
 
   const entryId=entryEl.value||'';
   const selectedLabel=entryEl.selectedOptions?.[0]?.textContent?.trim()||'';
+  const customGroup=div.querySelector('.agent-custom-model-group');
+  customGroup?.classList.toggle('hidden',provider!=='cursor'||entryId!=='__custom_model__');
+  if(provider==='cursor'){
+    div.querySelector('.agent-mode-group')?.classList.add('hidden');
+    hintEl.textContent=entryId==='__custom_model__'?'Enter a Cursor model string.':selectedLabel;
+    renderAgentModelControls(div,null,'','');
+    return;
+  }
   if(!catalog||entryGroup.classList.contains('hidden')){
     hintEl.textContent=entryId
       ? (selectedLabel||entryId)
@@ -1633,6 +1644,26 @@ function syncAgentModelField(div,options={}){
   const entries=listAgentCatalogEntries(catalog);
   const basicModels=PROVIDER_MODELS[provider]||[];
   const providerCatalogPending=!providerOptionsReady&&(providerOptionsLoading||providerOptionsRequestId===0);
+
+  if(provider==='cursor'){
+    const choices=entries.length>0
+      ? entries.map(entry=>({value:entry.id,label:entry.label||entry.id}))
+      : basicModels.map(entry=>({value:entry.value,label:entry.label||entry.value}));
+    const requested=normalizedState.modelSelection?.entryId||normalizedState.model||'';
+    const isCustom=(requested&&!choices.some(choice=>choice.value===requested))
+      ||(preserveCurrent&&select.value==='__custom_model__');
+    const customInput=div.querySelector('.agent-custom-model');
+    if(customInput&&isCustom&&requested&&!choices.some(choice=>choice.value===requested)) customInput.value=requested;
+    choices.push({value:'__custom_model__',label:'Custom model…'});
+    renderAgentRoutingSelectOptions(select,choices,isCustom?'__custom_model__':requested||choices[0].value);
+    select.disabled=false;
+    entryGroup.classList.remove('hidden');
+    syncAgentPresetField(div,null,'','',false);
+    renderAgentModelChoice(div);
+    refreshAgentCardSummary(div);
+    return;
+  }
+  div.querySelector('.agent-custom-model-group')?.classList.add('hidden');
 
   if(!catalog||entries.length===0){
     entryGroup.classList.remove('hidden');
@@ -1747,7 +1778,7 @@ function addAgent(name='',provider='claude',model='',tags=[],modelSelection=null
   const div=document.createElement('div'); div.id=`agent-${id}`;
   div.className='agent-card bg-slate-700/50 rounded-lg p-3 border border-slate-600';
   div.dataset.expanded='false';
-  div.innerHTML=`<div class="flex items-start gap-3"><button type="button" class="agent-card-toggle" aria-expanded="false" onclick="toggleAgentCard(${id})"><div class="agent-card-name-row"><span class="agent-summary-name agent-card-name">${escapeHtml(name)}</span><svg class="agent-card-chevron h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></div><div class="agent-summary-meta agent-card-summary-row"></div><div class="agent-summary-tags agent-card-summary-row"></div></button><button onclick="removeAgent(${id})" class="agent-remove hover:bg-slate-800/70 hover:text-red-400" title="Remove agent" aria-label="Remove agent"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg></button></div><div class="agent-card-details hidden space-y-3"><div><label class="block text-xs text-slate-400 mb-1">Name</label><input type="text" value="${escapeHtml(name)}" placeholder="Agent name" class="agent-name w-full bg-transparent border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none" /></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-slate-400">Provider</label><select class="agent-provider w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none">${listSelectableProviders().map(p=>`<option value="${p}" ${p===provider?'selected':''}>${p}</option>`).join('')}</select></div><div class="agent-entry-group"><label class="block text-xs text-slate-400">Model</label><select class="agent-entry-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select></div></div><div class="agent-mode-group"><label class="block text-xs text-slate-400">Mode</label><select class="agent-preset-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select><div class="agent-preset-static-label runtime-input hidden !py-2 text-xs text-slate-500"></div></div><div class="agent-model-controls space-y-2"></div><p class="agent-model-hint text-[11px] leading-4 text-slate-500"></p><div><label class="block text-xs text-slate-400 mb-1">Tags</label><div class="flex flex-wrap gap-x-3 gap-y-1 agent-tags">${buildTagCheckboxes(id,tags)}</div></div></div>`;
+  div.innerHTML=`<div class="flex items-start gap-3"><button type="button" class="agent-card-toggle" aria-expanded="false" onclick="toggleAgentCard(${id})"><div class="agent-card-name-row"><span class="agent-summary-name agent-card-name">${escapeHtml(name)}</span><svg class="agent-card-chevron h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></div><div class="agent-summary-meta agent-card-summary-row"></div><div class="agent-summary-tags agent-card-summary-row"></div></button><button onclick="removeAgent(${id})" class="agent-remove hover:bg-slate-800/70 hover:text-red-400" title="Remove agent" aria-label="Remove agent"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg></button></div><div class="agent-card-details hidden space-y-3"><div><label class="block text-xs text-slate-400 mb-1">Name</label><input type="text" value="${escapeHtml(name)}" placeholder="Agent name" class="agent-name w-full bg-transparent border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none" /></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-slate-400">Provider</label><select class="agent-provider w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none">${listSelectableProviders().map(p=>`<option value="${p}" ${p===provider?'selected':''}>${p}</option>`).join('')}</select></div><div class="agent-entry-group"><label class="block text-xs text-slate-400">Model</label><select class="agent-entry-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select></div></div><div class="agent-custom-model-group hidden"><label class="block text-xs text-slate-400">Custom model</label><input type="text" aria-label="Custom model" class="agent-custom-model w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" placeholder="Enter model string" /></div><div class="agent-mode-group"><label class="block text-xs text-slate-400">Mode</label><select class="agent-preset-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select><div class="agent-preset-static-label runtime-input hidden !py-2 text-xs text-slate-500"></div></div><div class="agent-model-controls space-y-2"></div><p class="agent-model-hint text-[11px] leading-4 text-slate-500"></p><div><label class="block text-xs text-slate-400 mb-1">Tags</label><div class="flex flex-wrap gap-x-3 gap-y-1 agent-tags">${buildTagCheckboxes(id,tags)}</div></div></div>`;
   list.appendChild(div);
   syncAgentModelField(div,{preserve:false,provider,model,modelSelection});
   const pSel=div.querySelector('.agent-provider'), entrySel=div.querySelector('.agent-entry-choice'), presetSel=div.querySelector('.agent-preset-choice');
@@ -1760,6 +1791,7 @@ function addAgent(name='',provider='claude',model='',tags=[],modelSelection=null
     syncAgentPresetField(div,getProviderAdvancedCatalog(providerName),entrySel.value||'','',false);
     renderAgentModelChoice(div);
     refreshAgentCardSummary(div);
+    validateStartChat();
   });
   presetSel.addEventListener('change',()=>{renderAgentModelChoice(div); refreshAgentCardSummary(div);});
   div.querySelectorAll('.agent-tag').forEach(cb=>{cb.addEventListener('change',()=>{
@@ -1769,6 +1801,7 @@ function addAgent(name='',provider='claude',model='',tags=[],modelSelection=null
     refreshAllAgentCardSummaries();
     validateStartChat();
   });});
+  div.querySelector('.agent-custom-model').addEventListener('input',()=>{refreshAgentCardSummary(div);validateStartChat();});
   nameInput.addEventListener('input',()=>{refreshAgentCardSummary(div);});
   nameInput.addEventListener('change',e=>{syncNextAgentNumber(e.target.value);refreshAgentCardSummary(div);});
   refreshAgentCardSummary(div);
@@ -1834,7 +1867,7 @@ function confirmApplyTwelveAgentPreset(){
 function applyTwelveAgentPreset(){applyAgentPreset(TWELVE_AGENT_PRESET);}
 function hasSupportingRole(agents){return agents.some(agent=>agent.tags.some(tag=>tag!=='orchestrator'));}
 function getSelectedAgents(){return getAgents().filter(agent=>agent.tags.length>0);}
-function validateStartChat(){const a=getSelectedAgents();const oc=a.filter(x=>x.tags.includes('orchestrator')).length;const v=providerOptionsReady&&!providerOptionsLoading&&oc===1&&hasSupportingRole(a);const b=document.getElementById('btn-start-chat');b.disabled=!v;b.classList.toggle('opacity-40',!v);b.classList.toggle('cursor-not-allowed',!v);}
+function validateStartChat(){const a=getSelectedAgents();const oc=a.filter(x=>x.tags.includes('orchestrator')).length;const customModelsReady=[...document.querySelectorAll('#agents-list > div')].every(div=>div.querySelector('.agent-entry-choice')?.value!=='__custom_model__'||Boolean(div.querySelector('.agent-custom-model')?.value.trim()));const v=providerOptionsReady&&!providerOptionsLoading&&oc===1&&hasSupportingRole(a)&&customModelsReady;const b=document.getElementById('btn-start-chat');b.disabled=!v;b.classList.toggle('opacity-40',!v);b.classList.toggle('cursor-not-allowed',!v);}
 function resetStartButton(){const b=document.getElementById('btn-start-chat');b.textContent='Start Chat';validateStartChat();}
 function getAgents(){return[...document.querySelectorAll('#agents-list > div')].map(div=>{const tags=[...div.querySelectorAll('.agent-tags input:checked')].map(cb=>cb.value);const modelState=readAgentModelState(div);return{name:div.querySelector('.agent-name').value.trim(),provider:div.querySelector('.agent-provider').value,model:modelState.model,modelSelection:modelState.modelSelection,tags};}).filter(a=>a.name);}
 

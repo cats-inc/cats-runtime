@@ -23,15 +23,16 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
 - **Shortlists:** Cursor Agent, Goose, Junie, Devin, Kiro, GitHub Copilot, OpenCode, Kilo Code,
   Auggie, Pi, and Cline. Maintain at most six explicitly selected model entries per CLI, plus
   custom input. Effort remains attached to its model; the custom-input action is not a model slot.
-- Exact shortlist members/order are pending individual operator decisions. Do not truncate current
+- Cursor's fixed shortlist is recorded in `docs/research/2026-09-17-cursor-fixed-presets.md`.
+  Other shortlist members/order are pending individual operator decisions. Do not truncate current
   catalogs or select the first six discovered models from this policy alone. These are product
   policy groups, not a substitute for deriving the registered inventory during an audit.
 - Custom input remains available for both groups, including API-key-backed use on supported
   execution paths. Preserve backend-specific identifiers; this policy does not establish new
   adapter/API support or unknown model capabilities.
 
-This amendment records the intended policy and maintenance scope; menu enforcement is not yet
-implemented. No scheduled refresh cadence or automated refresh job has been specified.
+Cursor implements its approved shortlist with fixed parameterized model strings; other shortlist
+rollouts remain pending. No scheduled refresh cadence or automated refresh job has been specified.
 
 ## Route the request
 
@@ -159,6 +160,8 @@ authorizes that external mutation.
 - [Codex](./references/providers/codex.md): supplied picker evidence, existing per-model defaults,
   exact display labels, fallback locations, and focused Runtime/Desktop validation.
 - [Copilot](./references/providers/copilot.md): account-resolved interactive model list.
+- [Cursor](./references/providers/cursor.md): exact parameterized variant strings, fixed-combination
+  shortlists, refresh/custom-input preservation, and isolated discovery fixtures.
 - [Grok](./references/providers/grok.md): screenshot/transcription evidence, retained effort-token
   mappings, and first-item selection that reaches the execution arguments.
 - [Kiro](./references/providers/kiro.md): authenticated, account-gated model listing and effort.

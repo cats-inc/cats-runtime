@@ -495,7 +495,9 @@ export function normalizeVerbatimCuratedModelId(
  * spaces, so the two never collide.
  */
 function isCursorModelId(value: string): boolean {
-  return /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/.test(value);
+  // Parameterized ids come from Cursor's variantStringRepresentation. Preserve
+  // the complete expression: legacy slugs can resolve to a different context.
+  return /^[a-z0-9]+(?:[.-][a-z0-9]+)*(?:\[[a-z][a-z0-9_]*=[a-z0-9.-]+(?:,[a-z][a-z0-9_]*=[a-z0-9.-]+)*\])?$/.test(value);
 }
 
 export function normalizeCursorCuratedModelId(model: CuratedModelCatalogModel): string | null {

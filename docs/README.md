@@ -20,9 +20,13 @@ scheduled polling, verified account linkage and durable history remain deferred.
 
 ## Provider Detection
 
+[Cursor fixed presets](./research/2026-09-17-cursor-fixed-presets.md) records the six approved
+combinations, parameterized execution, refresh-stable shortlist, and custom input.
+
 [Approved model-menu maintenance policy](./specs/SPEC-028-provider-model-catalog-maintenance-skill.md#approved-maintenance-and-menu-policy-2026-09-17)
 records complete catalogs for Codex/Claude/agy/Grok/Muse, up to six models for the named other
-CLIs, and custom model input for both groups. Individual shortlists and UI enforcement are pending.
+CLIs, and custom model input for both groups. Cursor's shortlist is implemented; the remaining
+individual shortlists and rollout are pending.
 
 [Grok Build 1.0.34 picker](./research/2026-09-17-grok-model-picker-refresh.md)
 records exact effort labels and first-item initialization in Desktop and Playground

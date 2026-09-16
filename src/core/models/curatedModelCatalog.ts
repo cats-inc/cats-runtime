@@ -74,6 +74,7 @@ export interface CuratedModelCatalogEntry {
   cli: string;
   version?: string;
   lastUpdated?: string;
+  selectionMode?: 'shortlist';
   notes?: string[];
   sharedOptions?: CuratedModelCatalogOption[];
   models?: CuratedModelCatalogModel[];
@@ -308,8 +309,13 @@ function parseCatalogEntry(
   const lastUpdated = readNonEmptyString(doc.last_updated);
   const notes = readStringList(doc.notes);
 
+  if (doc.selection_mode !== undefined && doc.selection_mode !== 'shortlist') {
+    warnings.push(`Curated model catalog entry '${label}.selection_mode' must be 'shortlist'.`);
+  }
+
   return {
     cli,
+    ...(doc.selection_mode === 'shortlist' ? { selectionMode: 'shortlist' as const } : {}),
     ...(version ? { version } : {}),
     ...(lastUpdated ? { lastUpdated } : {}),
     ...(notes ? { notes } : {}),

@@ -66,11 +66,13 @@ Discovery may observe more models than Cats' shortlist; a refresh must not silen
 approved shortlist. Complete upstream evidence and complete coverage of a selected shortlist are
 different claims and must remain distinguishable.
 
-**Implementation status:** policy recorded only. The owner explicitly chose to specify each
-shortlist later. No particular model membership or order, catalog removal, UI enforcement change,
-automated refresh job, or periodic refresh interval is authorized by this amendment. Custom input
-already has a Desktop implementation; empty-catalog reachability and Playground consistency remain
-implementation checks for the later rollout. Providers outside the named groups retain their
+**Implementation status:** Cursor's six fixed combos and custom input are implemented as recorded
+in [the Cursor evidence note](../research/2026-09-17-cursor-fixed-presets.md). The owner explicitly
+chose to specify other shortlists later. No other model membership or order, catalog removal,
+UI enforcement change, automated refresh job, or periodic refresh interval is authorized by this
+amendment. Custom input already has a Desktop implementation; empty-catalog reachability and
+Playground consistency for the remaining providers are checks for their later rollout.
+Providers outside the named groups retain their
 existing policy until separately specified.
 
 ## Goals
