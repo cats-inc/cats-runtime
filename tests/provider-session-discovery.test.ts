@@ -184,6 +184,28 @@ describe('automatic provider session discovery', () => {
     expect(runtime.context.registry.list({ provider: 'devin' })).toEqual([]);
   });
 
+  it.each(['background', 'manual'] as const)('holds selection through %s agent enumeration', async (mode) => {
+    const { runtime, discovery } = fixture(true);
+    let finish!: (value: { supported: boolean; summary: string; sessions: [] }) => void;
+    const listing = vi.spyOn(runtime.context.agentBackend!, 'listSessions')
+      .mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const request = mode === 'manual'
+      ? runtime.app.request('/sessions/discover', { method: 'POST' })
+      : undefined;
+    if (mode === 'background') discovery.start();
+    await vi.waitFor(() => expect(listing).toHaveBeenCalledTimes(1));
+    const selection = runtime.context.bootstrapService!.selection.getSnapshot();
+    const saveEmpty = () => runtime.app.request('/setup-selection', {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ expectedRevision: selection.revision, targets: [] }),
+    });
+    expect((await saveEmpty()).status).toBe(409);
+    discovery.stop();
+    finish({ supported: false, summary: 'Finished', sessions: [] });
+    await request;
+    await vi.waitFor(async () => expect((await saveEmpty()).status).toBe(200));
+  });
+
   it('retains known sessions on errors and retries, but stops polling unsupported agents', async () => {
     const { runtime, discovery } = fixture(true);
     runtime.context.registry.upsertDiscovered('known', {

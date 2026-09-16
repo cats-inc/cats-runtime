@@ -152,6 +152,7 @@ export class OpencodeNativeSessionService {
   private readonly fetchFn: typeof fetch;
   private readonly launcher: OpencodeServerLauncher;
   private server: ResolvedServer | null = null;
+  private closed = false;
   private serverPromise: Promise<ResolvedServer | null> | null = null;
 
   constructor(options: OpencodeNativeSessionServiceOptions) {
@@ -403,6 +404,7 @@ export class OpencodeNativeSessionService {
   }
 
   async close(): Promise<void> {
+    this.closed = true;
     const current = this.server;
     this.server = null;
     this.serverPromise = null;
@@ -420,7 +422,7 @@ export class OpencodeNativeSessionService {
     } = {},
   ): Promise<T> {
     const server = await this.resolveServer(options.startIfNeeded ?? true);
-    if (!server) {
+    if (!server || this.closed) {
       throw new Error('OpenCode server is not running');
     }
 
@@ -463,6 +465,7 @@ export class OpencodeNativeSessionService {
   }
 
   private async resolveServer(startIfNeeded: boolean): Promise<ResolvedServer | null> {
+    if (this.closed) throw new Error('Native session service is closed');
     if (this.server) {
       return this.server;
     }
@@ -481,6 +484,7 @@ export class OpencodeNativeSessionService {
         };
       }
 
+      if (this.closed) throw new Error('Native session service is closed');
       if (!startIfNeeded) {
         return null;
       }
@@ -500,6 +504,10 @@ export class OpencodeNativeSessionService {
 
     try {
       const server = await this.serverPromise;
+      if (this.closed) {
+        if (server?.managed) server.close();
+        throw new Error('Native session service closed during startup');
+      }
       if (server) {
         this.server = server;
       }

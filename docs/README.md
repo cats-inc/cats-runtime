@@ -24,6 +24,16 @@ scheduled polling, verified account linkage and durable history remain deferred.
 records the September 16 picker refresh and the per-entry defaults consumed by
 Desktop and Playground.
 
+The [selection-first bootstrap contract](./specs/SPEC-030-provider-selection-before-bootstrap-probes.md)
+uses active provider configuration to bound provider work across standalone
+Runtime, local Platform, and packaged Desktop. Selection is saved before probes;
+missing/invalid configuration requires repair and explicit empty selection is
+idle mode. Revision-aware scans, lifecycle admission, and host integration are
+implemented; PLAN-039 records integrated validation and native OS limits.
+
+- [ADR-039: accepted provider selection boundary](./decisions/039-use-selected-provider-config-as-the-resource-boundary.md)
+- [PLAN-039: Runtime, Platform, and Desktop rollout](./plans/PLAN-039-provider-selection-bootstrap-rollout.md)
+
 Provider detection incident: [Cline updates at Windows login and passive detection for all CLIs](./research/2026-08-27-cline-self-update-and-probe-concurrency.md)
 records the September 15 recurrence, shared CLI/ACP policy, Desktop handling,
 and regression scope.
@@ -132,5 +142,5 @@ later passes:
 
 ---
 
-*Last updated: 2026-09-01 (SPEC-028 and PLAN-037 implemented the provider catalog
-maintenance skill, safe cross-agent mirrors, and lossless raw-paste tooling.)*
+*Last updated: 2026-09-16 (SPEC-030, ADR-039, and PLAN-039 document the accepted
+selection-first bootstrap contract and rollout across Runtime, Platform, and Desktop.)*

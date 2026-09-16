@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   inspectRuntimeConfig,
@@ -231,11 +231,11 @@ describe('shouldEnterBootstrapMode', () => {
     )).toBe(true);
   });
 
-  it('returns true when config has no usable targets', () => {
+  it('allows an explicitly empty provider selection', () => {
     expect(shouldEnterBootstrapMode(
       { ...baseInspection, parsedProviderCount: 0, hasUsableTargets: false },
       false,
-    )).toBe(true);
+    )).toBe(false);
   });
 });
 
@@ -312,938 +312,135 @@ describe('WSL default discovery policy', () => {
 // Bootstrap Server Integration
 // ---------------------------------------------------------------------------
 
-describe('bootstrap mode server', () => {
-  it('GET / redirects to /setup in bootstrap mode', async () => {
+describe('selection-first bootstrap HTTP contract', () => {
+  const runtimes: ReturnType<typeof createRuntimeServer>[] = [];
+  const cleanups: Array<() => void> = [];
+  afterEach(async () => {
+    for (const runtime of runtimes.splice(0)) await runtime.close();
+    for (const cleanup of cleanups.splice(0)) cleanup();
+  });
+  function fixture(apiKey = '') {
     const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        const response = await runtime.app.request('/');
-        expect(response.status).toBe(302);
-        expect(response.headers.get('location')).toBe('/setup');
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
+    cleanups.push(cleanup);
+    const env = createTestEnv(root);
+    ensureDirs(env);
+    const config = loadConfig(env);
+    Object.assign(config, { host: '127.0.0.1', port: 0, apiKey });
+    const runtime = createRuntimeServer(config, { startup: createRuntimeStartupState({ bootstrapRequired: true }),
+      compatibility: createFastCompatibility(env) });
+    runtimes.push(runtime);
+    return { runtime, root, config, app: runtime.app };
+  }
+  function write(app: ReturnType<typeof createRuntimeServer>['app'], path: string, body: unknown, method = 'PUT', apiKey = '') {
+    return app.request(path, { method, headers: { 'content-type': 'application/json',
+      ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}) }, body: JSON.stringify(body) });
+  }
+
+  it('exposes static choices before any provider is active', async () => {
+    const { app } = fixture();
+    const state = await (await app.request('/setup-state')).json();
+    expect(state.selection).toMatchObject({ state: 'missing', targets: [], revision: 'missing' });
+    expect(state.universe.length).toBeGreaterThan(16);
+    expect(state.repair.status).toBe('selection_required');
+    expect((await write(app, '/setup-scan', { manual: true }, 'POST')).status).toBe(409);
+    for (const path of ['/', '/dashboard', '/playground']) {
+      const response = await app.request(path);
+      expect(response.status).toBe(302);
+      expect(response.headers.get('location')).toBe('/setup');
     }
   });
 
-  it('GET /dashboard redirects to /setup in bootstrap mode', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        const response = await runtime.app.request('/dashboard');
-        expect(response.status).toBe(302);
-        expect(response.headers.get('location')).toBe('/setup');
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
+  it('saves empty intent, exits bootstrap, and remains idle after restart', async () => {
+    const { app, runtime, root } = fixture();
+    const saved = await write(app, '/setup-selection', { targets: [], expectedRevision: 'missing' });
+    expect(saved.status).toBe(200);
+    expect((await saved.json()).selection.state).toBe('empty');
+    expect(runtime.context.startup.bootstrapRequired).toBe(false);
+    expect((await app.request('/')).status).toBe(200);
+    expect(shouldEnterBootstrapMode(inspectRuntimeConfig(createTestEnv(root)))).toBe(false);
+    const config = await (await app.request('/providers/config')).json();
+    expect(config.providers).toEqual({});
+    expect((await write(app, '/setup-apply', { providers: ['claude'] }, 'POST')).status).toBe(404);
   });
 
-  it('GET /playground redirects to /setup in bootstrap mode', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        const response = await runtime.app.request('/playground');
-        expect(response.status).toBe(302);
-        expect(response.headers.get('location')).toBe('/setup');
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
+  it('does not label a configuration response with a different selection revision', async () => {
+    const { app, runtime } = fixture();
+    const saved = await (await write(app, '/setup-selection', {
+      targets: [{ provider: 'claude', backend: 'cli', instance: 'native' }], expectedRevision: 'missing',
+    })).json();
+    const inspect = vi.spyOn(runtime.context.providerModelCatalog, 'inspectSummary').mockImplementationOnce(() => {
+      runtime.context.bootstrapService!.saveSelection([], saved.selection.revision);
+      throw new Error('Target was removed while reading metadata');
+    });
+    expect((await app.request('/providers/config')).status).toBe(409);
+    inspect.mockRestore();
+    const current = await (await app.request('/providers/config')).json();
+    expect(current.providers).toEqual({});
+    expect(current.revision).not.toBe(saved.selection.revision);
   });
 
-  it('session and agent discovery routes return 409 in bootstrap mode', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        const response = await runtime.app.request('/sessions', { method: 'GET' });
-        expect(response.status).toBe(409);
-        const body = await response.json() as Record<string, unknown>;
-        expect(body.error).toBe('runtime_bootstrap_required');
-
-        const agentResponse = await runtime.app.request('/agent/sessions/discover', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ provider: 'devin' }),
-        });
-        expect(agentResponse.status).toBe(409);
-        const agentBody = await agentResponse.json() as Record<string, unknown>;
-        expect(agentBody.error).toBe('runtime_bootstrap_required');
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
+  it('saves missing and non-CLI providers without requiring an installed CLI', async () => {
+    const { app } = fixture();
+    const targets = [{ provider: 'claude', backend: 'cli', instance: 'native' },
+      { provider: 'ollama', backend: 'local', instance: 'local' },
+      { provider: 'openclaw', backend: 'agent', instance: 'gateway' }];
+    const response = await write(app, '/setup-selection', { targets, expectedRevision: 'missing' });
+    expect(response.status).toBe(200);
+    const saved = (await response.json()).selection;
+    expect(saved.targets).toEqual(targets);
+    const state = await (await app.request('/setup-state')).json();
+    expect(state.bootstrapRequired).toBe(false);
+    expect(state.scan).toBeNull();
+    expect((await write(app, '/setup-scan', { targets: [{ provider: 'codex', backend: 'cli', instance: 'native' }] }, 'POST')).status).toBe(400);
   });
 
-  it('GET /setup-state returns bootstrap state', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        const response = await runtime.app.request('/setup-state');
-        expect(response.status).toBe(200);
-        const body = await response.json() as Record<string, unknown>;
-        expect(body.bootstrapRequired).toBe(true);
-        expect(body.state).toBeTruthy();
-        expect(body.universe).toBeTruthy();
-        expect(body.repair).toEqual(expect.objectContaining({
-          status: 'scan_required',
-          nextAction: expect.objectContaining({
-            kind: 'run_manual_scan',
-            path: '/setup-scan',
-          }),
-          actions: expect.arrayContaining([
-            expect.objectContaining({
-              kind: 'run_manual_scan',
-              path: '/setup-scan',
-              body: {
-                manual: true,
-              },
-            }),
-            expect.objectContaining({
-              kind: 'generate_setup_report',
-              path: '/diagnostics/setup-report',
-              body: {
-                refreshScan: true,
-              },
-            }),
-          ]),
-        }));
-        expect(body.diagnostics).toEqual({
-          latestReport: null,
-        });
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
+  it('requires current revision and preserves edits on disk', async () => {
+    const { app, root } = fixture();
+    const saved = await (await write(app, '/setup-selection', { targets: [], expectedRevision: 'missing' })).json();
+    const path = createRuntimeTestPaths(root).configPath;
+    writeFileSync(path, 'version: 1\nbackends:\n  local:\n    providers:\n      ollama:\n        instances:\n          local: { transport: ollama }\n');
+    expect((await write(app, '/setup-selection', { targets: [], expectedRevision: saved.selection.revision })).status).toBe(409);
+    const reloaded = await write(app, '/setup-selection/reload', { expectedRevision: saved.selection.revision }, 'POST');
+    expect(reloaded.status).toBe(200);
+    expect((await reloaded.json()).selection.targets).toEqual([{ provider: 'ollama', backend: 'local', instance: 'local' }]);
   });
 
-  it('POST /setup-scan answers immediately instead of holding the request open', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        // No timeout on this assertion on purpose: the point of the route is
-        // that it returns before the probes do, so it must answer well inside a
-        // default test timeout even though a real scan takes minutes.
-        const response = await runtime.app.request('/setup-scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
-        expect(response.status).toBe(202);
-        const body = await response.json() as Record<string, unknown>;
-        expect(body).toEqual(expect.objectContaining({
-          status: 'scanning',
-          started: true,
-        }));
-        expect(body.state).toEqual(expect.objectContaining({ status: 'scanning' }));
-
-        // A second start while the first is running is refused, not queued.
-        const second = await runtime.app.request('/setup-scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
-        expect(second.status).toBe(202);
-        expect(await second.json()).toEqual(expect.objectContaining({
-          status: 'scanning',
-          started: false,
-        }));
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
+  it('blocks target removal during an admitted helper, then allows it after release', async () => {
+    const { app } = fixture();
+    const target = { provider: 'ollama', backend: 'local', instance: 'local' };
+    const saved = await (await write(app, '/setup-selection', { targets: [target], expectedRevision: 'missing' })).json();
+    const operation = await (await write(app, '/setup-operations', { target, expectedRevision: saved.selection.revision }, 'POST')).json();
+    expect((await write(app, '/setup-selection', { targets: [], expectedRevision: saved.selection.revision })).status).toBe(409);
+    expect((await app.request('/setup-operations/' + operation.operationId, { method: 'DELETE' })).status).toBe(204);
+    expect((await write(app, '/setup-selection', { targets: [], expectedRevision: saved.selection.revision })).status).toBe(200);
   });
 
-  // Real scan against the host's CLIs, waited out through /setup-state the way
-  // every caller now does. The ceiling covers two serialized probe timeouts per
-  // provider (see ProviderCompatibilityService) on a host with every CLI
-  // installed; it is not a contract, only a bound on this test hanging.
-  it('POST /setup-scan without manual flag preserves auto scan semantics', { timeout: 240_000 }, async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        const response = await runtime.app.request('/setup-scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
-        expect(response.status).toBe(202);
-
-        const stateBody = await waitForSetupScanToSettle(runtime);
-        expect(stateBody.state).toEqual(expect.objectContaining({ status: 'ready' }));
-        expect(stateBody.scan).toEqual(expect.objectContaining({
-          scanType: 'auto',
-        }));
-        expect(stateBody.manualScan).toBeNull();
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
+  it('requires bearer auth for setup reads, writes, scans, reloads, and helper admission', async () => {
+    const { app } = fixture('test-secret');
+    expect((await app.request('/setup-state')).status).toBe(401);
+    for (const [method, path] of [['PUT', '/setup-selection'], ['POST', '/setup-scan'],
+      ['POST', '/setup-selection/reload'], ['POST', '/setup-operations'], ['DELETE', '/setup-operations/id']]) {
+      expect((await write(app, path!, {}, method!)).status).toBe(401);
     }
+    expect((await write(app, '/setup-selection', { targets: [], expectedRevision: 'missing' }, 'PUT', 'test-secret')).status).toBe(200);
   });
 
-  it('setup routes require auth when apiKey is set, even in bootstrap mode', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0, apiKey: 'test-secret' };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        // Unauthenticated — should get 401 even in bootstrap mode
-        const unauthRes = await runtime.app.request('/setup-state');
-        expect(unauthRes.status).toBe(401);
-
-        // Authenticated — should get 200
-        const authRes = await runtime.app.request('/setup-state', {
-          headers: { 'Authorization': 'Bearer test-secret' },
-        });
-        expect(authRes.status).toBe(200);
-        const body = await authRes.json() as Record<string, unknown>;
-        expect(body.bootstrapRequired).toBe(true);
-
-        // Setup page HTML is served before auth middleware, so it's always accessible
-        const pageRes = await runtime.app.request('/setup');
-        expect(pageRes.status).toBe(200);
-        const html = await pageRes.text();
-        expect(html).toContain('apiKeyInput');
-        expect(html).toContain('validateApiKeyInput');
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('BootstrapService scan persists artifacts', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const dataDir = createRuntimeTestPaths(root).dataDir;
-      const configPath = createRuntimeTestPaths(root).configPath;
-      const config = loadConfig(env);
-      // Use a stub compatibility service that returns fast
-      const { ProviderCompatibilityService } = await import(
-        '../src/core/compatibility/ProviderCompatibilityService.js'
-      );
-      const compatibility = new ProviderCompatibilityService(config, {
-        runner: {
-          run: async () => ({
-            exitCode: null, stdout: '', stderr: '',
-            timedOut: false, durationMs: 0,
-            error: 'Stub for test.',
-          }),
-        },
-        installCheckRunner: {
-          lookupCommand: async () => ({ available: false, timedOut: false }),
-          checkPath: async () => ({ exists: false, timedOut: false }),
-          checkNpmPackage: async () => ({ exists: false, timedOut: false }),
-          checkShellRcEntry: async () => ({ exists: false, timedOut: false }),
-          getNpmPrefix: async () => ({ value: undefined, timedOut: false }),
-        },
-      });
-      const { BootstrapService } = await import(
-        '../src/core/bootstrap/BootstrapService.js'
-      );
-      const bootstrap = new BootstrapService({
-        dataDir,
-        configPath,
-        config,
-        compatibility,
-      });
-
-      const result = await bootstrap.scan({ manual: true });
-      expect(result.scanType).toBe('manual');
-      expect(result.providers.length).toBeGreaterThan(0);
-
-      const scanPath = join(dataDir, 'setup', 'provider-scan.json');
-      expect(existsSync(scanPath)).toBe(true);
-      const manualScanPath = join(dataDir, 'setup', 'provider-manual-scan.json');
-      expect(existsSync(manualScanPath)).toBe(true);
-
-      const state = await bootstrap.getSetupState();
-      expect(state.status).toBe('ready');
-      expect(state.lastScanAt).toBeTruthy();
-      expect(state.lastManualScanAt).toBeTruthy();
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('POST /setup-apply writes config and exits bootstrap mode', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const configPath = createRuntimeTestPaths(root).configPath;
-      mkdirSync(createRuntimeTestPaths(root).configDir, { recursive: true });
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0, configPath };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        // Apply with claude selected
-        const response = await runtime.app.request('/setup-apply', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ providers: ['claude'] }),
-        });
-        expect(response.status).toBe(200);
-        const body = await response.json() as Record<string, unknown>;
-        expect(body.status).toBe('applied');
-        expect(body.bootstrapRequired).toBe(false);
-        expect(body.restart).toBe(false);
-
-        // Verify config file written
-        expect(existsSync(configPath)).toBe(true);
-        const yaml = readFileSync(configPath, 'utf8');
-        expect(yaml).toContain('claude');
-
-        // Verify bootstrap mode exited
-        expect(startup.bootstrapRequired).toBe(false);
-
-        // Session routes should now work (not 409)
-        const sessionResponse = await runtime.app.request('/sessions', { method: 'GET' });
-        expect(sessionResponse.status).not.toBe(409);
-
-        // /providers/config should reflect claude as the selected default target
-        const configResponse = await runtime.app.request('/providers/config');
-        expect(configResponse.status).toBe(200);
-        const configBody = await configResponse.json() as {
-          providers: Record<string, {
-            defaultBackend?: string;
-            defaultInstance?: string;
-            instances?: Array<{ id?: string; target?: string }>;
-          }>;
-        };
-        expect(configBody.providers).toHaveProperty('claude');
-        expect(configBody.providers.claude).toEqual(expect.objectContaining({
-          defaultBackend: 'cli',
-          defaultInstance: 'native',
-        }));
-        expect(configBody.providers.claude.instances).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({
-              id: 'native',
-              target: 'cli/native',
-            }),
-          ]),
-        );
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('POST /setup-apply stays in bootstrap mode when config reload fails', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const configPath = createRuntimeTestPaths(root).configPath;
-      mkdirSync(createRuntimeTestPaths(root).configDir, { recursive: true });
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0, configPath };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        if (!runtime.context.bootstrapService) {
-          throw new Error('Bootstrap service missing for test');
-        }
-        runtime.context.bootstrapService.applyConfig = async () => {
-          writeFileSync(configPath, [
-            'version: 1',
-            'environments:',
-            '  native:',
-            '    kind: native',
-            'backends:',
-            '  cli:',
-            '    providers:',
-            '      claude:',
-            '        instances:',
-            '          default:',
-            '            environment: native',
-            '            command: claude',
-            '            runner: auto',
-            '            projects_dir: /native/claude/projects',
-            '  api:',
-            '    providers:',
-            '      claude:',
-            '        instances:',
-            '          sonnet:',
-            '            transport: anthropic',
-            '            api_key_env: ANTHROPIC_API_KEY',
-            '            model: claude-sonnet-4-6',
-            '',
-          ].join('\n'), 'utf8');
-          return { configPath };
-        };
-
-        const response = await runtime.app.request('/setup-apply', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ providers: ['claude'] }),
-        });
-        expect(response.status).toBe(500);
-        const body = await response.json() as Record<string, unknown>;
-        expect(String(body.error)).toContain('configured in multiple backends');
-        expect(startup.bootstrapRequired).toBe(true);
-
-        const sessionResponse = await runtime.app.request('/sessions', { method: 'GET' });
-        expect(sessionResponse.status).toBe(409);
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('GET /health reflects bootstrap mode', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        const response = await runtime.app.request('/health');
-        expect(response.status).toBe(200);
-        const body = await response.json() as Record<string, unknown>;
-        const startupState = body.startup as Record<string, unknown>;
-        expect(startupState.bootstrapRequired).toBe(true);
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('GET /setup-state includes full scan.providers after a scan', { timeout: 60_000 }, async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, {
-        startup,
-        compatibility: createFastCompatibility(env),
-      });
-      try {
-        // Run a scan first
-        await runtime.app.request('/setup-scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ manual: false }),
-        });
-        await waitForSetupScanToSettle(runtime);
-
-        // Now check state
-        const response = await runtime.app.request('/setup-state');
-        expect(response.status).toBe(200);
-        const body = await response.json() as Record<string, unknown>;
-        const scan = body.scan as Record<string, unknown>;
-        expect(scan).toBeTruthy();
-        expect(Array.isArray(scan.providers)).toBe(true);
-        expect((scan.providers as unknown[]).length).toBeGreaterThan(0);
-        // Backward-compatible summary fields still present
-        expect(typeof scan.providerCount).toBe('number');
-        expect(typeof scan.availableCount).toBe('number');
-        expect(body.repair).toEqual(expect.objectContaining({
-          preferredScan: expect.objectContaining({
-            source: 'scan',
-            providerCount: expect.any(Number),
-          }),
-          providersReadyToApply: expect.any(Array),
-          nextAction: expect.objectContaining({
-            kind: 'apply_config',
-            path: '/setup-apply',
-            providers: expect.any(Array),
-          }),
-          actions: expect.arrayContaining([
-            expect.objectContaining({
-              kind: 'apply_config',
-              path: '/setup-apply',
-              providers: expect.any(Array),
-            }),
-            expect.objectContaining({
-              kind: 'generate_setup_report',
-              path: '/diagnostics/setup-report',
-            }),
-          ]),
-        }));
-        expect((body.repair as { providersReadyToApply: unknown[] }).providersReadyToApply.length)
-          .toBeGreaterThan(0);
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('GET /setup-state surfaces remediation previews and repair actions after a manual scan with failures', { timeout: 60_000 }, async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, {
-        startup,
-        compatibility: createFastCompatibility(env),
-      });
-      try {
-        const bootstrapService = runtime.context.bootstrapService;
-        if (!bootstrapService) {
-          throw new Error('Bootstrap service missing for test');
-        }
-
-        bootstrapService.getLatestManualScan = async () => ({
-          scannedAt: '2026-03-26T05:00:00.000Z',
-          scanType: 'manual',
-          providers: [
-            {
-              provider: 'claude',
-              family: 'Claude',
-              commandStatus: 'ready',
-              commandPath: 'claude',
-              version: '1.0.0',
-              authStatus: 'ready',
-              available: true,
-              install: null,
-              remediation: [],
-            },
-            {
-              provider: 'codex',
-              family: 'Codex',
-              commandStatus: 'missing_install',
-              commandPath: null,
-              version: null,
-              authStatus: 'unknown',
-              available: false,
-              install: null,
-              remediation: [
-                {
-                  code: 'install_missing',
-                  summary: 'Install Codex CLI.',
-                },
-                {
-                  code: 'auth_missing',
-                  summary: 'Set OPENAI_API_KEY.',
-                },
-              ],
-            },
-          ],
-        });
-
-        const response = await runtime.app.request('/setup-state');
-        expect(response.status).toBe(200);
-        const body = await response.json() as Record<string, unknown>;
-        expect(body.repair).toEqual(expect.objectContaining({
-          status: 'attention_required',
-          providersReadyToApply: [
-            {
-              provider: 'claude',
-              family: 'Claude',
-            },
-          ],
-          providersNeedingAttention: [
-            expect.objectContaining({
-              provider: 'codex',
-              family: 'Codex',
-              remediationCount: 2,
-              remediationPreview: [
-                {
-                  code: 'install_missing',
-                  summary: 'Install Codex CLI.',
-                },
-                {
-                  code: 'auth_missing',
-                  summary: 'Set OPENAI_API_KEY.',
-                },
-              ],
-            }),
-          ],
-          nextAction: expect.objectContaining({
-            kind: 'apply_config',
-            path: '/setup-apply',
-            providers: ['claude'],
-          }),
-          actions: expect.arrayContaining([
-            expect.objectContaining({
-              kind: 'apply_config',
-              providers: ['claude'],
-            }),
-            expect.objectContaining({
-              kind: 'review_remediation',
-              providers: ['codex'],
-            }),
-            expect.objectContaining({
-              kind: 'generate_setup_report',
-              path: '/diagnostics/setup-report',
-            }),
-          ]),
-        }));
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('GET /setup-state includes manualScan after manual scan', { timeout: 60_000 }, async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, {
-        startup,
-        compatibility: createFastCompatibility(env),
-      });
-      try {
-        // Run a manual scan
-        await runtime.app.request('/setup-scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ manual: true }),
-        });
-        await waitForSetupScanToSettle(runtime);
-
-        const response = await runtime.app.request('/setup-state');
-        expect(response.status).toBe(200);
-        const body = await response.json() as Record<string, unknown>;
-        const manualScan = body.manualScan as Record<string, unknown>;
-        expect(manualScan).toBeTruthy();
-        expect(manualScan.scanType).toBe('manual');
-        expect(Array.isArray(manualScan.providers)).toBe(true);
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('GET /setup-state surfaces latest setup-report highlights from persisted diagnostics artifacts', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        const generateResponse = await runtime.app.request('/diagnostics/setup-report', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshScan: false }),
-        });
-        expect(generateResponse.status).toBe(200);
-        const generated = await generateResponse.json() as {
-          report: {
-            artifactId: string;
-            generatedAt: string;
-            summary: {
-              status: string;
-              issueCounts: {
-                info: number;
-                warnings: number;
-                errors: number;
-              };
-              headline: string;
-              highlights: string[];
-            };
-          };
-          artifactPath: string;
-        };
-
-        const setupStateResponse = await runtime.app.request('/setup-state');
-        expect(setupStateResponse.status).toBe(200);
-        const body = await setupStateResponse.json() as {
-          diagnostics: {
-            latestReport: {
-              artifactId: string;
-              artifactPath: string;
-              generatedAt: string;
-              status: string;
-              issueCounts: {
-                info: number;
-                warnings: number;
-                errors: number;
-              };
-              headline: string;
-              highlights: string[];
-            } | null;
-          };
-        };
-
-        expect(body.diagnostics.latestReport).toEqual({
-          artifactId: generated.report.artifactId,
-          artifactPath: generated.artifactPath,
-          generatedAt: generated.report.generatedAt,
-          status: generated.report.summary.status,
-          issueCounts: generated.report.summary.issueCounts,
-          headline: generated.report.summary.headline,
-          highlights: generated.report.summary.highlights,
-        });
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('GET /setup-state returns manualScan null when no manual scan run', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        const response = await runtime.app.request('/setup-state');
-        expect(response.status).toBe(200);
-        const body = await response.json() as Record<string, unknown>;
-        expect(body.manualScan).toBeNull();
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('GET /setup-state includes full detail in non-bootstrap mode after a scan', { timeout: 60_000 }, async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      // Start in bootstrap, scan, then exit bootstrap to verify detail persists
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, {
-        startup,
-        compatibility: createFastCompatibility(env),
-      });
-      try {
-        // Run a scan while still in bootstrap
-        await runtime.app.request('/setup-scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ manual: true }),
-        });
-        await waitForSetupScanToSettle(runtime);
-
-        // Exit bootstrap mode
-        startup.bootstrapRequired = false;
-
-        // GET state in non-bootstrap — full detail should still be present
-        // because setup routes go through bearer auth like any other route
-        const response = await runtime.app.request('/setup-state');
-        expect(response.status).toBe(200);
-        const body = await response.json() as Record<string, unknown>;
-        expect(body.bootstrapRequired).toBe(false);
-        const scan = body.scan as Record<string, unknown>;
-        expect(scan).toBeTruthy();
-        expect(Array.isArray(scan.providers)).toBe(true);
-        expect((scan.providers as unknown[]).length).toBeGreaterThan(0);
-        expect(typeof scan.providerCount).toBe('number');
-        expect(body.manualScan).toBeTruthy();
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('GET /setup in bootstrap mode includes shared UI foundation', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        const response = await runtime.app.request('/setup');
-        expect(response.status).toBe(200);
-        const html = await response.text();
-        expect(html).toContain('Setup &amp; Repair');
-        expect(html).toContain('data-cats-ui');
-        expect(html).toContain('window.CatsUI');
-        expect(html).toContain('data-runtime-surface-switcher');
-        expect(html).toContain('data-active-surface="setup"');
-        expect(html).toContain('data-bootstrap-required="true"');
-        expect(html).toContain('runtime-surface-item-badge">Locked');
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('GET / serves the dashboard shell when bootstrap is not required', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: false });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        const response = await runtime.app.request('/');
-        expect(response.status).toBe(200);
-        const html = await response.text();
-        expect(html).toContain('Cats Runtime Dashboard');
-        expect(html).toContain('data-runtime-surface-switcher');
-        expect(html).toContain('data-active-surface="dashboard"');
-        expect(html).toContain('Runtime Health');
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('GET /dashboard includes the shared runtime shell', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: false });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        const response = await runtime.app.request('/dashboard');
-        expect(response.status).toBe(200);
-        const html = await response.text();
-        expect(html).toContain('Cats Runtime Dashboard');
-        expect(html).toContain('Session Dashboard');
-        expect(html).toContain('data-cats-ui');
-        expect(html).toContain('data-runtime-surface-switcher');
-        expect(html).toContain('data-active-surface="dashboard"');
-        expect(html).toContain('Runtime Health');
-        expect(html).toContain('runtimeAuthStatus');
-        expect(html).not.toContain('providerCapabilityPreview');
-        expect(html).toContain('chatSessionInsights');
-        expect(html).toContain('id="inputWorkspaceKind"');
-        expect(html).toContain('id="inputWorkspaceAccess"');
-        expect(html).not.toContain('id="inputWorkspaceMode"');
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('GET /playground includes shared UI foundation', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      const startup = createRuntimeStartupState({ bootstrapRequired: false });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        const response = await runtime.app.request('/playground');
-        expect(response.status).toBe(200);
-        const html = await response.text();
-        expect(html).toContain('Agent Playground');
-        expect(html).toContain('data-cats-ui');
-        expect(html).toContain('window.CatsUI');
-        expect(html).toContain('data-runtime-surface-switcher');
-        expect(html).toContain('data-active-surface="playground"');
-        expect(html).toContain('id="api-key"');
-        expect(html).toContain('validateRuntimeApiKey');
-        expect(html).toContain('/providers/${name}/models/advanced');
-        expect(html).toContain('modelSelection');
-        expect(html).toContain('workspaceKind');
-        expect(html).toContain('workspaceAccess');
-        expect(html).not.toContain('workspaceMode');
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('valid config does not enter bootstrap mode', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const configPath = createRuntimeTestPaths(root).configPath;
-      mkdirSync(createRuntimeTestPaths(root).configDir, { recursive: true });
-      writeFileSync(configPath, 'version: 1\nbackends:\n  cli:\n    providers:\n      claude:\n        instances:\n          default:\n            command: claude\n            runner: auto\n', 'utf8');
-      const inspection = inspectRuntimeConfig(env);
-      expect(shouldEnterBootstrapMode(inspection, false)).toBe(false);
-    } finally {
-      cleanup();
-    }
+  it('returns 202 before a selected scan finishes and exposes the final scoped observation', async () => {
+    const { app, runtime } = fixture();
+    await write(app, '/setup-selection', { targets: [{ provider: 'claude', backend: 'cli', instance: 'native' }], expectedRevision: 'missing' });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const assessment = vi.spyOn(runtime.context.compatibility!, 'assessCliTarget').mockImplementation(async () => {
+      await gate;
+      return { setup: { command: { status: 'missing_install' }, version: {}, auth: { status: 'unknown' }, remediation: [] } } as never;
+    });
+    const scan = await write(app, '/setup-scan', { manual: true }, 'POST');
+    expect(scan.status).toBe(202);
+    expect((await scan.json()).state.status).toBe('scanning');
+    release();
+    const state = await waitForSetupScanToSettle(runtime);
+    expect((state.scan as { providers: unknown[] }).providers).toHaveLength(1);
+    expect((state.selection as { targets: unknown[] }).targets).toHaveLength(1);
+    assessment.mockRestore();
   });
 });

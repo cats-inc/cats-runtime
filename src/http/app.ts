@@ -117,7 +117,6 @@ export interface AppContext {
   peerExecutionAdmission?: PeerExecutionAdmissionService;
   peerExecutionReplay?: PeerExecutionReplayService;
   bootstrapService?: BootstrapService;
-  completeBootstrap?: () => void;
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;
   resolveGooseNative?: (instanceId?: string) => GooseNativeSessionService;
   resolveKiroNative?: (instanceId?: string) => KiroNativeSessionService;
@@ -362,7 +361,8 @@ export function createRuntimeApp(ctx: AppContext) {
       || path === '/setup'
       || path === '/setup-state'
       || path === '/setup-scan'
-      || path === '/setup-apply'
+      || path === '/setup-selection'
+      || path === '/setup-selection/reload'
     ) {
       return await next();
     }

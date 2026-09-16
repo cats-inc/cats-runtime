@@ -1,5 +1,6 @@
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { KNOWN_PROVIDERS } from '../../src/backends/cli/providers/types.js';
 
 export interface RuntimeTestPaths {
   runtimeDir: string;
@@ -44,4 +45,18 @@ export function ensureRuntimeTestDirs(paths: RuntimeTestPaths): void {
   mkdirSync(paths.configDir, { recursive: true });
   mkdirSync(paths.dataDir, { recursive: true });
   mkdirSync(paths.sessionBaseDir, { recursive: true });
+}
+
+/** Explicit fixture for tests exercising CLI execution, rather than fresh bootstrap. */
+export function createRuntimeTestEnvWithAllCliProviders(
+  root: string, overrides: NodeJS.ProcessEnv = {},
+): NodeJS.ProcessEnv {
+  const paths = createRuntimeTestPaths(root);
+  mkdirSync(paths.configDir, { recursive: true });
+  if (!existsSync(paths.configPath)) {
+    writeFileSync(paths.configPath, JSON.stringify({ providers: Object.fromEntries(
+      KNOWN_PROVIDERS.map((provider) => [provider, { instances: { native: {} } }]),
+    ) }));
+  }
+  return createRuntimeTestEnv(root, overrides);
 }

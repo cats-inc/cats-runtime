@@ -1,3 +1,4 @@
+import { withSelectedCliProviders } from '../../tests/support/selectedCliFixture.js';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -21,7 +22,7 @@ function makeConfig(
   metering?: CliRuntimeConfig['metering'],
   dashboardShowSessionDetails = false,
 ): CliRuntimeConfig {
-  return {
+  return withSelectedCliProviders({
     host: '127.0.0.1',
     port: 3100,
     apiKey: '',
@@ -68,7 +69,7 @@ function makeConfig(
       kiro: { path: 'kiro-cli', runner: 'auto', runtime: { mode: 'native' } },
       opencode: { path: 'opencode', runner: 'auto', runtime: { mode: 'native' } },
     },
-  } as unknown as CliRuntimeConfig;
+  } as unknown as CliRuntimeConfig);
 }
 
 function makeApp(

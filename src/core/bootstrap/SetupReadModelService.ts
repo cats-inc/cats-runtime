@@ -7,7 +7,9 @@ import type {
   BootstrapScanResult,
   BootstrapService,
   SetupState,
+  ProviderUniverseEntry,
 } from './BootstrapService.js';
+import type { ProviderSelectionSnapshot } from './ProviderSelectionService.js';
 import {
   buildRepairSummary,
   type SetupRepairSummary,
@@ -16,14 +18,11 @@ export type { SetupReadModelAction, SetupRepairSummary } from './setupRepair.js'
 
 export interface SetupStateReadModel {
   bootstrapRequired: boolean;
+  selection: ProviderSelectionSnapshot;
   state: SetupState;
   scan: SetupStateScanSummary | null;
   manualScan: BootstrapScanResult | null;
-  universe: Array<{
-    provider: string;
-    familyLabel: string;
-    binaryName: string;
-  }>;
+  universe: ProviderUniverseEntry[];
   repair: SetupRepairSummary;
   diagnostics: {
     latestReport: SetupLatestDiagnosticReportSummary | null;
@@ -49,7 +48,7 @@ export interface SetupReadModelServiceOptions {
   bootstrapRequired: boolean;
   bootstrapService: Pick<
     BootstrapService,
-    'getSetupState' | 'getLatestScan' | 'getLatestManualScan' | 'getProviderUniverse'
+    'getSetupState' | 'getLatestScan' | 'getLatestManualScan' | 'getProviderUniverse' | 'getSelection'
   >;
   diagnostics?: Pick<SetupDiagnosticService, 'readLatestReport'>;
 }
@@ -75,16 +74,14 @@ export class SetupReadModelService {
 
     return {
       bootstrapRequired: this.bootstrapRequired,
+      selection: this.bootstrapService.getSelection(),
       state,
       scan: summarizeScan(scan),
       manualScan: manualScan ?? null,
-      universe: this.bootstrapService.getProviderUniverse().map((entry) => ({
-        provider: entry.provider,
-        familyLabel: entry.familyLabel,
-        binaryName: entry.binaryName,
-      })),
+      universe: this.bootstrapService.getProviderUniverse(),
       repair: buildRepairSummary({
         bootstrapRequired: this.bootstrapRequired,
+        selectedCount: this.bootstrapService.getSelection().targets.length,
         scan,
         manualScan,
       }),

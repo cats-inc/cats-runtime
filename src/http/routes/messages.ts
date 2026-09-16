@@ -430,6 +430,11 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   if (session.status === 'closed' || session.status === 'closing') {
     return c.json({ error: 'Session is closed. Resume it first.' }, 400);
   }
+  try {
+    resolveSessionProviderTarget(ctx.config, session);
+  } catch {
+    return c.json({ error: 'This session provider is no longer selected' }, 409);
+  }
 
   const body = await c.req.json<{
     message: string;
@@ -558,6 +563,11 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   }
 
   const runtime = getRuntimeSessionManager(ctx);
+  try {
+    resolveSessionProviderTarget(ctx.config, session);
+  } catch {
+    return c.json({ error: 'Provider selection changed before dispatch' }, 409);
+  }
   let worker = runtime.get(id);
   if (worker?.busy) {
     return c.json({ error: 'Session is busy processing another message' }, 409);

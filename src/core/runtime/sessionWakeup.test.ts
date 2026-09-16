@@ -75,10 +75,16 @@ function makeConfig() {
       },
     },
     providerDefaultInstances: {
+      claude: 'default',
+      kiro: 'default',
       copilot: 'default',
       pi: 'default',
     },
     providerInstances: {
+      claude: { default: { id: 'default', providerName: 'claude',
+        commandConfig: { path: 'claude', runner: 'auto', runtime: { mode: 'native' } } } },
+      kiro: { default: { id: 'default', providerName: 'kiro',
+        commandConfig: { path: 'kiro-cli', runner: 'auto', runtime: { mode: 'native' } } } },
       copilot: {
         default: {
           id: 'default',
@@ -104,6 +110,8 @@ function makeConfig() {
         },
       },
     },
+    remoteProviderCatalog: { api: { claude: { gateway: { id: 'gateway', providerName: 'claude',
+      backend: 'api', transport: 'anthropic', apiKeyEnv: 'TEST_KEY' } } }, local: {}, agent: {} },
   } as const;
 }
 

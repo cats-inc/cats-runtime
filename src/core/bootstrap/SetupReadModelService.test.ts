@@ -1,228 +1,46 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SetupReadModelService } from './SetupReadModelService.js';
-import { createRuntimeTestEnv } from '../../../tests/support/runtimeTestPaths.js';
+import type { BootstrapScanResult } from './BootstrapService.js';
+import type { ProviderSelectionSnapshot } from './ProviderSelectionService.js';
 
-function createTestRoot(): { root: string; cleanup: () => void } {
-  const root = mkdtempSync(join(tmpdir(), 'cats-setup-read-model-'));
-  return {
-    root,
-    cleanup: () => rmSync(root, { recursive: true, force: true }),
-  };
+function readModel(selection: ProviderSelectionSnapshot, scan: BootstrapScanResult | null = null) {
+  return new SetupReadModelService({
+    bootstrapRequired: selection.state === 'missing' || selection.state === 'invalid',
+    bootstrapService: {
+      getSelection: () => selection,
+      getSetupState: async () => ({ status: 'pending', lastScanAt: null, lastManualScanAt: null,
+        appliedAt: null, appliedConfigPath: null, error: null }),
+      getLatestScan: async () => scan,
+      getLatestManualScan: async () => scan?.scanType === 'manual' ? scan : null,
+      getProviderUniverse: () => [],
+    },
+  }).read();
 }
+const empty = { state: 'empty' as const, revision: 'empty', targets: [], nativeSetupTargets: [], diskChanged: false, error: null };
 
-function createTestEnv(root: string): NodeJS.ProcessEnv {
-  return createRuntimeTestEnv(root, {
-    CATS_RUNTIME_HOST: '127.0.0.1',
-    CATS_RUNTIME_PORT: '3110',
-  });
-}
-
-describe('SetupReadModelService', () => {
-  it('recommends a manual scan when no persisted scan exists', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const service = new SetupReadModelService({
-        bootstrapRequired: true,
-        bootstrapService: {
-          getSetupState: async () => ({
-            status: 'pending',
-            lastScanAt: null,
-            lastManualScanAt: null,
-            appliedAt: null,
-            appliedConfigPath: null,
-            error: null,
-          }),
-          getLatestScan: async () => null,
-          getLatestManualScan: async () => null,
-          getProviderUniverse: () => [],
-        },
-      });
-
-      const readModel = await service.read();
-
-      expect(readModel.repair.status).toBe('scan_required');
-      expect(readModel.repair.actions).toEqual([
-        expect.objectContaining({
-          kind: 'run_manual_scan',
-          path: '/setup-scan',
-          method: 'POST',
-          body: {
-            manual: true,
-          },
-        }),
-        expect.objectContaining({
-          kind: 'generate_setup_report',
-          path: '/diagnostics/setup-report',
-          method: 'POST',
-          body: {
-            refreshScan: true,
-          },
-        }),
-      ]);
-      expect(readModel.repair.nextAction).toEqual(expect.objectContaining({
-        kind: 'run_manual_scan',
-        path: '/setup-scan',
-        method: 'POST',
-      }));
-    } finally {
-      cleanup();
-    }
+describe('selection-first setup guidance', () => {
+  it('requires selection before detection and permits idle setup', async () => {
+    const missing = await readModel({ ...empty, state: 'missing', revision: 'missing', targets: [] });
+    expect(missing.repair.status).toBe('selection_required');
+    expect(missing.repair.nextAction.kind).toBe('manage_selection');
+    expect(missing.repair.actions.some((action) => action.kind === 'run_manual_scan')).toBe(false);
+    const idle = await readModel({ ...empty, targets: [] });
+    expect(idle.bootstrapRequired).toBe(false);
+    expect(idle.repair.status).toBe('ready');
   });
 
-  it('prefers the latest manual scan and surfaces apply-config guidance during bootstrap', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const service = new SetupReadModelService({
-        bootstrapRequired: true,
-        bootstrapService: {
-          getSetupState: async () => ({
-            status: 'ready',
-            lastScanAt: '2026-03-26T03:00:00.000Z',
-            lastManualScanAt: '2026-03-26T04:00:00.000Z',
-            appliedAt: null,
-            appliedConfigPath: null,
-            error: null,
-          }),
-          getLatestScan: async () => ({
-            scannedAt: '2026-03-26T03:00:00.000Z',
-            scanType: 'auto',
-            providers: [
-              {
-                provider: 'claude',
-                family: 'Claude',
-                commandStatus: 'ready',
-                commandPath: 'claude',
-                version: '1.0.0',
-                authStatus: 'ready',
-                available: true,
-                install: null,
-                remediation: [],
-              },
-            ],
-          }),
-          getLatestManualScan: async () => ({
-            scannedAt: '2026-03-26T04:00:00.000Z',
-            scanType: 'manual',
-            providers: [
-              {
-                provider: 'claude',
-                family: 'Claude',
-                commandStatus: 'ready',
-                commandPath: 'claude',
-                version: '1.0.0',
-                authStatus: 'ready',
-                available: true,
-                install: null,
-                remediation: [],
-              },
-              {
-                provider: 'codex',
-                family: 'Codex',
-                commandStatus: 'missing_install',
-                commandPath: null,
-                version: null,
-                authStatus: 'unknown',
-                available: false,
-                install: null,
-                remediation: [
-                  {
-                    code: 'install_missing',
-                    summary: 'Install Codex CLI.',
-                  },
-                ],
-              },
-            ],
-          }),
-          getProviderUniverse: () => [{
-            provider: 'claude',
-            familyLabel: 'Claude',
-            binaryName: 'claude',
-            install: {} as never,
-          }],
-        },
-        diagnostics: {
-          readLatestReport: () => ({
-            artifactPath: join(root, 'runtime-data', 'diagnostics', 'setup-report.json'),
-            report: {
-              artifactId: 'setup-report-test',
-              generatedAt: '2026-03-26T04:05:00.000Z',
-              summary: {
-                status: 'degraded',
-                issueCounts: {
-                  info: 0,
-                  warnings: 1,
-                  errors: 0,
-                },
-                headline: 'Setup report found 1 warning(s).',
-                highlights: [
-                  'Codex CLI is unavailable.',
-                ],
-              },
-            } as never,
-          }),
-        },
-      });
-
-      const readModel = await service.read();
-
-      expect(readModel.repair.preferredScan.source).toBe('manualScan');
-      expect(readModel.repair.status).toBe('attention_required');
-      expect(readModel.repair.providersReadyToApply).toEqual([
-        {
-          provider: 'claude',
-          family: 'Claude',
-        },
-      ]);
-      expect(readModel.repair.providersNeedingAttention).toEqual([
-        expect.objectContaining({
-          provider: 'codex',
-          family: 'Codex',
-          remediationCount: 1,
-          remediationPreview: [
-            {
-              code: 'install_missing',
-              summary: 'Install Codex CLI.',
-            },
-          ],
-        }),
-      ]);
-      expect(readModel.repair.nextAction).toEqual(expect.objectContaining({
-        kind: 'apply_config',
-        path: '/setup-apply',
-        method: 'POST',
-        providers: ['claude'],
-        body: {
-          providers: ['claude'],
-        },
-      }));
-      expect(readModel.repair.actions).toEqual([
-        expect.objectContaining({
-          kind: 'apply_config',
-          providers: ['claude'],
-        }),
-        expect.objectContaining({
-          kind: 'review_remediation',
-          providers: ['codex'],
-        }),
-        expect.objectContaining({
-          kind: 'generate_setup_report',
-          path: '/diagnostics/setup-report',
-          body: {
-            refreshScan: false,
-          },
-        }),
-      ]);
-      expect(readModel.diagnostics.latestReport).toEqual(expect.objectContaining({
-        artifactId: 'setup-report-test',
-        status: 'degraded',
-        headline: 'Setup report found 1 warning(s).',
-        highlights: ['Codex CLI is unavailable.'],
-      }));
-    } finally {
-      cleanup();
-    }
+  it('does not derive selection or apply actions from provider availability', async () => {
+    const targets = [{ provider: 'claude', backend: 'cli' as const, instance: 'native' }];
+    const data = await readModel({ ...empty, state: 'selected', targets }, {
+      revision: empty.revision, scannedAt: new Date().toISOString(), scanType: 'manual',
+      providers: [{ ...targets[0]!, family: 'Claude', available: false, commandStatus: 'missing_install',
+        commandPath: null, version: null, authStatus: 'unknown', install: null, remediation: [] }],
+    });
+    expect(data.selection.targets).toEqual(targets);
+    expect(data.repair.status).toBe('attention_required');
+    expect(data.repair.preferredScan.source).toBe('manualScan');
+    expect(data.repair.providersReady).toEqual([]);
+    expect(data.repair.actions.some((action) => action.path === '/setup-apply')).toBe(false);
+    expect(data.repair.actions.find((action) => action.kind === 'generate_setup_report')?.body).toEqual({ refreshScan: false });
   });
 });

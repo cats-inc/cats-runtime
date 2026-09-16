@@ -1,3 +1,4 @@
+import { withSelectedCliProviders } from '../../tests/support/selectedCliFixture.js';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -44,7 +45,7 @@ function decodeMessages(buffer: Buffer): unknown[] {
 }
 
 function makeConfig(rootDir: string): CliRuntimeConfig {
-  return {
+  return withSelectedCliProviders({
     host: '127.0.0.1',
     port: 3110,
     apiKey: '',
@@ -92,7 +93,7 @@ function makeConfig(rootDir: string): CliRuntimeConfig {
     },
     externalSessionLiveWindowMs: 0,
     maxSessions: 10,
-  } as unknown as CliRuntimeConfig;
+  } as unknown as CliRuntimeConfig);
 }
 
 describe('ACP stdio transport', () => {

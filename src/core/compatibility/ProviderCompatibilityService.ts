@@ -95,6 +95,8 @@ interface ProviderCompatibilityServiceOptions {
 }
 
 export class ProviderCompatibilityService {
+  private generation = 0;
+  private assertTarget?: (target: ProviderTargetDescriptor) => void;
   private readonly cache = new Map<string, CacheEntry>();
   private readonly cacheTtlMs: number;
   private readonly probeTimeoutMs: number;
@@ -249,6 +251,8 @@ export class ProviderCompatibilityService {
     if (target.backend !== 'cli' || !target.cliInstance) {
       throw new Error('Compatibility probes only support CLI targets');
     }
+    this.assertTarget?.(target);
+    const generation = this.generation;
 
     const purpose = options.purpose || 'diagnostics';
     const probeMode = purpose === 'diagnostics' ? options.probeMode || 'light' : 'light';
@@ -275,6 +279,8 @@ export class ProviderCompatibilityService {
     );
     let assessment: CompatibilityAssessment;
     try {
+      if (generation !== this.generation) throw new Error('Provider selection changed');
+      this.assertTarget?.(target);
       assessment = await this.buildAssessment(target, {
         purpose,
         probeMode,
@@ -282,6 +288,7 @@ export class ProviderCompatibilityService {
     } finally {
       this.releaseAssessmentSlot();
     }
+    if (generation !== this.generation) throw new Error('Provider selection changed');
     this.cache.set(createCacheKey(
       target.providerName as ProviderName,
       target.instanceId,
@@ -292,6 +299,15 @@ export class ProviderCompatibilityService {
       cachedAtMs: this.now(),
     });
     return assessment;
+  }
+
+  setTargetGuard(guard: (target: ProviderTargetDescriptor) => void): void {
+    this.assertTarget = guard;
+  }
+
+  invalidate(): void {
+    this.generation += 1;
+    this.cache.clear();
   }
 
   private getFreshCachedEntry(
@@ -358,6 +374,12 @@ export class ProviderCompatibilityService {
       probeMode: CompatibilityProbeMode;
     },
   ): Promise<CompatibilityAssessment> {
+    const generation = this.generation;
+    const assertCurrent = () => {
+      if (generation !== this.generation) throw new Error('Provider selection changed');
+      this.assertTarget?.(target);
+    };
+    assertCurrent();
     const instance = target.cliInstance as ProviderInstanceConfig;
     const providerName = target.providerName as ProviderName;
     const compatibilityKnowledge = getProviderCompatibilityKnowledge(providerName);
@@ -410,6 +432,7 @@ export class ProviderCompatibilityService {
       )
       : undefined;
     const metadataVersion = parseVersion(packageCheck?.version);
+    assertCurrent();
     // Serializing probes cannot contain a detached self-updater. Background
     // checks remain passive even when package inspection fails.
     const versionProbe = !metadataOnly && versionArgs.length && !metadataVersion
@@ -421,6 +444,7 @@ export class ProviderCompatibilityService {
         probeTimeoutMs,
       )
       : undefined;
+    assertCurrent();
     const helpProbe = !metadataOnly && helpArgs?.length
       ? await this.runner.run(
         providerName,
@@ -431,6 +455,7 @@ export class ProviderCompatibilityService {
       )
       : undefined;
 
+    assertCurrent();
     const versionProbeRecord = versionProbe
       ? toProbeRecord('version', versionArgs, versionProbe)
       : undefined;
@@ -523,6 +548,7 @@ export class ProviderCompatibilityService {
             : Promise.resolve(undefined),
         ]);
 
+    assertCurrent();
     if (metadataOnly) {
       commandAvailable = configuredLookup?.available === true;
     }
@@ -688,6 +714,7 @@ export class ProviderCompatibilityService {
     const profileDefinition = selection.profileDefinition;
     let profile = selection.profile;
 
+    assertCurrent();
     const liveProbeRecord = metadataOnly ? undefined : await this.maybeRunLiveProbe({
       instance,
       providerName,
@@ -842,6 +869,7 @@ export class ProviderCompatibilityService {
     const passiveUnverified = metadataOnly && commandAvailable && classification === 'degraded'
       && !checks.some((check) => check.status === 'unavailable');
     if (classification !== 'ready' && options.purpose !== 'health' && !passiveUnverified) {
+      assertCurrent();
       assessment.evidence = await this.captureEvidenceBundle(assessment, instance.commandConfig);
       if (assessment.evidence) {
         assessment.checks.push(createCheck(

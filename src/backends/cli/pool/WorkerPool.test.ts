@@ -9,7 +9,7 @@ describe('WorkerPool', () => {
       HOME: '/tmp/cats-runtime-workerpool-test',
       USERPROFILE: '',
     }, {
-      skipProviderFile: true,
+      providerYaml: 'providers: { antigravity: { instances: { native: {} } } }',
     });
 
     const registry = new SessionRegistry(
@@ -44,7 +44,7 @@ describe('WorkerPool', () => {
       HOME: '/tmp/cats-runtime-workerpool-test',
       USERPROFILE: '',
     }, {
-      skipProviderFile: true,
+      providerYaml: 'providers: { antigravity: { instances: { native: {} } } }',
     });
     const antigravityInstance = resolveProviderInstance(config, 'antigravity');
     config.providerInstances!.antigravity[antigravityInstance.id] = {
@@ -84,7 +84,7 @@ describe('WorkerPool', () => {
       HOME: '/tmp/cats-runtime-workerpool-test',
       USERPROFILE: '',
     }, {
-      skipProviderFile: true,
+      providerYaml: 'providers: { antigravity: { instances: { native: {} } } }',
     });
     const antigravityInstance = resolveProviderInstance(config, 'antigravity');
     config.providerDefaultInstances!.antigravity = 'singleton';

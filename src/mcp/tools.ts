@@ -1490,6 +1490,7 @@ async function runSetupScan(
   if (readOptionalBoolean(args, 'manual') === true) {
     body.manual = true;
   }
+  if (args.targets !== undefined) body.targets = args.targets;
 
   const started = await requestRuntimeJson(ctx, '/setup-scan', {
     method: 'POST',
@@ -1541,29 +1542,26 @@ async function waitForSetupScanToSettle(
   }
 }
 
-async function applySetupConfig(
+async function saveProviderSelection(
   ctx: AppContext,
   args: Record<string, unknown>,
 ): Promise<McpToolCallResult> {
-  const providers = readOptionalStringArray(args, 'providers');
-  if (!providers || providers.length === 0) {
-    throw new McpToolError(-32602, 'providers must be a non-empty array of provider names');
-  }
-
-  const result = await requestRuntimeJson(ctx, '/setup-apply', {
-    method: 'POST',
+  const expectedRevision = readRequiredString(args, 'expectedRevision');
+  const result = await requestRuntimeJson(ctx, '/setup-selection', {
+    method: 'PUT',
     body: {
-      providers,
+      targets: args.targets,
+      expectedRevision,
     },
   });
-  ensureRouteSuccess('apply_setup_config', result.status, result.body);
+  ensureRouteSuccess('save_provider_selection', result.status, result.body);
 
-  const payload = ensureObject(result.body, 'apply_setup_config result');
+  const payload = ensureObject(result.body, 'save_provider_selection result');
   return {
-    summary: `Applied setup config for ${providers.length} provider(s).`,
+    summary: 'Saved provider selection without requiring a scan.',
     structuredContent: {
       ...payload,
-      setupApplyPath: '/setup-apply',
+      setupSelectionPath: '/setup-selection',
     },
   };
 }
@@ -3461,6 +3459,10 @@ const TOOL_HANDLERS: McpToolHandler[] = [
         type: 'object',
         properties: {
           manual: { type: 'boolean' },
+          targets: { type: 'array', items: {
+            type: 'object', properties: { provider: { type: 'string' }, backend: { type: 'string' }, instance: { type: 'string' } },
+            required: ['provider', 'backend', 'instance'], additionalProperties: false,
+          } },
         },
         additionalProperties: false,
       },
@@ -3469,22 +3471,24 @@ const TOOL_HANDLERS: McpToolHandler[] = [
   },
   {
     definition: {
-      name: 'apply_setup_config',
-      title: 'Apply Setup Config',
-      description: 'Apply generated provider config through the existing runtime-owned bootstrap route.',
+      name: 'save_provider_selection',
+      title: 'Save Provider Selection',
+      description: 'Save exact selected provider targets with the revision from setup_state. An empty selection is valid; installation and scans are not prerequisites.',
       inputSchema: {
         type: 'object',
         properties: {
-          providers: {
-            type: 'array',
-            items: { type: 'string' },
-          },
+          expectedRevision: { type: 'string' },
+          targets: { type: 'array', items: {
+            type: 'object', properties: { provider: { type: 'string' }, backend: { type: 'string' },
+              instance: { type: 'string' }, configuration: { type: 'object' } },
+            required: ['provider', 'backend', 'instance'], additionalProperties: false,
+          } },
         },
-        required: ['providers'],
+        required: ['expectedRevision', 'targets'],
         additionalProperties: false,
       },
     },
-    execute: applySetupConfig,
+    execute: saveProviderSelection,
   },
   {
     definition: {

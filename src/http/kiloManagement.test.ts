@@ -1,3 +1,4 @@
+import { withSelectedCliProviders } from '../../tests/support/selectedCliFixture.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -17,7 +18,7 @@ describe('Kilo native session management', () => {
   let dataDir = '';
   let sessionBaseDir = '';
 
-  const makeConfig = (): CliRuntimeConfig => ({
+  const makeConfig = (): CliRuntimeConfig => withSelectedCliProviders(({
     host: '127.0.0.1',
     port: 3100,
     apiKey: '',
@@ -69,7 +70,7 @@ describe('Kilo native session management', () => {
       pi: { path: 'pi', runner: 'auto', runtime: { mode: 'native' } },
       junie: { path: 'junie', runner: 'auto', runtime: { mode: 'native' } },
     },
-  });
+  }));
 
   let registry: SessionRegistry;
   let pool: WorkerPool;

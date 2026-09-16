@@ -94,6 +94,7 @@ function parseToolCatalogScopeQuery(
 providerRoutes.get('/providers/config', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const providerCatalog = listProviderCatalog(ctx.config);
+  const revision = ctx.config.providerSelectionRevision;
   const compatibility = getProviderCompatibilityService(ctx);
   const compatibilityEvidence = createCompatibilityEvidenceService(ctx.config);
   const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies();
@@ -248,8 +249,13 @@ providerRoutes.get('/providers/config', async (c) => {
     providerEntries.filter((entry): entry is NonNullable<typeof entry> => entry !== null),
   );
 
+  if (ctx.config.providerSelectionRevision !== revision) {
+    return c.json({ error: 'provider_selection_changed' }, 409);
+  }
+
   return c.json({
     providers,
+    revision,
     ...(executionStrategies ? { executionStrategies } : {}),
   });
 });

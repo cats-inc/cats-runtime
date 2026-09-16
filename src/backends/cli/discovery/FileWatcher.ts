@@ -138,6 +138,7 @@ export class FileWatcher extends EventEmitter<FileWatcherEvents> {
   }
 
   private async scanAndMerge(generation: number): Promise<void> {
+    if (!this.started || generation !== this.generation) return;
     const discovered = await this.scanner.scan();
     if (!this.started || generation !== this.generation) return;
     const newlyImported = new Set<string>();

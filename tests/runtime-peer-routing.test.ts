@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -64,12 +64,11 @@ function createTestConfig(
     mkdirSync(dir, { recursive: true });
   }
 
+  writeFileSync(paths.configPath, JSON.stringify({ backends: { api: { providers: {
+    codex: { instances: { main: { transport: 'openai', api_key_env: 'OPENAI_API_KEY',
+      base_url: 'https://example.test', model: 'gpt-5.4' } } },
+  } } } }));
   const isolatedConfig = loadConfig(env);
-  // These peer fixtures use only a mocked API target. Missing provider keys
-  // fall back to real native CLI instances, so disable every CLI explicitly.
-  for (const provider of KNOWN_PROVIDERS) {
-    isolatedConfig.providerInstances[provider] = {};
-  }
   const config = {
     ...isolatedConfig,
     host: '127.0.0.1',

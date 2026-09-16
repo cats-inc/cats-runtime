@@ -42,7 +42,7 @@ function createRuntimeRootTestPaths(runtimeDir: string) {
   };
 }
 
-function loadConfigWithoutProviderFile(env: NodeJS.ProcessEnv = {}) {
+function loadConfigWithoutProviderFile(env: NodeJS.ProcessEnv = {}, providerYaml?: string) {
   return loadConfig({
     ...process.env,
     ...env,
@@ -53,6 +53,7 @@ function loadConfigWithoutProviderFile(env: NodeJS.ProcessEnv = {}) {
     ),
   }, {
     skipProviderFile: true,
+    providerYaml,
   });
 }
 
@@ -300,7 +301,7 @@ describe('config platform defaults', () => {
   it('loads the Grok command override and creates a native instance', () => {
     const config = loadConfigWithoutProviderFile({
       GROK_PATH: '/custom/grok',
-    });
+    }, 'providers: { grok: { instances: { native: {} } } }');
 
     expect(config.grokPath).toBe('/custom/grok');
     expect(config.providerCommands.grok).toEqual({
@@ -322,7 +323,7 @@ describe('config platform defaults', () => {
   it('derives the Grok sessions directory from GROK_HOME unless explicitly overridden', () => {
     const fromHome = loadConfigWithoutProviderFile({
       GROK_HOME: '/custom/grok-home',
-    });
+    }, 'providers: { grok: { instances: { native: {} } } }');
     expect(fromHome.grokSessionsDir).toBe(join('/custom/grok-home', 'sessions'));
     expect(resolveProviderInstance(fromHome, 'grok').grokSessionsDir)
       .toBe(join('/custom/grok-home', 'sessions'));
@@ -341,7 +342,8 @@ describe('config platform defaults', () => {
     try {
       const configuredDir = join(root, 'configured');
       const explicitDir = join(root, 'explicit');
-      const environment = loadConfigWithoutProviderFile({ MUSE_SESSIONS_DIR: explicitDir });
+      const environment = loadConfigWithoutProviderFile({ MUSE_SESSIONS_DIR: explicitDir },
+        'providers: { muse: { instances: { native: {} } } }');
       expect(resolveProviderInstance(environment, 'muse').museSessionsDir).toBe(explicitDir);
       const configPath = join(root, 'config', 'providers.yaml');
       mkdirSync(join(root, 'config'), { recursive: true });
@@ -378,10 +380,10 @@ backends:
   it('derives the Kiro database path from the configured runtime mode', () => {
     const nativeConfig = loadConfigWithoutProviderFile({
       KIRO_RUNTIME: 'native',
-    });
+    }, 'providers: { kiro: { instances: { native: {} } } }');
     const dockerConfig = loadConfigWithoutProviderFile({
       KIRO_RUNTIME: 'docker',
-    });
+    }, 'providers: { kiro: { instances: { native: {} } } }');
 
     expect(resolveProviderInstance(nativeConfig, 'kiro').kiroDbPath)
       .toBe(defaultKiroDbPath(process.platform, 'native'));
@@ -515,10 +517,8 @@ backends:
         join(root, '.cats', 'runtime', 'config', 'providers.yaml'),
       );
       expect(config.providerCommands.claude.path).toBeTruthy();
-      expect(config.providerDefaultTargets.claude).toEqual({
-        backend: 'cli',
-        instance: 'native',
-      });
+      expect(config.providerDefaultTargets.claude).toBeUndefined();
+      expect(config.providerInstances.claude).toEqual({});
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

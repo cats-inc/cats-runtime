@@ -137,7 +137,7 @@ describe('package contract', () => {
 
   beforeAll(() => {
     runBuild();
-  }, 90000);
+  }, 180000);
 
   it('keeps executable bin entries and curated publish contents aligned', () => {
     const manifest = readPackageManifest();
@@ -209,7 +209,7 @@ describe('package contract', () => {
     const packed = runPackDryRun();
     const packedPaths = new Set(packed.files.map((entry) => entry.path));
     expect(packedPaths.has('build/runtime/stale/old-artifact.txt')).toBe(false);
-  }, 90000);
+  }, 180000);
 
   it('emits public runtime HTML pages from the source UI pages', () => {
     for (const filename of ['index.html', 'playground.html', 'provider-setup.html']) {

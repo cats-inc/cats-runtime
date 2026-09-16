@@ -62,6 +62,9 @@ export async function ensureSessionAwake(
   if (!session) {
     throw new Error(`Session '${options.sessionId}' not found.`);
   }
+  resolveProviderTarget(options.config, session.providerName,
+    session.providerBackend && session.providerInstanceId
+      ? `${session.providerBackend}/${session.providerInstanceId}` : session.providerInstanceId);
 
   const attached = options.runtime.isAttached(session.id);
   const view = toSessionView(session, {

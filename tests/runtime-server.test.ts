@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { cleanupTempDirWithRetriesAsync } from './tempCleanup.js';
 import {
-  createRuntimeTestEnv,
+  createRuntimeTestEnvWithAllCliProviders,
   createRuntimeTestPaths,
   ensureRuntimeTestDirs,
 } from './support/runtimeTestPaths.js';
@@ -143,7 +143,7 @@ function createTestConfig(overrides = {}) {
     env: envOverrides,
     ...configOverrides
   } = overrides as Record<string, unknown>;
-  const env = createRuntimeTestEnv(root, {
+  const env = createRuntimeTestEnvWithAllCliProviders(root, {
     CATS_RUNTIME_HOST: '127.0.0.1',
     CATS_RUNTIME_PORT: '3110',
     CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
@@ -580,13 +580,13 @@ describe('runtime server', () => {
         expect(html).toContain('id="selectionStatusBadge"');
         expect(html).toContain('toggleSelectAllProviders()');
         expect(html).toContain("document.addEventListener('DOMContentLoaded'");
-        expect(html).toContain('escapeHtml(r.summary)');
-        expect(html).toContain('escapeHtml(p.commandPath)');
+        expect(html).toContain('escapeHtml(step.summary)');
+        expect(html).toContain('escapeHtml(entry.familyLabel)');
         expect(html).not.toContain('Bootstrap Mode');
         expect(html).not.toContain('Operator Notes');
         expect(html).not.toContain('localStorage');
         expect(html).toContain("await fetchFn('/setup-scan'");
-        expect(html).toContain("await fetchFn('/setup-apply'");
+        expect(html).toContain("await fetchFn('/setup-selection'");
       },
     );
   });
@@ -1157,7 +1157,7 @@ describe('runtime server', () => {
     mkdirSync(paths.configDir, { recursive: true });
     writeFileSync(configPath, 'providers: {}\n', 'utf8');
 
-    const env = createRuntimeTestEnv(root, {
+    const env = createRuntimeTestEnvWithAllCliProviders(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
@@ -1286,7 +1286,7 @@ describe('runtime server', () => {
     mkdirSync(paths.configDir, { recursive: true });
     writeFileSync(configPath, 'providers: {}\n', 'utf8');
 
-    const env = createRuntimeTestEnv(root, {
+    const env = createRuntimeTestEnvWithAllCliProviders(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
@@ -1500,7 +1500,7 @@ backends:
             model: claude-sonnet-4-20250514
 `.trimStart());
 
-    const env = createRuntimeTestEnv(root, {
+    const env = createRuntimeTestEnvWithAllCliProviders(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
@@ -1674,7 +1674,7 @@ backends:
             model: claude-sonnet-4-20250514
 `.trimStart());
 
-    const env = createRuntimeTestEnv(root, {
+    const env = createRuntimeTestEnvWithAllCliProviders(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
@@ -1970,7 +1970,7 @@ backends:
             sessions_dir: ~/.codex/sessions
 `.trimStart());
 
-    const env = createRuntimeTestEnv(root, {
+    const env = createRuntimeTestEnvWithAllCliProviders(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
@@ -2109,7 +2109,7 @@ backends:
             sessions_dir: ~/.codex/sessions
 `.trimStart());
 
-    const env = createRuntimeTestEnv(root, {
+    const env = createRuntimeTestEnvWithAllCliProviders(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
@@ -2260,7 +2260,7 @@ backends:
             model: gpt-5.2-codex
 `.trimStart());
 
-    const env = createRuntimeTestEnv(root, {
+    const env = createRuntimeTestEnvWithAllCliProviders(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
@@ -2353,7 +2353,7 @@ backends:
             model: claude-sonnet-4-20250514
 `.trimStart());
 
-    const env = createRuntimeTestEnv(root, {
+    const env = createRuntimeTestEnvWithAllCliProviders(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
@@ -3389,7 +3389,7 @@ providers:
         projects_dir: ~/.claude/projects
 `.trimStart());
 
-    const env = createRuntimeTestEnv(root, {
+    const env = createRuntimeTestEnvWithAllCliProviders(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',

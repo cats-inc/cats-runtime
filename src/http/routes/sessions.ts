@@ -2611,6 +2611,11 @@ sessionRoutes.post('/sessions', async (c) => {
     return c.json({ error: `${err}` }, 400);
   }
 
+  const selection = ctx.bootstrapService?.selection;
+  const operationId = selection?.acquireOperation({
+    provider: providerTarget.providerName, backend: providerTarget.backend, instance: providerTarget.instanceId,
+  }, selection.getSnapshot().revision);
+  try {
   const providerInstance = providerTarget.backend === 'cli'
     ? resolveCliProviderInstance(providerTarget)
     : undefined;
@@ -3208,6 +3213,9 @@ sessionRoutes.post('/sessions', async (c) => {
   }
 
   return c.json({ ...serializeSession(ctx, session), ...(warnings.length ? { warnings } : {}) }, 201);
+  } finally {
+    if (operationId) selection!.releaseOperation(operationId);
+  }
 });
 
 /** GET /sessions — list sessions */
@@ -3239,19 +3247,28 @@ sessionRoutes.get('/sessions', (c) => {
  */
 sessionRoutes.post('/sessions/discover', async (c) => {
   const ctx = c.get('ctx');
+  const revision = ctx.config.providerSelectionRevision;
   const agentBackend = ctx.agentBackend;
+  const withDiscoveryOperation = async <T>(
+    target: { provider: string; instanceId: string }, backend: 'cli' | 'agent', work: () => Promise<T>,
+  ): Promise<T> => {
+    const selection = ctx.bootstrapService?.selection;
+    const id = selection?.acquireOperation({ provider: target.provider, backend, instance: target.instanceId }, revision);
+    try { return await work(); } finally { if (id) selection?.releaseOperation(id); }
+  };
   const result = await runManualSessionDiscovery({
     config: ctx.config,
     registry: ctx.registry,
+    isCurrent: () => revision === ctx.config.providerSelectionRevision,
     runner: {
-      listSessions: (target) => listManualDiscoverySessions(ctx, target),
+      listSessions: (target) => withDiscoveryOperation(target, 'cli', () => listManualDiscoverySessions(ctx, target)),
     },
     ...(agentBackend ? {
       agentRunner: {
         listTargets: () => listAgentSessionDiscoveryTargets(ctx.config),
-        listSessions: (target) => agentBackend.listSessions(
+        listSessions: (target) => withDiscoveryOperation(target, 'agent', () => agentBackend.listSessions(
           resolveProviderTarget(ctx.config, target.provider, `agent/${target.instanceId}`),
-        ),
+        )),
       },
     } : {}),
   });
@@ -4142,6 +4159,11 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
 
   if (!session) {
     return c.json({ error: 'Session not found' }, 404);
+  }
+  try {
+    resolveSessionProviderTarget(ctx.config, session);
+  } catch {
+    return c.json({ error: 'This session provider is no longer selected' }, 409);
   }
 
   const view = serializeSession(ctx, session);

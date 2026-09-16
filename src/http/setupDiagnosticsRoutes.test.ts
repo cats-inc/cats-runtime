@@ -26,6 +26,11 @@ function createTestRoot(): { root: string; cleanup: () => void } {
 }
 
 function createTestEnv(root: string): NodeJS.ProcessEnv {
+  const paths = createRuntimeTestPaths(root);
+  ensureRuntimeTestDirs(paths);
+  if (!existsSync(paths.configPath)) {
+    writeFileSync(paths.configPath, 'providers: {claude: {instances: {native: {}}}}\n');
+  }
   return createRuntimeTestEnv(root, {
     CATS_RUNTIME_HOST: '127.0.0.1',
     CATS_RUNTIME_PORT: '3110',

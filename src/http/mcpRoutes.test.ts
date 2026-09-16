@@ -188,8 +188,11 @@ describe('runtime MCP facade', () => {
       },
       providerDefaultInstances: {
         claude: 'default',
+        codex: 'native',
       },
       providerInstances: {
+        codex: { native: { id: 'native', providerName: 'codex',
+          commandConfig: { path: 'codex', runner: 'auto', runtime: { mode: 'native' } } } },
         claude: {
           default: {
             id: 'default',
@@ -241,12 +244,15 @@ describe('runtime MCP facade', () => {
     const startup = createRuntimeStartupState();
     const peerNow = Date.parse('2026-03-25T00:00:05.000Z');
     const completedScan = {
+      revision: 'test-selection',
       scannedAt: '2026-03-27T00:00:00.000Z',
       scanType: 'manual',
       providers: [],
     };
     let latestScan: typeof completedScan | null = null;
     const bootstrapService = {
+      getSelection: () => ({ state: 'selected', revision: 'test-selection', diskChanged: false, error: null,
+        targets: [{ provider: 'claude', backend: 'cli', instance: 'native' }], nativeSetupTargets: [] }),
       getSetupState: vi.fn(async () => ({
         status: 'pending',
         lastScanAt: null,
@@ -270,9 +276,8 @@ describe('runtime MCP facade', () => {
         latestScan = completedScan;
         return { started: true };
       }),
-      applyConfig: vi.fn(async (_providers: string[]) => ({
-        configPath: join(rootDir, 'config', 'providers.yaml'),
-      })),
+      saveSelection: vi.fn((targets: unknown[]) => ({ state: targets.length ? 'selected' : 'empty',
+        revision: 'saved-selection', targets, nativeSetupTargets: [], diskChanged: false, error: null })),
     };
     const completeBootstrap = vi.fn(() => {
       startup.bootstrapRequired = false;
@@ -633,7 +638,7 @@ describe('runtime MCP facade', () => {
       'read_setup_diagnostic_report',
       'setup_state',
       'run_setup_scan',
-      'apply_setup_config',
+      'save_provider_selection',
       'observe_session',
       'list_wakeups',
       'read_wakeup',
@@ -1633,9 +1638,10 @@ describe('runtime MCP facade', () => {
         id: 35.96,
         method: 'tools/call',
         params: {
-          name: 'apply_setup_config',
+          name: 'save_provider_selection',
           arguments: {
-            providers: ['claude'],
+            targets: [{ provider: 'claude', backend: 'cli', instance: 'native' }],
+            expectedRevision: 'test-selection',
           },
         },
       }),
@@ -1644,17 +1650,17 @@ describe('runtime MCP facade', () => {
     const appliedSetupConfig = await applySetupConfigResponse.json() as {
       result: {
         structuredContent: {
-          setupApplyPath: string;
+          setupSelectionPath: string;
           status: string;
           bootstrapRequired: boolean;
-          configPath: string;
+          selection: { revision: string };
         };
       };
     };
-    expect(appliedSetupConfig.result.structuredContent.setupApplyPath).toBe('/setup-apply');
-    expect(appliedSetupConfig.result.structuredContent.status).toBe('applied');
+    expect(appliedSetupConfig.result.structuredContent.setupSelectionPath).toBe('/setup-selection');
+    expect(appliedSetupConfig.result.structuredContent.status).toBe('saved');
     expect(appliedSetupConfig.result.structuredContent.bootstrapRequired).toBe(false);
-    expect(appliedSetupConfig.result.structuredContent.configPath).toContain('providers.yaml');
+    expect(appliedSetupConfig.result.structuredContent.selection.revision).toBe('saved-selection');
 
     vi.mocked(pool.getCapabilities).mockClear();
 

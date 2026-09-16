@@ -404,7 +404,7 @@
                 <span id="providersRailBadge" class="setup-workflow-item-pill">Not scanned</span>
               </span>
               <span id="providersRailSummary" class="setup-workflow-item-summary">
-                Scan local providers, review readiness, and choose what to apply.
+                Choose providers first, then check only the providers you selected.
               </span>
               <span id="providersRailMeta" class="setup-workflow-item-meta">No providers selected yet.</span>
             </button>
@@ -537,7 +537,8 @@
                   </div>
                 </div>
                 <div class="flex justify-end pt-1">
-                  <button id="applyBtn" class="runtime-btn runtime-btn-primary" onclick="applyConfig()" disabled>Apply Selected</button>
+                  <button id="applyBtn" class="runtime-btn runtime-btn-primary" onclick="applyConfig()" disabled>Save Selection</button>
+                  <button id="reloadSelectionBtn" class="runtime-btn" onclick="reloadProviderSelection()" hidden>Reload edited configuration</button>
                 </div>
                 <section id="resultPanel" class="setup-result-banner hidden" hidden aria-live="polite">
                   <div>
@@ -787,7 +788,7 @@ function providerSelectionSummary() {
   const selectedProviders = currentSelectedProviders();
   const selectedSet = new Set(selectedProviders);
   const readySelected = Array.isArray(scanData?.providers)
-    ? scanData.providers.filter((provider) => selectedSet.has(provider.provider) && provider.available).length
+    ? scanData.providers.filter((provider) => selectedSet.has(selectionTargetKey(provider)) && provider.available).length
     : 0;
   const blockedSelected = Array.isArray(scanData?.providers)
     ? selectedProviders.length - readySelected
@@ -805,7 +806,7 @@ function selectableProviderSummary() {
   const selection = providerSelectionSummary();
   return {
     ...selection,
-    applyableCount: Array.isArray(scanData?.providers) ? selection.readySelected : selection.selectedCount,
+    applyableCount: selection.selectedCount,
   };
 }
 
@@ -836,7 +837,7 @@ function updateProvidersWorkspaceMetrics() {
         ? `${providerCount} ${providerCount === 1 ? 'provider is' : 'providers are'} available from the latest snapshot.`
         : 'No provider results were returned by the latest scan.'
     : providerCount > 0
-      ? `Scan local providers to inspect ${pluralize(providerCount, 'provider')} before you apply config.`
+      ? 'Choose the providers you want Cats to manage. Save your selection before checking availability.'
       : 'No provider catalog entries are available yet.';
   document.getElementById('providersWorkspaceSummary').textContent = workspaceSummary;
 
@@ -846,7 +847,7 @@ function updateProvidersWorkspaceMetrics() {
   document.getElementById('providersMetricSnapshotDetail').textContent = hasScan
     ? `${scanData.scanType === 'manual' ? 'Manual' : 'Auto'} snapshot across ${pluralize(providerCount, 'provider')}.`
     : providerCount > 0
-      ? `${pluralize(providerCount, 'provider')} available to scan from the current universe.`
+      ? 'Only saved selections are checked. Other catalog entries remain untouched.'
       : 'Waiting for setup-state data.';
 
   document.getElementById('providersMetricAttentionValue').textContent = hasScan ? String(attentionCount) : '--';
@@ -860,8 +861,8 @@ function updateProvidersWorkspaceMetrics() {
   document.getElementById('providersMetricSelectedDetail').textContent = selection.selectedCount > 0
     ? hasScan
       ? `${selection.readySelected} available${selection.blockedSelected > 0 ? ` · ${selection.blockedSelected} need attention` : ''}`
-      : 'Apply from the current provider list or scan first for readiness.'
-    : 'Selection stays in this workspace.';
+      : 'Save the selection to begin checking these providers.'
+    : 'Save an empty selection to keep Runtime idle.';
 
   const selectionStatusBadge = document.getElementById('selectionStatusBadge');
   selectionStatusBadge.className = `status-badge ${selection.selectedCount > 0 ? 'status-badge-ready' : 'status-badge-unknown'}`;
@@ -907,7 +908,7 @@ function toggleSelectAllProviders() {
     checkbox.checked = shouldSelectAll;
   });
 
-  document.getElementById('applyBtn').disabled = !shouldSelectAll;
+  document.getElementById('applyBtn').disabled = false;
   updateProvidersWorkspaceMetrics();
   updateSelectAllCheckbox();
 }
@@ -979,19 +980,17 @@ function updateConfiguredTargetsRail() {
 }
 
 function restoreProviderSelection(selectedProviders) {
-  if (!Array.isArray(selectedProviders) || selectedProviders.length === 0) {
+  if (!Array.isArray(selectedProviders)) {
     return;
   }
 
   const selected = new Set(selectedProviders);
   document.querySelectorAll('.provider-check').forEach((checkbox) => {
-    if (!checkbox.disabled && selected.has(checkbox.value)) {
-      checkbox.checked = true;
-    }
+    checkbox.checked = selected.has(checkbox.value);
   });
 }
 
-function applySetupStateReadModel(data, selectedProviders = []) {
+function applySetupStateReadModel(data, selectedProviders) {
   latestSetupState = data;
   if (
     typeof data?.bootstrapRequired === 'boolean'
@@ -1004,13 +1003,15 @@ function applySetupStateReadModel(data, selectedProviders = []) {
   if (data.scan && data.scan.providers) {
     renderScanResults(data.scan);
   } else {
+    scanData = null;
     renderUniverse(data.universe || []);
   }
-  restoreProviderSelection(selectedProviders);
+  restoreProviderSelection(selectedProviders ?? (data.selection?.targets || []).map(selectionTargetKey));
   const applyBtn = document.getElementById('applyBtn');
   if (applyBtn) {
-    applyBtn.disabled = selectableProviderSummary().applyableCount === 0;
+    applyBtn.disabled = !data.selection;
   }
+  document.getElementById('reloadSelectionBtn').hidden = !data.selection?.diskChanged;
   updateProvidersWorkspaceMetrics();
   updateSelectAllCheckbox();
 }
@@ -2108,68 +2109,39 @@ async function loadConfiguredTargetCapabilities() {
   }
 }
 
+function selectionTargetKey(target) {
+  return JSON.stringify([target.provider, target.backend, target.instance]);
+}
+
 function renderUniverse(universe) {
-  scanData = null;
-  const list = document.getElementById('providerList');
-  if (!universe.length) {
-    document.getElementById('providerListItems').innerHTML = '<div class="px-6 py-12 text-center text-sm text-slate-500">No providers found.</div>';
-    document.getElementById('applyBtn').disabled = true;
-    updateProvidersWorkspaceMetrics();
-    updateSelectAllCheckbox();
-    return;
+  const selected = new Set((latestSetupState?.selection?.targets || []).map(selectionTargetKey));
+  const entries = new Map(universe.map((entry) => [selectionTargetKey(entry), entry]));
+  for (const target of latestSetupState?.selection?.targets || []) {
+    if (!entries.has(selectionTargetKey(target))) {
+      entries.set(selectionTargetKey(target), { ...target, familyLabel: target.provider, binaryName: '' });
+    }
   }
-  document.getElementById('providerListItems').innerHTML = universe.map(p => `
-    <label class="flex cursor-pointer items-start gap-4 border-b border-slate-800 px-4 py-4 last:border-b-0 hover:bg-slate-900/40">
-      <input type="checkbox" value="${escapeHtml(p.provider)}" class="provider-check mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500" />
+  const observations = new Map((scanData?.providers || []).map((entry) => [selectionTargetKey(entry), entry]));
+  document.getElementById('providerListItems').innerHTML = Array.from(entries.entries()).map(([key, entry]) => {
+    const observed = observations.get(key);
+    const status = observed?.available ? 'Ready' : observed ? observed.commandStatus : selected.has(key) ? 'Not checked' : 'Not selected';
+    const remediation = (observed?.remediation || []).map((step) => `<div class="mt-2 text-xs text-amber-300">${escapeHtml(step.summary)}</div>`).join('');
+    return `<label class="flex cursor-pointer items-start gap-4 border-b border-slate-800 px-4 py-4 last:border-b-0 hover:bg-slate-900/40">
+      <input type="checkbox" value="${escapeHtml(key)}" class="provider-check mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500" ${selected.has(key) ? 'checked' : ''} />
       <div class="min-w-0 flex-1">
-        <div class="text-sm font-semibold text-slate-100">${escapeHtml(p.familyLabel)}</div>
-        <div class="mt-1 text-xs text-slate-500">${escapeHtml(p.provider)} &mdash; ${escapeHtml(p.binaryName)}</div>
+        <div class="text-sm font-semibold text-slate-100">${escapeHtml(entry.familyLabel)}</div>
+        <div class="mt-1 text-xs text-slate-500">${escapeHtml(entry.backend + '/' + entry.instance)}</div>
+        ${remediation}
       </div>
-      <div class="shrink-0">
-        <span class="status-badge status-badge-unknown">Not scanned</span>
-      </div>
-    </label>
-  `).join('');
+      <span class="status-badge ${observed?.available ? 'status-badge-ready' : 'status-badge-unknown'}">${escapeHtml(status)}</span>
+    </label>`;
+  }).join('');
   bindCheckboxes();
 }
 
 function renderScanResults(scan) {
   scanData = scan;
-  const list = document.getElementById('providerList');
-  if (!scan.providers.length) {
-    document.getElementById('providerListItems').innerHTML = '<div class="px-6 py-12 text-center text-sm text-slate-500">No providers were returned by the latest scan.</div>';
-    document.getElementById('applyBtn').disabled = true;
-    updateProvidersWorkspaceMetrics();
-    updateSelectAllCheckbox();
-    return;
-  }
-  document.getElementById('providerListItems').innerHTML = scan.providers.map(p => {
-    const statusClass = p.available
-      ? 'status-badge status-badge-ready'
-      : p.commandStatus === 'probe_failed'
-        ? 'status-badge status-badge-unavailable'
-        : 'status-badge status-badge-degraded';
-    const statusText = p.available ? 'Ready' : p.commandStatus === 'missing_install' ? 'Not installed' : p.commandStatus;
-    const remediation = (p.remediation || []).map(r =>
-      `<div class="mt-2 text-xs text-amber-300">${escapeHtml(r.summary)}${r.command ? ' <code class="rounded bg-slate-950 px-1.5 py-0.5 text-[11px] text-slate-300">' + escapeHtml(r.command) + '</code>' : ''}</div>`
-    ).join('');
-    return `
-      <label class="flex items-start gap-4 border-b border-slate-800 px-4 py-4 last:border-b-0 ${p.available ? 'cursor-pointer hover:bg-slate-900/40' : 'cursor-not-allowed opacity-60'}">
-        <input type="checkbox" value="${escapeHtml(p.provider)}" class="provider-check mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500" ${p.available ? 'checked' : 'disabled'} />
-        <div class="min-w-0 flex-1">
-          <div class="text-sm font-semibold text-slate-100">${escapeHtml(p.family)}</div>
-          <div class="mt-1 text-xs text-slate-500">
-            ${escapeHtml(p.provider)}${p.version ? ' v' + escapeHtml(p.version) : ''}${p.commandPath ? ' &mdash; ' + escapeHtml(p.commandPath) : ''}
-          </div>
-          ${remediation}
-        </div>
-        <div class="shrink-0">
-          <span class="${statusClass}">${escapeHtml(statusText)}</span>
-        </div>
-      </label>
-    `;
-  }).join('');
-  bindCheckboxes();
+  renderUniverse(latestSetupState?.universe || []);
 }
 
 function bindCheckboxes() {
@@ -2177,7 +2149,7 @@ function bindCheckboxes() {
   const applyBtn = document.getElementById('applyBtn');
   const update = () => {
     const selection = selectableProviderSummary();
-    applyBtn.disabled = selection.applyableCount === 0;
+    applyBtn.disabled = !latestSetupState?.selection;
     updateProvidersWorkspaceMetrics();
     updateSelectAllCheckbox();
   };
@@ -2205,97 +2177,90 @@ async function waitForScanToSettle(fetchFn) {
   }
 }
 
+async function saveProviderSelection(fetchFn) {
+  if (!latestSetupState?.selection) throw new Error('Reload setup before saving selection.');
+  const targets = currentSelectedProviders().map((value) => {
+    const [provider, backend, instance] = JSON.parse(value);
+    return { provider, backend, instance };
+  });
+  const res = await fetchFn('/setup-selection', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ targets, expectedRevision: latestSetupState.selection.revision }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Could not save selection (${res.status}).`);
+  latestSetupState.selection = data.selection;
+  latestSetupState.bootstrapRequired = false;
+  return data;
+}
+
+async function reloadProviderSelection() {
+  const button = document.getElementById('reloadSelectionBtn');
+  button.disabled = true;
+  try {
+    const fetchFn = window.CatsUI?.apiFetch || fetch;
+    const response = await fetchFn('/setup-selection/reload', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ expectedRevision: latestSetupState.selection.revision }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Could not reload provider selection');
+    await fetchState();
+  } catch (error) {
+    showResult('Could not reload selection', error.message, true);
+  } finally { button.disabled = false; }
+}
+
 async function runScan() {
   if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
   setActiveSetupWorkspace('providers');
   const scanBtn = document.getElementById('scanBtn');
   scanBtn.disabled = true;
-  document.getElementById('providerListItems').innerHTML = '<div class="px-6 py-12 text-center text-sm text-slate-500">Scanning providers...</div>';
-  document.getElementById('providersWorkspaceSummary').textContent = 'Scanning local providers...';
-  // The checkbox list just collapsed back to "Scanning..." so the previous
-  // selection is gone; refresh the badges right away instead of letting the
-  // stale "N selected" count linger until the scan returns.
   document.getElementById('applyBtn').disabled = true;
-  updateProvidersWorkspaceMetrics();
-  updateSelectAllCheckbox();
   hideResult();
-
   try {
     const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
+    await saveProviderSelection(fetchFn);
+    document.getElementById('providersWorkspaceSummary').textContent = 'Checking selected providers...';
     const res = await fetchFn('/setup-scan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ manual: true }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await waitForScanToSettle(fetchFn);
-    if (data.state && data.state.status === 'error') {
-      throw new Error(data.state.error || 'The runtime reported a failed scan.');
-    }
+    if (data.state?.status === 'error') throw new Error(data.state.error || 'Provider check failed.');
     applySetupStateReadModel(data);
+    await loadConfiguredTargetCapabilities();
   } catch (err) {
-    document.getElementById('providerListItems').innerHTML =
-      '<div class="px-6 py-12 text-center text-sm text-red-300">Scan failed: ' + escapeHtml(err.message) + '</div>';
-    document.getElementById('providersWorkspaceSummary').textContent = 'Scan failed. Review the workspace error and retry.';
-    document.getElementById('providersRailBadge').textContent = 'Retry';
-    document.getElementById('providersRailSummary').textContent = 'The latest provider scan failed. Review the error and retry.';
-    updateSelectAllCheckbox();
+    showResult('Provider check failed', err.message, true);
   } finally {
     scanBtn.disabled = false;
+    document.getElementById('applyBtn').disabled = false;
   }
 }
 
 async function applyConfig() {
   if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
-  const selection = selectableProviderSummary();
-  const providers = Array.isArray(scanData?.providers)
-    ? selection.selectedProviders.filter((provider) =>
-        scanData.providers.some((entry) => entry.provider === provider && entry.available),
-      )
-    : selection.selectedProviders;
-  if (!providers.length) {
-    if (selection.selectedCount > 0) {
-      showResult('Unavailable Selection', 'Only available providers can be applied. Run Scan Providers and select a ready provider.', true);
-    }
-    return;
-  }
-
-  const applyBtn = document.getElementById('applyBtn');
-  applyBtn.disabled = true;
-  applyBtn.textContent = 'Applying...';
+  const button = document.getElementById('applyBtn');
+  button.disabled = true;
+  button.textContent = 'Saving...';
   hideResult();
-
   try {
     const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
-    const res = await fetchFn('/setup-apply', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ providers }),
-    });
-    const data = await res.json();
-    if (res.ok && data.status === 'applied') {
-      showResult(
-        'Setup Complete',
-        `Configuration written to ${data.configPath}. ` +
-        (data.restart ? 'Please restart the runtime.' : 'Runtime is now active.') +
-        ' <a class="runtime-link" href="/dashboard">Go to Dashboard</a>',
-        false,
-        true
-      );
-      const stateRes = await fetchFn('/setup-state');
-      if (!stateRes.ok) throw new Error(`HTTP ${stateRes.status}`);
-      const stateData = await stateRes.json();
-      applySetupStateReadModel(stateData, providers);
-      await loadConfiguredTargetCapabilities();
-      setActiveSetupWorkspace('providers');
-    } else {
-      showResult('Error', data.error || 'Failed to apply configuration.', true);
-    }
+    const saved = await saveProviderSelection(fetchFn);
+    const response = await fetchFn('/setup-state');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    scanData = null;
+    applySetupStateReadModel(await response.json());
+    await loadConfiguredTargetCapabilities();
+    showResult('Selection saved', saved.selection.targets.length
+      ? 'Cats will check and use only the selected providers.'
+      : 'Runtime is idle. Add providers whenever you are ready.', false);
   } catch (err) {
-    showResult('Error', err.message, true);
+    showResult('Could not save selection', err.message, true);
   } finally {
-    applyBtn.disabled = false;
-    applyBtn.textContent = 'Apply Selected';
+    button.disabled = false;
+    button.textContent = 'Save Selection';
   }
 }
 

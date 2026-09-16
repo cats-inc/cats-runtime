@@ -203,20 +203,15 @@ describe('SetupDiagnosticService', () => {
 
       const artifact = await service.generateReport();
       expect(artifact.report.setup.repair).toEqual(expect.objectContaining({
-        status: 'ready',
+        status: 'selection_required',
         nextAction: expect.objectContaining({
-          kind: 'apply_config',
-          path: '/setup-apply',
-          method: 'POST',
-          providers: ['claude'],
-          body: {
-            providers: ['claude'],
-          },
+          kind: 'manage_selection',
+          path: '/setup',
+          method: 'GET',
         }),
         actions: expect.arrayContaining([
           expect.objectContaining({
-            kind: 'apply_config',
-            providers: ['claude'],
+            kind: 'manage_selection',
           }),
           expect.objectContaining({
             kind: 'generate_setup_report',

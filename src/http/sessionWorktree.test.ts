@@ -1,3 +1,4 @@
+import { withSelectedCliProviders } from '../../tests/support/selectedCliFixture.js';
 import { spawnSync } from 'node:child_process';
 import {
   existsSync,
@@ -82,7 +83,7 @@ function buildHydration(runtimeCwd: string, sourceCwd: string) {
 }
 
 describe('session worktree routes', () => {
-  const makeConfig = (): CliRuntimeConfig => ({
+  const makeConfig = (): CliRuntimeConfig => withSelectedCliProviders(({
     host: '127.0.0.1',
     port: 3100,
     apiKey: '',
@@ -125,7 +126,7 @@ describe('session worktree routes', () => {
       kiro: { path: 'kiro-cli', runner: 'auto', runtime: { mode: 'native' } },
       opencode: { path: 'opencode', runner: 'auto', runtime: { mode: 'native' } },
     },
-  });
+  }));
 
   let registry: SessionRegistry;
   let pool: WorkerPool;

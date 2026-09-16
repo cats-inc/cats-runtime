@@ -30,11 +30,13 @@ export interface RemoteModelDiscoveryFetchOptions {
   fetch?: typeof fetch;
   timeoutMs?: number;
   signal?: AbortSignal;
+  readJson?: boolean;
 }
 
 export interface RemoteModelDiscoveryFetchResult {
   response: Response;
   latencyMs: number;
+  payload?: unknown;
 }
 
 export const DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS = 5_000;
@@ -273,14 +275,18 @@ export async function fetchRemoteModelDiscovery(
   }
 
   try {
+    options.signal?.throwIfAborted();
     const response = await fetchImpl(request.url, {
       method: request.method,
       ...(Object.keys(request.headers).length > 0 ? { headers: request.headers } : {}),
       signal: controller.signal,
     });
 
+    const payload = options.readJson && response.ok ? await response.json() : undefined;
+    options.signal?.throwIfAborted();
     return {
       response,
+      payload,
       latencyMs: Date.now() - startedAt,
     };
   } catch (error) {
