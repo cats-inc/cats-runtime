@@ -39,6 +39,13 @@ An unknown version remains `unknown-version`. Do not substitute another machine'
   accepted-evidence changes. Request explicit scope before making those broader changes.
 - Authentication, paid probes, or quota-consuming calls require explicit authorization.
 
+Apply the maintenance groups in `SKILL.md` before choosing refresh scope. A deliberate shortlist
+is a Cats menu selection, not a claim that the upstream provider offers only those models. Keep
+source completeness separate from shortlist coverage and retain the supporting evidence. A
+five-entry cap alone does not identify which entries to remove; obtain the operator's concrete
+shortlist before changing membership. Full-catalog providers retain complete evidenced options.
+Custom input in either group does not authorize inventing effort choices or other model metadata.
+
 ## Freshness and partial evidence
 
 Advance `last_updated` only when the model list for the edited catalog/provider scope was re-read or

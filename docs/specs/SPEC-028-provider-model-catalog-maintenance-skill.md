@@ -42,6 +42,37 @@ onto the curated schema, and let the operator choose in plain language whether
 to preview every reading, confirm only uncertainty, or apply unambiguous changes.
 A paste by itself authorizes capture and preview, not a repository edit.
 
+## Approved maintenance and menu policy (2026-09-17)
+
+The repository owner approved two maintenance groups for Cats Desktop and Runtime Playground:
+
+| Group | CLI providers | Maintained and selectable catalog |
+|---|---|---|
+| Full catalog | Codex, Claude, Antigravity (`agy`), Grok, Muse | Complete evidenced CLI model lists and all applicable effort/options, plus custom model-string input |
+| Shortlist | Cursor Agent CLI, Goose CLI, Junie CLI, Devin CLI, Kiro CLI, GitHub Copilot CLI, OpenCode, Kilo Code CLI, Auggie CLI, Pi, Cline | At most five explicitly selected models per CLI, plus a custom-input action |
+
+The full-catalog group has no five-model cap. The shortlist may contain fewer than five models;
+effort choices remain attached to their model and custom input does not consume a model slot.
+Both surfaces shall follow the same policy. Existing evidence, exact-label, per-model applicability,
+and confirmed-default rules continue to apply.
+
+Custom model strings remain available for both groups, including API-key-backed use through
+supported execution paths. This records the selection requirement; it does not imply that every
+CLI exposes an API-key backend, nor does it authorize new adapter support or guessed model metadata.
+Preserve the identifiers required by the selected provider/backend.
+
+This changes routine maintenance coverage, not the inventory boundary of a requested full audit.
+Discovery may observe more models than Cats' shortlist; a refresh must not silently expand an
+approved shortlist. Complete upstream evidence and complete coverage of a selected shortlist are
+different claims and must remain distinguishable.
+
+**Implementation status:** policy recorded only. The owner explicitly chose to specify each
+shortlist later. No particular model membership or order, catalog removal, UI enforcement change,
+automated refresh job, or periodic refresh interval is authorized by this amendment. Custom input
+already has a Desktop implementation; empty-catalog reachability and Playground consistency remain
+implementation checks for the later rollout. Providers outside the named groups retain their
+existing policy until separately specified.
+
 ## Goals
 
 - provide one repeatable workflow for provider catalog refresh, audit, and
