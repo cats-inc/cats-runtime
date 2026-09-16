@@ -195,11 +195,11 @@ const KIRO_WSL_MODELS: ProviderModelCatalogEntry[] = [
 ];
 
 const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
-  // Aligned 2026-09-02 with the operator-confirmed complete Claude Code 2.1.257
-  // interactive `/model` picker. The provider-default null sentinel is not an
-  // executable model id, so this fallback contains only the four model aliases.
+  // Aligned 2026-09-16 with the Claude Code 2.1.273 picker and the operator's
+  // four version-bearing display names. The duplicate provider-default sentinel
+  // stays evidence-only; Opus is the requested Cats default.
   claude: [
-    { id: 'opus', label: 'Opus 5 (1M context)', default: true },
+    { id: 'opus', label: 'Opus 5 with 1M context', default: true },
     { id: 'fable', label: 'Fable 5.1' },
     { id: 'sonnet', label: 'Sonnet 5' },
     { id: 'haiku', label: 'Haiku 4.5' },

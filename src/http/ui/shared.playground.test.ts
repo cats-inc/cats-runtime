@@ -61,6 +61,11 @@ describe('shared playground selection helpers', () => {
       advancedCatalogs: { codex: catalog },
     }).modelSelection.controls).toEqual({ 'codex.reasoning_effort': 'high' });
     expect(catsUI.formatAdvancedDefaultLabel('Low', true)).toBe('Low (default)');
+    expect(catsUI.formatAdvancedDefaultLabel('Opus 5 with 1M context (Default)', true))
+      .toBe('Opus 5 with 1M context (default)');
+    expect(catsUI.formatAdvancedDefaultLabel('xHigh (DEFAULT)', false)).toBe('xHigh');
+    expect(catsUI.formatAdvancedDefaultLabel('xHigh (Default)', undefined))
+      .toBe('xHigh (default)');
     expect(catsUI.formatAdvancedDefaultLabel('Medium (default)', false)).toBe('Medium');
     expect(catsUI.formatAdvancedDefaultLabel('gpt-6-astra (default)', true))
       .toBe('gpt-6-astra (default)');
