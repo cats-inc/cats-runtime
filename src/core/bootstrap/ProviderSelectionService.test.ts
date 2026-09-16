@@ -33,6 +33,29 @@ function fixture(yaml?: string) {
 }
 
 describe('provider intent and resource scope', () => {
+  it.each(['url', 'base_url', 'connect'])('edits an endpoint without replacing auth or transport settings (%s)', (shape) => {
+    const connection = shape === 'connect' ? "connect: {base_url: 'http://old.invalid:11434', headers: {X-Test: preserved}}"
+      : `${shape}: 'http://old.invalid:11434'`;
+    const f = fixture(`backends:\n  local:\n    providers:\n      ollama:\n        instances:\n          local:\n            transport: ollama\n            api_key_env: PRIVATE_TEST_KEY\n            timeout_ms: 4321\n            ${connection}\n`);
+    f.selection.save([{ ...ollama, endpoint: 'http://127.0.0.1:11435' }], f.selection.getSnapshot().revision);
+    const saved = parse(readFileSync(f.paths.configPath, 'utf8')).backends.local.providers.ollama.instances.local;
+    expect(saved.api_key_env).toBe('PRIVATE_TEST_KEY');
+    expect(saved.timeout_ms).toBe(4321);
+    expect(saved.transport).toBe('ollama');
+    if (shape === 'connect') expect(saved.connect.headers).toEqual({ 'X-Test': 'preserved' });
+    expect(new BootstrapService({ ...f, compatibility: {} as ProviderCompatibilityService }).getConnections()[0]?.endpoint)
+      .toBe('http://127.0.0.1:11435');
+  });
+
+  it('rejects endpoint credentials, unsafe protocols and non-string patches without changing disk', () => {
+    const f = fixture();
+    const selection = f.selection.save([ollama], 'missing');
+    const before = readFileSync(f.paths.configPath, 'utf8');
+    for (const endpoint of ['file:///test', 'http://user:secret@localhost', 'http://localhost?token=secret', 123]) {
+      expect(() => f.selection.save([{ ...ollama, endpoint }], selection.revision)).toThrow();
+      expect(readFileSync(f.paths.configPath, 'utf8')).toBe(before);
+    }
+  });
   it('holds non-cancellable CLI model discovery until it completes', async () => {
     const f = fixture();
     const pi = { provider: 'pi', backend: 'cli', instance: 'native' };

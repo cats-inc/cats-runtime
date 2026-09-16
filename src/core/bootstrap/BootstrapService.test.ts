@@ -25,6 +25,35 @@ function fixture(assessCliTarget = vi.fn(async (_target: unknown, _options?: unk
 }
 
 describe('selected provider bootstrap scans', () => {
+  it('checks the expected revision before coalescing and keeps explicit connection checks distinct', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const f = fixture(vi.fn(async () => {
+      await gate;
+      return { setup: { command: { status: 'ready' }, version: {}, auth: { status: 'unknown' }, remediation: [] } };
+    }));
+    const saved = f.service.saveSelection([targets[0]], 'missing');
+    const scan = f.service.startScan({ expectedRevision: saved.revision });
+    expect(() => f.service.startScan({ expectedRevision: 'stale' })).toThrow('Selection changed');
+    expect(() => f.service.startScan({ expectedRevision: saved.revision, includeConnections: true })).toThrow('different provider scan');
+    expect(await f.service.getSetupState()).toMatchObject({ scanId: scan.scanId, scanCompleted: 0, scanTotal: 1 });
+    release();
+    await f.service.scan();
+    expect(await f.service.getSetupState()).toMatchObject({ scanId: scan.scanId, scanCompleted: 1, status: 'ready' });
+  });
+
+  it('retains a verified endpoint through passive scans and only refreshes explicitly requested targets', async () => {
+    const f = fixture();
+    const service = new BootstrapService({ ...f.options, probeNonCliTarget: async (_target, options) =>
+      options.includeConnections ? { connectionStatus: 'connected', available: true } : null });
+    const ollama = { provider: 'ollama', backend: 'local', instance: 'local' };
+    service.saveSelection([ollama, targets[0]], 'missing');
+    await service.scan({ includeConnections: true, targets: [ollama] });
+    const before = service.getProviderObservations();
+    await service.scan();
+    expect(service.getProviderObservations().find((entry) => entry.provider === 'ollama')).toEqual(before[0]);
+    expect(f.assessCliTarget).toHaveBeenCalledOnce();
+  });
   it('does not probe the supported catalog or a missing selection', () => {
     const f = fixture();
     expect(f.service.getProviderUniverse().some((entry) => entry.provider === 'ollama')).toBe(true);
@@ -139,16 +168,17 @@ describe('selected provider bootstrap scans', () => {
 
   it('marks changed endpoint settings without persisting configuration secrets', async () => {
     const f = fixture();
+    const service = new BootstrapService({ ...f.options, probeNonCliTarget: async () => ({ connectionStatus: 'connected', available: true }) });
     const target = { provider: 'openclaw', backend: 'agent', instance: 'gateway' };
-    f.service.saveSelection([{ ...target, configuration: {
+    service.saveSelection([{ ...target, configuration: {
       transport: 'openclaw_gateway', url: 'http://example.invalid/first',
       headers: { Authorization: 'private-test-value' },
     } }], 'missing');
-    await f.service.scan({ manual: true });
+    await service.scan({ manual: true, includeConnections: true });
     const yaml = readFileSync(f.paths.configPath, 'utf8');
     writeFileSync(f.paths.configPath, yaml.replace('http://example.invalid/first', 'http://example.invalid/second'));
-    f.service.selection.reload(f.service.getSelection().revision);
-    expect(f.service.getProviderObservations()[0]).toMatchObject({ ...target, configurationStatus: 'changed' });
+    service.selection.reload(service.getSelection().revision);
+    expect(service.getProviderObservations()[0]).toMatchObject({ ...target, configurationStatus: 'changed' });
     const archive = readFileSync(join(f.paths.dataDir, 'setup', 'provider-observations.json'), 'utf8');
     expect(archive).not.toContain('private-test-value');
     expect(archive).not.toContain('example.invalid');
@@ -163,9 +193,10 @@ describe('selected provider bootstrap scans', () => {
       return { setup: { command: { status: 'ready' }, version: {}, auth: { status: 'unknown' }, remediation: [] } };
     }));
     f.service.saveSelection([targets[0]], 'missing');
-    expect(f.service.startScan()).toEqual({ started: true });
+    const started = f.service.startScan();
+    expect(started).toMatchObject({ started: true, scanId: expect.any(String) });
     expect((await f.service.getSetupState()).status).toBe('scanning');
-    expect(f.service.startScan()).toEqual({ started: false });
+    expect(f.service.startScan()).toEqual({ started: false, scanId: started.scanId });
     release();
     await f.service.scan();
     expect((await f.service.getSetupState()).status).toBe('ready');

@@ -80,6 +80,7 @@ import { readClaudeQuota } from './backends/cli/usage/claudeQuota.js';
 import { readAntigravityQuota } from './backends/cli/usage/antigravityQuota.js';
 import { readCodexQuota } from './backends/cli/usage/codexQuota.js';
 import { primeProviderAvailabilityDiagnosticsCache, invalidateProviderAvailabilityDiagnosticsCache } from './http/routes/diagnostics.js';
+import { probeSetupNonCliTarget } from './core/bootstrap/setupConnections.js';
 import { executeRetainedWorktreeCleanup } from './http/routes/sessions.js';
 import type { ProviderName } from './backends/cli/providers/types.js';
 import type { ApiBackendOptions } from './backends/api/types.js';
@@ -1182,6 +1183,10 @@ export function createRuntimeServer(
     configPath: configPathForBootstrap,
     config,
     compatibility,
+    probeNonCliTarget: (target, probeOptions) => probeSetupNonCliTarget(target, {
+      ...probeOptions, env: getRuntimeConfigEnv(config), agentBackend: context.agentBackend,
+      fetch: options.apiBackend?.fetch,
+    }),
     beforeActivate: (_candidate: RuntimeConfig, changed: SelectedProviderTarget[]) => {
       const keys = new Set(changed.map(providerSelectionKey));
       for (const session of registry.list()) {

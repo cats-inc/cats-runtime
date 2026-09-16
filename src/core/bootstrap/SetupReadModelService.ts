@@ -11,6 +11,7 @@ import type {
   ProviderSetupObservation,
 } from './BootstrapService.js';
 import type { ProviderSelectionSnapshot } from './ProviderSelectionService.js';
+import type { SetupConnection } from './setupConnections.js';
 import {
   buildRepairSummary,
   type SetupRepairSummary,
@@ -24,6 +25,7 @@ export interface SetupStateReadModel {
   scan: SetupStateScanSummary | null;
   manualScan: BootstrapScanResult | null;
   observations: ProviderSetupObservation[];
+  connections: SetupConnection[];
   universe: ProviderUniverseEntry[];
   repair: SetupRepairSummary;
   diagnostics: {
@@ -52,7 +54,7 @@ export interface SetupReadModelServiceOptions {
     BootstrapService,
     'getSetupState' | 'getLatestScan' | 'getLatestManualScan' | 'getProviderUniverse'
     | 'getSelection' | 'getProviderObservations'
-  >;
+  > & Partial<Pick<BootstrapService, 'getConnections'>>;
   diagnostics?: Pick<SetupDiagnosticService, 'readLatestReport'>;
 }
 
@@ -83,6 +85,7 @@ export class SetupReadModelService {
       scan: summarizeScan(scan),
       manualScan: manualScan ?? null,
       observations,
+      connections: this.bootstrapService.getConnections?.() ?? [],
       universe: this.bootstrapService.getProviderUniverse(),
       repair: buildRepairSummary({
         bootstrapRequired: this.bootstrapRequired,

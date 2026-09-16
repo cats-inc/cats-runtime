@@ -17,6 +17,8 @@ export interface SelectedProviderTarget {
 export interface ProviderSelectionEntry extends SelectedProviderTarget {
   /** Only needed when adding a target without a built-in template. */
   configuration?: Record<string, unknown>;
+  /** Narrow endpoint edit; preserves authentication and other instance fields. */
+  endpoint?: string;
 }
 
 export interface ProviderSelectionSnapshot {
@@ -114,9 +116,13 @@ export function parseSelectionTargets(input: unknown): ProviderSelectionEntry[] 
       || typeof entry.configuration !== 'object' || Array.isArray(entry.configuration))) {
       throw new ProviderSelectionError('Target configuration must be an object');
     }
+    if (entry.endpoint !== undefined && typeof entry.endpoint !== 'string') {
+      throw new ProviderSelectionError('Endpoint must be a URL string');
+    }
     const target: ProviderSelectionEntry = {
       provider: entry.provider, backend: entry.backend as BackendKind, instance: entry.instance,
       ...(entry.configuration ? { configuration: entry.configuration as Record<string, unknown> } : {}),
+      ...(typeof entry.endpoint === 'string' ? { endpoint: entry.endpoint } : {}),
     };
     const key = providerSelectionKey(target);
     if (seen.has(key)) throw new ProviderSelectionError('Duplicate selected target');
@@ -185,7 +191,7 @@ export class ProviderSelectionService {
         if (target.providerName === 'devin') return target.remoteInstance?.transport === 'acp_stdio';
         if (target.providerName !== 'ollama' || target.remoteInstance?.transport !== 'ollama') return false;
         const remote = target.remoteInstance;
-        const url = remote.baseUrl || (remote.baseUrlEnv ? env[remote.baseUrlEnv] : undefined) || 'http://127.0.0.1:11434';
+        const url = (remote.baseUrlEnv ? env[remote.baseUrlEnv] : undefined) || remote.baseUrl || 'http://127.0.0.1:11434';
         try { return ['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname); } catch { return false; }
       }).map(selectedTarget),
       diskChanged: providerConfigRevision(readSource(this.options.configPath)) !== this.revision,
@@ -272,6 +278,35 @@ export class ProviderSelectionService {
     const currentKeys = new Set(configuredTargets(this.options.config).map((target) =>
       providerSelectionKey(selectedTarget(target))));
     for (const target of desired) {
+      if (target.endpoint !== undefined) {
+        if (target.configuration !== undefined) throw new ProviderSelectionError('Choose either endpoint or full configuration');
+        const current = configuredTargets(this.options.config).find((value) => providerSelectionKey(selectedTarget(value)) === providerSelectionKey(target));
+        const template = templateFor(target);
+        const transport = current?.remoteInstance?.transport ?? template?.transport;
+        if (!['ollama', 'openclaw', 'openclaw_gateway'].includes(String(transport))) {
+          throw new ProviderSelectionError('This target does not support endpoint editing');
+        }
+        const env = getRuntimeConfigEnv(this.options.config);
+        const remote = current?.remoteInstance;
+        if ((remote?.urlEnv && env[remote.urlEnv]) || (remote?.baseUrlEnv && env[remote.baseUrlEnv])) {
+          throw new ProviderSelectionError('This endpoint is managed by an environment variable');
+        }
+        let url: URL;
+        try { url = new URL(target.endpoint); } catch { throw new ProviderSelectionError('Enter a valid endpoint URL'); }
+        const protocols = transport === 'ollama' ? ['http:', 'https:'] : ['ws:', 'wss:'];
+        if (!protocols.includes(url.protocol) || url.username || url.password || url.search || url.hash) {
+          throw new ProviderSelectionError('Use a service URL without embedded credentials or query parameters');
+        }
+        const providerPath = ['backends', target.backend, 'providers', target.provider];
+        const path = current && !document.hasIn([...providerPath, 'instances'])
+          ? providerPath : [...providerPath, 'instances', target.instance];
+        if (!current) document.setIn(path, template);
+        const endpointPath = document.hasIn([...path, 'connect']) ? [...path, 'connect'] : path;
+        const field = transport === 'ollama' ? 'base_url' : 'url';
+        if (field === 'base_url') document.deleteIn([...endpointPath, 'baseUrl']);
+        document.setIn([...endpointPath, field], target.endpoint);
+        continue;
+      }
       if (currentKeys.has(providerSelectionKey(target)) && target.configuration === undefined) continue;
       const configuration = target.configuration ?? templateFor(target);
       if (!configuration) throw new ProviderSelectionError('New custom targets require configuration');
@@ -323,7 +358,7 @@ export class ProviderSelectionService {
     }
   }
 
-  private assertRevision(expectedRevision: unknown): void {
+  assertRevision(expectedRevision: unknown): void {
     if (expectedRevision !== this.revision
       || providerConfigRevision(readSource(this.options.configPath)) !== this.revision) {
       throw new ProviderSelectionError('Selection changed; reload before editing', 409);

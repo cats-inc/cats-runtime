@@ -42,8 +42,10 @@ setupRoutes.post('/setup-scan', async (c) => {
     || c.req.query('manual') === '1';
 
   let started: boolean;
+  let scanId: string | undefined;
   try {
-    ({ started } = ctx.bootstrapService.startScan({ manual, targets: body.targets }));
+    ({ started, scanId } = ctx.bootstrapService.startScan({ manual, targets: body.targets,
+      expectedRevision: body.expectedRevision, includeConnections: body.includeConnections === true }));
   } catch (error) {
     if (error instanceof ProviderSelectionError) return c.json({ error: error.message }, error.status);
     throw error;
@@ -55,6 +57,7 @@ setupRoutes.post('/setup-scan', async (c) => {
   return c.json({
     status: 'scanning',
     started,
+    scanId,
     state: await ctx.bootstrapService.getSetupState(),
   }, 202);
 });
