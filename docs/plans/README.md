@@ -46,6 +46,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
+| [PLAN-039](./PLAN-039-provider-selection-bootstrap-rollout.md) | Provider Selection Bootstrap Rollout | Draft; implementation not started | [SPEC-030](../specs/SPEC-030-provider-selection-before-bootstrap-probes.md), [ADR-039](../decisions/039-use-selected-provider-config-as-the-resource-boundary.md) |
 | [PLAN-038](./PLAN-038-provider-account-quota-and-usage-snapshots.md) | Provider Account Quota and Usage Snapshots | Planned — current metering audited; implementation pending | [SPEC-029](../specs/SPEC-029-provider-account-quota-and-usage-snapshots.md), [ADR-038](../decisions/038-separate-execution-usage-from-provider-account-quota.md) |
 | [PLAN-037](./PLAN-037-provider-model-catalog-maintenance-skill.md) | Provider Model Catalog Maintenance Skill | In Progress (Skill and Sync Implemented; Claude-Owned Doc Remains) | [SPEC-028](../specs/SPEC-028-provider-model-catalog-maintenance-skill.md), [ADR-036](../decisions/036-separate-repository-maintenance-skills-from-runtime-delivered-skills.md) |
 | [PLAN-036](./PLAN-036-provider-upstream-drift-watch-and-staleness-surfacing.md) | Provider Upstream Drift Watch and Staleness Surfacing | Draft | [ADR-034](../decisions/034-automate-light-tier-provider-drift-and-separate-observation-from-acceptance.md), [ADR-029](../decisions/029-keep-advanced-provider-catalogs-verified-and-manual-refresh.md) |
@@ -111,5 +112,5 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 ---
 
 *See also: [specs/](../specs/) for feature specifications*
-*Last updated: 2026-09-01 (PLAN-037 implemented the canonical provider-catalog skill,
-safe cross-platform mirrors, nested paste tooling, and testable interaction decisions.)*
+*Last updated: 2026-09-16 (PLAN-039 drafts the shared Runtime, Platform, and Desktop
+selection-first bootstrap rollout; implementation has not started.)*

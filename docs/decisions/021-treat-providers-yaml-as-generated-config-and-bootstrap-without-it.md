@@ -7,6 +7,12 @@
 
 Accepted
 
+Proposed amendment (2026-09-16):
+[ADR-039](./039-use-selected-provider-config-as-the-resource-boundary.md) moves
+provider detection after saved selection while retaining static catalog access
+and bootstrap without a preexisting config. That proposal is not yet accepted;
+this record's current status remains unchanged.
+
 ## Date
 
 2026-03-25

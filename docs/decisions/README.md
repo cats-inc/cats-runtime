@@ -41,6 +41,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [039-use-selected-provider-config-as-the-resource-boundary](./039-use-selected-provider-config-as-the-resource-boundary.md) | Use Selected Provider Config as the Resource Boundary | Proposed | 2026-09-16 |
 | [038-separate-execution-usage-from-provider-account-quota](./038-separate-execution-usage-from-provider-account-quota.md) | Separate Execution Usage from Provider Account Quota | Accepted | 2026-09-10 |
 | [037-adopt-meta-muse-as-an-executable-cli-provider-and-retire-aider](./037-adopt-meta-muse-as-an-executable-cli-provider-and-retire-aider.md) | Adopt Meta Muse as an executable CLI provider family and retire Aider | Accepted | 2026-09-05 |
 | [036-separate-repository-maintenance-skills-from-runtime-delivered-skills](./036-separate-repository-maintenance-skills-from-runtime-delivered-skills.md) | Separate repository-maintenance skills from runtime-delivered skills | Accepted | 2026-08-28 |
@@ -90,7 +91,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 ---
 
-*Last updated: 2026-09-05 (ADR-037 adopts Meta Muse as an executable CLI provider family and
-retires Aider.)*
+*Last updated: 2026-09-16 (ADR-039 proposes selection-scoped provider work and a
+narrow amendment to ADR-021's detection-before-config policy.)*
 
 *See also: [AGENTS.md](../../AGENTS.md) for decision-making protocols*
