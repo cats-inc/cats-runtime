@@ -128,19 +128,17 @@ catalogs:
         options: []
 
   - cli: Codex
-    version: 0.152.0
-    last_updated: 2026-09-02
+    version: 0.154.0
+    last_updated: 2026-09-16
     notes:
-      - "Model list re-read 2026-09-02 from the authenticated interactive `/model` picker on Codex CLI 0.152.0; the operator confirmed all seven rows were visible with nothing scrolled off"
-      - "Every model id, ordering, description, reasoning-level value set, and per-model reasoning default below was re-verified against that picker"
-      - "Evidence: docs/research/fixtures/codex-0.152.0/model-picker.success.redacted.txt"
-      - "The picker shows raw ids only. Every `label` and every `context` number still comes from the 2026-08-26 `codex debug models` run on 0.149.1 and was not re-observed here"
-      - "`default: true` on gpt-5.6-sol likewise remains from that 0.149.1 `codex debug models` run. The 0.152.0 model list marks gpt-5.6-sol only `(current)`, which is the session selection; the reasoning screens print a separate `(default)` marker, so the model list itself makes no account-default claim either way"
-      - "Only models with `visibility: list` are included; hidden internal models are omitted. That filter is from the 0.149.1 `codex debug models` output and was not re-checked"
+      - "Model list and all per-model reasoning screens re-read 2026-09-16 from the operator-pasted `/model` picker on Codex CLI 0.154.0. The operator confirmed the five visible rows are complete and authorized removing gpt-5.4, gpt-5.4-mini, and gpt-5.3-codex-spark from the Cats picker. Scope is the operator's account; entitlement elsewhere is unverified."
+      - "Evidence: docs/research/fixtures/codex-0.154.0/model-picker.success.redacted.txt"
+      - "The model ids, ordering, descriptions, reasoning sets, and defaults below were observed in that paste. gpt-6-astra is explicitly `(default)`; gpt-5.5 is only `(current)`, a session selection. This supersedes the older gpt-5.6-sol model default."
+      - "Display names preserve the raw ids and casing shown by the 0.154.0 picker, as requested by the operator; older GPT-style label overrides are removed. The four retained context values come from `codex debug models` on 0.149.1 (2026-08-26) and were not re-observed. gpt-6-astra has no inferred context limit."
+      - "The picker says legacy models remain accessible through `codex -m <model_name>` or config.toml. Removal from this visible catalog does not claim those ids are invalid for manual use."
       - "Context values reflect the Codex CLI catalog and may differ from OpenAI API limits"
-      - "Max and Ultra sit behind a `More reasoning…` entry that opens an `Advanced Reasoning` screen headed `⚠ Consumes usage limits faster`. That nesting has no representation in this schema and is flattened into the value lists below. The picker gates it per model: gpt-5.6-sol and gpt-5.6-terra offer `Max and Ultra`, gpt-5.6-luna offers `Max` only, and gpt-5.5, gpt-5.4, gpt-5.4-mini, and gpt-5.3-codex-spark show no such entry at all"
-      - "All three `More reasoning…` submenus were opened on 0.152.0 - gpt-5.6-sol, gpt-5.6-terra, and gpt-5.6-luna - so the per-model gating above is directly observed rather than read from the picker's hint text. gpt-5.5, gpt-5.4, gpt-5.4-mini, and gpt-5.3-codex-spark expose no `More reasoning…` entry to open"
-      - "Max and Ultra descriptions are the 0.152.0 picker text and sit in shared_options on observed grounds: the Max line is byte-identical across all three models that offer it (gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna) and the Ultra line is byte-identical across both that offer it (gpt-5.6-sol, gpt-5.6-terra). That matches Low, Medium, High, and Extra high, which render identically under all seven models, so Codex draws level descriptions from one table rather than per model. The wording they replace came from the runtime advanced-knowledge baseline and was never observed in any picker"
+      - "All four `More reasoning…` submenus were opened: gpt-6-astra, gpt-5.6-sol, and gpt-5.6-terra offer Max and Ultra; gpt-5.6-luna offers Max only; gpt-5.5 stops at Extra high. The Advanced Reasoning screen warns `⚠ Consumes usage limits faster`. The operator explicitly authorized a flat Cats reasoning list; navigation/grouping and usage warnings remain in the evidence."
+      - "Level descriptions are identical across every captured model offering that level, so they are shared below; value availability and defaults remain model-specific. Extra high maps to xhigh through the existing Codex effort normalizer, and Max/Ultra map to max/ultra."
     shared_options:
       - name: Reasoning Level
         values:
@@ -164,24 +162,25 @@ catalogs:
               - "For demanding work using multiple agents · highest usage"
         default: Medium
     models:
-      - name: gpt-5.6-sol
-        label: GPT-5.6-Sol
+      - name: gpt-6-astra
         notes:
-          - "Latest frontier agentic coding model."
+          - "Our most capable model for complex, demanding work."
         default: true
+
+      - name: gpt-5.6-sol
+        notes:
+          - "Reliable agentic workhorse for everyday tasks."
         context: 272000
         options:
           - name: Reasoning Level
             default: Low
 
       - name: gpt-5.6-terra
-        label: GPT-5.6-Terra
         notes:
           - "Balanced agentic coding model for everyday work."
         context: 272000
 
       - name: gpt-5.6-luna
-        label: GPT-5.6-Luna
         notes:
           - "Fast and affordable agentic coding model."
         context: 272000
@@ -191,44 +190,13 @@ catalogs:
             default: Medium
 
       - name: gpt-5.5
-        label: GPT-5.5
         notes:
-          - "Frontier model for complex coding, research, and real-world work."
+          - "Proven previous-generation model for coding and general work."
         context: 272000
         options:
           - name: Reasoning Level
             values: [Low, Medium, High, Extra high]
             default: Medium
-
-      - name: gpt-5.4
-        label: GPT-5.4
-        notes:
-          - "Strong model for everyday coding."
-        context: 272000
-        options:
-          - name: Reasoning Level
-            values: [Low, Medium, High, Extra high]
-            default: Medium
-
-      - name: gpt-5.4-mini
-        label: GPT-5.4-Mini
-        notes:
-          - "Small, fast, and cost-efficient model for simpler coding tasks."
-        context: 272000
-        options:
-          - name: Reasoning Level
-            values: [Low, Medium, High, Extra high]
-            default: Medium
-
-      - name: gpt-5.3-codex-spark
-        label: GPT-5.3-Codex-Spark
-        notes:
-          - "Ultra-fast coding model."
-        context: 128000
-        options:
-          - name: Reasoning Level
-            values: [Low, Medium, High, Extra high]
-            default: High
 
   - cli: Antigravity
     version: 1.1.24

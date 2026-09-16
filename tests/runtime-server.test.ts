@@ -4021,17 +4021,15 @@ providers:
         provider: 'codex',
         backend: 'cli',
         instance: 'native',
-        defaultModel: 'gpt-5.6-sol',
+        defaultModel: 'gpt-6-astra',
         source: 'static',
         cache: null,
         models: expect.arrayContaining([
-          { id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol', default: true },
-          { id: 'gpt-5.6-terra', label: 'GPT-5.6-Terra', default: false },
-          { id: 'gpt-5.6-luna', label: 'GPT-5.6-Luna', default: false },
-          { id: 'gpt-5.5', label: 'GPT-5.5', default: false },
-          { id: 'gpt-5.4', label: 'GPT-5.4', default: false },
-          { id: 'gpt-5.4-mini', label: 'GPT-5.4-Mini', default: false },
-          { id: 'gpt-5.3-codex-spark', label: 'GPT-5.3-Codex-Spark', default: false },
+          { id: 'gpt-6-astra', label: 'gpt-6-astra', default: true },
+          { id: 'gpt-5.6-sol', label: 'gpt-5.6-sol', default: false },
+          { id: 'gpt-5.6-terra', label: 'gpt-5.6-terra', default: false },
+          { id: 'gpt-5.6-luna', label: 'gpt-5.6-luna', default: false },
+          { id: 'gpt-5.5', label: 'gpt-5.5', default: false },
         ]),
         warnings: [],
       });
@@ -4217,7 +4215,7 @@ providers:
         instance: 'native',
         source: 'static',
       });
-      expect(payload.providers.codex.models[0]?.id).toBe('gpt-5.6-sol');
+      expect(payload.providers.codex.models[0]?.id).toBe('gpt-6-astra');
       expect(payload.providers.claude).toMatchObject({
         provider: 'claude',
         backend: 'cli',
@@ -4245,15 +4243,15 @@ providers:
         provider: 'codex',
         backend: 'cli',
         instance: 'native',
-        defaultModel: 'gpt-5.6-sol',
+        defaultModel: 'gpt-6-astra',
         source: 'static',
         cache: null,
         presets: [],
         defaultSelection: {
-          entryId: 'gpt-5.6-sol',
+          entryId: 'gpt-6-astra',
           entryMode: 'explicit',
           controls: {
-            'codex.reasoning_effort': 'low',
+            'codex.reasoning_effort': 'medium',
           },
         },
         support: {
@@ -4262,28 +4260,26 @@ providers:
         warnings: [],
       });
       expect(payload.entries.map((entry: { id: string }) => entry.id)).toEqual([
+        'gpt-6-astra',
         'gpt-5.6-sol',
         'gpt-5.6-terra',
         'gpt-5.6-luna',
         'gpt-5.5',
-        'gpt-5.4',
-        'gpt-5.4-mini',
-        'gpt-5.3-codex-spark',
       ]);
       expect(payload.controls).toMatchObject([
         {
           key: 'codex.reasoning_effort',
           applicableEntryIds: [
+            'gpt-6-astra',
             'gpt-5.6-sol',
             'gpt-5.6-terra',
             'gpt-5.6-luna',
             'gpt-5.5',
-            'gpt-5.4',
-            'gpt-5.4-mini',
-            'gpt-5.3-codex-spark',
           ],
         },
       ]);
+      expect(payload.entries.find((entry: { id: string }) => entry.id === 'gpt-5.6-sol'))
+        .toMatchObject({ controlDefaults: { 'codex.reasoning_effort': 'low' } });
     });
   });
 
@@ -4826,29 +4822,34 @@ providers:
           {
             id: 'gpt-5.4',
             label: 'GPT-5.4',
+            controlDefaults: { 'copilot.reasoning_effort': 'medium' },
             default: true,
             capabilityTags: ['reasoning'],
           },
           {
             id: 'gpt-5.4-mini',
             label: 'GPT-5.4 mini',
+            controlDefaults: { 'copilot.reasoning_effort': 'medium' },
             default: false,
             capabilityTags: ['reasoning', 'latency_optimized'],
           },
           {
             id: 'gpt-5.2-codex',
             label: 'GPT-5.2-Codex',
+            controlDefaults: { 'copilot.reasoning_effort': 'high' },
             default: false,
           },
           {
             id: 'claude-opus-4.6',
             label: 'Claude Opus 4.6',
+            controlDefaults: { 'copilot.reasoning_effort': 'high' },
             default: false,
             capabilityTags: ['reasoning'],
           },
           {
             id: 'claude-sonnet-4',
             label: 'Claude Sonnet 4',
+            controlDefaults: { 'copilot.reasoning_effort': 'medium' },
             default: false,
           },
         ],

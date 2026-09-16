@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-09-16-codex-model-picker-defaults](./2026-09-16-codex-model-picker-defaults.md) | Codex 0.154.0 catalog and selector defaults | Complete operator-confirmed five-model picker, model-specific reasoning, authorized flat menus, and Desktop/Playground default propagation |
 | [2026-09-11-additional-cli-quota-queries](./2026-09-11-additional-cli-quota-queries.md) | Copilot / Claude / Antigravity account reads | CLI-owned auth, live numbers, bounded non-model protocols, native quantity semantics, Kiro auth blocker and no-release boundary |
 | [2026-09-11-codex-cli-explicit-quota-read](./2026-09-11-codex-cli-explicit-quota-read.md) | Explicit Codex CLI quota read | Native Windows CLI-only account read and built Usage/SDK/Host/Runtime proof; no credential extraction, provider HTTP client or model turns; bounded refresh and unsupported remote transports |
 | [2026-09-10-claude-codex-rate-limit-signal-probe](./2026-09-10-claude-codex-rate-limit-signal-probe.md) | Claude Code 2.1.267 and codex-cli 0.153.4 rate-limit signal probe | The account-level quota signals both CLIs already emit on their own streams (`rate_limit_event` with per-window utilization and reset times; `account/rateLimits/updated` and the on-demand `account/rateLimits/read`); the `total_cost_usd`, `modelUsage`, and cache-token fields the adapters had been dropping; why reading `~/.claude/.credentials.json` for the OAuth usage endpoint is out of bounds; and the redacted fixtures that pin the adapters |

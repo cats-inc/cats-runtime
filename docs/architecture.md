@@ -714,6 +714,9 @@ path is intentionally narrow:
 
 - Loads runtime-wide configuration
 - Hosts shared provider-target and provider-model catalog services
+  - Advanced entries expose per-model `controlDefaults` from the same knowledge
+    used by execution resolution. Hosts and Playground use them for default
+    labels and model switches without inferring defaults from shared enum labels.
 - Hosts the runtime-owned provider install/check metadata plus shared command
   lookup / package-check runner seam, including copied prerequisite, shell PATH
   persistence, and npm-prefix logic with no runtime dependency on

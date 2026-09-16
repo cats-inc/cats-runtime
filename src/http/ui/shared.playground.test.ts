@@ -30,6 +30,42 @@ function createCatsUI() {
 }
 
 describe('shared playground selection helpers', () => {
+  it('selects each Codex entry default and preserves explicit saved effort on reload', () => {
+    const catsUI = createCatsUI();
+    const catalog = {
+      provider: 'codex', backend: 'cli', instance: 'default',
+      entries: [
+        { id: 'gpt-6-astra', label: 'gpt-6-astra', default: true,
+          controlDefaults: { 'codex.reasoning_effort': 'medium' } },
+        { id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol',
+          controlDefaults: { 'codex.reasoning_effort': 'low' } },
+      ],
+      presets: [],
+      controls: [{
+        key: 'codex.reasoning_effort', kind: 'enum', scope: 'both',
+        values: ['low', 'medium', 'high'].map((value) => ({ value, label: value })),
+      }],
+      defaultSelection: { entryId: 'gpt-6-astra', entryMode: 'explicit',
+        controls: { 'codex.reasoning_effort': 'medium' } },
+    };
+    expect(catsUI.getAdvancedCatalogDefaultEntryId(catalog)).toBe('gpt-6-astra');
+    expect(catsUI.getAdvancedEntryControlDefaults(catalog, 'gpt-5.6-sol', ''))
+      .toEqual({ 'codex.reasoning_effort': 'low' });
+    expect(catsUI.getAdvancedEntryControlDefaults(catalog, 'gpt-6-astra', ''))
+      .toEqual({ 'codex.reasoning_effort': 'medium' });
+    expect(catsUI.normalizePlaygroundAgentSelection({
+      provider: 'codex',
+      modelSelection: { entryId: 'gpt-5.6-sol', entryMode: 'explicit',
+        controls: { 'codex.reasoning_effort': 'high' } },
+      selectableProviders: ['codex'], providerOrder: ['codex'],
+      advancedCatalogs: { codex: catalog },
+    }).modelSelection.controls).toEqual({ 'codex.reasoning_effort': 'high' });
+    expect(catsUI.formatAdvancedDefaultLabel('Low', true)).toBe('Low (default)');
+    expect(catsUI.formatAdvancedDefaultLabel('Medium (default)', false)).toBe('Medium');
+    expect(catsUI.formatAdvancedDefaultLabel('gpt-6-astra (default)', true))
+      .toBe('gpt-6-astra (default)');
+  });
+
   it('orders runtime-usable providers ahead of unavailable targets', () => {
     const catsUI = createCatsUI();
 

@@ -62,17 +62,20 @@ describe('buildProviderAdvancedKnowledge', () => {
       {
         id: 'gpt-5.4',
         label: 'gpt-5.4',
+        controlDefaults: { 'openai.reasoning_effort': 'medium' },
         default: true,
         capabilityTags: ['tool_use', 'reasoning'],
       },
       {
         id: 'gpt-5.3-codex',
         label: 'gpt-5.3-codex',
+        controlDefaults: { 'openai.reasoning_effort': 'medium' },
         capabilityTags: ['tool_use'],
       },
       {
         id: 'gpt-5-mini',
         label: 'gpt-5-mini',
+        controlDefaults: { 'openai.reasoning_effort': 'medium' },
         capabilityTags: ['tool_use', 'latency_optimized'],
       },
     ]);
@@ -926,29 +929,34 @@ describe('buildProviderAdvancedKnowledge', () => {
         {
           id: 'gpt-5.4',
           label: 'GPT-5.4',
+          controlDefaults: { 'copilot.reasoning_effort': 'medium' },
           default: true,
           capabilityTags: ['reasoning'],
         },
         {
           id: 'gpt-5.4-mini',
           label: 'GPT-5.4 mini',
+          controlDefaults: { 'copilot.reasoning_effort': 'medium' },
           default: false,
           capabilityTags: ['reasoning', 'latency_optimized'],
         },
         {
           id: 'gpt-5.2-codex',
           label: 'GPT-5.2-Codex',
+          controlDefaults: { 'copilot.reasoning_effort': 'high' },
           default: false,
         },
         {
           id: 'claude-opus-4.6',
           label: 'Claude Opus 4.6',
+          controlDefaults: { 'copilot.reasoning_effort': 'high' },
           default: false,
           capabilityTags: ['reasoning'],
         },
         {
           id: 'claude-sonnet-4',
           label: 'Claude Sonnet 4',
+          controlDefaults: { 'copilot.reasoning_effort': 'medium' },
           default: false,
         },
       ]);
@@ -1417,6 +1425,7 @@ describe('buildProviderAdvancedKnowledge', () => {
       {
         id: 'opus',
         label: 'Opus (1M context)',
+        controlDefaults: { 'claude.reasoning_effort': 'high' },
         default: true,
         capabilityTags: ['tool_use', 'reasoning'],
         notes: ['Best for everyday, complex tasks.'],
@@ -1424,12 +1433,14 @@ describe('buildProviderAdvancedKnowledge', () => {
       {
         id: 'fable',
         label: 'Fable',
+        controlDefaults: { 'claude.reasoning_effort': 'high' },
         capabilityTags: ['tool_use', 'reasoning'],
         notes: ['Most capable for your hardest and longest-running tasks.'],
       },
       {
         id: 'sonnet',
         label: 'Sonnet',
+        controlDefaults: { 'claude.reasoning_effort': 'high' },
         capabilityTags: ['tool_use'],
         notes: ['Efficient for routine tasks.'],
       },
