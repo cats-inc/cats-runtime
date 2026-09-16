@@ -43,7 +43,7 @@ Only Claude should read and maintain this file.
 
 - **MUST** read AGENTS.md at the start of every session
 - **MUST** follow the Development Workflow defined in AGENTS.md
-- **MUST NOT** skip testing when code changes are made
+- **MUST** validate changes under [AGENTS.md: Local Validation Scope](./AGENTS.md#local-validation-scope)
 - **MUST NOT** modify other agents' files (GEMINI.md, CODEX.md)
 - **MUST NOT** use compound commands with `cd` and `git`（例如 `cd submodule && git log`）。對 submodule 操作時，使用 `-C` 參數或指定完整路徑
 - **SHOULD** ask for clarification when requirements are ambiguous
@@ -117,7 +117,7 @@ product surface under `src/mcp/`, not tooling for the agent editing this repo. S
 ### Preferred Behaviors
 
 - **Precision over speed**: Take time to understand requirements fully
-- **Test before commit**: Always validate changes work as expected
+- **Validate before commit**: Run the checks selected by the shared testing policy
 - **Document decisions**: Use ADRs for architectural choices
 - **Communicate clearly**: Report progress and blockers promptly
 
@@ -151,13 +151,16 @@ add a second client-facing transport when an existing one can carry the case
 
 #### Tests
 
+- Follow [AGENTS.md: Local Validation Scope](./AGENTS.md#local-validation-scope).
+  Use focused local checks; full CI remains required before merge. Documentation
+  and rules-only changes need diff/reference review, not application tests/builds.
 - Vitest, single-threaded. `npm test` runs a full `npm run build` first, so it is slow.
   For a focused run use `npx vitest run tests/<name>.test.ts`, building once beforehand if
   that test asserts against `build/runtime/**`.
 - Tests **MUST NOT** touch the real `~/.cats/runtime`. Use `createRuntimeTestEnv` /
   `createRuntimeTestPaths` from `tests/support/runtimeTestPaths.ts`; they redirect `HOME`,
   `USERPROFILE`, and `CATS_RUNTIME_DIR` at a temp root.
-- `npm run verify:skills` validates the runtime-owned `skills/` library. `npm run
+- `npm run verify:skills` validates the runtime-owned `runtime-skills/` library. `npm run
   release:check` (verify:skills + test + `npm pack --dry-run`) is what CI preflight runs.
 
 #### Runtime state
@@ -186,4 +189,4 @@ and docs to the current contract.
 
 This file is maintained by Claude only. Other agents should not modify this file.
 
-Last updated: 2026-09-02
+Last updated: 2026-09-16

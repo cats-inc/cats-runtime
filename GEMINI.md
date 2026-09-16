@@ -34,7 +34,7 @@ Only Antigravity (`agy`) should read and maintain this file.
 
 - **MUST** read AGENTS.md at the start of every session
 - **MUST** follow the Development Workflow defined in AGENTS.md
-- **MUST NOT** skip testing when code changes are made
+- **MUST** validate changes under [AGENTS.md: Local Validation Scope](./AGENTS.md#local-validation-scope)
 - **MUST NOT** modify other agents' files (CLAUDE.md, CODEX.md)
 - **SHOULD** ask for clarification when requirements are ambiguous
 - **SHOULD** propose approach before implementing major changes
@@ -75,8 +75,10 @@ If assigned as Conductor in Project Roles table:
 - **MUST** run `npm run build:ui` and commit changes whenever modifying `src/http/ui/**`.
 
 #### Testing and Skill Verification
+- Follow [AGENTS.md: Local Validation Scope](./AGENTS.md#local-validation-scope):
+  focused local checks, full CI gates, and no application tests/builds for rules-only edits.
 - Test runner: Vitest (single-threaded).
-- `npm run verify:skills` verifies the runtime-delivered `skills/` catalog.
+- `npm run verify:skills` verifies the runtime-delivered `runtime-skills/` catalog.
 - `npm run release:check` runs skill verification, tests, and npm packaging check.
 
 ### Agent Skills
@@ -113,4 +115,4 @@ In addition to project-level skills, skills reach Antigravity from user-level ro
 
 This file is maintained by Antigravity only. Other agents should not modify this file.
 
-Last updated: 2026-09-02
+Last updated: 2026-09-16

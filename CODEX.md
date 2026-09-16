@@ -85,16 +85,13 @@ If assigned as Conductor in Project Roles table:
 
 ### Testing Scope
 
-- Default to the smallest validation that can prove the change works.
-- Do **not** default to broad `vitest` or full integration sweeps for small or
-  localized edits.
-- Prefer file-scoped `vitest`, targeted CLI/runtime tests, focused build
-  checks, or a narrow manual verification of the touched flow.
-- Escalate to broader suites only when touching startup/bootstrap, storage
-  layout, provider contracts, shared compatibility layers, or HTTP surfaces
-  used by multiple paths.
-- For docs-only changes, do not run code tests unless the docs depend on a
-  command or behavior you re-verified.
+- Follow [AGENTS.md: Local Validation Scope](./AGENTS.md#local-validation-scope)
+  for local checks, scope escalation, result reuse, and CI/release gates.
+- Use focused Vitest and required build/type checks for affected contracts.
+  Commit, PR creation, or a version bump does not itself require duplicating
+  the full CI suite locally.
+- For documentation/rules-only edits, review the diff and references without
+  running application tests or builds.
 
 ### Agent Skills
 
@@ -134,4 +131,4 @@ To sync skills after changes:
 
 This file is maintained by Codex only. Other agents should not modify this file.
 
-Last updated: 2026-04-18
+Last updated: 2026-09-16

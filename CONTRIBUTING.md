@@ -33,12 +33,12 @@ test: add unit tests
 ### Code Style
 
 - Follow the project's coding standards (see `.editorconfig`)
-- Run linters before committing
+- Run affected checks under [Local Validation Scope](./AGENTS.md#local-validation-scope) before committing
 - Write meaningful comments where necessary
 
 ## Pull Request Process
 
-1. Ensure all tests pass
+1. Record passing scoped local checks; required full CI must pass before merge
 2. Update documentation if needed
 3. Fill out the PR template
 4. Request review from maintainers
