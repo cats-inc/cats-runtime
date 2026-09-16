@@ -20,6 +20,10 @@ scheduled polling, verified account linkage and durable history remain deferred.
 
 ## Provider Detection
 
+[Antigravity 1.2.3 model and effort picker](./research/2026-09-16-antigravity-model-picker-refresh.md)
+records the seven-family menu, execution mapping and first-item initialization
+without provider-default claims.
+
 [Claude 2.1.273 catalog refresh](./research/2026-09-16-claude-model-picker-refresh.md)
 records the four version-bearing model names, per-model efforts, and consistent
 lowercase default markers in Desktop and Playground, with a delivery timing

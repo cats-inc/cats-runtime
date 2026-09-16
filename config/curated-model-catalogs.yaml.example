@@ -31,6 +31,8 @@ schema_version: 1
 # the first time from the Grok CLI 1.0.13 account-resolved model manifest.
 # 2026-09-05: a Muse entry was added for the first time from muse 1.0.3's own
 # `model/list` reply over `muse serve`.
+# 2026-09-16: Antigravity 1.2.3 picker families and effort controls refreshed;
+# execution ids retain the independent 1.1.24 enumeration provenance.
 # Every other entry keeps the provenance and date recorded in its own `notes`.
 # Copilot, Kilo, Kiro, and Junie had their versions re-probed but not their model
 # lists - those CLIs either gate the list behind an account, expose it only in an
@@ -199,65 +201,66 @@ catalogs:
             default: Medium
 
   - cli: Antigravity
-    version: 1.1.24
-    last_updated: 2026-09-03
+    version: 1.2.3
+    last_updated: 2026-09-16
     notes:
-      - "Model list re-read 2026-09-03 from live `agy models` on 1.1.24, one `<id><tab><label>` pair per line; the command printed the whole list and exited 0, so the enumeration is complete for this account."
-      - "Evidence: docs/research/fixtures/antigravity-1.1.24/models-command.success.redacted.txt"
-      - "Independently corroborated the same day by the operator-pasted interactive `/model` picker on 1.1.24, which listed exactly the seven families these ids flatten to. Evidence: docs/research/fixtures/antigravity-1.1.24/model-picker.success.redacted.txt"
-      - "`name` is the raw id `--model` accepts. A rejected id makes agy echo the labels back instead, so ids and labels are not interchangeable on input."
-      - "The picker lists a model family plus a separate Effort slider, while `agy models` flattens the same choices into one id per effort level. Only the flat ids are represented here, because the ids are what the runtime passes through `--model`; the picker's family/Effort hierarchy is retained in the fixture rather than projected into curated `options`, which the Antigravity overlay does not consume."
-      - "Effort coverage observed in the 1.1.24 picker: Gemini 3.8/3.7/3.6 Flash each expose low, medium, and high; Gemini 3.1 Pro exposes only low and high; the Claude and GPT-OSS rows cannot be adjusted at all. That matches the id set exactly."
-      - "The per-level descriptions on the Flash rows below were read off the 1.1.24 Effort slider. Gemini 3.1 Pro's low/high descriptions were not captured and are deliberately not copied over from the Flash rows."
-      - "Superseded the 1.1.20 listing: `gemini-3.5-flash-high`, `-medium`, and `-low` are absent from both 1.1.24 sources and were removed; `gemini-3.8-flash-*` is new."
-      - "No entry is marked default: agy takes its default from the per-user settings.json `model` field, and the runtime omits `--model` entirely when nothing is selected, so naming one here would override a preference the runtime cannot see. The picker's `> ... (current)` marker on Gemini 3.8 Flash is recorded as the operator's current selection only, not as an account default."
+      - "Complete operator-supplied /model picker and all per-model effort screens on Antigravity CLI 1.2.3, observed 2026-09-16; account scope is the operator's CLI."
+      - "Evidence: docs/research/fixtures/antigravity-1.2.3/model-picker.success.redacted.txt"
+      - "Raw execution ids retain the 2026-09-03 agy models capture on 1.1.24: docs/research/fixtures/antigravity-1.1.24/models-command.success.redacted.txt. They were not re-enumerated on 1.2.3."
+      - "One row per picker family. The first effort's verified raw id identifies each Gemini row; Runtime resolves model plus effort to the corresponding verified --model id. All fourteen executable choices remain represented."
+      - "No model or effort is marked default. Cats initializes to the first model and first applicable effort without adding a default label; existing explicit choices are preserved."
     models:
-      - name: gemini-3.8-flash-high
-        label: Gemini 3.8 Flash (High)
-        notes:
-          - "Effort high: deepest reasoning for complex problems - slower but strongest"
-      - name: gemini-3.8-flash-medium
-        label: Gemini 3.8 Flash (Medium)
-        notes:
-          - "Effort medium: balanced speed and reasoning quality for most tasks"
       - name: gemini-3.8-flash-low
-        label: Gemini 3.8 Flash (Low)
-        notes:
-          - "Effort low: faster responses, lighter reasoning - great for simpler tasks"
-      - name: gemini-3.7-flash-high
-        label: Gemini 3.7 Flash (High)
-        notes:
-          - "Effort high: deepest reasoning for complex problems - slower but strongest"
-      - name: gemini-3.7-flash-medium
-        label: Gemini 3.7 Flash (Medium)
-        notes:
-          - "Effort medium: balanced speed and reasoning quality for most tasks"
+        label: Gemini 3.8 Flash
+        options:
+          - name: Effort
+            values:
+              - name: low
+                notes: ["Faster responses, lighter reasoning — great for simpler tasks"]
+              - name: medium
+                notes: ["Balanced speed and reasoning quality for most tasks"]
+              - name: high
+                notes: ["Deepest reasoning for complex problems — slower but strongest"]
       - name: gemini-3.7-flash-low
-        label: Gemini 3.7 Flash (Low)
-        notes:
-          - "Effort low: faster responses, lighter reasoning - great for simpler tasks"
-      - name: gemini-3.6-flash-high
-        label: Gemini 3.6 Flash (High)
-        notes:
-          - "Effort high: deepest reasoning for complex problems - slower but strongest"
-      - name: gemini-3.6-flash-medium
-        label: Gemini 3.6 Flash (Medium)
-        notes:
-          - "Effort medium: balanced speed and reasoning quality for most tasks"
+        label: Gemini 3.7 Flash
+        options:
+          - name: Effort
+            values:
+              - name: low
+                notes: ["Faster responses, lighter reasoning — great for simpler tasks"]
+              - name: medium
+                notes: ["Balanced speed and reasoning quality for most tasks"]
+              - name: high
+                notes: ["Deepest reasoning for complex problems — slower but strongest"]
       - name: gemini-3.6-flash-low
-        label: Gemini 3.6 Flash (Low)
-        notes:
-          - "Effort low: faster responses, lighter reasoning - great for simpler tasks"
-      - name: gemini-3.1-pro-high
-        label: Gemini 3.1 Pro (High)
+        label: Gemini 3.6 Flash
+        options:
+          - name: Effort
+            values:
+              - name: low
+                notes: ["Faster responses, lighter reasoning — great for simpler tasks"]
+              - name: medium
+                notes: ["Balanced speed and reasoning quality for most tasks"]
+              - name: high
+                notes: ["Deepest reasoning for complex problems — slower but strongest"]
       - name: gemini-3.1-pro-low
-        label: Gemini 3.1 Pro (Low)
+        label: Gemini 3.1 Pro
+        options:
+          - name: Effort
+            values:
+              - name: low
+                notes: ["Faster responses, lighter reasoning — great for simpler tasks"]
+              - name: high
+                notes: ["Deepest reasoning for complex problems — slower but strongest"]
       - name: claude-sonnet-4-6
         label: Claude Sonnet 4.6 (Thinking)
+        options: []
       - name: claude-opus-4-6-thinking
         label: Claude Opus 4.6 (Thinking)
+        options: []
       - name: gpt-oss-120b-medium
         label: GPT-OSS 120B (Medium)
+        options: []
 
   - cli: Grok
     version: 1.0.13

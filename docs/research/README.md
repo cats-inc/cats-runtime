@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-09-16-antigravity-model-picker-refresh](./2026-09-16-antigravity-model-picker-refresh.md) | Antigravity 1.2.3 picker | Seven families with per-model effort, verified raw-id mapping and first-item initialization without default claims |
 | [2026-09-16-claude-model-picker-refresh](./2026-09-16-claude-model-picker-refresh.md) | Claude 2.1.273 catalog refresh | Four version-bearing names, per-model defaults/efforts, lowercase default markers, and measured delivery retrospective feeding the maintenance skill |
 | [2026-09-16-setup-action-layout](./2026-09-16-setup-action-layout.md) | Runtime Setup action layout | Accepted footer actions, a single primary action, and stable detection controls |
 | [2026-09-16-codex-model-picker-defaults](./2026-09-16-codex-model-picker-defaults.md) | Codex 0.154.0 catalog and selector defaults | Complete operator-confirmed five-model picker, model-specific reasoning, authorized flat menus, and Desktop/Playground default propagation |

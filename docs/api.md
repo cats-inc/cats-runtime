@@ -4187,6 +4187,14 @@ their own.
 underlying catalog refresh behavior before layering advanced selection/control
 metadata on top.
 
+Antigravity CLI catalogs expose seven model families and an applicable
+`antigravity.effort` enum. Entry ids use each family's first verified executable
+model id. Resolution combines entry and effort into the actual CLI model id (for
+example, `gemini-3.1-pro-low` plus `high` resolves to `gemini-3.1-pro-high`).
+When no effort is supplied, the first applicable value is used. This is UI/execution
+initialization, not a provider default: no default marker or `controlDefaults`
+is inferred. See [the evidence note](./research/2026-09-16-antigravity-model-picker-refresh.md).
+
 Advanced `entries[].controlDefaults` contains that model's known control defaults
 (for example, `{ "codex.reasoning_effort": "low" }`). `defaultSelection` describes
 the target's default model/preset only; it must not be reused for other entries.

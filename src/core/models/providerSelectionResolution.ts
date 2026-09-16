@@ -6,6 +6,7 @@ import type {
   ProviderAdvancedControlValue,
 } from './providerAdvancedCatalog.js';
 import { cloneProviderControls } from './providerControlUtils.js';
+import { ANTIGRAVITY_EFFORT_CONTROL, resolveAntigravityExecutionModel } from './antigravityModelCatalog.js';
 
 export type ProviderModelSelectionEntryMode = 'auto' | 'explicit';
 
@@ -439,18 +440,32 @@ export function resolveProviderSelection(
     );
   }
 
-  const mergedControls = mergeControls(
+  let mergedControls = mergeControls(
     knowledge.entryDefaults[entry.id],
     cloneProviderControls(preset?.controlDefaults),
     cloneProviderControls(normalizedSelection.controls),
     cloneProviderControls(options.requestControls),
   );
+  if (knowledge.target.backend === 'cli' && knowledge.target.providerName === 'antigravity') {
+    const effortControl = knowledge.controlsByKey[ANTIGRAVITY_EFFORT_CONTROL];
+    const firstEffort = effortControl && effortControl.applicableEntryIds?.includes(entry.id)
+      ? listEnumControlValues(effortControl, entry.id)[0]
+      : undefined;
+    if (firstEffort && mergedControls?.[ANTIGRAVITY_EFFORT_CONTROL] === undefined) {
+      mergedControls = { ...mergedControls, [ANTIGRAVITY_EFFORT_CONTROL]: firstEffort };
+    }
+  }
   ensureControlApplicability(knowledge, entry.id, mergedControls);
 
   const requestBodyPatch = buildProviderExecutionRequestPatch(knowledge.target, mergedControls);
+  const effort = mergedControls?.[ANTIGRAVITY_EFFORT_CONTROL];
+  const model = knowledge.target.backend === 'cli'
+    && knowledge.target.providerName === 'antigravity' && typeof effort === 'string'
+    ? resolveAntigravityExecutionModel(entry.id, effort)
+    : entry.id;
   const resolution: ProviderModelResolution = {
     entryId: entry.id,
-    model: entry.id,
+    model,
     entryMode: normalizedSelection.entryMode,
     ...(preset ? { presetId: preset.id } : {}),
     ...(mergedControls ? { controls: mergedControls } : {}),

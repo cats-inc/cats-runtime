@@ -12,6 +12,7 @@ import type {
 } from './providerAdvancedCatalog.js';
 import type { ProviderModelCatalogResult } from './providerModelCatalog.js';
 import { cloneProviderControls } from './providerControlUtils.js';
+import { ANTIGRAVITY_EFFORT_CONTROL, listAntigravityModelEfforts } from './antigravityModelCatalog.js';
 import type { ProviderModelSelection } from './providerSelectionResolution.js';
 import type { CliRuntimeConfig } from '../../backends/cli/config.js';
 import {
@@ -821,7 +822,56 @@ function buildCuratedAntigravityCliOverlay(
     return null;
   }
 
-  return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeVerbatimCuratedModelId);
+  const overlay = buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeVerbatimCuratedModelId);
+  if (!overlay) return null;
+  const effortOptions = new Map<string, CuratedModelCatalogOption>();
+  for (const model of scope.models) {
+    const effort = resolveEffectiveCuratedModelOptions(scope.sharedOptions, model)
+      .find((option) => matchesCuratedOptionName(option, ['effort']));
+    if (effort) effortOptions.set(model.name, effort);
+  }
+  const controls = buildAntigravityControls(Object.keys(overlay.entriesById), effortOptions, overlay.warnings);
+  return {
+    ...overlay,
+    ...(controls.length ? { controls } : {}),
+  };
+}
+
+function buildAntigravityControls(
+  entryIds: string[],
+  curatedOptions?: Map<string, CuratedModelCatalogOption>,
+  warnings: string[] = [],
+): ProviderAdvancedCatalogControl[] {
+  const values: ProviderAdvancedCatalogControlOption[] = [];
+  const applicableEntryIds: string[] = [];
+  for (const entryId of entryIds) {
+    const supported = listAntigravityModelEfforts(entryId);
+    const options: NonNullable<CuratedModelCatalogOption['values']> = curatedOptions
+      ? curatedOptions.get(entryId)?.values ?? []
+      : supported.map((name) => ({ name }));
+    for (const option of options) {
+      if (!supported.includes(option.name)) {
+        warnings.push(`Unverified Antigravity effort '${option.name}' for '${entryId}' was omitted.`);
+        continue;
+      }
+      if (!applicableEntryIds.includes(entryId)) applicableEntryIds.push(entryId);
+      values.push({
+        value: option.name,
+        label: option.name,
+        ...(option.notes?.length ? { description: option.notes.join(' ') } : {}),
+        applicableEntryIds: [entryId],
+      });
+    }
+  }
+  return values.length ? [{
+    key: ANTIGRAVITY_EFFORT_CONTROL,
+    label: 'Effort',
+    kind: 'enum',
+    scope: 'both',
+    values,
+    applicableEntryIds,
+    semanticTags: ['reasoning'],
+  }] : [];
 }
 
 function buildCuratedGrokCliOverlay(
@@ -837,7 +887,7 @@ function buildCuratedGrokCliOverlay(
     return null;
   }
 
-  // Unlike Antigravity, Grok's ids do not encode effort: the CLI takes it as a
+  // Grok's ids do not encode effort: the CLI takes it as a
   // separate `--reasoning-effort` argument, and the account-resolved manifest
   // gives each model its own menu. So the overlay carries the option axis
   // instead of collapsing to entry metadata.
@@ -1729,12 +1779,15 @@ export function buildProviderAdvancedKnowledge(
     curatedOverlay?.entriesById,
   );
   const manifest = resolveVerifiedAdvancedManifest(target);
+  const antigravityControls = target.backend === 'cli' && target.providerName === 'antigravity'
+    ? curatedOverlay ? curatedOverlay.controls ?? [] : buildAntigravityControls(entries.map((entry) => entry.id))
+    : [];
   const supportTier = manifest?.supportTier
-    ?? (curatedOverlay?.controls?.length ? 'full' : 'entry_only');
+    ?? (curatedOverlay?.controls?.length || antigravityControls.length ? 'full' : 'entry_only');
   let manifestCatalog = manifest
     ? manifest.build(target, entries)
     : {
-        controls: [],
+        controls: antigravityControls,
         entryDefaults: {},
         presets: [],
         defaultSelection: null,

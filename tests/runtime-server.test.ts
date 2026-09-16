@@ -495,7 +495,7 @@ describe('runtime server', () => {
       expect(html).toContain('Runtime Health');
       expect(html).toContain('validateRuntimeApiKey');
       expect(html).toContain('getRuntimeAuthHeaders');
-      expect(html).toContain("antigravity:[{value:'antigravity-default',label:'Antigravity default'}],");
+      expect(html).toContain("antigravity:[{value:'gemini-3.8-flash-low',label:'Gemini 3.8 Flash'}");
       // Grok 1.0.13 enumerates two models and marks neither default; the
       // `(default)` marker `grok models` prints comes from the per-user config.
       expect(html).toContain("grok:[{value:'grok-4.6',label:'Grok 4.6'},{value:'grok-4.5',label:'Grok 4.5'}],");
@@ -4036,7 +4036,7 @@ providers:
     });
   });
 
-  it('GET /providers/antigravity/models serves the ids agy models enumerated, with no imposed default', async () => {
+  it('GET /providers/antigravity/models serves picker families with no imposed default', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/antigravity/models');
       expect(response.status).toBe(200);
@@ -4049,12 +4049,12 @@ providers:
         cache: null,
         warnings: [],
       });
-      expect(body.models).toHaveLength(14);
+      expect(body.models).toHaveLength(7);
       // `--model` takes the slug, not the display label agy prints back when it
       // rejects one, so the catalog has to serve ids in that form.
       expect(body.models[0]).toEqual({
-        id: 'gemini-3.8-flash-high',
-        label: 'Gemini 3.8 Flash (High)',
+        id: 'gemini-3.8-flash-low',
+        label: 'Gemini 3.8 Flash',
       });
       // 1.1.24 dropped the 3.5 Flash family; serving ids agy rejects is worse
       // than serving a shorter list.

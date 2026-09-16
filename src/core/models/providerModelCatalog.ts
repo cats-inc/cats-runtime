@@ -1,3 +1,4 @@
+import { ANTIGRAVITY_MODELS } from './antigravityModelCatalog.js';
 import {
   existsSync,
   mkdirSync,
@@ -215,33 +216,7 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'gpt-5.6-luna', label: 'gpt-5.6-luna' },
     { id: 'gpt-5.5', label: 'gpt-5.5' },
   ],
-  // Re-enumerated live 2026-09-03 from `agy models` on 1.1.24, which prints one
-  // `<id>\t<label>` pair per line. The ids are what `--model` accepts; a
-  // rejected id makes agy echo the labels instead, so the two are not
-  // interchangeable on input. The interactive `/model` picker on the same build
-  // lists seven families plus a separate Effort slider; these ids are that
-  // family/effort pair already flattened, which is why no option axis appears
-  // here. `gemini-3.5-flash-*` was dropped because it is absent from both 1.1.24
-  // sources. No entry is marked default: agy takes its default from the per-user
-  // `settings.json` `model` field, and the runtime omits `--model` entirely when
-  // no model is selected, so claiming one here would override a user preference
-  // the runtime cannot see.
-  antigravity: [
-    { id: 'gemini-3.8-flash-high', label: 'Gemini 3.8 Flash (High)' },
-    { id: 'gemini-3.8-flash-medium', label: 'Gemini 3.8 Flash (Medium)' },
-    { id: 'gemini-3.8-flash-low', label: 'Gemini 3.8 Flash (Low)' },
-    { id: 'gemini-3.7-flash-high', label: 'Gemini 3.7 Flash (High)' },
-    { id: 'gemini-3.7-flash-medium', label: 'Gemini 3.7 Flash (Medium)' },
-    { id: 'gemini-3.7-flash-low', label: 'Gemini 3.7 Flash (Low)' },
-    { id: 'gemini-3.6-flash-high', label: 'Gemini 3.6 Flash (High)' },
-    { id: 'gemini-3.6-flash-medium', label: 'Gemini 3.6 Flash (Medium)' },
-    { id: 'gemini-3.6-flash-low', label: 'Gemini 3.6 Flash (Low)' },
-    { id: 'gemini-3.1-pro-high', label: 'Gemini 3.1 Pro (High)' },
-    { id: 'gemini-3.1-pro-low', label: 'Gemini 3.1 Pro (Low)' },
-    { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (Thinking)' },
-    { id: 'claude-opus-4-6-thinking', label: 'Claude Opus 4.6 (Thinking)' },
-    { id: 'gpt-oss-120b-medium', label: 'GPT-OSS 120B (Medium)' },
-  ],
+  antigravity: ANTIGRAVITY_MODELS,
   // Read 2026-09-03 from the Grok CLI 1.0.13 account-resolved model manifest
   // (~/.grok/models_cache.json, fetched from the vendor endpoint by the CLI
   // itself) and corroborated by `grok models` on the same build. No entry is
