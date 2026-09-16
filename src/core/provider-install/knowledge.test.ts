@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { buildProviderInstallCatalogView, getProviderInstallKnowledge } from './knowledge.js';
 
 describe('buildProviderInstallCatalogView', () => {
+  it('uses the current native Windows Cursor launcher directory', () => {
+    const view = buildProviderInstallCatalogView('cursor', { mode: 'native' }, 'win32');
+    expect(view.path.expectedPath?.replaceAll('\\', '/')).toBe('%LOCALAPPDATA%/cursor-agent/cursor-agent.cmd');
+  });
+
   it('keeps Kiro on the native Windows install path', () => {
     const view = buildProviderInstallCatalogView('kiro', { mode: 'native' }, 'win32');
 

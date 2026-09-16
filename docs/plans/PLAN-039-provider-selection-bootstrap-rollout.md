@@ -297,6 +297,13 @@ explicitly unverified, never counted as passing.
   rerun and the complete suite without changing its timeout or assertions.
   No real developer service was started or restarted for this pass.
 
+- Desktop follow-through: explicit Ollama checks refresh Windows PATH before
+  resolving the newly installed command. Native Cursor knowledge follows
+  `%LOCALAPPDATA%/cursor-agent`. Connection tests (6) and installation knowledge
+  tests (20) passed, as did TypeScript checking. Runtime version 0.1.24 is the
+  coordinated source for the Desktop 0.2.9 unsigned preview; publication pins
+  the eventual merged Runtime commit, rather than following a moving branch.
+
 - Built-page Chromium checks on Windows passed for standalone Runtime selection,
   Platform's connected-Runtime proxy, and the Desktop bootstrap page. OpenClaw-only
   and explicit empty saves work; separate Runtime roots remain independent.

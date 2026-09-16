@@ -284,7 +284,8 @@ export class BootstrapService {
   ): Promise<BootstrapScanResult> {
     const current = () => generation === this.generation && revision === this.getSelection().revision;
     try {
-      if (targets.some((target) => target.backend === 'cli' || target.remoteInstance?.command)) {
+      if (targets.some((target) => target.backend === 'cli' || target.remoteInstance?.command
+        || (options.includeConnections && target.remoteInstance?.transport === 'ollama'))) {
         await refreshWindowsProcessPath().catch(() => undefined);
       }
       const entries = new Array<ProviderScanEntry>(targets.length);

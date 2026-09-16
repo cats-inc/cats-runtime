@@ -4,6 +4,14 @@
 
 ## Current Status
 
+Desktop provider setup (2026-09-16): Runtime 0.1.24 adds revision-bound scan IDs
+and progress, explicit Ollama/OpenClaw connection checks, safe endpoint edits,
+and retained observations for Desktop onboarding and Settings. Native Windows
+checks refresh PATH after installation; Cursor hints follow its current launcher
+directory. Focused bootstrap/HTTP/interaction/installation regressions and
+TypeScript checks passed. Required release-preflight CI remains the merge gate.
+The coordinated Desktop preview is delivered by Platform PLAN-107.
+
 Implementation update (2026-09-11): `/usage/snapshot` provides sanitized current
 usage, epoch/truncation, separate currencies, incidents/guardrails and passive
 Claude/Codex quota windows. Quota-only events are retained independently; elapsed

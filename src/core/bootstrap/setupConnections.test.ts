@@ -7,6 +7,18 @@ const target = (transport: string, extra = {}) => ({ providerName: transport, ba
   instanceId: 'local', remoteInstance: { transport, ...extra } }) as ProviderTargetDescriptor;
 
 describe('explicit setup connection checks', () => {
+  it.runIf(process.platform === 'win32')('uses refreshed Windows PATH after installation instead of the startup snapshot', async () => {
+    const lookup = vi.fn(async (_command: string, _options?: { env?: NodeJS.ProcessEnv }) => ({ available: true }));
+    await probeSetupNonCliTarget(target('ollama'), {
+      includeConnections: true, env: { PATH: 'old-path', Path: 'old-path-too' }, lookup,
+      fetch: async () => Response.json({ models: [] }),
+    });
+    const lookupEnvironment = lookup.mock.calls[0]?.[1]?.env;
+    const pathKey = Object.keys(process.env).find((name) => name.toUpperCase() === 'PATH')!;
+    expect(lookupEnvironment?.[pathKey]).toBe(process.env[pathKey]);
+    expect(Object.keys(lookupEnvironment!).filter((name) => name.toUpperCase() === 'PATH')).toHaveLength(1);
+  });
+
   it('does not contact endpoints on passive scans', async () => {
     const fetch = vi.fn();
     const probe = vi.fn();

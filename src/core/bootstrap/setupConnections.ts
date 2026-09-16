@@ -57,7 +57,15 @@ export async function probeSetupNonCliTarget(
     const endpoint = resolveRemoteEndpoint(remote, options.env);
     let localInstallation: Partial<ProviderScanEntry> = {};
     if (endpoint && ['localhost', '127.0.0.1', '[::1]'].includes(new URL(endpoint).hostname)) {
-      const found = await (options.lookup ?? lookupNativeCommand)('ollama', { env: options.env });
+      const lookupEnv = { ...options.env };
+      if (process.platform === 'win32') {
+        // runScan refreshes the registry PATH after a Desktop installer. The
+        // original config environment snapshot must not shadow that refresh.
+        for (const name of Object.keys(lookupEnv)) if (name.toUpperCase() === 'PATH') delete lookupEnv[name];
+        const pathKey = Object.keys(process.env).find((name) => name.toUpperCase() === 'PATH');
+        if (pathKey) lookupEnv[pathKey] = process.env[pathKey];
+      }
+      const found = await (options.lookup ?? lookupNativeCommand)('ollama', { env: lookupEnv });
       localInstallation = { commandStatus: found.available ? 'ready' : 'missing_install', commandPath: found.resolvedPath ?? null };
     }
     const request = buildRemoteModelDiscoveryRequest(remote, options.env);
