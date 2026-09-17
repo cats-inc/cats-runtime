@@ -381,17 +381,18 @@ catalogs:
 
   - cli: Cursor
     version: 2026.09.15-d2fe57e
-    last_updated: 2026-09-17
+    last_updated: 2026-09-18
     selection_mode: shortlist
     notes:
       - "Operator-approved six fixed combos in picker order; complete shortlist, not the full upstream catalog. Custom model strings remain supported."
       - "Source: docs/research/fixtures/cursor-2026.09.15-d2fe57e/picker-transcription.redacted.txt and approved-presets.redacted.txt."
       - "Exact execution expressions and parameter tokens: docs/research/fixtures/cursor-2026.09.15-d2fe57e/selected-variants.redacted.json, from the installed CLI's account-resolved model-list request."
+      - "2026-09-18: the operator changed only Cursor Grok 4.6 from Extra High Fast to High Fast. Revised shortlist and exact retained variant: docs/research/fixtures/cursor-2026.09.15-d2fe57e/shortlist-2026-09-18.redacted.txt and selected-variants-2026-09-18.redacted.json."
       - "Use the complete parameterized --model expression. Legacy slugs/list labels can imply a different context. No default metadata; UI initializes from the first entry."
       - "Refresh re-reads this shortlist without expanding it from discovery or cached models. All parameters are fixed in each model expression."
     models:
-      - name: "grok-4.6[effort=xhigh,fast=true]"
-        label: "Cursor Grok 4.6 — Extra High Fast"
+      - name: "grok-4.6[effort=high,fast=true]"
+        label: "Cursor Grok 4.6 — High Fast"
       - name: "composer-2.5[fast=true]"
         label: "Composer 2.5 — Fast"
       - name: "claude-opus-5[thinking=true,context=300k,effort=high,fast=false]"
@@ -405,14 +406,15 @@ catalogs:
 
   - cli: Copilot
     version: 1.0.85
-    last_updated: 2026-09-17
+    last_updated: 2026-09-18
     selection_mode: shortlist
     notes:
       - "Operator-selected six fixed model/effort combos; this is a Cats shortlist, not a complete upstream catalog."
       - "Source: docs/research/fixtures/copilot-1.0.85/picker.redacted.txt and selected-models.redacted.json (account-resolved models.list; no session or model turn)."
+      - "2026-09-18 shortlist revision replaces GPT-5.6 Luna with MAI-Code-1.1-Flash at fixed Medium. Source: docs/research/fixtures/copilot-1.0.85/shortlist-2026-09-18.redacted.txt and mai-2026-09-18.redacted.json; models.list verifies mai-code-1.1-flash and medium."
       - "Gemini was absent from models.list; the operator confirmed its actual session selection as gemini-3.8-flash (medium). All six selected combinations are now mapped."
       - "Only GPT-5.6 Terra was explicitly marked default. Single-value options encode operator-fixed effort, not upstream effort defaults. Custom strings remain available."
-      - "Picker context figures (400K, 264K, 266K, 328K, 328K, unknown) are informational and retained in the evidence, not selectable context settings or inferred token limits."
+      - "Picker context figures (400K, 264K, 266K, 328K, unknown, unknown) are informational and retained in the evidence, not selectable context settings or inferred token limits."
     models:
       - name: gpt-5.6-terra
         label: "GPT-5.6 Terra — Medium"
@@ -439,8 +441,8 @@ catalogs:
           - name: Reasoning effort
             values:
               - name: Medium
-      - name: gpt-5.6-luna
-        label: "GPT-5.6 Luna — Medium"
+      - name: mai-code-1.1-flash
+        label: "MAI-Code-1.1-Flash — Medium"
         options:
           - name: Reasoning effort
             values:

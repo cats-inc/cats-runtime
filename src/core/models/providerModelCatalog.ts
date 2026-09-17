@@ -259,7 +259,7 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 — Medium' },
     { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash — Medium' },
     { id: 'grok-4.6', label: 'Grok 4.6 — Medium' },
-    { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna — Medium' },
+    { id: 'mai-code-1.1-flash', label: 'MAI-Code-1.1-Flash — Medium' },
     { id: 'kimi-k3', label: 'Kimi K3 — High' },
   ],
   opencode: [
@@ -297,7 +297,7 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'Grok 4.1 Fast Reasoning', label: 'Grok 4.1 Fast Reasoning' },
   ],
   cursor: [
-    { id: 'grok-4.6[effort=xhigh,fast=true]', label: 'Cursor Grok 4.6 — Extra High Fast' },
+    { id: 'grok-4.6[effort=high,fast=true]', label: 'Cursor Grok 4.6 — High Fast' },
     { id: 'composer-2.5[fast=true]', label: 'Composer 2.5 — Fast' },
     { id: 'claude-opus-5[thinking=true,context=300k,effort=high,fast=false]', label: 'Claude Opus 5 — 300K High Thinking' },
     { id: 'gpt-5.6-sol[context=272k,reasoning=medium,fast=false]', label: 'GPT-5.6 Sol — 272K Medium' },

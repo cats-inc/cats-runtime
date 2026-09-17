@@ -188,12 +188,12 @@ describe('curatedModelCatalog', () => {
 
       const catalog = findCuratedCliCatalog(result.document, 'cursor');
       expect(catalog?.version).toBe('2026.09.15-d2fe57e');
-      expect(catalog?.lastUpdated).toBe('2026-09-17');
+      expect(catalog?.lastUpdated).toBe('2026-09-18');
       expect(catalog?.selectionMode).toBe('shortlist');
       expect(catalog?.models).toHaveLength(6);
       expect(catalog?.models?.[0]).toEqual({
-        name: 'grok-4.6[effort=xhigh,fast=true]',
-        label: 'Cursor Grok 4.6 — Extra High Fast',
+        name: 'grok-4.6[effort=high,fast=true]',
+        label: 'Cursor Grok 4.6 — High Fast',
       });
       expect(catalog?.models?.every(model => model.default === undefined && !model.options)).toBe(true);
       expect(catalog?.models?.map(model => model.name)).toContain(
