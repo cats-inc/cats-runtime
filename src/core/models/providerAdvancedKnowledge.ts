@@ -1038,7 +1038,21 @@ function buildCuratedKiloCliOverlay(
     return null;
   }
 
-  return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeKiloCuratedModelId);
+  const overlay = buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeKiloCuratedModelId);
+  if (!overlay || catalog.selectionMode !== 'shortlist') return overlay;
+
+  // A single approved variant belongs to the fixed model combination. Keep it
+  // in execution defaults without exposing an editable control or default label.
+  const entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>> = {};
+  for (const model of scope.models) {
+    const entryId = normalizeKiloCuratedModelId(model);
+    const option = resolveEffectiveCuratedModelOptions(scope.sharedOptions, model)
+      .find((candidate) => matchesCuratedOptionName(candidate, ['variant']));
+    if (entryId && option?.values?.length === 1) {
+      entryDefaults[entryId] = { 'kilo.variant': option.values[0].name };
+    }
+  }
+  return { ...overlay, entryDefaults, controls: [] };
 }
 
 function buildCuratedKiroCliOverlay(

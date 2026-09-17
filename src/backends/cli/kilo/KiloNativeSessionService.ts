@@ -290,6 +290,7 @@ export class KiloNativeSessionService {
     sessionId: string;
     content: string;
     model?: string;
+    variant?: string;
     signal?: AbortSignal;
   }): Promise<KiloPromptResult> {
     const model = parseKiloModel(input.model);
@@ -299,6 +300,7 @@ export class KiloNativeSessionService {
         method: 'POST',
         body: JSON.stringify(stripUndefined({
           model,
+          variant: input.variant,
           parts: [
             {
               type: 'text',

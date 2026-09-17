@@ -4945,10 +4945,10 @@ providers:
         source: 'static',
         cache: null,
         models: [
-          { id: 'kilo/kilo-auto/frontier', label: 'Kilo Auto Frontier', default: false },
-          { id: 'kilo/openrouter/elephant-alpha', label: 'Elephant (new)', default: false },
+          { id: 'kilo/kilo-auto/frontier', label: 'Kilo Auto Frontier' },
+          { id: 'kilo/openrouter/elephant-alpha', label: 'Elephant (new)' },
           { id: 'kilo/openai/gpt-5.4', label: 'OpenAI: GPT-5.4', default: true },
-          { id: 'kilo/moonshotai/kimi-k2.5', label: 'MoonshotAI: Kimi K2.5', default: false },
+          { id: 'kilo/moonshotai/kimi-k2.5', label: 'MoonshotAI: Kimi K2.5' },
         ],
         warnings: [],
       });
@@ -6262,7 +6262,7 @@ providers:
       });
 
     try {
-      await withRuntime({
+      await withCuratedCatalogRuntime(['schema_version: 1', 'catalogs: []'], {
         // The mocked command must not depend on a personal OpenCode installation.
         env: { OPENCODE_PATH: process.platform === 'win32' ? 'opencode.cmd' : 'opencode' },
       }, {}, async (runtime) => {
@@ -6272,25 +6272,16 @@ providers:
           provider: 'opencode',
           backend: 'cli',
           instance: 'native',
-          defaultModel: 'opencode-go/glm-5',
+          defaultModel: null,
           source: 'static',
           cache: null,
           models: [
-            {
-              id: 'opencode-go/glm-5',
-              label: 'glm-5',
-              default: true,
-            },
-            {
-              id: 'opencode-go/kimi-k2.5',
-              label: 'kimi k2.5',
-              default: false,
-            },
-            {
-              id: 'opencode-go/minimax-m2.5',
-              label: 'minimax m2.5',
-              default: false,
-            },
+            { id: 'opencode-go/union-alpha', label: 'Union Alpha Free' },
+            { id: 'opencode-go/deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash' },
+            { id: 'opencode-go/hy4-preview', label: 'Hy4 preview' },
+            { id: 'opencode-go/glm-5.3-flash', label: 'GLM-5.3-Flash' },
+            { id: 'opencode-go/qwen3.8-flash', label: 'Qwen3.8 Flash' },
+            { id: 'opencode-go/minimax-m3', label: 'MiniMax-M3' },
           ],
           warnings: [],
         });
@@ -6301,7 +6292,7 @@ providers:
           provider: 'opencode',
           backend: 'cli',
           instance: 'native',
-          defaultModel: 'opencode-go/glm-5',
+          defaultModel: null,
           source: 'dynamic',
           cache: {
             servedFromCache: false,
@@ -6312,13 +6303,11 @@ providers:
             {
               id: 'anthropic/claude-sonnet-4-5',
               label: 'anthropic/claude-sonnet-4-5',
-              default: false,
               status: 'available',
             },
             {
               id: 'opencode-go/glm-5',
               label: 'opencode-go/glm-5',
-              default: true,
               status: 'available',
             },
           ],
@@ -6331,7 +6320,7 @@ providers:
           provider: 'opencode',
           backend: 'cli',
           instance: 'native',
-          defaultModel: 'opencode-go/glm-5',
+          defaultModel: null,
           source: 'dynamic',
           cache: {
             servedFromCache: false,
@@ -6342,19 +6331,16 @@ providers:
             {
               id: 'anthropic/claude-sonnet-4-5',
               label: 'anthropic/claude-sonnet-4-5',
-              default: false,
               status: 'available',
             },
             {
               id: 'openai/gpt-5.4',
               label: 'openai/gpt-5.4',
-              default: false,
               status: 'available',
             },
             {
               id: 'opencode-go/glm-5',
               label: 'opencode-go/glm-5',
-              default: true,
               status: 'available',
             },
           ],

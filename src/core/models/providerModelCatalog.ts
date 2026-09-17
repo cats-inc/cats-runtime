@@ -263,17 +263,20 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'kimi-k3', label: 'Kimi K3 — High' },
   ],
   opencode: [
-    { id: 'opencode-go/glm-5', label: 'glm-5', default: true },
-    { id: 'opencode-go/kimi-k2.5', label: 'kimi k2.5' },
-    { id: 'opencode-go/minimax-m2.5', label: 'minimax m2.5' },
+    { id: 'opencode-go/union-alpha', label: 'Union Alpha Free' },
+    { id: 'opencode-go/deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash' },
+    { id: 'opencode-go/hy4-preview', label: 'Hy4 preview' },
+    { id: 'opencode-go/glm-5.3-flash', label: 'GLM-5.3-Flash' },
+    { id: 'opencode-go/qwen3.8-flash', label: 'Qwen3.8 Flash' },
+    { id: 'opencode-go/minimax-m3', label: 'MiniMax-M3' },
   ],
   kilo: [
-    { id: 'kilo/openai/gpt-5.4', label: 'gpt-5.4', default: true },
-    { id: 'kilo/openai/gpt-5.4-mini', label: 'gpt-5.4-mini' },
-    { id: 'kilo/anthropic/claude-opus-4.6', label: 'claude-opus-4.6' },
-    { id: 'kilo/anthropic/claude-sonnet-4.6', label: 'claude-sonnet-4.6' },
-    { id: 'kilo/google/gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview' },
-    { id: 'kilo/z-ai/glm-5', label: 'glm-5' },
+    { id: 'kilo/deepseek/deepseek-v4.1-flash', label: 'DeepSeek: DeepSeek V4.1 Flash' },
+    { id: 'kilo/z-ai/glm-5.3-flash', label: 'Z.ai: GLM 5.3 Flash' },
+    { id: 'kilo/moonshotai/kimi-k3', label: 'MoonshotAI: Kimi K3' },
+    { id: 'kilo/minimax/minimax-m3', label: 'MiniMax: MiniMax M3' },
+    { id: 'kilo/bytedance-seed/seed-2-1-turbo', label: 'ByteDance Seed: Seed 2.1 Turbo Thinking' },
+    { id: 'kilo/google/gemini-3-pro-image', label: 'Google: Nano Banana Pro (Gemini 3 Pro Image) Thinking' },
   ],
   auggie: [
     { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
@@ -676,6 +679,7 @@ function supportsCuratedStaticCliCatalog(providerName: string): boolean {
     || providerName === 'kiro'
     || providerName === 'junie'
     || providerName === 'copilot'
+    || providerName === 'opencode'
     || providerName === 'cursor';
 }
 

@@ -359,6 +359,12 @@ export function normalizeKiloModelName(
 
   const knownIds = new Set([
     'kilo/kilo-auto/frontier',
+    'kilo/deepseek/deepseek-v4.1-flash',
+    'kilo/z-ai/glm-5.3-flash',
+    'kilo/moonshotai/kimi-k3',
+    'kilo/minimax/minimax-m3',
+    'kilo/bytedance-seed/seed-2-1-turbo',
+    'kilo/google/gemini-3-pro-image',
     'kilo/kilo-auto/balanced',
     'kilo/kilo-auto/free',
     'kilo/bytedance-seed/dola-seed-2.0-pro:free',
@@ -610,6 +616,7 @@ export function normalizeCuratedModelId(
     case 'antigravity':
     case 'grok':
     case 'muse':
+    case 'opencode':
       return normalizeVerbatimCuratedModelId(model);
     case 'kilo':
       return normalizeKiloCuratedModelId(model);

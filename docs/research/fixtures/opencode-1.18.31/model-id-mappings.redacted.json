@@ -1,0 +1,43 @@
+{
+  "source": "Installed OpenCode 1.18.31: opencode models --verbose --pure",
+  "observed": "2026-09-18",
+  "scope": "Local configured providers; public id/name/providerID fields projected from 36 returned entries. No inference request.",
+  "entries": [
+    {
+      "id": "opencode/union-alpha",
+      "name": "Union Alpha Free",
+      "providerID": "opencode"
+    },
+    {
+      "id": "opencode-go/union-alpha",
+      "name": "Union Alpha Free",
+      "providerID": "opencode-go"
+    },
+    {
+      "id": "opencode-go/deepseek-v4.1-flash",
+      "name": "DeepSeek V4.1 Flash",
+      "providerID": "opencode-go"
+    },
+    {
+      "id": "opencode-go/hy4-preview",
+      "name": "Hy4 preview",
+      "providerID": "opencode-go"
+    },
+    {
+      "id": "opencode-go/glm-5.3-flash",
+      "name": "GLM-5.3-Flash",
+      "providerID": "opencode-go"
+    },
+    {
+      "id": "opencode-go/qwen3.8-flash",
+      "name": "Qwen3.8 Flash",
+      "providerID": "opencode-go"
+    },
+    {
+      "id": "opencode-go/minimax-m3",
+      "name": "MiniMax-M3",
+      "providerID": "opencode-go"
+    }
+  ],
+  "decision": "Operator selected opencode-go/union-alpha instead of the same-name opencode/union-alpha entry."
+}

@@ -1,0 +1,57 @@
+{
+  "source": "kilo models kilo --verbose --pure",
+  "version": "7.7.3",
+  "scope": "Only the six operator-selected mappings are retained; gateway enumeration is not picker or default evidence.",
+  "models": [
+    {
+      "executionId": "kilo/deepseek/deepseek-v4.1-flash",
+      "id": "deepseek/deepseek-v4.1-flash",
+      "name": "DeepSeek: DeepSeek V4.1 Flash",
+      "providerID": "kilo"
+    },
+    {
+      "executionId": "kilo/z-ai/glm-5.3-flash",
+      "id": "z-ai/glm-5.3-flash",
+      "name": "Z.ai: GLM 5.3 Flash",
+      "providerID": "kilo"
+    },
+    {
+      "executionId": "kilo/moonshotai/kimi-k3",
+      "id": "moonshotai/kimi-k3",
+      "name": "MoonshotAI: Kimi K3",
+      "providerID": "kilo"
+    },
+    {
+      "executionId": "kilo/minimax/minimax-m3",
+      "id": "minimax/minimax-m3",
+      "name": "MiniMax: MiniMax M3",
+      "providerID": "kilo"
+    },
+    {
+      "executionId": "kilo/bytedance-seed/seed-2-1-turbo",
+      "id": "bytedance-seed/seed-2-1-turbo",
+      "name": "ByteDance Seed: Seed 2.1 Turbo",
+      "providerID": "kilo",
+      "selectedVariant": "thinking",
+      "selectedVariantOptions": {
+        "reasoning": {
+          "enabled": true,
+          "effort": "high"
+        }
+      }
+    },
+    {
+      "executionId": "kilo/google/gemini-3-pro-image",
+      "id": "google/gemini-3-pro-image",
+      "name": "Google: Nano Banana Pro (Gemini 3 Pro Image)",
+      "providerID": "kilo",
+      "selectedVariant": "thinking",
+      "selectedVariantOptions": {
+        "reasoning": {
+          "enabled": true,
+          "effort": "high"
+        }
+      }
+    }
+  ]
+}

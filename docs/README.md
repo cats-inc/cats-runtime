@@ -20,6 +20,12 @@ scheduled polling, verified account linkage and durable history remain deferred.
 
 ## Provider Detection
 
+[Kilo shortlist](./research/2026-09-18-kilo-shortlist.md) records six selected models and fixed
+Thinking transport for the final two entries.
+
+[OpenCode shortlist](./research/2026-09-18-opencode-shortlist.md) records the six selected models,
+verified Go IDs, exact labels, refresh behavior and custom input.
+
 [Copilot fixed presets](./research/2026-09-17-copilot-fixed-presets.md) records the approved shortlist,
 fixed effort execution and per-model raw-ID evidence.
 
@@ -28,7 +34,7 @@ combinations, parameterized execution, refresh-stable shortlist, and custom inpu
 
 [Approved model-menu maintenance policy](./specs/SPEC-028-provider-model-catalog-maintenance-skill.md#approved-maintenance-and-menu-policy-2026-09-17)
 records complete catalogs for Codex/Claude/agy/Grok/Muse, up to six models for the named other
-CLIs, and custom model input for both groups. Cursor and Copilot shortlists are implemented; the remaining
+CLIs, and custom model input for both groups. Cursor, Copilot, OpenCode and Kilo shortlists are implemented; the remaining
 individual shortlists and rollout are pending.
 
 [Grok Build 1.0.34 picker](./research/2026-09-17-grok-model-picker-refresh.md)

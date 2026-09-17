@@ -52,6 +52,12 @@ six-entry cap alone does not identify which entries to remove; obtain the operat
 shortlist before changing membership. Full-catalog providers retain complete evidenced options.
 Custom input in either group does not authorize inventing effort choices or other model metadata.
 
+Inspect personal curated-file precedence early. The current loader selects the personal document
+as a whole when it exists; it does not merge missing provider sections from the bundled example.
+Therefore a missing provider block can hide a new bundled shortlist just as an old block can.
+Prepare the selected-provider-only addition or replacement before requesting any missing
+outside-project authorization; compare other providers and back up before an authorized write.
+
 ## Freshness and partial evidence
 
 Advance `last_updated` only when the model list for the edited catalog/provider scope was re-read or

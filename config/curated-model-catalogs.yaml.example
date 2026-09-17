@@ -36,13 +36,36 @@ schema_version: 1
 # 2026-09-16: Antigravity 1.2.3 picker families and effort controls refreshed;
 # execution ids retain the independent 1.1.24 enumeration provenance.
 # Every other entry keeps the provenance and date recorded in its own `notes`.
-# Kilo, Kiro, and Junie had their versions re-probed but not their model
+# Kiro and Junie had their versions re-probed but not their model
 # lists - those CLIs either gate the list behind an account, expose it only in an
 # interactive picker, or publish a different artifact than the picker shows.
 #
 # Treat this file as a starting point to correct, trim, or expand.
 
 catalogs:
+  - cli: OpenCode
+    version: 1.18.31
+    last_updated: 2026-09-18
+    selection_mode: shortlist
+    notes:
+      - "Operator-selected six-model shortlist, in the supplied order; this is not the complete upstream catalog. Display names are preserved exactly. No model default or effort/options were supplied, so none are asserted."
+      - "Evidence: docs/research/fixtures/opencode-1.18.31/models.redacted.txt and model-id-mappings.redacted.json. Installed 1.18.31 `opencode models --verbose --pure` supplied exact provider/model IDs on 2026-09-18; no inference request was sent."
+      - "Union Alpha Free appeared under both opencode and opencode-go. The operator explicitly selected opencode-go/union-alpha, matching the other five entries. All six are scoped to this machine's configured CLI providers; availability elsewhere is unverified."
+      - "Desktop and Playground initialize to the first row without adding a default marker. Refresh retains this shortlist and custom model-string input remains available. See docs/research/2026-09-18-opencode-shortlist.md."
+    models:
+      - name: opencode-go/union-alpha
+        label: Union Alpha Free
+      - name: opencode-go/deepseek-v4.1-flash
+        label: DeepSeek V4.1 Flash
+      - name: opencode-go/hy4-preview
+        label: Hy4 preview
+      - name: opencode-go/glm-5.3-flash
+        label: GLM-5.3-Flash
+      - name: opencode-go/qwen3.8-flash
+        label: Qwen3.8 Flash
+      - name: opencode-go/minimax-m3
+        label: MiniMax-M3
+
   - cli: Claude
     version: 2.1.273
     last_updated: 2026-09-16
@@ -462,40 +485,35 @@ catalogs:
               - name: High
 
   - cli: Kilo
-    version: 7.4.23
-    last_updated: 2026-04-17
+    version: 7.7.3
+    last_updated: 2026-09-18
+    selection_mode: shortlist
     notes:
-      - "Source: Kilo model picker output supplied by user."
-      - "Entries below preserve picker-visible labels only; runtime maps them to Kilo gateway ids."
-      - "2026-08-26: version re-probed as 7.4.23. Picker list NOT re-verified - `kilo models` returns the full 299-entry gateway catalog from models.dev, which is a different artifact: the picker virtual routing rows (Kilo Auto Frontier/Balanced/Free, Elephant) do not appear in it. Entries below remain as of 2026-04-17."
-      - "`kilo models --verbose` emits per-model JSON (id, name, family, cost, limit.context, limit.output) and is the better source if this section is ever re-scoped to the gateway catalog rather than the picker."
+      - "Source: operator-selected six-model shortlist for Kilo Code 7.7.3, supplied 2026-09-18."
+      - "Exact IDs and the final two thinking variant tokens were verified with installed kilo models kilo --verbose --pure; this gateway enumeration supplies mappings, not shortlist membership."
+      - "Seed and Nano Banana use the fixed thinking variant. Other entries leave the variant unspecified. No provider default was supplied; UI initialization uses the first entry without a default label."
+      - "Evidence: docs/research/2026-09-18-kilo-shortlist.md and docs/research/fixtures/kilo-7.7.3/."
     models:
-      - name: Kilo Auto Frontier
-
-      - name: Kilo Auto Balanced
-
-      - name: Kilo Auto Free
-
-      - name: "xAI: Grok Code Fast 1 Optimized"
-
-      - name: "StepFun: Step 3.5 Flash"
-
-      - name: Elephant
-
-      - name: "Anthropic: Claude Opus 4.7"
-
-      - name: "Anthropic: Claude Sonnet 4.6"
-
-      - name: "OpenAI: GPT-5.4"
-        default: true
-
-      - name: "Google: Gemini 3.1 Pro Preview"
-
-      - name: "MiniMax: MiniMax M2.7"
-
-      - name: "MoonshotAI: Kimi K2.5"
-
-      - name: "Z.ai: GLM 5.1"
+      - name: kilo/deepseek/deepseek-v4.1-flash
+        label: "DeepSeek: DeepSeek V4.1 Flash"
+      - name: kilo/z-ai/glm-5.3-flash
+        label: "Z.ai: GLM 5.3 Flash"
+      - name: kilo/moonshotai/kimi-k3
+        label: "MoonshotAI: Kimi K3"
+      - name: kilo/minimax/minimax-m3
+        label: "MiniMax: MiniMax M3"
+      - name: kilo/bytedance-seed/seed-2-1-turbo
+        label: "ByteDance Seed: Seed 2.1 Turbo Thinking"
+        options:
+          - name: Variant
+            values:
+              - name: thinking
+      - name: kilo/google/gemini-3-pro-image
+        label: "Google: Nano Banana Pro (Gemini 3 Pro Image) Thinking"
+        options:
+          - name: Variant
+            values:
+              - name: thinking
 
   - cli: Kiro
     version: 2.19.2

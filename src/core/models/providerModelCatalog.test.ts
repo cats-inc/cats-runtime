@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  getStaticProviderModels,
   normalizeProviderCatalogModelId,
   ProviderModelCatalogService,
 } from './providerModelCatalog.js';
@@ -1267,7 +1268,13 @@ describe('ProviderModelCatalogService', () => {
     expect(vi.mocked(piModelDiscoveryRunner.run)).toHaveBeenCalledTimes(1);
   });
 
-  it('loads dynamic OpenCode model catalogs and forwards runtime refresh to the CLI helper', async () => {
+  it('loads dynamic OpenCode model catalogs and forwards runtime refresh to the CLI helper', async ({ onTestFinished }) => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-opencode-dynamic-'));
+    onTestFinished(() => rmSync(root, { recursive: true, force: true }));
+    const paths = createRuntimeTestPaths(root);
+    ensureRuntimeTestDirs(paths);
+    // Explicitly exercise an installation without a curated shortlist.
+    writeFileSync(paths.curatedModelCatalogPath, 'schema_version: 1\ncatalogs: []\n');
     const opencodeModelDiscoveryRunner = {
       run: vi.fn(async (_instance, args: string[]) => ({
         exitCode: 0,
@@ -1289,6 +1296,7 @@ describe('ProviderModelCatalogService', () => {
 
     const service = new ProviderModelCatalogService(createCatalogConfig() as never, {
       opencodeModelDiscoveryRunner,
+      env: createRuntimeTestEnv(root),
       ttlMs: 60_000,
     });
 
@@ -1297,7 +1305,7 @@ describe('ProviderModelCatalogService', () => {
       provider: 'opencode',
       backend: 'cli',
       instance: 'default',
-      defaultModel: 'opencode-go/glm-5',
+      defaultModel: null,
       source: 'dynamic',
       cache: {
         servedFromCache: false,
@@ -1310,13 +1318,11 @@ describe('ProviderModelCatalogService', () => {
       {
         id: 'anthropic/claude-sonnet-4-5',
         label: 'anthropic/claude-sonnet-4-5',
-        default: false,
         status: 'available',
       },
       {
         id: 'opencode-go/glm-5',
         label: 'opencode-go/glm-5',
-        default: true,
         status: 'available',
       },
     ]);
@@ -1326,19 +1332,16 @@ describe('ProviderModelCatalogService', () => {
       {
         id: 'anthropic/claude-sonnet-4-5',
         label: 'anthropic/claude-sonnet-4-5',
-        default: false,
         status: 'available',
       },
       {
         id: 'openai/gpt-5.4',
         label: 'openai/gpt-5.4',
-        default: false,
         status: 'available',
       },
       {
         id: 'opencode-go/glm-5',
         label: 'opencode-go/glm-5',
-        default: true,
         status: 'available',
       },
     ]);
@@ -1360,7 +1363,9 @@ describe('ProviderModelCatalogService', () => {
     );
   });
 
-  it('returns an immediate snapshot without invoking slow dynamic discovery runners', () => {
+  it('returns an immediate snapshot without invoking slow dynamic discovery runners', ({ onTestFinished }) => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-immediate-catalog-'));
+    onTestFinished(() => rmSync(root, { recursive: true, force: true }));
     const piModelDiscoveryRunner = {
       run: vi.fn(async () => {
         throw new Error('dynamic discovery should not run');
@@ -1374,6 +1379,7 @@ describe('ProviderModelCatalogService', () => {
 
     const service = new ProviderModelCatalogService(createCatalogConfig() as never, {
       piModelDiscoveryRunner,
+      env: createRuntimeTestEnv(root),
       opencodeModelDiscoveryRunner,
     });
 
@@ -1394,29 +1400,9 @@ describe('ProviderModelCatalogService', () => {
       warnings: [],
     });
     expect(service.getImmediateCatalog('opencode')).toEqual({
-      provider: 'opencode',
-      backend: 'cli',
-      instance: 'default',
-      defaultModel: 'opencode-go/glm-5',
-      source: 'static',
-      cache: null,
-      models: [
-        {
-          id: 'opencode-go/glm-5',
-          label: 'glm-5',
-          default: true,
-        },
-        {
-          id: 'opencode-go/kimi-k2.5',
-          label: 'kimi k2.5',
-          default: false,
-        },
-        {
-          id: 'opencode-go/minimax-m2.5',
-          label: 'minimax m2.5',
-          default: false,
-        },
-      ],
+      provider: 'opencode', backend: 'cli', instance: 'default',
+      defaultModel: null, source: 'static', cache: null,
+      models: getStaticProviderModels({ providerName: 'opencode', backend: 'cli' }),
       warnings: [],
     });
     expect(piModelDiscoveryRunner.run).not.toHaveBeenCalled();
@@ -2891,16 +2877,15 @@ describe('ProviderModelCatalogService', () => {
         source: 'static',
         cache: null,
         models: [
-          { id: 'kilo/kilo-auto/frontier', label: 'Kilo Auto Frontier', default: false },
+          { id: 'kilo/kilo-auto/frontier', label: 'Kilo Auto Frontier' },
           {
             id: 'kilo/x-ai/grok-code-fast-1:optimized:free',
             label: 'xAI: Grok Code Fast 1 Optimized (free)',
-            default: false,
           },
-          { id: 'kilo/openrouter/elephant-alpha', label: 'Elephant (new)', default: false },
+          { id: 'kilo/openrouter/elephant-alpha', label: 'Elephant (new)' },
           { id: 'kilo/openai/gpt-5.4', label: 'OpenAI: GPT-5.4', default: true },
-          { id: 'kilo/minimax/minimax-m2.7', label: 'MiniMax: MiniMax M2.7', default: false },
-          { id: 'kilo/z-ai/glm-5.1', label: 'Z.ai: GLM 5.1 (new)', default: false },
+          { id: 'kilo/minimax/minimax-m2.7', label: 'MiniMax: MiniMax M2.7' },
+          { id: 'kilo/z-ai/glm-5.1', label: 'Z.ai: GLM 5.1 (new)' },
         ],
         warnings: [],
       });

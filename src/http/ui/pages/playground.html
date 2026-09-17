@@ -410,8 +410,8 @@ const PROVIDER_MODELS = {
   codex:[{value:'gpt-6-astra',label:'gpt-6-astra (default)'},{value:'gpt-5.6-sol',label:'gpt-5.6-sol'},{value:'gpt-5.6-terra',label:'gpt-5.6-terra'},{value:'gpt-5.6-luna',label:'gpt-5.6-luna'},{value:'gpt-5.5',label:'gpt-5.5'}],
   antigravity:[{value:'gemini-3.8-flash-low',label:'Gemini 3.8 Flash'},{value:'gemini-3.7-flash-low',label:'Gemini 3.7 Flash'},{value:'gemini-3.6-flash-low',label:'Gemini 3.6 Flash'},{value:'gemini-3.1-pro-low',label:'Gemini 3.1 Pro'},{value:'claude-sonnet-4-6',label:'Claude Sonnet 4.6 (Thinking)'},{value:'claude-opus-4-6-thinking',label:'Claude Opus 4.6 (Thinking)'},{value:'gpt-oss-120b-medium',label:'GPT-OSS 120B (Medium)'}],
   copilot:[{value:'gpt-5.6-terra',label:'GPT-5.6 Terra — Medium (default)'},{value:'claude-sonnet-5',label:'Claude Sonnet 5 — Medium'},{value:'gemini-3.8-flash',label:'Gemini 3.8 Flash — Medium'},{value:'grok-4.6',label:'Grok 4.6 — Medium'},{value:'mai-code-1.1-flash',label:'MAI-Code-1.1-Flash — Medium'},{value:'kimi-k3',label:'Kimi K3 — High'}],
-  opencode:[{value:'opencode-go/glm-5',label:'opencode-go/glm-5 (default)'},{value:'opencode-go/kimi-k2.5',label:'opencode-go/kimi-k2.5'}],
-  kilo:[{value:'kilo/openai/gpt-5.4',label:'kilo/openai/gpt-5.4 (default)'},{value:'kilo/openai/gpt-5.4-mini',label:'kilo/openai/gpt-5.4-mini'},{value:'kilo/anthropic/claude-sonnet-4.6',label:'kilo/anthropic/claude-sonnet-4.6'}],
+  opencode:[{value:'opencode-go/union-alpha',label:'Union Alpha Free'},{value:'opencode-go/deepseek-v4.1-flash',label:'DeepSeek V4.1 Flash'},{value:'opencode-go/hy4-preview',label:'Hy4 preview'},{value:'opencode-go/glm-5.3-flash',label:'GLM-5.3-Flash'},{value:'opencode-go/qwen3.8-flash',label:'Qwen3.8 Flash'},{value:'opencode-go/minimax-m3',label:'MiniMax-M3'}],
+  kilo:[{value:'kilo/deepseek/deepseek-v4.1-flash',label:'DeepSeek: DeepSeek V4.1 Flash'},{value:'kilo/z-ai/glm-5.3-flash',label:'Z.ai: GLM 5.3 Flash'},{value:'kilo/moonshotai/kimi-k3',label:'MoonshotAI: Kimi K3'},{value:'kilo/minimax/minimax-m3',label:'MiniMax: MiniMax M3'},{value:'kilo/bytedance-seed/seed-2-1-turbo',label:'ByteDance Seed: Seed 2.1 Turbo Thinking'},{value:'kilo/google/gemini-3-pro-image',label:'Google: Nano Banana Pro (Gemini 3 Pro Image) Thinking'}],
   auggie:[{value:'gpt-5.4',label:'gpt-5.4 (default)'},{value:'claude opus 4.6',label:'claude opus 4.6'},{value:'sonnet 4.6',label:'sonnet 4.6'}],
   pi:[{value:'openai-codex/gpt-5.4',label:'openai-codex/gpt-5.4 (default)'}],
   junie:[{value:'Gemini 3 Flash',label:'Gemini 3 Flash (default)'},{value:'Claude Opus 4.6',label:'Claude Opus 4.6'},{value:'Claude Opus 4.7',label:'Claude Opus 4.7'},{value:'Claude Sonnet 4.6',label:'Claude Sonnet 4.6'},{value:'Gemini 3.1 Flash Lite',label:'Gemini 3.1 Flash Lite'},{value:'Gemini 3.1 Pro Preview',label:'Gemini 3.1 Pro Preview'},{value:'GPT-5',label:'GPT-5'},{value:'GPT-5.2',label:'GPT-5.2'},{value:'GPT-5.3-codex',label:'GPT-5.3-codex'},{value:'GPT-5.4',label:'GPT-5.4'},{value:'Grok 4.1 Fast Reasoning',label:'Grok 4.1 Fast Reasoning'}],
@@ -457,7 +457,7 @@ function normalizeSelectableProvider(provider) {
   return selectable[0] || provider || '';
 }
 function normalizeAgentSelectionState(provider,model='',modelSelection=null,options={}) {
-  const allowLegacyModel=(provider==='cursor'||provider==='copilot')||options.allowLegacyModel===true;
+  const allowLegacyModel=(provider==='cursor'||provider==='copilot'||provider==='opencode'||provider==='kilo')||options.allowLegacyModel===true;
   const normalized=window.CatsUI?.normalizePlaygroundAgentSelection
     ? window.CatsUI.normalizePlaygroundAgentSelection({
       provider,
@@ -1448,7 +1448,7 @@ function readAgentModelControlValues(div){
 function readAgentModelState(div){
   const provider=div.querySelector('.agent-provider')?.value||'';
   const entryId=div.querySelector('.agent-entry-choice')?.value||'';
-  if((provider==='cursor'||provider==='copilot')&&entryId==='__custom_model__'){
+  if((provider==='cursor'||provider==='copilot'||provider==='opencode'||provider==='kilo')&&entryId==='__custom_model__'){
     return { model:div.querySelector('.agent-custom-model')?.value.trim()||'', modelSelection:null };
   }
   const presetId=div.querySelector('.agent-preset-choice')?.value||'';
@@ -1583,8 +1583,8 @@ function renderAgentModelChoice(div){
   const entryId=entryEl.value||'';
   const selectedLabel=entryEl.selectedOptions?.[0]?.textContent?.trim()||'';
   const customGroup=div.querySelector('.agent-custom-model-group');
-  customGroup?.classList.toggle('hidden',(provider!=='cursor'&&provider!=='copilot')||entryId!=='__custom_model__');
-  if(provider==='cursor'||provider==='copilot'){
+  customGroup?.classList.toggle('hidden',(provider!=='cursor'&&provider!=='copilot'&&provider!=='opencode'&&provider!=='kilo')||entryId!=='__custom_model__');
+  if(provider==='cursor'||provider==='copilot'||provider==='opencode'||provider==='kilo'){
     div.querySelector('.agent-mode-group')?.classList.add('hidden');
     hintEl.textContent=entryId==='__custom_model__'?'Enter a model string.':selectedLabel;
     renderAgentModelControls(div,null,'','');
@@ -1645,7 +1645,7 @@ function syncAgentModelField(div,options={}){
   const basicModels=PROVIDER_MODELS[provider]||[];
   const providerCatalogPending=!providerOptionsReady&&(providerOptionsLoading||providerOptionsRequestId===0);
 
-  if(provider==='cursor'||provider==='copilot'){
+  if(provider==='cursor'||provider==='copilot'||provider==='opencode'||provider==='kilo'){
     const choices=entries.length>0
       ? entries.map(entry=>({value:entry.id,label:window.CatsUI.formatAdvancedDefaultLabel(entry.label||entry.id,entry.default)}))
       : basicModels.map(entry=>({value:entry.value,label:entry.label||entry.value}));

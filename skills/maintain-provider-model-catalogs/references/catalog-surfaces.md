@@ -80,6 +80,23 @@ output, and curated row disagree, use the conflict procedure in
 
 ## Validation by changed surface
 
+### New shortlist rollout checks
+
+When a provider first adopts an approved shortlist, trace the existing path before the final gate:
+
+- Verify curated lookup, static-catalog support and ID normalization accept the provider. A valid
+  YAML entry alone does not prove the returned menu uses it. Reuse existing shortlist support.
+- Check each UI's custom action, field visibility, serialization and saved-value reconciliation.
+  These paths can use provider-specific conditions: Desktop custom input or another provider's
+  Playground behavior does not establish support for this provider. Test the first selection,
+  actual six-plus-custom menu and saved custom string after refresh.
+- Classify service, HTTP and diagnostics tests by their catalog source. Unrestricted-discovery
+  cases need an explicit empty/non-shortlist curated document in an isolated environment,
+  including at server construction. A temporary home alone can still load the bundled example.
+  Keep current bundled-shortlist coverage separate; do not rewrite independent historical IDs.
+
+### Curated catalog checks
+
 At minimum for a curated catalog edit:
 
 ```text
@@ -121,6 +138,18 @@ Also:
   emits failure details as they occur.
 - If only this skill's Markdown changes, validate frontmatter, links, diff, and discovery sync.
   Do not run product tests solely for prose edits or the later commit/PR step.
+- A Windows sandbox `spawn EPERM` before collection is a runner restriction, not a failed product
+  assertion. Reuse that diagnosis for commands needing the same child-process capability instead
+  of repeatedly trying blocked launches. Use approved execution when needed; Node's
+  `--test-isolation=none` is an alternative only for selected tests that do not require isolation.
+
+### Report live-check limits precisely
+
+A refused localhost connection proves only that the requested endpoint refused the connection.
+Report the endpoint and error; do not infer port occupation or a leftover Runtime process.
+If process cleanup is requested, inspect listeners and process identity before stopping anything.
+No listener or matching process means there is nothing identified to stop. Do not start a service
+merely to turn an unavailable optional live check into a pass.
 
 ### Desktop iteration, only when its consumers change
 
