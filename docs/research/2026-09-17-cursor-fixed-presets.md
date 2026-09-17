@@ -84,6 +84,9 @@ examples alone do not replace an existing personal override.
   and fixed-preset serialization. This was an isolated DOM check, not a running-app smoke test.
 - Curated data for other providers, local override parity, Markdown references, skill mirrors,
   and final diff checks passed.
+- Updated the Dashboard provider-summary regression to expect no upstream default and no
+  live-discovery warning for the fixed shortlist. The targeted route test and TypeScript
+  check passed; CI runs the full suite.
 - No model inference or installed Desktop smoke test was performed.
 
 ## Maintenance feedback
