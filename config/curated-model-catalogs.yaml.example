@@ -323,35 +323,8 @@ catalogs:
       - "The `-contributor` rows are the same models on terms Meta describes as \"Your content, including inter-session messages, may be used for product improvement.\" They are listed so an operator can choose one deliberately."
       - "No entry is marked default even though `model/list` flags `muse-spark-1.3-contributor` as `isDefault`. Projecting that here would make every runtime turn opt into content sharing without the operator asking for it; with no `--model` argument muse still uses whatever the account prefers."
       - "`context: 1007997` and `max_output: 128000` are the reply's `contextLimit` and `outputLimit`, identical across all four rows. `cost` is null upstream and is therefore omitted rather than guessed."
-      - "The effort menu is provider-wide, not per model: `--reasoning-effort` is a root argument on both `muse` and `muse exec`, and its help states one list for every model - none, minimal, low, medium, high, xhigh, max, ultra - with `high` as the default. That is why it sits in shared_options and no model overrides it."
-    shared_options:
-      - name: Reasoning effort
-        values:
-          - name: none
-            notes:
-              - "No reasoning budget."
-          - name: minimal
-            notes:
-              - "Minimal reasoning budget."
-          - name: low
-            notes:
-              - "Quick responses with lighter reasoning."
-          - name: medium
-            notes:
-              - "Balances speed and reasoning depth."
-          - name: high
-            notes:
-              - "Greater reasoning depth for complex problems."
-          - name: xhigh
-            notes:
-              - "Extra high reasoning depth."
-          - name: max
-            notes:
-              - "Maximum reasoning depth."
-          - name: ultra
-            notes:
-              - "Highest reasoning budget muse exposes."
-        default: high
+      - "Effort menus corrected from the operator on 2026-09-18: both 1.3 rows have minimal, low, medium, high, xhigh, max; both 1.2 rows stop at xhigh. No effort default is declared. Evidence: docs/research/fixtures/muse-unknown-version/efforts-2026-09-18.redacted.txt."
+      - "The earlier exec --help list proves parser vocabulary, not per-model picker availability/defaults. Model-list version, freshness, labels, and limits retain their 2026-09-05 provenance; this correction only re-observes effort menus."
     models:
       - name: muse-spark-1.3
         label: muse-spark-1.3
@@ -359,6 +332,15 @@ catalogs:
           - "releaseDate 2026-09-02; the catalog carries no description for this row."
         context: 1007997
         max_output: 128000
+        options:
+          - name: Reasoning effort
+            values:
+              - name: minimal
+              - name: low
+              - name: medium
+              - name: high
+              - name: xhigh
+              - name: max
       - name: muse-spark-1.3-contributor
         label: muse-spark-1.3 (contributor)
         notes:
@@ -366,18 +348,43 @@ catalogs:
           - "Marked isDefault by `model/list`; deliberately not marked default here."
         context: 1007997
         max_output: 128000
+        options:
+          - name: Reasoning effort
+            values:
+              - name: minimal
+              - name: low
+              - name: medium
+              - name: high
+              - name: xhigh
+              - name: max
       - name: muse-spark-1.2
         label: muse-spark-1.2
         notes:
           - "releaseDate 2026-08-05; the catalog carries no description for this row."
         context: 1007997
         max_output: 128000
+        options:
+          - name: Reasoning effort
+            values:
+              - name: minimal
+              - name: low
+              - name: medium
+              - name: high
+              - name: xhigh
       - name: muse-spark-1.2-contributor
         label: muse-spark-1.2 (contributor)
         notes:
           - "Catalog description: Your content, including inter-session messages, may be used for product improvement."
         context: 1007997
         max_output: 128000
+        options:
+          - name: Reasoning effort
+            values:
+              - name: minimal
+              - name: low
+              - name: medium
+              - name: high
+              - name: xhigh
 
   - cli: Cursor
     version: 2026.09.15-d2fe57e

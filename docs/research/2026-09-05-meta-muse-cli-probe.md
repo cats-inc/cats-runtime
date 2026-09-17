@@ -101,10 +101,10 @@ default 10s budget that the provider declares `minProbeTimeoutMs: 20_000`.
   default, with `run.model.configured` reporting
   `model_id: "definitely-not-a-model"` and `profile_id: null`. Model selection is
   therefore best-effort and cannot be validated from the exit code.
-- `--reasoning-effort` is a root argument on both `muse` and `muse exec`, with
-  one list for every model: `none|minimal|low|medium|high|xhigh|max|ultra`,
-  defaulting to `high`. Unlike Grok, the menu does not vary per model, which is
-  why the curated catalog carries it in `shared_options`.
+- `--reasoning-effort` is a root argument on both `muse` and `muse exec`.
+  The recorded help lists `none|minimal|low|medium|high|xhigh|max|ultra` and `high`
+  as its parser default. The original inference that this was every model's picker
+  menu was incorrect; the 2026-09-18 operator correction below supersedes it.
 - `--provider echo` runs the whole record pipeline with no account and no model
   call. `fixtures/muse-1.0.3/echo-provider.success.redacted.ndjson` is that run
   and is reproducible offline.
@@ -325,6 +325,60 @@ Validation on 2026-09-16:
   reported.
 - This validates the source change with isolated fixtures. The installed Desktop
   runtime (`0.1.22`) was not replaced during this check.
+
+## 2026-09-18 correction: per-model effort menus
+
+Mode: refresh; interaction policy: confirm uncertainty. The operator explicitly corrected the
+complete effort menus for both regular/contributor rows in each generation. This resolves the
+older help-derived inference; no additional confirmation or CLI probe was needed. The current
+CLI version was not supplied, so model-list version/freshness and model limits retain the earlier
+provenance. The correction is preserved in
+[the operator evidence](./fixtures/muse-unknown-version/efforts-2026-09-18.redacted.txt).
+
+| Models | Ordered effort menu | Declared default |
+| --- | --- | --- |
+| muse-spark-1.3, muse-spark-1.3-contributor | minimal, low, medium, high, xhigh, max | None |
+| muse-spark-1.2, muse-spark-1.2-contributor | minimal, low, medium, high, xhigh | None |
+
+Root cause: the initial implementation promoted the global help's parser vocabulary and its
+high default into a shared picker menu. The provider skill repeated that incorrect inference;
+there was no bundled-catalog regression checking Muse's per-model menus. Machine-readable model
+identity evidence cannot establish effort availability, and a global argument cannot establish
+that every model's picker is identical. The operator's correction supersedes that inference.
+
+The curated menus now live on each model. Runtime already supports per-model applicability and
+no-default controls, so no selector or adapter behavior change is required. Playground renders
+minimal first and submits it through the existing form serializer without adding a default label;
+Desktop consumes the same public control metadata. Existing parser acceptance stays separate from
+curated structured selections. Model ids/labels/order, contributor metadata, context/output limits,
+and other providers are unchanged.
+
+The canonical maintenance skill now distinguishes evidence by field and selected model, removes
+the false Muse shared-menu rule, and requires validating exact per-model menus against the loaded
+catalog, including absent defaults and cross-model rejection. Generated agent mirrors are synced
+from the canonical source, including Claude; no hand edits to discovery copies.
+
+Validation:
+
+- Focused catalog loading, normalization, advanced knowledge, and model catalog suites passed.
+- The final Muse catalog, Playground, and adapter run passed all 38 tests (3 files, 2.98 seconds).
+  These check exact menus, no effort defaults, first-value form serialization, saved effort,
+  rejected cross-model options, and the generated CLI arguments without spawning Muse.
+- Desktop's existing model-default selector suite passed all 3 tests using its unchanged compiled
+  bundle. It covers generic per-model filtering, first selection without default labels, and saved
+  effort restoration; it is not a Muse-specific installed-Desktop visual smoke.
+- Runtime typecheck (including UI generation) passed. The first sandboxed Vitest attempt hit
+  Windows spawn EPERM before collecting tests; the authorized unsandboxed run completed.
+  Two initial new-test failures were test harness mistakes (missing adapter turn preparation and
+  checking normalization instead of the actual form serializer), corrected before the final pass.
+- The skill's Python validator could not import PyYAML. Equivalent frontmatter/name/description,
+  placeholder and relative-link checks passed with the existing Node YAML dependency. Runtime
+  mirrors match the source; workspace sync/check also passed for both Codex and Claude.
+- The operator authorized personal Muse sync. A backup and unchanged-source check preceded the
+  provider-only write; parsed comparison verified every other provider stayed unchanged.
+- Read-only GET /providers/muse/models/advanced against the running localhost Runtime returned
+  the four corrected menus, no declared effort defaults, and no warnings. No restart was needed
+  for this check. No installed Desktop visual smoke or provider inference was performed.
 
 ## Fixtures
 

@@ -109,8 +109,8 @@ const MUSE_TOOL_ALIASES: Record<string, string> = {
 };
 
 /**
- * `--reasoning-effort` is a run-wide argument on both `muse` and `muse exec`;
- * the accepted levels do not vary per model the way Grok's do.
+ * Parser vocabulary recorded from `muse exec --help`. This is not a model's
+ * picker menu: curated per-model options constrain structured selections.
  */
 export const MUSE_REASONING_EFFORTS = [
   'none',

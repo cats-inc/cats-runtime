@@ -1,0 +1,14 @@
+Operator correction, 2026-09-18. CLI version not re-observed.
+Muse Spark 1.3 and 1.3 contributor: complete effort menus, no default
+  minimal
+  low
+  medium
+  high
+  xhigh
+  max
+Muse Spark 1.2 and 1.2 contributor: complete effort menus, no default
+  minimal
+  low
+  medium
+  high
+  xhigh

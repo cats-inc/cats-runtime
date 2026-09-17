@@ -100,6 +100,64 @@ function createCatsUI() {
 }
 
 describe('shared playground selection helpers', () => {
+  it('renders each Muse effort menu without defaults and persists first/saved selections', () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-muse-playground-'));
+    try {
+      const catsUI = createCatsUI();
+      const target = { providerName: 'muse', backend: 'cli' as const,
+        instanceId: 'native', defaultTarget: true };
+      const { catalog } = buildProviderAdvancedKnowledge(target, {
+        provider: 'muse', backend: 'cli', instance: 'native', defaultModel: null,
+        source: 'static', cache: null, models: getStaticProviderModels(target), warnings: [],
+      }, { env: createRuntimeTestEnv(root, {
+        CATS_RUNTIME_PACKAGE_ROOT: fileURLToPath(new URL('../../../', import.meta.url)),
+      }) });
+      const html = readFileSync(fileURLToPath(new URL('./pages/playground.html', import.meta.url)), 'utf8');
+      const start = html.indexOf('function renderAgentModelControls(');
+      const end = html.indexOf('\nfunction ', start + 1);
+      const controls = { innerHTML: '' };
+      const context = { window: { CatsUI: catsUI }, escapeHtml: String,
+        div: { querySelector: () => controls }, catalog, entryId: '' };
+      vm.createContext(context);
+      vm.runInContext(html.slice(start, end), context);
+      for (const entry of catalog.entries) {
+        context.entryId = entry.id;
+        vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
+        expect(controls.innerHTML).not.toMatch(/default/i);
+        const expected = ['minimal', 'low', 'medium', 'high', 'xhigh',
+          ...(entry.id.includes('1.3') ? ['max'] : [])];
+        const options = [...controls.innerHTML.matchAll(/<option value="([^"]+)"[^>]*>([^<]+)<\/option>/g)]
+          .map(match => [match[1], match[2]]);
+        expect(options).toEqual(expected.map(value => [value, value]));
+        expect(controls.innerHTML).toContain('<option value="minimal" selected>minimal</option>');
+        const input = { provider: 'muse', selectableProviders: ['muse'], providerOrder: ['muse'],
+          advancedCatalogs: { muse: catalog },
+          modelSelection: { entryId: entry.id, entryMode: 'explicit' } };
+        // The form serializer, rather than metadata normalization, persists the
+        // displayed first value. Exercise it before any user effort change.
+        const readStart = html.indexOf('function readAgentModelControlValues(');
+        const readEnd = html.indexOf('\nfunction syncAgentPresetField(', readStart);
+        const formContext = { getProviderAdvancedCatalog: () => catalog, form: {
+          querySelector: (selector: string) => ({ value: ({ '.agent-provider': 'muse',
+            '.agent-entry-choice': entry.id } as Record<string, string>)[selector] || '' }),
+          querySelectorAll: () => [{
+            value: controls.innerHTML.match(/<option value="([^"]+)" selected>/)?.[1],
+            getAttribute: (name: string) => name === 'data-model-control-key'
+              ? 'muse.reasoning_effort' : 'enum',
+          }],
+        } };
+        const submitted = vm.runInNewContext(`${html.slice(readStart, readEnd)}\nreadAgentModelState(form)`, formContext);
+        expect(submitted.modelSelection.controls)
+          .toEqual({ 'muse.reasoning_effort': 'minimal' });
+        expect(catsUI.normalizePlaygroundAgentSelection({ ...input,
+          modelSelection: { ...input.modelSelection, controls: { 'muse.reasoning_effort': 'high' } },
+        }).modelSelection.controls).toEqual({ 'muse.reasoning_effort': 'high' });
+      }
+    } finally {
+      cleanupTempDirWithRetries(root);
+    }
+  });
+
   it('renders Grok model-specific effort in picker order without active or default markers', () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-grok-playground-'));
     try {
