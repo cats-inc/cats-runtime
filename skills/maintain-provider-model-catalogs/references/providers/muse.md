@@ -1,9 +1,10 @@
 # Meta Muse Catalog Evidence
 
-`muse` has no model-listing subcommand. `muse --help` shows no `models` entry, and `muse exec`
-cannot enumerate — so there is no CLI path to the catalog at all.
+The recorded Muse build has no model-listing subcommand. This limits noninteractive enumeration;
+it does not establish that the TUI lacks a model/effort picker. Use supplied picker evidence first.
 
-The one enumeration surface is the MSP host the CLI serves on stdio. Start `muse serve`, send the
+When model ids need verification, the recorded enumeration surface is the MSP host on stdio.
+Start `muse serve`, send the
 JSON-RPC `initialize` request, send the `initialized` notification, then call `model/list`. The
 `initialized` notification is required: without it `model/list` returns
 `{"code":-32600,"message":"Not initialized","data":{"kind":"notInitialized"}}`. Frames are
@@ -23,10 +24,17 @@ model whose own description says the session may be used for product improvement
 into content sharing. Leave the curated default unset unless the operator asks for a specific row;
 with no `--model` argument muse uses whatever the account already prefers.
 
-**The effort axis is provider-wide, not per model.** `--reasoning-effort` is a root argument on both
-`muse` and `muse exec`, and its help declares one list for every model. Unlike Grok, whose menu
-differs per model, muse's belongs in `shared_options` with no per-model override. Confirm the list
-against the current build's `muse exec --help` rather than copying it forward.
+**Effort menus are per model.** A global `--reasoning-effort` argument describes parser vocabulary,
+not the values or defaults shown for each model. Keep the operator's complete per-model menus in
+model `options`, including regular and contributor rows only where both were confirmed. Do not
+restore extra values or a help-derived default when refreshing model ids through MSP. Absence of a
+picker default means no curated/default label; the UI initializes to the first option and must
+persist that value for execution. Keep broader parser acceptance separate from menu metadata.
+
+The 2026-09-18 correction is recorded in `docs/research/2026-09-05-meta-muse-cli-probe.md`.
+Verify exact ordered values and absence of default metadata for every affected model through the
+loaded catalog and picker, including that a value available on one generation is rejected for
+another. Do not validate only the union of all values or an inline copy of the expected YAML.
 
 Never verify a muse build by running the tool as part of catalog work. The installed entry point is
 a launcher that forwards every argument to the agent binary, so an unrecognised flag opens the

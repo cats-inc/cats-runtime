@@ -169,8 +169,8 @@ authorizes that external mutation.
   mappings, and first-item selection that reaches the execution arguments.
 - [Kiro](./references/providers/kiro.md): authenticated, account-gated model listing and effort.
 - [Kilo](./references/providers/kilo.md): distinguish the gateway catalog from the picker.
-- [Muse](./references/providers/muse.md): no CLI listing at all; the catalog comes from
-  `model/list` over the MSP host, and its `isDefault` must not be copied into curated YAML.
+- [Muse](./references/providers/muse.md): MSP model-id enumeration versus per-model picker efforts;
+  global help is not a menu, and MSP `isDefault` must not be copied into curated YAML.
 
 For providers without a reference, inspect the current adapter, discovery helper, catalog notes,
 and retained evidence. Add a provider reference only when a stable, non-obvious procedure is proven;

@@ -4,7 +4,8 @@ Use this reference for every refresh, review, or audit.
 
 ## Evidence priority
 
-When sources conflict, prefer:
+Compare evidence for the same field, model/option path, version, and account scope. Within that
+scope, prefer:
 
 1. account-resolved machine-readable enumeration from the installed CLI;
 2. operator-pasted output from the authenticated interactive picker;
@@ -14,6 +15,11 @@ When sources conflict, prefer:
 Vendor documentation may explain how to obtain evidence, but it does not replace account-resolved
 evidence for entitlement-, rollout-, region-, or account-dependent catalogs. Never fill ids,
 labels, defaults, limits, or options from model memory.
+
+An enumeration of model ids does not establish their effort menus. Global help/parser enums and
+defaults do not override a complete per-model picker observation. An explicit operator correction
+settles the named scope: record it as superseding the earlier inference, remove the faulty rule
+from provider guidance, and do not ask the same question again. Keep unrelated older provenance.
 
 Record for each observation:
 

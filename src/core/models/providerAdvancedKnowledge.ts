@@ -314,9 +314,8 @@ function fallbackGrokEffortDescription(
   }
 }
 
-// muse takes one provider-wide effort list on `--reasoning-effort`; unlike
-// Grok's, the menu does not vary per model, so the tokens are accepted verbatim
-// and the label spellings a curator might paste are folded onto them.
+// Normalize CLI tokens independently of menu availability. The curated options
+// decide which values each model exposes; global CLI help is only parser vocabulary.
 function normalizeMuseEffortValue(
   value: string | undefined,
 ): ProviderAdvancedControlValue | null {
@@ -941,10 +940,8 @@ function buildCuratedMuseCliOverlay(
     return null;
   }
 
-  // Same shape as Grok: the effort token is a separate CLI argument rather than
-  // part of the model id. It differs in where the menu lives - muse publishes
-  // one list for every model, so the curated entry carries it in
-  // shared_options and every model resolves to the same axis.
+  // The effort token is a separate CLI argument. Resolve each model's observed
+  // menu independently; generations can expose different values and no default.
   const entriesById: Record<string, CuratedEntryMetadata> = {};
   const effortOptions = new Map<string, CuratedModelCatalogOption>();
   const warnings: string[] = [];

@@ -129,7 +129,7 @@ describe('MuseProvider', () => {
     })).toThrow(/cannot fork/i);
   });
 
-  it('passes the curated reasoning effort through as --reasoning-effort', () => {
+  it('passes accepted parser tokens through as --reasoning-effort independently of picker menus', () => {
     for (const effort of MUSE_REASONING_EFFORTS) {
       const provider = new MuseProvider(VERIFIED_PROFILE);
       provider.prepareEphemeralTurn({ message: 'Say hi' });
