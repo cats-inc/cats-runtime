@@ -1,0 +1,14 @@
+Copilot v1.0.85
+
+GPT-5.6 Terra (default)  400K       Medium
+Claude Sonnet 5          264K       Medium
+Gemini 3.8 Flash         266K       Medium
+Grok 4.6                 328K       Medium
+GPT-5.6 Luna             328K       Medium
+Kimi K3                  —          High
+
+Context is informational and not adjustable in the observed picker.
+Operator confirmed six fixed model + effort combos.
+
+Operator supplied the actual Copilot session selection confirmation:
+Model changed from Auto to gemini-3.8-flash (medium) for this session

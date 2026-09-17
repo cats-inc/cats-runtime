@@ -67,7 +67,9 @@ approved shortlist. Complete upstream evidence and complete coverage of a select
 different claims and must remain distinguishable.
 
 **Implementation status:** Cursor's six fixed combos and custom input are implemented as recorded
-in [the Cursor evidence note](../research/2026-09-17-cursor-fixed-presets.md). The owner explicitly
+in [the Cursor evidence note](../research/2026-09-17-cursor-fixed-presets.md).
+The subsequently approved Copilot six-model shortlist, fixed efforts and custom input are recorded
+in [the Copilot evidence note](../research/2026-09-17-copilot-fixed-presets.md). The owner explicitly
 chose to specify other shortlists later. No other model membership or order, catalog removal,
 UI enforcement change, automated refresh job, or periodic refresh interval is authorized by this
 amendment. Custom input already has a Desktop implementation; empty-catalog reachability and

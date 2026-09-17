@@ -280,6 +280,12 @@ export function normalizeCopilotModelName(
   }
 
   const knownIds = new Set([
+    'gpt-5.6-terra',
+    'claude-sonnet-5',
+    'gemini-3.8-flash',
+    'grok-4.6',
+    'gpt-5.6-luna',
+    'kimi-k3',
     'gpt-5.4',
     'gpt-5.3-codex',
     'gpt-5.2-codex',
@@ -300,6 +306,18 @@ export function normalizeCopilotModelName(
   }
 
   switch (normalized) {
+    case 'gpt-5.6 terra':
+      return 'gpt-5.6-terra';
+    case 'claude sonnet 5':
+      return 'claude-sonnet-5';
+    case 'gemini 3.8 flash':
+      return 'gemini-3.8-flash';
+    case 'grok 4.6':
+      return 'grok-4.6';
+    case 'gpt-5.6 luna':
+      return 'gpt-5.6-luna';
+    case 'kimi k3':
+      return 'kimi-k3';
     case 'gpt-5.4 mini':
       return 'gpt-5.4-mini';
     case 'gpt-5 mini':

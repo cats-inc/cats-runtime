@@ -292,7 +292,7 @@ describe('curatedModelCatalog', () => {
       });
 
       expect(result.warnings).toEqual([]);
-      for (const providerName of ['copilot', 'kilo', 'kiro', 'junie']) {
+      for (const providerName of ['kilo', 'kiro', 'junie']) {
         const catalog = findCuratedCliCatalog(result.document, providerName);
         expect(catalog?.lastUpdated).toBe('2026-04-17');
         expect(catalog?.notes).toEqual(expect.arrayContaining([

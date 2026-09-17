@@ -409,7 +409,7 @@ const PROVIDER_MODELS = {
   claude:[{value:'opus',label:'Opus 5 with 1M context (default)'},{value:'fable',label:'Fable 5.1'},{value:'sonnet',label:'Sonnet 5'},{value:'haiku',label:'Haiku 4.5'}],
   codex:[{value:'gpt-6-astra',label:'gpt-6-astra (default)'},{value:'gpt-5.6-sol',label:'gpt-5.6-sol'},{value:'gpt-5.6-terra',label:'gpt-5.6-terra'},{value:'gpt-5.6-luna',label:'gpt-5.6-luna'},{value:'gpt-5.5',label:'gpt-5.5'}],
   antigravity:[{value:'gemini-3.8-flash-low',label:'Gemini 3.8 Flash'},{value:'gemini-3.7-flash-low',label:'Gemini 3.7 Flash'},{value:'gemini-3.6-flash-low',label:'Gemini 3.6 Flash'},{value:'gemini-3.1-pro-low',label:'Gemini 3.1 Pro'},{value:'claude-sonnet-4-6',label:'Claude Sonnet 4.6 (Thinking)'},{value:'claude-opus-4-6-thinking',label:'Claude Opus 4.6 (Thinking)'},{value:'gpt-oss-120b-medium',label:'GPT-OSS 120B (Medium)'}],
-  copilot:[{value:'gpt-5.4',label:'gpt-5.4 (default)'},{value:'claude-opus-4.6',label:'claude-opus-4.6'},{value:'gemini-3-pro-preview',label:'gemini-3-pro-preview'}],
+  copilot:[{value:'gpt-5.6-terra',label:'GPT-5.6 Terra — Medium (default)'},{value:'claude-sonnet-5',label:'Claude Sonnet 5 — Medium'},{value:'gemini-3.8-flash',label:'Gemini 3.8 Flash — Medium'},{value:'grok-4.6',label:'Grok 4.6 — Medium'},{value:'gpt-5.6-luna',label:'GPT-5.6 Luna — Medium'},{value:'kimi-k3',label:'Kimi K3 — High'}],
   opencode:[{value:'opencode-go/glm-5',label:'opencode-go/glm-5 (default)'},{value:'opencode-go/kimi-k2.5',label:'opencode-go/kimi-k2.5'}],
   kilo:[{value:'kilo/openai/gpt-5.4',label:'kilo/openai/gpt-5.4 (default)'},{value:'kilo/openai/gpt-5.4-mini',label:'kilo/openai/gpt-5.4-mini'},{value:'kilo/anthropic/claude-sonnet-4.6',label:'kilo/anthropic/claude-sonnet-4.6'}],
   auggie:[{value:'gpt-5.4',label:'gpt-5.4 (default)'},{value:'claude opus 4.6',label:'claude opus 4.6'},{value:'sonnet 4.6',label:'sonnet 4.6'}],
@@ -457,7 +457,7 @@ function normalizeSelectableProvider(provider) {
   return selectable[0] || provider || '';
 }
 function normalizeAgentSelectionState(provider,model='',modelSelection=null,options={}) {
-  const allowLegacyModel=provider==='cursor'||options.allowLegacyModel===true;
+  const allowLegacyModel=(provider==='cursor'||provider==='copilot')||options.allowLegacyModel===true;
   const normalized=window.CatsUI?.normalizePlaygroundAgentSelection
     ? window.CatsUI.normalizePlaygroundAgentSelection({
       provider,
@@ -1448,7 +1448,7 @@ function readAgentModelControlValues(div){
 function readAgentModelState(div){
   const provider=div.querySelector('.agent-provider')?.value||'';
   const entryId=div.querySelector('.agent-entry-choice')?.value||'';
-  if(provider==='cursor'&&entryId==='__custom_model__'){
+  if((provider==='cursor'||provider==='copilot')&&entryId==='__custom_model__'){
     return { model:div.querySelector('.agent-custom-model')?.value.trim()||'', modelSelection:null };
   }
   const presetId=div.querySelector('.agent-preset-choice')?.value||'';
@@ -1583,10 +1583,10 @@ function renderAgentModelChoice(div){
   const entryId=entryEl.value||'';
   const selectedLabel=entryEl.selectedOptions?.[0]?.textContent?.trim()||'';
   const customGroup=div.querySelector('.agent-custom-model-group');
-  customGroup?.classList.toggle('hidden',provider!=='cursor'||entryId!=='__custom_model__');
-  if(provider==='cursor'){
+  customGroup?.classList.toggle('hidden',(provider!=='cursor'&&provider!=='copilot')||entryId!=='__custom_model__');
+  if(provider==='cursor'||provider==='copilot'){
     div.querySelector('.agent-mode-group')?.classList.add('hidden');
-    hintEl.textContent=entryId==='__custom_model__'?'Enter a Cursor model string.':selectedLabel;
+    hintEl.textContent=entryId==='__custom_model__'?'Enter a model string.':selectedLabel;
     renderAgentModelControls(div,null,'','');
     return;
   }
@@ -1645,9 +1645,9 @@ function syncAgentModelField(div,options={}){
   const basicModels=PROVIDER_MODELS[provider]||[];
   const providerCatalogPending=!providerOptionsReady&&(providerOptionsLoading||providerOptionsRequestId===0);
 
-  if(provider==='cursor'){
+  if(provider==='cursor'||provider==='copilot'){
     const choices=entries.length>0
-      ? entries.map(entry=>({value:entry.id,label:entry.label||entry.id}))
+      ? entries.map(entry=>({value:entry.id,label:window.CatsUI.formatAdvancedDefaultLabel(entry.label||entry.id,entry.default)}))
       : basicModels.map(entry=>({value:entry.value,label:entry.label||entry.value}));
     const requested=normalizedState.modelSelection?.entryId||normalizedState.model||'';
     const isCustom=(requested&&!choices.some(choice=>choice.value===requested))

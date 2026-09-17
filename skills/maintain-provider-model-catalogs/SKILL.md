@@ -23,7 +23,8 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
 - **Shortlists:** Cursor Agent, Goose, Junie, Devin, Kiro, GitHub Copilot, OpenCode, Kilo Code,
   Auggie, Pi, and Cline. Maintain at most six explicitly selected model entries per CLI, plus
   custom input. Effort remains attached to its model; the custom-input action is not a model slot.
-- Cursor's fixed shortlist is recorded in `docs/research/2026-09-17-cursor-fixed-presets.md`.
+- Approved fixed shortlists are recorded in `docs/research/2026-09-17-cursor-fixed-presets.md`
+  and `docs/research/2026-09-17-copilot-fixed-presets.md`.
   Other shortlist members/order are pending individual operator decisions. Do not truncate current
   catalogs or select the first six discovered models from this policy alone. These are product
   policy groups, not a substitute for deriving the registered inventory during an audit.
@@ -31,8 +32,9 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
   execution paths. Preserve backend-specific identifiers; this policy does not establish new
   adapter/API support or unknown model capabilities.
 
-Cursor implements its approved shortlist with fixed parameterized model strings; other shortlist
-rollouts remain pending. No scheduled refresh cadence or automated refresh job has been specified.
+Cursor uses fixed parameterized model strings; Copilot resolves fixed effort separately from its
+model id. Other shortlist rollouts remain pending. No scheduled refresh cadence or automated
+refresh job has been specified.
 
 ## Route the request
 
@@ -159,7 +161,8 @@ authorizes that external mutation.
   per-model effort, and existing Runtime/Desktop support; compiled extraction is a possible superset.
 - [Codex](./references/providers/codex.md): supplied picker evidence, existing per-model defaults,
   exact display labels, fallback locations, and focused Runtime/Desktop validation.
-- [Copilot](./references/providers/copilot.md): account-resolved interactive model list.
+- [Copilot](./references/providers/copilot.md): bounded `models.list` reads, picker/session evidence
+  for omitted rows, and fixed effort execution without editable controls.
 - [Cursor](./references/providers/cursor.md): exact parameterized variant strings, fixed-combination
   shortlists, refresh/custom-input preservation, and isolated discovery fixtures.
 - [Grok](./references/providers/grok.md): screenshot/transcription evidence, retained effort-token
