@@ -23,8 +23,10 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
 - **Shortlists:** Cursor Agent, Goose, Junie, Devin, Kiro, GitHub Copilot, OpenCode, Kilo Code,
   Auggie, Pi, and Cline. Maintain at most six explicitly selected model entries per CLI, plus
   custom input. Effort remains attached to its model; the custom-input action is not a model slot.
-- Approved fixed shortlists are recorded in `docs/research/2026-09-17-cursor-fixed-presets.md`
-  and `docs/research/2026-09-17-copilot-fixed-presets.md`.
+- Approved shortlists are recorded in `docs/research/2026-09-17-cursor-fixed-presets.md`,
+  `docs/research/2026-09-17-copilot-fixed-presets.md`,
+  `docs/research/2026-09-18-opencode-shortlist.md`, and
+  `docs/research/2026-09-18-kilo-shortlist.md`.
   Other shortlist members/order are pending individual operator decisions. Do not truncate current
   catalogs or select the first six discovered models from this policy alone. These are product
   policy groups, not a substitute for deriving the registered inventory during an audit.
@@ -33,8 +35,10 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
   adapter/API support or unknown model capabilities.
 
 Cursor uses fixed parameterized model strings; Copilot resolves fixed effort separately from its
-model id. Other shortlist rollouts remain pending. No scheduled refresh cadence or automated
-refresh job has been specified.
+model id; OpenCode uses provider-qualified model IDs without evidenced option controls; Kilo
+resolves approved fixed variants separately from the raw model ID. Other
+shortlist rollouts remain pending. No scheduled refresh cadence or automated refresh job has
+been specified.
 
 ## Route the request
 
@@ -168,9 +172,12 @@ authorizes that external mutation.
 - [Grok](./references/providers/grok.md): screenshot/transcription evidence, retained effort-token
   mappings, and first-item selection that reaches the execution arguments.
 - [Kiro](./references/providers/kiro.md): authenticated, account-gated model listing and effort.
-- [Kilo](./references/providers/kilo.md): distinguish the gateway catalog from the picker.
+- [Kilo](./references/providers/kilo.md): distinguish gateway mappings from the picker and
+  execution variants from display-only thinking flags.
 - [Muse](./references/providers/muse.md): MSP model-id enumeration versus per-model picker efforts;
   global help is not a menu, and MSP `isDefault` must not be copied into curated YAML.
+- [OpenCode](./references/providers/opencode.md): verbose ID/name enumeration, same-name provider
+  disambiguation, and entry-only shortlist wiring.
 
 For providers without a reference, inspect the current adapter, discovery helper, catalog notes,
 and retained evidence. Add a provider reference only when a stable, non-obvious procedure is proven;

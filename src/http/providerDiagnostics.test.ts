@@ -2763,6 +2763,8 @@ describe('provider diagnostics HTTP contract', () => {
   it('surfaces OpenCode live compatibility against the models subcommand seam', async () => {
     const rootDir = mkdtempSync(join(tmpdir(), 'cats-runtime-provider-opencode-live-'));
     try {
+      const catalogPath = join(rootDir, 'curated-model-catalogs.yaml');
+      writeFileSync(catalogPath, 'schema_version: 1\ncatalogs: []\n');
       const registry = new SessionRegistry();
       const pool = {
         getCapabilities: vi.fn(() => ({
@@ -2772,6 +2774,7 @@ describe('provider diagnostics HTTP contract', () => {
         })),
       } as unknown as WorkerPool;
       const config = makeConfig({
+        configPath: join(rootDir, 'providers.yaml'),
         sessionBaseDir: join(rootDir, 'sessions'),
         dataDir: join(rootDir, 'data'),
         providerCommands: {
@@ -2866,6 +2869,7 @@ describe('provider diagnostics HTTP contract', () => {
         now: () => Date.parse('2026-03-23T00:02:10.000Z'),
       });
       const providerModelCatalog = new ProviderModelCatalogService(config, {
+        env: { HOME: rootDir, USERPROFILE: rootDir },
         opencodeModelDiscoveryRunner: {
           run: vi.fn(async () => ({
             exitCode: 0,
@@ -2918,8 +2922,7 @@ describe('provider diagnostics HTTP contract', () => {
         config: expect.objectContaining({
           modelCatalog: expect.objectContaining({
             source: 'dynamic',
-            defaultModel: 'opencode-go/glm-5',
-            defaultModelStatus: 'available',
+            defaultModel: null,
             modelCount: 2,
             warnings: [],
           }),

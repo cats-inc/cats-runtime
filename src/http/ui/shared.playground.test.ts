@@ -11,8 +11,8 @@ import { SHARED_UI_SCRIPT } from './shared.js';
 import { buildProviderAdvancedKnowledge } from '../../core/models/providerAdvancedKnowledge.js';
 import { getStaticProviderModels } from '../../core/models/providerModelCatalog.js';
 
-describe.each(['cursor', 'copilot'])('%s fixed presets in Playground', (provider) => {
-  it('uses the same six parameterized fallbacks and preserves custom strings on reload', () => {
+describe.each(['cursor', 'copilot', 'opencode', 'kilo'])('%s shortlists in Playground', (provider) => {
+  it('uses the same six approved fallbacks and preserves custom strings on reload', () => {
     const html = readFileSync(fileURLToPath(new URL('./pages/playground.html', import.meta.url)), 'utf8');
     const array = html.match(new RegExp(`^  ${provider}:(\\[.*\\]),$`, 'm'))?.[1];
     expect(array).toBeDefined();
@@ -22,7 +22,7 @@ describe.each(['cursor', 'copilot'])('%s fixed presets in Playground', (provider
       value: id, label: `${label}${isDefault ? ' (default)' : ''}`,
     })));
     expect(fallback).toHaveLength(6);
-    expect(fallback.filter(entry => /default/i.test(entry.label))).toHaveLength(provider === 'cursor' ? 0 : 1);
+    expect(fallback.filter(entry => /default/i.test(entry.label))).toHaveLength(provider === 'copilot' ? 1 : 0);
     const catalog = {
       provider, backend: 'cli', instance: 'native', defaultModel: null,
       source: 'static', cache: null, entries: models, controls: [], presets: [],

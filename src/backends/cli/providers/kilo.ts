@@ -68,6 +68,8 @@ export class KiloProvider implements Provider {
         sessionId,
         content: compileRuntimeTurnPrompt(turn.message, turn),
         model: opts.model,
+        variant: typeof opts.modelControls?.['kilo.variant'] === 'string'
+          ? opts.modelControls['kilo.variant'] : undefined,
         signal: opts.signal,
       });
 

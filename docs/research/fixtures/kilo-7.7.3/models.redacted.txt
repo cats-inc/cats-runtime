@@ -1,0 +1,9 @@
+Kilo Code 7.7.3
+DeepSeek: DeepSeek V4.1 Flash
+Z.ai: GLM 5.3 Flash
+MoonshotAI: Kimi K3
+MiniMax: MiniMax M3
+ByteDance Seed: Seed 2.1 Turbo Thinking
+Google: Nano Banana Pro (Gemini 3 Pro Image) Thinking
+
+Operator: enable Thinking for the final two entries.

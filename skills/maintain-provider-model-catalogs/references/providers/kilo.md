@@ -13,3 +13,26 @@ Read `src/backends/cli/kilo/models.ts` and its tests before relying on parsed id
 ids separately from picker-visible labels. `--refresh` changes acquisition behavior, not evidence
 priority, and may require account/network access; obtain authorization before a credentialed or
 quota-bearing live call.
+
+## Fixed variants and native execution
+
+For an operator-selected shortlist, use gateway metadata only to fill missing ID/variant mappings.
+A selected subset does not re-scope the menu to the full gateway. Preserve exact names and explicit
+operator suffixes separately from raw IDs. Do not publish other discovered efforts or defaults.
+
+- Check installed help before acquiring evidence. A bounded `kilo models <provider> --verbose --pure`
+  read can expose ID/name pairs and each model's variants; retain only the relevant public fields.
+- `kilo run --thinking` displays thinking blocks. It does not enable a reasoning variant.
+  An observed `thinking` variant is an execution choice, separate from the model string.
+- Trace the Cats execution path: Kilo uses a native HTTP session service. A CLI flag alone is not
+  evidence that Cats sends the option. Verify the installed SDK/request shape; the native prompt
+  uses a top-level `variant` body property. Do not start a session to inspect this contract.
+- Reuse the typed single-value Variant option and fixed execution defaults for an approved combo.
+  Keep those defaults out of public editable controls and provider-default labels. Entries without
+  an operator-specified variant leave it unspecified; do not infer that they request thinking off.
+- Cover catalog resolution through the provider and final native request body, including both
+  specified and unspecified variants. Reuse shared shortlist rollout checks for UI/custom input.
+
+See [Kilo shortlist evidence](../../../../docs/research/2026-09-18-kilo-shortlist.md) for the bounded
+mapping capture and [catalog surfaces](../catalog-surfaces.md#new-shortlist-rollout-checks) for
+shared validation. Current model values belong in catalog/evidence data, not this procedure.

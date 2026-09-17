@@ -61,7 +61,6 @@ Follow [catalog surfaces](../catalog-surfaces.md). `src/core/models/cursorPreset
 bundled shortlist order, stale discovery snapshots, refresh, selection resolution, and adapter
 argv. Include the affected Playground form/helper and Desktop fallback/selection tests.
 
-Discovery tests that intentionally exercise an unrestricted list need their own temporary curated
-fixture and environment. They must not depend on a developer's personal override or the evolving
-bundled shortlist. Reuse passing checks for unchanged inputs; a docs/skill follow-up does not
-invalidate product validation. Distinguish argv/DOM checks from installed-app or live-model tests.
+Use the shared [new shortlist rollout checks](../catalog-surfaces.md#new-shortlist-rollout-checks)
+for isolated discovery fixtures and custom-input wiring. Distinguish argv/DOM checks from
+installed-app or live-model tests.
