@@ -8,7 +8,7 @@ effort, reasoning, thinking, and fast controls were explicitly declined for this
 
 | Order | Menu label | Fixed settings |
 |---|---|---|
-| 1 | Cursor Grok 4.6 | Extra High Fast |
+| 1 | Cursor Grok 4.6 | High Fast |
 | 2 | Composer 2.5 | Fast |
 | 3 | Claude Opus 5 | 300K High Thinking; Fast off |
 | 4 | GPT-5.6 Sol | 272K Medium; Fast off |
@@ -20,6 +20,37 @@ are no default markers. New selections start with the first entry; saved explici
 remain explicit. The owner corrected `Medium6` to `Medium` and explicitly included Thinking
 in the final Opus combination. Earlier proposals for adjustable effort or universal Fast-off
 were superseded by these fixed combinations.
+
+## 2026-09-18 High Fast revision
+
+The operator explicitly changed the first combination from Extra High Fast to High Fast and
+reconfirmed the other five rows. Refresh scope remains Cursor only, with confirm-uncertainty
+policy. The [revised shortlist](./fixtures/cursor-2026.09.15-d2fe57e/shortlist-2026-09-18.redacted.txt)
+preserves the operator's labels, order and fixed-combination policy.
+
+The retained 2026-09-17 account-resolved capture already contains the exact server variant
+`grok-4.6[effort=high,fast=true]`, with `effort=high` and `fast=true`. The
+[revised executable shortlist](./fixtures/cursor-2026.09.15-d2fe57e/selected-variants-2026-09-18.redacted.json)
+records that variant and its parameter definitions without recapturing the CLI. Original
+Extra High evidence below remains historical. Internal variant-default flags are not copied
+into Cats defaults; initial selection still uses the first entry without a default marker.
+
+Bundled YAML, Runtime/Playground/Desktop fallbacks and execution regression expectations follow
+the new tuple. Existing schema and normalization preserve it without behavioral changes.
+Prior authorization to sync the personal Cursor block applies to this revision; the pending
+Copilot MAI revision is preserved.
+
+Revision validation: seven focused Runtime catalog, normalization, fixed-preset and Playground
+files passed (81 tests); Runtime TypeScript and UI generation passed. The execution regression
+verifies the exact model string reaches `--model` as one argument. Source/test/fallback searches
+show no remaining old menu tuple outside historical evidence. The personal Cursor block was
+backed up as `.cursor-high-fast-2026-09-17T16-57-57.300Z.bak`, checked against the prepared
+file hash, and read back successfully. Parsed comparisons verified the other five Cursor rows
+and every other provider, including Copilot MAI, unchanged. No inference or installed Desktop
+smoke test was performed.
+
+Desktop revision validation also passed: the official UI test bundle, 44 focused
+selector/default/persistence/audience tests, renderer TypeScript and test TypeScript checks.
 
 ## Evidence and execution identifiers
 

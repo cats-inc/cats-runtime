@@ -1,0 +1,9 @@
+Operator revision, 2026-09-18 (Asia/Taipei). Continues the Copilot 1.0.85 shortlist.
+Replace GPT-5.6 Luna with MAI-Code-1.1-Flash; fixed model + effort combos retained.
+
+GPT-5.6 Terra (default)  400K       Medium
+Claude Sonnet 5          264K       Medium
+Gemini 3.8 Flash         266K       Medium
+Grok 4.6                 328K       Medium
+MAI-Code-1.1-Flash       —          Medium
+Kimi K3                  —          High

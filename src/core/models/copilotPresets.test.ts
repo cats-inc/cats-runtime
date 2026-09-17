@@ -15,7 +15,7 @@ const presets = [
   ['claude-sonnet-5', 'Claude Sonnet 5', 'medium'],
   ['gemini-3.8-flash', 'Gemini 3.8 Flash', 'medium'],
   ['grok-4.6', 'Grok 4.6', 'medium'],
-  ['gpt-5.6-luna', 'GPT-5.6 Luna', 'medium'],
+  ['mai-code-1.1-flash', 'MAI-Code-1.1-Flash', 'medium'],
   ['kimi-k3', 'Kimi K3', 'high'],
 ] as const;
 

@@ -285,6 +285,7 @@ export function normalizeCopilotModelName(
     'gemini-3.8-flash',
     'grok-4.6',
     'gpt-5.6-luna',
+    'mai-code-1.1-flash',
     'kimi-k3',
     'gpt-5.4',
     'gpt-5.3-codex',

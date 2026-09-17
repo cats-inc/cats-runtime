@@ -15,13 +15,45 @@ Only GPT-5.6 Terra carries an explicit upstream model default; no effort default
 | Claude Sonnet 5 | Medium | 264K | ID verified; implemented |
 | Gemini 3.8 Flash | Medium | 266K | ID and effort confirmed by session selection message |
 | Grok 4.6 | Medium | 328K | ID verified; implemented |
-| GPT-5.6 Luna | Medium | 328K | ID verified; implemented |
+| MAI-Code-1.1-Flash | Medium | — | Replaces Luna on 2026-09-18; ID and effort verified |
 | Kimi K3 | High | — | ID verified; implemented |
 
 Display labels preserve upstream case and append the fixed effort, for example
 `GPT-5.6 Terra — Medium (default)`. No context or effort selector is shown.
 The six-entry policy is a deliberate Cats shortlist, not an upstream completeness claim.
 All six selected entries are implemented, in the operator's order.
+
+## 2026-09-18 shortlist revision
+
+Refresh / Copilot only / confirm uncertainty. The operator explicitly replaced the fifth
+entry, GPT-5.6 Luna, with MAI-Code-1.1-Flash at fixed Medium and reconfirmed all six rows.
+Terra remains the sole model default; custom input and the other five combinations are unchanged.
+The original capture below remains historical evidence for the initial shortlist.
+
+- [Revised operator shortlist](./fixtures/copilot-1.0.85/shortlist-2026-09-18.redacted.txt).
+- [Targeted CLI metadata](./fixtures/copilot-1.0.85/mai-2026-09-18.redacted.json) confirms
+  `mai-code-1.1-flash`, the exact display name and `medium`. The installed CLI is still 1.0.85;
+  the bounded read used existing login without a session or prompt. The capture's UTC date is
+  September 17; the operator observation date in Asia/Taipei is September 18.
+- The approved combo stays fixed even though RPC also lists Low and High. The picker has no
+  context figure for MAI; RPC limits remain evidence only, without introducing a context choice.
+- Existing schema/normalization and fixed-effort resolution represent this revision without
+  behavior changes. Runtime, Playground and Desktop fallbacks are updated together. Prior
+  authorization to synchronize the personal Copilot block applies to this revision.
+
+Revision validation:
+
+- Six focused Runtime catalog, normalization, advanced-knowledge and Playground files:
+  80 tests passed, including the new model's resolved `--model` / `--effort` arguments and
+  zero catalog warnings. Runtime TypeScript and UI generation passed.
+- Desktop UI test bundle, 44 focused selector/default/persistence/audience tests and
+  renderer/test TypeScript checks passed for the revised shortlist.
+- Repository-wide old-ID searches confirm remaining Luna entries belong to Codex, historical
+  evidence or accepted raw-name normalization, not the Copilot menu.
+- The personal Copilot block was backed up and synchronized with hash-checked readback. Its
+  backup suffix is `.copilot-1.0.85-2026-09-17T16-22-36.952Z.bak`. Parsed comparisons confirm
+  all other providers unchanged in both the bundled example and personal file.
+- No installed Desktop or paid inference smoke was performed for this revision.
 
 ## Evidence
 
