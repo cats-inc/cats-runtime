@@ -183,6 +183,8 @@ backends:
           native:
             environment: native
             command: cursor-agent
+            # Fixed model combinations live in curated-model-catalogs.yaml;
+            # each complete bracket expression is passed as one --model value.
             runner: auto
             chats_dir: ~/.cursor/chats
 

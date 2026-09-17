@@ -2983,13 +2983,10 @@ backends:
                 metering: expectIdleMeteringSummary(),
                 modelCatalog: expect.objectContaining({
                   source: 'static',
-                  // The bundled curated example tracks `cursor-agent models`,
-                  // which marks `auto` as the default on 2026.08.11.
-                  defaultModel: 'auto',
+                  // The approved fixed shortlist has no upstream default.
+                  defaultModel: null,
                   modelCount: cursorStaticModelCount,
-                  warnings: [
-                    'Live model discovery is available for cursor/cli/ubuntu via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
-                  ],
+                  warnings: [],
                   statusCounts: {
                     configured: 0,
                     available: 0,
@@ -3049,13 +3046,10 @@ backends:
                 metering: expectIdleMeteringSummary(),
                 modelCatalog: expect.objectContaining({
                   source: 'static',
-                  // The bundled curated example tracks `cursor-agent models`,
-                  // which marks `auto` as the default on 2026.08.11.
-                  defaultModel: 'auto',
+                  // Refresh preserves the shortlist instead of expanding discovery.
+                  defaultModel: null,
                   modelCount: cursorStaticModelCount,
-                  warnings: [
-                    'Live model discovery is available for cursor/cli/debian via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
-                  ],
+                  warnings: [],
                   statusCounts: {
                     configured: 0,
                     available: 0,

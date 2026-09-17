@@ -172,7 +172,7 @@ describe('curatedModelCatalog', () => {
     }
   });
 
-  it('bundled Cursor example marks Auto as the only default entry', () => {
+  it('bundled Cursor example contains six fixed combos without a default claim', () => {
     const runtime = createRuntimeRoot();
 
     try {
@@ -187,21 +187,18 @@ describe('curatedModelCatalog', () => {
       expect(result.warnings).toEqual([]);
 
       const catalog = findCuratedCliCatalog(result.document, 'cursor');
-      expect(catalog?.version).toBe('2026.08.11-e8db854');
-      expect(catalog?.lastUpdated).toBe('2026-08-26');
-      // `name` is the raw `cursor-agent --model` id, matching the identities the
-      // dynamic `--list-models` path produces; `label` is the picker text.
-      expect(catalog?.models?.slice(0, 2)).toEqual([
-        { name: 'auto', label: 'Auto', default: true },
-        { name: 'gpt-5.3-codex-low', label: 'Codex 5.3 Low' },
-      ]);
-      expect(catalog?.models?.filter((model) => model.default).map((model) => model.name))
-        .toEqual(['auto']);
-      // Cursor's Anthropic id scheme changed at 4.7; both spellings must survive
-      // verbatim rather than being re-derived from the label.
-      const cursorIds = catalog?.models?.map((model) => model.name) ?? [];
-      expect(cursorIds).toContain('claude-4.6-opus-high');
-      expect(cursorIds).toContain('claude-opus-4-7-low');
+      expect(catalog?.version).toBe('2026.09.15-d2fe57e');
+      expect(catalog?.lastUpdated).toBe('2026-09-17');
+      expect(catalog?.selectionMode).toBe('shortlist');
+      expect(catalog?.models).toHaveLength(6);
+      expect(catalog?.models?.[0]).toEqual({
+        name: 'grok-4.6[effort=xhigh,fast=true]',
+        label: 'Cursor Grok 4.6 — Extra High Fast',
+      });
+      expect(catalog?.models?.every(model => model.default === undefined && !model.options)).toBe(true);
+      expect(catalog?.models?.map(model => model.name)).toContain(
+        'claude-opus-5[thinking=true,context=300k,effort=high,fast=false]',
+      );
     } finally {
       runtime.cleanup();
     }

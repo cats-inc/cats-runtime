@@ -294,11 +294,12 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'Grok 4.1 Fast Reasoning', label: 'Grok 4.1 Fast Reasoning' },
   ],
   cursor: [
-    { id: 'auto', label: 'Auto' },
-    { id: 'composer-2-fast', label: 'Composer 2 Fast', default: true },
-    { id: 'gpt-5.4-medium', label: 'GPT-5.4 1M' },
-    { id: 'claude-4.6-opus-high-thinking', label: 'Opus 4.6 1M Thinking' },
-    { id: 'gemini-3-flash', label: 'Gemini 3 Flash' },
+    { id: 'grok-4.6[effort=xhigh,fast=true]', label: 'Cursor Grok 4.6 — Extra High Fast' },
+    { id: 'composer-2.5[fast=true]', label: 'Composer 2.5 — Fast' },
+    { id: 'claude-opus-5[thinking=true,context=300k,effort=high,fast=false]', label: 'Claude Opus 5 — 300K High Thinking' },
+    { id: 'gpt-5.6-sol[context=272k,reasoning=medium,fast=false]', label: 'GPT-5.6 Sol — 272K Medium' },
+    { id: 'gemini-3.8-flash[reasoning_effort=high]', label: 'Gemini 3.8 Flash — High' },
+    { id: 'muse-spark-1.3[context=300k,effort=high]', label: 'Muse Spark 1.3 — 300K High' },
   ],
   goose: [
     { id: 'openai/gpt-5-codex', label: 'openai/gpt-5-codex', default: true },
@@ -919,6 +920,8 @@ export class ProviderModelCatalogService {
     target: ProviderTargetDescriptor,
   ): ProviderModelCatalogResult {
     this.assertTarget(target);
+    const shortlist = this.tryCuratedShortlistCatalog(target);
+    if (shortlist) return shortlist;
     const defaultModel = resolveDefaultModel(target, this.env);
     const warnings: string[] = [];
     const cachedDynamic = this.getCachedDynamicCatalog(target, defaultModel, warnings);
@@ -952,6 +955,8 @@ export class ProviderModelCatalogService {
     options: ProviderModelCatalogRequestOptions = {},
   ): Promise<ProviderModelCatalogResult> {
     this.assertTarget(target);
+    const shortlist = this.tryCuratedShortlistCatalog(target);
+    if (shortlist) return shortlist;
     const generation = this.generation;
     const defaultModel = resolveDefaultModel(target, this.env);
     const warnings: string[] = [];
@@ -968,6 +973,28 @@ export class ProviderModelCatalogService {
     }
 
     return this.buildStaticCatalog(target, defaultModel, warnings);
+  }
+
+  private tryCuratedShortlistCatalog(
+    target: ProviderTargetDescriptor,
+  ): ProviderModelCatalogResult | null {
+    if (target.backend !== 'cli') return null;
+    const loaded = loadCuratedModelCatalog({ runtimeConfig: this.config, env: this.env });
+    const curated = findCuratedCliCatalog(loaded.document, target.providerName);
+    if (curated?.selectionMode !== 'shortlist') return null;
+
+    // A refresh re-reads this operator-maintained menu. Live discovery, cached
+    // snapshots, and the CLI's current model must not expand the shortlist.
+    // Arbitrary model strings remain available through explicit custom input.
+    const warnings: string[] = [];
+    const models = buildCuratedStaticCliModels(target, this.config, this.env, warnings) ?? [];
+    return this.buildCatalog(target, {
+      defaultModel: models.find((model) => model.default)?.id ?? null,
+      source: 'static',
+      cache: null,
+      models,
+      warnings,
+    });
   }
 
   private cacheKey(target: ProviderTargetDescriptor): string {

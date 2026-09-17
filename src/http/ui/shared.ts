@@ -1098,6 +1098,16 @@ export const SHARED_UI_SCRIPT = `
     if (!entryId && model && entryIds.indexOf(model) >= 0) {
       entryId = model;
     }
+    // An explicit custom string is an execution choice, including parameter
+    // overrides. Do not replace it with a similar curated model on reload.
+    if (!entryId && model && options.allowLegacyModel === true) {
+      return { provider: provider, model: model, modelSelection: null };
+    }
+    if (!entryId && provider === 'cursor' && options.allowLegacyModel === true
+      && incomingSelection && incomingSelection.entryMode === 'explicit'
+      && typeof incomingSelection.entryId === 'string' && incomingSelection.entryId) {
+      return { provider: provider, model: incomingSelection.entryId, modelSelection: null };
+    }
     if (!entryId) {
       entryId = findClosestPlaygroundAdvancedEntry(catalog, model, incomingSelection);
     }

@@ -1,0 +1,459 @@
+{
+  "source": "Account-resolved parameterizedModels from the installed CLI model-list request; captured 2026-09-17 without inference.",
+  "version": "2026.09.15-d2fe57e",
+  "presets": [
+    {
+      "id": "grok-4.6[effort=xhigh,fast=true]",
+      "label": "Cursor Grok 4.6 — Extra High Fast",
+      "model": "grok-4.6",
+      "parameters": [
+        {
+          "id": "effort",
+          "value": "xhigh"
+        },
+        {
+          "id": "fast",
+          "value": "true"
+        }
+      ],
+      "parameterDefinitions": [
+        {
+          "id": "effort",
+          "name": "Effort",
+          "markdownTooltip": "Effort the model uses to generate its response.",
+          "parameterType": {
+            "enumParameter": {
+              "values": [
+                {
+                  "value": "low",
+                  "displayName": "Low",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "medium",
+                  "displayName": "Medium",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "high",
+                  "displayName": "High",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "xhigh",
+                  "displayName": "Extra High",
+                  "modelPickerBadges": []
+                }
+              ]
+            }
+          },
+          "isCycleableByHotkey": true
+        },
+        {
+          "id": "fast",
+          "name": "Fast",
+          "markdownTooltip": "Significantly faster but consumes more usage",
+          "parameterType": {
+            "booleanParameter": {
+              "values": [
+                {
+                  "value": "false"
+                },
+                {
+                  "value": "true",
+                  "displayName": "Fast​​",
+                  "increasesModelCost": true
+                }
+              ]
+            }
+          },
+          "isCycleableByHotkey": false
+        }
+      ],
+      "legacySlug": "cursor-grok-4.6-xhigh-fast"
+    },
+    {
+      "id": "composer-2.5[fast=true]",
+      "label": "Composer 2.5 — Fast",
+      "model": "composer-2.5",
+      "parameters": [
+        {
+          "id": "fast",
+          "value": "true"
+        }
+      ],
+      "parameterDefinitions": [
+        {
+          "id": "fast",
+          "name": "Fast",
+          "markdownTooltip": "Significantly faster but consumes more usage",
+          "parameterType": {
+            "booleanParameter": {
+              "values": [
+                {
+                  "value": "false"
+                },
+                {
+                  "value": "true",
+                  "displayName": "Fast",
+                  "increasesModelCost": true
+                }
+              ]
+            }
+          },
+          "isCycleableByHotkey": true
+        }
+      ],
+      "legacySlug": "composer-2.5-fast"
+    },
+    {
+      "id": "claude-opus-5[thinking=true,context=300k,effort=high,fast=false]",
+      "label": "Claude Opus 5 — 300K High Thinking",
+      "model": "claude-opus-5",
+      "parameters": [
+        {
+          "id": "thinking",
+          "value": "true"
+        },
+        {
+          "id": "context",
+          "value": "300k"
+        },
+        {
+          "id": "effort",
+          "value": "high"
+        },
+        {
+          "id": "fast",
+          "value": "false"
+        }
+      ],
+      "parameterDefinitions": [
+        {
+          "id": "thinking",
+          "name": "Thinking",
+          "markdownTooltip": "Does the model use thinking to generate its response?",
+          "parameterType": {
+            "booleanParameter": {
+              "values": [
+                {
+                  "value": "false"
+                },
+                {
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "context",
+          "name": "Context",
+          "markdownTooltip": "Context size the model has available.",
+          "parameterType": {
+            "enumParameter": {
+              "values": [
+                {
+                  "value": "300k",
+                  "displayName": "300K",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "1m",
+                  "displayName": "1M",
+                  "increasesModelCost": true,
+                  "modelPickerBadges": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "effort",
+          "name": "Effort",
+          "markdownTooltip": "Effort the model uses to generate its response.",
+          "parameterType": {
+            "enumParameter": {
+              "values": [
+                {
+                  "value": "low",
+                  "displayName": "Low",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "medium",
+                  "displayName": "Medium",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "high",
+                  "displayName": "High",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "xhigh",
+                  "displayName": "Extra High",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "max",
+                  "displayName": "Max",
+                  "modelPickerBadges": []
+                }
+              ]
+            }
+          },
+          "isCycleableByHotkey": true
+        },
+        {
+          "id": "fast",
+          "name": "Fast",
+          "markdownTooltip": "2x more expensive, but significantly faster speeds.",
+          "parameterType": {
+            "booleanParameter": {
+              "values": [
+                {
+                  "value": "false"
+                },
+                {
+                  "value": "true",
+                  "displayName": "Fast",
+                  "increasesModelCost": true
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "legacySlug": "claude-opus-5-thinking-high"
+    },
+    {
+      "id": "gpt-5.6-sol[context=272k,reasoning=medium,fast=false]",
+      "label": "GPT-5.6 Sol — 272K Medium",
+      "model": "gpt-5.6-sol",
+      "parameters": [
+        {
+          "id": "context",
+          "value": "272k"
+        },
+        {
+          "id": "reasoning",
+          "value": "medium"
+        },
+        {
+          "id": "fast",
+          "value": "false"
+        }
+      ],
+      "parameterDefinitions": [
+        {
+          "id": "context",
+          "name": "Context",
+          "markdownTooltip": "Context size the model has available.",
+          "parameterType": {
+            "enumParameter": {
+              "values": [
+                {
+                  "value": "272k",
+                  "displayName": "272K",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "1m",
+                  "displayName": "1M",
+                  "increasesModelCost": true,
+                  "modelPickerBadges": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "reasoning",
+          "name": "Reasoning",
+          "markdownTooltip": "Reasoning effort the model uses to generate its response.",
+          "parameterType": {
+            "enumParameter": {
+              "values": [
+                {
+                  "value": "none",
+                  "displayName": "None",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "low",
+                  "displayName": "Low",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "medium",
+                  "displayName": "Medium",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "high",
+                  "displayName": "High",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "xhigh",
+                  "displayName": "Extra High",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "max",
+                  "displayName": "Max",
+                  "modelPickerBadges": []
+                }
+              ]
+            }
+          },
+          "isCycleableByHotkey": true
+        },
+        {
+          "id": "fast",
+          "name": "Fast",
+          "markdownTooltip": "2x more expensive, but faster speeds.",
+          "parameterType": {
+            "booleanParameter": {
+              "values": [
+                {
+                  "value": "false"
+                },
+                {
+                  "value": "true",
+                  "displayName": "Fast",
+                  "increasesModelCost": true
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "legacySlug": "gpt-5.6-sol-medium"
+    },
+    {
+      "id": "gemini-3.8-flash[reasoning_effort=high]",
+      "label": "Gemini 3.8 Flash — High",
+      "model": "gemini-3.8-flash",
+      "parameters": [
+        {
+          "id": "reasoning_effort",
+          "value": "high"
+        }
+      ],
+      "parameterDefinitions": [
+        {
+          "id": "reasoning_effort",
+          "name": "Effort",
+          "markdownTooltip": "Effort the model uses to generate its response.",
+          "parameterType": {
+            "enumParameter": {
+              "values": [
+                {
+                  "value": "low",
+                  "displayName": "Low",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "medium",
+                  "displayName": "Medium",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "high",
+                  "displayName": "High",
+                  "modelPickerBadges": []
+                }
+              ]
+            }
+          },
+          "isCycleableByHotkey": true
+        }
+      ],
+      "legacySlug": "gemini-3.8-flash-high"
+    },
+    {
+      "id": "muse-spark-1.3[context=300k,effort=high]",
+      "label": "Muse Spark 1.3 — 300K High",
+      "model": "muse-spark-1.3",
+      "parameters": [
+        {
+          "id": "context",
+          "value": "300k"
+        },
+        {
+          "id": "effort",
+          "value": "high"
+        }
+      ],
+      "parameterDefinitions": [
+        {
+          "id": "context",
+          "name": "Context",
+          "markdownTooltip": "Context size the model has available.",
+          "parameterType": {
+            "enumParameter": {
+              "values": [
+                {
+                  "value": "300k",
+                  "displayName": "300K",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "1m",
+                  "displayName": "1M",
+                  "increasesModelCost": true,
+                  "modelPickerBadges": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "effort",
+          "name": "Effort",
+          "markdownTooltip": "Effort the model uses to generate its response.",
+          "parameterType": {
+            "enumParameter": {
+              "values": [
+                {
+                  "value": "minimal",
+                  "displayName": "Minimal",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "low",
+                  "displayName": "Low",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "medium",
+                  "displayName": "Medium",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "high",
+                  "displayName": "High",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "xhigh",
+                  "displayName": "Extra High",
+                  "modelPickerBadges": []
+                },
+                {
+                  "value": "max",
+                  "displayName": "Max",
+                  "modelPickerBadges": []
+                }
+              ]
+            }
+          },
+          "isCycleableByHotkey": true
+        }
+      ],
+      "legacySlug": "muse-spark-1.3-high"
+    }
+  ]
+}

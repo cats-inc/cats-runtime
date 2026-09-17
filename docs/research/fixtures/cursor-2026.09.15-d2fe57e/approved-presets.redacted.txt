@@ -1,0 +1,13 @@
+Operator-approved shortlist, 2026-09-17. Order and fixed combinations:
+Cursor Grok 4.6 — Extra High Fast
+Composer 2.5 — Fast
+Claude Opus 5 — 300K High Thinking
+GPT-5.6 Sol — 272K Medium
+Gemini 3.8 Flash — High
+Muse Spark 1.3 — 300K High
+
+Gemini Medium6 was confirmed to be Medium. All unlisted Fast switches are off.
+These are six selected combinations, not the complete upstream catalog.
+The operator chose fixed presets instead of separately adjustable parameters.
+No provider-default claim was approved.
+The operator clarified that commas only separated input fields; display labels join them with spaces.
