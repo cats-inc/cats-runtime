@@ -11,31 +11,33 @@ import { SHARED_UI_SCRIPT } from './shared.js';
 import { buildProviderAdvancedKnowledge } from '../../core/models/providerAdvancedKnowledge.js';
 import { getStaticProviderModels } from '../../core/models/providerModelCatalog.js';
 
-describe('Cursor fixed presets in Playground', () => {
+describe.each(['cursor', 'copilot'])('%s fixed presets in Playground', (provider) => {
   it('uses the same six parameterized fallbacks and preserves custom strings on reload', () => {
     const html = readFileSync(fileURLToPath(new URL('./pages/playground.html', import.meta.url)), 'utf8');
-    const array = html.match(/^  cursor:(\[.*\]),$/m)?.[1];
+    const array = html.match(new RegExp(`^  ${provider}:(\\[.*\\]),$`, 'm'))?.[1];
     expect(array).toBeDefined();
     const fallback = vm.runInNewContext(`(${array})`) as Array<{ value: string; label: string }>;
-    const models = getStaticProviderModels({ providerName: 'cursor', backend: 'cli' });
-    expect(fallback).toEqual(models.map(({ id, label }) => ({ value: id, label })));
+    const models = getStaticProviderModels({ providerName: provider, backend: 'cli' });
+    expect(fallback).toEqual(models.map(({ id, label, default: isDefault }) => ({
+      value: id, label: `${label}${isDefault ? ' (default)' : ''}`,
+    })));
     expect(fallback).toHaveLength(6);
-    expect(fallback.every(entry => !/default/i.test(entry.label))).toBe(true);
+    expect(fallback.filter(entry => /default/i.test(entry.label))).toHaveLength(provider === 'cursor' ? 0 : 1);
     const catalog = {
-      provider: 'cursor', backend: 'cli', instance: 'native', defaultModel: null,
+      provider, backend: 'cli', instance: 'native', defaultModel: null,
       source: 'static', cache: null, entries: models, controls: [], presets: [],
       defaultSelection: null, support: { tier: 'entry_only' }, warnings: [],
     };
     const catsUI = createCatsUI();
-    const input = { provider: 'cursor', selectableProviders: ['cursor'], providerOrder: ['cursor'],
-      advancedCatalogs: { cursor: catalog }, allowLegacyModel: true };
+    const input = { provider, selectableProviders: [provider], providerOrder: [provider],
+      advancedCatalogs: { [provider]: catalog }, allowLegacyModel: true };
     expect(catsUI.normalizePlaygroundAgentSelection(input).modelSelection.entryId).toBe(models[0].id);
     const custom = 'claude-opus-5[thinking=false,context=1m,effort=max,fast=true]';
     expect(catsUI.normalizePlaygroundAgentSelection({ ...input, model: custom }))
-      .toEqual({ provider: 'cursor', model: custom, modelSelection: null });
+      .toEqual({ provider, model: custom, modelSelection: null });
     expect(catsUI.normalizePlaygroundAgentSelection({ ...input,
       modelSelection: { entryMode: 'explicit', entryId: 'gpt-5.4-medium' },
-    })).toEqual({ provider: 'cursor', model: 'gpt-5.4-medium', modelSelection: null });
+    })).toEqual({ provider, model: 'gpt-5.4-medium', modelSelection: null });
 
     // Read the actual form serializer: the custom action itself is never sent
     // as a catalog id and does not acquire structured preset controls.
@@ -43,9 +45,31 @@ describe('Cursor fixed presets in Playground', () => {
     const end = html.indexOf('\nfunction ', start + 1);
     const readState = vm.runInNewContext(`(${html.slice(start, end)})`) as (div: unknown) => unknown;
     expect(readState({ querySelector: (selector: string) => ({ value: ({
-      '.agent-provider': 'cursor', '.agent-entry-choice': '__custom_model__',
+      '.agent-provider': provider, '.agent-entry-choice': '__custom_model__',
       '.agent-custom-model': ` ${custom} `,
     } as Record<string, string>)[selector] }) })).toEqual({ model: custom, modelSelection: null });
+
+    // Exercise the actual fixed-combo menu path with Runtime metadata, not
+    // only the already-decorated offline labels. Copilot's default must survive.
+    const syncStart = html.indexOf('function syncAgentModelField(div,options={})');
+    const syncEnd = html.indexOf('\nfunction ', syncStart + 1);
+    let renderedChoices: Array<{ value: string; label: string }> = [];
+    const element = { value: '', classList: { remove() {}, add() {} } };
+    const syncField = vm.runInNewContext(`(${html.slice(syncStart, syncEnd)})`, {
+      window: { CatsUI: catsUI },
+      normalizeAgentSelectionState: () => ({ provider, model: '', modelSelection: null }),
+      renderAgentProviderSelectOptions: () => provider,
+      getProviderAdvancedCatalog: () => catalog,
+      listAgentCatalogEntries: () => catalog.entries,
+      PROVIDER_MODELS: { [provider]: fallback },
+      providerOptionsReady: true, providerOptionsLoading: false, providerOptionsRequestId: 1,
+      renderAgentRoutingSelectOptions: (_select: unknown, choices: typeof renderedChoices) => {
+        renderedChoices = choices;
+      },
+      syncAgentPresetField() {}, renderAgentModelChoice() {}, refreshAgentCardSummary() {},
+    }) as (div: unknown, options: unknown) => void;
+    syncField({ querySelector: () => element }, { preserve: false, provider });
+    expect(renderedChoices).toEqual([...fallback, { value: '__custom_model__', label: 'Custom model…' }]);
   });
 });
 

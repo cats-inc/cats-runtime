@@ -188,6 +188,7 @@ backends:
             runner: auto
             chats_dir: ~/.cursor/chats
 
+      # Copilot fixed shortlist efforts are passed as a separate --effort argument.
       copilot:
         instances:
           native:

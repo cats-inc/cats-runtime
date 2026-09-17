@@ -255,9 +255,12 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'muse-spark-1.2-contributor', label: 'muse-spark-1.2 (contributor)' },
   ],
   copilot: [
-    { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
-    { id: 'claude-opus-4.6', label: 'claude-opus-4.6' },
-    { id: 'gemini-3-pro-preview', label: 'gemini-3-pro-preview' },
+    { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra — Medium', default: true },
+    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 — Medium' },
+    { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash — Medium' },
+    { id: 'grok-4.6', label: 'Grok 4.6 — Medium' },
+    { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna — Medium' },
+    { id: 'kimi-k3', label: 'Kimi K3 — High' },
   ],
   opencode: [
     { id: 'opencode-go/glm-5', label: 'glm-5', default: true },

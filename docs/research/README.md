@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-09-17-copilot-fixed-presets](./2026-09-17-copilot-fixed-presets.md) | Copilot 1.0.85 fixed shortlist | Six fixed efforts, Terra default, custom input, models.list and session-selection ID evidence |
 | [2026-09-17-cursor-fixed-presets](./2026-09-17-cursor-fixed-presets.md) | Cursor six fixed combinations | Account-resolved parameter expressions, shortlist-preserving refresh, and custom model input |
 | [2026-09-17-grok-model-picker-refresh](./2026-09-17-grok-model-picker-refresh.md) | Grok Build 1.0.34 picker | Exact model/effort labels, seven executable combinations, first-item UI initialization without default or active markers |
 | [2026-09-16-antigravity-model-picker-refresh](./2026-09-16-antigravity-model-picker-refresh.md) | Antigravity 1.2.3 picker | Seven families with per-model effort, verified raw-id mapping and first-item initialization without default claims |

@@ -96,6 +96,10 @@ Also:
 
 ### Schedule validation once per relevant change
 
+- Resolve material model-id/option questions before expensive final builds when the answer changes
+  the catalog under test. While waiting, prepare evidence, implementation and focused checks of
+  independent behavior. A provisional subset is not a reason to run the full affected build matrix
+  twice; run the final consumer checks against the settled authorized data.
 - When PR/release work is authorized, inspect the intended base and integrate required upstream
   changes before the final local gate. Record the tree tested and expand package scripts once to
   see which commands already include typecheck/build/test; avoid stacking duplicate phases.
@@ -132,6 +136,10 @@ node --test --test-isolation=none build/test/provider-model-fields.test.js build
 Mounted selector tests must wait for catalog loading and initial target reconciliation before
 changing model/effort. Wait for the observable target/control state, not an arbitrary delay; an
 early change can be overwritten by initialization and produce a misleading default-selection failure.
+
+For a menu that renders fixed combinations, verify default labels after Runtime metadata loads as
+well as in the static fallback. Correct fallback text does not prove that a separate loaded-menu
+branch renders the model's `default` flag. Check the displayed default and submitted selection together.
 
 For first-item initialization, assert both the visible value and the emitted/persisted selection
 before any manual effort change, then verify the corresponding execution argument. A select can

@@ -1,0 +1,249 @@
+{
+  "source": "Installed Copilot 1.0.85 models.list (no session created)",
+  "observedAt": "2026-09-17T00:03:50.630Z",
+  "availableCount": 14,
+  "models": [
+    {
+      "id": "claude-sonnet-5",
+      "name": "Claude Sonnet 5",
+      "capabilities": {
+        "family": "claude-sonnet-5",
+        "limits": {
+          "max_context_window_tokens": 1000000,
+          "max_non_streaming_output_tokens": 16000,
+          "max_output_tokens": 64000,
+          "max_prompt_tokens": 936000,
+          "vision": {
+            "max_prompt_image_size": 3145728,
+            "max_prompt_images": 5,
+            "supported_media_types": [
+              "image/jpeg",
+              "image/png",
+              "image/webp",
+              "image/gif",
+              "application/pdf"
+            ]
+          }
+        },
+        "object": "model_capabilities",
+        "supports": {
+          "adaptive_thinking": "required",
+          "max_thinking_budget": 32000,
+          "min_thinking_budget": 1024,
+          "parallel_tool_calls": true,
+          "reasoning_effort": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "streaming": true,
+          "structured_outputs": true,
+          "tool_calls": true,
+          "vision": true,
+          "reasoningEffort": true
+        },
+        "tokenizer": "o200k_base",
+        "type": "chat"
+      },
+      "supportedReasoningEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "name": "GPT-5.6 Terra",
+      "capabilities": {
+        "family": "gpt-5.6-terra",
+        "limits": {
+          "max_context_window_tokens": 1050000,
+          "max_output_tokens": 128000,
+          "max_prompt_tokens": 922000,
+          "vision": {
+            "max_prompt_image_size": 3145728,
+            "max_prompt_images": 1,
+            "supported_media_types": [
+              "image/jpeg",
+              "image/png",
+              "image/webp",
+              "image/gif",
+              "application/pdf"
+            ]
+          }
+        },
+        "object": "model_capabilities",
+        "supports": {
+          "parallel_tool_calls": true,
+          "reasoning_effort": [
+            "none",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "streaming": true,
+          "structured_outputs": true,
+          "tool_calls": true,
+          "vision": true,
+          "adaptive_thinking": "unsupported",
+          "reasoningEffort": true
+        },
+        "tokenizer": "o200k_base",
+        "type": "chat"
+      },
+      "supportedReasoningEfforts": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "name": "GPT-5.6 Luna",
+      "capabilities": {
+        "family": "gpt-5.6-luna",
+        "limits": {
+          "max_context_window_tokens": 1050000,
+          "max_output_tokens": 128000,
+          "max_prompt_tokens": 922000,
+          "vision": {
+            "max_prompt_image_size": 3145728,
+            "max_prompt_images": 1,
+            "supported_media_types": [
+              "image/jpeg",
+              "image/png",
+              "image/webp",
+              "image/gif",
+              "application/pdf"
+            ]
+          }
+        },
+        "object": "model_capabilities",
+        "supports": {
+          "parallel_tool_calls": true,
+          "reasoning_effort": [
+            "none",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "streaming": true,
+          "structured_outputs": true,
+          "tool_calls": true,
+          "vision": true,
+          "adaptive_thinking": "unsupported",
+          "reasoningEffort": true
+        },
+        "tokenizer": "o200k_base",
+        "type": "chat"
+      },
+      "supportedReasoningEfforts": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "id": "kimi-k3",
+      "name": "Kimi K3",
+      "capabilities": {
+        "family": "kimi-k3",
+        "limits": {
+          "max_context_window_tokens": 1048576,
+          "max_output_tokens": 131072,
+          "max_prompt_tokens": 917504,
+          "vision": {
+            "max_prompt_image_size": 3145728,
+            "max_prompt_images": 1,
+            "supported_media_types": [
+              "image/jpeg",
+              "image/png",
+              "image/webp",
+              "image/gif"
+            ]
+          }
+        },
+        "object": "model_capabilities",
+        "supports": {
+          "parallel_tool_calls": true,
+          "reasoning_effort": [
+            "low",
+            "high",
+            "max"
+          ],
+          "streaming": true,
+          "structured_outputs": true,
+          "tool_calls": true,
+          "vision": true,
+          "adaptive_thinking": "unsupported",
+          "reasoningEffort": true
+        },
+        "tokenizer": "o200k_base",
+        "type": "chat"
+      },
+      "supportedReasoningEfforts": [
+        "low",
+        "high",
+        "max"
+      ]
+    },
+    {
+      "id": "grok-4.6",
+      "name": "Grok 4.6",
+      "capabilities": {
+        "family": "grok-4.6",
+        "limits": {
+          "max_context_window_tokens": 500000,
+          "max_output_tokens": 128000,
+          "max_prompt_tokens": 372000,
+          "vision": {
+            "max_prompt_image_size": 3145728,
+            "max_prompt_images": 1,
+            "supported_media_types": [
+              "image/jpeg",
+              "image/png"
+            ]
+          }
+        },
+        "object": "model_capabilities",
+        "supports": {
+          "parallel_tool_calls": true,
+          "reasoning_effort": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "streaming": true,
+          "structured_outputs": true,
+          "tool_calls": true,
+          "vision": true,
+          "adaptive_thinking": "unsupported",
+          "reasoningEffort": true
+        },
+        "tokenizer": "o200k_base",
+        "type": "chat"
+      },
+      "supportedReasoningEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    }
+  ]
+}

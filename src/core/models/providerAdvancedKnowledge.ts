@@ -1120,11 +1120,23 @@ function buildCuratedCopilotCliOverlay(
     return null;
   }
 
+  // In an operator-maintained shortlist, a single allowed effort is part of
+  // the fixed combo. Keep it in execution defaults, not in an editable menu.
+  const fixedEfforts: Record<string, Record<string, ProviderAdvancedControlValue>> = {};
+  if (catalog.selectionMode === 'shortlist') {
+    for (const [entryId, option] of effortOptions) {
+      if (option.values?.length !== 1) continue;
+      const effort = normalizeCopilotEffortValue(option.values[0]?.name);
+      if (effort === null) continue;
+      fixedEfforts[entryId] = { 'copilot.reasoning_effort': effort };
+      effortOptions.delete(entryId);
+    }
+  }
   const controlResult = buildCuratedCopilotCliControls(effortOptions);
   return {
     entriesById,
-    ...(controlResult.controls ? { controls: controlResult.controls } : {}),
-    entryDefaults: controlResult.entryDefaults,
+    controls: controlResult.controls ?? [],
+    entryDefaults: { ...controlResult.entryDefaults, ...fixedEfforts },
     warnings,
   };
 }
@@ -1807,6 +1819,15 @@ export function buildProviderAdvancedKnowledge(
         : manifestCatalog.defaultSelection,
     };
   }
+  // Fixed execution parameters are resolved internally. Public defaults must
+  // only contain controls clients are allowed to submit back to the runtime.
+  const editableKeys = new Set(manifestCatalog.controls.map((control) => control.key));
+  const publicDefaults = (values: Record<string, ProviderAdvancedControlValue> | undefined) => {
+    const entries = Object.entries(values ?? {}).filter(([key]) => editableKeys.has(key));
+    return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+  };
+  const { controls: defaultControls, ...defaultEntrySelection } = manifestCatalog.defaultSelection ?? {};
+  const publicDefaultControls = publicDefaults(defaultControls);
   const catalog: ProviderAdvancedCatalogResult = {
     provider: modelCatalog.provider,
     backend: modelCatalog.backend,
@@ -1816,13 +1837,16 @@ export function buildProviderAdvancedKnowledge(
     cache: modelCatalog.cache,
     entries: entries.map((entry) => ({
       ...entry,
-      ...(manifestCatalog.entryDefaults[entry.id]
-        ? { controlDefaults: cloneProviderControls(manifestCatalog.entryDefaults[entry.id]) }
+      ...(publicDefaults(manifestCatalog.entryDefaults[entry.id])
+        ? { controlDefaults: publicDefaults(manifestCatalog.entryDefaults[entry.id]) }
         : {}),
     })),
     presets: manifestCatalog.presets,
     controls: manifestCatalog.controls,
-    defaultSelection: manifestCatalog.defaultSelection,
+    defaultSelection: manifestCatalog.defaultSelection
+      ? { ...defaultEntrySelection, entryMode: manifestCatalog.defaultSelection.entryMode,
+          ...(publicDefaultControls ? { controls: publicDefaultControls } : {}) }
+      : null,
     support: buildVerifiedSupportMetadata(
       supportTier,
       manifest ? 'verified_manifest' : 'unverified_omitted',

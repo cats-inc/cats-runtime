@@ -36,7 +36,7 @@ schema_version: 1
 # 2026-09-16: Antigravity 1.2.3 picker families and effort controls refreshed;
 # execution ids retain the independent 1.1.24 enumeration provenance.
 # Every other entry keeps the provenance and date recorded in its own `notes`.
-# Copilot, Kilo, Kiro, and Junie had their versions re-probed but not their model
+# Kilo, Kiro, and Junie had their versions re-probed but not their model
 # lists - those CLIs either gate the list behind an account, expose it only in an
 # interactive picker, or publish a different artifact than the picker shows.
 #
@@ -404,77 +404,53 @@ catalogs:
         label: "Muse Spark 1.3 — 300K High"
 
   - cli: Copilot
-    version: 1.0.80
-    last_updated: 2026-04-17
+    version: 1.0.85
+    last_updated: 2026-09-17
+    selection_mode: shortlist
     notes:
-      - "Source: Copilot model picker output supplied by user"
-      - "2026-08-26: version re-probed as 1.0.80. Model list NOT re-verified - the CLI has no models subcommand, an invalid --model reports availability without enumerating, and the shipped app.js carries no catalog. The list is fetched per account at runtime and is only readable from the interactive /model picker. Entries below remain as of 2026-04-17."
-      - "2026-08-26: both effort option blocks re-verified verbatim against the shipped app.js bundle - all six option descriptions are unchanged."
-    providers:
-      - name: OpenAI
-        shared_options:
+      - "Operator-selected six fixed model/effort combos; this is a Cats shortlist, not a complete upstream catalog."
+      - "Source: docs/research/fixtures/copilot-1.0.85/picker.redacted.txt and selected-models.redacted.json (account-resolved models.list; no session or model turn)."
+      - "Gemini was absent from models.list; the operator confirmed its actual session selection as gemini-3.8-flash (medium). All six selected combinations are now mapped."
+      - "Only GPT-5.6 Terra was explicitly marked default. Single-value options encode operator-fixed effort, not upstream effort defaults. Custom strings remain available."
+      - "Picker context figures (400K, 264K, 266K, 328K, 328K, unknown) are informational and retained in the evidence, not selectable context settings or inferred token limits."
+    models:
+      - name: gpt-5.6-terra
+        label: "GPT-5.6 Terra — Medium"
+        default: true
+        options:
           - name: Reasoning effort
             values:
-              - name: Low
-                notes:
-                  - "Faster responses, less detailed reasoning"
               - name: Medium
-                notes:
-                  - "Balanced speed and reasoning depth"
-              - name: High
-                notes:
-                  - "More thorough reasoning, slower responses"
-            default: Medium
-        models:
-          - name: GPT-5.4
-            default: true
-
-          - name: GPT-5.3-Codex
-
-          - name: GPT-5.2-Codex
-            options:
-              - name: Reasoning effort
-                default: High
-
-          - name: GPT-5.2
-
-          - name: GPT-5.4 mini
-
-          - name: GPT-5 mini
-
-          - name: GPT-4.1
-            options: []
-
-      - name: Anthropic
-        shared_options:
-          - name: Effort Level
+      - name: claude-sonnet-5
+        label: "Claude Sonnet 5 — Medium"
+        options:
+          - name: Reasoning effort
             values:
-              - name: Low
-                notes:
-                  - "Minimal thinking, prioritizes speed"
               - name: Medium
-                notes:
-                  - "Balanced, thinks on harder problems"
+      - name: gemini-3.8-flash
+        label: "Gemini 3.8 Flash — Medium"
+        options:
+          - name: Reasoning effort
+            values:
+              - name: Medium
+      - name: grok-4.6
+        label: "Grok 4.6 — Medium"
+        options:
+          - name: Reasoning effort
+            values:
+              - name: Medium
+      - name: gpt-5.6-luna
+        label: "GPT-5.6 Luna — Medium"
+        options:
+          - name: Reasoning effort
+            values:
+              - name: Medium
+      - name: kimi-k3
+        label: "Kimi K3 — High"
+        options:
+          - name: Reasoning effort
+            values:
               - name: High
-                notes:
-                  - "Optimal performance, thorough thinking"
-            default: Medium
-        models:
-          - name: Claude Sonnet 4.6
-
-          - name: Claude Sonnet 4.5
-            options: []
-
-          - name: Claude Haiku 4.5
-            options: []
-
-          - name: Claude Opus 4.6
-
-          - name: Claude Opus 4.5
-            options: []
-
-          - name: Claude Sonnet 4
-            options: []
 
   - cli: Kilo
     version: 7.4.23
