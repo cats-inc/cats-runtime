@@ -1,3 +1,4 @@
+import { isDevinAcpModelTarget } from './devinModelCatalog.js';
 import type { ProviderTargetDescriptor } from '../providerCatalog.js';
 import type {
   ProviderAdvancedCatalogControl,
@@ -1726,7 +1727,7 @@ function loadCuratedOverlay(
   options: ProviderAdvancedKnowledgeBuildOptions,
 ): CuratedCatalogOverlay | null {
   if (
-    target.backend !== 'cli'
+    (target.backend !== 'cli' && !isDevinAcpModelTarget(target))
     || (
       target.providerName !== 'claude'
       && target.providerName !== 'codex'
@@ -1738,6 +1739,7 @@ function loadCuratedOverlay(
       && target.providerName !== 'junie'
       && target.providerName !== 'copilot'
       && target.providerName !== 'cursor'
+      && target.providerName !== 'devin'
     )
     || (!options.runtimeConfig && !options.env)
   ) {
@@ -1750,6 +1752,12 @@ function loadCuratedOverlay(
   });
   const overlay = (() => {
     switch (target.providerName) {
+      case 'devin': {
+        const catalog = findCuratedCliCatalog(result.document, 'devin');
+        return catalog?.models
+          ? buildCuratedEntryOnlyOverlay(catalog.cli, catalog.models, normalizeVerbatimCuratedModelId)
+          : null;
+      }
       case 'claude':
         return buildCuratedClaudeCliOverlay(result.document);
       case 'codex':

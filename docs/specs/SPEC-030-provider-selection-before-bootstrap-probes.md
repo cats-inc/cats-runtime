@@ -256,6 +256,13 @@ On an accepted change:
   fallback responses. Old results cannot make an unselected provider selectable.
 - Stop removed targets' watchers and pending background work; discard late probe
   results from older revisions. Reconcile added/retained workers by target.
+- In-flight passive diagnostics retry once against the new selection and cache.
+  Continued selection changes return a structured HTTP 409 without an internal
+  error stack. Explicit live probes are not automatically repeated.
+- Setup counts verified command-installation observations for native ACP
+  targets, including Devin, alongside CLI-backend installations. Its progress,
+  status and remediation use installation evidence rather than backend identity;
+  an installed command does not establish login, connection or model execution.
 - Preserve historical data. Deselecting a provider does not delete transcripts,
   credentials, binaries, or provider-owned files.
 - Retain completed setup observations separately from revision-scoped scan

@@ -1,4 +1,5 @@
 import { ANTIGRAVITY_MODELS } from './antigravityModelCatalog.js';
+import { DEVIN_MODELS, isDevinAcpModelTarget } from './devinModelCatalog.js';
 import {
   existsSync,
   mkdirSync,
@@ -233,9 +234,7 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
   // whatever the signed-in account has configured. Left empty rather than
   // bundling a one-account sample as a catalog.
   cline: [],
-  // `devin models list` enumerates 37 live families, but the runtime cannot
-  // execute Devin through the CLI backend, so no ids are bundled until the ACP
-  // path lands and can prove which of them are selectable from it.
+  // Devin execution/model selection is supported only by its ACP stdio target.
   devin: [],
   // Read 2026-09-05 from muse 1.0.3's own `model/list` over the MSP host it
   // serves on stdio (`muse serve`), which is the only enumeration surface the
@@ -660,8 +659,12 @@ export function summarizeProviderModelCatalog(
 }
 
 export function getStaticProviderModels(
-  target: Pick<ProviderTargetDescriptor, 'providerName' | 'cliInstance'>,
+  target: Pick<ProviderTargetDescriptor, 'providerName' | 'cliInstance'>
+    & Partial<Pick<ProviderTargetDescriptor, 'backend' | 'remoteInstance'>>,
 ): ProviderModelCatalogEntry[] {
+  if (isDevinAcpModelTarget(target)) {
+    return cloneModels(DEVIN_MODELS);
+  }
   if (target.providerName === 'kiro') {
     const runtimeMode = target.cliInstance?.commandConfig.runtime.mode;
     return cloneModels(runtimeMode === 'wsl' ? KIRO_WSL_MODELS : KIRO_NATIVE_MODELS);
@@ -736,7 +739,8 @@ function buildCuratedStaticCliModels(
   env: NodeJS.ProcessEnv,
   warnings: string[],
 ): ProviderModelCatalogEntry[] | null {
-  if (target.backend !== 'cli' || !supportsCuratedStaticCliCatalog(target.providerName)) {
+  if (!isDevinAcpModelTarget(target)
+    && (target.backend !== 'cli' || !supportsCuratedStaticCliCatalog(target.providerName))) {
     return null;
   }
 
@@ -985,7 +989,7 @@ export class ProviderModelCatalogService {
   private tryCuratedShortlistCatalog(
     target: ProviderTargetDescriptor,
   ): ProviderModelCatalogResult | null {
-    if (target.backend !== 'cli') return null;
+    if (target.backend !== 'cli' && !isDevinAcpModelTarget(target)) return null;
     const loaded = loadCuratedModelCatalog({ runtimeConfig: this.config, env: this.env });
     const curated = findCuratedCliCatalog(loaded.document, target.providerName);
     if (curated?.selectionMode !== 'shortlist') return null;

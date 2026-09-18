@@ -372,6 +372,8 @@ backends:
         instances:
           acp:
             command: devin
+            # Curated fixed model/effort IDs are applied after ACP new/load;
+            # no model here means the session keeps the provider-selected model.
             args: ['acp']
             # Devin's Windows ACP session bootstrap can exceed the generic
             # five-second stdio timeout even when the target is healthy.

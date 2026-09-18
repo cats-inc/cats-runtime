@@ -984,6 +984,16 @@ function providerObservationMap() {
   return new Map((latestSetupState?.observations || []).map((entry) => [selectionTargetKey(entry), entry]));
 }
 
+function supportsInstallationDetection(target, observed = providerObservationMap().get(selectionTargetKey(target))) {
+  if (target.backend === 'cli') return true;
+  // Native ACP commands (including Devin) have an installation check even
+  // though execution belongs to the agent backend. Gateway connections do not.
+  if (target.backend === 'agent' && (latestSetupState?.selection?.nativeSetupTargets || [])
+    .some((entry) => selectionTargetKey(entry) === selectionTargetKey(target))) return true;
+  return ['ready', 'missing_install', 'missing_path', 'misconfigured_command']
+    .includes(observed?.commandStatus);
+}
+
 function detectionResultMessage() {
   const { installedCount, attentionCount, unverifiedCount } = providerDetectionSummary();
   return `Installation detected for ${pluralize(installedCount, 'CLI')}. `
@@ -1002,7 +1012,7 @@ function showDetectionResult(title) {
 
 function showSelectionProgress() {
   const targets = latestSetupState?.selection?.targets || [];
-  const cliCount = targets.filter((target) => target.backend === 'cli').length;
+  const cliCount = targets.filter((target) => supportsInstallationDetection(target)).length;
   const detecting = selectionOperation === 'check';
   const title = detecting ? 'Detecting your selected providers'
     : selectionOperation === 'reload' ? 'Reloading your selection' : 'Applying your selection';
@@ -1119,7 +1129,9 @@ function updateProviderSelectionControls(selection = providerSelectionSummary())
     const pending = checkbox.checked !== saved;
     const row = checkbox.closest('.provider-selection-row');
     row.dataset.selected = String(checkbox.checked);
-    const detecting = selectionOperation === 'check' && saved && row.dataset.backend === 'cli';
+    const [provider, backend, instance] = JSON.parse(checkbox.value);
+    const detecting = selectionOperation === 'check' && saved
+      && supportsInstallationDetection({ provider, backend, instance });
     const processing = detecting || (selectionOperation === 'save' && (checkbox.checked || pending));
     row.dataset.processing = String(processing);
     const progress = row.querySelector('.setup-provider-progress');
@@ -2420,7 +2432,7 @@ function describeProviderObservation(target, observed) {
       detail: 'Configuration changed since the last detection. Use Detect Again to check the new configuration.',
     };
   }
-  if (target.backend !== 'cli') {
+  if (!supportsInstallationDetection(target, observed)) {
     return {
       ...unknown, label: 'Connection not checked',
       detail: 'Your choice is applied. This page does not yet check this provider\'s connection automatically.',
@@ -2465,7 +2477,7 @@ function setupInstructionsLink(url) {
 }
 
 function renderProviderGuidance(entry, observed) {
-  if (!observed || entry.backend !== 'cli') return '';
+  if (!observed || !supportsInstallationDetection(entry, observed)) return '';
   const steps = [...(observed.remediation || [])];
   const install = observed.install || entry.install;
   if (observed.commandStatus === 'missing_install' && !steps.some((step) => step.code === 'install_provider')) {
@@ -2494,7 +2506,7 @@ function renderUniverse(universe) {
     const observed = observations.get(key);
     const status = describeProviderObservation(entry, observed);
     const historical = observed?.configurationStatus === 'not_selected';
-    const authLabel = observed?.configurationStatus === 'unchanged' && observed.commandStatus === 'ready' && entry.backend === 'cli'
+    const authLabel = observed?.configurationStatus === 'unchanged' && status.installationDetected
       ? observed.authStatus === 'missing' ? 'Login required'
         : observed.authStatus === 'not_required' ? 'Login not required' : 'Login not verified'
       : '';

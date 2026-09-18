@@ -1,0 +1,7 @@
+Devin v3000.10.31
+Adaptive
+Claude Fable 5.1      Medium
+Gemini 3.8 Flash      Medium
+GPT-6 Astra           Medium
+Grok 4.6              Medium
+Nemotron 3 Ultra      High

@@ -603,3 +603,25 @@ catalogs:
       - name: GPT-5.4
 
       - name: Grok 4.1 Fast Reasoning
+
+  - cli: Devin
+    version: "3000.10.31"
+    last_updated: 2026-09-18
+    selection_mode: shortlist
+    notes:
+      - "Source: docs/research/2026-09-18-devin-shortlist.md and fixtures/devin-3000.10.31/."
+      - "Six operator-selected fixed combinations, not the complete upstream catalog. No model/effort default is claimed."
+      - "Effort is encoded in model_uid; Adaptive has no specified effort. Applied through agent/acp session/set_config_option."
+    models:
+      - name: adaptive
+        label: "Adaptive"
+      - name: claude-fable-5-1-medium
+        label: "Claude Fable 5.1 — Medium"
+      - name: gemini-3-8-flash-medium
+        label: "Gemini 3.8 Flash — Medium"
+      - name: gpt-6-astra-medium
+        label: "GPT-6 Astra — Medium"
+      - name: grok-4-6-medium
+        label: "Grok 4.6 — Medium"
+      - name: nemotron-3-ultra-high
+        label: "Nemotron 3 Ultra — High"
