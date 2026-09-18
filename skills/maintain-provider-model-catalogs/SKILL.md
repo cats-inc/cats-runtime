@@ -25,8 +25,9 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
   custom input. Effort remains attached to its model; the custom-input action is not a model slot.
 - Approved shortlists are recorded in `docs/research/2026-09-17-cursor-fixed-presets.md`,
   `docs/research/2026-09-17-copilot-fixed-presets.md`,
-  `docs/research/2026-09-18-opencode-shortlist.md`, and
-  `docs/research/2026-09-18-kilo-shortlist.md`.
+  `docs/research/2026-09-18-opencode-shortlist.md`,
+  `docs/research/2026-09-18-kilo-shortlist.md`, and
+  `docs/research/2026-09-18-devin-shortlist.md`.
   Other shortlist members/order are pending individual operator decisions. Do not truncate current
   catalogs or select the first six discovered models from this policy alone. These are product
   policy groups, not a substitute for deriving the registered inventory during an audit.
@@ -36,7 +37,8 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
 
 Cursor uses fixed parameterized model strings; Copilot resolves fixed effort separately from its
 model id; OpenCode uses provider-qualified model IDs without evidenced option controls; Kilo
-resolves approved fixed variants separately from the raw model ID. Other
+resolves approved fixed variants separately from the raw model ID; Devin uses executable variant
+UIDs containing the fixed effort on its agent/ACP target. Other
 shortlist rollouts remain pending. No scheduled refresh cadence or automated refresh job has
 been specified.
 
@@ -169,6 +171,8 @@ authorizes that external mutation.
   for omitted rows, and fixed effort execution without editable controls.
 - [Cursor](./references/providers/cursor.md): exact parameterized variant strings, fixed-combination
   shortlists, refresh/custom-input preservation, and isolated discovery fixtures.
+- [Devin](./references/providers/devin.md): family versus executable variant UIDs, bounded JSON
+  mapping evidence, ACP new/resume model application, and response-consumer validation.
 - [Grok](./references/providers/grok.md): screenshot/transcription evidence, retained effort-token
   mappings, and first-item selection that reaches the execution arguments.
 - [Kiro](./references/providers/kiro.md): authenticated, account-gated model listing and effort.
