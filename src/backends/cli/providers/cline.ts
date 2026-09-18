@@ -25,6 +25,7 @@ import {
 } from '../../../core/compatibility/providerEvolution.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
+import { CLINE_EFFORT_CONTROL, getClineFixedEffort } from '../../../core/models/clineModelCatalog.js';
 
 export const CLINE_JSON_PROFILE_ID = 'cline-cli-json-3.0.51';
 
@@ -114,9 +115,19 @@ export class ClineProvider implements Provider {
       '--cwd', opts.cwd,
     ];
 
-    const model = normalizeClineModelId(opts.model);
+    const model = opts.model?.trim();
     if (model) {
+      // ClinePass is a separate CLI provider; a qualified model alone does not
+      // select it. Other custom strings continue using the user's configured provider.
+      if (model.startsWith('cline-pass/')) args.push('--provider', 'cline-pass');
       args.push('--model', model);
+    }
+    const effort = opts.modelControls?.[CLINE_EFFORT_CONTROL] ?? getClineFixedEffort(model);
+    if (effort !== undefined) {
+      if (typeof effort !== 'string' || !['none', 'low', 'medium', 'high', 'xhigh'].includes(effort)) {
+        throw new Error('Unsupported Cline reasoning effort.');
+      }
+      args.push('--thinking', effort);
     }
 
     appendClinePermissionArgs(args, opts);
@@ -560,14 +571,6 @@ function appendClinePermissionArgs(args: string[], opts: ProviderSpawnOptions): 
   // it refuses each call with "Tool approval requires an interactive session",
   // lets the agent retry, and ends the run aborted.
   args.push('--auto-approve', opts.permissionMode === 'skip' ? 'true' : 'false');
-}
-
-function normalizeClineModelId(model?: string): string | undefined {
-  const trimmed = model?.trim();
-  if (!trimmed || trimmed === 'cline-default') {
-    return undefined;
-  }
-  return trimmed;
 }
 
 function buildFailedRunMessage(line: ClineStreamLine): string {

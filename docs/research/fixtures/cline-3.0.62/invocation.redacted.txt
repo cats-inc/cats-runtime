@@ -1,0 +1,7 @@
+Cline 3.0.62 --help (selected lines, local installed CLI)
+-P, --provider <id>  Provider id (default: cline)
+-m, --model <model-id>  Model to use for the session with the selected provider
+--thinking <level>  Set reasoning effort: none|low|medium|high|xhigh. Bare --thinking uses medium; omitted leaves provider default.
+
+Installed provider registry and models.js identify ClinePass as cline-pass.
+No inference request was sent. These observations establish argument/mapping support only.

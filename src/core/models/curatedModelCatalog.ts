@@ -30,7 +30,7 @@ const CURATED_PROVIDER_ALIASES: Record<string, string[]> = {
   codex: ['openai', 'codex'],
   antigravity: ['antigravity', 'agy', 'google', 'gemini'],
   grok: ['grok', 'xai', 'x.ai'],
-  cline: ['cline'],
+  cline: ['cline', 'clinepass', 'cline-pass'],
   devin: ['devin', 'cognition'],
   muse: ['muse', 'meta', 'meta ai'],
   kilo: ['kilo'],

@@ -1,0 +1,32 @@
+{
+  "cliVersion": "3.0.62",
+  "sourceClass": "installed-static-artifact",
+  "source": "@cline/llms@0.0.83/dist/models.js cline-pass block",
+  "scope": "Selected six mappings only; upstream catalog is a possible superset, not account entitlement evidence.",
+  "models": [
+    {
+      "id": "cline-pass/glm-5.3",
+      "name": "GLM-5.3"
+    },
+    {
+      "id": "cline-pass/kimi-k3",
+      "name": "Kimi K3"
+    },
+    {
+      "id": "cline-pass/qwen3.8-max",
+      "name": "cline-pass/qwen3.8-max"
+    },
+    {
+      "id": "cline-pass/deepseek-v4-pro",
+      "name": "DeepSeek V4 Pro"
+    },
+    {
+      "id": "cline-pass/minimax-m3",
+      "name": "MiniMax-M3"
+    },
+    {
+      "id": "cline-pass/mimo-v2.5-pro",
+      "name": "MiMo-V2.5-Pro"
+    }
+  ]
+}

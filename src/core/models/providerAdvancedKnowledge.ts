@@ -1,4 +1,5 @@
 import { isDevinAcpModelTarget } from './devinModelCatalog.js';
+import { CLINE_EFFORT_CONTROL, getClineFixedEffort } from './clineModelCatalog.js';
 import type { ProviderTargetDescriptor } from '../providerCatalog.js';
 import type {
   ProviderAdvancedCatalogControl,
@@ -1026,6 +1027,28 @@ function collectCuratedCopilotModel(
   }
 }
 
+function buildCuratedClineCliOverlay(
+  document: CuratedModelCatalogDocument | undefined,
+): CuratedCatalogOverlay | null {
+  const catalog = findCuratedCliCatalog(document, 'cline');
+  const scope = catalog && resolveCuratedCatalogScope(catalog, 'cline');
+  if (!catalog || !scope) return null;
+  const overlay = buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeVerbatimCuratedModelId);
+  if (!overlay || catalog.selectionMode !== 'shortlist') return overlay;
+
+  const entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>> = {};
+  for (const model of scope.models) {
+    const id = normalizeVerbatimCuratedModelId(model);
+    const option = resolveEffectiveCuratedModelOptions(scope.sharedOptions, model)
+      .find((candidate) => matchesCuratedOptionName(candidate, ['effort', 'reasoning effort']));
+    const effort = option?.values?.length === 1 ? option.values[0].name.toLowerCase() : undefined;
+    if (id && effort && ['none', 'low', 'medium', 'high', 'xhigh'].includes(effort)) {
+      entryDefaults[id] = { [CLINE_EFFORT_CONTROL]: effort };
+    }
+  }
+  return { ...overlay, entryDefaults, controls: [] };
+}
+
 function buildCuratedKiloCliOverlay(
   document: CuratedModelCatalogDocument | undefined,
 ): CuratedCatalogOverlay | null {
@@ -1648,6 +1671,22 @@ function buildGenericManifestResult(
 
 const VERIFIED_ADVANCED_MANIFESTS: VerifiedAdvancedManifest[] = [
   {
+    id: 'cline-cli-fixed-combos-v1',
+    version: '2026-09-18',
+    supportTier: 'entry_only',
+    evidenceRefs: ['docs/research/2026-09-18-cline-shortlist.md'],
+    matches: (target) => target.providerName === 'cline' && target.backend === 'cli',
+    build: (_target, entries) => {
+      const entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>> = {};
+      for (const entry of entries) {
+        const effort = getClineFixedEffort(entry.id);
+        if (effort) entryDefaults[entry.id] = { [CLINE_EFFORT_CONTROL]: effort };
+      }
+      return { controls: [], entryDefaults, presets: [],
+        defaultSelection: buildDefaultSelection(entries, [], entryDefaults) };
+    },
+  },
+  {
     id: 'codex-api-openai-v1',
     version: '2026-04-07',
     supportTier: 'full',
@@ -1740,6 +1779,7 @@ function loadCuratedOverlay(
       && target.providerName !== 'copilot'
       && target.providerName !== 'cursor'
       && target.providerName !== 'devin'
+      && target.providerName !== 'cline'
     )
     || (!options.runtimeConfig && !options.env)
   ) {
@@ -1752,6 +1792,8 @@ function loadCuratedOverlay(
   });
   const overlay = (() => {
     switch (target.providerName) {
+      case 'cline':
+        return buildCuratedClineCliOverlay(result.document);
       case 'devin': {
         const catalog = findCuratedCliCatalog(result.document, 'devin');
         return catalog?.models

@@ -119,9 +119,12 @@ Also:
   the catalog under test. While waiting, prepare evidence, implementation and focused checks of
   independent behavior. A provisional subset is not a reason to run the full affected build matrix
   twice; run the final consumer checks against the settled authorized data.
+- Before the first build/typecheck, expand the relevant package scripts once to avoid duplicate
+  phases. Runtime's `npm run typecheck` includes `build:ui`; after an unchanged successful UI
+  build, a direct `tsc --noEmit -p tsconfig.json` covers the remaining compiler phase. Report the
+  actual commands. Repeating the npm wrapper also repeats its child-process permission needs.
 - When PR/release work is authorized, inspect the intended base and integrate required upstream
-  changes before the final local gate. Record the tree tested and expand package scripts once to
-  see which commands already include typecheck/build/test; avoid stacking duplicate phases.
+  changes before the final local gate. Record the tree tested.
 - Follow the owning repository's Local Validation Scope for the final diff too. Commit/PR creation
   alone does not require a full local suite. Reuse passing checks with unchanged inputs; full local
   runs need the reasons defined by that policy. Required full CI/release gates still apply, and a
@@ -138,6 +141,10 @@ Also:
 - Quiet package/build tests can run synchronous subprocesses for minutes. Check process/log
   progress before interrupting; silence alone is not evidence of a hang. Prefer a reporter that
   emits failure details as they occur.
+- `runtime-ui-build.test.ts` checks both source/generated equality and unstaged Git changes in
+  `public/*.html`. If equality passes and only the latter fails, inspect and stage the intended
+  generated artifact as part of the normal change, then rerun that check alone. Do not change
+  the assertion, stage unrelated files, or rebuild/rerun passing product suites for that failure.
 - If only this skill's Markdown changes, validate frontmatter, links, diff, and discovery sync.
   Do not run product tests solely for prose edits or the later commit/PR step.
 - A Windows sandbox `spawn EPERM` before collection is a runner restriction, not a failed product
@@ -152,6 +159,15 @@ Report the endpoint and error; do not infer port occupation or a leftover Runtim
 If process cleanup is requested, inspect listeners and process identity before stopping anything.
 No listener or matching process means there is nothing identified to stop. Do not start a service
 merely to turn an unavailable optional live check into a pass.
+
+Before diagnosing a live catalog mismatch, identify the listener's executable and script path.
+An installed Desktop can serve its bundled Runtime on the same port used by checkout development;
+an empty or stale response from that process does not test the edited checkout. On Windows,
+`netstat -ano -p tcp` can identify the listener PID; inspect only that process's command line and
+keep private arguments out of evidence. If the installed bundle owns the port, explain that
+checkout verification requires closing that app and starting the checkout with `npm run dev`.
+Restarting the installed bundle does not load checkout edits. Use live checks only when useful;
+this diagnosis does not require stopping the user's app or starting another Runtime.
 
 ### Desktop iteration, only when its consumers change
 
