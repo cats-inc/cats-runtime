@@ -1,0 +1,13 @@
+Cline 3.0.62
+Provider: ClinePass
+
+GLM-5.3                 Medium
+Kimi K3                 Medium
+cline-pass/qwen3.8-max  Medium
+DeepSeek V4 Pro         Medium
+MiniMax-M3              Medium
+MiMo-V2.5-Pro           Medium
+
+Operator: Qwen label may accidentally be the raw model string.
+Confirmed: six fixed Medium combinations and ClinePass/effort execution support.
+Confirmed display projection: Qwen3.8 Max; executable ID remains cline-pass/qwen3.8-max.

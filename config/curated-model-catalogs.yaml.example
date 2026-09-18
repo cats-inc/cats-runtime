@@ -625,3 +625,30 @@ catalogs:
         label: "Grok 4.6 — Medium"
       - name: nemotron-3-ultra-high
         label: "Nemotron 3 Ultra — High"
+
+  - cli: Cline
+    version: "3.0.62"
+    last_updated: 2026-09-18
+    selection_mode: shortlist
+    notes:
+      - "Source: docs/research/2026-09-18-cline-shortlist.md and fixtures/cline-3.0.62/."
+      - "Six operator-selected ClinePass combinations with fixed Medium; not the complete upstream catalog. No provider default is claimed."
+      - "Qwen3.8 Max is an explicitly approved display projection of cline-pass/qwen3.8-max."
+      - "Execution uses --provider cline-pass --model <verbatim ID> --thinking medium."
+    shared_options:
+      - name: Effort
+        values:
+          - name: Medium
+    models:
+      - name: cline-pass/glm-5.3
+        label: "GLM-5.3 — Medium"
+      - name: cline-pass/kimi-k3
+        label: "Kimi K3 — Medium"
+      - name: cline-pass/qwen3.8-max
+        label: "Qwen3.8 Max — Medium"
+      - name: cline-pass/deepseek-v4-pro
+        label: "DeepSeek V4 Pro — Medium"
+      - name: cline-pass/minimax-m3
+        label: "MiniMax-M3 — Medium"
+      - name: cline-pass/mimo-v2.5-pro
+        label: "MiMo-V2.5-Pro — Medium"

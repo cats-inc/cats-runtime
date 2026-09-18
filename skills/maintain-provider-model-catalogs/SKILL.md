@@ -26,8 +26,9 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
 - Approved shortlists are recorded in `docs/research/2026-09-17-cursor-fixed-presets.md`,
   `docs/research/2026-09-17-copilot-fixed-presets.md`,
   `docs/research/2026-09-18-opencode-shortlist.md`,
-  `docs/research/2026-09-18-kilo-shortlist.md`, and
-  `docs/research/2026-09-18-devin-shortlist.md`.
+  `docs/research/2026-09-18-kilo-shortlist.md`,
+  `docs/research/2026-09-18-devin-shortlist.md`, and
+  `docs/research/2026-09-18-cline-shortlist.md`.
   Other shortlist members/order are pending individual operator decisions. Do not truncate current
   catalogs or select the first six discovered models from this policy alone. These are product
   policy groups, not a substitute for deriving the registered inventory during an audit.
@@ -38,9 +39,9 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
 Cursor uses fixed parameterized model strings; Copilot resolves fixed effort separately from its
 model id; OpenCode uses provider-qualified model IDs without evidenced option controls; Kilo
 resolves approved fixed variants separately from the raw model ID; Devin uses executable variant
-UIDs containing the fixed effort on its agent/ACP target. Other
-shortlist rollouts remain pending. No scheduled refresh cadence or automated refresh job has
-been specified.
+UIDs containing the fixed effort on its agent/ACP target; ClinePass uses explicit CLI provider
+selection plus a separate fixed thinking argument. Other shortlist rollouts remain pending.
+No scheduled refresh cadence or automated refresh job has been specified.
 
 ## Route the request
 
@@ -165,6 +166,8 @@ authorizes that external mutation.
   executable model ids, first-item initialization without default claims, and structured selection.
 - [Claude](./references/providers/claude.md): supplied picker fast path, alias/label projection,
   per-model effort, and existing Runtime/Desktop support; compiled extraction is a possible superset.
+- [Cline](./references/providers/cline.md): bounded installed ClinePass mappings, explicit provider
+  routing, fixed thinking arguments and consistent structured/plain-string execution.
 - [Codex](./references/providers/codex.md): supplied picker evidence, existing per-model defaults,
   exact display labels, fallback locations, and focused Runtime/Desktop validation.
 - [Copilot](./references/providers/copilot.md): bounded `models.list` reads, picker/session evidence

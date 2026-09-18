@@ -1,5 +1,6 @@
 import { ANTIGRAVITY_MODELS } from './antigravityModelCatalog.js';
 import { DEVIN_MODELS, isDevinAcpModelTarget } from './devinModelCatalog.js';
+import { CLINE_MODELS } from './clineModelCatalog.js';
 import {
   existsSync,
   mkdirSync,
@@ -230,10 +231,7 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'grok-4.6', label: 'Grok 4.6' },
     { id: 'grok-4.5', label: 'Grok 4.5' },
   ],
-  // Cline exposes no model-enumeration command; the only observed id is
-  // whatever the signed-in account has configured. Left empty rather than
-  // bundling a one-account sample as a catalog.
-  cline: [],
+  cline: CLINE_MODELS,
   // Devin execution/model selection is supported only by its ACP stdio target.
   devin: [],
   // Read 2026-09-05 from muse 1.0.3's own `model/list` over the MSP host it
@@ -678,6 +676,7 @@ function supportsCuratedStaticCliCatalog(providerName: string): boolean {
     || providerName === 'codex'
     || providerName === 'antigravity'
     || providerName === 'grok'
+    || providerName === 'cline'
     || providerName === 'kilo'
     || providerName === 'kiro'
     || providerName === 'junie'

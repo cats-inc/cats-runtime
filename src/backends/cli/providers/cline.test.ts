@@ -70,10 +70,10 @@ describe('ClineProvider', () => {
       .toThrow(/cannot enforce a tool allowlist/);
   });
 
-  it('passes an explicit model but drops the default sentinel', () => {
+  it('passes an explicit model and leaves omitted models to the provider', () => {
     expect(verifiedProvider().buildSpawnArgs({ cwd: '/work', model: 'anthropic/claude-opus-5' }))
       .toContain('anthropic/claude-opus-5');
-    expect(verifiedProvider().buildSpawnArgs({ cwd: '/work', model: 'cline-default' }))
+    expect(verifiedProvider().buildSpawnArgs({ cwd: '/work', model: ' ' }))
       .not.toContain('--model');
   });
 
