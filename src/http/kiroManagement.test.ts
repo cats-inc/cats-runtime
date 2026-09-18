@@ -302,9 +302,12 @@ describe('Kiro native session management', () => {
     });
     expect(body.source).toBe('static');
     expect(body.models).toEqual([
-      'claude-opus-4.6',
-      'deepseek-3.2',
-      'minimax-m2.1',
+      'claude-opus-5',
+      'claude-sonnet-5',
+      'gpt-5.6-sol',
+      'gpt-5.6-terra',
+      'gpt-5.6-luna',
+      'claude-haiku-4.5',
     ]);
   });
 

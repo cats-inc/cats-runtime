@@ -11,10 +11,11 @@ import { SHARED_UI_SCRIPT } from './shared.js';
 import { buildProviderAdvancedKnowledge } from '../../core/models/providerAdvancedKnowledge.js';
 import { getStaticProviderModels } from '../../core/models/providerModelCatalog.js';
 
-describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline'])('%s shortlists in Playground', (provider) => {
+describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'kiro'])('%s shortlists in Playground', (provider) => {
   it('uses the same six approved fallbacks and preserves custom strings on reload', () => {
     const html = readFileSync(fileURLToPath(new URL('./pages/playground.html', import.meta.url)), 'utf8');
-    const array = html.match(new RegExp(`^  ${provider}:(\\[.*\\]),$`, 'm'))?.[1];
+    const modelTable = html.slice(html.indexOf('const PROVIDER_MODELS ='), html.indexOf('const PROVIDERS ='));
+    const array = modelTable.match(new RegExp(`^  ${provider}:(\\[.*\\]),$`, 'm'))?.[1];
     expect(array).toBeDefined();
     const fallback = vm.runInNewContext(`(${array})`) as Array<{ value: string; label: string }>;
     const models = getStaticProviderModels({ providerName: provider,

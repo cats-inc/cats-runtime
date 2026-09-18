@@ -144,7 +144,7 @@ describe('curatedModelCatalogNormalization', () => {
     expect(normalizeKiloModelName('Unknown Kilo Model')).toBeNull();
   });
 
-  it('normalizes Kiro model names into runtime-owned catalog ids', () => {
+  it('preserves Kiro raw ids without an obsolete allowlist or case conversion', () => {
     expect(normalizeKiroCuratedModelId({ name: 'auto' })).toBe('auto');
     expect(normalizeKiroCuratedModelId({ name: 'claude-opus-4.6' })).toBe('claude-opus-4.6');
     expect(normalizeKiroCuratedModelId({ name: 'claude-sonnet-4.6' })).toBe('claude-sonnet-4.6');
@@ -153,7 +153,11 @@ describe('curatedModelCatalogNormalization', () => {
     expect(normalizeKiroCuratedModelId({ name: 'minimax-m2.5' })).toBe('minimax-m2.5');
     expect(normalizeKiroCuratedModelId({ name: 'glm-5' })).toBe('glm-5');
     expect(normalizeKiroCuratedModelId({ name: 'qwen3-coder-next' })).toBe('qwen3-coder-next');
-    expect(normalizeKiroCuratedModelId({ name: 'Unknown Kiro Model' })).toBeNull();
+    expect(normalizeKiroCuratedModelId({ name: 'claude-opus-5' })).toBe('claude-opus-5');
+    expect(normalizeKiroCuratedModelId({ name: 'gpt-5.6-terra' })).toBe('gpt-5.6-terra');
+    expect(normalizeKiroCuratedModelId({ name: ' Vendor/CaseSensitive.Model ', label: 'Display' }))
+      .toBe('Vendor/CaseSensitive.Model');
+    expect(normalizeKiroCuratedModelId({ name: ' ' })).toBeNull();
   });
 
   it('preserves Junie picker labels as literal curated ids', () => {

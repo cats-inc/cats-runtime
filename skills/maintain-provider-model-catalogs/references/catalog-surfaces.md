@@ -92,6 +92,10 @@ When a provider first adopts an approved shortlist, trace the existing path befo
   These paths can use provider-specific conditions: Desktop custom input or another provider's
   Playground behavior does not establish support for this provider. Test the first selection,
   actual six-plus-custom menu and saved custom string after refresh.
+- Scope Playground edits and source-based test extraction to `PROVIDER_MODELS`, not the first
+  occurrence of a provider key. The same key exists in the color table; a broad replacement and
+  an equally broad test can agree on the wrong table and leave the real menu unchanged. Check
+  the enclosing declaration and expected match count, preserving line-ending handling.
 - Classify service, HTTP and diagnostics tests by their catalog source. Unrestricted-discovery
   cases need an explicit empty/non-shortlist curated document in an isolated environment,
   including at server construction. A temporary home alone can still load the bundled example.
@@ -123,6 +127,10 @@ Also:
   phases. Runtime's `npm run typecheck` includes `build:ui`; after an unchanged successful UI
   build, a direct `tsc --noEmit -p tsconfig.json` covers the remaining compiler phase. Report the
   actual commands. Repeating the npm wrapper also repeats its child-process permission needs.
+- Check the current Tailwind inputs when page classes change: the existing UI builder scans
+  `public/**/*.html` before copying source pages there. A first build can therefore leave CSS
+  from the previous page. After HTML is synchronized, regenerate if necessary and inspect the
+  generated CSS delta; source/public HTML equality alone does not verify the CSS.
 - When PR/release work is authorized, inspect the intended base and integrate required upstream
   changes before the final local gate. Record the tree tested.
 - Follow the owning repository's Local Validation Scope for the final diff too. Commit/PR creation

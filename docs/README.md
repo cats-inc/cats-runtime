@@ -27,6 +27,9 @@ scheduled polling, verified account linkage and durable history remain deferred.
 
 ## Provider Detection
 
+[Kiro shortlist](./research/2026-09-18-kiro-shortlist.md) records the six raw model
+IDs, first-row initialization without default claims and custom input.
+
 [ClinePass shortlist](./research/2026-09-18-cline-shortlist.md) records six fixed Medium
 combinations, explicit provider routing and custom input.
 
