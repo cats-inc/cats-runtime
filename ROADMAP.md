@@ -1873,6 +1873,14 @@ follow-through on contract hardening, launch-truth hardening across the full
 
 #### Follow-through Checklist
 
+- [ ] Clarify Devin ACP sign-in failures (reported 2026-09-18, Desktop 0.3.1).
+  A signed-out CLI surfaced `E_PRECHECK_FAILED` with
+  `session/set_config_option failed: Resource not found`. Read-only CLI checks
+  reported `Not logged in`, and the operator confirmed execution worked after
+  `devin auth login`. Follow up in Runtime error normalization, with an actionable
+  sign-in message for Desktop/Playground. Require authentication evidence before
+  classifying the error; do not relabel every `Resource not found` or invalid-model
+  failure as a sign-in problem. Add regression coverage when implementing.
 - maintain the ACP support matrix defined in
   `docs/specs/SPEC-025-acp-agent-adapters-and-runtime-facade.md`, anchored to
   the runtime's existing provider families rather than to the full public ACP
