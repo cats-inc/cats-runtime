@@ -1340,6 +1340,15 @@ function buildToolMetadata(
   return Object.keys(details).length > 0 ? details : undefined;
 }
 
+function readAcpTextContent(value: unknown): string | undefined {
+  const content = parseRecord(value);
+  // ACP chunks carry a ContentBlock, including whitespace-only text deltas.
+  // readString rejects whitespace, which would corrupt word/line boundaries.
+  return content?.type === 'text' && typeof content.text === 'string'
+    ? content.text
+    : undefined;
+}
+
 function parseSessionUpdateEvents(
   input: AgentInvokeInput,
   providerSessionId: string,
@@ -1360,9 +1369,7 @@ function parseSessionUpdateEvents(
 
   const buildActiveState = () => buildProviderState(input, providerSessionId, 'active', adapterState);
   if (updateType === 'agent_message_chunk') {
-    const text = readString(update.content)
-      || readString(parseRecord(update.chunk)?.text)
-      || readString(parseRecord(update.delta)?.text);
+    const text = readAcpTextContent(update.content);
     return text
       ? [{
           type: 'text',
@@ -1373,9 +1380,7 @@ function parseSessionUpdateEvents(
   }
 
   if (updateType === 'agent_thought_chunk') {
-    const text = readString(update.content)
-      || readString(parseRecord(update.chunk)?.text)
-      || readString(parseRecord(update.delta)?.text);
+    const text = readAcpTextContent(update.content);
     return text
       ? [buildProgressEvent(
           input,
@@ -2188,8 +2193,9 @@ export class AcpAdapter implements AgentAdapter {
         }
       }
 
+      const profile = resolveAcpProviderProfile(input.instance);
       const sessionModeId = resolveAcpSessionModeId(
-        resolveAcpProviderProfile(input.instance),
+        profile,
         input.acpHost?.context.permissionMode,
         input.providerName,
       );
@@ -2197,6 +2203,17 @@ export class AcpAdapter implements AgentAdapter {
         await client.request('session/set_mode', {
           sessionId: providerSessionId,
           modeId: sessionModeId,
+        }, { timeoutMs: bootstrapTimeoutMs });
+      }
+
+      // Apply after both new and load: a launch-time default does not override
+      // a resumed session's saved model. Fixed effort is encoded in the id.
+      const model = input.model?.trim();
+      if (profile?.modelConfigId && model) {
+        await client.request('session/set_config_option', {
+          sessionId: providerSessionId,
+          configId: profile.modelConfigId,
+          value: model,
         }, { timeoutMs: bootstrapTimeoutMs });
       }
 

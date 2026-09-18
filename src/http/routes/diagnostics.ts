@@ -1,5 +1,6 @@
 import { isIP } from 'node:net';
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import type { BackendKind, RemoteProviderInstanceConfig } from '../../backends/cli/config.js';
 import { inspectAgentTarget } from '../../backends/agent/inspection.js';
 import { buildApiRuntimeExecutionStrategyCatalog } from '../../backends/api/runtime/strategies/catalog.js';
@@ -1695,6 +1696,32 @@ async function collectProviderDiagnostics(
   return { catalog, providers };
 }
 
+async function readCurrentProviderDiagnostics(
+  ctx: AppContext,
+  probeMode: DiagnosticsProbeMode,
+  read: () => Promise<ProviderDiagnosticsCollectionResult>,
+): Promise<ProviderDiagnosticsCollectionResult> {
+  // A setup save invalidates in-flight assessments and availability caches.
+  // Restart passive reads from the new selection, including the new cache map;
+  // never relabel an old snapshot or repeat an explicit live probe implicitly.
+  const attempts = probeMode === 'light' ? 2 : 1;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const revision = ctx.config.providerSelectionRevision;
+    try {
+      const result = await read();
+      if (revision === ctx.config.providerSelectionRevision) return result;
+    } catch (error) {
+      if (revision === ctx.config.providerSelectionRevision) throw error;
+    }
+  }
+  throw new HTTPException(409, {
+    res: Response.json({
+      error: 'Provider selection changed during diagnostics; retry with the current selection.',
+      code: 'provider_selection_changed',
+    }, { status: 409 }),
+  });
+}
+
 function getAvailabilityDiagnosticsCacheMap(
   ctx: AppContext,
 ): Map<string, AvailabilityDiagnosticsCacheEntry> {
@@ -1809,6 +1836,18 @@ function startAvailabilityDiagnosticsRefresh(
 }
 
 async function collectAvailabilityDiagnostics(
+  ctx: AppContext,
+  probeMode: DiagnosticsProbeMode,
+  env: Readonly<NodeJS.ProcessEnv>,
+  forceRefresh = false,
+  filters: ProviderDiagnosticsFilters = { defaultOnly: false, toolCatalogScope: 'catalog' },
+): Promise<ProviderDiagnosticsCollectionResult> {
+  return readCurrentProviderDiagnostics(ctx, probeMode, () => collectAvailabilityDiagnosticsSnapshot(
+    ctx, probeMode, env, forceRefresh, filters,
+  ));
+}
+
+async function collectAvailabilityDiagnosticsSnapshot(
   ctx: AppContext,
   probeMode: DiagnosticsProbeMode,
   env: Readonly<NodeJS.ProcessEnv>,
@@ -2375,7 +2414,7 @@ async function buildProviderDiagnosticsPayload(
       forceRefresh,
       filters,
     )
-    : await collectProviderDiagnostics(
+    : await readCurrentProviderDiagnostics(ctx, probeMode, () => collectProviderDiagnostics(
       ctx,
       probeMode,
       env,
@@ -2385,7 +2424,7 @@ async function buildProviderDiagnosticsPayload(
         includeArtifacts: true,
         compatibilityPurpose: 'diagnostics',
       },
-    );
+    ));
   const summary = summarizeProviderDiagnostics(catalog, providers, {
     queryHasFilters: hasProviderDiagnosticsFilters(filters),
   });

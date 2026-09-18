@@ -170,6 +170,11 @@ remember raw filesystem paths in order to clean up correctly.
 
 ## Open Questions
 
+- [ ] Resolve [Playground workspace retention](../research/2026-09-18-playground-workspace-retention.md)
+      with Platform: Stop Chat currently deletes room outputs, contrary to the
+      user's expectation. Review room ownership, explicit deletion and retention
+      together; this follow-up is not covered by the implemented slices above.
+
 - [ ] Should `preserve` remain an operator-only escape hatch, or become a
       first-class product option?
 - [ ] Which maintenance outcomes should become separate run-history events
@@ -187,4 +192,4 @@ remember raw filesystem paths in order to clean up correctly.
 
 *Created: 2026-03-24*
 *Author: Codex*
-*Last updated: 2026-03-24*
+*Last updated: 2026-09-18*

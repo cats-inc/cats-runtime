@@ -943,7 +943,17 @@ integrate against:
   - `guardrails`: configured thresholds/cooldowns plus currently active outcomes
 
 `GET /diagnostics/providers` returns the runtime-owned provider availability
-surface for hosts and dashboards. The response includes:
+surface for hosts and dashboards.
+
+Provider diagnostics and `GET /diagnostics/health` discard an in-flight result
+when the provider selection changes. Passive (`light`) reads retry once using
+the current selection and its cache. If selection changes again, the request
+returns HTTP 409 with `code: provider_selection_changed`; callers may read again.
+Explicit `live` probes return the same conflict without automatically repeating
+provider work. These expected conflicts do not log an internal-error stack, and
+unrelated failures retain their normal error handling.
+
+The response includes:
 
 - a truthful but operator-grade diagnostics payload; the current route still
   hydrates setup, compatibility, metering, config-inspection, and retained
@@ -4526,6 +4536,13 @@ When it is supported, each entry is imported into the session registry with
 `updatedAt` onto the runtime's `providerSessionId`, `cwd`, `summary`, and
 `lastActivity`. Discovery never issues `session/new`, so enumerating sessions
 does not create one. Verified against Devin 3000.5.20.
+
+Devin 3000.10.31 model selection uses the six fixed combinations in the
+[Devin shortlist](./research/2026-09-18-devin-shortlist.md), plus custom raw model strings.
+On its executable ACP stdio target, a selected model is applied with
+`session/set_config_option` (`configId: "model"`) after new/load and permission-mode
+pinning, before prompting. Effort is encoded in the model UID. A rejected model
+stops the turn; an omitted model leaves the provider's current model unchanged.
 
 ACP enumeration follows `nextCursor` until all pages have been read. Failed or
 invalid pages do not import/prune a partial result. For agents that advertise

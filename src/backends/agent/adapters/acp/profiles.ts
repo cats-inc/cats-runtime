@@ -26,6 +26,8 @@ export interface AcpProviderProfile {
   summary: string;
   clientCapabilityMeta?: Record<string, unknown>;
   sessionModes?: AcpSessionModeMapping;
+  /** Verified session/set_config_option id for applying a requested model. */
+  modelConfigId?: string;
   defaultStartupTimeoutMs?: number;
   probe: {
     helpArgs: string[];
@@ -173,6 +175,7 @@ const DEVIN_ACP_PROFILE: AcpProviderProfile = {
   label: 'Devin ACP',
   family: 'devin',
   tier: 1,
+  modelConfigId: 'model',
   summary: 'Tier 1 Devin ACP target served by the devin acp stdio subcommand, verified against '
     + 'Devin 3000.3.27 (protocolVersion 1, loadSession, four session modes) and re-probed on '
     + '3000.5.20, which additionally advertises sessionCapabilities.list and .delete; the '

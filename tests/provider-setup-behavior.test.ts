@@ -67,10 +67,10 @@ function page(initial: ReturnType<typeof state>, fetcher: (path: string, init?: 
     return elements.get(id)!;
   };
   element('resultPanel').hidden = true;
-  const checks = targets.map((target) => {
+  const checks = initial.universe.map((target) => {
     const checkbox = new ElementDouble();
     checkbox.value = key(target);
-    checkbox.closest('.provider-selection-row').dataset.backend = 'cli';
+    checkbox.closest('.provider-selection-row').dataset.backend = target.backend;
     return checkbox;
   });
   const apiFetch = vi.fn(fetcher);
@@ -97,6 +97,53 @@ function page(initial: ReturnType<typeof state>, fetcher: (path: string, init?: 
 }
 
 describe('provider setup interactions', () => {
+  const devin = { provider: 'devin', backend: 'agent', instance: 'acp' };
+
+  function devinState(commandStatus = 'ready') {
+    const base = state([devin]);
+    return { ...base,
+      universe: [{ ...devin, familyLabel: 'Devin CLI', binaryName: 'devin' }],
+      selection: { ...base.selection, nativeSetupTargets: [devin] },
+      observations: [{ ...observation(devin), commandStatus, available: commandStatus === 'ready' }],
+    };
+  }
+
+  it('counts a detected Devin ACP command as installed without claiming login or execution', () => {
+    const ui = page(devinState(), async () => { throw new Error('No request expected'); });
+    expect(ui.evaluate('providerDetectionSummary()')).toMatchObject({ installedCount: 1, unverifiedCount: 0 });
+    expect(ui.element('providerListItems').innerHTML).toContain('Installation detected');
+    expect(ui.element('providerListItems').innerHTML).toContain('Login not verified');
+    expect(ui.element('providerListItems').innerHTML).not.toContain('Connection not checked');
+    ui.evaluate("showDetectionResult('Choices applied — detection results')");
+    expect(ui.element('resultBody').textContent).toContain('Installation detected for 1 CLI.');
+    expect(ui.element('resultBody').textContent).not.toContain('remain unverified');
+    expect(ui.element('resultPanel').dataset.variant).toBe('success');
+  });
+
+  it('shows detection progress and installation guidance for a missing Devin ACP command', () => {
+    const initial = devinState('missing_install');
+    const ui = page({ ...initial, universe: [{ ...initial.universe[0], install: {
+      install: { command: 'install-devin', docsUrl: 'https://devin.ai/cli' },
+    } }] }, async () => { throw new Error('No request expected'); });
+    expect(ui.evaluate('providerDetectionSummary()')).toMatchObject({ installedCount: 0, attentionCount: 1 });
+    expect(ui.element('providerListItems').innerHTML).toContain('Not installed');
+    expect(ui.element('providerListItems').innerHTML).toContain('install-devin');
+    ui.evaluate("selectionOperation = 'check'; updateProvidersWorkspaceMetrics(); showSelectionProgress()");
+    expect(ui.checks[0].closest('.provider-selection-row').dataset.processing).toBe('true');
+    expect(ui.element('resultBody').textContent).toContain('Checking installation for 1 CLI provider.');
+  });
+
+  it('keeps gateway connection uncertainty separate from detected stdio commands', () => {
+    const gateway = { provider: 'openclaw', backend: 'agent', instance: 'gateway' };
+    const customAcp = { provider: 'custom-agent', backend: 'agent', instance: 'stdio' };
+    const ui = page({ ...state([gateway, customAcp]), observations: [
+      { ...observation(gateway), commandStatus: 'unknown', available: false }, observation(customAcp),
+    ] }, async () => { throw new Error('No request expected'); });
+    expect(ui.evaluate('providerDetectionSummary()')).toMatchObject({ installedCount: 1, unverifiedCount: 1 });
+    expect(ui.element('providerListItems').innerHTML).toContain('Connection not checked');
+    expect(ui.element('providerListItems').innerHTML).toContain('Installation detected');
+  });
+
   it('applies without scanning and retains previous results for unchanged targets', async () => {
     const retained = observation();
     const initial = { ...state(), observations: [retained] };

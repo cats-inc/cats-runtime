@@ -11,13 +11,18 @@ import { SHARED_UI_SCRIPT } from './shared.js';
 import { buildProviderAdvancedKnowledge } from '../../core/models/providerAdvancedKnowledge.js';
 import { getStaticProviderModels } from '../../core/models/providerModelCatalog.js';
 
-describe.each(['cursor', 'copilot', 'opencode', 'kilo'])('%s shortlists in Playground', (provider) => {
+describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin'])('%s shortlists in Playground', (provider) => {
   it('uses the same six approved fallbacks and preserves custom strings on reload', () => {
     const html = readFileSync(fileURLToPath(new URL('./pages/playground.html', import.meta.url)), 'utf8');
     const array = html.match(new RegExp(`^  ${provider}:(\\[.*\\]),$`, 'm'))?.[1];
     expect(array).toBeDefined();
     const fallback = vm.runInNewContext(`(${array})`) as Array<{ value: string; label: string }>;
-    const models = getStaticProviderModels({ providerName: provider, backend: 'cli' });
+    const models = getStaticProviderModels({ providerName: provider,
+      backend: provider === 'devin' ? 'agent' : 'cli',
+      ...(provider === 'devin' ? { remoteInstance: {
+        providerName: provider, id: 'acp', backend: 'agent', transport: 'acp_stdio', command: 'devin',
+      } } : {}),
+    });
     expect(fallback).toEqual(models.map(({ id, label, default: isDefault }) => ({
       value: id, label: `${label}${isDefault ? ' (default)' : ''}`,
     })));

@@ -1,0 +1,23 @@
+[
+  {
+    "method": "initialize",
+    "result": {
+      "protocolVersion": 1
+    }
+  },
+  {
+    "method": "session/set_config_option",
+    "params": {
+      "sessionId": "<nonexistent-session>",
+      "configId": "model",
+      "value": "adaptive"
+    },
+    "error": {
+      "code": -32002,
+      "message": "Resource not found",
+      "data": {
+        "uri": "Model not found: adaptive. Available models: "
+      }
+    }
+  }
+]

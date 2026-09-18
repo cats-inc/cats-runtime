@@ -1484,7 +1484,11 @@ describe('AcpAdapter', () => {
     };
   }
 
-  function startDevinServer(process: FakeAcpProcess, seen: string[], resumed = false) {
+  function startDevinServer(
+    process: FakeAcpProcess, seen: string[], resumed = false,
+    modelRequests: unknown[] = [], rejectModel = false,
+    updates: unknown[] = [],
+  ) {
     startFakeServer(process, async (message) => {
       if (message.method) seen.push(message.method);
       if (message.method === 'initialize') {
@@ -1508,7 +1512,25 @@ describe('AcpAdapter', () => {
         }) + '\n');
         return;
       }
+      if (message.method === 'session/set_config_option') {
+        modelRequests.push(message.params);
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0', id: message.id,
+          ...(rejectModel
+            ? { error: { code: -32602, message: 'Model not available' } }
+            : { result: { configOptions: [{ id: 'model', currentValue: message.params.value }] } }),
+        }) + '\n');
+        return;
+      }
       if (message.method === 'session/set_mode' || message.method === 'session/prompt') {
+        if (message.method === 'session/prompt') {
+          for (const update of updates) {
+            process.stdout.write(JSON.stringify({
+              jsonrpc: '2.0', method: 'session/update',
+              params: { sessionId: 'sage-origin', update },
+            }) + '\n');
+          }
+        }
         process.stdout.write(JSON.stringify({
           jsonrpc: '2.0',
           id: message.id,
@@ -1535,6 +1557,69 @@ describe('AcpAdapter', () => {
 
     expect(seen).toContain('session/set_mode');
     expect(seen.indexOf('session/set_mode')).toBeLessThan(seen.indexOf('session/prompt'));
+    expect(seen).not.toContain('session/set_config_option');
+  });
+
+  it('preserves Devin content blocks and whitespace needed for the Playground handoff', async () => {
+    const process = new FakeAcpProcess();
+    const chunks = ['已完成分工。', '\n\n', 'NEXT:', ' ', 'Agent-2'];
+    startDevinServer(process, [], false, [], false, [
+      { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: '檢查工作區。' } },
+      ...chunks.map(text => ({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } })),
+      { sessionUpdate: 'agent_message_chunk', content: { type: 'image', text: 'not assistant text', data: '', mimeType: 'image/png' } },
+    ]);
+    const adapter = new AcpAdapter({
+      acpHostBridge: createHostBridge(), acpProcessSpawner: createSpawner(process),
+    });
+    const events = await collectEvents(adapter.invoke({
+      ...createInvokeInput(createDevinStdioInstance(), createHostBridge(), 'default'),
+      providerName: 'devin', model: 'gemini-3-8-flash-medium',
+    }));
+    expect(events.filter(event => event.type === 'text').map(event => event.text)).toEqual(chunks);
+    expect(events.filter(event => event.type === 'text').map(event => event.text).join(''))
+      .toBe('已完成分工。\n\nNEXT: Agent-2');
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'progress', text: '檢查工作區。', metadata: expect.objectContaining({ kind: 'reasoning' }),
+    }));
+  });
+
+  it.each([
+    'adaptive', 'claude-fable-5-1-medium', 'gemini-3-8-flash-medium',
+    'gpt-6-astra-medium', 'grok-4-6-medium', 'nemotron-3-ultra-high', 'custom-model',
+  ])('applies Devin model %s after new and load, before the prompt', async (model) => {
+    for (const resumed of [false, true]) {
+      const process = new FakeAcpProcess();
+      const seen: string[] = [];
+      const modelRequests: unknown[] = [];
+      startDevinServer(process, seen, resumed, modelRequests);
+      const adapter = new AcpAdapter({
+        acpHostBridge: createHostBridge(), acpProcessSpawner: createSpawner(process),
+      });
+      await collectEvents(adapter.invoke({
+        ...createInvokeInput(createDevinStdioInstance(), createHostBridge(), 'default'),
+        providerName: 'devin', model,
+        ...(resumed ? { providerSessionId: 'sage-origin' } : {}),
+      }));
+      expect(modelRequests).toEqual([{ sessionId: 'sage-origin', configId: 'model', value: model }]);
+      expect(seen.indexOf('session/set_config_option'))
+        .toBeGreaterThan(seen.indexOf(resumed ? 'session/load' : 'session/new'));
+      expect(seen.indexOf('session/set_config_option')).toBeLessThan(seen.indexOf('session/prompt'));
+    }
+  });
+
+  it('does not prompt with another model when Devin rejects the requested model', async () => {
+    const process = new FakeAcpProcess();
+    const seen: string[] = [];
+    startDevinServer(process, seen, false, [], true);
+    const adapter = new AcpAdapter({
+      acpHostBridge: createHostBridge(), acpProcessSpawner: createSpawner(process),
+    });
+    await expect(collectEvents(adapter.invoke({
+      ...createInvokeInput(createDevinStdioInstance(), createHostBridge(), 'default'),
+      providerName: 'devin', model: 'unavailable-model',
+    }))).rejects.toThrow('Model not available');
+    expect(seen).not.toContain('session/prompt');
+    expect(process.killed).toBe(true);
   });
 
   it('re-pins the Devin session mode after resuming, because load resets it', async () => {
@@ -1615,7 +1700,7 @@ describe('AcpAdapter', () => {
             sessionId: 'acp-session-1',
             update: {
               sessionUpdate: 'agent_message_chunk',
-              content: 'hello from codex-acp',
+              content: { type: 'text', text: 'hello from codex-acp' },
             },
           },
         }) + '\n');
@@ -2369,7 +2454,7 @@ describe('AcpAdapter', () => {
             sessionId: 'acp-session-progress',
             update: {
               sessionUpdate: 'agent_thought_chunk',
-              content: 'Need to inspect the repository first.',
+              content: { type: 'text', text: 'Need to inspect the repository first.' },
             },
           },
         }) + '\n');
@@ -3030,7 +3115,7 @@ describe('AcpAdapter', () => {
             sessionId: 'acp-session-restore',
             update: {
               sessionUpdate: 'agent_message_chunk',
-              content: 'old replay that should stay internal',
+              content: { type: 'text', text: 'old replay that should stay internal' },
             },
           },
         }) + '\n');
@@ -3052,7 +3137,7 @@ describe('AcpAdapter', () => {
             sessionId: 'acp-session-restore',
             update: {
               sessionUpdate: 'agent_message_chunk',
-              content: 'fresh prompt output',
+              content: { type: 'text', text: 'fresh prompt output' },
             },
           },
         }) + '\n');

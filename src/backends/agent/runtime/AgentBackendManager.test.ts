@@ -393,7 +393,7 @@ describe('AgentBackendManager', () => {
             sessionId: 'acp-runtime-session',
             update: {
               sessionUpdate: 'agent_message_chunk',
-              content: 'runtime-facing output',
+              content: { type: 'text', text: 'runtime-facing output' },
             },
           },
         }) + '\n');

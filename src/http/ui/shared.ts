@@ -1103,7 +1103,7 @@ export const SHARED_UI_SCRIPT = `
     if (!entryId && model && options.allowLegacyModel === true) {
       return { provider: provider, model: model, modelSelection: null };
     }
-    if (!entryId && (provider === 'cursor' || provider === 'copilot' || provider === 'opencode' || provider === 'kilo') && options.allowLegacyModel === true
+    if (!entryId && (provider === 'cursor' || provider === 'copilot' || provider === 'opencode' || provider === 'kilo' || provider === 'devin') && options.allowLegacyModel === true
       && incomingSelection && incomingSelection.entryMode === 'explicit'
       && typeof incomingSelection.entryId === 'string' && incomingSelection.entryId) {
       return { provider: provider, model: incomingSelection.entryId, modelSelection: null };

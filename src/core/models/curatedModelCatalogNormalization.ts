@@ -617,6 +617,7 @@ export function normalizeCuratedModelId(
     case 'grok':
     case 'muse':
     case 'opencode':
+    case 'devin':
       return normalizeVerbatimCuratedModelId(model);
     case 'kilo':
       return normalizeKiloCuratedModelId(model);

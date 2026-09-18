@@ -2,6 +2,13 @@
 
 > This directory contains all project documentation.
 
+## Pending Workspace Lifecycle Review
+
+[Playground workspace retention](./research/2026-09-18-playground-workspace-retention.md)
+records the unexpected deletion of generated files on Stop Chat, its historical
+cause, and a proposed joint Runtime/Platform review of room ownership and bounded
+cleanup. This is an open design issue; the cleanup behavior has not changed.
+
 ## Usage and Provider Account Quota
 
 Existing execution metering and guardrails are not an account-quota service.
@@ -20,6 +27,9 @@ scheduled polling, verified account linkage and durable history remain deferred.
 
 ## Provider Detection
 
+[Devin shortlist](./research/2026-09-18-devin-shortlist.md) records six fixed combinations,
+custom input and model application after ACP session creation/resume.
+
 [Kilo shortlist](./research/2026-09-18-kilo-shortlist.md) records six selected models and fixed
 Thinking transport for the final two entries.
 
@@ -34,7 +44,7 @@ combinations, parameterized execution, refresh-stable shortlist, and custom inpu
 
 [Approved model-menu maintenance policy](./specs/SPEC-028-provider-model-catalog-maintenance-skill.md#approved-maintenance-and-menu-policy-2026-09-17)
 records complete catalogs for Codex/Claude/agy/Grok/Muse, up to six models for the named other
-CLIs, and custom model input for both groups. Cursor, Copilot, OpenCode and Kilo shortlists are implemented; the remaining
+CLIs, and custom model input for both groups. Cursor, Copilot, OpenCode, Kilo and Devin shortlists are implemented; the remaining
 individual shortlists and rollout are pending.
 
 [Grok Build 1.0.34 picker](./research/2026-09-17-grok-model-picker-refresh.md)

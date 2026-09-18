@@ -1,0 +1,162 @@
+{
+  "command": "devin models list --format json",
+  "version": "3000.10.31",
+  "families": [
+    {
+      "family_label": "Claude Fable 5.1",
+      "family_uid": "claude-fable-5-1",
+      "slug": "claude-fable-5.1",
+      "aliases": [],
+      "variants": [
+        {
+          "model_uid": "claude-fable-5-1-medium",
+          "label": "Claude Fable 5.1 Medium"
+        },
+        {
+          "model_uid": "claude-fable-5-1-low",
+          "label": "Claude Fable 5.1 Low"
+        },
+        {
+          "model_uid": "claude-fable-5-1-high",
+          "label": "Claude Fable 5.1 High"
+        },
+        {
+          "model_uid": "claude-fable-5-1-xhigh",
+          "label": "Claude Fable 5.1 XHigh"
+        },
+        {
+          "model_uid": "claude-fable-5-1-max",
+          "label": "Claude Fable 5.1 Max"
+        }
+      ]
+    },
+    {
+      "family_label": "Gemini 3.8 Flash",
+      "family_uid": "gemini-3-8-flash",
+      "slug": "gemini-3.8-flash",
+      "aliases": [
+        "gemini"
+      ],
+      "variants": [
+        {
+          "model_uid": "gemini-3-8-flash-medium",
+          "label": "Gemini 3.8 Flash Medium"
+        },
+        {
+          "model_uid": "gemini-3-8-flash-low",
+          "label": "Gemini 3.8 Flash Low"
+        },
+        {
+          "model_uid": "gemini-3-8-flash-high",
+          "label": "Gemini 3.8 Flash High"
+        }
+      ]
+    },
+    {
+      "family_label": "GPT-6 Astra",
+      "family_uid": "gpt-6-astra",
+      "slug": "gpt-6-astra",
+      "aliases": [
+        "gpt"
+      ],
+      "variants": [
+        {
+          "model_uid": "gpt-6-astra-medium",
+          "label": "GPT-6 Astra Medium Thinking"
+        },
+        {
+          "model_uid": "gpt-6-astra-low",
+          "label": "GPT-6 Astra Low Thinking"
+        },
+        {
+          "model_uid": "gpt-6-astra-high",
+          "label": "GPT-6 Astra High Thinking"
+        },
+        {
+          "model_uid": "gpt-6-astra-xhigh",
+          "label": "GPT-6 Astra XHigh Thinking"
+        },
+        {
+          "model_uid": "gpt-6-astra-max",
+          "label": "GPT-6 Astra Max Thinking"
+        },
+        {
+          "model_uid": "gpt-6-astra-low-priority",
+          "label": "GPT-6 Astra Low Thinking Fast"
+        },
+        {
+          "model_uid": "gpt-6-astra-medium-priority",
+          "label": "GPT-6 Astra Medium Thinking Fast"
+        },
+        {
+          "model_uid": "gpt-6-astra-high-priority",
+          "label": "GPT-6 Astra High Thinking Fast"
+        },
+        {
+          "model_uid": "gpt-6-astra-xhigh-priority",
+          "label": "GPT-6 Astra XHigh Thinking Fast"
+        },
+        {
+          "model_uid": "gpt-6-astra-max-priority",
+          "label": "GPT-6 Astra Max Thinking Fast"
+        }
+      ]
+    },
+    {
+      "family_label": "Adaptive",
+      "family_uid": "Adaptive",
+      "slug": "adaptive",
+      "aliases": [],
+      "variants": [
+        {
+          "model_uid": "adaptive",
+          "label": "Adaptive"
+        }
+      ]
+    },
+    {
+      "family_label": "Grok 4.6",
+      "family_uid": "grok-4-6",
+      "slug": "grok-4.6",
+      "aliases": [],
+      "variants": [
+        {
+          "model_uid": "grok-4-6-low",
+          "label": "Grok 4.6 Low"
+        },
+        {
+          "model_uid": "grok-4-6-medium",
+          "label": "Grok 4.6 Medium"
+        },
+        {
+          "model_uid": "grok-4-6-high",
+          "label": "Grok 4.6 High"
+        },
+        {
+          "model_uid": "grok-4-6-xhigh",
+          "label": "Grok 4.6 XHigh"
+        }
+      ]
+    },
+    {
+      "family_label": "Nemotron 3 Ultra",
+      "family_uid": "nemotron-3-ultra",
+      "slug": "nemotron-3-ultra",
+      "aliases": [],
+      "variants": [
+        {
+          "model_uid": "nemotron-3-ultra-none",
+          "label": "Nemotron 3 Ultra None"
+        },
+        {
+          "model_uid": "nemotron-3-ultra-medium",
+          "label": "Nemotron 3 Ultra Medium"
+        },
+        {
+          "model_uid": "nemotron-3-ultra-high",
+          "label": "Nemotron 3 Ultra High"
+        }
+      ]
+    }
+  ]
+}

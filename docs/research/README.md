@@ -6,6 +6,8 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-09-18-playground-workspace-retention](./2026-09-18-playground-workspace-retention.md) | Playground workspace retention | Stop Chat deletion history, unexpected output loss, and pending joint Runtime/Platform lifecycle review |
+| [2026-09-18-devin-shortlist](./2026-09-18-devin-shortlist.md) | Devin 3000.10.31 fixed shortlist | Six variant UIDs, ACP model application after new/load, no default claims and custom input |
 | [2026-09-18-kilo-shortlist](./2026-09-18-kilo-shortlist.md) | Kilo 7.7.3 six-model shortlist | Exact labels, fixed Thinking variants, native transport and custom input |
 | [2026-09-18-opencode-shortlist](./2026-09-18-opencode-shortlist.md) | OpenCode 1.18.31 six-model shortlist | Exact Go IDs and labels, same-name provider disambiguation, refresh preservation and custom input |
 | [2026-09-17-copilot-fixed-presets](./2026-09-17-copilot-fixed-presets.md) | Copilot 1.0.85 fixed shortlist | Six fixed efforts, Terra default, custom input, models.list and session-selection ID evidence |
