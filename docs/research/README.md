@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-09-18-kiro-shortlist](./2026-09-18-kiro-shortlist.md) | Kiro six-model shortlist | Verbatim IDs, Native/WSL fallback, first-row selection and custom input |
 | [2026-09-18-cline-shortlist](./2026-09-18-cline-shortlist.md) | ClinePass six fixed combinations | Verbatim model IDs, Medium execution, Qwen display projection and custom input |
 | [2026-09-18-playground-workspace-retention](./2026-09-18-playground-workspace-retention.md) | Playground workspace retention | Stop Chat deletion history, unexpected output loss, and pending joint Runtime/Platform lifecycle review |
 | [2026-09-18-devin-shortlist](./2026-09-18-devin-shortlist.md) | Devin 3000.10.31 fixed shortlist | Six variant UIDs, ACP model application after new/load, no default claims and custom input |

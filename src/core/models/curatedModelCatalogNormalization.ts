@@ -574,30 +574,7 @@ export function normalizeKiloCuratedModelId(model: CuratedModelCatalogModel): st
 }
 
 export function normalizeKiroCuratedModelId(model: CuratedModelCatalogModel): string | null {
-  const candidates = [model.name, model.label].filter((value): value is string => Boolean(value));
-  const knownIds = new Set([
-    'auto',
-    'claude-opus-4.6',
-    'claude-sonnet-4.6',
-    'claude-opus-4.5',
-    'claude-sonnet-4.5',
-    'claude-sonnet-4',
-    'claude-haiku-4.5',
-    'deepseek-3.2',
-    'minimax-m2.5',
-    'minimax-m2.1',
-    'glm-5',
-    'qwen3-coder-next',
-  ]);
-
-  for (const candidate of candidates) {
-    const normalized = candidate.trim().toLowerCase();
-    if (knownIds.has(normalized)) {
-      return normalized;
-    }
-  }
-
-  return null;
+  return normalizeVerbatimCuratedModelId(model);
 }
 
 export function normalizeJunieCuratedModelId(model: CuratedModelCatalogModel): string | null {

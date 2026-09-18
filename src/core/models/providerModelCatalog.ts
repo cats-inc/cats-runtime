@@ -185,19 +185,16 @@ const DEFAULT_DISCOVERY_BACKOFF_MS = 60_000;
 const MAX_DISCOVERY_BACKOFF_MS = 15 * 60_000;
 const MAX_GEMINI_MODEL_LIST_PAGES = 5;
 
-const KIRO_NATIVE_MODELS: ProviderModelCatalogEntry[] = [
-  { id: 'claude-opus-4.6', label: 'claude-opus-4.6', default: true },
-  { id: 'deepseek-3.2', label: 'deepseek-3.2' },
-  { id: 'minimax-m2.1', label: 'minimax-m2.1' },
-];
-
-const KIRO_WSL_MODELS: ProviderModelCatalogEntry[] = [
-  { id: 'claude-sonnet-4.5', label: 'claude-sonnet-4.5', default: true },
-  { id: 'deepseek-3.2', label: 'deepseek-3.2' },
-  { id: 'minimax-m2.1', label: 'minimax-m2.1' },
-];
-
 const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
+  // Operator-selected Kiro 2.22.0 shortlist; no provider default was supplied.
+  kiro: [
+    { id: 'claude-opus-5', label: 'claude-opus-5' },
+    { id: 'claude-sonnet-5', label: 'claude-sonnet-5' },
+    { id: 'gpt-5.6-sol', label: 'gpt-5.6-sol' },
+    { id: 'gpt-5.6-terra', label: 'gpt-5.6-terra' },
+    { id: 'gpt-5.6-luna', label: 'gpt-5.6-luna' },
+    { id: 'claude-haiku-4.5', label: 'claude-haiku-4.5' },
+  ],
   // Aligned 2026-09-16 with the Claude Code 2.1.273 picker and the operator's
   // four version-bearing display names. The duplicate provider-default sentinel
   // stays evidence-only; Opus is the requested Cats default.
@@ -663,11 +660,6 @@ export function getStaticProviderModels(
   if (isDevinAcpModelTarget(target)) {
     return cloneModels(DEVIN_MODELS);
   }
-  if (target.providerName === 'kiro') {
-    const runtimeMode = target.cliInstance?.commandConfig.runtime.mode;
-    return cloneModels(runtimeMode === 'wsl' ? KIRO_WSL_MODELS : KIRO_NATIVE_MODELS);
-  }
-
   return cloneModels(STATIC_PROVIDER_MODELS[target.providerName] || []);
 }
 

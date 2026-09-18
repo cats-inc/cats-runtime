@@ -2772,7 +2772,8 @@ backends:
         instance: 'native',
         runtime: { mode: 'wsl' },
         source: 'static',
-        models: ['claude-sonnet-4.5', 'deepseek-3.2', 'minimax-m2.1'],
+        models: ['claude-opus-5', 'claude-sonnet-5', 'gpt-5.6-sol', 'gpt-5.6-terra',
+          'gpt-5.6-luna', 'claude-haiku-4.5'],
       });
     });
   });
