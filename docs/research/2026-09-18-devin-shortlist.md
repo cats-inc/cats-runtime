@@ -118,3 +118,11 @@ checked separately. The connected browser service had no available browser for v
 Maintenance lesson: model-setting success is narrower than end-to-end usability. Use protocol-shaped
 event fixtures and verify emitted text plus its downstream consumer; an accepted model request or
 normal stop reason alone cannot prove the response was displayed or delegated.
+
+## Skill feedback
+
+The canonical [Devin maintenance reference](../../skills/maintain-provider-model-catalogs/references/providers/devin.md)
+now captures bounded variant-UID lookup, the existing ACP new/load path and conditional response
+validation. The skill entrypoint marks Devin's shortlist as implemented, and shared surface guidance
+requires tracing the actual backend/transport. Data-only refreshes reuse these supported paths;
+this feedback adds no new product behavior or live-probe requirement.

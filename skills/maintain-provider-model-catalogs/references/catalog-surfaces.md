@@ -47,7 +47,7 @@ native-installed providers may expose dynamic enumeration.
 | Advanced controls | `src/core/models/providerAdvancedKnowledge.ts` | controls/presets and verified provenance |
 | Public per-model defaults | `src/core/models/providerAdvancedCatalog.ts` | `entries[].controlDefaults` alongside catalog defaults |
 | Selection resolution | `src/core/models/providerSelectionResolution.ts` | whether curated defaults/options are honored |
-| Provider adapter | `src/backends/cli/providers/<provider>.ts` | accepted model/control argv and execution support |
+| Provider adapter | `src/backends/cli/providers/<provider>.ts`, `src/backends/agent/adapters/acp/` | follow the actual target's model/control transport; CLI installation does not imply CLI-backend execution |
 | Playground | `src/http/ui/shared.ts`, `src/http/ui/pages/playground.html` | labels, per-model defaults, static fallback; generate `public/playground.html` with `npm run build:ui` |
 | Desktop consumer | `cats-platform` provider catalog/selector modules | only inspect/change when fallback data or consumer behavior is affected; read that member's instructions first |
 
@@ -86,6 +86,8 @@ When a provider first adopts an approved shortlist, trace the existing path befo
 
 - Verify curated lookup, static-catalog support and ID normalization accept the provider. A valid
   YAML entry alone does not prove the returned menu uses it. Reuse existing shortlist support.
+  Scope this check by backend/transport as well as provider name; a CLI-only lookup can silently
+  exclude an agent/ACP target while that provider's CLI fallback is intentionally empty.
 - Check each UI's custom action, field visibility, serialization and saved-value reconciliation.
   These paths can use provider-specific conditions: Desktop custom input or another provider's
   Playground behavior does not establish support for this provider. Test the first selection,
