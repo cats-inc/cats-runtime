@@ -236,8 +236,11 @@ usage on failed turns is not reported, consistent with the cancellation finding 
 The prompt is positional. A prompt whose text merely *starts* with a subcommand name is
 safe — `cline --json "config is a word. Reply OK."` began a normal agent run rather than the
 `config` subcommand, because matching is on an exact first-argument equality against a
-single argv element. The residual risk is a prompt that is exactly one bare subcommand word.
-The adapter places the prompt last, behind valued flags, so it is never the first argument.
+single argv element. This capture did not establish safety for a bare subcommand word.
+Putting a positional prompt after valued flags is insufficient: Cline 3.0.62 also rejects
+single-token prompts such as `晚安` even when correctly quoted. See the
+[September 18 argument-handling follow-up](./2026-09-18-cline-shortlist.md#prompt-argument-follow-up)
+for the current adapter contract and validation.
 
 ## Stream split — `error` lines go to stderr, not stdout
 
