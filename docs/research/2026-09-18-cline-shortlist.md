@@ -74,6 +74,49 @@ No global user Cline provider settings are rewritten.
   load these source changes. The installed process was left running.
 - No paid inference or packaged Desktop visual check. Full suites remain CI gates.
 
+## Prompt argument follow-up
+
+Desktop 0.3.2 subsequently failed on a plain `晚安` message with the installed
+Cline 3.0.62: `Unknown command or unquoted prompt`. This failed before model
+execution and is separate from ClinePass model ID or account validation.
+
+The installed Windows binary and the upstream
+[CLI entrypoint](https://github.com/cline/cline/blob/main/apps/cli/src/main.ts)
+both require whitespace inside a positional prompt to consider it quoted.
+Shell quoting alone cannot satisfy this heuristic for a single token. Placing
+the prompt after valued flags is also insufficient. The entrypoint scans raw
+argv for `--config` before Commander, and its
+[argument normalizer](https://github.com/cline/cline/blob/main/apps/cli/src/utils/helpers.ts)
+rewrites selected flag aliases before respecting the end-of-options boundary.
+
+The adapter now terminates options with `--` and prefixes one ASCII space when
+the compiled prompt has no whitespace or starts with `-`. Existing whitespace,
+instruction layers and message content are preserved; the padding adds no new
+instructions. Keep this normalization local to Cline, including unknown/newer
+versions. Do not remove it as redundant shell quoting or add an exact-version
+execution gate. A stdin-only replacement is not sufficient for 3.0.62: JSON
+mode checks for a positional prompt before reading piped input.
+
+Validation on Windows, 2026-09-18:
+
+- The original `晚安` argument reproduced the reported failure in the installed
+  binary. The final adapter arguments were then passed through Runtime's native
+  Windows launcher and the installed npm command shim for `晚安`, `config`, and
+  `--config=some directory`. All three reached `agent_start` and then failed only
+  on the deliberately nonexistent provider, with zero input/output tokens and
+  zero cost. This proves argument acceptance, not a successful ClinePass reply.
+- Probes isolated HOME, config, data, cache and workspace in temporary directories;
+  no user credentials were inherited. `CLINE_NO_AUTO_UPDATE=1`, confirmed in the
+  installed updater, prevented updating the CLI during the probe.
+- 67 tests passed across the Cline adapter, captured stream fixtures, ClinePass
+  catalog/execution mapping, native launchers and prompt instruction composition.
+  Real child-process echo tests verify one positional argument survives Windows
+  command-shim quoting, including its leading space and model/effort/permission
+  flags. TypeScript `--noEmit` and diff whitespace checks passed.
+- Independent review found no blocking issues. Full-suite validation, including
+  the Linux native-launch case, remains the PR CI gate; macOS was not run locally.
+  No paid inference or installed Desktop end-to-end success is claimed here.
+
 ## Maintenance observations
 
 The installed static catalog can prove raw ID/label mappings even when the CLI

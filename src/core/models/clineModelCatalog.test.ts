@@ -64,7 +64,7 @@ describe('ClinePass fixed combinations', () => {
         expect(provider.buildSpawnArgs({ cwd: root, model: resolved.execution.model,
           modelControls: resolved.resolution.controls })).toEqual([
           '--json', '--cwd', root, '--provider', 'cline-pass', '--model', id,
-          '--thinking', 'medium', '--auto-approve', 'false', 'Test request',
+          '--thinking', 'medium', '--auto-approve', 'false', '--', 'Test request',
         ]);
         expect(() => resolveProviderSelection(knowledge, { entryId: id, entryMode: 'explicit',
           controls: { 'cline.reasoning_effort': 'high' } })).toThrow(/not supported/);

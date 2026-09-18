@@ -31,7 +31,8 @@ scheduled polling, verified account linkage and durable history remain deferred.
 IDs, first-row initialization without default claims and custom input.
 
 [ClinePass shortlist](./research/2026-09-18-cline-shortlist.md) records six fixed Medium
-combinations, explicit provider routing and custom input.
+combinations, explicit provider routing, custom input and the fix for single-token
+or flag-like prompts rejected by Cline's argument parser.
 
 [Devin shortlist](./research/2026-09-18-devin-shortlist.md) records six fixed combinations,
 custom input and model application after ACP session creation/resume.

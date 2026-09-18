@@ -132,11 +132,13 @@ export class ClineProvider implements Provider {
 
     appendClinePermissionArgs(args, opts);
 
-    // The prompt is positional and must come last. Cline matches subcommands on
-    // an exact first-argument match, so a prompt is only ambiguous when it is a
-    // single bare word like "doctor"; keeping it last behind valued flags means
-    // it is never the first argument.
-    args.push(prompt);
+    // Cline 3.0.62 rejects positional prompts without whitespace, even when
+    // passed as one correctly quoted argument (e.g. "晚安" or "hello"). It also
+    // scans raw argv for flags such as --config before honoring `--`. A leading
+    // space avoids both heuristics without adding instructions to the message.
+    // Keep existing whitespace intact and let the launcher handle shell quoting.
+    const positionalPrompt = !/\s/.test(prompt) || prompt.startsWith('-') ? ` ${prompt}` : prompt;
+    args.push('--', positionalPrompt);
     return args;
   }
 
