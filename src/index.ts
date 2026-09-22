@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { isDirectCliEntrypoint } from './core/cliEntrypoint.js';
+import { browserUrl, startCliInteraction } from './core/cliInteraction.js';
 import { loadRuntimeEnvFiles } from './core/dotenv.js';
 import { runAcpCli } from './bin/acp.js';
 import { runMcpCli } from './bin/mcp.js';
@@ -265,6 +266,7 @@ async function main(): Promise<void> {
     bootstrapRequired: startup.bootstrapRequired,
   });
   let shutdownPromise: Promise<void> | null = null;
+  let stopInteraction = () => {};
 
   const writeLifecycle = (line: string | null) => {
     if (line) {
@@ -278,6 +280,7 @@ async function main(): Promise<void> {
     }
 
     markRuntimeStopping(startup, reason);
+    stopInteraction();
     writeLifecycle(formatRuntimeStoppingMessage(startup, reason));
 
     shutdownPromise = runtime.close()
@@ -338,11 +341,18 @@ async function main(): Promise<void> {
   });
   writeLifecycle(readyMessage);
 
-  if (startup.bootstrapRequired) {
+  if (startup.bootstrapRequired && startup.mode === 'standalone' && startup.readyOutput === 'plain') {
     process.stdout.write(
-      `cats-runtime is in bootstrap mode. Open http://${address.host}:${address.port}/ to set up providers.\n`,
+      `cats-runtime is in bootstrap mode. Open ${browserUrl(address.host, address.port, '/setup')} to set up providers.\n`,
     );
   }
+  stopInteraction = startCliInteraction({
+    url: browserUrl(address.host, address.port, startup.bootstrapRequired ? '/setup' : '/'),
+    mode: startup.mode,
+    readyOutput: startup.readyOutput,
+    noOpen: cliOptions.noOpen,
+    onQuit: requestShutdown,
+  });
 }
 
 if (isDirectCliEntrypoint(import.meta.url, process.argv[1])) {

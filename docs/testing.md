@@ -29,6 +29,21 @@ locally in the same service that ships them.
 - **Framework**: N/A
 - **Scope**: local verification against installed provider CLIs and the embedded dashboard
 
+### Interactive CLI Lifecycle
+
+After `npm run build:runtime`, run:
+
+```sh
+npx vitest run tests/cli-interaction.test.ts tests/cli-entrypoint.test.ts tests/runtime-startup.test.ts --pool=threads --poolOptions.threads.singleThread
+```
+
+The compiled-entrypoint fixtures use `createRuntimeTestEnv`, temporary homes and
+intercepted browser openers. They cover first-launch Setup, configured Dashboard,
+`o`, `q`, terminal restoration, port closure and managed JSON/EOF shutdown. Helper
+tests cover Ctrl+C, `--no-open`, opener failure, all three OS commands, IPv6,
+and managed/CI/non-TTY/machine-output exclusions. Native browser and physical
+terminal smoke on each OS remains separate from these automated checks.
+
 ## Choosing Local Validation
 
 [AGENTS.md: Local Validation Scope](../AGENTS.md#local-validation-scope) is the

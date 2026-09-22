@@ -97,12 +97,34 @@ Supported startup flags:
 - `--startup-mode <standalone|app-managed>`
 - `--managed-by <host-name>`
 - `--ready-output <plain|json|silent>`
+- `--no-open` (keep the manual `o` shortcut, suppress initial browser launch)
 - `--host <bind-host>`
 - `--port <bind-port>`
 
 The packaged stdio MCP entrypoint is `cats-runtime mcp`. For repo-local
 workspaces, `node build/runtime/bin/mcp.js` remains the equivalent helper. Both
 proxy to the primary runtime rather than starting a second runtime core.
+
+### Interactive terminal
+
+Standalone plain-output CLI sessions with interactive stdin/stdout open the
+default browser once the listener is ready. Bootstrap opens `/setup`; configured
+Runtime opens `/`. The address uses the actual listening port, with loopback
+substituted for wildcard hosts (including IPv6).
+
+The terminal shows `o` to open, `q` to stop and Ctrl+C to stop. Both stop keys use
+the existing Runtime cleanup routine and restore terminal input. `--no-open`
+skips only the initial launch. A missing browser/opener leaves the service running
+and prints the URL for manual use. No browser credentials are put into the URL.
+
+App-managed/Desktop, watch supervisors, CI, non-TTY, JSON/silent lifecycle output,
+help, MCP/ACP and diagnostic commands do not open browsers or consume shortcut
+keys. `cats-one` uses an app-managed Runtime with private stdin, opens only
+Platform, and ends Runtime stdin after Platform has completed cleanup. A reused
+Runtime is outside that launcher's ownership.
+
+See [SPEC-002](../../cats-one/docs/specs/SPEC-002-interactive-cli-startup.md) for the
+shared npm-entrypoint contract.
 
 ### 4. App-managed local startup
 

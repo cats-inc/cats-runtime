@@ -40,7 +40,7 @@
     "build:runtime": "tsc -p tsconfig.json",
     "build:runtime-bundle": "node scripts/bundle-runtime.mjs",
     "build": "npm run clean:build && npm run build:ui && node scripts/build-runtime-artifacts.mjs",
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch src/index.ts --startup-mode app-managed --managed-by tsx-watch --ready-output plain",
     "start": "node build/runtime/index.js",
     "prepack": "npm run build",
     "release:check": "npm run verify:skills && npm test && npm pack --dry-run",

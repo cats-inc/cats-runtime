@@ -2,6 +2,16 @@
 
 > Unified runtime for subscription CLIs, API backends, and local-model backends.
 
+## Interactive npm entrypoint
+
+Run `npx @cats-inc/cats-runtime`. Once ready, an interactive terminal opens
+`/setup` when provider setup is required, otherwise the dashboard at `/`.
+Press `o` to open the browser again, or `q` / Ctrl+C to stop gracefully.
+`--no-open` skips the automatic launch while preserving the `o` shortcut.
+Managed/Desktop, dev/watch, CI, non-TTY and JSON/silent sessions do not open
+browsers or claim keyboard input; MCP/ACP and diagnostic commands keep their
+existing protocols. See [deployment](docs/deployment.md#interactive-terminal).
+
 ## Overview
 
 Usage snapshot (2026-09-10): authenticated `GET /usage/snapshot` now exposes

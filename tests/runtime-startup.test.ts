@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+it('accepts --no-open without changing the startup mode', () => {
+  expect(parseRuntimeCliOptions(['--no-open'])).toEqual({ noOpen: true });
+  expect(getRuntimeHelpText()).toContain('--no-open');
+});
+
 import {
   RUNTIME_DIAGNOSTICS_CONTRACT_VERSION,
   RUNTIME_DIAGNOSTICS_PATHS,

@@ -505,7 +505,7 @@ Example response:
       "runtime.stopped"
     ],
     "shutdownSignals": ["SIGINT", "SIGTERM"],
-    "shutdownReasons": ["sigint", "sigterm", "stdin_closed"],
+    "shutdownReasons": ["sigint", "sigterm", "stdin_closed", "keyboard"],
     "endpoints": {
       "health": "/health",
       "runtime": "/diagnostics/runtime",
@@ -537,7 +537,7 @@ Example response:
   },
   "shutdown": {
     "signals": ["SIGINT", "SIGTERM"],
-    "reasons": ["sigint", "sigterm", "stdin_closed"],
+    "reasons": ["sigint", "sigterm", "stdin_closed", "keyboard"],
     "stdinCloseEnabled": false
   }
 }

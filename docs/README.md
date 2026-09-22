@@ -2,6 +2,11 @@
 
 > This directory contains all project documentation.
 
+## Interactive npm entrypoint
+
+[Interactive terminal](deployment.md#interactive-terminal) documents automatic
+Setup/Dashboard opening, o/q/Ctrl+C, managed/automation opt-outs and cleanup.
+
 ## Pending Workspace Lifecycle Review
 
 [Playground workspace retention](./research/2026-09-18-playground-workspace-retention.md)

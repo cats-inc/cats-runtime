@@ -56,6 +56,7 @@ export const RUNTIME_SHUTDOWN_REASONS = [
   'sigint',
   'sigterm',
   'stdin_closed',
+  'keyboard',
 ] as const;
 
 export type RuntimeStartupMode = typeof RUNTIME_STARTUP_MODES[number];
@@ -67,6 +68,7 @@ export type RuntimeShutdownReason = typeof RUNTIME_SHUTDOWN_REASONS[number];
 
 export interface RuntimeCliOptions {
   help?: boolean;
+  noOpen?: boolean;
   cleanupTempDirs?: boolean;
   cleanupTempAgeHours?: string;
   bootstrap?: boolean;
@@ -184,6 +186,11 @@ export function parseRuntimeCliOptions(argv: string[]): RuntimeCliOptions {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+
+    if (arg === '--no-open') {
+      options.noOpen = true;
+      continue;
+    }
 
     if (arg === '--help' || arg === '-h') {
       options.help = true;
@@ -855,6 +862,7 @@ export function getRuntimeHelpText(): string {
     '  --startup-mode <standalone|app-managed>',
     '  --managed-by <name>',
     '  --ready-output <plain|json|silent>',
+    '  --no-open                             Skip opening the browser (press o to open later)',
     '  --host <host>',
     '  --port <port>',
     '  -h, --help',
