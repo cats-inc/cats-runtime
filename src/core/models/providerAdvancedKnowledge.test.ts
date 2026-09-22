@@ -1579,27 +1579,27 @@ describe('buildProviderAdvancedKnowledge', () => {
 
   it('keeps unverified targets conservative and marks omitted metadata explicitly', () => {
     const target: ProviderTargetDescriptor = {
-      providerName: 'pi',
+      providerName: 'unverified-provider',
       backend: 'cli',
       instanceId: 'default',
       defaultTarget: true,
       cliInstance: {
         id: 'default',
-        providerName: 'pi',
+        providerName: 'unverified-provider',
         backend: 'cli',
-        command: 'pi',
+        command: 'unverified-provider',
       },
     };
 
     const knowledge = buildProviderAdvancedKnowledge(target, {
-      provider: 'pi',
+      provider: 'unverified-provider',
       backend: 'cli',
       instance: 'default',
-      defaultModel: 'openai-codex/gpt-5.4',
+      defaultModel: 'custom-model',
       source: 'static',
       cache: null,
       models: [
-        { id: 'openai-codex/gpt-5.4', label: 'openai-codex/gpt-5.4', default: true },
+        { id: 'custom-model', label: 'custom-model', default: true },
       ],
       warnings: [],
     });

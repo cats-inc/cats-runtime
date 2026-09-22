@@ -6071,6 +6071,30 @@ providers:
     });
   });
 
+  it('GET /providers/pi/models preserves the bundled shortlist on refresh', async () => {
+    const spawnMock = vi.spyOn(providerInstallRunner, 'runSpawnedCommand');
+    try {
+      await withRuntime({}, {}, async (runtime) => {
+        const expected = [
+          { id: 'openai-codex/gpt-5.6-luna', label: 'gpt-5.6-luna [openai-codex] — medium' },
+          { id: 'openai-codex/gpt-5.6-sol', label: 'gpt-5.6-sol [openai-codex] — medium' },
+          { id: 'openai-codex/gpt-5.6-terra', label: 'gpt-5.6-terra [openai-codex] — medium' },
+          { id: 'openai-codex/gpt-6-astra', label: 'gpt-6-astra [openai-codex] — medium' },
+          { id: 'openai-codex/gpt-6-luna', label: 'gpt-6-luna [openai-codex] — medium' },
+          { id: 'openai-codex/gpt-6-sol', label: 'gpt-6-sol [openai-codex] — medium' },
+        ];
+        for (const route of ['/providers/pi/models', '/providers/pi/models?refresh=1']) {
+          const response = await runtime.app.request(route);
+          expect(response.status).toBe(200);
+          expect(await response.json()).toMatchObject({ models: expected, defaultModel: null, source: 'static' });
+        }
+        expect(spawnMock).not.toHaveBeenCalled();
+      });
+    } finally {
+      spawnMock.mockRestore();
+    }
+  });
+
   it('GET /providers/:provider/models loads a dynamic Pi catalog through the CLI runtime helper only on refresh', async () => {
     const spawnMock = vi.spyOn(providerInstallRunner, 'runSpawnedCommand').mockResolvedValueOnce({
       exitCode: 0,
@@ -6086,22 +6110,25 @@ providers:
     });
 
     try {
-      await withRuntime({}, {}, async (runtime) => {
+      await withCuratedCatalogRuntime([
+        'schema_version: 1', 'catalogs: []',
+      ], { env: { PI_PATH: process.platform === 'win32' ? 'pi.cmd' : 'pi' } }, {}, async (runtime) => {
         const immediate = await runtime.app.request('/providers/pi/models');
         expect(immediate.status).toBe(200);
         expect(await immediate.json()).toEqual({
           provider: 'pi',
           backend: 'cli',
           instance: 'native',
-          defaultModel: 'openai-codex/gpt-5.4',
+          defaultModel: null,
           source: 'static',
           cache: null,
           models: [
-            {
-              id: 'openai-codex/gpt-5.4',
-              label: 'openai-codex/gpt-5.4',
-              default: true,
-            },
+            { id: 'openai-codex/gpt-5.6-luna', label: 'gpt-5.6-luna [openai-codex] — medium' },
+            { id: 'openai-codex/gpt-5.6-sol', label: 'gpt-5.6-sol [openai-codex] — medium' },
+            { id: 'openai-codex/gpt-5.6-terra', label: 'gpt-5.6-terra [openai-codex] — medium' },
+            { id: 'openai-codex/gpt-6-astra', label: 'gpt-6-astra [openai-codex] — medium' },
+            { id: 'openai-codex/gpt-6-luna', label: 'gpt-6-luna [openai-codex] — medium' },
+            { id: 'openai-codex/gpt-6-sol', label: 'gpt-6-sol [openai-codex] — medium' },
           ],
           warnings: [],
         });
@@ -6114,7 +6141,7 @@ providers:
           provider: 'pi',
           backend: 'cli',
           instance: 'native',
-          defaultModel: 'openai-codex/gpt-5.4',
+          defaultModel: null,
           source: 'dynamic',
           cache: {
             servedFromCache: false,
@@ -6127,13 +6154,11 @@ providers:
           {
             id: 'anthropic/claude-sonnet-4-5',
             label: 'anthropic/claude-sonnet-4-5',
-            default: false,
             status: 'available',
           },
           {
             id: 'openai-codex/gpt-5.4',
             label: 'openai-codex/gpt-5.4',
-            default: true,
             status: 'available',
           },
         ]);

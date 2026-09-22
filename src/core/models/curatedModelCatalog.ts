@@ -32,6 +32,7 @@ const CURATED_PROVIDER_ALIASES: Record<string, string[]> = {
   grok: ['grok', 'xai', 'x.ai'],
   cline: ['cline', 'clinepass', 'cline-pass'],
   goose: ['chatgpt_codex', 'ChatGPT Codex'],
+  pi: ['openai-codex'],
   devin: ['devin', 'cognition'],
   muse: ['muse', 'meta', 'meta ai'],
   kilo: ['kilo'],

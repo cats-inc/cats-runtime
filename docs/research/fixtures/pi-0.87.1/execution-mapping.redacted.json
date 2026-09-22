@@ -1,0 +1,16 @@
+{
+  "sourceClass": "installed-shipped-artifact; transport evidence, not account enumeration",
+  "package": "@earendil-works/pi-coding-agent",
+  "version": "0.87.1",
+  "files": {
+    "dist/cli/args.js": "5e806262fe4389828d4f562358f725835634f8e0ae2bacd42fcbe5ad810d0d54",
+    "dist/main.js": "5a9473442cd761b21d07c374bb137967dd11474f5a7754d1c32f585e7b1a1f49"
+  },
+  "execution": {
+    "provider": "--provider openai-codex",
+    "model": "--model <raw model ID>",
+    "thinking": "--thinking medium",
+    "resume": "--session <session source>",
+    "precedence": "explicit parsed thinking becomes sessionOptions.thinkingLevel, ahead of saved/scoped defaults"
+  }
+}

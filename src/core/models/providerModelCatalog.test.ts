@@ -1212,7 +1212,13 @@ describe('ProviderModelCatalogService', () => {
     expect(vi.mocked(cursorModelDiscoveryRunner.run)).toHaveBeenCalledTimes(1);
   });
 
-  it('loads dynamic Pi model catalogs through the shared runtime catalog service', async () => {
+  it('loads dynamic Pi model catalogs through the shared runtime catalog service', async ({ onTestFinished }) => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-pi-dynamic-'));
+    onTestFinished(() => rmSync(root, { recursive: true, force: true }));
+    const paths = createRuntimeTestPaths(root);
+    ensureRuntimeTestDirs(paths);
+    // Test unrestricted discovery independently of the bundled shortlist.
+    writeFileSync(paths.curatedModelCatalogPath, 'schema_version: 1\ncatalogs: []\n');
     const piModelDiscoveryRunner = {
       run: vi.fn(async () => ({
         exitCode: 0,
@@ -1230,6 +1236,7 @@ describe('ProviderModelCatalogService', () => {
 
     const service = new ProviderModelCatalogService(createCatalogConfig() as never, {
       piModelDiscoveryRunner,
+      env: createRuntimeTestEnv(root),
       ttlMs: 60_000,
     });
 
@@ -1238,7 +1245,7 @@ describe('ProviderModelCatalogService', () => {
       provider: 'pi',
       backend: 'cli',
       instance: 'default',
-      defaultModel: 'openai-codex/gpt-5.4',
+      defaultModel: null,
       source: 'dynamic',
       cache: {
         servedFromCache: false,
@@ -1251,13 +1258,11 @@ describe('ProviderModelCatalogService', () => {
       {
         id: 'anthropic/claude-sonnet-4-5',
         label: 'anthropic/claude-sonnet-4-5',
-        default: false,
         status: 'available',
       },
       {
         id: 'openai-codex/gpt-5.4',
         label: 'openai-codex/gpt-5.4',
-        default: true,
         status: 'available',
       },
     ]);
@@ -1388,19 +1393,9 @@ describe('ProviderModelCatalogService', () => {
     });
 
     expect(service.getImmediateCatalog('pi')).toEqual({
-      provider: 'pi',
-      backend: 'cli',
-      instance: 'default',
-      defaultModel: 'openai-codex/gpt-5.4',
-      source: 'static',
-      cache: null,
-      models: [
-        {
-          id: 'openai-codex/gpt-5.4',
-          label: 'openai-codex/gpt-5.4',
-          default: true,
-        },
-      ],
+      provider: 'pi', backend: 'cli', instance: 'default',
+      defaultModel: null, source: 'static', cache: null,
+      models: getStaticProviderModels({ providerName: 'pi', backend: 'cli' }),
       warnings: [],
     });
     expect(service.getImmediateCatalog('opencode')).toEqual({

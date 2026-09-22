@@ -29,7 +29,7 @@ function fixture(yaml?: string) {
   const config = loadConfig(createRuntimeTestEnv(root));
   const options = { config, configPath: paths.configPath, dataDir: paths.dataDir };
   const selection = new ProviderSelectionService(options);
-  return { ...options, paths, selection };
+  return { ...options, root, paths, selection };
 }
 
 describe('provider intent and resource scope', () => {
@@ -58,6 +58,8 @@ describe('provider intent and resource scope', () => {
   });
   it('holds non-cancellable CLI model discovery until it completes', async () => {
     const f = fixture();
+    // Exercise a running discovery operation independently of the curated shortlist.
+    writeFileSync(f.paths.curatedModelCatalogPath, 'schema_version: 1\ncatalogs: []\n');
     const pi = { provider: 'pi', backend: 'cli', instance: 'native' };
     const { revision } = f.selection.save([pi], 'missing');
     let release!: () => void;
@@ -65,6 +67,7 @@ describe('provider intent and resource scope', () => {
     const gate = new Promise<void>((resolve) => { release = resolve; });
     const ready = new Promise<void>((resolve) => { started = resolve; });
     const catalog = new ProviderModelCatalogService(f.config, {
+      env: createRuntimeTestEnv(f.root),
       beginProviderOperation: (target) => {
         const id = f.selection.acquireOperation({ provider: target.providerName,
           backend: target.backend, instance: target.instanceId }, revision);
@@ -74,7 +77,9 @@ describe('provider intent and resource scope', () => {
         return { exitCode: 0, stdout: '', stderr: '', timedOut: false, durationMs: 1 }; } },
     });
     const pending = catalog.getCatalog('pi', 'cli/native', { forceRefresh: true });
-    await ready;
+    await Promise.race([ready, pending.then(() => {
+      throw new Error('Expected the catalog to start CLI model discovery');
+    })]);
     expect(() => f.selection.save([], revision)).toThrow('running provider operation');
     release();
     await pending;
