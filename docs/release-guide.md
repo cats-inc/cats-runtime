@@ -3,6 +3,22 @@
 > How to publish `cats-runtime` to npm and evolve from a manual beta release to
 > trusted CI publishing.
 
+## 0.1.25 npm alignment preparation (2026-09-23)
+
+Prepare the current Runtime implementation for the default npm install path.
+This includes selected-provider bootstrap, the current model catalogs, and the
+Cline prompt fix already merged into `main`.
+
+After the preparation PR and release gate pass, publish
+`@cats-inc/cats-runtime@0.1.25` through `.github/workflows/npm-publish.yml` with
+`dist_tag=latest`. Publish Platform 0.3.4 as well before updating cats-one 0.1.22
+to require Runtime `^0.1.25` and Platform `^0.3.4`; generate the launcher lockfile
+from those published registry artifacts.
+
+The package ships its configuration examples. Provider selection writes the
+active user configuration; management and curated catalogs can use bundled
+defaults without copying all examples into the user's configuration directory.
+
 ## 0.1.23 prerelease preparation (2026-09-16)
 
 This release carries the Claude Code 2.1.273 catalog refresh, version-bearing
