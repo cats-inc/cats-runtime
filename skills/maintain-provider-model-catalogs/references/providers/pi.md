@@ -36,3 +36,8 @@ static default. A curated row's default does not configure the dynamic discovery
 default; use an explicit target configuration when testing that behavior.
 Cover the actual bundled shortlist separately. Update Desktop/Playground fallback, custom-input and saved
 selection paths, and search metadata/diagnostics consumers before final builds.
+
+Search injected discovery runners and operation-lifecycle tests as well as model
+IDs. Bootstrap selection tests may await a discovery-start signal that a shortlist
+correctly bypasses. Give those tests an empty curated fixture and isolated env;
+fail promptly if the catalog returns without starting the intended operation.

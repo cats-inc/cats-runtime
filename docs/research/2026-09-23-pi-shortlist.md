@@ -90,3 +90,14 @@ thinking metadata. No native CLI session, login, model listing or inference ran.
 No native Pi inference session or installed Desktop binary was exercised. The
 focused checks do not represent a full-suite run. No commit, PR, release or
 version bump is included in the catalog-refresh request.
+
+## PR validation follow-up
+
+The first full CI run found one bootstrap selection test waiting for a Pi
+discovery-start signal. The new shortlist correctly bypassed discovery, so its
+test fixture never reached that signal. The test now uses an explicit empty
+curated file and isolated environment, with a prompt failure if discovery is
+bypassed. Skill feedback now includes injected discovery runners and operation
+lifecycle consumers in the search checklist. Production behavior is unchanged.
+All 28 bootstrap selection tests and TypeScript checking passed after the fix;
+independent follow-up review found no blocking issues.
