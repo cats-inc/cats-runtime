@@ -1,3 +1,4 @@
+import { PI_THINKING_CONTROL, getPiFixedThinking } from './piModelCatalog.js';
 import { GOOSE_EFFORT_CONTROL, getGooseFixedEffort } from './gooseModelCatalog.js';
 import { isDevinAcpModelTarget } from './devinModelCatalog.js';
 import { CLINE_EFFORT_CONTROL, getClineFixedEffort } from './clineModelCatalog.js';
@@ -1029,6 +1030,28 @@ function collectCuratedCopilotModel(
   }
 }
 
+function buildCuratedPiCliOverlay(
+  document: CuratedModelCatalogDocument | undefined,
+): CuratedCatalogOverlay | null {
+  const catalog = findCuratedCliCatalog(document, 'pi');
+  const scope = catalog && resolveCuratedCatalogScope(catalog, 'pi');
+  if (!catalog || !scope) return null;
+  const overlay = buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeVerbatimCuratedModelId);
+  if (!overlay || catalog.selectionMode !== 'shortlist') return overlay;
+
+  const entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>> = {};
+  for (const model of scope.models) {
+    const id = normalizeVerbatimCuratedModelId(model);
+    const option = resolveEffectiveCuratedModelOptions(scope.sharedOptions, model)
+      .find((candidate) => matchesCuratedOptionName(candidate, ['thinking']));
+    const effort = option?.values?.length === 1 ? option.values[0].name.toLowerCase() : undefined;
+    if (id && effort && effort === 'medium' && getPiFixedThinking(id) === 'medium') {
+      entryDefaults[id] = { [PI_THINKING_CONTROL]: effort };
+    }
+  }
+  return { ...overlay, entryDefaults, controls: [] };
+}
+
 function buildCuratedGooseCliOverlay(
   document: CuratedModelCatalogDocument | undefined,
 ): CuratedCatalogOverlay | null {
@@ -1724,6 +1747,22 @@ const VERIFIED_ADVANCED_MANIFESTS: VerifiedAdvancedManifest[] = [
     },
   },
   {
+    id: 'pi-cli-fixed-combos-v1',
+    version: '2026-09-23',
+    supportTier: 'entry_only',
+    evidenceRefs: ['docs/research/2026-09-23-pi-shortlist.md'],
+    matches: (target) => target.providerName === 'pi' && target.backend === 'cli',
+    build: (_target, entries) => {
+      const entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>> = {};
+      for (const entry of entries) {
+        const effort = getPiFixedThinking(entry.id);
+        if (effort) entryDefaults[entry.id] = { [PI_THINKING_CONTROL]: effort };
+      }
+      return { controls: [], entryDefaults, presets: [],
+        defaultSelection: buildDefaultSelection(entries, [], entryDefaults) };
+    },
+  },
+  {
     id: 'goose-cli-fixed-combos-v1',
     version: '2026-09-23',
     supportTier: 'entry_only',
@@ -1847,6 +1886,7 @@ function loadCuratedOverlay(
       && target.providerName !== 'junie'
       && target.providerName !== 'auggie'
       && target.providerName !== 'goose'
+      && target.providerName !== 'pi'
       && target.providerName !== 'copilot'
       && target.providerName !== 'cursor'
       && target.providerName !== 'devin'
@@ -1863,6 +1903,8 @@ function loadCuratedOverlay(
   });
   const overlay = (() => {
     switch (target.providerName) {
+      case 'pi':
+        return buildCuratedPiCliOverlay(result.document);
       case 'goose':
         return buildCuratedGooseCliOverlay(result.document);
       case 'cline':

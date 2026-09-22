@@ -594,6 +594,7 @@ export function normalizeCuratedModelId(
     case 'grok':
     case 'muse':
     case 'opencode':
+    case 'pi':
     case 'goose':
     case 'auggie':
     case 'devin':

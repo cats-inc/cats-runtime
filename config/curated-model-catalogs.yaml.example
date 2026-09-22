@@ -670,3 +670,32 @@ catalogs:
             label: "gpt-5.5 — Off"
           - name: chatgpt_codex/gpt-5.4
             label: "gpt-5.4 — Off"
+
+  - cli: Pi
+    version: 0.87.1
+    last_updated: 2026-09-23
+    selection_mode: shortlist
+    notes:
+      - Complete operator-selected six-model shortlist for the openai-codex subscription provider; every combination fixes thinking to medium.
+      - Preserve the supplied model names, order and visible [openai-codex] suffix; append the fixed medium value. No provider default was supplied; UI initializes the first row without a default marker.
+      - Execution uses --provider openai-codex --model <raw ID> --thinking medium. Custom provider/model input remains available.
+      - "Evidence: docs/research/2026-09-23-pi-shortlist.md and docs/research/fixtures/pi-0.87.1/operator.redacted.txt."
+    providers:
+      - name: openai-codex
+        shared_options:
+          - name: Thinking
+            values:
+              - name: medium
+        models:
+          - name: openai-codex/gpt-5.6-luna
+            label: gpt-5.6-luna [openai-codex] — medium
+          - name: openai-codex/gpt-5.6-sol
+            label: gpt-5.6-sol [openai-codex] — medium
+          - name: openai-codex/gpt-5.6-terra
+            label: gpt-5.6-terra [openai-codex] — medium
+          - name: openai-codex/gpt-6-astra
+            label: gpt-6-astra [openai-codex] — medium
+          - name: openai-codex/gpt-6-luna
+            label: gpt-6-luna [openai-codex] — medium
+          - name: openai-codex/gpt-6-sol
+            label: gpt-6-sol [openai-codex] — medium

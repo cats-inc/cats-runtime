@@ -31,8 +31,9 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
   `docs/research/2026-09-18-cline-shortlist.md`,
   `docs/research/2026-09-18-kiro-shortlist.md`,
   `docs/research/2026-09-23-junie-shortlist.md`,
-  `docs/research/2026-09-23-auggie-shortlist.md`, and
-  `docs/research/2026-09-23-goose-shortlist.md`.
+  `docs/research/2026-09-23-auggie-shortlist.md`,
+  `docs/research/2026-09-23-goose-shortlist.md`, and
+  `docs/research/2026-09-23-pi-shortlist.md`.
   Other shortlist members/order are pending individual operator decisions. Do not truncate current
   catalogs or select the first six discovered models from this policy alone. These are product
   policy groups, not a substitute for deriving the registered inventory during an audit.
@@ -47,7 +48,8 @@ UIDs containing the fixed effort on its agent/ACP target; ClinePass uses explici
 selection plus a separate fixed thinking argument; Kiro uses verbatim model IDs with no
 evidenced option controls; Junie uses literal picker names plus a separate fixed effort argument;
 Auggie uses CLI-observed IDs and exact labels without evidenced option controls;
-Goose uses provider-qualified IDs with fixed Thinking Off through its native model suffix.
+Goose uses provider-qualified IDs with fixed Thinking Off through its native model suffix;
+Pi retains bracketed provider labels and resolves fixed thinking through a separate CLI argument.
 Other shortlist rollouts remain pending.
 No scheduled refresh cadence or automated refresh job has been specified.
 
@@ -200,6 +202,9 @@ authorizes that external mutation.
   global help is not a menu, and MSP `isDefault` must not be copied into curated YAML.
 - [OpenCode](./references/providers/opencode.md): verbose ID/name enumeration, same-name provider
   disambiguation, and entry-only shortlist wiring.
+
+- [Pi](./references/providers/pi.md): bracketed subscription labels, separate provider/model/thinking
+  transport and isolated shortlist versus dynamic-discovery tests.
 
 For providers without a reference, inspect the current adapter, discovery helper, catalog notes,
 and retained evidence. Add a provider reference only when a stable, non-obvious procedure is proven;

@@ -1,3 +1,4 @@
+import { PI_MODELS } from './piModelCatalog.js';
 import { GOOSE_MODELS } from './gooseModelCatalog.js';
 import { JUNIE_MODELS } from './junieModelCatalog.js';
 import { ANTIGRAVITY_MODELS } from './antigravityModelCatalog.js';
@@ -282,9 +283,7 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'grok-4-7', label: 'Grok 4.7' },
     { id: 'butler_a', label: 'Prism (Claude + GPT)' },
   ],
-  pi: [
-    { id: 'openai-codex/gpt-5.4', label: 'openai-codex/gpt-5.4', default: true },
-  ],
+  pi: PI_MODELS,
   junie: JUNIE_MODELS,
   cursor: [
     { id: 'grok-4.6[effort=high,fast=true]', label: 'Cursor Grok 4.6 — High Fast' },
@@ -650,7 +649,8 @@ export function getStaticProviderModels(
 }
 
 function supportsCuratedStaticCliCatalog(providerName: string): boolean {
-  return providerName === 'goose'
+  return providerName === 'pi'
+    || providerName === 'goose'
     || providerName === 'auggie'
     || providerName === 'claude'
     || providerName === 'codex'

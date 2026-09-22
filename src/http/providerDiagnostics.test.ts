@@ -2628,7 +2628,9 @@ describe('provider diagnostics HTTP contract', () => {
   });
 
   it('surfaces dynamic Pi model catalog details during live CLI diagnostics', async () => {
+    writeFileSync(join(rootDir, 'curated-model-catalogs.yaml'), 'schema_version: 1\ncatalogs: []\n');
     const config = makeConfig({
+      configPath: join(rootDir, 'providers.yaml'),
       providerCommands: {
         claude: { path: 'claude', runner: 'auto', runtime: { mode: 'native' } },
         pi: { path: 'pi', runner: 'auto', runtime: { mode: 'native' } },
@@ -2740,8 +2742,7 @@ describe('provider diagnostics HTTP contract', () => {
         }),
         modelCatalog: expect.objectContaining({
           source: 'dynamic',
-          defaultModel: 'openai-codex/gpt-5.4',
-          defaultModelStatus: 'available',
+          defaultModel: null,
           modelCount: 2,
           warnings: [],
         }),
@@ -2751,11 +2752,10 @@ describe('provider diagnostics HTTP contract', () => {
       expect.objectContaining({
         code: 'model_catalog_loaded',
         status: 'ok',
-        details: expect.objectContaining({
+        details: {
           source: 'dynamic',
           modelCount: 2,
-          defaultModel: 'openai-codex/gpt-5.4',
-        }),
+        },
       }),
     ]));
   });
