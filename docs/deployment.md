@@ -44,10 +44,8 @@ node build/runtime/index.js
 
 ### 3. Executable npm package
 
-The executable packaging contract is already repo-ready locally, even though
-the first public npm release is still pending.
-
-The planned first public package name is the unscoped package `cats-runtime`.
+The published package is `@cats-inc/cats-runtime`; its executable is
+`cats-runtime`. The unscoped package name is not this repository's release target.
 
 For local packaged-flow verification before publish, use the platform helper
 scripts:
@@ -59,17 +57,23 @@ scripts:
 or the equivalent Linux/macOS helpers under `scripts/linux/` and
 `scripts/macos/`.
 
-The repo also now includes a non-publishing GitHub Actions preflight workflow
-at `../../.github/workflows/cats-runtime-release-preflight.yml` that runs
-`npm run release:check` without calling `npm publish`.
+The [release preflight](../.github/workflows/release-preflight.yml) runs
+`npm run release:check` without publishing. The manual
+[npm publish workflow](../.github/workflows/npm-publish.yml) runs the same full
+release gate before publishing with the configured npm trusted publisher.
+Update `package.json` and the root package-lock version together, integrate the
+latest remote main, then dispatch the chosen release commit:
 
-The repo now also carries a manual publish workflow at
-`../../.github/workflows/cats-runtime-npm-publish.yml` with OIDC
-`id-token: write` permission. That workflow is only the repo-owned skeleton for
-later npm trusted publishing and still depends on exact npm-side trusted
-publisher configuration before any successful registry publish can happen.
+```sh
+gh workflow run npm-publish.yml --repo cats-inc/cats-runtime --ref main -f dist_tag=latest
+```
 
-Once published, the public package flow is expected to be:
+Confirm the workflow and registry version before reporting publication complete.
+For changes coordinated with cats-one, publish Runtime and Platform first, then
+update the launcher's dependency minima and registry lockfile before publishing
+both cats-one package names.
+
+Install or launch the public package with:
 
 ```powershell
 npm install -g @cats-inc/cats-runtime
