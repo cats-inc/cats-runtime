@@ -594,6 +594,7 @@ export function normalizeCuratedModelId(
     case 'grok':
     case 'muse':
     case 'opencode':
+    case 'auggie':
     case 'devin':
     case 'cline':
       return normalizeVerbatimCuratedModelId(model);
