@@ -28,8 +28,9 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
   `docs/research/2026-09-18-opencode-shortlist.md`,
   `docs/research/2026-09-18-kilo-shortlist.md`,
   `docs/research/2026-09-18-devin-shortlist.md`,
-  `docs/research/2026-09-18-cline-shortlist.md`, and
-  `docs/research/2026-09-18-kiro-shortlist.md`.
+  `docs/research/2026-09-18-cline-shortlist.md`,
+  `docs/research/2026-09-18-kiro-shortlist.md`, and
+  `docs/research/2026-09-23-junie-shortlist.md`.
   Other shortlist members/order are pending individual operator decisions. Do not truncate current
   catalogs or select the first six discovered models from this policy alone. These are product
   policy groups, not a substitute for deriving the registered inventory during an audit.
@@ -42,7 +43,8 @@ model id; OpenCode uses provider-qualified model IDs without evidenced option co
 resolves approved fixed variants separately from the raw model ID; Devin uses executable variant
 UIDs containing the fixed effort on its agent/ACP target; ClinePass uses explicit CLI provider
 selection plus a separate fixed thinking argument; Kiro uses verbatim model IDs with no
-evidenced option controls. Other shortlist rollouts remain pending.
+evidenced option controls; Junie uses literal picker names plus a separate fixed effort argument.
+Other shortlist rollouts remain pending.
 No scheduled refresh cadence or automated refresh job has been specified.
 
 ## Route the request
@@ -180,6 +182,8 @@ authorizes that external mutation.
   mapping evidence, ACP new/resume model application, and response-consumer validation.
 - [Grok](./references/providers/grok.md): screenshot/transcription evidence, retained effort-token
   mappings, and first-item selection that reaches the execution arguments.
+- [Junie](./references/providers/junie.md): literal picker names, separate fixed effort arguments,
+  informational probes and shortlist/default propagation.
 - [Kiro](./references/providers/kiro.md): raw-ID shortlist updates, Native/WSL fallbacks,
   first-row initialization and account-gated model/effort evidence.
 - [Kilo](./references/providers/kilo.md): distinguish gateway mappings from the picker and

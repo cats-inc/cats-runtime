@@ -838,7 +838,7 @@ describe('ProviderModelCatalogService', () => {
         defaultModel: 'Gemini 3 Flash',
         source: 'static',
         cache: null,
-        models: junieCuratedModels,
+        models: junieCuratedModels.map(model => ({ ...model, default: model.default === true })),
         warnings: [junieStaticWarning],
       });
 
@@ -852,13 +852,16 @@ describe('ProviderModelCatalogService', () => {
         entries: junieCuratedAdvancedEntries,
         presets: [],
         controls: [],
-        defaultSelection: null,
+        defaultSelection: { entryMode: 'explicit', entryId: 'Gemini 3 Flash' },
         support: {
           tier: 'entry_only',
-          advancedMetadataStatus: 'unverified_omitted',
+          advancedMetadataStatus: 'verified_manifest',
           discoveryMode: 'manual_refresh',
           provenance: {
-            status: 'unverified_omitted',
+            status: 'verified_manifest',
+            manifestId: 'junie-cli-fixed-combos-v1',
+            manifestVersion: '2026-09-23',
+            evidenceRefs: ['docs/research/2026-09-23-junie-shortlist.md'],
           },
         },
         warnings: [junieStaticWarning],
@@ -913,10 +916,16 @@ describe('ProviderModelCatalogService', () => {
         provider: 'junie',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'Gemini 3 Flash',
+        defaultModel: 'Gemini 3.7 Flash',
         source: 'static',
-        models: junieCuratedModels,
-        warnings: [junieStaticWarning],
+        models: [
+          { id: 'Gemini 3.7 Flash', label: 'Gemini 3.7 Flash — Medium', default: true },
+          { id: 'Claude Fable 5.1', label: 'Claude Fable 5.1 — Low' },
+          { id: 'Gemini 3.8 Flash', label: 'Gemini 3.8 Flash — Medium' },
+          { id: 'GPT-5.6-SOL', label: 'GPT-5.6-SOL — Low' },
+          { id: 'Grok 4.6', label: 'Grok 4.6 — Low' },
+        ],
+        warnings: [],
       });
     } finally {
       runtime.cleanup();
@@ -988,7 +997,7 @@ describe('ProviderModelCatalogService', () => {
         models: [
           { id: 'Gemini 3 Flash', label: 'Gemini 3 Flash', default: true },
           { id: 'GPT-5', label: 'GPT-5', default: false },
-          { id: 'Claude Opus 4.7', label: 'Claude Opus 4.7' },
+          { id: 'Claude Opus 4.7', label: 'Claude Opus 4.7', default: false },
         ],
         warnings: [
           junieStaticWarning,
@@ -1024,13 +1033,16 @@ describe('ProviderModelCatalogService', () => {
         ],
         presets: [],
         controls: [],
-        defaultSelection: null,
+        defaultSelection: { entryMode: 'explicit', entryId: 'Gemini 3 Flash' },
         support: {
           tier: 'entry_only',
-          advancedMetadataStatus: 'unverified_omitted',
+          advancedMetadataStatus: 'verified_manifest',
           discoveryMode: 'manual_refresh',
           provenance: {
-            status: 'unverified_omitted',
+            status: 'verified_manifest',
+            manifestId: 'junie-cli-fixed-combos-v1',
+            manifestVersion: '2026-09-23',
+            evidenceRefs: ['docs/research/2026-09-23-junie-shortlist.md'],
           },
         },
         warnings: [

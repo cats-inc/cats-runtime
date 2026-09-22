@@ -1,5 +1,6 @@
 import { isDevinAcpModelTarget } from './devinModelCatalog.js';
 import { CLINE_EFFORT_CONTROL, getClineFixedEffort } from './clineModelCatalog.js';
+import { JUNIE_EFFORT_CONTROL, getJunieFixedEffort } from './junieModelCatalog.js';
 import type { ProviderTargetDescriptor } from '../providerCatalog.js';
 import type {
   ProviderAdvancedCatalogControl,
@@ -1108,7 +1109,20 @@ function buildCuratedJunieCliOverlay(
     return null;
   }
 
-  return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeJunieCuratedModelId);
+  const overlay = buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeJunieCuratedModelId);
+  if (!overlay || catalog.selectionMode !== 'shortlist') return overlay;
+
+  const entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>> = {};
+  for (const model of scope.models) {
+    const id = normalizeJunieCuratedModelId(model);
+    const option = resolveEffectiveCuratedModelOptions(scope.sharedOptions, model)
+      .find((candidate) => matchesCuratedOptionName(candidate, ['effort', 'reasoning effort']));
+    const effort = option?.values?.length === 1 ? option.values[0].name.toLowerCase() : undefined;
+    if (id && effort && ['low', 'medium', 'high'].includes(effort)) {
+      entryDefaults[id] = { [JUNIE_EFFORT_CONTROL]: effort };
+    }
+  }
+  return { ...overlay, entryDefaults, controls: [] };
 }
 
 function buildCuratedCopilotCliOverlay(
@@ -1670,6 +1684,22 @@ function buildGenericManifestResult(
 }
 
 const VERIFIED_ADVANCED_MANIFESTS: VerifiedAdvancedManifest[] = [
+  {
+    id: 'junie-cli-fixed-combos-v1',
+    version: '2026-09-23',
+    supportTier: 'entry_only',
+    evidenceRefs: ['docs/research/2026-09-23-junie-shortlist.md'],
+    matches: (target) => target.providerName === 'junie' && target.backend === 'cli',
+    build: (_target, entries) => {
+      const entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>> = {};
+      for (const entry of entries) {
+        const effort = getJunieFixedEffort(entry.id);
+        if (effort) entryDefaults[entry.id] = { [JUNIE_EFFORT_CONTROL]: effort };
+      }
+      return { controls: [], entryDefaults, presets: [],
+        defaultSelection: buildDefaultSelection(entries, [], entryDefaults) };
+    },
+  },
   {
     id: 'cline-cli-fixed-combos-v1',
     version: '2026-09-18',

@@ -1,3 +1,4 @@
+import { JUNIE_MODELS } from './junieModelCatalog.js';
 import { ANTIGRAVITY_MODELS } from './antigravityModelCatalog.js';
 import { DEVIN_MODELS, isDevinAcpModelTarget } from './devinModelCatalog.js';
 import { CLINE_MODELS } from './clineModelCatalog.js';
@@ -280,19 +281,7 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
   pi: [
     { id: 'openai-codex/gpt-5.4', label: 'openai-codex/gpt-5.4', default: true },
   ],
-  junie: [
-    { id: 'Gemini 3 Flash', label: 'Gemini 3 Flash', default: true },
-    { id: 'Claude Opus 4.6', label: 'Claude Opus 4.6' },
-    { id: 'Claude Opus 4.7', label: 'Claude Opus 4.7' },
-    { id: 'Claude Sonnet 4.6', label: 'Claude Sonnet 4.6' },
-    { id: 'Gemini 3.1 Flash Lite', label: 'Gemini 3.1 Flash Lite' },
-    { id: 'Gemini 3.1 Pro Preview', label: 'Gemini 3.1 Pro Preview' },
-    { id: 'GPT-5', label: 'GPT-5' },
-    { id: 'GPT-5.2', label: 'GPT-5.2' },
-    { id: 'GPT-5.3-codex', label: 'GPT-5.3-codex' },
-    { id: 'GPT-5.4', label: 'GPT-5.4' },
-    { id: 'Grok 4.1 Fast Reasoning', label: 'Grok 4.1 Fast Reasoning' },
-  ],
+  junie: JUNIE_MODELS,
   cursor: [
     { id: 'grok-4.6[effort=high,fast=true]', label: 'Cursor Grok 4.6 — High Fast' },
     { id: 'composer-2.5[fast=true]', label: 'Composer 2.5 — Fast' },
@@ -389,10 +378,6 @@ function resolveDefaultModel(
   const configuredModel = resolveConfiguredDefaultModel(target, env);
   if (configuredModel) {
     return configuredModel;
-  }
-
-  if (target.providerName === 'junie' && target.backend === 'cli') {
-    return null;
   }
 
   if (target.providerName === 'cursor' && target.backend === 'cli') {
