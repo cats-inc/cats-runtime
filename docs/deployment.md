@@ -121,6 +121,10 @@ the existing Runtime cleanup routine and restore terminal input. `--no-open`
 skips only the initial launch. A missing browser/opener leaves the service running
 and prints the URL for manual use. No browser credentials are put into the URL.
 
+On Windows the hidden PowerShell browser launcher must remain non-detached:
+detached PowerShell can exit successfully without executing the open command.
+The helper waits for launcher completion, not for the browser to close.
+
 App-managed/Desktop, watch supervisors, CI, non-TTY, JSON/silent lifecycle output,
 help, MCP/ACP and diagnostic commands do not open browsers or consume shortcut
 keys. `cats-one` uses an app-managed Runtime with private stdin, opens only

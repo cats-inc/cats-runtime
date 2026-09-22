@@ -28,7 +28,11 @@ export function browserCommand(url: string, platform = process.platform): [strin
 export function openBrowser(url: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const [command, args] = browserCommand(url);
-    const child = spawn(command, args, { stdio: 'ignore', windowsHide: true, detached: true });
+    // Detached Windows PowerShell can exit 0 without executing EncodedCommand.
+    // Keep its console association; windowsHide prevents an extra console window.
+    const child = spawn(command, args, {
+      stdio: 'ignore', windowsHide: true, detached: process.platform !== 'win32',
+    });
     const timer = setTimeout(() => reject(new Error('Browser launcher timed out.')), 10_000);
     timer.unref();
     child.once('error', error => { clearTimeout(timer); reject(error); });

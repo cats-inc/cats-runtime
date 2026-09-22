@@ -24,6 +24,9 @@ for (const bootstrap of [true, false]) {
       assert.equal((await fetch(`http://127.0.0.1:${cli.port}/health`)).ok, true);
       cli.child.stdin.write('o');
       await cli.waitFor(({ stderr }: { stderr: string }) => stderr.split('TEST_BROWSER').length === 3);
+      if (process.platform === 'win32') {
+        assert.match(cli.stderr, /"detached":false/);
+      }
       cli.child.stdin.write('q');
       assert.equal((await cli.done).code, 0);
       assert.match(cli.stdout, /cats-runtime stopped \(keyboard\)/);
