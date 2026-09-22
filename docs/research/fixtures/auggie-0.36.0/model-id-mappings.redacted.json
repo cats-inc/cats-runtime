@@ -1,0 +1,32 @@
+{
+  "source": "auggie model list --json",
+  "version": "0.36.0",
+  "observedOn": "2026-09-23",
+  "scope": "Public id/displayName fields projected from the installed Windows CLI output, limited to the six operator-selected rows. Other metadata and account identity are not retained.",
+  "models": [
+    {
+      "id": "gpt-6-astra",
+      "displayName": "GPT-6 Astra"
+    },
+    {
+      "id": "gpt-5-6-sol",
+      "displayName": "GPT-5.6 Sol"
+    },
+    {
+      "id": "claude-fable-5-1",
+      "displayName": "Claude Fable 5.1"
+    },
+    {
+      "id": "claude-opus-5-5",
+      "displayName": "Claude Opus 5.5"
+    },
+    {
+      "id": "grok-4-7",
+      "displayName": "Grok 4.7"
+    },
+    {
+      "id": "butler_a",
+      "displayName": "Prism (Claude + GPT)"
+    }
+  ]
+}

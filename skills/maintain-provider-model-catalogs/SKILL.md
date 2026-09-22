@@ -29,8 +29,9 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
   `docs/research/2026-09-18-kilo-shortlist.md`,
   `docs/research/2026-09-18-devin-shortlist.md`,
   `docs/research/2026-09-18-cline-shortlist.md`,
-  `docs/research/2026-09-18-kiro-shortlist.md`, and
-  `docs/research/2026-09-23-junie-shortlist.md`.
+  `docs/research/2026-09-18-kiro-shortlist.md`,
+  `docs/research/2026-09-23-junie-shortlist.md`, and
+  `docs/research/2026-09-23-auggie-shortlist.md`.
   Other shortlist members/order are pending individual operator decisions. Do not truncate current
   catalogs or select the first six discovered models from this policy alone. These are product
   policy groups, not a substitute for deriving the registered inventory during an audit.
@@ -43,7 +44,8 @@ model id; OpenCode uses provider-qualified model IDs without evidenced option co
 resolves approved fixed variants separately from the raw model ID; Devin uses executable variant
 UIDs containing the fixed effort on its agent/ACP target; ClinePass uses explicit CLI provider
 selection plus a separate fixed thinking argument; Kiro uses verbatim model IDs with no
-evidenced option controls; Junie uses literal picker names plus a separate fixed effort argument.
+evidenced option controls; Junie uses literal picker names plus a separate fixed effort argument;
+Auggie uses CLI-observed IDs and exact labels without evidenced option controls.
 Other shortlist rollouts remain pending.
 No scheduled refresh cadence or automated refresh job has been specified.
 
@@ -168,6 +170,8 @@ authorizes that external mutation.
 
 - [Antigravity (agy)](./references/providers/antigravity.md): separate picker families/effort from
   executable model ids, first-item initialization without default claims, and structured selection.
+- [Auggie](./references/providers/auggie.md): bounded JSON ID/display-name enumeration, opaque IDs
+  and entry-only shortlist wiring without inferred effort/default metadata.
 - [Claude](./references/providers/claude.md): supplied picker fast path, alias/label projection,
   per-model effort, and existing Runtime/Desktop support; compiled extraction is a possible superset.
 - [Cline](./references/providers/cline.md): bounded installed ClinePass mappings, explicit provider

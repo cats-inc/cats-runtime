@@ -1806,6 +1806,7 @@ function loadCuratedOverlay(
       && target.providerName !== 'kilo'
       && target.providerName !== 'kiro'
       && target.providerName !== 'junie'
+      && target.providerName !== 'auggie'
       && target.providerName !== 'copilot'
       && target.providerName !== 'cursor'
       && target.providerName !== 'devin'
@@ -1824,8 +1825,9 @@ function loadCuratedOverlay(
     switch (target.providerName) {
       case 'cline':
         return buildCuratedClineCliOverlay(result.document);
+      case 'auggie':
       case 'devin': {
-        const catalog = findCuratedCliCatalog(result.document, 'devin');
+        const catalog = findCuratedCliCatalog(result.document, target.providerName);
         return catalog?.models
           ? buildCuratedEntryOnlyOverlay(catalog.cli, catalog.models, normalizeVerbatimCuratedModelId)
           : null;

@@ -274,9 +274,12 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'kilo/google/gemini-3-pro-image', label: 'Google: Nano Banana Pro (Gemini 3 Pro Image) Thinking' },
   ],
   auggie: [
-    { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
-    { id: 'claude opus 4.6', label: 'claude opus 4.6' },
-    { id: 'sonnet 4.6', label: 'sonnet 4.6' },
+    { id: 'gpt-6-astra', label: 'GPT-6 Astra' },
+    { id: 'gpt-5-6-sol', label: 'GPT-5.6 Sol' },
+    { id: 'claude-fable-5-1', label: 'Claude Fable 5.1' },
+    { id: 'claude-opus-5-5', label: 'Claude Opus 5.5' },
+    { id: 'grok-4-7', label: 'Grok 4.7' },
+    { id: 'butler_a', label: 'Prism (Claude + GPT)' },
   ],
   pi: [
     { id: 'openai-codex/gpt-5.4', label: 'openai-codex/gpt-5.4', default: true },
@@ -649,7 +652,8 @@ export function getStaticProviderModels(
 }
 
 function supportsCuratedStaticCliCatalog(providerName: string): boolean {
-  return providerName === 'claude'
+  return providerName === 'auggie'
+    || providerName === 'claude'
     || providerName === 'codex'
     || providerName === 'antigravity'
     || providerName === 'grok'

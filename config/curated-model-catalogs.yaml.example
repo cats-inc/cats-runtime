@@ -619,3 +619,25 @@ catalogs:
         label: "MiniMax-M3 — Medium"
       - name: cline-pass/mimo-v2.5-pro
         label: "MiMo-V2.5-Pro — Medium"
+
+  - cli: Auggie
+    version: "0.36.0"
+    last_updated: 2026-09-23
+    selection_mode: shortlist
+    notes:
+      - "Source: operator-selected six-model shortlist; ID/displayName mappings from Auggie 0.36.0 model list --json. Complete Cats shortlist, not the full upstream inventory."
+      - "Preserve supplied labels and order. No model default or option metadata was supplied; UI initializes the first row without marking it default. Custom model input remains available."
+      - "Evidence: docs/research/2026-09-23-auggie-shortlist.md and docs/research/fixtures/auggie-0.36.0/."
+    models:
+      - name: gpt-6-astra
+        label: "GPT-6 Astra"
+      - name: gpt-5-6-sol
+        label: "GPT-5.6 Sol"
+      - name: claude-fable-5-1
+        label: "Claude Fable 5.1"
+      - name: claude-opus-5-5
+        label: "Claude Opus 5.5"
+      - name: grok-4-7
+        label: "Grok 4.7"
+      - name: butler_a
+        label: "Prism (Claude + GPT)"
