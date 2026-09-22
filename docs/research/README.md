@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-09-23-goose-shortlist](./2026-09-23-goose-shortlist.md) | Goose ChatGPT Codex shortlist | Six fixed Off models, exact provider routing and native effort suffix |
 | [2026-09-23-auggie-shortlist](./2026-09-23-auggie-shortlist.md) | Auggie six-model shortlist | Exact labels and CLI IDs, opaque Prism mapping, first-row selection and custom input |
 | [2026-09-23-junie-shortlist](./2026-09-23-junie-shortlist.md) | Junie fixed shortlist | Five literal model names, fixed effort execution, explicit default and custom input |
 | [2026-09-18-kiro-shortlist](./2026-09-18-kiro-shortlist.md) | Kiro six-model shortlist | Verbatim IDs, Native/WSL fallback, first-row selection and custom input |

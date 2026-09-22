@@ -1,3 +1,4 @@
+import { GOOSE_MODELS } from './gooseModelCatalog.js';
 import { JUNIE_MODELS } from './junieModelCatalog.js';
 import { ANTIGRAVITY_MODELS } from './antigravityModelCatalog.js';
 import { DEVIN_MODELS, isDevinAcpModelTarget } from './devinModelCatalog.js';
@@ -293,10 +294,7 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'gemini-3.8-flash[reasoning_effort=high]', label: 'Gemini 3.8 Flash — High' },
     { id: 'muse-spark-1.3[context=300k,effort=high]', label: 'Muse Spark 1.3 — 300K High' },
   ],
-  goose: [
-    { id: 'openai/gpt-5-codex', label: 'openai/gpt-5-codex', default: true },
-    { id: 'openai/gpt-5', label: 'openai/gpt-5' },
-  ],
+  goose: GOOSE_MODELS,
   ollama: [
     { id: 'qwen2.5-coder:7b', label: 'qwen2.5-coder:7b', default: true },
   ],
@@ -652,7 +650,8 @@ export function getStaticProviderModels(
 }
 
 function supportsCuratedStaticCliCatalog(providerName: string): boolean {
-  return providerName === 'auggie'
+  return providerName === 'goose'
+    || providerName === 'auggie'
     || providerName === 'claude'
     || providerName === 'codex'
     || providerName === 'antigravity'
