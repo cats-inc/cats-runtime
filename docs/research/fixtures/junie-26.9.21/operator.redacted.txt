@@ -1,0 +1,7 @@
+Junie   v.26.9.21
+
+Gemini 3.7 Flash (Default)      Medium
+Claude Fable 5.1                Low
+Gemini 3.8 Flash                Medium
+GPT-5.6-SOL                     Low
+Grok 4.6                        Low

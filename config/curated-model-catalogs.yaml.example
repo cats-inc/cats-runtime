@@ -36,9 +36,7 @@ schema_version: 1
 # 2026-09-16: Antigravity 1.2.3 picker families and effort controls refreshed;
 # execution ids retain the independent 1.1.24 enumeration provenance.
 # Every other entry keeps the provenance and date recorded in its own `notes`.
-# Kiro and Junie had their versions re-probed but not their model
-# lists - those CLIs either gate the list behind an account, expose it only in an
-# interactive picker, or publish a different artifact than the picker shows.
+# Kiro and Junie subsequently received operator-approved shortlists; see their notes.
 #
 # Treat this file as a starting point to correct, trim, or expand.
 
@@ -533,36 +531,45 @@ catalogs:
       - name: claude-haiku-4.5
 
   - cli: Junie
-    version: "26.8.24 (2929.5)"
-    last_updated: 2026-04-17
+    version: "26.9.21"
+    last_updated: 2026-09-23
+    selection_mode: shortlist
     notes:
-      - "Source: Junie model picker output supplied by user"
-      - "All models routed through JetBrains AI"
-      - "2026-08-26: version re-probed as 26.8.24 (2929.5). Model list NOT re-verified - the CLI exposes --model/--provider but has no list command, and an invalid --model fails without enumerating. Entries below remain as of 2026-04-17."
-      - "`--provider` accepts openai, anthropic, google, xai, openrouter, copilot, litellm for BYOK; when unset the Junie/Custom provider is used."
+      - "Source: docs/research/2026-09-23-junie-shortlist.md and fixtures/junie-26.9.21/. Installed version: 26.9.21 (3294.5)."
+      - "Five operator-selected fixed combinations, not the complete upstream catalog. Gemini 3.7 Flash is explicitly marked Default; effort values are fixed choices, not effort-default claims."
+      - "Preserve picker names as literal --model arguments, including GPT-5.6-SOL. Pass the fixed effort separately with --effort low|medium; custom model strings remain available."
     models:
-      - name: Gemini 3 Flash
+      - name: Gemini 3.7 Flash
+        label: "Gemini 3.7 Flash — Medium"
         default: true
-
-      - name: Claude Opus 4.6
-
-      - name: Claude Opus 4.7
-
-      - name: Claude Sonnet 4.6
-
-      - name: Gemini 3.1 Flash Lite
-
-      - name: Gemini 3.1 Pro Preview
-
-      - name: GPT-5
-
-      - name: GPT-5.2
-
-      - name: GPT-5.3-codex
-
-      - name: GPT-5.4
-
-      - name: Grok 4.1 Fast Reasoning
+        options:
+          - name: Effort
+            values:
+              - name: Medium
+      - name: Claude Fable 5.1
+        label: "Claude Fable 5.1 — Low"
+        options:
+          - name: Effort
+            values:
+              - name: Low
+      - name: Gemini 3.8 Flash
+        label: "Gemini 3.8 Flash — Medium"
+        options:
+          - name: Effort
+            values:
+              - name: Medium
+      - name: GPT-5.6-SOL
+        label: "GPT-5.6-SOL — Low"
+        options:
+          - name: Effort
+            values:
+              - name: Low
+      - name: Grok 4.6
+        label: "Grok 4.6 — Low"
+        options:
+          - name: Effort
+            values:
+              - name: Low
 
   - cli: Devin
     version: "3000.10.31"

@@ -11,8 +11,8 @@ import { SHARED_UI_SCRIPT } from './shared.js';
 import { buildProviderAdvancedKnowledge } from '../../core/models/providerAdvancedKnowledge.js';
 import { getStaticProviderModels } from '../../core/models/providerModelCatalog.js';
 
-describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'kiro'])('%s shortlists in Playground', (provider) => {
-  it('uses the same six approved fallbacks and preserves custom strings on reload', () => {
+describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'kiro', 'junie'])('%s shortlists in Playground', (provider) => {
+  it('uses the approved fallbacks and preserves custom strings on reload', () => {
     const html = readFileSync(fileURLToPath(new URL('./pages/playground.html', import.meta.url)), 'utf8');
     const modelTable = html.slice(html.indexOf('const PROVIDER_MODELS ='), html.indexOf('const PROVIDERS ='));
     const array = modelTable.match(new RegExp(`^  ${provider}:(\\[.*\\]),$`, 'm'))?.[1];
@@ -27,8 +27,8 @@ describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'kiro'
     expect(fallback).toEqual(models.map(({ id, label, default: isDefault }) => ({
       value: id, label: `${label}${isDefault ? ' (default)' : ''}`,
     })));
-    expect(fallback).toHaveLength(6);
-    expect(fallback.filter(entry => /default/i.test(entry.label))).toHaveLength(provider === 'copilot' ? 1 : 0);
+    expect(fallback).toHaveLength(provider === 'junie' ? 5 : 6);
+    expect(fallback.filter(entry => /default/i.test(entry.label))).toHaveLength(['copilot', 'junie'].includes(provider) ? 1 : 0);
     const catalog = {
       provider, backend: 'cli', instance: 'native', defaultModel: null,
       source: 'static', cache: null, entries: models, controls: [], presets: [],

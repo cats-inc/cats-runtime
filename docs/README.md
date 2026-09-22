@@ -27,6 +27,8 @@ scheduled polling, verified account linkage and durable history remain deferred.
 
 ## Provider Detection
 
+[Junie shortlist](./research/2026-09-23-junie-shortlist.md) records five fixed model/effort combinations and the explicit model default.
+
 [Kiro shortlist](./research/2026-09-18-kiro-shortlist.md) records the six raw model
 IDs, first-row initialization without default claims and custom input.
 

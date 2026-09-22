@@ -26,6 +26,7 @@ import type {
 import { compileRuntimeTurnPrompt } from './prompt.js';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
+import { JUNIE_EFFORT_CONTROL, getJunieFixedEffort } from '../../../core/models/junieModelCatalog.js';
 
 const DEFAULT_JUNIE_SESSIONS_DIR = join(os.homedir(), '.junie', 'sessions');
 const SESSION_POLL_INTERVAL_MS = 250;
@@ -92,6 +93,14 @@ export class JunieProvider implements Provider {
     const model = normalizeJunieModelId(opts.model);
     if (model) {
       args.push('--model', model);
+    }
+
+    const effort = opts.modelControls?.[JUNIE_EFFORT_CONTROL] ?? getJunieFixedEffort(model);
+    if (effort !== undefined) {
+      if (typeof effort !== 'string' || !['low', 'medium', 'high'].includes(effort)) {
+        throw new Error('Unsupported Junie reasoning effort.');
+      }
+      args.push('--effort', effort);
     }
 
     if (opts.cwd) {
