@@ -1,3 +1,4 @@
+import { GOOSE_EFFORT_CONTROL, getGooseFixedEffort } from '../../../core/models/gooseModelCatalog.js';
 import { GooseNativeSessionService } from '../goose/GooseNativeSessionService.js';
 import { parseGooseModel, parseGooseStreamLine } from '../goose/parser.js';
 import type {
@@ -51,7 +52,11 @@ export class GooseProvider implements Provider {
     if (opts.model) {
       const { provider, modelId } = parseGooseModel(opts.model);
       args.push('--provider', provider);
-      args.push('--model', modelId);
+      const fixedEffort = getGooseFixedEffort(opts.model);
+      const effort = opts.modelControls?.[GOOSE_EFFORT_CONTROL] ?? fixedEffort;
+      // Goose's native -none suffix becomes ThinkingEffort::Off before request
+      // construction, overriding saved/global effort without changing user config.
+      args.push('--model', fixedEffort === 'off' && effort === 'off' ? `${modelId}-none` : modelId);
     }
 
     if (opts.resumeSessionId) {

@@ -1,3 +1,4 @@
+import { GOOSE_EFFORT_CONTROL, getGooseFixedEffort } from './gooseModelCatalog.js';
 import { isDevinAcpModelTarget } from './devinModelCatalog.js';
 import { CLINE_EFFORT_CONTROL, getClineFixedEffort } from './clineModelCatalog.js';
 import { JUNIE_EFFORT_CONTROL, getJunieFixedEffort } from './junieModelCatalog.js';
@@ -1028,6 +1029,28 @@ function collectCuratedCopilotModel(
   }
 }
 
+function buildCuratedGooseCliOverlay(
+  document: CuratedModelCatalogDocument | undefined,
+): CuratedCatalogOverlay | null {
+  const catalog = findCuratedCliCatalog(document, 'goose');
+  const scope = catalog && resolveCuratedCatalogScope(catalog, 'goose');
+  if (!catalog || !scope) return null;
+  const overlay = buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeVerbatimCuratedModelId);
+  if (!overlay || catalog.selectionMode !== 'shortlist') return overlay;
+
+  const entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>> = {};
+  for (const model of scope.models) {
+    const id = normalizeVerbatimCuratedModelId(model);
+    const option = resolveEffectiveCuratedModelOptions(scope.sharedOptions, model)
+      .find((candidate) => matchesCuratedOptionName(candidate, ['thinking effort']));
+    const effort = option?.values?.length === 1 ? option.values[0].name.toLowerCase() : undefined;
+    if (id && effort && effort === 'off' && getGooseFixedEffort(id) === 'off') {
+      entryDefaults[id] = { [GOOSE_EFFORT_CONTROL]: effort };
+    }
+  }
+  return { ...overlay, entryDefaults, controls: [] };
+}
+
 function buildCuratedClineCliOverlay(
   document: CuratedModelCatalogDocument | undefined,
 ): CuratedCatalogOverlay | null {
@@ -1701,6 +1724,22 @@ const VERIFIED_ADVANCED_MANIFESTS: VerifiedAdvancedManifest[] = [
     },
   },
   {
+    id: 'goose-cli-fixed-combos-v1',
+    version: '2026-09-23',
+    supportTier: 'entry_only',
+    evidenceRefs: ['docs/research/2026-09-23-goose-shortlist.md'],
+    matches: (target) => target.providerName === 'goose' && target.backend === 'cli',
+    build: (_target, entries) => {
+      const entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>> = {};
+      for (const entry of entries) {
+        const effort = getGooseFixedEffort(entry.id);
+        if (effort) entryDefaults[entry.id] = { [GOOSE_EFFORT_CONTROL]: effort };
+      }
+      return { controls: [], entryDefaults, presets: [],
+        defaultSelection: buildDefaultSelection(entries, [], entryDefaults) };
+    },
+  },
+  {
     id: 'cline-cli-fixed-combos-v1',
     version: '2026-09-18',
     supportTier: 'entry_only',
@@ -1807,6 +1846,7 @@ function loadCuratedOverlay(
       && target.providerName !== 'kiro'
       && target.providerName !== 'junie'
       && target.providerName !== 'auggie'
+      && target.providerName !== 'goose'
       && target.providerName !== 'copilot'
       && target.providerName !== 'cursor'
       && target.providerName !== 'devin'
@@ -1823,6 +1863,8 @@ function loadCuratedOverlay(
   });
   const overlay = (() => {
     switch (target.providerName) {
+      case 'goose':
+        return buildCuratedGooseCliOverlay(result.document);
       case 'cline':
         return buildCuratedClineCliOverlay(result.document);
       case 'auggie':

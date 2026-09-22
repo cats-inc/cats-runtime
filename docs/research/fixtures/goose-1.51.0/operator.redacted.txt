@@ -1,0 +1,11 @@
+<redacted-session-id>
+Provider: ChatGPT Codex (Use your ChatGPT Plus/Pro subscription for GPT-5 Codex models via OAuth)
+gpt-5.6-sol
+gpt-5.6-terra
+gpt-5.6-luna
+gpt-5.6
+gpt-5.5
+gpt-5.4
+thinking effort: Off for all six
+
+Operator confirmation: CLI version is 1.51.0; six fixed ChatGPT Codex + Thinking Off combinations and execution support authorized.

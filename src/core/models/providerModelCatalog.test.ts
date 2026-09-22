@@ -722,7 +722,7 @@ describe('ProviderModelCatalogService', () => {
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
-  it('uses runtime-owned Goose config as the default-model hint for CLI catalogs', async () => {
+  it('keeps the curated Goose shortlist independent of the active provider config', async () => {
     const { env, cleanup } = createGooseConfigRoot([
       'GOOSE_PROVIDER: anthropic',
       'GOOSE_MODEL: claude-sonnet-4-5',
@@ -739,24 +739,16 @@ describe('ProviderModelCatalogService', () => {
         provider: 'goose',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'anthropic/claude-sonnet-4-5',
+        defaultModel: null,
         source: 'static',
         cache: null,
         models: [
-          {
-            id: 'anthropic/claude-sonnet-4-5',
-            label: 'anthropic/claude-sonnet-4-5',
-            default: true,
-            status: 'configured',
-          },
-          {
-            id: 'openai/gpt-5-codex',
-            label: 'openai/gpt-5-codex',
-          },
-          {
-            id: 'openai/gpt-5',
-            label: 'openai/gpt-5',
-          },
+          { id: 'chatgpt_codex/gpt-5.6-sol', label: 'gpt-5.6-sol — Off' },
+          { id: 'chatgpt_codex/gpt-5.6-terra', label: 'gpt-5.6-terra — Off' },
+          { id: 'chatgpt_codex/gpt-5.6-luna', label: 'gpt-5.6-luna — Off' },
+          { id: 'chatgpt_codex/gpt-5.6', label: 'gpt-5.6 — Off' },
+          { id: 'chatgpt_codex/gpt-5.5', label: 'gpt-5.5 — Off' },
+          { id: 'chatgpt_codex/gpt-5.4', label: 'gpt-5.4 — Off' },
         ],
         warnings: [],
       });

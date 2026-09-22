@@ -3272,15 +3272,14 @@ backends:
           metering: expectIdleMeteringSummary(),
           modelCatalog: expect.objectContaining({
             source: 'static',
-            defaultModel: 'anthropic/claude-sonnet-4-5',
-            defaultModelStatus: 'configured',
-            modelCount: 3,
+            defaultModel: null,
+            modelCount: 6,
             warnings: [],
             statusCounts: {
-              configured: 1,
+              configured: 0,
               available: 0,
               running: 0,
-              unknown: 2,
+              unknown: 6,
             },
           }),
           tooling: {
@@ -3315,24 +3314,16 @@ backends:
         provider: 'goose',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'anthropic/claude-sonnet-4-5',
+        defaultModel: null,
         source: 'static',
         cache: null,
         models: [
-          {
-            id: 'anthropic/claude-sonnet-4-5',
-            label: 'anthropic/claude-sonnet-4-5',
-            default: true,
-            status: 'configured',
-          },
-          {
-            id: 'openai/gpt-5-codex',
-            label: 'openai/gpt-5-codex',
-          },
-          {
-            id: 'openai/gpt-5',
-            label: 'openai/gpt-5',
-          },
+          { id: 'chatgpt_codex/gpt-5.6-sol', label: 'gpt-5.6-sol — Off' },
+          { id: 'chatgpt_codex/gpt-5.6-terra', label: 'gpt-5.6-terra — Off' },
+          { id: 'chatgpt_codex/gpt-5.6-luna', label: 'gpt-5.6-luna — Off' },
+          { id: 'chatgpt_codex/gpt-5.6', label: 'gpt-5.6 — Off' },
+          { id: 'chatgpt_codex/gpt-5.5', label: 'gpt-5.5 — Off' },
+          { id: 'chatgpt_codex/gpt-5.4', label: 'gpt-5.4 — Off' },
         ],
         warnings: [],
       });
