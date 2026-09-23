@@ -12,7 +12,7 @@ const { catalogCapabilities, readLocalCatalogProjection } = await fromPackage('b
 const { ProviderModelCatalogService } = await fromPackage('build/runtime/core/models/providerModelCatalog.js');
 const { resolveProviderSelection } = await fromPackage('build/runtime/core/models/providerSelectionResolution.js');
 const { PiProvider } = await fromPackage('build/runtime/backends/cli/providers/pi.js');
-assert.deepEqual(catalogCapabilities, { schemaVersion: 2, bindingVersion: 1, localOverrides: true });
+assert.deepEqual(catalogCapabilities, { schemaVersion: 2, bindingVersion: 1, localOverrides: true, automaticSchema1Upgrade: true });
 const paths = { packageRoot, runtimeRoot };
 const configPath = join(runtimeRoot, 'config', 'providers.yaml');
 const overridePath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');
@@ -34,14 +34,15 @@ assert.equal(baseline.source, 'local_candidate');
 assert.ok(baseline.snapshot);
 assert.equal(existsSync(runtimeRoot), false, 'read-only module must not create a profile');
 mkdirSync(join(runtimeRoot, 'config'), { recursive: true });
-const service = new ProviderModelCatalogService({
+const config = {
   dataDir: join(runtimeRoot, 'data'), configPath,
   providerDefaultTargets: { pi: { backend: 'cli', instance: 'fixture' } },
   providerDefaultInstances: {},
   providerInstances: { pi: { fixture: { id: 'fixture', providerName: 'pi',
     commandConfig: { path: 'pi', runner: 'auto', runtime: { mode: 'native' } } } } },
   providerCommands: {}, remoteProviderCatalog: { api: {}, local: {}, agent: {} },
-}, { catalogPaths: paths });
+};
+const service = new ProviderModelCatalogService(config, { catalogPaths: paths });
 const initial = service.getImmediateAdvancedKnowledge('pi');
 const patch = { schema_version: 2, catalogs: [{
   provider: 'pi', backend: 'cli', selection_mode: 'shortlist', models: [{
@@ -94,6 +95,29 @@ assert.equal(readLocalCatalogProjection(paths).source, 'last_accepted');
 rmSync(overridePath);
 service.reloadCatalogs(current.catalog.catalogRevision);
 assert.equal(service.getImmediateAdvancedKnowledge('pi').catalog.catalogRevision, initial.catalog.catalogRevision);
+
+// A fresh profile from the previous release must upgrade using only installed resources.
+// The input is a frozen old document; migration code and evidence come from the tarball.
+const legacy = readFileSync(new URL('../../docs/research/fixtures/catalog-schema1/factory-before-cutover.json', import.meta.url), 'utf8');
+const upgradeRoot = join(runtimeRoot, 'old-release-profile');
+const upgradeOverride = join(upgradeRoot, 'config', 'curated-model-catalogs.yaml');
+mkdirSync(join(upgradeRoot, 'config'), { recursive: true });
+writeFileSync(upgradeOverride, legacy);
+const upgradePaths = { packageRoot, runtimeRoot: upgradeRoot };
+assert.equal(readLocalCatalogProjection(upgradePaths).source, 'unavailable');
+assert.equal(readFileSync(upgradeOverride, 'utf8'), legacy, 'read-only host must not migrate');
+const upgradedConfig = { ...config, dataDir: join(upgradeRoot, 'data'), configPath: join(upgradeRoot, 'config', 'providers.yaml') };
+const upgraded = new ProviderModelCatalogService(upgradedConfig, { catalogPaths: upgradePaths });
+const upgradeStatus = upgraded.catalogStore.status();
+assert.equal(upgradeStatus.available, true);
+assert.equal(upgradeStatus.upgrade.state, 'completed');
+assert.equal(readFileSync(upgradeStatus.upgrade.backupPath, 'utf8'), legacy);
+assert.deepEqual(upgraded.getImmediateAdvancedKnowledge('pi').catalog.entries.map(row => row.label),
+  JSON.parse(legacy).catalogs.find(scope => scope.cli === 'Pi').providers.flatMap(group => group.models.map(model => model.label || model.name)));
+const restarted = new ProviderModelCatalogService(upgradedConfig, { catalogPaths: upgradePaths });
+assert.equal(restarted.catalogStore.status().catalogRevision, upgradeStatus.catalogRevision);
+assert.equal(restarted.catalogStore.status().upgrade.state, 'not_needed');
+assert.equal(readdirSync(join(upgradeRoot, 'config')).filter(name => name.endsWith('.bak')).length, 1);
 assert.deepEqual({ build: hashes(join(packageRoot, 'build')), config: hashes(join(packageRoot, 'config')) }, originalHashes);
 console.log(JSON.stringify({ installedVersion: JSON.parse(readFileSync(join(packageRoot, 'package.json'))).version,
-  factoryDigest: baseline.snapshot.factoryDigest, verified: 'fixed installed build; data-only unknown ID, binding, empty, rollback, invalid, remove' }));
+  factoryDigest: baseline.snapshot.factoryDigest, verified: 'fixed installed build; data-only unknown ID, binding, empty, rollback, invalid, remove, old-profile upgrade and restart' }));

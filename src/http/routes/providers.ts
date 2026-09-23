@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { catalogCapabilities } from '../../catalogs/index.js';
-import { CatalogRevisionConflict, CatalogUnavailableError } from '../../catalogs/store.js';
+import { CatalogRevisionConflict, CatalogUnavailableError } from '../../catalogs/errors.js';
 import {
   isProviderTargetResolutionError,
   listConfiguredProviders,

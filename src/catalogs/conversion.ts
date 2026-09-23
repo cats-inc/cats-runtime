@@ -30,7 +30,7 @@ function allowKeys(value: ObjectValue, keys: string[]): void {
   for (const key of Object.keys(value)) if (!keys.includes(key)) throw new Error(`Unresolved field '${key}'`);
 }
 
-/** Offline explicit conversion against frozen, reviewed label-to-binding evidence; never guesses tokens. */
+/** Pure conversion against frozen, reviewed label-to-binding evidence; never guesses tokens. */
 export function convertLegacyCatalog(source: string, mapping: LegacyMigrationScope[]): CatalogDocument {
   const parsed = parseDocument(source, { uniqueKeys: true });
   if (parsed.errors.length) throw new Error(parsed.errors.map(error => error.message).join('; '));

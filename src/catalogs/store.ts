@@ -7,20 +7,8 @@ import {
 } from './resolver.js';
 import { catalogScopeKey } from './schema.js';
 import type { CatalogPaths, CatalogSnapshot } from './types.js';
-
-export class CatalogRevisionConflict extends Error {
-  readonly code = 'catalog_revision_conflict';
-}
-
-/** No accepted data exists; retrying a read cannot repair the configuration. */
-export class CatalogUnavailableError extends Error {
-  readonly code = 'catalog_unavailable';
-
-  constructor() {
-    super('Provider catalog configuration needs attention. Inspect /providers/catalogs, apply a valid catalog, and reload.');
-    this.name = 'CatalogUnavailableError';
-  }
-}
+import { CatalogRevisionConflict, CatalogUpgradeError } from './errors.js';
+import { upgradeCatalogOverride, type CatalogUpgradeStatus } from './upgrade.js';
 
 export interface CatalogStatus {
   available: boolean;
@@ -31,6 +19,7 @@ export interface CatalogStatus {
   factoryDigest: string;
   overrideDigest: string | null;
   origins: CatalogSnapshot['origins'];
+  upgrade: CatalogUpgradeStatus;
 }
 
 /** Runtime-owned activation. Hosts import the resolver instead of constructing this store. */
@@ -39,6 +28,7 @@ export class CatalogStore {
   private activationId = randomUUID();
   private diagnostics: string[] = [];
   private source: CatalogStatus['source'] = 'unavailable';
+  private upgrade: CatalogUpgradeStatus = { state: 'not_needed' };
   readonly paths: Required<CatalogPaths>;
   private readonly factoryDigest: string;
 
@@ -46,7 +36,7 @@ export class CatalogStore {
     this.paths = resolveCatalogPaths(paths);
     this.factoryDigest = catalogDigest(readCatalogFactory(paths).source);
     try {
-      this.activate(readCatalogCandidate(paths));
+      this.activate(this.readCandidate());
     } catch (error) {
       this.diagnostics = [error instanceof Error ? error.message : String(error)];
       this.snapshot = readAcceptedCatalog(paths, this.factoryDigest);
@@ -62,6 +52,7 @@ export class CatalogStore {
       activationId: this.activationId, source: this.source, diagnostics: [...this.diagnostics],
       factoryDigest: this.snapshot?.factoryDigest ?? this.factoryDigest, overrideDigest: this.snapshot?.overrideDigest ?? null,
       origins: { ...this.snapshot?.origins },
+      upgrade: { ...this.upgrade },
     };
   }
 
@@ -70,7 +61,7 @@ export class CatalogStore {
       throw new CatalogRevisionConflict('Catalog changed; read the current catalog before reloading.');
     }
     let candidate: CatalogSnapshot;
-    try { candidate = readCatalogCandidate(this.paths); }
+    try { candidate = this.readCandidate(); }
     catch (error) {
       this.diagnostics = [error instanceof Error ? error.message : String(error)];
       throw error;
@@ -101,5 +92,18 @@ export class CatalogStore {
     this.activationId = randomUUID();
     this.diagnostics = [];
     this.source = 'files';
+  }
+
+  private readCandidate(): CatalogSnapshot {
+    if (this.persist) {
+      try {
+        const upgrade = upgradeCatalogOverride(this.paths);
+        if (upgrade.state === 'completed' || this.upgrade.state !== 'completed') this.upgrade = upgrade;
+      } catch (error) {
+        if (error instanceof CatalogUpgradeError) this.upgrade = { state: 'blocked', message: error.message };
+        throw error;
+      }
+    }
+    return readCatalogCandidate(this.paths);
   }
 }

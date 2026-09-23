@@ -234,18 +234,35 @@ flowchart TD
 Schema 1 and its human-label normalizers preceded this implementation. Provide
 an explicit offline conversion/preview tool that produces schema 2 using retained
 evidenced mappings. It must report unresolved mappings instead of guessing, preserve
-source labels/order/defaults, and require authorization before writing personal
-files. A whole schema-1 snapshot converts to replacements for all scopes it contains;
+source labels/order/defaults, and require authorization for agent-initiated personal
+file edits. The product activation migration is specified below. A whole schema-1
+snapshot converts to replacements for all scopes it contains;
 do not silently delete scopes merely because they equal today's factory data.
 
-The new execution loader accepts only the current schema. Keep any legacy parser
-inside the explicit conversion tool, not parallel runtime fallback paths. Before
+The new execution loader accepts only the current schema. Keep the legacy parser
+inside the bounded migration module, not parallel runtime fallback paths. Before
 replacing a personal file, the apply/conversion helper checks the selected installed
 Runtime's catalog capability/schema support; an unsupported or unknown installation
 is left unchanged with an explicit result. A converter may still write a candidate
 to a separate output path for review. Already installed schema-1 software cannot be
 made to reject files differently by this design; post-load rejection guarantees
 apply to the new loader only. Patch distribution states this prerequisite.
+
+**Installed-upgrade amendment (2026-09-23):** writable Runtime startup and an
+explicit catalog reload automatically convert a recognized schema-1 override
+through the same reviewed converter and transactional apply helper. Validate the
+complete candidate before backup/replacement; preserve the full local snapshot
+and expose completed/blocked status with backup details in catalog diagnostics.
+Schema 2 and absent overrides are idempotent no-ops. Unknown schemas, unresolved
+mappings, concurrent edits, locks or write failures preserve the original. An
+interrupted lock is never force-cleared. Failed upgrades use a compatible accepted
+snapshot if available, otherwise the typed unavailable state. Runtime Setup shows
+the failure and supports explicit reload after correction. Read-only projections,
+inspect and preview must never migrate. Desktop and cats-one delegate to the
+Runtime activation boundary instead of maintaining another migration implementation.
+The read-only capability export advertises `automaticSchema1Upgrade: true` without
+performing migration. A committed conversion remains valid if later accepted-snapshot
+persistence fails; the original backup and failure diagnostics remain available.
 
 Package tests must verify npm and installed Desktop contain the exact generated
 factory data, resolver, and source revision. A moved installation, read-only install
@@ -288,6 +305,7 @@ their implementation lands. Update the skill in the same cutover delivery.
 | AC-12 | Convert schema 1 without loss; unresolved mappings stop conversion; preview and apply against unsupported/unknown installed capability leave the personal file unchanged |
 | AC-13 | Generation/check fails when a derivative is edited or a production model table returns; intentional fixtures/evidence remain permitted |
 | AC-14 | A fresh agent follows the updated canonical/mirrored skill to perform factory and local fixture changes; no manual production model literals or unsupported capability claims |
+| AC-15 | A packaged Runtime upgrades a previous-release profile before its first model read, preserves all choices with a raw backup, performs no duplicate conversion after restart, and supports explicit retry after a blocked conversion; read-only hosts do not write |
 
 All execution assertions use isolated fake transports; no user-state sessions,
 authentication, or inference quota are required. Native packaging results must be

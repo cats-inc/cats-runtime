@@ -27,8 +27,6 @@ import {
   createRuntimeStartupState,
 } from '../src/startup.js';
 import { readCatalogFactory } from '../src/catalogs/resolver.js';
-import { convertLegacyCatalog, type LegacyMigrationScope } from '../src/catalogs/conversion.js';
-import { applyCatalogPatch, previewCatalogPatch } from '../src/catalogs/patch.js';
 
 const RUNTIME_SERVER_DEFAULT_TIMEOUT_MS = process.platform === 'win32' ? 30_000 : 5_000;
 const RUNTIME_SERVER_MEDIUM_TIMEOUT_MS = process.platform === 'win32' ? 60_000 : 10_000;
@@ -244,7 +242,7 @@ async function withCuratedCatalogRuntime(
 }
 
 describe('runtime server', () => {
-  it('reports a cold schema-1 profile as a configuration problem and recovers after backed-up conversion and reload', async () => {
+  it('upgrades an existing schema-1 profile before the first model request', async () => {
     const { root, config, cleanup } = createTestConfig({ apiKey: 'upgrade-fixture' });
     const paths = createRuntimeTestPaths(root);
     const original = readFileSync('docs/research/fixtures/catalog-schema1/factory-before-cutover.json', 'utf8');
@@ -253,31 +251,49 @@ describe('runtime server', () => {
     const headers = { authorization: 'Bearer upgrade-fixture', 'content-type': 'application/json' };
     try {
       const status = await (await runtime.app.request('/providers/catalogs', { headers })).json();
-      expect(status).toMatchObject({ available: false, catalogRevision: null });
-      expect(status.diagnostics.join(' ')).toContain("Unsupported catalog schema '1'");
-      for (const path of ['/providers/models', '/providers/claude/models', '/providers/claude/models/advanced']) {
-        const rejected = await runtime.app.request(path, { headers });
-        expect(rejected.status).toBe(503);
-        expect(await rejected.json()).toMatchObject({ code: 'catalog_unavailable' });
-      }
-      expect(readFileSync(paths.curatedModelCatalogPath, 'utf8')).toBe(original);
-
-      const mapping = JSON.parse(readFileSync('config/catalog-schema1-migration.json', 'utf8')) as LegacyMigrationScope[];
-      const converted = JSON.stringify(convertLegacyCatalog(original, mapping));
-      const catalogPaths = runtime.context.providerModelCatalog.catalogStore.paths;
-      const preview = previewCatalogPatch(catalogPaths, converted);
-      const applied = applyCatalogPatch(catalogPaths, converted, preview.expectedDigest);
-      expect(readFileSync(applied.backupPath!, 'utf8')).toBe(original);
-      const reload = await runtime.app.request('/providers/catalogs/reload', {
-        method: 'POST', headers, body: JSON.stringify({ expectedRevision: null }),
-      });
-      expect(reload.status).toBe(200);
+      expect(status).toMatchObject({ available: true, automaticSchema1Upgrade: true,
+        upgrade: { state: 'completed', fromSchema: 1, toSchema: 2 } });
+      expect(readFileSync(status.upgrade.backupPath, 'utf8')).toBe(original);
       const basic = await (await runtime.app.request('/providers/claude/models', { headers })).json();
       const advanced = await (await runtime.app.request('/providers/claude/models/advanced', { headers })).json();
       expect(basic.models.map((model: { id: string }) => model.id)).toEqual(['opus', 'fable', 'sonnet', 'haiku']);
       expect(advanced).toMatchObject({ catalogRevision: basic.catalogRevision, catalogActivationId: basic.catalogActivationId,
         defaultSelection: { entryId: 'opus', controls: { 'claude.reasoning_effort': 'high' } } });
       expect((await (await runtime.app.request('/providers/catalogs', { headers })).json()).diagnostics).toEqual([]);
+    } finally {
+      await runtime.close();
+      await cleanup();
+    }
+  });
+
+  it('keeps an unrecognized old profile and exposes a recoverable configuration error without returning fake models', async () => {
+    const { root, config, cleanup } = createTestConfig({ apiKey: 'upgrade-fixture' });
+    const paths = createRuntimeTestPaths(root);
+    const original = readFileSync('docs/research/fixtures/catalog-schema1/factory-before-cutover.json', 'utf8');
+    const invalid = JSON.parse(original);
+    invalid.catalogs[0].models[0].name = 'no-reviewed-binding';
+    const unknown = JSON.stringify(invalid);
+    writeFileSync(paths.curatedModelCatalogPath, unknown);
+    const runtime = createRuntimeServer(config);
+    const headers = { authorization: 'Bearer upgrade-fixture', 'content-type': 'application/json' };
+    try {
+      const status = await (await runtime.app.request('/providers/catalogs', { headers })).json();
+      expect(status).toMatchObject({ available: false, catalogRevision: null, upgrade: { state: 'blocked' } });
+      for (const path of ['/providers/models', '/providers/claude/models', '/providers/claude/models/advanced']) {
+        const rejected = await runtime.app.request(path, { headers });
+        expect(rejected.status).toBe(503);
+        expect(await rejected.json()).toMatchObject({ code: 'catalog_unavailable' });
+      }
+      const retry = () => runtime.app.request('/providers/catalogs/reload', {
+        method: 'POST', headers, body: JSON.stringify({ expectedRevision: null }),
+      });
+      expect((await retry()).status).toBe(400);
+      expect(readFileSync(paths.curatedModelCatalogPath, 'utf8')).toBe(unknown);
+      writeFileSync(paths.curatedModelCatalogPath, original);
+      expect((await retry()).status).toBe(200);
+      expect((await runtime.app.request('/providers/claude/models', { headers })).status).toBe(200);
+      const recovered = await (await runtime.app.request('/providers/catalogs', { headers })).json();
+      expect(recovered).toMatchObject({ available: true, diagnostics: [], upgrade: { state: 'completed' } });
     } finally {
       await runtime.close();
       await cleanup();

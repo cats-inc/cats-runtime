@@ -4121,6 +4121,11 @@ current local default selection without reviving a sample-only shim route.
 
 `GET /providers/catalogs` reports capabilities, availability, `catalogRevision`,
 `activationId`, source, factory/override digests, origins and diagnostics.
+`automaticSchema1Upgrade: true` advertises one-time conversion at writable Runtime
+startup and explicit reload. `upgrade.state` is `not_needed`, `completed` (with
+`fromSchema`, `toSchema`, `backupPath`, `sourceDigest`, `candidateDigest`), or
+`blocked` (with `message`). Status GETs never migrate. Completed status persists
+for that process; after restart the converted file reports `not_needed`.
 `POST /providers/catalogs/reload` accepts `{"expectedRevision":"<revision>"}`
 (or null for unavailable state), requires the configured authentication and uses
 the selected Runtime's file paths. It validates and atomically activates one
@@ -4134,8 +4139,8 @@ Clients must not combine mismatched revisions/activations or targets. Structured
 new-session selections may send `catalogRevision`; stale values return 409 before
 execution. Resumed sessions preserve recorded bindings.
 
-The [soft-patch guide](provider-catalog-soft-patches.md) documents explicit schema-1
-conversion, CLI preview/apply with digest checks, backup and rollback. Discovery
+The [soft-patch guide](provider-catalog-soft-patches.md) documents automatic and explicit
+schema-1 conversion, CLI preview/apply with digest checks, backup and rollback. Discovery
 refresh is separate from local-file reload.
 
 `GET /providers/models` is the runtime-owned aggregate default-target catalog

@@ -71,7 +71,27 @@ immediately; ordinary reads also revalidate automatically.
 
 ## Existing schema-1 files and rollback
 
-There is no implicit migration or automatic Desktop seeding. Convert explicitly:
+Runtime builds advertising `automaticSchema1Upgrade: true` in `./catalogs` and
+`GET /providers/catalogs` upgrade recognized schema-1 overrides on writable startup
+or explicit reload. The converter uses shipped, reviewed mappings without probing
+providers. It validates the complete candidate, saves a unique byte-for-byte backup,
+checks the source digest under an apply lock, and atomically replaces the file.
+All existing scopes stay pinned; labels, order, defaults and controls are preserved.
+Missing overrides and schema 2 are no-ops, including repeat startup. There is no
+automatic Desktop seeding and no second host-owned converter.
+
+Catalog status includes `upgrade.state`: `completed` (with schema numbers and
+`backupPath`), `blocked` (with a message), or `not_needed`. Setup & Repair shows
+upgrade/recovery details and can retry by reloading the current revision after the
+cause is corrected. A failed conversion/write or concurrent edit preserves the
+existing file. An interrupted writer's lock is retained for verified recovery;
+do not blindly delete it or run two writers. A completed conversion remains valid
+if later snapshot persistence fails; its original is still in the recorded backup.
+After restart, the now-current file needs no further migration or backup.
+
+Read-only projections, inspect and preview never migrate or create personal files.
+For older schema-2 installations without this capability, or reviewed manual
+recovery of unresolved mappings, convert explicitly:
 
 ```text
 node <package>/build/runtime/bin/catalogs.js convert --package-root <package> --runtime-root <profile> --file <old.yaml> --output <new-preview.yaml>
@@ -80,7 +100,9 @@ node <package>/build/runtime/bin/catalogs.js convert --package-root <package> --
 Conversion writes a new preview only and refuses unresolved mappings. Review every
 retained scope: a former complete personal snapshot pins all of those scopes until
 removed. Keep this validated schema-2 baseline for rollback, then preview/apply/reload.
-An old schema-1 backup cannot be applied directly to the new loader.
+An old schema-1 backup cannot be applied as a schema-2 patch; restoring it causes
+a migration-capable Runtime to migrate again. Convert it to a validated candidate
+before applying a rollback.
 
 To roll back one scope, copy it from a validated schema-2 backup into the **latest**
 candidate, preserving other scopes, then preview/apply/reload with the current
@@ -99,8 +121,9 @@ software, connection or profile cannot borrow another identity's accepted snapsh
 
 An upgrade must cover an existing profile as well as a clean install. Desktop
 0.3.8 exposed a missed transition: an existing schema-1 override left the catalog
-unavailable while the picker kept spinning. Recover with the selected installed
-package's convert/preview/apply/reload sequence above; verify the backup, both
+unavailable while the picker kept spinning. That release requires the selected
+package's explicit conversion sequence above; newer builds expose the automatic
+upgrade capability. Verify the backup, both
 model endpoints and their shared revision. A package health response or a passing
 converter unit test alone does not establish that the upgraded picker works.
 

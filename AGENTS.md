@@ -151,6 +151,13 @@ contract.
 
 ## Release Scope and Versioning
 
+- Preserve compatibility within each `0.x` minor line. Breaking HTTP/CLI,
+  user-config or persisted-data contracts require a minor bump; stable `1.x+`
+  breaking public contracts require a major bump. A schema change must include
+  a tested upgrade path with validation, backup, atomic replacement and explicit
+  failure recovery. One-time data migrations are allowed under the pre-release
+  policy; do not retain obsolete execution paths. See the release SOP.
+
 - Follow the [Runtime release SOP](docs/release-guide.md) and the
   [cross-repository release guide](https://github.com/cats-inc/cats-one/blob/main/docs/release-guide.md).
 - Ordinary implementation, documentation, commit/push and merge requests do not

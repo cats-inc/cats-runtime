@@ -24,6 +24,23 @@ dist-tags.
 | npm channel | Explicit `dist_tag=latest` or `next`; the workflow defaults to `next` |
 | Git release tag | Not required for npm publication |
 
+## Version selection and migration gate
+
+Follow the [cross-repository compatibility policy](https://github.com/cats-inc/cats-one/blob/main/docs/release-guide.md#compatibility-and-data-upgrades).
+Breaking HTTP/CLI, user-authored configuration or persisted-data contracts move
+`0.x` to its next minor; stable `1.x+` public contracts use a major bump. Compatible
+fixes use patch; compatible features may use minor. Schema numbers do not directly
+determine package versions. A tested transparent internal migration can preserve
+compatibility; simply rejecting an old user file cannot.
+
+The catalog schema-2 cutover sets the next authorized Runtime release boundary at
+`0.2.0`. Do not continue `0.1.x` as if existing schema-1 profiles were compatible.
+Shipping requires the owning Runtime to handle recognized data upgrades with
+complete validation, backup, atomic replacement, idempotent restart and explicit
+failure diagnostics. Test clean and existing profiles; a version bump or a note
+asking users to repair their files is insufficient. Do not add legacy execution
+fallbacks or overwrite unrecognized data to make startup appear successful.
+
 ## Prepare and publish
 
 1. Select the intended source and npm channel, and integrate remote changes without

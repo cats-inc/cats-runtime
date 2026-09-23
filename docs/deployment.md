@@ -11,7 +11,14 @@ migration mappings, read-only `./catalogs` export and catalog CLI. Desktop bundl
 layout retains these split modules and their dependencies alongside the main bundle.
 
 Keep local overrides under the selected Runtime profile/config path across upgrades.
-Do not seed or overwrite them from a package. Supported data changes need no rebuild;
+Do not seed or overwrite them with factory contents. Writable Runtime startup and
+explicit catalog reload upgrade recognized schema-1 files once using the shipped
+converter, complete validation, backup and atomic apply. `automaticSchema1Upgrade`
+advertises this capability; `GET /providers/catalogs` reports upgrade state and
+Setup & Repair provides details and retry. Read-only hosts never migrate.
+Unknown mappings or failed writes preserve the old file and show a configuration
+error, retaining a compatible accepted snapshot when one exists.
+Supported data changes need no rebuild;
 see [soft patches](provider-catalog-soft-patches.md). A new package must implement
 the capability before this workflow is supported. Publication remains a separate step.
 

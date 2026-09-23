@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { catalogDigest, createCatalogSnapshot, readCatalogFactory, resolveCatalogPaths } from './resolver.js';
-import { CatalogRevisionConflict } from './store.js';
+import { CatalogRevisionConflict } from './errors.js';
 import type { CatalogPaths, CatalogSnapshot } from './types.js';
 
 function readOverride(path: string): string | undefined {
@@ -42,9 +42,9 @@ export function applyCatalogPatch(paths: CatalogPaths, candidate: string, expect
     }
     if (current !== undefined) {
       backupPath = `${resolved.overridePath}.${new Date().toISOString().replace(/[:.]/g, '-')}.${randomUUID()}.bak`;
-      writeFileSync(backupPath, current, { flag: 'wx' });
+      writeFileSync(backupPath, current, { flag: 'wx', flush: true });
     }
-    writeFileSync(temp, candidate, { flag: 'wx' });
+    writeFileSync(temp, candidate, { flag: 'wx', flush: true });
     const latest = readOverride(resolved.overridePath);
     if ((latest === undefined ? null : catalogDigest(latest)) !== expectedDigest) {
       throw new CatalogRevisionConflict('Override changed during apply; original file retained.');

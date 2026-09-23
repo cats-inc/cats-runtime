@@ -66,6 +66,10 @@ The factory, generated digest, read-only module and catalog CLI must come from o
 Check the npm payload and both Desktop sidecar layouts when packaging code changes. A local scope
 replacement survives factory upgrades; unpatched scopes adopt the new factory. Do not auto-seed a
 whole personal factory snapshot. Follow [local patches](./local-soft-patch.md) for installed users.
+Schema changes must also exercise an isolated previous-version profile through writable Runtime
+startup, backup, repeat startup and failed-upgrade recovery using the installed package resources.
+The `automaticSchema1Upgrade` capability belongs to Runtime activation, never the read-only export
+or a second Desktop migration. A successful health check or converter unit test is insufficient.
 
 ## Skill source and mirrors
 

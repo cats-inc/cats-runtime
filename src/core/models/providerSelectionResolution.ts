@@ -6,7 +6,7 @@ import type {
   ProviderAdvancedControlValue,
 } from './providerAdvancedCatalog.js';
 import { cloneProviderControls } from './providerControlUtils.js';
-import { CatalogRevisionConflict } from '../../catalogs/store.js';
+import { CatalogRevisionConflict } from '../../catalogs/errors.js';
 import { CATALOG_BINDING_VERSION } from '../../catalogs/bindings.js';
 
 export type ProviderModelSelectionEntryMode = 'auto' | 'explicit';

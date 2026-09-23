@@ -46,6 +46,19 @@ with fake transports unless paid/live execution is authorized. A stale new selec
 
 ## Schema 1 and rollback
 
+Check the selected installation's `catalogCapabilities.automaticSchema1Upgrade` or the running
+`GET /providers/catalogs` response before planning manual conversion. When true, Runtime startup
+and explicit reload perform the reviewed schema-1 conversion, validate the complete effective
+catalog, save a unique raw backup, and atomically replace the override under a lock and digest
+check. `upgrade.state` reports `completed`, `blocked`, or `not_needed`; completed includes
+`backupPath`. Schema 2 and missing overrides are no-ops. The Runtime does not seed a new override.
+Desktop delegates this operation to Runtime. Do not add another converter to the picker/host.
+Read-only `./catalogs`, inspect and preview never migrate or create files. Do not start a real
+personal Runtime merely as a test; use isolated profiles. Product startup migration is distinct
+from an agent's authorization to manually edit a personal file.
+
+For installations without that capability, or an unresolved mapping needing review:
+
 `convert --file <old.yaml> --output <new-preview.yaml>` with the same package/profile arguments
 creates a **new** schema-2 preview. It never edits the source or activates it. Reviewed migration
 mappings preserve known scopes/options; unresolved IDs/options stop conversion instead of guessing.
@@ -55,18 +68,23 @@ Then use preview/apply/reload. Conversion is not authorization to modify a perso
 ### Upgrade regression: a picker that never finishes loading
 
 Inspect the **running installation's** `GET /providers/catalogs` before probing a
-vendor or changing UI model data. `available: false` plus an unsupported-schema
-diagnostic means reads cannot recover until the local file is converted. New model
+vendor or changing UI model data. Inspect `upgrade` and diagnostics: a blocked migration
+requires correcting its cause and explicit reload; ordinary GET requests do not migrate. An
+existing apply lock is never stolen; verify its owner before considering manual recovery.
+An older installation without automatic upgrade still needs explicit conversion. New model
 routes identify this with `code: catalog_unavailable`; Desktop 0.3.8 originally
 returned a generic model lookup failure and kept spinning. Do not fix this by
 deleting the user's override, inserting hardcoded defaults, or ignoring a rejected
-patch. Prepare the reviewed conversion, verify retained scopes/models/options,
-apply it with backup and digest protection within authorization, then reload with
+patch. Use Setup & Repair's retry after correction, or prepare the reviewed manual
+conversion and apply it with backup and digest protection within authorization. Reload with
 the current revision (null on this cold failure). Verify both model endpoints and
 the consumer's subsequent reads; an HTTP health check alone is insufficient.
 
-For schema/loader releases, test a previous-format profile through the complete
-upgrade/recovery path in isolation. Converter unit tests and clean-install smokes
+For schema/loader releases, follow the repository's version/migration gate: breaking changes
+require a minor bump during `0.x` and a major bump from `1.x`, when release is authorized.
+Test a previous-format profile through the complete upgrade/recovery path in isolation,
+including the installed package, repeated startup, failed writes, and unknown mappings.
+Converter unit tests and clean-install smokes
 do not cover an installed picker with existing settings. Surface any required
 personal-file conversion before calling that installation ready, not only in
 release notes. Keep this lesson in the Runtime skill source and synchronize both
@@ -79,10 +97,10 @@ current scopes, then preview/apply against the current digest and reload. Restor
 also restores every other scope to that backup's state; do so only when authorized. Removing the override
 file restores all factory scopes after reload. Retain backups until the user approves removal.
 
-The first conversion's raw backup is still schema 1 and cannot be applied to a schema-2 loader.
+The first conversion's raw backup is still schema 1 and cannot be used as a schema-2 patch.
 Keep the validated converted baseline preview for rollback; alternatively convert that old backup
 to a new preview before preview/apply. Restoring raw schema-1 bytes is only useful with its original
-software and makes the new loader report rejection/unavailability; do not call that a valid rollback.
+software; a newer Runtime will migrate it again or reject it. Do not call that a valid schema-2 rollback.
 
 Deliver the small scope data, required schema/binding capability, evidence, exact target paths,
 preview/digest, activation and rollback steps. Do not claim support on unverified old binaries.

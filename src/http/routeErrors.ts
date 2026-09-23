@@ -1,5 +1,5 @@
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { CatalogRevisionConflict, CatalogUnavailableError } from '../catalogs/store.js';
+import { CatalogRevisionConflict, CatalogUnavailableError } from '../catalogs/errors.js';
 import {
   isProviderNotConfiguredError,
   isUnknownProviderInstanceError,

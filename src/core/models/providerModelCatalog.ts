@@ -49,7 +49,8 @@ import {
 } from './remoteModelDiscovery.js';
 import { resolve } from 'node:path';
 import { resolveRuntimeRoot, resolveRuntimePackageRoot } from '../../shared/runtimePaths.js';
-import { CatalogStore, CatalogUnavailableError } from '../../catalogs/store.js';
+import { CatalogStore } from '../../catalogs/store.js';
+import { CatalogUnavailableError } from '../../catalogs/errors.js';
 import { findCatalogScope, readCatalogFactory, createCatalogSnapshot } from '../../catalogs/resolver.js';
 import type { CatalogPaths } from '../../catalogs/types.js';
 

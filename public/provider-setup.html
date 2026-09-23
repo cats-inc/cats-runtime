@@ -6,6 +6,9 @@
 <link rel="icon" href="/favicon.ico" />
 <title>Cats Runtime Setup</title>
 <style>
+  #reloadModelCatalogBtn[hidden] {
+    display: none;
+  }
   .setup-workflow-rail {
     display: flex;
     flex-direction: column;
@@ -639,6 +642,19 @@
 
       <div class="runtime-page-content overflow-y-auto p-6">
         <div class="mx-auto flex max-w-6xl flex-col gap-6">
+          <section id="modelCatalogStatusPanel" class="runtime-card hidden" hidden aria-live="polite">
+            <div class="runtime-card-header">
+              <div>
+                <h2 class="runtime-card-title">Model Settings</h2>
+                <p id="modelCatalogStatusMessage" class="runtime-card-copy"></p>
+              </div>
+              <button id="reloadModelCatalogBtn" class="runtime-btn" onclick="reloadModelCatalog()">Retry Model Settings</button>
+            </div>
+            <details class="px-4 pb-4 text-sm text-slate-400">
+              <summary>Upgrade and recovery details</summary>
+              <pre id="modelCatalogStatusDetails" class="mt-2 whitespace-pre-wrap break-words"></pre>
+            </details>
+          </section>
           <div id="providersWorkspace" class="setup-workspace space-y-6" data-setup-workspace="providers">
             <section class="runtime-card">
               <div class="runtime-card-header">
@@ -1324,6 +1340,7 @@ function applySetupStateReadModel(data, selectedProviders) {
 
 async function fetchState() {
   if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
+  void loadModelCatalogStatus();
   try {
     const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
     const res = await fetchFn('/setup-state');
@@ -1333,6 +1350,72 @@ async function fetchState() {
   } catch (err) {
     document.getElementById('statusText').textContent = 'Failed to load state: ' + err.message;
   }
+}
+
+let modelCatalogStatus = null;
+let modelCatalogReloading = false;
+
+function renderModelCatalogStatus(error = '') {
+  const status = modelCatalogStatus;
+  const upgrade = status?.upgrade;
+  const diagnostics = Array.isArray(status?.diagnostics) ? status.diagnostics : [];
+  const needsAttention = Boolean(error || upgrade?.state === 'blocked' || status?.available === false || diagnostics.length);
+  const completed = upgrade?.state === 'completed';
+  const panel = document.getElementById('modelCatalogStatusPanel');
+  panel.hidden = !needsAttention && !completed;
+  panel.classList.toggle('hidden', panel.hidden);
+  const message = document.getElementById('modelCatalogStatusMessage');
+  message.textContent = needsAttention
+    ? status?.available
+      ? 'Model settings need attention. The last accepted settings remain available. Correct the problem below, then retry.'
+      : 'Model settings could not be loaded. Correct the problem below, then retry.'
+    : 'Model settings were upgraded. Your choices were preserved and a backup was saved.';
+  const details = [...new Set([error, ...diagnostics, upgrade?.state === 'blocked' ? upgrade.message : ''].filter(Boolean))];
+  if (completed) details.push(`Upgraded schema ${upgrade.fromSchema} to ${upgrade.toSchema}.`, `Backup: ${upgrade.backupPath}`);
+  document.getElementById('modelCatalogStatusDetails').textContent = details.join('\n');
+  const button = document.getElementById('reloadModelCatalogBtn');
+  button.hidden = !needsAttention;
+  button.disabled = modelCatalogReloading;
+  button.textContent = modelCatalogReloading ? 'Retrying…' : 'Retry Model Settings';
+}
+
+async function fetchModelCatalogStatus() {
+  const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
+  const response = await fetchFn('/providers/catalogs');
+  if (!response.ok) throw new Error(`Unable to read model settings (HTTP ${response.status}).`);
+  modelCatalogStatus = await response.json();
+  renderModelCatalogStatus();
+  return modelCatalogStatus;
+}
+
+async function loadModelCatalogStatus() {
+  try { await fetchModelCatalogStatus(); }
+  catch (error) { renderModelCatalogStatus(error.message); }
+}
+
+async function reloadModelCatalog() {
+  if (modelCatalogReloading) return;
+  modelCatalogReloading = true;
+  renderModelCatalogStatus();
+  let failure = '';
+  try {
+    // Read the current revision before retrying; a rejected cold start has null.
+    const current = await fetchModelCatalogStatus();
+    const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
+    const response = await fetchFn('/providers/catalogs/reload', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedRevision: current.catalogRevision }),
+    });
+    if (!response.ok) {
+      const result = await response.json();
+      throw new Error(result.error || `Model settings were rejected (HTTP ${response.status}).`);
+    }
+  } catch (error) { failure = error.message; }
+  try { await fetchModelCatalogStatus(); }
+  catch (error) { failure = failure || error.message; }
+  modelCatalogReloading = false;
+  renderModelCatalogStatus(failure);
+  if (!failure && modelCatalogStatus?.available) void loadConfiguredTargetCapabilities();
 }
 
 function updateStatusBar(data) {

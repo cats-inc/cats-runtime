@@ -117,7 +117,7 @@ import {
   sameProviderModelSelection,
 } from '../../core/models/providerSelectionResolution.js';
 import { normalizeProviderCatalogModelId } from '../../core/models/providerModelCatalog.js';
-import { CatalogRevisionConflict } from '../../catalogs/store.js';
+import { CatalogRevisionConflict } from '../../catalogs/errors.js';
 import { cloneProviderControls } from '../../core/models/providerControlUtils.js';
 import {
   buildRuntimeExecutionStrategySessionPatch,

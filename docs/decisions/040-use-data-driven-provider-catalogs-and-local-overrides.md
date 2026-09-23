@@ -5,8 +5,9 @@
 Accepted and implemented — 2026-09-23. Runtime and Platform changes were committed
 and pushed directly to main with the operator's authorization. Both implementation
 CI runs passed; [PLAN-040](../plans/PLAN-040-provider-catalog-data-and-local-overrides.md)
-records acceptance evidence and platform limits. Package/installer publication
-and conversion of personal schema-1 files remain separate operations.
+records acceptance evidence and platform limits. Package and installer publication
+remain separate operations. The 2026-09-23 upgrade amendment below supersedes
+the original requirement for an operator-run conversion on every installation.
 
 ## Context
 
@@ -121,12 +122,40 @@ are release requirements, not optional follow-up work.
   require software work. A patch cannot supply commands or executable code.
 - The initial refactor spans Runtime resolution, adapters, Playground, Platform,
   packaging, and skill guidance; moving only the visible lists is insufficient.
-- Existing schema-1 personal snapshots need an explicit, backed-up conversion.
-  The execution loader will not retain parallel legacy normalization paths.
+- Runtime upgrades recognized schema-1 snapshots once, with a validated conversion
+  and backup before atomic replacement. The execution loader still accepts only
+  schema 2; there is no parallel legacy execution/normalization path.
 - Factory upgrades preserve local overridden scopes; those scopes stay pinned to
   the user's replacement until edited or removed. Diagnostics expose that origin.
 - The read-only resolver and revision-aware caches become supported Runtime
   boundaries and need package/consumer contract tests.
+
+## Amendment: installed-profile upgrades (2026-09-23)
+
+The owner authorized a product upgrade flow after Desktop 0.3.8 rejected an
+existing schema-1 profile and left its picker loading indefinitely. Runtime owns
+the migration at its writable catalog activation boundary, shared by Desktop,
+npm/cats-one and development startup, and by an explicit catalog reload.
+
+Convert only schema 1 with the shipped reviewed migration evidence. Validate the
+entire candidate against the current factory/bindings before creating a backup
+and using the digest-protected, locked atomic apply operation. Preserve every
+local scope, order, display label, explicit default and supported option. Repeated
+startup on schema 2 makes no conversion or extra backup. No CLI discovery or
+network call belongs to migration.
+
+Unknown schemas/mappings, invalid input, concurrent changes and write failures
+retain original bytes and report a blocked upgrade; use a compatible accepted
+snapshot when available. Never discard overrides to get factory choices. Failed
+or interrupted writers are not force-unlocked. Runtime Setup shows upgrade status
+and diagnostic details and allows an explicit reload after repair. The existing
+typed catalog error keeps Desktop from showing an indefinite loading spinner.
+
+Read-only module imports, local informational projections, inspect and preview
+remain non-mutating. The explicit converter remains available for review and
+unresolved mappings. Tests use isolated profiles; agents still need appropriate
+authorization before operating on an actual user's profile. This is a bounded
+data migration permitted by the workspace's compatibility policy.
 
 ## Alternatives Considered
 

@@ -96,6 +96,72 @@ function page(initial: ReturnType<typeof state>, fetcher: (path: string, init?: 
     update(data: unknown) { context.nextState = data; evaluate('applySetupStateReadModel(nextState)'); } };
 }
 
+describe('model catalog upgrade recovery', () => {
+  const blocked = { available: false, catalogRevision: null, diagnostics: ['Unresolved model'],
+    upgrade: { state: 'blocked', message: 'Unresolved model' } };
+
+  it('shows an upgrade backup in plain text and hides retry after a successful migration', async () => {
+    const ui = page(state(), async () => Response.json({ available: true, diagnostics: [], catalogRevision: 'r1',
+      upgrade: { state: 'completed', fromSchema: 1, toSchema: 2, backupPath: 'fixture/<backup>.bak' } }));
+    await ui.evaluate<Promise<void>>('loadModelCatalogStatus()');
+    expect(ui.element('modelCatalogStatusPanel').hidden).toBe(false);
+    expect(ui.element('modelCatalogStatusMessage').textContent).toContain('Your choices were preserved');
+    expect(ui.element('modelCatalogStatusDetails').textContent).toContain('fixture/<backup>.bak');
+    expect(ui.element('modelCatalogStatusDetails').innerHTML).toBe('');
+    expect(ui.element('reloadModelCatalogBtn').hidden).toBe(true);
+  });
+
+  it('retries a cold failure with the current null revision, prevents duplicate posts, and clears the error on recovery', async () => {
+    const retry = deferred<Response>();
+    let recovered = false;
+    const ui = page(state(), async (path) => {
+      if (path === '/providers/catalogs/reload') { await retry.promise; recovered = true; return Response.json({}); }
+      return Response.json(recovered ? { available: true, catalogRevision: 'r2', diagnostics: [], upgrade: { state: 'not_needed' } } : blocked);
+    });
+    await ui.evaluate<Promise<void>>('loadModelCatalogStatus()');
+    expect(ui.element('modelCatalogStatusMessage').textContent).toContain('could not be loaded');
+    expect(ui.element('modelCatalogStatusDetails').textContent).toBe('Unresolved model');
+    ui.evaluate('let catalogTargetRefreshes = 0; loadConfiguredTargetCapabilities = async () => { catalogTargetRefreshes += 1; };');
+    const pending = ui.evaluate<Promise<void>>('reloadModelCatalog()');
+    await Promise.resolve();
+    expect(ui.element('reloadModelCatalogBtn').disabled).toBe(true);
+    await ui.evaluate<Promise<void>>('reloadModelCatalog()');
+    retry.resolve(Response.json({}));
+    await pending;
+    const posts = ui.apiFetch.mock.calls.filter(([path]) => path === '/providers/catalogs/reload');
+    expect(posts).toHaveLength(1);
+    expect(JSON.parse(String(posts[0][1]?.body))).toEqual({ expectedRevision: null });
+    expect(ui.element('modelCatalogStatusPanel').hidden).toBe(true);
+    expect(ui.element('reloadModelCatalogBtn').disabled).toBe(false);
+    expect(ui.evaluate('catalogTargetRefreshes')).toBe(1);
+    expect(ui.apiFetch.mock.calls.every(([path]) => path.startsWith('/providers/catalogs'))).toBe(true);
+  });
+
+  it('retains a failed retry as an actionable error while showing the accepted snapshot is still usable', async () => {
+    const ui = page(state(), async (path) => path.endsWith('/reload')
+      ? Response.json({ error: 'Override changed during apply' }, { status: 400 })
+      : Response.json({ ...blocked, available: true, catalogRevision: 'accepted' }));
+    await ui.evaluate<Promise<void>>('loadModelCatalogStatus()');
+    await ui.evaluate<Promise<void>>('reloadModelCatalog()');
+    expect(ui.element('modelCatalogStatusPanel').hidden).toBe(false);
+    expect(ui.element('modelCatalogStatusMessage').textContent).toContain('last accepted settings remain available');
+    expect(ui.element('modelCatalogStatusDetails').textContent).toContain('Override changed during apply');
+    expect(ui.element('reloadModelCatalogBtn').hidden).toBe(false);
+    expect(ui.element('reloadModelCatalogBtn').disabled).toBe(false);
+    expect(JSON.parse(String(ui.apiFetch.mock.calls.find(([path]) => path.endsWith('/reload'))![1]?.body)))
+      .toEqual({ expectedRevision: 'accepted' });
+  });
+
+  it('surfaces a status read failure and releases retry without reporting success', async () => {
+    const ui = page(state(), async () => { throw new Error('Connection lost'); });
+    await ui.evaluate<Promise<void>>('reloadModelCatalog()');
+    expect(ui.element('modelCatalogStatusPanel').hidden).toBe(false);
+    expect(ui.element('modelCatalogStatusDetails').textContent).toBe('Connection lost');
+    expect(ui.element('reloadModelCatalogBtn').disabled).toBe(false);
+    expect(ui.apiFetch.mock.calls.some(([path]) => path.endsWith('/reload'))).toBe(false);
+  });
+});
+
 describe('provider setup interactions', () => {
   const devin = { provider: 'devin', backend: 'agent', instance: 'acp' };
 

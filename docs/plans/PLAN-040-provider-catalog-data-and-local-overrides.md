@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Completed — implementation and CI accepted 2026-09-23; release separate |
+| Status | Cutover and installed-upgrade follow-up implemented and locally validated — 2026-09-23; release separate |
 | Owner | Runtime catalog workstream with Platform consumer/packaging workstream |
 | Assigned To | Runtime/Platform integration workstream |
 | Reviewer | User; independent contract review before cutover |
@@ -17,6 +17,49 @@ One authored factory catalog and one optional local override replace handwritten
 model data across Runtime, Playground, and Desktop. A supported data-only patch
 changes a fixed installed version's UI and execution together. Skill guidance,
 conversion, packaged resources, and regression enforcement ship with that outcome.
+
+## Installed-upgrade follow-up (authorized 2026-09-23)
+
+- [x] Record same-minor compatibility, required data migration and the next
+  Runtime 0.2.0 / Platform 0.4.0 release boundaries in all four owning repos.
+- [x] Add one-time validated/backup/atomic conversion at Runtime activation;
+  keep read-only consumers non-mutating and schema-2 execution single-path.
+- [x] Expose upgrade diagnostics and explicit retry in Runtime Setup.
+- [x] Verify old-profile first start, repeat start, unknown data, failed writes,
+  concurrency protection, recovery, installed npm package and Runtime host integration.
+- [x] Update canonical skill and both Runtime/workspace agent mirrors.
+
+Follow-up validation on Windows:
+
+- Build/typecheck and catalog boundary generation checks passed. The focused
+  catalog/Setup group passed 83 tests; after adding post-conversion snapshot-write
+  failure coverage and correcting target refresh, the two affected files passed
+  30 tests (16 upgrade, 14 Setup behavior). This is 84 distinct focused cases,
+  plus two old-profile HTTP integration cases.
+- The actual npm tarball install smoke passed, including all 16 prior CLI scopes
+  and 87 model entries, byte-exact raw backup, first activation and repeat startup.
+  It ran via `npm exec -- vitest ...`; direct `node vitest` lacks `npm_execpath`
+  on this Windows installation and fails to spawn `npm.cmd` before tests start.
+- An isolated headless Edge smoke used the real Setup page/routes with both split
+  Runtime and the Desktop Runtime bundle: unrecognized input, visible diagnostics,
+  repaired source, explicit retry, completed backup details, hidden retry button,
+  and no browser page errors. Each fixture/server/browser was removed or closed.
+  This is not a newly installed Electron/NSIS preview or a macOS/Linux native test.
+- Independent review identified stale configured-target metadata after recovery
+  and conflicting older policy wording; both were corrected. Browser verification
+  caught shared button CSS overriding the hidden attribute; the recovery button
+  now enforces its hidden state. Review also checked validation, lock ownership,
+  digest conflicts, read-only boundaries and restart behavior.
+- Skill validation passed; all 26 canonical skill files match all four Runtime/
+  workspace `.agents` and `.claude` mirrors. The workspace source-template sync,
+  added local document links and each repository's whitespace checks passed.
+
+Power-loss behavior was not physically tested. Backup and candidate writes flush
+before replacement; an interrupted apply lock fails closed and is never stolen.
+If later accepted-snapshot persistence fails, the validated conversion and raw
+backup remain, diagnostics report the failure, and restart can recover. No real
+personal profile was modified during these tests. Publication and the next
+Runtime 0.2.0 / Platform 0.4.0 release remain separate authorized operations.
 
 ## Findings Before Cutover
 
