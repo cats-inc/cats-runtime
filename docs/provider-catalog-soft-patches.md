@@ -88,9 +88,21 @@ digest. A whole-file backup also reverts other scopes. To adopt factory values,
 remove the intended scope instead. Retain backups until their deletion is approved.
 
 Invalid candidates use a compatible last-accepted snapshot or report unavailable.
+When no accepted snapshot exists, model reads return HTTP 503 with
+`code: catalog_unavailable`. This is a configuration failure, not a pending model
+discovery operation. `GET /providers/catalogs` contains the rejection diagnostics.
+Consumers should distinguish it from a transient connection failure, retain any
+previously observed choices, and check again after the configuration is repaired.
 Compatibility includes the Runtime root, config/override paths, factory digest,
 schema and bindings. Corrupt package assets are installation errors. Changing
 software, connection or profile cannot borrow another identity's accepted snapshot.
+
+An upgrade must cover an existing profile as well as a clean install. Desktop
+0.3.8 exposed a missed transition: an existing schema-1 override left the catalog
+unavailable while the picker kept spinning. Recover with the selected installed
+package's convert/preview/apply/reload sequence above; verify the backup, both
+model endpoints and their shared revision. A package health response or a passing
+converter unit test alone does not establish that the upgraded picker works.
 
 ## Factory maintenance and validation
 

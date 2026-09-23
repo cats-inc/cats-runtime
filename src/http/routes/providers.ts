@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { catalogCapabilities } from '../../catalogs/index.js';
-import { CatalogRevisionConflict } from '../../catalogs/store.js';
+import { CatalogRevisionConflict, CatalogUnavailableError } from '../../catalogs/store.js';
 import {
   isProviderTargetResolutionError,
   listConfiguredProviders,
@@ -319,6 +319,7 @@ providerRoutes.get('/providers/models', async (c) => {
     return c.json(
       {
         error: `Failed to inspect configured provider models: ${err}`,
+        ...(err instanceof CatalogUnavailableError ? { code: err.code } : {}),
       },
       getRouteErrorStatus(err),
     );
@@ -339,6 +340,7 @@ providerRoutes.get('/providers/:provider/models', async (c) => {
   } catch (err) {
     const payload: Record<string, unknown> = {
       error: `Failed to inspect provider models: ${err}`,
+      ...(err instanceof CatalogUnavailableError ? { code: err.code } : {}),
     };
     if (err instanceof ProviderCatalogQueryError) {
       return c.json({ error: err.message }, 400);
@@ -449,6 +451,7 @@ providerRoutes.get('/providers/:provider/models/advanced', async (c) => {
   } catch (err) {
     const payload: Record<string, unknown> = {
       error: `Failed to inspect advanced provider models: ${err}`,
+      ...(err instanceof CatalogUnavailableError ? { code: err.code } : {}),
     };
     if (err instanceof ProviderCatalogQueryError) {
       return c.json({ error: err.message }, 400);

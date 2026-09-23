@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -27,6 +27,8 @@ import {
   createRuntimeStartupState,
 } from '../src/startup.js';
 import { readCatalogFactory } from '../src/catalogs/resolver.js';
+import { convertLegacyCatalog, type LegacyMigrationScope } from '../src/catalogs/conversion.js';
+import { applyCatalogPatch, previewCatalogPatch } from '../src/catalogs/patch.js';
 
 const RUNTIME_SERVER_DEFAULT_TIMEOUT_MS = process.platform === 'win32' ? 30_000 : 5_000;
 const RUNTIME_SERVER_MEDIUM_TIMEOUT_MS = process.platform === 'win32' ? 60_000 : 10_000;
@@ -242,6 +244,46 @@ async function withCuratedCatalogRuntime(
 }
 
 describe('runtime server', () => {
+  it('reports a cold schema-1 profile as a configuration problem and recovers after backed-up conversion and reload', async () => {
+    const { root, config, cleanup } = createTestConfig({ apiKey: 'upgrade-fixture' });
+    const paths = createRuntimeTestPaths(root);
+    const original = readFileSync('docs/research/fixtures/catalog-schema1/factory-before-cutover.json', 'utf8');
+    writeFileSync(paths.curatedModelCatalogPath, original);
+    const runtime = createRuntimeServer(config);
+    const headers = { authorization: 'Bearer upgrade-fixture', 'content-type': 'application/json' };
+    try {
+      const status = await (await runtime.app.request('/providers/catalogs', { headers })).json();
+      expect(status).toMatchObject({ available: false, catalogRevision: null });
+      expect(status.diagnostics.join(' ')).toContain("Unsupported catalog schema '1'");
+      for (const path of ['/providers/models', '/providers/claude/models', '/providers/claude/models/advanced']) {
+        const rejected = await runtime.app.request(path, { headers });
+        expect(rejected.status).toBe(503);
+        expect(await rejected.json()).toMatchObject({ code: 'catalog_unavailable' });
+      }
+      expect(readFileSync(paths.curatedModelCatalogPath, 'utf8')).toBe(original);
+
+      const mapping = JSON.parse(readFileSync('config/catalog-schema1-migration.json', 'utf8')) as LegacyMigrationScope[];
+      const converted = JSON.stringify(convertLegacyCatalog(original, mapping));
+      const catalogPaths = runtime.context.providerModelCatalog.catalogStore.paths;
+      const preview = previewCatalogPatch(catalogPaths, converted);
+      const applied = applyCatalogPatch(catalogPaths, converted, preview.expectedDigest);
+      expect(readFileSync(applied.backupPath!, 'utf8')).toBe(original);
+      const reload = await runtime.app.request('/providers/catalogs/reload', {
+        method: 'POST', headers, body: JSON.stringify({ expectedRevision: null }),
+      });
+      expect(reload.status).toBe(200);
+      const basic = await (await runtime.app.request('/providers/claude/models', { headers })).json();
+      const advanced = await (await runtime.app.request('/providers/claude/models/advanced', { headers })).json();
+      expect(basic.models.map((model: { id: string }) => model.id)).toEqual(['opus', 'fable', 'sonnet', 'haiku']);
+      expect(advanced).toMatchObject({ catalogRevision: basic.catalogRevision, catalogActivationId: basic.catalogActivationId,
+        defaultSelection: { entryId: 'opus', controls: { 'claude.reasoning_effort': 'high' } } });
+      expect((await (await runtime.app.request('/providers/catalogs', { headers })).json()).diagnostics).toEqual([]);
+    } finally {
+      await runtime.close();
+      await cleanup();
+    }
+  });
+
   it('reloads catalog data atomically with auth, stale-selection rejection and stable resumed bindings', async () => {
     await withRuntime({apiKey:'catalog-test'}, {}, async runtime => {
       const headers = {authorization:'Bearer catalog-test','content-type':'application/json'};

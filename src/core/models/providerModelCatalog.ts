@@ -49,7 +49,7 @@ import {
 } from './remoteModelDiscovery.js';
 import { resolve } from 'node:path';
 import { resolveRuntimeRoot, resolveRuntimePackageRoot } from '../../shared/runtimePaths.js';
-import { CatalogStore } from '../../catalogs/store.js';
+import { CatalogStore, CatalogUnavailableError } from '../../catalogs/store.js';
 import { findCatalogScope, readCatalogFactory, createCatalogSnapshot } from '../../catalogs/resolver.js';
 import type { CatalogPaths } from '../../catalogs/types.js';
 
@@ -707,7 +707,7 @@ export class ProviderModelCatalogService {
 
   private tryManagedCatalog(target: ProviderTargetDescriptor): ProviderModelCatalogResult | null {
     const snapshot = this.catalogStore.current();
-    if (!snapshot) throw new Error('Provider catalog unavailable; inspect catalog diagnostics.');
+    if (!snapshot) throw new CatalogUnavailableError();
     const scope = findCatalogScope(snapshot, target);
     if (!scope || scope.selection_mode === 'discovery') return null;
     return this.buildCatalog(target, {

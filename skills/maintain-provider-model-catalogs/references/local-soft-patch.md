@@ -52,6 +52,26 @@ mappings preserve known scopes/options; unresolved IDs/options stop conversion i
 Inspect all preserved scopes: a former full snapshot will intentionally keep those scopes pinned.
 Then use preview/apply/reload. Conversion is not authorization to modify a personal profile.
 
+### Upgrade regression: a picker that never finishes loading
+
+Inspect the **running installation's** `GET /providers/catalogs` before probing a
+vendor or changing UI model data. `available: false` plus an unsupported-schema
+diagnostic means reads cannot recover until the local file is converted. New model
+routes identify this with `code: catalog_unavailable`; Desktop 0.3.8 originally
+returned a generic model lookup failure and kept spinning. Do not fix this by
+deleting the user's override, inserting hardcoded defaults, or ignoring a rejected
+patch. Prepare the reviewed conversion, verify retained scopes/models/options,
+apply it with backup and digest protection within authorization, then reload with
+the current revision (null on this cold failure). Verify both model endpoints and
+the consumer's subsequent reads; an HTTP health check alone is insufficient.
+
+For schema/loader releases, test a previous-format profile through the complete
+upgrade/recovery path in isolation. Converter unit tests and clean-install smokes
+do not cover an installed picker with existing settings. Surface any required
+personal-file conversion before calling that installation ready, not only in
+release notes. Keep this lesson in the Runtime skill source and synchronize both
+agent mirrors.
+
 To adopt factory data again, remove the relevant scope from the candidate, preview/apply/reload.
 `models: []` intentionally empties a scope; it does not mean inherit or discover. To restore a prior
 replacement, copy that scope from a schema-2 backup into the latest candidate, preserving other

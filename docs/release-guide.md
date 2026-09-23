@@ -91,6 +91,14 @@ Choose verification that covers the changed contract; do not repeat full startup
 exercises for documentation or a version-only edit. See
 [deployment](deployment.md) and [testing](testing.md).
 
+When changing the catalog schema or loader, include an isolated **existing-profile
+upgrade** using the previous shipped catalog format. Verify rejection diagnostics,
+the backed-up conversion/apply/reload path, and basic/advanced model reads with one
+revision. A clean-profile package smoke is insufficient. For a known operator
+installation, inspect its selected package/profile read-only and prepare any needed
+conversion before reporting upgrade readiness. Obtain any required personal-file
+authorization before applying it; release notes alone do not complete migration.
+
 ## Coordination with other release targets
 
 - If an authorized cats-one release requires a new Runtime minimum, publish that

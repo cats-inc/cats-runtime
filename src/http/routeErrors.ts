@@ -1,5 +1,5 @@
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { CatalogRevisionConflict } from '../catalogs/store.js';
+import { CatalogRevisionConflict, CatalogUnavailableError } from '../catalogs/store.js';
 import {
   isProviderNotConfiguredError,
   isUnknownProviderInstanceError,
@@ -8,6 +8,7 @@ import { isProviderTargetResolutionError } from '../core/providerCatalog.js';
 
 export function getRouteErrorStatus(error: unknown): ContentfulStatusCode {
   if (error instanceof CatalogRevisionConflict) return 409;
+  if (error instanceof CatalogUnavailableError) return 503;
   if (
     isUnknownProviderInstanceError(error)
     || isProviderNotConfiguredError(error)
