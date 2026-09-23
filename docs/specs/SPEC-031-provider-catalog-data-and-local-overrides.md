@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Draft — design only; no implementation claimed |
+| Status | Accepted — implementation in progress; see PLAN-040 for delivery evidence |
 | Owner | Runtime catalog workstream; Platform owns its consumers and packaging |
 | Reviewer | User |
 | Decision | [ADR-040](../decisions/040-use-data-driven-provider-catalogs-and-local-overrides.md) |

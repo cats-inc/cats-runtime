@@ -2,9 +2,9 @@
 
 ## Status
 
-Proposed — 2026-09-23. The operator requested this ADR, specification, and plan;
-implementation has not started. The data-only soft-patch direction is requested;
-the detailed contract below is proposed for review.
+Accepted — 2026-09-23. The operator authorized implementation and staged commits
+and pushes to main. PLAN-040 records delivery progress; acceptance of the design
+does not imply that the installed-version soft-patch workflow is already delivered.
 
 ## Context
 

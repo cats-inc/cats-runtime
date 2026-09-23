@@ -4,9 +4,9 @@
 
 | Field | Value |
 |---|---|
-| Status | Draft — planning requested; implementation not started |
+| Status | In progress — implementation authorized 2026-09-23 |
 | Owner | Runtime catalog workstream with Platform consumer/packaging workstream |
-| Assigned To | Unassigned implementation owner |
+| Assigned To | Runtime/Platform integration workstream |
 | Reviewer | User; independent contract review before cutover |
 | Spec | [SPEC-031](../specs/SPEC-031-provider-catalog-data-and-local-overrides.md) |
 | Decision | [ADR-040](../decisions/040-use-data-driven-provider-catalogs-and-local-overrides.md) |
@@ -41,17 +41,17 @@ Future PR/publication steps require the operator's authorization.
 
 ### Phase 1 — Inventory and Freeze the Data Contract (Runtime + Platform)
 
-- [ ] Derive all registered provider/backend/transport families from current code.
+- [x] Derive all registered provider/backend/transport families from current code.
   Classify full, shortlist, discovery-owned, empty, BYO-model, and sentinel scopes.
-- [ ] Inventory catalog literals, normalization branches, advanced manifests,
+- [x] Inventory catalog literals, normalization branches, advanced manifests,
   fixed-combination helpers, config defaults, label consumers, and package assets.
   Include Chat/Code/Work drafts, execution chips, audience labels, and native/WSL
   target variants; historical test fixtures are not replacement candidates.
-- [ ] Finalize schema 2 using lossless projections of all current evidenced models,
+- [x] Finalize schema 2 using lossless projections of all current evidenced models,
   option inheritance, defaults, fixed controls, and Antigravity execution variants.
   Preserve opaque Cursor strings, Devin ACP UIDs, subscription routes, and
   Claude alias/display separation without model-name inference.
-- [ ] Define the supported binding registry and generic adapter serializers.
+- [x] Define the supported binding registry and generic adapter serializers.
   Distinguish unsupported protocol work from adding another ID/value through an
   existing binding; record genuine gaps before implementation.
 - [ ] Freeze package exports, catalog revision, reload/error contract, snapshot
@@ -60,6 +60,53 @@ Future PR/publication steps require the operator's authorization.
 
 **Exit:** mapping coverage is complete and reviewable; no provider loses current
 capability/default/custom-input behavior; implementation authorization is recorded.
+
+#### Implementation inventory (2026-09-23)
+
+The operator authorized staged commits and direct pushes to `main`; no release or
+personal configuration conversion is included in that authorization. The first
+foundation commit adds an isolated schema-2 module without switching the live
+schema-1 loader. The active maintenance skill changes with the consumer cutover.
+
+| Scope | Data and protocol binding |
+|---|---|
+| Claude, Codex, Grok, Muse CLI | Complete per-entry controls with exact values, labels, descriptions and explicit defaults; existing effort serializers |
+| Antigravity CLI | Seven entries, ordered controls and all fourteen explicit executable variants; no inferred default |
+| Cursor CLI | Six opaque combo strings; no parsing/reassembly of parameterized IDs |
+| Copilot, Junie CLI | Six/five fixed model-effort combinations through existing effort flags |
+| Pi, Goose CLI | Six subscription routes each; separate wire provider/model plus fixed thinking; generic serializers must accept unfamiliar model IDs |
+| Cline CLI | Six ClinePass entries, explicit executable provider and fixed thinking |
+| OpenCode, Kilo CLI | Exact routed model strings; Kilo's two fixed variants |
+| Auggie, Kiro CLI | Six exact model IDs each, with preserved labels; no effort |
+| Devin agent/acp_stdio | Six opaque model UIDs; Devin CLI remains empty |
+| Claude API/anthropic, Codex API/openai, Antigravity API/google | Separate discovery-owned scopes retaining explicit fallback data; no CLI control inheritance or model-name-based metadata guesses |
+| Ollama local/ollama | Discovery-owned data fallback and scope-level generic controls |
+| OpenClaw agent/openclaw_gateway, Claude agent/agent_sdk_bridge | Separate agent scopes; no unrelated CLI controls |
+
+The factory projection covers 23 exact scopes. Native/WSL instances share a
+provider/backend scope; account/instance selection remains independent authority.
+No new provider protocol is needed for current catalog data. Exact IDs, option
+values and fixed controls move to data; binding keys/types and transport
+serialization remain code. API preset heuristics exposed an existing inconsistency:
+the balanced preset attached reasoning to an entry that had no supported control.
+The data projection omits that unsupported preset control rather than inventing it.
+
+The schema uses `provider`, `backend`, optional non-CLI `transport`,
+`selection_mode`, `models`, and optional `shared_controls`/`presets`. Each model
+has `id`, `label`, `execution.model`, optional `execution.provider`,
+`execution.fixed_controls`, explicit conditional `execution.variants`, and
+per-entry `controls`. Controls retain label/value pairs and optional explicit
+`default`. `controls: []` disables inherited controls. `source_names` retains
+picker spellings for explicit schema-1 conversion only, never runtime guessing.
+Unknown fields, unsupported bindings, duplicate identities/defaults and ambiguous
+variants reject the complete candidate. The side-effect-free package boundary is
+`@cats-inc/cats-runtime/catalogs`; Runtime activation/persistence is separate.
+
+Additional removal surfaces found by independent inventory: provider-specific
+alias maps in Auggie/Goose/OpenCode/Kilo native services; API preset/capability
+inference; session resume re-resolution; Playground constants; Platform renderer,
+server and label caches; Desktop's automatic curated-template seed/refresh path.
+The latter must stop creating full personal snapshots that pin factory updates.
 
 ### Phase 2 — Factory Pack, Overrides, and Validation (Runtime)
 
@@ -215,5 +262,6 @@ Platform roots, never the user's live home or persisted conversations.
 | 2026-09-23 | ADR/spec/plan drafted from current source and operator requirements. Implementation, active skill rewrite, and personal configuration changes remain pending. |
 | 2026-09-23 | Independent document review resolved mixed catalog revisions, snapshot/config identity and offline candidate authority, unbound resumed sessions, and old-installation capability checks. Bounded reread found no remaining material issues. |
 | 2026-09-23 | Documentation checks passed: 35 new/added local links across 11 changed documents, heading targets, new-file whitespace, and both repos' `git diff --check`. Illustrative YAML syntax was checked. No application builds/tests or installed-version acceptance were run for this documentation-only change. |
+| 2026-09-23 | Implementation authorized, including staged direct commits/pushes to main. Added the isolated schema-2 validator, exact-scope resolver, read-only host projection and Runtime activation store. Nineteen temp-root tests passed, along with `npx tsc --noEmit -p tsconfig.json`. Independent foundation review findings on malformed enum input, variant/preset completeness, ENOENT-only absence, serializer compatibility and failed-persistence diagnostics were corrected and covered. The live loader, factory file and package export have not yet switched; this foundation alone does not enable soft patches. |
 
 *Last updated: 2026-09-23*
