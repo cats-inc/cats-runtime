@@ -43,6 +43,11 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+Runtime `0.2.0` is prepared for the Desktop `0.4.0` preview's catalog upgrade
+validation. The complete pre-bump implementation passed release preflight at
+`231abff3231ab8a0e3fb4df5c77de13ff33cff02`. Pin the prepared Runtime commit in the
+Desktop workflow. This preparation does not publish Runtime to npm.
+
 1. Select the intended source and npm channel, and integrate remote changes without
    discarding other work. Check the registry before choosing an unused version.
    An already prepared, unpublished version can be reused; published versions
