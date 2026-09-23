@@ -2,9 +2,11 @@
 
 ## Status
 
-Accepted — 2026-09-23. The operator authorized implementation and staged commits
-and pushes to main. PLAN-040 records delivery progress; acceptance of the design
-does not imply that the installed-version soft-patch workflow is already delivered.
+Accepted and implemented — 2026-09-23. Runtime and Platform changes were committed
+and pushed directly to main with the operator's authorization. Both implementation
+CI runs passed; [PLAN-040](../plans/PLAN-040-provider-catalog-data-and-local-overrides.md)
+records acceptance evidence and platform limits. Package/installer publication
+and conversion of personal schema-1 files remain separate operations.
 
 ## Context
 

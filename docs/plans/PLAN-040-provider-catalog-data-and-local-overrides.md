@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Implementation complete; staged validation and CI in progress |
+| Status | Completed — implementation and CI accepted 2026-09-23; release separate |
 | Owner | Runtime catalog workstream with Platform consumer/packaging workstream |
 | Assigned To | Runtime/Platform integration workstream |
 | Reviewer | User; independent contract review before cutover |
@@ -229,9 +229,9 @@ old hardcode-edit instructions are gone. This phase ships with the code cutover.
   session resume, local offline labels, disconnected remote views, and reconnect.
 - [x] Verify a later factory package upgrade preserves local replacements while
   unpatched scopes update; explicitly remove the override to adopt new factory data.
-- [ ] Record AC-01 through AC-14 results, real commands, timings, platform coverage,
+- [x] Record AC-01 through AC-14 results, real commands, timings, platform coverage,
   generated-resource digests, and any remaining limitations in the durable plan.
-- [ ] Update affected indexes, superseded schema/static-table guidance, and statuses
+- [x] Update affected indexes, superseded schema/static-table guidance, and statuses
   only after implementation evidence supports them. Complete required PR CI when
   PR work is authorized; publication/version bumps are separate instructions.
 
@@ -260,7 +260,7 @@ Platform roots, never the user's live home or persisted conversations.
 
 See the [acceptance record](../research/provider-catalog-data-cutover-acceptance-2026-09-23.md)
 for AC-01–14 evidence, commands, timings, the factory digest, independent review and
-OS coverage limits. All phases are implemented; final CI results remain to record.
+OS coverage limits. All phases are implemented; both implementation CI runs passed.
 The installed-package and mounted-consumer checks are separate automated fixtures,
 not a claim of a manual installed Electron test or a released installer.
 
@@ -274,5 +274,6 @@ not a claim of a manual installed Electron test or a released installer.
 | 2026-09-23 | Implementation authorized, including staged direct commits/pushes to main. Added the isolated schema-2 validator, exact-scope resolver, read-only host projection and Runtime activation store. Nineteen temp-root tests passed, along with `npx tsc --noEmit -p tsconfig.json`. Independent foundation review findings on malformed enum input, variant/preset completeness, ENOENT-only absence, serializer compatibility and failed-persistence diagnostics were corrected and covered. The live loader, factory file and package export have not yet switched; this foundation alone does not enable soft patches. |
 
 | 2026-09-23 | Cut over all 23 scopes, Runtime resolution/execution, Playground, Platform selectors/labels and package resources. Added explicit conversion/apply tools, immutable revisions and session bindings. Removed production model/default/effort tables. Canonical skill plus both agents' mirrors were updated and independently exercised. Local validation and limitations are recorded in the linked acceptance report; direct-main CI is the remaining delivery check. |
+| 2026-09-23 | Runtime `24eda3b` release preflight passed (224 test files; 2,272 passed). Platform `7101d8d1` CI passed (4,644 passed, no failures), including all type checks and package/consumer tests. Independent review fixes for selection/label publication and saved plain models passed 77 focused regressions. Final renderer build, documentation link checks and four skill-mirror comparisons passed. No personal schema-1 conversion or release publication was performed. |
 
 *Last updated: 2026-09-23*

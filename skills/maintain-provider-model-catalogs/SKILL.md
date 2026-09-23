@@ -34,7 +34,7 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
   `docs/research/2026-09-23-auggie-shortlist.md`,
   `docs/research/2026-09-23-goose-shortlist.md`, and
   `docs/research/2026-09-23-pi-shortlist.md`.
-  Other shortlist members/order are pending individual operator decisions. Do not truncate current
+  Shortlist membership and order remain operator decisions. Do not truncate current
   catalogs or select the first six discovered models from this policy alone. These are product
   policy groups, not a substitute for deriving the registered inventory during an audit.
 - Custom input remains available for both groups, including API-key-backed use on supported
@@ -50,7 +50,6 @@ evidenced option controls; Junie uses literal picker names plus a separate fixed
 Auggie uses CLI-observed IDs and exact labels without evidenced option controls;
 Goose uses provider-qualified IDs with fixed Thinking Off through its native model suffix;
 Pi retains bracketed provider labels and resolves fixed thinking through a separate CLI argument.
-Other shortlist rollouts remain pending.
 No scheduled refresh cadence or automated refresh job has been specified.
 
 ## Schema-2 data boundary

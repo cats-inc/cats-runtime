@@ -52,7 +52,8 @@ tested build fixed between baseline and patch.
 | Runtime full Vitest run excluding the separately checked package contract | 2,260 passed, 10 skipped, one scan callback timing failure. The test now waits for the actual callback handshake; its entire 28-test bootstrap file then passed. |
 | Runtime focused catalog/HTTP verification | 123/123 passed. Later upgrade/guard additions passed; the two built-CLI capability cases passed after correcting test cleanup registration. |
 | Platform affected catalog/label/picker/server/package checks | 338/338 passed, approximately 31 seconds. |
-| Platform initial broad Node run | 3,952 cases reported; 16 failures exposed old static-label/default expectations and a local renderer-build assumption. These were corrected and included in the passing affected set. The runner retained an open handle after reporting every case, so this initial run is not recorded as a successful full-suite run. |
+| Platform final picker publication changes | 77/77 passed, approximately 11 seconds. Reconciliation and label publication are one operation; saved plain non-default models remain selected. Final test typecheck and renderer production build passed. |
+| Platform initial broad Node run | 3,952 top-level results reported; 16 failures exposed old static-label/default expectations and a local renderer-build assumption. These were corrected and included in the passing affected set. The runner remained alive after output stopped and was terminated, so this initial run is not recorded as a successful full-suite run. |
 | Independent skill exercise | 11 CLI operations and one factory check passed in approximately 18 seconds. Eighteen selected build/factory hashes were unchanged. The expected stale-digest failure left the override unchanged. |
 | Skill tooling | Six intake-helper tests, YAML frontmatter validation, Runtime sync and parent workspace sync/check passed. |
 
@@ -60,14 +61,35 @@ The independent agent's machine-local evidence is under
 `tmp/skill-workflow-plan040-independent-5efb8c-run-7d335f59/artifacts/`:
 `summary.json`, `commands.json` and `fake-transport-argv.json`. Those temporary
 artifacts are not shipped; the repeatable package smoke and regression tests are
-tracked. CI results and final validation will be appended after the staged pushes.
+tracked. All 26 canonical skill files matched the four Runtime/workspace
+Codex/Claude mirrors. Workspace sync's own readonly check passed. Sixty-seven
+added local documentation links and their filesystem case were checked.
+
+## Main-branch CI
+
+- Runtime implementation `24eda3b` passed
+  [release preflight](https://github.com/cats-inc/cats-runtime/actions/runs/35822595011):
+  224 test files, 2,272 passed cases and five platform-specific skips; test duration
+  121.29 seconds. The job also verified 33 Runtime-owned skill packages, rebuilt
+  assets and checked the npm package. The earlier local scan timing failure did
+  not recur after the deterministic callback-handshake correction.
+- Platform implementation `7101d8d1` passed
+  [CI](https://github.com/cats-inc/cats-platform/actions/runs/35823411793):
+  4,644 passed cases, 56 skipped and no failures (4,700 reported cases); test duration
+  323.01 seconds. The job includes all server, Desktop, renderer, test and mobile
+  type checks, server/host/test builds, catalog guard and the complete Node suite.
 
 ## Review and platform limits
 
 Independent reviews covered the schema/store foundation, Runtime/Platform contract,
 mixed revisions, invalidation, offline reads, packaging and the skill procedure.
 Findings were corrected, including explicit refresh notification for mounted
-selectors and the inactive-picker loading state.
+selectors and the inactive-picker loading state. The final review also found
+competing selection/label effects and loss of a saved plain non-default model.
+Selection and label are now published together from the reconciled target;
+deduplication stays local to the picker. Mounted regressions cover R1-to-R2
+publication without stale restoration, removed controls, delayed old-provider
+responses, changing callback identities and saved plain model IDs.
 
 Windows source/build, npm installation and Desktop package-staging fixtures ran
 locally. This is not a signed/unsigned installer release, native macOS/Linux
