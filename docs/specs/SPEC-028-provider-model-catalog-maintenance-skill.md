@@ -478,6 +478,19 @@ runtime-skills/                   runtime-delivered, npm-shipped
   (see functional requirement 4)
 - the Agent Skills validation tooling used by the active coding-agent environment
 
+## Planned Data-Only Maintenance Cutover (2026-09-23)
+
+[SPEC-031](./SPEC-031-provider-catalog-data-and-local-overrides.md) and
+[PLAN-040 phase 5](../plans/PLAN-040-provider-catalog-data-and-local-overrides.md#phase-5--maintenance-skill-cutover-and-enforcement-runtime)
+require the canonical skill and provider references to teach factory-data updates
+and per-machine soft patches through one resolver. The cutover removes instructions
+to maintain handwritten model/default/effort tables and adds generation, revision,
+rollback, and data-only execution checks. Both `.agents` and `.claude` mirrors must
+be synchronized from the Runtime-owned source, including the parent workspace.
+
+This is planned work, not a claim that schema 2 or the updated skill already exists.
+Current maintenance must still match the installed implementation until cutover.
+
 ## Acceptance Scenarios
 
 1. A Codex refresh of the Codex section uses account-resolved enumeration,
