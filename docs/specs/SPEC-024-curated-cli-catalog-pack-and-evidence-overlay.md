@@ -10,6 +10,13 @@
 
 ## Summary
 
+**Proposed successor (2026-09-23):**
+[SPEC-031](./SPEC-031-provider-catalog-data-and-local-overrides.md) defines a
+schema-2 factory pack and scoped local overrides, including explicit executable
+mapping data and shared UI fallbacks. It is not implemented. This document records
+the original human-facing schema; its normalization/whole-file behavior must not
+be assumed to satisfy the proposed installed-version soft-patch contract.
+
 `cats-runtime` needs a way to accept human-curated CLI model knowledge without
 forcing the curator to learn runtime internals.
 

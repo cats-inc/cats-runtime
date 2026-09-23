@@ -2,6 +2,17 @@
 
 > This directory contains all project documentation.
 
+## Proposed Provider Catalog Soft Patches
+
+[ADR-040](./decisions/040-use-data-driven-provider-catalogs-and-local-overrides.md),
+[SPEC-031](./specs/SPEC-031-provider-catalog-data-and-local-overrides.md), and
+[PLAN-040](./plans/PLAN-040-provider-catalog-data-and-local-overrides.md) propose
+one factory data source, per-provider local replacements without a software update,
+and shared Runtime/Playground/Desktop projections. The joint plan includes execution
+mapping, offline behavior, conversion, package checks, and canonical maintenance-skill
+cutover with Codex/Claude mirror verification. These are design documents;
+the current schema-1 loader and handwritten fallback tables still exist.
+
 ## Interactive npm entrypoint
 
 [Interactive terminal](deployment.md#interactive-terminal) documents automatic
