@@ -149,6 +149,22 @@ contract.
 
 ---
 
+## Release Scope and Versioning
+
+- Follow the [Runtime release SOP](docs/release-guide.md) and the
+  [cross-repository release guide](https://github.com/cats-inc/cats-one/blob/main/docs/release-guide.md).
+- Ordinary implementation, documentation, commit/push and merge requests do not
+  authorize version bumps or publication. Accumulate commits until a release is
+  requested. Apply existing user authorization without asking for it again.
+- A Runtime npm release updates only this package's version and root lockfile.
+  A push runs CI; publication requires a separate npm-publish.yml dispatch.
+  Do not create Git release tags as an incidental npm version-bump side effect.
+- Do not bump Platform, cats-one, Desktop or Apps just because Runtime changed.
+  Coordinate only the consumers whose compatibility/minimum-version requirements
+  change, within the user's release scope.
+- Desktop can bundle an identified Runtime source commit without publishing that
+  Runtime to npm. App versions and Desktop's App selection remain independently owned.
+
 ## Development Workflow
 
 <!-- Overview of the development process. See detailed sections below for specific rules. -->

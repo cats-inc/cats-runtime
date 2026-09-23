@@ -1,303 +1,109 @@
-# Release Guide
+# Runtime npm Release Guide
 
-> How to publish `cats-runtime` to npm and evolve from a manual beta release to
-> trusted CI publishing.
+## Release boundaries
 
-## 0.1.25 npm alignment preparation (2026-09-23)
+Runtime npm is independently released as `@cats-inc/cats-runtime`. Ordinary
+commits, merges and branch pushes do not bump its version or publish it. Accumulate
+changes until the owner selects a Runtime npm release; use existing authorization
+without asking again for already authorized steps.
 
-Prepare the current Runtime implementation for the default npm install path.
-This includes selected-provider bootstrap, the current model catalogs, and the
-Cline prompt fix already merged into `main`.
+A Runtime release does not require a new Platform, cats-one, Desktop or App
+release. Coordinate a consumer only when the delivered compatibility contract or
+chosen minimum version requires it. See the
+[cross-repository release guide](https://github.com/cats-inc/cats-one/blob/main/docs/release-guide.md)
+for all targets and the distinction between package versions, Git tags and npm
+dist-tags.
 
-After the preparation PR and release gate pass, publish
-`@cats-inc/cats-runtime@0.1.25` through `.github/workflows/npm-publish.yml` with
-`dist_tag=latest`. Publish Platform 0.3.4 as well before updating cats-one 0.1.22
-to require Runtime `^0.1.25` and Platform `^0.3.4`; generate the launcher lockfile
-from those published registry artifacts.
+| Item | Current source or behavior |
+| --- | --- |
+| npm identity | `@cats-inc/cats-runtime`; the unscoped name is not this repo's release target |
+| Version | Root `package.json`, `package-lock.json.version` and `package-lock.json.packages[""].version` |
+| Branch push / merge | Configured CI only; no npm publication |
+| Release preflight | [release-preflight.yml](../.github/workflows/release-preflight.yml); runs the gate without publishing |
+| npm publication | Manually dispatch [npm-publish.yml](../.github/workflows/npm-publish.yml) |
+| npm channel | Explicit `dist_tag=latest` or `next`; the workflow defaults to `next` |
+| Git release tag | Not required for npm publication |
 
-The package ships its configuration examples. Provider selection writes the
-active user configuration; management and curated catalogs can use bundled
-defaults without copying all examples into the user's configuration directory.
+## Prepare and publish
 
-## 0.1.23 prerelease preparation (2026-09-16)
+1. Select the intended source and npm channel, and integrate remote changes without
+   discarding other work. Check the registry before choosing an unused version.
+   An already prepared, unpublished version can be reused; published versions
+   cannot be overwritten with new bytes.
+2. Synchronize the root manifest and both root lockfile version fields. Update
+   them directly or use `npm version <version> --no-git-tag-version`; an npm-only
+   release must not create a Git tag as an incidental bump side effect.
+3. Follow [local validation scope](../AGENTS.md#local-validation-scope) for changed
+   behavior. The publication workflow runs `npm run release:check`; do not duplicate
+   the full suite locally solely because a version is being bumped or published.
+   The optional preflight is useful when release readiness needs to be established
+   before publication, not an additional mandatory duplicate run.
+4. Commit/push using the user's authorized Git workflow. Pushing the version files
+   is preparation, not publication. Dispatch the selected source separately:
 
-This release carries the Claude Code 2.1.273 catalog refresh, version-bearing
-model labels, and lowercase Cats default markers. It also includes the merged
-Codex 0.154.0 catalog/defaults, initial native-session discovery fixes, and the
-selected-provider bootstrap boundary now on `main`.
+   ```sh
+   gh workflow run npm-publish.yml --repo cats-inc/cats-runtime --ref main -f dist_tag=latest
+   ```
 
-Publish `@cats-inc/cats-runtime@0.1.23` through this repository's
-`.github/workflows/npm-publish.yml` with `dist_tag=next` after the preparation PR
-merges and passes its release gate. The current workflow and `package.json` are
-authoritative for the scoped package identity; the older first-release planning
-sections below retain historical names and workflow paths.
+   `--ref main` publishes the commit selected from main at dispatch time. Use the
+   intended release branch when main contains work outside the selected release.
+   Use `next` only for the chosen prerelease channel.
+5. Confirm the workflow succeeded, then verify the registry and tarball:
 
-Cats Desktop 0.2.8 will package the exact merged Runtime commit through its
-manual unsigned-preview workflow. Keep that immutable Runtime revision in the
-dispatch input so all three OS packages embed the same changes.
+   ```sh
+   npm view @cats-inc/cats-runtime@latest version dist.tarball --json
+   ```
 
-## Purpose
+   Substitute the chosen dist-tag. Registry propagation can lag a successful
+   publish; verify availability rather than dispatching another attempt to
+   overwrite the same version. A pending workflow is not a completed release.
 
-`cats-runtime` is an executable-first npm package:
+The workflow installs dependencies, runs the full release gate and uses the
+configured npm trusted publisher. The package's `prepack` builds the published
+artifacts. Trusted publication is the established release path, not future setup;
+do not introduce a separate local-login/token flow for routine releases.
 
-- consumers should be able to `npm install cats-runtime`
-- technical evaluators should be able to `npx @cats-inc/cats-runtime`
-- upper-layer hosts such as `cats` should continue to treat it as a
-  separate process and HTTP runtime boundary
+## Package and consumer boundary
 
-This guide documents the release path that matches that packaging direction.
+The package supplies the `cats-runtime` executable at `build/runtime/index.js`.
+Its manifest controls the published files, including built Runtime code, web
+assets, runtime skills and configuration examples. Hosts use the process/HTTP
+boundary; the root JavaScript export is not a supported product source-import
+contract.
 
-## Current Package Posture
+Install or launch the scoped package:
 
-The first public npm release shipped as `@cats-inc/cats-runtime@0.1.0`
-(2026-07-22) with OIDC trusted publishing and provenance. The package has:
-
-- a package entry at `build/runtime/index.js`
-- an executable `bin` entry for `cats-runtime`
-- bundled repo-local helper scripts under `build/runtime/bin/`
-- curated publish contents via `files`
-- a `prepack` build step
-- a local release gate via `npm run release:check`
-- local pack/install smoke helpers under `scripts/linux/`, `scripts/macos/`,
-  and `scripts/windows/`
-- package-contract coverage that now goes beyond tarball contents and also
-  smokes the installed runtime entrypoint plus bundled helper scripts from the
-  locally packed artifact
-
-That means repo-local package verification is ready now, while registry
-publication and trusted publishing activation are still future follow-through.
-
-## Published Package Name
-
-The first public package name is frozen to the unscoped package:
-
-- `cats-runtime`
-
-If a future migration ever moves to a scoped package, treat that as a separate
-follow-through and update:
-
-- `package.json` `name`
-- README install examples
-- any automation or release docs that mention install commands
-
-Before the first manual release, verify current registry state and owner access:
-
-```powershell
-npm view cats-runtime name version
+```sh
+npm install -g @cats-inc/cats-runtime
+cats-runtime
+# Or launch without a global installation:
+npx @cats-inc/cats-runtime@latest
 ```
 
-If npm returns `404 Not Found`, the name is still unpublished.
-
-## Release Channels
-
-- prerelease channel: `next`
-- stable channel: `latest`
-
-That keeps the first external validation off the default install path while the
-registry artifact is still being proven.
-
-## Release Modes
-
-### Manual beta release
-
-Use this for the first external trial release once the package name, npm owner,
-and release operator are actually ready.
-
-1. Ensure you can log in to npm with the account that will own the package.
-2. Run the local release gate:
-
-```powershell
-npm run release:check
-```
-
-3. Publish a prerelease under a non-`latest` tag:
-
-```powershell
-npm version 0.1.0-beta.1
-npm publish --tag next
-```
-
-If the package name is scoped, publish it publicly:
-
-```powershell
-npm publish --tag next --access public
-```
-
-Consumers can then install or run the beta with:
-
-```powershell
-npm install cats-runtime@next
-npx @cats-inc/cats-runtime@next
-```
-
-## Repo-Owned Preflight Automation
-
-The repository now includes a non-publishing GitHub Actions preflight at:
-
-- `.github/workflows/cats-runtime-release-preflight.yml`
-
-That workflow currently does only two repo-owned things:
-
-1. `npm ci`
-2. `npm run release:check`
-
-It intentionally does **not**:
-
-- call `npm publish`
-- request `id-token: write`
-- claim npm trusted publishing is already configured
-
-Use it to keep the release gate reproducible in GitHub before the first real
-manual prerelease is attempted.
-
-## Repo-Owned Trusted Publishing Skeleton
-
-The repository also now includes a dedicated manual publish workflow at:
-
-- `.github/workflows/cats-runtime-npm-publish.yml`
-
-That workflow exists so npm trusted publishing can later bind to a stable
-GitHub Actions workflow filename without forcing a publish in this repo slice.
-
-Current repo-owned facts:
-
-- it is `workflow_dispatch` only
-- it requests `id-token: write`
-- it uses `cats-runtime/.nvmrc`, which is now aligned to the Node 22 runtime
-  baseline
-- it runs `npm ci`
-- it runs `npm run release:check`
-- it then runs `npm publish --tag <next|latest>`
-
-This still does **not** mean npm trusted publishing is already configured for
-`cats-runtime`. A successful publish depends on external npm-side trusted
-publisher setup matching the same GitHub repository and workflow filename.
-
-### Manual stable release
-
-After the beta is validated:
-
-```powershell
-npm version patch
-npm publish
-```
-
-For scoped public packages:
-
-```powershell
-npm publish --access public
-```
-
-## Recommended Release Checklist
-
-Run this sequence from `cats-runtime/`:
-
-```powershell
-npm install
-npm run release:check
-```
-
-Then manually verify:
-
-```powershell
-node build/runtime/index.js --help
-node build/runtime/index.js --startup-mode app-managed --managed-by release-check --ready-output json
-```
-
-The second command should emit a single-line JSON `runtime.ready` event after
-the HTTP server is ready.
-
-## Post-Publish Validation
-
-After the first publish, validate the actual registry artifact:
-
-```powershell
-npx cats-runtime@latest --help
-```
-
-For a beta tag:
-
-```powershell
-npx @cats-inc/cats-runtime@next --help
-```
-
-Also validate installation:
-
-```powershell
-npm install cats-runtime
-```
-
-## Future State: Trusted Publishing Activation
-
-After the first manual prerelease is proven, keep the dedicated publish
-workflow and finish the external npm trusted-publisher activation around it.
-
-The current preflight workflow is intentionally separate from the publish
-workflow. The publish workflow file now exists, but the npm-side trust
-relationship still has to be configured and proven outside the repo.
-
-Recommended activation checklist:
-
-1. Keep the repository public if public provenance support is desired.
-2. Configure npm trusted publishing for the exact GitHub org/user, repository,
-   and workflow filename `cats-runtime-npm-publish.yml`.
-3. If GitHub environment protection is later added, register the same
-   environment name in npm trusted publisher settings.
-4. Keep the publish workflow on GitHub-hosted runners; npm does not currently
-   support self-hosted runners for trusted publishing.
-5. Keep `package.json` `repository.url` exactly aligned with the GitHub repo.
-6. Use protected manual dispatch first, then decide later whether to move the
-   same workflow to tag- or release-driven publishing.
-7. Once trusted publishing works, restrict or remove long-lived publish tokens.
-
-Important notes from npm's current guidance:
-
-- trusted publishing is preferred over long-lived tokens
-- trusted publishing currently requires npm CLI `11.5.1+` and Node
-  `22.14.0+`
-- GitHub-hosted runners are supported; self-hosted runners are not currently
-  supported
-- npm trusted publisher matching is exact for the GitHub repository and
-  workflow filename
-- provenance is generated automatically for public packages published from
-  public repositories through trusted publishing, so that path does not need
-  a separate `--provenance` flag
-
-## Package Metadata Expectations
-
-Keep these fields accurate before publish:
-
-- `repository`
-- `homepage`
-- `bugs`
-- `engines.node`
-- `publishConfig.access`
-
-When the package name or repo path changes, update those fields before the next
-release.
-
-## Notes on Public Surface
-
-`cats-runtime` is published as an executable-first package. Even though the
-package still exposes some programmatic exports for internal/dev use, product
-hosts should integrate through:
-
-- child-process startup
-- JSON readiness output
-- `GET /health`
-- the public HTTP API
-
-That keeps the package aligned with the process-boundary ADRs.
-
-## References
-
-- npm publish: https://docs.npmjs.com/cli/v8/commands/npm-publish
-- Trusted publishing: https://docs.npmjs.com/trusted-publishers/
-- Provenance: https://docs.npmjs.com/generating-provenance-statements
-- GitHub Actions npm publish guide: https://docs.github.com/en/actions/tutorials/publish-packages/publish-nodejs-packages
-- Scoped public packages: https://docs.npmjs.com/creating-and-publishing-scoped-public-packages/
-- Unscoped public packages: https://docs.npmjs.com/creating-and-publishing-unscoped-public-packages
-
----
-
-*Last updated: 2026-04-07*
+The package ships its necessary examples. Missing user provider configuration
+enters bootstrap; saving the provider selection writes the active configuration.
+Management and curated catalogs can use bundled defaults without copying every
+example into the user's configuration directory.
+
+Use the existing pack/install helpers under `scripts/windows/`, `scripts/macos/`
+or `scripts/linux/` when packaging, install behavior or entrypoints changed.
+Choose verification that covers the changed contract; do not repeat full startup
+exercises for documentation or a version-only edit. See
+[deployment](deployment.md) and [testing](testing.md).
+
+## Coordination with other release targets
+
+- If an authorized cats-one release requires a new Runtime minimum, publish that
+  Runtime version and confirm it is downloadable before changing the launcher's
+  dependency range and resolving its lockfile from npm. Already published
+  dependencies need no repeat release.
+- A newer Runtime patch within cats-one's existing range does not require a
+  cats-one bump. Fresh consumers may resolve it; existing installations/caches
+  are not an automatic update mechanism.
+- Desktop bundles an identified Runtime source checkout. Publishing Runtime to
+  npm is not a prerequisite for a Desktop preview or official release. Platform
+  owns Desktop source selection, packaging, versioning and publication.
+- Apps are independently versioned artifacts owned by cats-apps. A Runtime change
+  does not bump App versions or change Desktop's selected App artifacts.
+
+*Last updated: 2026-09-23*

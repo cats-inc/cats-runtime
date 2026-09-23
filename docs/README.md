@@ -130,8 +130,8 @@ These important documents live in the project root:
 |----------|--------|-------------|
 | [setup-guide.md](./setup-guide.md) | Complete | Environment setup, startup contract, and diagnostics/compatibility basics |
 | [testing.md](./testing.md) | Complete | Testing strategy |
-| [deployment.md](./deployment.md) | Complete | Standalone and app-managed local deployment guidance |
-| [release-guide.md](./release-guide.md) | Complete | npm packaging, release, and repo-owned trusted publishing readiness workflow |
+| [deployment.md](./deployment.md) | Complete | Standalone/app-managed deployment and independent npm release entrypoint |
+| [release-guide.md](./release-guide.md) | Complete | Runtime version preparation, manual trusted npm publication and consumer release boundaries |
 | [security-guidelines.md](./security-guidelines.md) | Partial | Runtime-specific secret/auth boundaries are documented, but deeper project-specific hardening guidance still needs follow-through |
 | [mcp-config.md](./mcp-config.md) | Partial | Current MCP facade ownership, transport, auth, and representative tool coverage are documented, but the full tool inventory and host setup patterns still need a later pass |
 | [services.md](./services.md) | Complete | Service registry and port assignments |
@@ -211,5 +211,5 @@ later passes:
 
 ---
 
-*Last updated: 2026-09-17 (SPEC-028 records the approved full-catalog/shortlist model-menu
+*Last updated: 2026-09-23 (SPEC-028 records the approved full-catalog/shortlist model-menu
 policy; individual shortlists and UI enforcement remain pending.)*

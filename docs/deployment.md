@@ -57,6 +57,10 @@ scripts:
 or the equivalent Linux/macOS helpers under `scripts/linux/` and
 `scripts/macos/`.
 
+Follow the [Runtime release SOP](release-guide.md) for version preparation,
+independent release scope and publication. A branch push runs CI; it does not
+publish npm or require any other Cats product to release.
+
 The [release preflight](../.github/workflows/release-preflight.yml) runs
 `npm run release:check` without publishing. The manual
 [npm publish workflow](../.github/workflows/npm-publish.yml) runs the same full
@@ -69,9 +73,10 @@ gh workflow run npm-publish.yml --repo cats-inc/cats-runtime --ref main -f dist_
 ```
 
 Confirm the workflow and registry version before reporting publication complete.
-For changes coordinated with cats-one, publish Runtime and Platform first, then
-update the launcher's dependency minima and registry lockfile before publishing
-both cats-one package names.
+Only when a selected cats-one release needs a new dependency minimum, publish
+that dependency first, then update the launcher's range and registry lockfile.
+Already published compatible dependencies need no repeat release. Desktop can
+bundle Runtime source without a Runtime npm release.
 
 Install or launch the public package with:
 
@@ -258,4 +263,4 @@ assets. Use `npm pack --dry-run` to inspect the payload.
 
 ---
 
-*Last updated: 2026-04-07*
+*Last updated: 2026-09-23*
