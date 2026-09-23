@@ -62,7 +62,7 @@ describe('AuggieSessionScanner', () => {
         summary: 'Repo review',
         messageCount: 1,
         lastActivity: '2026-03-10T00:01:00.000Z',
-        model: 'gpt5.4',
+        model: 'gpt-5-4',
       },
     ]);
   });

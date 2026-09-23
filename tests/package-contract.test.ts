@@ -146,6 +146,7 @@ describe('package contract', () => {
 
     expect(manifest.bin).toEqual({
       'cats-runtime': 'build/runtime/index.js',
+      'cats-runtime-catalog': 'build/runtime/bin/catalogs.js',
     });
     expect(manifest.exports?.['.']).toEqual({
       import: './build/runtime/index.js',
@@ -163,8 +164,10 @@ describe('package contract', () => {
       '.env.example',
       'README.md',
       'LICENSE',
+      'config/curated-model-catalogs.generated.json',
+      'config/catalog-schema1-migration.json',
     ]);
-    expect(manifest.scripts?.build).toBe('npm run clean:build && npm run build:ui && node scripts/build-runtime-artifacts.mjs');
+    expect(manifest.scripts?.build).toBe('npm run catalog:check && npm run clean:build && npm run build:ui && node scripts/build-runtime-artifacts.mjs');
     expect(manifest.scripts?.['build:runtime']).toBe('tsc -p tsconfig.json');
     expect(manifest.scripts?.['build:runtime-bundle']).toBe('node scripts/bundle-runtime.mjs');
 
@@ -180,6 +183,10 @@ describe('package contract', () => {
       'build/runtime/index.js',
       'build/runtime/index.d.ts',
       'build/runtime/bin/verifySkills.js',
+      'build/runtime/catalogs/index.js',
+      'build/runtime/bin/catalogs.js',
+      'config/curated-model-catalogs.generated.json',
+      'config/catalog-schema1-migration.json',
       'public/index.html',
       'public/playground.html',
       'public/provider-setup.html',
@@ -248,6 +255,13 @@ describe('package contract', () => {
     });
 
     const installedRoot = join(consumerDir, 'node_modules', '@cats-inc', 'cats-runtime');
+
+    const softPatch = runNodeCommand([
+      join(testsDir, 'fixtures', 'catalog-soft-patch-smoke.mjs'), installedRoot,
+      join(installRoot, 'catalog-profile'),
+    ], { cwd: consumerDir });
+    expect(softPatch.status, softPatch.stderr || softPatch.stdout).toBe(0);
+    expect(JSON.parse(softPatch.stdout).verified).toContain('data-only unknown ID');
 
     const runtimeHelp = runNodeCommand([join(installedRoot, 'build', 'runtime', 'index.js'), '--help'], {
       cwd: consumerDir,

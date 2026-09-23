@@ -1,0 +1,107 @@
+# Provider catalog soft patches
+
+A compatible installed Runtime can change model lists, labels, defaults, ordered
+controls and fixed combinations without rebuilding or changing its version. The
+factory source is `config/curated-model-catalogs.yaml.example` (schema 2). The
+optional local file is `config/curated-model-catalogs.yaml` below the Runtime root;
+when a custom `providers.yaml` path is selected, the override is its sibling.
+
+## Replacement rules
+
+- A scope is `(provider, backend, transport)`. CLI scopes omit transport; an ACP
+  scope does not replace the same provider's CLI or API scope.
+- A local scope replaces its entire factory scope. Keep its complete intended
+  model list, control definitions, execution bindings and provenance.
+- Omitted scopes inherit factory data. `models: []` intentionally empties a scope.
+  Removing a scope or the override file restores factory data after activation.
+- Preserve every other existing local scope when delivering a one-scope patch.
+  A candidate file replaces the previous override file; it is not merged into it.
+- Full/shortlist scopes are authoritative, including order and removals. Discovery
+  scopes retain their separate live discovery/config behavior.
+- Only explicitly evidenced defaults get `(default)`. First-row initialization
+  and fixed controls do not imply a provider default. Custom model input remains.
+
+## Prepare and apply
+
+Use absolute paths for the actual installed package and profile. Desktop-bundled
+and globally installed Runtime packages can differ. The selected package must
+expose `@cats-inc/cats-runtime/catalogs` with schema 2, binding version 1 and local
+override support. Unsupported installations need a software update first.
+
+```text
+node <package>/build/runtime/bin/catalogs.js inspect --package-root <package> --runtime-root <profile>
+node <package>/build/runtime/bin/catalogs.js preview --package-root <package> --runtime-root <profile> --file <candidate.yaml>
+node <package>/build/runtime/bin/catalogs.js apply --package-root <package> --runtime-root <profile> --file <candidate.yaml> --expected-digest <preview.expectedDigest>
+```
+
+Add `--config <absolute-providers.yaml>` to every command for a custom config
+location. Use `absent` when `expectedDigest` is null. `validate` accepts the same
+arguments as `preview`. Neither reads credentials nor probes CLIs. Apply validates
+the complete candidate, checks the current file digest, creates a unique backup,
+and atomically replaces the file. A conflict requires another preview.
+
+The installed binding registry defines control keys and serialization. A new model
+ID using those bindings is data-only; new flags/transports/control types require
+code support. See [the schema](../src/catalogs/types.ts) and [binding registry](../src/catalogs/bindings.ts).
+Data cannot introduce shell scripts, arbitrary arguments or credential overrides.
+
+## Activate and verify
+
+Read `GET /providers/catalogs` from the matching running Runtime. POST
+`{"expectedRevision":"<catalogRevision>"}` to `/providers/catalogs/reload` using
+the configured bearer authentication. Use null for an unavailable initial revision.
+HTTP 409 means read status again; HTTP 400 rejects the candidate and preserves the
+accepted snapshot. Restarting the same Runtime also activates valid data.
+
+Basic and advanced model responses carry `catalogRevision` and
+`catalogActivationId`. Consumers must use a coherent pair. The status endpoint also
+reports origins, digests and diagnostics. Editing the file alone does not change a
+running snapshot. Model discovery refresh and local-file reload are separate actions.
+
+New sessions resolve against the active revision. Stale structured requests are
+rejected before launch. Existing sessions keep their recorded executable model,
+provider and controls; a new catalog never silently changes a resumed session.
+Unknown custom strings preserve their exact transport semantics.
+
+Desktop uses Runtime observations for executable choices. Its local read-only
+projection can show informational labels while disconnected; it does not create
+usable targets or prove that a candidate was activated. Remote connections never
+read the local machine's patch. Desktop's model refresh updates mounted selectors
+immediately; ordinary reads also revalidate automatically.
+
+## Existing schema-1 files and rollback
+
+There is no implicit migration or automatic Desktop seeding. Convert explicitly:
+
+```text
+node <package>/build/runtime/bin/catalogs.js convert --package-root <package> --runtime-root <profile> --file <old.yaml> --output <new-preview.yaml>
+```
+
+Conversion writes a new preview only and refuses unresolved mappings. Review every
+retained scope: a former complete personal snapshot pins all of those scopes until
+removed. Keep this validated schema-2 baseline for rollback, then preview/apply/reload.
+An old schema-1 backup cannot be applied directly to the new loader.
+
+To roll back one scope, copy it from a validated schema-2 backup into the **latest**
+candidate, preserving other scopes, then preview/apply/reload with the current
+digest. A whole-file backup also reverts other scopes. To adopt factory values,
+remove the intended scope instead. Retain backups until their deletion is approved.
+
+Invalid candidates use a compatible last-accepted snapshot or report unavailable.
+Compatibility includes the Runtime root, config/override paths, factory digest,
+schema and bindings. Corrupt package assets are installation errors. Changing
+software, connection or profile cannot borrow another identity's accepted snapshot.
+
+## Factory maintenance and validation
+
+Edit the single authored YAML, run `npm run catalog:generate` and
+`npm run catalog:check`, and review generated changes. Never reintroduce model,
+default or effort lists in TypeScript, JavaScript or HTML. The canonical maintenance
+skill is [maintain-provider-model-catalogs](../skills/maintain-provider-model-catalogs/SKILL.md);
+its local-patch route uses the installed commands above, without requiring source
+tests in a shipped package.
+
+The [delivery plan](plans/PLAN-040-provider-catalog-data-and-local-overrides.md)
+records fixed-build acceptance, exact scope isolation, rollback, session stability,
+selector/cache tests and Windows/package coverage. Native macOS/Linux installers
+require their normal release validation; this change does not publish a release.

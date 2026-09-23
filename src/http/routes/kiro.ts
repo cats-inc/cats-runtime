@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import type { AppContext } from '../app.js';
 import { toSessionViews } from '../../backends/cli/pool/sessionView.js';
 import { resolveProviderTarget } from '../../core/providerCatalog.js';
-import { getStaticProviderModels } from '../../core/models/providerModelCatalog.js';
 import { getKiroNative } from '../providerServices.js';
 import { getRouteErrorStatus } from '../routeErrors.js';
 
@@ -19,7 +18,7 @@ kiroRoutes.get('/kiro/models', async (c) => {
       runtime,
       instance: target.instanceId,
       source: 'static',
-      models: getStaticProviderModels(target).map((model) => model.id),
+      models: ctx.providerModelCatalog.getImmediateCatalog('kiro', instance).models.map((model) => model.id),
     });
   } catch (err) {
     return c.json(

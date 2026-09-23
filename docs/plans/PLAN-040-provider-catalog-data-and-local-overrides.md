@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Status | In progress — implementation authorized 2026-09-23 |
+| Status | Implementation complete; staged validation and CI in progress |
 | Owner | Runtime catalog workstream with Platform consumer/packaging workstream |
 | Assigned To | Runtime/Platform integration workstream |
 | Reviewer | User; independent contract review before cutover |
@@ -18,7 +18,7 @@ model data across Runtime, Playground, and Desktop. A supported data-only patch
 changes a fixed installed version's UI and execution together. Skill guidance,
 conversion, packaged resources, and regression enforcement ship with that outcome.
 
-## Current Findings
+## Findings Before Cutover
 
 - The personal loader selects a whole document, hiding missing factory scopes.
 - Runtime, Playground, and Platform carry independently maintained literal lists.
@@ -37,7 +37,8 @@ Phases 1–3 establish the data/resolver contract. Phase 4 integrates consumers.
 Phase 5 updates procedural guidance against working commands. Phase 6 proves the
 installed-version use case. Work can be split into reviewable PRs, but do not mark
 the feature delivered or publish the soft-patch promise before all phases pass.
-Future PR/publication steps require the operator's authorization.
+The operator subsequently authorized staged direct pushes to main. Publication
+remains a separate instruction.
 
 ### Phase 1 — Inventory and Freeze the Data Contract (Runtime + Platform)
 
@@ -54,9 +55,9 @@ Future PR/publication steps require the operator's authorization.
 - [x] Define the supported binding registry and generic adapter serializers.
   Distinguish unsupported protocol work from adding another ID/value through an
   existing binding; record genuine gaps before implementation.
-- [ ] Freeze package exports, catalog revision, reload/error contract, snapshot
+- [x] Freeze package exports, catalog revision, reload/error contract, snapshot
   compatibility, and session-binding persistence fields with Platform consumers.
-- [ ] Review ADR/spec and replace illustrative details with the agreed schema.
+- [x] Review ADR/spec and replace illustrative details with the agreed schema.
 
 **Exit:** mapping coverage is complete and reviewable; no provider loses current
 capability/default/custom-input behavior; implementation authorization is recorded.
@@ -110,21 +111,21 @@ The latter must stop creating full personal snapshots that pin factory updates.
 
 ### Phase 2 — Factory Pack, Overrides, and Validation (Runtime)
 
-- [ ] Evolve the single factory YAML and add typed schema validation, deterministic
+- [x] Evolve the single factory YAML and add typed schema validation, deterministic
   JSON projection, source digest, and a generator/check command.
-- [ ] Load factory plus scoped local replacements through one injected resolver.
+- [x] Load factory plus scoped local replacements through one injected resolver.
   Honor Runtime root/config-path resolution; validate duplicates, empty semantics,
   options/defaults, explicit variants, and supported bindings before activation.
-- [ ] Add explicit schema-1 conversion/preview tooling. Preserve all source scopes,
+- [x] Add explicit schema-1 conversion/preview tooling. Preserve all source scopes,
   provenance and labels; report unresolved mappings. Check the selected installed
   Runtime's capability before apply; unsupported/unknown installs stay unchanged.
   No implicit home-file writes or promises to alter old loader behavior.
-- [ ] Implement immutable snapshots, compatible last-accepted persistence, status
+- [x] Implement immutable snapshots, compatible last-accepted persistence, status
   diagnostics, and authenticated revision-checked local reload without CLI probes.
-- [ ] Add the side-effect-free package export for local host reads, with explicit
+- [x] Add the side-effect-free package export for local host reads, with explicit
   paths and shared validation/failure semantics. Distinguish informational candidate
   data from activated Runtime data; only Runtime activation writes accepted snapshots.
-- [ ] Cover AC-03 through AC-06 and AC-12 in temp-root tests, including wrong target
+- [x] Cover AC-03 through AC-06 and AC-12 in temp-root tests, including wrong target
   scope, patch deletion, new factory data, and read-only installation directories.
 
 **Exit:** a local data file replaces a scope without hiding unrelated factory data;
@@ -132,24 +133,24 @@ no candidate is partially activated and no read writes personal configuration.
 
 ### Phase 3 — Menus and Execution Share the Revision (Runtime)
 
-- [ ] Refactor basic/advanced catalog construction and normalizers to consume the
+- [x] Refactor basic/advanced catalog construction and normalizers to consume the
   effective pack. Remove static model arrays and model-keyed defaults/effort helpers.
-- [ ] Make curated full/shortlist membership authoritative while retaining the
+- [x] Make curated full/shortlist membership authoritative while retaining the
   separate discovery behavior for discovery-owned/BYO scopes. Refresh is explicit
   and cannot reintroduce removed models or unwanted option defaults.
-- [ ] Resolve known raw-string and structured selections through the same mapping;
+- [x] Resolve known raw-string and structured selections through the same mapping;
   unknown custom strings keep their existing unadorned transport semantics.
-- [ ] Snapshot resolved bindings in sessions; preserve them on resume. Reconcile
+- [x] Snapshot resolved bindings in sessions; preserve them on resume. Reconcile
   stale new requests before launch and use the new revision only on explicit change.
   For discovered/pre-cutover sessions without a full binding, preserve native or
   recorded wire values; require an explicit first selection when the adapter cannot
   resume without missing data. Never infer prior effort from the current patch.
-- [ ] Replace Playground handwritten arrays with served projections. Cover initial
+- [x] Replace Playground handwritten arrays with served projections. Cover initial
   selected values, model switches, empty data, fixed combos, and custom restoration;
   regenerate public assets from their source as required by the repo.
-- [ ] Cover AC-02 and AC-07 through AC-09 with fake CLI/ACP transports. Assert actual
+- [x] Cover AC-02 and AC-07 through AC-09 with fake CLI/ACP transports. Assert actual
   model/provider/control arguments, not only rendered labels.
-- [ ] Migrate discovery/bootstrap fixtures to explicit isolated catalog input so
+- [x] Migrate discovery/bootstrap fixtures to explicit isolated catalog input so
   shortlist bypasses cannot leave tests awaiting a discovery runner indefinitely.
 
 **Exit:** changing a data fixture changes UI and emitted execution bindings with
@@ -157,22 +158,22 @@ zero provider-specific production edits; existing sessions remain stable.
 
 ### Phase 4 — Platform/Desktop and Packaging (Platform + Runtime)
 
-- [ ] Remove Platform's authored model/default tables. Route initial drafts, labels,
+- [x] Remove Platform's authored model/default tables. Route initial drafts, labels,
   chips, audience participants, and selectors through scoped effective projections.
-- [ ] Keep execution pickers Runtime-backed under Platform SPEC-013; cold factory
+- [x] Keep execution pickers Runtime-backed under Platform SPEC-013; cold factory
   data does not fabricate usable targets. Retain automatic recovery and selection/
   authorization resets across tray idle and transport failures.
-- [ ] Consume the Runtime read-only module for local offline informational labels.
+- [x] Consume the Runtime read-only module for local offline informational labels.
   Use the configured local Runtime paths; do not import startup or duplicate merge
   logic. Remote connections use only their remote observed data.
-- [ ] Key caches/label maps by connection, authorization context, target, selection,
+- [x] Key caches/label maps by connection, authorization context, target, selection,
   and catalog revision. Remove stale rows on replacement and reject late responses
   with request/activation fences, not content-hash ordering. Test mixed base/advanced
   revisions explicitly: retain a coherent old snapshot or withhold mismatched
   advanced selections while revalidating.
-- [ ] Package the factory resource and resolver from the same pinned Runtime build.
+- [x] Package the factory resource and resolver from the same pinned Runtime build.
   Verify npm/Desktop assets and digests; retain patches across updates/relocation.
-- [ ] Cover AC-09 through AC-11 with mounted selector tests, isolated host/package
+- [x] Cover AC-09 through AC-11 with mounted selector tests, isolated host/package
   fixtures, and native checks on each available OS; record remaining OS limits.
 
 **Exit:** no independently editable Platform catalog remains; online/offline label
@@ -194,23 +195,23 @@ skill-authoring instructions when implementing this work package.
 | Runtime setup/deployment/API/architecture docs | Document installed-version patch workflow, rejection diagnostics, conversion, package boundaries, and remote/offline limits |
 | Platform integration/selector/package docs | Document effective data, cache scope, local informational reads, and unchanged execution authority |
 
-- [ ] Teach patch delivery as a small scope replacement plus required schema,
+- [x] Teach patch delivery as a small scope replacement plus required schema,
   evidence, validation, apply/reload, and remove/restore instructions. No release
   or rebuild is required for data within the installed binding capability.
-- [ ] Distinguish factory canonical edits from generated assets: agents run the
+- [x] Distinguish factory canonical edits from generated assets: agents run the
   generator/check instead of editing TS/JS/HTML lists or matching model names.
-- [ ] Add a guard that rejects handwritten production model/default/effort tables
+- [x] Add a guard that rejects handwritten production model/default/effort tables
   outside approved data/generated paths. Cover AST/table patterns and generator
   imports; allow explicit historical fixtures/evidence and generic protocol code.
   Do not equate any occurrence of `gpt-` in a test with a production hardcode.
-- [ ] Add deterministic-generation checks and an unknown-ID data-only regression
+- [x] Add deterministic-generation checks and an unknown-ID data-only regression
   so the guard cannot pass while execution still depends on a model allowlist.
-- [ ] Update skill regression fixtures and references that mention old paths/schema.
+- [x] Update skill regression fixtures and references that mention old paths/schema.
   Record actual working commands; no proposed command may be presented as available.
-- [ ] Sync Runtime `.agents` and `.claude` using `Sync-AgentSkills.ps1`, then the
+- [x] Sync Runtime `.agents` and `.claude` using `Sync-AgentSkills.ps1`, then the
   parent workspace using `cats-one/scripts/windows/Sync-WorkspaceSkills.ps1` (or
   the owning OS equivalent). Run workspace `-Check` and compare both agent copies.
-- [ ] Exercise factory refresh and local patch instructions with isolated files;
+- [x] Exercise factory refresh and local patch instructions with isolated files;
   have an independent fresh agent review the workflow and changed-file set. Verify
   no code literals were added and no account/probe/personal-state access occurred.
 
@@ -219,14 +220,14 @@ old hardcode-edit instructions are gone. This phase ships with the code cutover.
 
 ### Phase 6 — Installed-Version Acceptance and Documentation (Joint)
 
-- [ ] Build/stage a candidate once into a temporary installation/profile. Record
+- [x] Build/stage a candidate once into a temporary installation/profile. Record
   software versions and artifact hashes, then keep them fixed for the experiment.
-- [ ] Apply a scoped data patch, reload, and compare effective API data, Playground,
+- [x] Apply a scoped data patch, reload, and compare effective API data, Playground,
   Desktop labels/menus, revision, and fake-transport invocation. Repeat with an ID
   absent from production code. No rebuild is allowed between baseline and patch.
-- [ ] Check empty/removal/rollback, invalid candidate, stale requests, existing
+- [x] Check empty/removal/rollback, invalid candidate, stale requests, existing
   session resume, local offline labels, disconnected remote views, and reconnect.
-- [ ] Verify a later factory package upgrade preserves local replacements while
+- [x] Verify a later factory package upgrade preserves local replacements while
   unpatched scopes update; explicitly remove the override to adopt new factory data.
 - [ ] Record AC-01 through AC-14 results, real commands, timings, platform coverage,
   generated-resource digests, and any remaining limitations in the durable plan.
@@ -255,6 +256,14 @@ Platform roots, never the user's live home or persisted conversations.
 | Old skill instructs agents to restore arrays | Same-delivery skill rewrite, mirror checks, fresh-agent exercise, and CI guard |
 | Partial repo/package rollout disagrees | Shared versioned Runtime contract and pinned-resource package tests; no compatibility shim to old arrays |
 
+## Implementation Acceptance
+
+See the [acceptance record](../research/provider-catalog-data-cutover-acceptance-2026-09-23.md)
+for AC-01–14 evidence, commands, timings, the factory digest, independent review and
+OS coverage limits. All phases are implemented; final CI results remain to record.
+The installed-package and mounted-consumer checks are separate automated fixtures,
+not a claim of a manual installed Electron test or a released installer.
+
 ## Progress Log
 
 | Date | Update |
@@ -263,5 +272,7 @@ Platform roots, never the user's live home or persisted conversations.
 | 2026-09-23 | Independent document review resolved mixed catalog revisions, snapshot/config identity and offline candidate authority, unbound resumed sessions, and old-installation capability checks. Bounded reread found no remaining material issues. |
 | 2026-09-23 | Documentation checks passed: 35 new/added local links across 11 changed documents, heading targets, new-file whitespace, and both repos' `git diff --check`. Illustrative YAML syntax was checked. No application builds/tests or installed-version acceptance were run for this documentation-only change. |
 | 2026-09-23 | Implementation authorized, including staged direct commits/pushes to main. Added the isolated schema-2 validator, exact-scope resolver, read-only host projection and Runtime activation store. Nineteen temp-root tests passed, along with `npx tsc --noEmit -p tsconfig.json`. Independent foundation review findings on malformed enum input, variant/preset completeness, ENOENT-only absence, serializer compatibility and failed-persistence diagnostics were corrected and covered. The live loader, factory file and package export have not yet switched; this foundation alone does not enable soft patches. |
+
+| 2026-09-23 | Cut over all 23 scopes, Runtime resolution/execution, Playground, Platform selectors/labels and package resources. Added explicit conversion/apply tools, immutable revisions and session bindings. Removed production model/default/effort tables. Canonical skill plus both agents' mirrors were updated and independently exercised. Local validation and limitations are recorded in the linked acceptance report; direct-main CI is the remaining delivery check. |
 
 *Last updated: 2026-09-23*

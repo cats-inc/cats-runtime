@@ -188,7 +188,7 @@ describe('shared UI script', () => {
     });
   });
 
-  it('falls back to a provider default entry when the requested model is unavailable', () => {
+  it('preserves a removed model as a custom string', () => {
     const catsUi = loadCatsUiHelpers();
     const result = catsUi.normalizePlaygroundAgentSelection({
       provider: 'codex',
@@ -198,15 +198,7 @@ describe('shared UI script', () => {
       advancedCatalogs: createAdvancedCatalogs(),
     });
 
-    expect(result).toEqual({
-      provider: 'codex',
-      model: '',
-      modelSelection: {
-        entryMode: 'explicit',
-        entryId: 'gpt-5.4',
-        presetId: 'balanced',
-      },
-    });
+    expect(result).toEqual({ provider: 'codex', model: 'gpt-4.1-legacy', modelSelection: null });
   });
 
   it('preserves an explicit legacy model override when requested', () => {

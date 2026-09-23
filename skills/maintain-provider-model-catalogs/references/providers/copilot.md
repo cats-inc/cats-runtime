@@ -37,30 +37,15 @@ Do not diagnose an adapter defect solely because help omits an alias: the retain
 changelog confirms `--effort` aliases `--reasoning-effort`. Reuse that evidence unless the current
 CLI demonstrably rejects the invocation. CLI help proves flag syntax, not a model's supported values.
 
-## Project the approved menu
 
-- Resolve fixed combinations versus adjustable effort before choosing YAML. Reuse the operator's
-  explicit choice. An effort column records one value, not the model's complete option menu.
-- For approved fixed combinations, use `selection_mode: shortlist`, an observed raw model id in
-  `name`, and a separate display label composed from the original model name and approved effort.
-  A single value under that model's effort option is resolved internally by the Copilot overlay.
-  Do not set an effort `default` merely to force the combo, or invent a Cursor-style bracket id.
-- The Runtime keeps fixed effort out of public editable controls and their defaults, then resolves
-  it for execution. Public `defaultSelection` must remain valid when submitted unchanged. Verify
-  separate `--model` and `--effort` arguments, model switches and rejection of unsupported overrides.
-- Preserve an explicit model default independently of fixed effort. Check both the offline fallback
-  and the loaded Runtime menu: the fixed-combo Playground branch needs to format default metadata
-  too. Its earlier Cursor-only use had no default row and did not exercise that path.
-- Context figures in the picker and maximum limits from RPC can differ. Keep their provenance
-  separate; do not infer a selectable tier, convert rounded figures to exact limits, or silently
-  replace the picker figure. Follow the operator's display choice.
-- For adjustable catalogs, retain provider grouping and per-model effort evidence. Shared option
-  inheritance needs observed scope; distinguish unsupported effort from an uncaptured menu.
+## Schema-2 execution data
 
-## Focused verification
+Keep model ID and `copilot.reasoning_effort` separate. Approved fixed effort belongs in `execution.fixed_controls`; an observed model default remains a separate `default: true`. Fixed effort is neither editable nor a default claim.
 
-Follow [catalog surfaces](../catalog-surfaces.md). The existing `copilotPresets.test.ts` covers
-shortlist/cache/refresh behavior, public default submission, fixed effort resolution and adapter
-argv. Include the affected Playground form/default/custom-input tests and Desktop fallback tests.
-Custom strings and saved out-of-shortlist selections must survive refresh without acquiring a
-fixed combo's effort. Keep test state isolated from the personal catalog.
+Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
+Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.
+There are no independent Runtime, Playground or Desktop model tables to update. Existing generic
+bindings require no repeated implementation authorization; a new unsupported binding is a separate
+code change. Validate labels, ordered values, defaults, custom input, and actual emitted bindings.
+Discovery tests must explicitly use a `selection_mode: discovery` scope before constructing the
+service. `catalogs: []` inherits factory; `models: []` empties a full/shortlist scope.

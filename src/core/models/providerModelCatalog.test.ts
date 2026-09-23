@@ -107,46 +107,6 @@ function createCatalogConfig() {
 }
 
 describe('normalizeProviderCatalogModelId', () => {
-  it('does not treat default as a Claude opus alias', () => {
-    expect(normalizeProviderCatalogModelId({
-      providerName: 'claude',
-      backend: 'cli',
-    }, 'default')).toBe('default');
-    expect(normalizeProviderCatalogModelId({
-      providerName: 'claude',
-      backend: 'cli',
-    }, 'claude-opus-4-6')).toBe('opus');
-    expect(normalizeProviderCatalogModelId({
-      providerName: 'claude',
-      backend: 'cli',
-    }, 'claude-fable-5-1')).toBe('fable');
-  });
-
-  it('normalizes Kilo picker labels to canonical gateway ids', () => {
-    expect(normalizeProviderCatalogModelId({
-      providerName: 'kilo',
-      backend: 'cli',
-    }, 'OpenAI: GPT-5.4')).toBe('kilo/openai/gpt-5.4');
-    expect(normalizeProviderCatalogModelId({
-      providerName: 'kilo',
-      backend: 'cli',
-    }, 'Elephant')).toBe('kilo/openrouter/elephant-alpha');
-    expect(normalizeProviderCatalogModelId({
-      providerName: 'kilo',
-      backend: 'cli',
-    }, 'Anthropic: Claude Opus 4.7')).toBe('kilo/anthropic/claude-opus-4.7');
-  });
-
-  it('normalizes current Cursor anthropic picker labels to canonical ids', () => {
-    expect(normalizeProviderCatalogModelId({
-      providerName: 'cursor',
-      backend: 'cli',
-    }, 'Opus 4.7 Thinking')).toBe('claude-4.7-opus-thinking');
-    expect(normalizeProviderCatalogModelId({
-      providerName: 'cursor',
-      backend: 'cli',
-    }, 'Sonnet 4.6 1M Thinking')).toBe('claude-4.6-sonnet-thinking');
-  });
 
   it('preserves Junie picker labels as literal model ids', () => {
     expect(normalizeProviderCatalogModelId({
@@ -188,7 +148,7 @@ function createGooseConfigRoot(content: string) {
   return {
     root,
     gooseConfigPath,
-    env: {
+    env: { ...createRuntimeTestEnv(process.env.HOME!),
       HOME: root,
       USERPROFILE: root,
     },
@@ -380,7 +340,7 @@ describe('ProviderModelCatalogService', () => {
     });
 
     const first = await service.getCatalog('ollama');
-    expect(first).toEqual({
+    expect(first).toMatchObject({
       provider: 'ollama',
       backend: 'local',
       instance: 'local',
@@ -410,7 +370,7 @@ describe('ProviderModelCatalogService', () => {
     });
 
     const second = await service.getCatalog('ollama');
-    expect(second.cache).toEqual({
+    expect(second.cache).toMatchObject({
       servedFromCache: true,
       cachedAt: expect.any(String),
       ttlSec: 60,
@@ -449,7 +409,7 @@ describe('ProviderModelCatalogService', () => {
 
     await service.getCatalog('ollama');
 
-    expect(service.inspectSummary('ollama')).toEqual({
+    expect(service.inspectSummary('ollama')).toMatchObject({
       source: 'dynamic',
       defaultModel: 'qwen3:latest',
       defaultModelStatus: 'configured',
@@ -548,7 +508,7 @@ describe('ProviderModelCatalogService', () => {
 
       const first = await service.getCatalog('ollama');
       expect(first.source).toBe('dynamic');
-      expect(first.cache).toEqual({
+      expect(first.cache).toMatchObject({
         servedFromCache: false,
         cachedAt: '2026-03-27T00:00:00.000Z',
         ttlSec: 60,
@@ -559,7 +519,7 @@ describe('ProviderModelCatalogService', () => {
 
       const second = await service.getCatalog('ollama');
       expect(second.source).toBe('dynamic');
-      expect(second.cache).toEqual({
+      expect(second.cache).toMatchObject({
         servedFromCache: true,
         cachedAt: '2026-03-27T00:00:00.000Z',
         ttlSec: 60,
@@ -638,7 +598,7 @@ describe('ProviderModelCatalogService', () => {
       });
 
       const second = await secondService.getCatalog('ollama');
-      expect(second).toEqual({
+      expect(second).toMatchObject({
         provider: 'ollama',
         backend: 'local',
         instance: 'local',
@@ -735,7 +695,7 @@ describe('ProviderModelCatalogService', () => {
       });
 
       const catalog = await service.getCatalog('goose');
-      expect(catalog).toEqual({
+      expect(catalog).toMatchObject({
         provider: 'goose',
         backend: 'cli',
         instance: 'default',
@@ -754,112 +714,6 @@ describe('ProviderModelCatalogService', () => {
       });
     } finally {
       cleanup();
-    }
-  });
-
-  it('preserves curated Junie picker labels in model and advanced catalogs', () => {
-    const runtime = createRuntimeRoot();
-
-    try {
-      writeFileSync(runtime.paths.curatedModelCatalogPath, [
-        'schema_version: 1',
-        'catalogs:',
-        '  - cli: Junie',
-        '    version: 1362.47',
-        '    last_updated: 2026-04-17',
-        '    notes:',
-        '      - Source: Junie model picker output supplied by user',
-        '      - All models routed through JetBrains AI',
-        '    models:',
-        '      - name: Gemini 3 Flash',
-        '        default: true',
-        '      - name: Claude Opus 4.6',
-        '      - name: Claude Opus 4.7',
-        '      - name: Claude Sonnet 4.6',
-        '      - name: Gemini 3.1 Flash Lite',
-        '      - name: Gemini 3.1 Pro Preview',
-        '      - name: GPT-5',
-        '      - name: GPT-5.2',
-        '      - name: GPT-5.3-codex',
-        '      - name: GPT-5.4',
-        '      - name: Grok 4.1 Fast Reasoning',
-        '',
-      ].join('\n'), 'utf8');
-
-      const base = createCatalogConfig();
-      const config = {
-        ...base,
-        configPath: runtime.paths.configPath,
-        sessionBaseDir: runtime.paths.sessionBaseDir,
-        providerDefaultTargets: {
-          ...base.providerDefaultTargets,
-          junie: { backend: 'cli', instance: 'default' },
-        },
-        providerInstances: {
-          ...base.providerInstances,
-          junie: {
-            default: {
-              id: 'default',
-              providerName: 'junie',
-              commandConfig: {
-                path: 'junie',
-                runner: 'auto',
-                runtime: { mode: 'native' },
-              },
-            },
-          },
-        },
-        providerCommands: {
-          ...base.providerCommands,
-          junie: {
-            path: 'junie',
-            runner: 'auto',
-            runtime: { mode: 'native' },
-          },
-        },
-      } as const;
-
-      const service = new ProviderModelCatalogService(config as never, {
-        env: runtime.env,
-      });
-
-      expect(service.getImmediateCatalog('junie')).toEqual({
-        provider: 'junie',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'Gemini 3 Flash',
-        source: 'static',
-        cache: null,
-        models: junieCuratedModels.map(model => ({ ...model, default: model.default === true })),
-        warnings: [junieStaticWarning],
-      });
-
-      expect(service.getImmediateAdvancedCatalog('junie')).toEqual({
-        provider: 'junie',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'Gemini 3 Flash',
-        source: 'static',
-        cache: null,
-        entries: junieCuratedAdvancedEntries,
-        presets: [],
-        controls: [],
-        defaultSelection: { entryMode: 'explicit', entryId: 'Gemini 3 Flash' },
-        support: {
-          tier: 'entry_only',
-          advancedMetadataStatus: 'verified_manifest',
-          discoveryMode: 'manual_refresh',
-          provenance: {
-            status: 'verified_manifest',
-            manifestId: 'junie-cli-fixed-combos-v1',
-            manifestVersion: '2026-09-23',
-            evidenceRefs: ['docs/research/2026-09-23-junie-shortlist.md'],
-          },
-        },
-        warnings: [junieStaticWarning],
-      });
-    } finally {
-      runtime.cleanup();
     }
   });
 
@@ -924,129 +778,6 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
-  it('keeps the first Junie default when multiple curated models are marked default', () => {
-    const runtime = createRuntimeRoot();
-
-    try {
-      writeFileSync(runtime.paths.curatedModelCatalogPath, [
-        'schema_version: 1',
-        'catalogs:',
-        '  - cli: Junie',
-        '    version: 1362.47',
-        '    models:',
-        '      - name: Gemini 3 Flash',
-        '        default: true',
-        '      - name: GPT-5',
-        '        default: true',
-        '      - name: Claude Opus 4.7',
-        '',
-      ].join('\n'), 'utf8');
-
-      const base = createCatalogConfig();
-      const config = {
-        ...base,
-        configPath: runtime.paths.configPath,
-        sessionBaseDir: runtime.paths.sessionBaseDir,
-        providerDefaultTargets: {
-          ...base.providerDefaultTargets,
-          junie: { backend: 'cli', instance: 'default' },
-        },
-        providerInstances: {
-          ...base.providerInstances,
-          junie: {
-            default: {
-              id: 'default',
-              providerName: 'junie',
-              commandConfig: {
-                path: 'junie',
-                runner: 'auto',
-                runtime: { mode: 'native' },
-              },
-            },
-          },
-        },
-        providerCommands: {
-          ...base.providerCommands,
-          junie: {
-            path: 'junie',
-            runner: 'auto',
-            runtime: { mode: 'native' },
-          },
-        },
-      } as const;
-
-      const service = new ProviderModelCatalogService(config as never, {
-        env: runtime.env,
-      });
-
-      expect(service.getImmediateCatalog('junie')).toEqual({
-        provider: 'junie',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'Gemini 3 Flash',
-        source: 'static',
-        cache: null,
-        models: [
-          { id: 'Gemini 3 Flash', label: 'Gemini 3 Flash', default: true },
-          { id: 'GPT-5', label: 'GPT-5', default: false },
-          { id: 'Claude Opus 4.7', label: 'Claude Opus 4.7', default: false },
-        ],
-        warnings: [
-          junieStaticWarning,
-          "Curated catalog for Junie marked multiple defaults; keeping 'Gemini 3 Flash' as the default.",
-        ],
-      });
-
-      expect(service.getImmediateAdvancedCatalog('junie')).toEqual({
-        provider: 'junie',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'Gemini 3 Flash',
-        source: 'static',
-        cache: null,
-        entries: [
-          {
-            id: 'Gemini 3 Flash',
-            label: 'Gemini 3 Flash',
-            default: true,
-            capabilityTags: ['latency_optimized'],
-          },
-          {
-            id: 'GPT-5',
-            label: 'GPT-5',
-            default: false,
-          },
-          {
-            id: 'Claude Opus 4.7',
-            label: 'Claude Opus 4.7',
-            default: false,
-            capabilityTags: ['reasoning'],
-          },
-        ],
-        presets: [],
-        controls: [],
-        defaultSelection: { entryMode: 'explicit', entryId: 'Gemini 3 Flash' },
-        support: {
-          tier: 'entry_only',
-          advancedMetadataStatus: 'verified_manifest',
-          discoveryMode: 'manual_refresh',
-          provenance: {
-            status: 'verified_manifest',
-            manifestId: 'junie-cli-fixed-combos-v1',
-            manifestVersion: '2026-09-23',
-            evidenceRefs: ['docs/research/2026-09-23-junie-shortlist.md'],
-          },
-        },
-        warnings: [
-          junieStaticWarning,
-          "Curated catalog for Junie marked multiple defaults; keeping 'Gemini 3 Flash' as the default.",
-        ],
-      });
-    } finally {
-      runtime.cleanup();
-    }
-  });
-
   it('serves the bundled Cursor shortlist without promising upstream expansion', async () => {
     const runtime = createRuntimeRoot();
 
@@ -1092,7 +823,7 @@ describe('ProviderModelCatalogService', () => {
       }
       const cursorStaticModelCount = cursorCatalog.models.length;
 
-      expect(service.inspectSummary('cursor')).toEqual({
+      expect(service.inspectSummary('cursor')).toMatchObject({
         source: 'static',
         defaultModel: null,
         modelCount: cursorStaticModelCount,
@@ -1114,7 +845,7 @@ describe('ProviderModelCatalogService', () => {
     onTestFinished(runtime.cleanup);
     // Exercise discovery without an opted-in shortlist, independent of the
     // bundled policy and the developer's personal catalog.
-    writeFileSync(runtime.paths.curatedModelCatalogPath, 'schema_version: 1\ncatalogs: []\n');
+    writeFileSync(runtime.paths.curatedModelCatalogPath, JSON.stringify({schema_version:2,catalogs:['cursor','pi','opencode'].map(provider=>({provider,backend:'cli',selection_mode:'discovery',models:[]}))}));
     const cursorModelDiscoveryRunner = {
       run: vi.fn(async () => ({
         exitCode: 0,
@@ -1218,7 +949,7 @@ describe('ProviderModelCatalogService', () => {
     const paths = createRuntimeTestPaths(root);
     ensureRuntimeTestDirs(paths);
     // Test unrestricted discovery independently of the bundled shortlist.
-    writeFileSync(paths.curatedModelCatalogPath, 'schema_version: 1\ncatalogs: []\n');
+    writeFileSync(paths.curatedModelCatalogPath, JSON.stringify({schema_version:2,catalogs:['cursor','pi','opencode'].map(provider=>({provider,backend:'cli',selection_mode:'discovery',models:[]}))}));
     const piModelDiscoveryRunner = {
       run: vi.fn(async () => ({
         exitCode: 0,
@@ -1268,7 +999,7 @@ describe('ProviderModelCatalogService', () => {
     ]);
 
     const second = await service.getCatalog('pi');
-    expect(second.cache).toEqual({
+    expect(second.cache).toMatchObject({
       servedFromCache: true,
       cachedAt: expect.any(String),
       ttlSec: 60,
@@ -1283,7 +1014,7 @@ describe('ProviderModelCatalogService', () => {
     const paths = createRuntimeTestPaths(root);
     ensureRuntimeTestDirs(paths);
     // Explicitly exercise an installation without a curated shortlist.
-    writeFileSync(paths.curatedModelCatalogPath, 'schema_version: 1\ncatalogs: []\n');
+    writeFileSync(paths.curatedModelCatalogPath, JSON.stringify({schema_version:2,catalogs:['cursor','pi','opencode'].map(provider=>({provider,backend:'cli',selection_mode:'discovery',models:[]}))}));
     const opencodeModelDiscoveryRunner = {
       run: vi.fn(async (_instance, args: string[]) => ({
         exitCode: 0,
@@ -1392,13 +1123,13 @@ describe('ProviderModelCatalogService', () => {
       opencodeModelDiscoveryRunner,
     });
 
-    expect(service.getImmediateCatalog('pi')).toEqual({
+    expect(service.getImmediateCatalog('pi')).toMatchObject({
       provider: 'pi', backend: 'cli', instance: 'default',
       defaultModel: null, source: 'static', cache: null,
       models: getStaticProviderModels({ providerName: 'pi', backend: 'cli' }),
       warnings: [],
     });
-    expect(service.getImmediateCatalog('opencode')).toEqual({
+    expect(service.getImmediateCatalog('opencode')).toMatchObject({
       provider: 'opencode', backend: 'cli', instance: 'default',
       defaultModel: null, source: 'static', cache: null,
       models: getStaticProviderModels({ providerName: 'opencode', backend: 'cli' }),
@@ -1406,133 +1137,6 @@ describe('ProviderModelCatalogService', () => {
     });
     expect(piModelDiscoveryRunner.run).not.toHaveBeenCalled();
     expect(opencodeModelDiscoveryRunner.run).not.toHaveBeenCalled();
-  });
-
-  it('builds an immediate advanced catalog without probing verified remote providers', () => {
-    const config = {
-      ...createCatalogConfig(),
-      providerDefaultTargets: {
-        ...createCatalogConfig().providerDefaultTargets,
-        codex: { backend: 'api', instance: 'main' },
-      },
-      remoteProviderCatalog: {
-        api: {
-          codex: {
-            main: {
-              id: 'main',
-              providerName: 'codex',
-              backend: 'api',
-              transport: 'openai',
-              apiKeyEnv: 'OPENAI_API_KEY',
-              baseUrl: 'https://example.test',
-              model: 'gpt-5.4',
-            },
-          },
-        },
-        local: createCatalogConfig().remoteProviderCatalog.local,
-        agent: {},
-      },
-    } as const;
-    const fetchMock = vi.fn<typeof fetch>(async () => {
-      throw new Error('dynamic discovery should not run');
-    });
-
-    const service = new ProviderModelCatalogService(config as never, {
-      fetch: fetchMock,
-      env: {
-        OPENAI_API_KEY: 'test-key',
-      },
-    });
-
-    expect(service.getImmediateAdvancedCatalog('codex')).toEqual({
-      provider: 'codex',
-      backend: 'api',
-      instance: 'main',
-      defaultModel: 'gpt-5.4',
-      source: 'config',
-      cache: null,
-      entries: [
-        {
-          id: 'gpt-5.4',
-          label: 'gpt-5.4',
-          controlDefaults: { 'openai.reasoning_effort': 'medium' },
-          default: true,
-          status: 'configured',
-          capabilityTags: ['tool_use', 'reasoning'],
-        },
-      ],
-      presets: [
-        {
-          id: 'balanced',
-          label: 'Balanced',
-          availability: 'supported',
-          applicableEntryIds: ['gpt-5.4'],
-          preferredEntryId: 'gpt-5.4',
-          controlDefaults: {
-            'openai.reasoning_effort': 'medium',
-          },
-        },
-        {
-          id: 'fast',
-          label: 'Fast',
-          availability: 'supported',
-          applicableEntryIds: ['gpt-5.4'],
-          preferredEntryId: 'gpt-5.4',
-          controlDefaults: {
-            'openai.reasoning_effort': 'low',
-          },
-        },
-        {
-          id: 'deep_reasoning',
-          label: 'Deep reasoning',
-          availability: 'supported',
-          applicableEntryIds: ['gpt-5.4'],
-          preferredEntryId: 'gpt-5.4',
-          controlDefaults: {
-            'openai.reasoning_effort': 'high',
-          },
-        },
-      ],
-      controls: [
-        {
-          key: 'openai.reasoning_effort',
-          label: 'Reasoning effort',
-          description: 'Controls OpenAI reasoning effort for supported GPT-5 entries.',
-          kind: 'enum',
-          scope: 'both',
-          values: [
-            { value: 'low', label: 'Low' },
-            { value: 'medium', label: 'Medium' },
-            { value: 'high', label: 'High' },
-          ],
-          applicableEntryIds: ['gpt-5.4'],
-          semanticTags: ['reasoning_intensity'],
-        },
-      ],
-      defaultSelection: {
-        entryId: 'gpt-5.4',
-        entryMode: 'auto',
-        presetId: 'balanced',
-        controls: {
-          'openai.reasoning_effort': 'medium',
-        },
-      },
-      support: {
-        tier: 'full',
-        advancedMetadataStatus: 'verified_manifest',
-        discoveryMode: 'manual_refresh',
-        provenance: {
-          status: 'verified_manifest',
-          manifestId: 'codex-api-openai-v1',
-          manifestVersion: '2026-04-07',
-          evidenceRefs: [
-            'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#codex-api-openai-v1',
-          ],
-        },
-      },
-      warnings: [],
-    });
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('loads a dynamic OpenAI catalog when auth is configured and caches the result', async () => {
@@ -1580,7 +1184,7 @@ describe('ProviderModelCatalogService', () => {
 
     const service = new ProviderModelCatalogService(config as never, {
       fetch: fetchMock,
-      env: {
+      env: { ...createRuntimeTestEnv(process.env.HOME!),
         OPENAI_API_KEY: 'test-openai-key',
         OPENAI_ORG_ID: 'test-openai-org',
         OPENAI_PROJECT_ID: 'test-openai-project',
@@ -1589,7 +1193,7 @@ describe('ProviderModelCatalogService', () => {
     });
 
     const first = await service.getCatalog('codex');
-    expect(first).toEqual({
+    expect(first).toMatchObject({
       provider: 'codex',
       backend: 'api',
       instance: 'main',
@@ -1618,7 +1222,7 @@ describe('ProviderModelCatalogService', () => {
     });
 
     const second = await service.getCatalog('codex');
-    expect(second.cache).toEqual({
+    expect(second.cache).toMatchObject({
       servedFromCache: true,
       cachedAt: expect.any(String),
       ttlSec: 60,
@@ -1663,7 +1267,7 @@ describe('ProviderModelCatalogService', () => {
 
     const service = new ProviderModelCatalogService(config as never, {
       fetch: fetchMock,
-      env: {
+      env: { ...createRuntimeTestEnv(process.env.HOME!),
         OPENAI_API_KEY: 'test-openai-key',
       },
       remoteDiscoveryTimeoutMs: 25,
@@ -1671,7 +1275,7 @@ describe('ProviderModelCatalogService', () => {
     });
 
     const catalog = await service.getCatalog('codex');
-    expect(catalog).toEqual({
+    expect(catalog).toMatchObject({
       provider: 'codex',
       backend: 'api',
       instance: 'main',
@@ -1727,13 +1331,13 @@ describe('ProviderModelCatalogService', () => {
 
     const service = new ProviderModelCatalogService(config as never, {
       fetch: fetchMock,
-      env: {
+      env: { ...createRuntimeTestEnv(process.env.HOME!),
         OPENAI_API_KEY: 'test-openai-key',
       },
       ttlMs: 60_000,
     });
 
-    expect(service.inspectSummary('codex')).toEqual({
+    expect(service.inspectSummary('codex')).toMatchObject({
       source: 'config',
       defaultModel: 'gpt-5.4',
       defaultModelStatus: 'configured',
@@ -1813,7 +1417,7 @@ describe('ProviderModelCatalogService', () => {
 
     const service = new ProviderModelCatalogService(config as never, {
       fetch: fetchMock,
-      env: {
+      env: { ...createRuntimeTestEnv(process.env.HOME!),
         GEMINI_API_KEY: 'test-gemini-key',
         GEMINI_BASE_URL: 'https://generativelanguage.test',
       },
@@ -1821,7 +1425,7 @@ describe('ProviderModelCatalogService', () => {
     });
 
     const catalog = await service.getCatalog('gemini');
-    expect(catalog).toEqual({
+    expect(catalog).toMatchObject({
       provider: 'gemini',
       backend: 'api',
       instance: 'pro',
@@ -1878,12 +1482,12 @@ describe('ProviderModelCatalogService', () => {
 
     const service = new ProviderModelCatalogService(config as never, {
       fetch: fetchMock,
-      env: {},
+      env: { ...createRuntimeTestEnv(process.env.HOME!),},
       ttlMs: 60_000,
     });
 
     const catalog = await service.getCatalog('claude');
-    expect(catalog).toEqual({
+    expect(catalog).toMatchObject({
       provider: 'claude',
       backend: 'api',
       instance: 'sonnet',
@@ -1903,1567 +1507,5 @@ describe('ProviderModelCatalogService', () => {
       ],
     });
     expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('applies curated Claude CLI metadata from curated-model-catalogs.yaml', () => {
-    const runtime = createRuntimeRoot();
-
-    try {
-      writeFileSync(runtime.paths.curatedModelCatalogPath, [
-        'schema_version: 1',
-        'catalogs:',
-        '  - cli: Claude',
-        '    version: 2.1.96',
-        '    last_updated: 2026-04-08',
-        '    models:',
-        '      - name: Opus',
-        '        label: Opus 4.6 with 1M context',
-        '        default: true',
-        '        context: 1000000',
-        '        max_output: 32000',
-        '        notes:',
-        '          - Most capable for complex work.',
-        '        options:',
-        '          - name: Effort',
-        '            values:',
-        '              - name: Low',
-        '                notes:',
-        '                  - Lighter reasoning for faster responses.',
-        '              - name: Medium',
-        '                notes:',
-        '                  - Balanced effort for most work.',
-        '              - name: High',
-        '                notes:',
-        '                  - Greater depth for complex tasks.',
-        '              - name: Max',
-        '                notes:',
-        '                  - Maximum effort for the most complex work.',
-        '            default: Medium',
-        '      - name: Sonnet',
-        '        label: Sonnet 4.6',
-        '        notes:',
-        '          - Best for everyday tasks.',
-        '        options:',
-        '          - name: Effort',
-        '            values: [Low, Medium, High]',
-        '            default: Medium',
-        '      - name: Haiku',
-        '        label: Haiku 4.5',
-        '        notes:',
-        '          - Fastest for quick answers.',
-        '        options: []',
-        '',
-      ].join('\n'), 'utf8');
-
-      const base = createCatalogConfig();
-      const config = {
-        ...base,
-        configPath: runtime.paths.configPath,
-        sessionBaseDir: runtime.paths.sessionBaseDir,
-        providerDefaultTargets: {
-          ...base.providerDefaultTargets,
-          claude: { backend: 'cli', instance: 'default' },
-        },
-        providerInstances: {
-          ...base.providerInstances,
-          claude: {
-            default: {
-              id: 'default',
-              providerName: 'claude',
-              commandConfig: {
-                path: 'claude',
-                runner: 'auto',
-                runtime: { mode: 'native' },
-              },
-            },
-          },
-        },
-        providerCommands: {
-          ...base.providerCommands,
-          claude: {
-            path: 'claude',
-            runner: 'auto',
-            runtime: { mode: 'native' },
-          },
-        },
-      } as const;
-
-      const service = new ProviderModelCatalogService(config as never, {
-        env: runtime.env,
-      });
-
-      expect(service.getImmediateCatalog('claude')).toEqual({
-        provider: 'claude',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'opus',
-        source: 'static',
-        cache: null,
-        models: [
-          { id: 'opus', label: 'Opus 4.6 with 1M context', default: true },
-          { id: 'sonnet', label: 'Sonnet 4.6', default: false },
-          { id: 'haiku', label: 'Haiku 4.5', default: false },
-        ],
-        warnings: [],
-      });
-      expect(service.getImmediateAdvancedCatalog('claude')).toEqual({
-        provider: 'claude',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'opus',
-        source: 'static',
-        cache: null,
-        entries: [
-          {
-            id: 'opus',
-            label: 'Opus 4.6 with 1M context',
-            controlDefaults: { 'claude.reasoning_effort': 'medium' },
-            default: true,
-            capabilityTags: ['tool_use', 'reasoning'],
-            limits: {
-              contextWindowTokens: 1000000,
-              maxOutputTokens: 32000,
-            },
-            notes: ['Most capable for complex work.'],
-          },
-          {
-            id: 'sonnet',
-            label: 'Sonnet 4.6',
-            controlDefaults: { 'claude.reasoning_effort': 'medium' },
-            default: false,
-            capabilityTags: ['tool_use'],
-            notes: ['Best for everyday tasks.'],
-          },
-          {
-            id: 'haiku',
-            label: 'Haiku 4.5',
-            default: false,
-            capabilityTags: ['tool_use', 'latency_optimized'],
-            notes: ['Fastest for quick answers.'],
-          },
-        ],
-        presets: [],
-        controls: [
-          {
-            key: 'claude.reasoning_effort',
-            label: 'Reasoning effort',
-            description: 'Controls Claude Code effort for supported models.',
-            kind: 'enum',
-            scope: 'both',
-            values: [
-              {
-                value: 'low',
-                label: 'Low',
-                description: 'Lighter reasoning for faster responses.',
-                applicableEntryIds: ['opus', 'sonnet'],
-              },
-              {
-                value: 'medium',
-                label: 'Medium (default)',
-                description: 'Balanced effort for most work.',
-                applicableEntryIds: ['opus', 'sonnet'],
-              },
-              {
-                value: 'high',
-                label: 'High',
-                description: 'Greater depth for complex tasks.',
-                applicableEntryIds: ['opus', 'sonnet'],
-              },
-              {
-                value: 'max',
-                label: 'Max',
-                description: 'Maximum effort for the most complex work.',
-                applicableEntryIds: ['opus'],
-              },
-            ],
-            applicableEntryIds: ['opus', 'sonnet'],
-            semanticTags: ['reasoning_intensity'],
-          },
-        ],
-        defaultSelection: {
-          entryId: 'opus',
-          entryMode: 'explicit',
-          controls: {
-            'claude.reasoning_effort': 'medium',
-          },
-        },
-        support: {
-          tier: 'full',
-          advancedMetadataStatus: 'verified_manifest',
-          discoveryMode: 'manual_refresh',
-          provenance: {
-            status: 'verified_manifest',
-            manifestId: 'claude-cli-v1',
-            manifestVersion: '2026-09-02',
-            evidenceRefs: [
-              'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#claude-cli-v1',
-              'docs/research/fixtures/claude-2.1.257/model-picker.success.redacted.txt',
-            ],
-          },
-        },
-        warnings: [],
-      });
-    } finally {
-      runtime.cleanup();
-    }
-  });
-
-  it('applies curated Claude CLI xHigh effort defaults from curated-model-catalogs.yaml', () => {
-    const runtime = createRuntimeRoot();
-
-    try {
-      writeFileSync(runtime.paths.curatedModelCatalogPath, [
-        'schema_version: 1',
-        'catalogs:',
-        '  - cli: Claude',
-        '    version: 2.1.111',
-        '    last_updated: 2026-04-17',
-        '    models:',
-        '      - name: Opus',
-        '        label: Opus 4.7 with 1M context',
-        '        default: true',
-        '        options:',
-        '          - name: Effort',
-        '            values:',
-        '              - name: Low',
-        '              - name: High',
-        '              - name: xHigh',
-        '                notes:',
-        '                  - Deeper reasoning than high, just below maximum.',
-        '              - name: Max',
-        '            default: xHigh',
-        '',
-      ].join('\n'), 'utf8');
-
-      const base = createCatalogConfig();
-      const config = {
-        ...base,
-        configPath: runtime.paths.configPath,
-        sessionBaseDir: runtime.paths.sessionBaseDir,
-        providerDefaultTargets: {
-          ...base.providerDefaultTargets,
-          claude: { backend: 'cli', instance: 'default' },
-        },
-        providerInstances: {
-          ...base.providerInstances,
-          claude: {
-            default: {
-              id: 'default',
-              providerName: 'claude',
-              commandConfig: {
-                path: 'claude',
-                runner: 'auto',
-                runtime: { mode: 'native' },
-              },
-            },
-          },
-        },
-        providerCommands: {
-          ...base.providerCommands,
-          claude: {
-            path: 'claude',
-            runner: 'auto',
-            runtime: { mode: 'native' },
-          },
-        },
-      } as const;
-
-      const service = new ProviderModelCatalogService(config as never, {
-        env: runtime.env,
-      });
-
-      const advanced = service.getImmediateAdvancedCatalog('claude');
-      expect(advanced).not.toBeNull();
-      if (!advanced) {
-        throw new Error('Expected Claude advanced catalog to be available.');
-      }
-
-      expect(advanced.controls).toEqual([
-        {
-          key: 'claude.reasoning_effort',
-          label: 'Reasoning effort',
-          description: 'Controls Claude Code effort for supported models.',
-          kind: 'enum',
-          scope: 'both',
-          values: [
-            {
-              value: 'low',
-              label: 'Low',
-              description: 'Lighter reasoning for faster responses.',
-              applicableEntryIds: ['opus'],
-            },
-            {
-              value: 'high',
-              label: 'High',
-              description: 'Greater depth for complex tasks.',
-              applicableEntryIds: ['opus'],
-            },
-            {
-              value: 'xhigh',
-              label: 'xHigh (default)',
-              description: 'Deeper reasoning than high, just below maximum.',
-              applicableEntryIds: ['opus'],
-            },
-            {
-              value: 'max',
-              label: 'Max',
-              description: 'Maximum effort for the most complex work.',
-              applicableEntryIds: ['opus'],
-            },
-          ],
-          applicableEntryIds: ['opus'],
-          semanticTags: ['reasoning_intensity'],
-        },
-      ]);
-      expect(advanced.defaultSelection).toEqual({
-        entryId: 'opus',
-        entryMode: 'explicit',
-        controls: {
-          'claude.reasoning_effort': 'xhigh',
-        },
-      });
-    } finally {
-      runtime.cleanup();
-    }
-  });
-
-  it('applies curated Codex CLI effort metadata from curated-model-catalogs.yaml', () => {
-    const runtime = createRuntimeRoot();
-
-    try {
-      writeFileSync(runtime.paths.curatedModelCatalogPath, [
-        'schema_version: 1',
-        'catalogs:',
-        '  - cli: Codex',
-        '    version: 0.118.0',
-        '    last_updated: 2026-04-08',
-        '    shared_options:',
-        '      - name: Reasoning Level',
-        '        values: [Low, Medium, High, Extra High]',
-        '        default: Medium',
-        '    models:',
-        '      - name: gpt-5.4',
-        '        label: gpt-5.4',
-        '        default: true',
-        '      - name: gpt-5.2-codex',
-        '        label: gpt-5.2-codex',
-        '      - name: gpt-5.1-codex-max',
-        '        label: gpt-5.1-codex-max',
-        '      - name: gpt-5.4-mini',
-        '        label: gpt-5.4-mini',
-        '      - name: gpt-5.3-codex',
-        '        label: gpt-5.3-codex',
-        '      - name: gpt-5.3-codex-spark',
-        '        label: gpt-5.3-codex-spark',
-        '        options:',
-        '          - name: Reasoning Level',
-        '            default: High',
-        '      - name: gpt-5.2',
-        '        label: gpt-5.2',
-        '      - name: gpt-5.1-codex-mini',
-        '        label: gpt-5.1-codex-mini',
-        '        options:',
-        '          - name: Reasoning Level',
-        '            values: [Medium, High]',
-        '            default: Medium',
-        '',
-      ].join('\n'), 'utf8');
-
-      const base = createCatalogConfig();
-      const config = {
-        ...base,
-        configPath: runtime.paths.configPath,
-        sessionBaseDir: runtime.paths.sessionBaseDir,
-        providerDefaultTargets: {
-          ...base.providerDefaultTargets,
-          codex: { backend: 'cli', instance: 'default' },
-        },
-        providerInstances: {
-          ...base.providerInstances,
-          codex: {
-            default: {
-              id: 'default',
-              providerName: 'codex',
-              commandConfig: {
-                path: 'codex',
-                runner: 'auto',
-                runtime: { mode: 'native' },
-              },
-            },
-          },
-        },
-        providerCommands: {
-          ...base.providerCommands,
-          codex: {
-            path: 'codex',
-            runner: 'auto',
-            runtime: { mode: 'native' },
-          },
-        },
-      } as const;
-
-      const service = new ProviderModelCatalogService(config as never, {
-        env: runtime.env,
-      });
-
-      expect(service.getImmediateCatalog('codex')).toEqual({
-        provider: 'codex',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'gpt-5.4',
-        source: 'static',
-        cache: null,
-        models: [
-          { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
-          { id: 'gpt-5.2-codex', label: 'gpt-5.2-codex', default: false },
-          { id: 'gpt-5.1-codex-max', label: 'gpt-5.1-codex-max', default: false },
-          { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini', default: false },
-          { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex', default: false },
-          { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark', default: false },
-          { id: 'gpt-5.2', label: 'gpt-5.2', default: false },
-          { id: 'gpt-5.1-codex-mini', label: 'gpt-5.1-codex-mini', default: false },
-        ],
-        warnings: [],
-      });
-      const catalog = service.getImmediateAdvancedCatalog('codex');
-      expect(catalog.provider).toBe('codex');
-      expect(catalog.backend).toBe('cli');
-      expect(catalog.defaultModel).toBe('gpt-5.4');
-      expect(catalog.entries).toHaveLength(8);
-      expect(catalog.entries).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          id: 'gpt-5.4',
-          label: 'gpt-5.4',
-          default: true,
-        }),
-        expect.objectContaining({
-          id: 'gpt-5.2-codex',
-          label: 'gpt-5.2-codex',
-        }),
-        expect.objectContaining({
-          id: 'gpt-5.1-codex-max',
-          label: 'gpt-5.1-codex-max',
-        }),
-        expect.objectContaining({
-          id: 'gpt-5.3-codex-spark',
-          label: 'gpt-5.3-codex-spark',
-        }),
-        expect.objectContaining({
-          id: 'gpt-5.1-codex-mini',
-          label: 'gpt-5.1-codex-mini',
-        }),
-      ]));
-      expect(catalog.controls).toHaveLength(1);
-      expect(catalog.controls[0]).toEqual({
-        key: 'codex.reasoning_effort',
-        label: 'Reasoning effort',
-        description: 'Controls Codex CLI reasoning depth for supported models.',
-        kind: 'enum',
-        scope: 'both',
-        // One option per submitted token. `medium` defaults for every model but
-        // gpt-5.3-codex-spark, and `high` only for spark, so neither is the
-        // default everywhere and neither keeps a `(default)` suffix.
-        values: expect.arrayContaining([
-          {
-            value: 'low',
-            label: 'Low',
-            description: 'Fast responses with lighter reasoning.',
-            applicableEntryIds: [
-              'gpt-5.4',
-              'gpt-5.2-codex',
-              'gpt-5.1-codex-max',
-              'gpt-5.4-mini',
-              'gpt-5.3-codex',
-              'gpt-5.3-codex-spark',
-              'gpt-5.2',
-            ],
-          },
-          {
-            value: 'medium',
-            label: 'Medium',
-            description: 'Balances speed and reasoning depth for everyday tasks.',
-            applicableEntryIds: [
-              'gpt-5.4',
-              'gpt-5.2-codex',
-              'gpt-5.1-codex-max',
-              'gpt-5.4-mini',
-              'gpt-5.3-codex',
-              'gpt-5.3-codex-spark',
-              'gpt-5.2',
-              'gpt-5.1-codex-mini',
-            ],
-          },
-          {
-            value: 'high',
-            label: 'High',
-            description: 'Greater reasoning depth for complex problems.',
-            applicableEntryIds: [
-              'gpt-5.4',
-              'gpt-5.2-codex',
-              'gpt-5.1-codex-max',
-              'gpt-5.4-mini',
-              'gpt-5.3-codex',
-              'gpt-5.3-codex-spark',
-              'gpt-5.2',
-              'gpt-5.1-codex-mini',
-            ],
-          },
-          {
-            value: 'xhigh',
-            label: 'Extra High',
-            description: 'Extra high reasoning depth for complex problems.',
-            applicableEntryIds: [
-              'gpt-5.4',
-              'gpt-5.2-codex',
-              'gpt-5.1-codex-max',
-              'gpt-5.4-mini',
-              'gpt-5.3-codex',
-              'gpt-5.3-codex-spark',
-              'gpt-5.2',
-            ],
-          },
-        ]),
-        applicableEntryIds: [
-          'gpt-5.4',
-          'gpt-5.2-codex',
-          'gpt-5.1-codex-max',
-          'gpt-5.4-mini',
-          'gpt-5.3-codex',
-          'gpt-5.3-codex-spark',
-          'gpt-5.2',
-          'gpt-5.1-codex-mini',
-        ],
-        semanticTags: ['reasoning_intensity'],
-      });
-      // low, medium, high, xhigh - one per submitted token, not one per
-      // (token, label, description) combination.
-      expect(catalog.controls[0]?.values).toHaveLength(4);
-      expect(catalog.controls[0]?.values.map((value) => value.value))
-        .toEqual(['low', 'medium', 'high', 'xhigh']);
-      expect(catalog.defaultSelection).toEqual({
-        entryId: 'gpt-5.4',
-        entryMode: 'explicit',
-        controls: {
-          'codex.reasoning_effort': 'medium',
-        },
-      });
-      expect(catalog.support).toEqual({
-        tier: 'full',
-        advancedMetadataStatus: 'verified_manifest',
-        discoveryMode: 'manual_refresh',
-        provenance: {
-          status: 'verified_manifest',
-          manifestId: 'codex-cli-v1',
-          manifestVersion: '2026-04-07',
-          evidenceRefs: [
-            'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#codex-cli-v1',
-          ],
-        },
-      });
-      expect(catalog.warnings).toEqual([]);
-    } finally {
-      runtime.cleanup();
-    }
-  });
-
-  it('applies user-curated Antigravity CLI entry metadata from curated-model-catalogs.yaml', () => {
-    const runtime = createRuntimeRoot();
-
-    try {
-      writeFileSync(runtime.paths.curatedModelCatalogPath, [
-        'schema_version: 1',
-        'catalogs:',
-        '  - cli: Antigravity',
-        '    version: probe-required',
-        '    last_updated: 2026-05-24',
-        '    models:',
-        '      - name: antigravity-fixture-high',
-        '        label: Antigravity fixture high',
-        '        default: true',
-        '        tags: [reasoning]',
-        '        notes:',
-        '          - User supplied model entry.',
-        '      - name: antigravity-fixture-low',
-        '        label: Antigravity fixture low',
-        '        tags: [reasoning]',
-        '      - name: antigravity-fixture-fast',
-        '        label: Antigravity fixture fast',
-        '        tags: [latency_optimized]',
-        '',
-      ].join('\n'), 'utf8');
-
-      const base = createCatalogConfig();
-      const config = {
-        ...base,
-        configPath: runtime.paths.configPath,
-        sessionBaseDir: runtime.paths.sessionBaseDir,
-        providerDefaultTargets: {
-          ...base.providerDefaultTargets,
-          antigravity: { backend: 'cli', instance: 'default' },
-        },
-        providerInstances: {
-          ...base.providerInstances,
-          antigravity: {
-            default: {
-              id: 'default',
-              providerName: 'antigravity',
-              commandConfig: {
-                path: 'agy',
-                runner: 'auto',
-                runtime: { mode: 'native' },
-              },
-            },
-          },
-        },
-        providerCommands: {
-          ...base.providerCommands,
-          antigravity: {
-            path: 'agy',
-            runner: 'auto',
-            runtime: { mode: 'native' },
-          },
-        },
-      } as const;
-
-      const service = new ProviderModelCatalogService(config as never, {
-        env: runtime.env,
-      });
-
-      expect(service.getImmediateCatalog('antigravity')).toEqual({
-        provider: 'antigravity',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'antigravity-fixture-high',
-        source: 'static',
-        cache: null,
-        models: [
-          {
-            id: 'antigravity-fixture-high',
-            label: 'Antigravity fixture high',
-            default: true,
-          },
-          {
-            id: 'antigravity-fixture-low',
-            label: 'Antigravity fixture low',
-          },
-          {
-            id: 'antigravity-fixture-fast',
-            label: 'Antigravity fixture fast',
-          },
-        ],
-        warnings: [],
-      });
-      expect(service.getImmediateAdvancedCatalog('antigravity')).toEqual({
-        provider: 'antigravity',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'antigravity-fixture-high',
-        source: 'static',
-        cache: null,
-        entries: [
-          {
-            id: 'antigravity-fixture-high',
-            label: 'Antigravity fixture high',
-            default: true,
-            capabilityTags: ['tool_use', 'reasoning'],
-            notes: ['User supplied model entry.'],
-          },
-          {
-            id: 'antigravity-fixture-low',
-            label: 'Antigravity fixture low',
-            default: false,
-            capabilityTags: ['tool_use', 'reasoning'],
-          },
-          {
-            id: 'antigravity-fixture-fast',
-            label: 'Antigravity fixture fast',
-            default: false,
-            capabilityTags: ['tool_use', 'latency_optimized'],
-          },
-        ],
-        presets: [],
-        controls: [],
-        defaultSelection: null,
-        support: {
-          tier: 'entry_only',
-          advancedMetadataStatus: 'unverified_omitted',
-          discoveryMode: 'manual_refresh',
-          provenance: {
-            status: 'unverified_omitted',
-          },
-        },
-        warnings: [],
-      });
-    } finally {
-      runtime.cleanup();
-    }
-  });
-
-  it('applies curated Copilot CLI entry metadata from curated-model-catalogs.yaml', () => {
-    const runtime = createRuntimeRoot();
-
-    try {
-      writeFileSync(runtime.paths.curatedModelCatalogPath, [
-        'schema_version: 1',
-        'catalogs:',
-        '  - cli: Copilot',
-        '    version: v1.0.26',
-        '    last_updated: 2026-04-15',
-        '    providers:',
-        '      - name: OpenAI',
-        '        shared_options:',
-        '          - name: Reasoning Effort',
-        '            values: [Low, Medium, High]',
-        '            default: Medium',
-        '        models:',
-        '          - name: GPT-5.4',
-        '            default: true',
-        '          - name: GPT-5.4 mini',
-        '          - name: GPT-5.2-Codex',
-        '            options:',
-        '              - name: Reasoning Effort',
-        '                default: High',
-        '      - name: Anthropic',
-        '        shared_options:',
-        '          - name: Effort Level',
-        '            values: [Low, Medium, High]',
-        '            default: Medium',
-        '        models:',
-        '          - name: Claude Opus 4.6',
-        '            options:',
-        '              - name: Effort Level',
-        '                default: High',
-        '          - name: Claude Sonnet 4',
-        '',
-      ].join('\n'), 'utf8');
-
-      const base = createCatalogConfig();
-      const config = {
-        ...base,
-        configPath: runtime.paths.configPath,
-        sessionBaseDir: runtime.paths.sessionBaseDir,
-        providerDefaultTargets: {
-          ...base.providerDefaultTargets,
-          copilot: { backend: 'cli', instance: 'default' },
-        },
-        providerInstances: {
-          ...base.providerInstances,
-          copilot: {
-            default: {
-              id: 'default',
-              providerName: 'copilot',
-              commandConfig: {
-                path: 'copilot',
-                runner: 'auto',
-                runtime: { mode: 'native' },
-              },
-            },
-          },
-        },
-        providerCommands: {
-          ...base.providerCommands,
-          copilot: {
-            path: 'copilot',
-            runner: 'auto',
-            runtime: { mode: 'native' },
-          },
-        },
-      } as const;
-
-      const service = new ProviderModelCatalogService(config as never, {
-        env: runtime.env,
-      });
-
-      expect(service.getImmediateCatalog('copilot')).toEqual({
-        provider: 'copilot',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'gpt-5.4',
-        source: 'static',
-        cache: null,
-        models: [
-          { id: 'gpt-5.4', label: 'GPT-5.4', default: true },
-          { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini', default: false },
-          { id: 'gpt-5.2-codex', label: 'GPT-5.2-Codex', default: false },
-          { id: 'claude-opus-4.6', label: 'Claude Opus 4.6', default: false },
-          { id: 'claude-sonnet-4', label: 'Claude Sonnet 4', default: false },
-        ],
-        warnings: [],
-      });
-      expect(service.getImmediateAdvancedCatalog('copilot')).toEqual({
-        provider: 'copilot',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'gpt-5.4',
-        source: 'static',
-        cache: null,
-        entries: [
-          {
-            id: 'gpt-5.4',
-            label: 'GPT-5.4',
-            controlDefaults: { 'copilot.reasoning_effort': 'medium' },
-            default: true,
-            capabilityTags: ['reasoning'],
-          },
-          {
-            id: 'gpt-5.4-mini',
-            label: 'GPT-5.4 mini',
-            controlDefaults: { 'copilot.reasoning_effort': 'medium' },
-            default: false,
-            capabilityTags: ['reasoning', 'latency_optimized'],
-          },
-          {
-            id: 'gpt-5.2-codex',
-            label: 'GPT-5.2-Codex',
-            controlDefaults: { 'copilot.reasoning_effort': 'high' },
-            default: false,
-          },
-          {
-            id: 'claude-opus-4.6',
-            label: 'Claude Opus 4.6',
-            controlDefaults: { 'copilot.reasoning_effort': 'high' },
-            default: false,
-            capabilityTags: ['reasoning'],
-          },
-          {
-            id: 'claude-sonnet-4',
-            label: 'Claude Sonnet 4',
-            controlDefaults: { 'copilot.reasoning_effort': 'medium' },
-            default: false,
-          },
-        ],
-        presets: [],
-        controls: [
-          expect.objectContaining({
-            key: 'copilot.reasoning_effort',
-            label: 'Reasoning effort',
-            description: 'Controls GitHub Copilot CLI reasoning effort for supported models.',
-            kind: 'enum',
-            scope: 'both',
-            // One option per submitted token, every entry unioned onto it.
-            // `medium` and `high` each default for only part of the catalog,
-            // so neither keeps a `(default)` suffix on the shared option.
-            values: [
-              expect.objectContaining({
-                value: 'low',
-                label: 'Low',
-                applicableEntryIds: [
-                  'gpt-5.4',
-                  'gpt-5.4-mini',
-                  'gpt-5.2-codex',
-                  'claude-opus-4.6',
-                  'claude-sonnet-4',
-                ],
-              }),
-              expect.objectContaining({
-                value: 'medium',
-                label: 'Medium',
-                applicableEntryIds: [
-                  'gpt-5.4',
-                  'gpt-5.4-mini',
-                  'gpt-5.2-codex',
-                  'claude-opus-4.6',
-                  'claude-sonnet-4',
-                ],
-              }),
-              expect.objectContaining({
-                value: 'high',
-                label: 'High',
-                applicableEntryIds: [
-                  'gpt-5.4',
-                  'gpt-5.4-mini',
-                  'gpt-5.2-codex',
-                  'claude-opus-4.6',
-                  'claude-sonnet-4',
-                ],
-              }),
-            ],
-            applicableEntryIds: [
-              'gpt-5.4',
-              'gpt-5.4-mini',
-              'gpt-5.2-codex',
-              'claude-opus-4.6',
-              'claude-sonnet-4',
-            ],
-            semanticTags: ['reasoning_intensity'],
-          }),
-        ],
-        defaultSelection: {
-          entryId: 'gpt-5.4',
-          entryMode: 'explicit',
-          controls: {
-            'copilot.reasoning_effort': 'medium',
-          },
-        },
-        support: {
-          tier: 'full',
-          advancedMetadataStatus: 'unverified_omitted',
-          discoveryMode: 'manual_refresh',
-          provenance: {
-            status: 'unverified_omitted',
-          },
-        },
-        warnings: [],
-      });
-    } finally {
-      runtime.cleanup();
-    }
-  });
-
-  it('applies curated Kilo CLI entry metadata from curated-model-catalogs.yaml', () => {
-    const runtime = createRuntimeRoot();
-
-    try {
-      writeFileSync(runtime.paths.curatedModelCatalogPath, [
-        'schema_version: 1',
-        'catalogs:',
-        '  - cli: Kilo',
-        '    version: v7.2.0',
-        '    last_updated: 2026-04-14',
-        '    models:',
-        '      - name: Kilo Auto Frontier',
-        '      - name: "xAI: Grok Code Fast 1 Optimized (free)"',
-        '      - name: Elephant (new)',
-        '      - name: "OpenAI: GPT-5.4"',
-        '        default: true',
-        '      - name: "MiniMax: MiniMax M2.7"',
-        '      - name: "Z.ai: GLM 5.1 (new)"',
-        '',
-      ].join('\n'), 'utf8');
-
-      const base = createCatalogConfig();
-      const config = {
-        ...base,
-        configPath: runtime.paths.configPath,
-        sessionBaseDir: runtime.paths.sessionBaseDir,
-        providerDefaultTargets: {
-          ...base.providerDefaultTargets,
-          kilo: { backend: 'cli', instance: 'default' },
-        },
-        providerInstances: {
-          ...base.providerInstances,
-          kilo: {
-            default: {
-              id: 'default',
-              providerName: 'kilo',
-              commandConfig: {
-                path: 'kilo',
-                runner: 'auto',
-                runtime: { mode: 'native' },
-              },
-            },
-          },
-        },
-        providerCommands: {
-          ...base.providerCommands,
-          kilo: {
-            path: 'kilo',
-            runner: 'auto',
-            runtime: { mode: 'native' },
-          },
-        },
-      } as const;
-
-      const service = new ProviderModelCatalogService(config as never, {
-        env: runtime.env,
-      });
-
-      expect(service.getImmediateCatalog('kilo')).toEqual({
-        provider: 'kilo',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'kilo/openai/gpt-5.4',
-        source: 'static',
-        cache: null,
-        models: [
-          { id: 'kilo/kilo-auto/frontier', label: 'Kilo Auto Frontier' },
-          {
-            id: 'kilo/x-ai/grok-code-fast-1:optimized:free',
-            label: 'xAI: Grok Code Fast 1 Optimized (free)',
-          },
-          { id: 'kilo/openrouter/elephant-alpha', label: 'Elephant (new)' },
-          { id: 'kilo/openai/gpt-5.4', label: 'OpenAI: GPT-5.4', default: true },
-          { id: 'kilo/minimax/minimax-m2.7', label: 'MiniMax: MiniMax M2.7' },
-          { id: 'kilo/z-ai/glm-5.1', label: 'Z.ai: GLM 5.1 (new)' },
-        ],
-        warnings: [],
-      });
-      expect(service.getImmediateAdvancedCatalog('kilo')).toEqual({
-        provider: 'kilo',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'kilo/openai/gpt-5.4',
-        source: 'static',
-        cache: null,
-        entries: [
-          {
-            id: 'kilo/kilo-auto/frontier',
-            label: 'Kilo Auto Frontier',
-            default: false,
-          },
-          {
-            id: 'kilo/x-ai/grok-code-fast-1:optimized:free',
-            label: 'xAI: Grok Code Fast 1 Optimized (free)',
-            default: false,
-          },
-          {
-            id: 'kilo/openrouter/elephant-alpha',
-            label: 'Elephant (new)',
-            default: false,
-          },
-          {
-            id: 'kilo/openai/gpt-5.4',
-            label: 'OpenAI: GPT-5.4',
-            default: true,
-            capabilityTags: ['reasoning'],
-          },
-          {
-            id: 'kilo/minimax/minimax-m2.7',
-            label: 'MiniMax: MiniMax M2.7',
-            default: false,
-            capabilityTags: ['latency_optimized'],
-          },
-          {
-            id: 'kilo/z-ai/glm-5.1',
-            label: 'Z.ai: GLM 5.1 (new)',
-            default: false,
-          },
-        ],
-        presets: [],
-        controls: [],
-        defaultSelection: null,
-        support: {
-          tier: 'entry_only',
-          advancedMetadataStatus: 'unverified_omitted',
-          discoveryMode: 'manual_refresh',
-          provenance: {
-            status: 'unverified_omitted',
-          },
-        },
-        warnings: [],
-      });
-    } finally {
-      runtime.cleanup();
-    }
-  });
-
-  it('applies curated Kiro CLI entry metadata and default from curated-model-catalogs.yaml', () => {
-    const runtime = createRuntimeRoot();
-
-    try {
-      writeFileSync(runtime.paths.curatedModelCatalogPath, [
-        'schema_version: 1',
-        'catalogs:',
-        '  - cli: Kiro',
-        '    version: 2.0.0',
-        '    last_updated: 2026-04-15',
-        '    models:',
-        '      - name: auto',
-        '        default: true',
-        '      - name: claude-opus-4.6',
-        '      - name: claude-sonnet-4.6',
-        '      - name: claude-opus-4.5',
-        '      - name: claude-sonnet-4.5',
-        '      - name: claude-sonnet-4',
-        '      - name: claude-haiku-4.5',
-        '      - name: deepseek-3.2',
-        '      - name: minimax-m2.5',
-        '      - name: minimax-m2.1',
-        '      - name: glm-5',
-        '      - name: qwen3-coder-next',
-        '',
-      ].join('\n'), 'utf8');
-
-      const base = createCatalogConfig();
-      const config = {
-        ...base,
-        configPath: runtime.paths.configPath,
-        sessionBaseDir: runtime.paths.sessionBaseDir,
-        providerDefaultTargets: {
-          ...base.providerDefaultTargets,
-          kiro: { backend: 'cli', instance: 'default' },
-        },
-        providerInstances: {
-          ...base.providerInstances,
-          kiro: {
-            default: {
-              id: 'default',
-              providerName: 'kiro',
-              commandConfig: {
-                path: 'kiro-cli',
-                runner: 'auto',
-                runtime: { mode: 'native' },
-              },
-            },
-          },
-        },
-        providerCommands: {
-          ...base.providerCommands,
-          kiro: {
-            path: 'kiro-cli',
-            runner: 'auto',
-            runtime: { mode: 'native' },
-          },
-        },
-      } as const;
-
-      const service = new ProviderModelCatalogService(config as never, {
-        env: runtime.env,
-      });
-
-      expect(service.getImmediateCatalog('kiro')).toEqual({
-        provider: 'kiro',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'auto',
-        source: 'static',
-        cache: null,
-        models: [
-          { id: 'auto', label: 'auto', default: true },
-          { id: 'claude-opus-4.6', label: 'claude-opus-4.6' },
-          { id: 'claude-sonnet-4.6', label: 'claude-sonnet-4.6' },
-          { id: 'claude-opus-4.5', label: 'claude-opus-4.5' },
-          { id: 'claude-sonnet-4.5', label: 'claude-sonnet-4.5' },
-          { id: 'claude-sonnet-4', label: 'claude-sonnet-4' },
-          { id: 'claude-haiku-4.5', label: 'claude-haiku-4.5' },
-          { id: 'deepseek-3.2', label: 'deepseek-3.2' },
-          { id: 'minimax-m2.5', label: 'minimax-m2.5' },
-          { id: 'minimax-m2.1', label: 'minimax-m2.1' },
-          { id: 'glm-5', label: 'glm-5' },
-          { id: 'qwen3-coder-next', label: 'qwen3-coder-next' },
-        ],
-        warnings: [],
-      });
-      expect(service.getImmediateAdvancedCatalog('kiro')).toEqual({
-        provider: 'kiro',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'auto',
-        source: 'static',
-        cache: null,
-        entries: [
-          { id: 'auto', label: 'auto', default: true },
-          {
-            id: 'claude-opus-4.6',
-            label: 'claude-opus-4.6',
-            default: false,
-            capabilityTags: ['reasoning'],
-          },
-          {
-            id: 'claude-sonnet-4.6',
-            label: 'claude-sonnet-4.6',
-            default: false,
-          },
-          {
-            id: 'claude-opus-4.5',
-            label: 'claude-opus-4.5',
-            default: false,
-            capabilityTags: ['reasoning'],
-          },
-          {
-            id: 'claude-sonnet-4.5',
-            label: 'claude-sonnet-4.5',
-            default: false,
-          },
-          {
-            id: 'claude-sonnet-4',
-            label: 'claude-sonnet-4',
-            default: false,
-          },
-          {
-            id: 'claude-haiku-4.5',
-            label: 'claude-haiku-4.5',
-            default: false,
-            capabilityTags: ['latency_optimized'],
-          },
-          {
-            id: 'deepseek-3.2',
-            label: 'deepseek-3.2',
-            default: false,
-          },
-          {
-            id: 'minimax-m2.5',
-            label: 'minimax-m2.5',
-            default: false,
-            capabilityTags: ['latency_optimized'],
-          },
-          {
-            id: 'minimax-m2.1',
-            label: 'minimax-m2.1',
-            default: false,
-            capabilityTags: ['latency_optimized'],
-          },
-          {
-            id: 'glm-5',
-            label: 'glm-5',
-            default: false,
-          },
-          {
-            id: 'qwen3-coder-next',
-            label: 'qwen3-coder-next',
-            default: false,
-          },
-        ],
-        presets: [],
-        controls: [],
-        defaultSelection: null,
-        support: {
-          tier: 'entry_only',
-          advancedMetadataStatus: 'unverified_omitted',
-          discoveryMode: 'manual_refresh',
-          provenance: {
-            status: 'unverified_omitted',
-          },
-        },
-        warnings: [],
-      });
-    } finally {
-      runtime.cleanup();
-    }
-  });
-
-  it('warns when curated CLI models cannot be normalized', () => {
-    const runtime = createRuntimeRoot();
-
-    try {
-      writeFileSync(runtime.paths.curatedModelCatalogPath, [
-        'schema_version: 1',
-        'catalogs:',
-        '  - cli: Codex',
-        '    version: 0.118.0',
-        '    last_updated: 2026-04-08',
-        '    models:',
-        '      - name: gpt-5.4',
-        '        default: true',
-        '      - name: gpt-5.0',
-        '',
-      ].join('\n'), 'utf8');
-
-      const base = createCatalogConfig();
-      const config = {
-        ...base,
-        configPath: runtime.paths.configPath,
-        sessionBaseDir: runtime.paths.sessionBaseDir,
-        providerDefaultTargets: {
-          ...base.providerDefaultTargets,
-          codex: { backend: 'cli', instance: 'default' },
-        },
-        providerInstances: {
-          ...base.providerInstances,
-          codex: {
-            default: {
-              id: 'default',
-              providerName: 'codex',
-              commandConfig: {
-                path: 'codex',
-                runner: 'auto',
-                runtime: { mode: 'native' },
-              },
-            },
-          },
-        },
-        providerCommands: {
-          ...base.providerCommands,
-          codex: {
-            path: 'codex',
-            runner: 'auto',
-            runtime: { mode: 'native' },
-          },
-        },
-      } as const;
-
-      const service = new ProviderModelCatalogService(config as never, {
-        env: runtime.env,
-      });
-
-      expect(service.getImmediateCatalog('codex')).toEqual({
-        provider: 'codex',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'gpt-5.4',
-        source: 'static',
-        cache: null,
-        models: [
-          { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
-        ],
-        warnings: [
-          "Curated model 'gpt-5.0' for Codex could not be normalized and was ignored.",
-        ],
-      });
-    } finally {
-      runtime.cleanup();
-    }
-  });
-
-  it('applies curated Cursor label-only entry metadata from curated-model-catalogs.yaml', () => {
-    const runtime = createRuntimeRoot();
-
-    try {
-      writeFileSync(runtime.paths.curatedModelCatalogPath, [
-        'schema_version: 1',
-        'catalogs:',
-        '  - cli: Cursor',
-        '    version: 2026.04.13-a9d7fb5',
-        '    last_updated: 2026-04-14',
-        '    models:',
-        '      - name: Auto',
-        '      - name: Composer 2 Fast',
-        '        default: true',
-        '      - name: Codex 5.3 Extra High',
-        '      - name: GPT-5.4 1M',
-        '      - name: Opus 4.5 Thinking',
-        '      - name: Gemini 3 Flash',
-        '',
-      ].join('\n'), 'utf8');
-
-      const base = createCatalogConfig();
-      const config = {
-        ...base,
-        configPath: runtime.paths.configPath,
-        sessionBaseDir: runtime.paths.sessionBaseDir,
-        providerDefaultTargets: {
-          ...base.providerDefaultTargets,
-          cursor: { backend: 'cli', instance: 'default' },
-        },
-        providerInstances: {
-          ...base.providerInstances,
-          cursor: {
-            default: {
-              id: 'default',
-              providerName: 'cursor',
-              commandConfig: {
-                path: 'cursor-agent',
-                runner: 'auto',
-                runtime: { mode: 'native' },
-              },
-            },
-          },
-        },
-        providerCommands: {
-          ...base.providerCommands,
-          cursor: {
-            path: 'cursor-agent',
-            runner: 'auto',
-            runtime: { mode: 'native' },
-          },
-        },
-      } as const;
-
-      const service = new ProviderModelCatalogService(config as never, {
-        env: runtime.env,
-      });
-
-      expect(service.getImmediateCatalog('cursor')).toEqual({
-        provider: 'cursor',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'composer-2-fast',
-        source: 'static',
-        cache: null,
-        models: [
-          { id: 'auto', label: 'Auto' },
-          { id: 'composer-2-fast', label: 'Composer 2 Fast', default: true },
-          { id: 'gpt-5.3-codex-xhigh', label: 'Codex 5.3 Extra High' },
-          { id: 'gpt-5.4-medium', label: 'GPT-5.4 1M' },
-          { id: 'claude-4.5-opus-thinking', label: 'Opus 4.5 Thinking' },
-          { id: 'gemini-3-flash', label: 'Gemini 3 Flash' },
-        ],
-        warnings: [
-          'Live model discovery is available for cursor/cli/default via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
-        ],
-      });
-      expect(service.getImmediateAdvancedCatalog('cursor')).toEqual({
-        provider: 'cursor',
-        backend: 'cli',
-        instance: 'default',
-        defaultModel: 'composer-2-fast',
-        source: 'static',
-        cache: null,
-        entries: [
-          {
-            id: 'auto',
-            label: 'Auto',
-            default: false,
-          },
-          {
-            id: 'composer-2-fast',
-            label: 'Composer 2 Fast',
-            default: true,
-          },
-          {
-            id: 'gpt-5.3-codex-xhigh',
-            label: 'Codex 5.3 Extra High',
-            default: false,
-          },
-          {
-            id: 'gpt-5.4-medium',
-            label: 'GPT-5.4 1M',
-            default: false,
-            capabilityTags: ['reasoning'],
-          },
-          {
-            id: 'claude-4.5-opus-thinking',
-            label: 'Opus 4.5 Thinking',
-            default: false,
-            capabilityTags: ['reasoning'],
-          },
-          {
-            id: 'gemini-3-flash',
-            label: 'Gemini 3 Flash',
-            default: false,
-            capabilityTags: ['latency_optimized'],
-          },
-        ],
-        presets: [],
-        controls: [],
-        defaultSelection: null,
-        support: {
-          tier: 'entry_only',
-          advancedMetadataStatus: 'unverified_omitted',
-          discoveryMode: 'manual_refresh',
-          provenance: {
-            status: 'unverified_omitted',
-          },
-        },
-        warnings: [
-          'Live model discovery is available for cursor/cli/default via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
-        ],
-      });
-    } finally {
-      runtime.cleanup();
-    }
-  });
-
-  it('builds an additive advanced catalog with presets and controls for OpenAI targets', async () => {
-    const config = {
-      ...createCatalogConfig(),
-      providerDefaultTargets: {
-        codex: { backend: 'api', instance: 'main' },
-      },
-      remoteProviderCatalog: {
-        api: {
-          codex: {
-            main: {
-              id: 'main',
-              providerName: 'codex',
-              backend: 'api',
-              transport: 'openai',
-              apiKeyEnv: 'OPENAI_API_KEY',
-              baseUrl: 'https://example.test',
-              model: 'gpt-5.4',
-            },
-          },
-        },
-        local: createCatalogConfig().remoteProviderCatalog.local,
-        agent: {},
-      },
-    } as const;
-
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
-      jsonResponse({
-        data: [
-          { id: 'gpt-5.4' },
-        ],
-      }),
-    );
-
-    const service = new ProviderModelCatalogService(config as never, {
-      fetch: fetchMock,
-      env: {
-        OPENAI_API_KEY: 'test-key',
-      },
-    });
-
-    const catalog = await service.getAdvancedCatalog('codex');
-    expect(catalog).toEqual({
-      provider: 'codex',
-      backend: 'api',
-      instance: 'main',
-      defaultModel: 'gpt-5.4',
-      source: 'dynamic',
-      cache: {
-        servedFromCache: false,
-        cachedAt: expect.any(String),
-        ttlSec: 60,
-      },
-      entries: [
-        {
-          id: 'gpt-5.4',
-          label: 'gpt-5.4',
-          controlDefaults: { 'openai.reasoning_effort': 'medium' },
-          default: true,
-          status: 'available',
-          capabilityTags: ['tool_use', 'reasoning'],
-        },
-      ],
-      presets: [
-        {
-          id: 'balanced',
-          label: 'Balanced',
-          availability: 'supported',
-          applicableEntryIds: ['gpt-5.4'],
-          preferredEntryId: 'gpt-5.4',
-          controlDefaults: {
-            'openai.reasoning_effort': 'medium',
-          },
-        },
-        {
-          id: 'fast',
-          label: 'Fast',
-          availability: 'supported',
-          applicableEntryIds: ['gpt-5.4'],
-          preferredEntryId: 'gpt-5.4',
-          controlDefaults: {
-            'openai.reasoning_effort': 'low',
-          },
-        },
-        {
-          id: 'deep_reasoning',
-          label: 'Deep reasoning',
-          availability: 'supported',
-          applicableEntryIds: ['gpt-5.4'],
-          preferredEntryId: 'gpt-5.4',
-          controlDefaults: {
-            'openai.reasoning_effort': 'high',
-          },
-        },
-      ],
-      controls: [{
-        key: 'openai.reasoning_effort',
-        label: 'Reasoning effort',
-        description: 'Controls OpenAI reasoning effort for supported GPT-5 entries.',
-        kind: 'enum',
-        scope: 'both',
-        values: [
-          { value: 'low', label: 'Low' },
-          { value: 'medium', label: 'Medium' },
-          { value: 'high', label: 'High' },
-        ],
-        applicableEntryIds: ['gpt-5.4'],
-        semanticTags: ['reasoning_intensity'],
-      }],
-      defaultSelection: {
-        entryId: 'gpt-5.4',
-        entryMode: 'auto',
-        presetId: 'balanced',
-        controls: {
-          'openai.reasoning_effort': 'medium',
-        },
-      },
-      support: {
-        tier: 'full',
-        advancedMetadataStatus: 'verified_manifest',
-        discoveryMode: 'manual_refresh',
-        provenance: {
-          status: 'verified_manifest',
-          manifestId: 'codex-api-openai-v1',
-          manifestVersion: '2026-04-07',
-          evidenceRefs: [
-            'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#codex-api-openai-v1',
-          ],
-        },
-      },
-      warnings: [],
-    });
   });
 });

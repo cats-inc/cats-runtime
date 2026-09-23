@@ -19,14 +19,15 @@ evidence belong in `docs/research/2026-09-18-opencode-shortlist.md`, not in this
   row. Do not pick the first result or infer it from neighboring rows. A matching name/ID does
   not establish model options, defaults or entitlements on another machine.
 
-## Apply the approved shortlist
 
-Store the observed provider-qualified ID as `name`, the exact display text as `label`, and use
-the existing `selection_mode: shortlist`. Model-list-only evidence adds no effort/context controls
-or default flags. Reuse the entry-only advanced selection path and verbatim-ID normalizer.
+## Schema-2 execution data
 
-Follow [new shortlist rollout checks](../catalog-surfaces.md#new-shortlist-rollout-checks) for
-Runtime routing, both UI consumers, custom input and isolated dynamic-discovery fixtures.
-The bundled `opencodeShortlist.test.ts` exercises order, refresh, configured-default exclusion
-and exact model resolution. Older unrestricted-discovery fixtures remain a separate supported
-configuration; they must explicitly opt out of the bundled shortlist.
+Use the observed provider-qualified token in `id` and `execution.model`, exact display name in `label`. Matching names in two namespaces require an explicit choice. A model-only list establishes no effort/default metadata.
+
+Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
+Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.
+There are no independent Runtime, Playground or Desktop model tables to update. Existing generic
+bindings require no repeated implementation authorization; a new unsupported binding is a separate
+code change. Validate labels, ordered values, defaults, custom input, and actual emitted bindings.
+Discovery tests must explicitly use a `selection_mode: discovery` scope before constructing the
+service. `catalogs: []` inherits factory; `models: []` empties a full/shortlist scope.

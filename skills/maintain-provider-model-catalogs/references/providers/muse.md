@@ -26,7 +26,7 @@ with no `--model` argument muse uses whatever the account already prefers.
 
 **Effort menus are per model.** A global `--reasoning-effort` argument describes parser vocabulary,
 not the values or defaults shown for each model. Keep the operator's complete per-model menus in
-model `options`, including regular and contributor rows only where both were confirmed. Do not
+model `controls`, including regular and contributor rows only where both were confirmed. Do not
 restore extra values or a help-derived default when refreshing model ids through MSP. Absence of a
 picker default means no curated/default label; the UI initializes to the first option and must
 persist that value for execution. Keep broader parser acceptance separate from menu metadata.
@@ -40,3 +40,15 @@ Never verify a muse build by running the tool as part of catalog work. The insta
 a launcher that forwards every argument to the agent binary, so an unrecognised flag opens the
 interactive TUI. Read the version from `.muse-version` in the install directory. The launcher also
 self-updates in the background, so record the exact `muse-bin-<version>` the evidence came from.
+
+## Schema-2 execution data
+
+Keep exact per-model `muse.reasoning_effort` values, including regular/contributor variants only where separately confirmed. Do not import help-wide enums or MSP defaults into per-model picker data.
+
+Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
+Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.
+There are no independent Runtime, Playground or Desktop model tables to update. Existing generic
+bindings require no repeated implementation authorization; a new unsupported binding is a separate
+code change. Validate labels, ordered values, defaults, custom input, and actual emitted bindings.
+Discovery tests must explicitly use a `selection_mode: discovery` scope before constructing the
+service. `catalogs: []` inherits factory; `models: []` empties a full/shortlist scope.

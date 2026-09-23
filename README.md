@@ -253,41 +253,23 @@ If `management.yaml` or `curated-model-catalogs.yaml` is missing, the runtime
 falls back to the bundled `config/*.yaml.example` templates shipped with the
 installed package.
 
-## Curated CLI Catalogs
+## Provider Model Catalogs
 
-`cats-runtime` now accepts a human-curated CLI model catalog at:
+The schema-2 factory catalog is authored once in
+`config/curated-model-catalogs.yaml.example`. An optional local
+`curated-model-catalogs.yaml` replaces only the scopes it contains. Missing scopes
+inherit factory data; an empty scope stays empty. Desktop no longer seeds or
+refreshes complete personal catalog copies.
 
-- `~/.cats/runtime/config/curated-model-catalogs.yaml`
-- bundled example/fallback: `config/curated-model-catalogs.yaml.example`
+Full/shortlist scopes drive basic and advanced menus and exact execution bindings.
+Discovery-owned scopes retain live discovery and config fallback. Runtime,
+Playground and Desktop share revisions instead of maintaining separate model lists.
 
-Current runtime behavior:
-
-- Claude, Codex, Antigravity, Grok, Muse, Kilo, Copilot, and Cursor can all consume curated YAML on the CLI
-  static-fallback path
-- Claude, Codex, Antigravity, Grok, Muse, Kilo, Copilot, and Cursor advanced catalogs also consume the same
-  curated input
-- packaged desktop hosts seed `management.yaml` and
-  `curated-model-catalogs.yaml` into `~/.cats/runtime/config/` when those
-  files do not already exist, so users get editable runtime-owned copies
-  outside the app bundle
-- packaged desktop hosts may refresh `curated-model-catalogs.yaml` when the
-  existing file still matches a known previously auto-seeded template or the
-  recorded seed hash, but they do not force-overwrite user-edited copies
-- packaged desktop hosts do not force-overwrite existing `management.yaml`
-  copies; that file remains operator-owned once present
-- for those advanced catalogs, the curated `models[]` or flattened
-  `providers[]` entry list is authoritative for entry filtering and ordering
-- dynamic discovery or config-backed catalogs still take precedence when those
-  sources are available; the curated file is the runtime-owned static fallback
-  seam, not a replacement for verified live discovery
-
-Current stabilization status:
-
-- Claude, Codex, Antigravity, Copilot, and Kilo curated CLI support now has
-  model-layer and route-layer regression coverage on both
-  `/providers/{provider}/models` and `/providers/{provider}/models/advanced`
-- Cursor curated support remains available, but grouped `providers[]`
-  behavior is still the more likely place for future follow-up changes
+See [Provider catalog soft patches](docs/provider-catalog-soft-patches.md) for
+installed capability checks, schema-1 conversion, preview/apply/backup, reload,
+rollback and remote/offline behavior. Old personal files require explicit conversion;
+they are never silently rewritten. No version bump is needed for a supported data
+patch after installing this loader.
 
 ## Key Files
 
@@ -302,7 +284,7 @@ Current stabilization status:
 - `config/providers.yaml.example` - reference topology for manual/preseeded config
 - `config/management.yaml.example` - default management adapter template used as
   the packaged fallback when `~/.cats/runtime/config/management.yaml` is absent
-- `config/curated-model-catalogs.yaml.example` - human-curated CLI model catalog input example consumed by the current Claude/Codex/Antigravity/Grok/Muse/Kilo/Copilot/Cursor importer slices
+- `config/curated-model-catalogs.yaml.example` - single authored schema-2 factory catalog for all supported target scopes
 - `docs/api.md` - public HTTP surface
 - `docs/architecture.md` - internal layout and data flow
 

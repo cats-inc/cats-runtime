@@ -18,10 +18,15 @@
       "types": "./build/runtime/index.d.ts",
       "import": "./build/runtime/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./catalogs": {
+      "types": "./build/runtime/catalogs/index.d.ts",
+      "import": "./build/runtime/catalogs/index.js"
+    }
   },
   "bin": {
-    "cats-runtime": "build/runtime/index.js"
+    "cats-runtime": "build/runtime/index.js",
+    "cats-runtime-catalog": "build/runtime/bin/catalogs.js"
   },
   "files": [
     "build/runtime",
@@ -32,14 +37,16 @@
     "config/curated-model-catalogs.yaml.example",
     ".env.example",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "config/curated-model-catalogs.generated.json",
+    "config/catalog-schema1-migration.json"
   ],
   "scripts": {
     "clean:build": "node scripts/clean-build.mjs",
     "build:ui": "node scripts/build-runtime-ui-css.mjs",
     "build:runtime": "tsc -p tsconfig.json",
     "build:runtime-bundle": "node scripts/bundle-runtime.mjs",
-    "build": "npm run clean:build && npm run build:ui && node scripts/build-runtime-artifacts.mjs",
+    "build": "npm run catalog:check && npm run clean:build && npm run build:ui && node scripts/build-runtime-artifacts.mjs",
     "dev": "tsx watch src/index.ts --startup-mode app-managed --managed-by tsx-watch --ready-output plain",
     "start": "node build/runtime/index.js",
     "prepack": "npm run build",
@@ -47,7 +54,9 @@
     "test": "npm run build && vitest run --pool=threads --poolOptions.threads.singleThread",
     "test:watch": "vitest --pool=threads --poolOptions.threads.singleThread",
     "typecheck": "npm run build:ui && tsc --noEmit -p tsconfig.json",
-    "verify:skills": "npm run build && node build/runtime/bin/verifySkills.js"
+    "verify:skills": "npm run build && node build/runtime/bin/verifySkills.js",
+    "catalog:generate": "node --import tsx scripts/generate-provider-catalog.mjs",
+    "catalog:check": "node --import tsx scripts/generate-provider-catalog.mjs --check && node scripts/check-provider-catalog-boundaries.mjs"
   },
   "keywords": [
     "cats",

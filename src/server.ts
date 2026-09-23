@@ -962,7 +962,8 @@ export function createRuntimeServer(
       getOpencodeNative: resolveOpencodeNative,
     },
   );
-  const runtime = new RuntimeSessionManager(config, pool, apiBackend, agentBackend);
+  const runtime = new RuntimeSessionManager(config, pool, apiBackend, agentBackend,
+    (sessionId) => registry.get(sessionId));
   const wakeup = new RuntimeWakeupService({
     persistPath: join(dataDir, 'wakeups.json'),
     sessionExists: (sessionId) => registry.get(sessionId) !== undefined,

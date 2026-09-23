@@ -313,23 +313,7 @@ function normalizeTokenUsage(
 }
 
 function normalizeStoredModelId(modelId?: string): string | undefined {
-  if (!modelId) return undefined;
-
-  const normalized = modelId.trim().toLowerCase();
-  const aliases: Record<string, string> = {
-    'gpt-5': 'gpt5',
-    'gpt-5-1': 'gpt5.1',
-    'gpt-5-2': 'gpt5.2',
-    'gpt-5-4': 'gpt5.4',
-    'haiku-4-5': 'haiku4.5',
-    'opus-4-5': 'opus4.5',
-    'opus-4-6': 'opus4.6',
-    'sonnet-4': 'sonnet4',
-    'sonnet-4-5': 'sonnet4.5',
-    'sonnet-4-6': 'sonnet4.6',
-  };
-
-  return aliases[normalized] || normalized;
+  return modelId?.trim() || undefined;
 }
 
 function compareByActivityDesc(a: AuggieSavedSession, b: AuggieSavedSession): number {

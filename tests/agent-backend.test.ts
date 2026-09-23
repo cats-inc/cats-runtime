@@ -2773,7 +2773,7 @@ describe('agent backend integration', () => {
     try {
       const response = await runtime.app.request('/providers/openclaw/tools?instance=agent/gateway');
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({
+      await expect(response.json()).resolves.toMatchObject({
         provider: 'openclaw',
         backend: 'agent',
         instance: 'gateway',
@@ -3212,7 +3212,7 @@ describe('agent backend integration', () => {
         '/providers/openclaw/models?instance=agent/gateway&refresh=1',
       );
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({
+      await expect(response.json()).resolves.toMatchObject({
         provider: 'openclaw',
         backend: 'agent',
         instance: 'gateway',

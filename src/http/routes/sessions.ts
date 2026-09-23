@@ -117,6 +117,7 @@ import {
   sameProviderModelSelection,
 } from '../../core/models/providerSelectionResolution.js';
 import { normalizeProviderCatalogModelId } from '../../core/models/providerModelCatalog.js';
+import { CatalogRevisionConflict } from '../../catalogs/store.js';
 import { cloneProviderControls } from '../../core/models/providerControlUtils.js';
 import {
   buildRuntimeExecutionStrategySessionPatch,
@@ -438,25 +439,13 @@ function buildSpawnOptions(input: {
     ...(input.workspaceMode ? { workspaceMode: input.workspaceMode } : {}),
     ...(input.model ? { model: input.model } : {}),
     ...(modelControls ? { modelControls } : {}),
+    ...(input.modelResolution?.executionProvider ? { modelProvider: input.modelResolution.executionProvider } : {}),
     ...(input.resumeSessionId ? { resumeSessionId: input.resumeSessionId } : {}),
     ...(input.instructionsFile ? { instructionsFile: input.instructionsFile } : {}),
     ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
     ...(input.allowedTools ? { allowedTools: input.allowedTools } : {}),
     ...(input.forkSession ? { forkSession: input.forkSession } : {}),
   };
-}
-
-function shouldRetrySessionSelectionWithoutPreset(message: string): boolean {
-  return /Unknown preset '/u.test(message)
-    || /Preset '.*' is not applicable to entry '/u.test(message);
-}
-
-function removePresetFromSelection(
-  selection: ProviderModelSelection,
-): ProviderModelSelection {
-  const normalized = canonicalizeProviderModelSelection(selection);
-  const { presetId: _presetId, ...withoutPreset } = normalized;
-  return withoutPreset;
 }
 
 function normalizeLegacyModelForTarget(
@@ -498,8 +487,6 @@ async function resolveRequestedSessionModelState(
     legacyModel?: string;
     selection?: ProviderModelSelection;
     enforceLegacyMatch?: boolean;
-    fallbackToLegacyModelOnResolutionError?: boolean;
-    preserveSelectionOnFallback?: boolean;
   },
 ): Promise<ResolvedSessionModelState> {
   const normalizedLegacyModel = normalizeLegacyModelForTarget(target, input.legacyModel);
@@ -513,70 +500,28 @@ async function resolveRequestedSessionModelState(
   }
 
   const knowledge = await ctx.providerModelCatalog.getAdvancedKnowledgeForTarget(target);
-  const buildCompatibilityFallback = (
-    legacyModel: string,
-    warning: string,
-  ): ResolvedSessionModelState => ({
-    model: legacyModel,
-    modelSelection: input.preserveSelectionOnFallback
-      ? canonicalizeProviderModelSelection(input.selection ?? effectiveSelection)
-      : createLegacyModelSelection(legacyModel),
-    modelResolution: {
-      entryId: legacyModel,
-      model: legacyModel,
-      entryMode: 'explicit',
-      supportTier: knowledge.supportTier,
-      warnings: [warning],
-    },
-    warnings: [warning],
-  });
-  let resolved;
-  let compatibilityWarnings: string[] = [];
-  try {
-    resolved = resolveProviderSelection(knowledge, effectiveSelection);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (input.selection?.presetId && shouldRetrySessionSelectionWithoutPreset(message)) {
-      const sanitizedSelection = removePresetFromSelection(input.selection);
-      resolved = resolveProviderSelection(knowledge, sanitizedSelection);
-      compatibilityWarnings = [
-        `Preset '${input.selection.presetId}' is no longer available for `
-        + `${target.providerName}/${target.backend}/${target.instanceId}; continuing without it.`,
-      ];
-    } else {
-      if (
-        normalizedLegacyModel
-        && (
-          !input.selection
-          || isLegacyCompatibleExplicitSelection(
-            normalizeSelectionAliasesForTarget(target, input.selection),
-            normalizedLegacyModel,
-          )
-        )
-        && /Unknown catalog entry/.test(message)
-      ) {
-        return buildCompatibilityFallback(
-          normalizedLegacyModel,
-          `Legacy model '${normalizedLegacyModel}' is not present in the advanced catalog; `
-          + 'preserving it as a compatibility passthrough.',
-        );
-      }
-      if (normalizedLegacyModel && input.fallbackToLegacyModelOnResolutionError) {
-        return buildCompatibilityFallback(
-          normalizedLegacyModel,
-          `Structured model selection could not be resolved; preserving legacy model `
-          + `'${normalizedLegacyModel}' as a compatibility fallback (${message}).`,
-        );
-      }
-      throw error;
+  // Custom strings carry no catalog-derived effort/provider. Known strings and
+  // structured selections resolve through the same accepted snapshot.
+  if (normalizedLegacyModel && !knowledge.catalog.entries.some(entry => entry.id === effectiveSelection.entryId)
+    && (!input.selection || isLegacyCompatibleExplicitSelection(effectiveSelection, normalizedLegacyModel))) {
+    if (effectiveSelection.catalogRevision && effectiveSelection.catalogRevision !== knowledge.catalog.catalogRevision) {
+      throw new CatalogRevisionConflict('Catalog changed; choose the model again from the current catalog.');
     }
+    return {
+      model: normalizedLegacyModel, modelSelection: createLegacyModelSelection(normalizedLegacyModel),
+      modelResolution: { entryId: normalizedLegacyModel, model: normalizedLegacyModel, entryMode: 'explicit',
+        catalogRevision: knowledge.catalog.catalogRevision, bindingVersion: 1,
+        controls: {}, supportTier: 'entry_only', warnings: [] }, warnings: [],
+    };
   }
+  const resolved = resolveProviderSelection(knowledge, effectiveSelection);
 
   if (
     input.enforceLegacyMatch !== false
     && normalizedLegacyModel
     && input.selection
     && normalizedLegacyModel !== resolved.resolution.model
+    && normalizedLegacyModel !== resolved.resolution.entryId
   ) {
     throw new Error(
       `Legacy model '${normalizedLegacyModel}' does not match resolved structured selection `
@@ -584,7 +529,7 @@ async function resolveRequestedSessionModelState(
     );
   }
 
-  const warnings = [...compatibilityWarnings, ...resolved.resolution.warnings];
+  const warnings = [...resolved.resolution.warnings];
 
   return {
     model: resolved.resolution.model,
@@ -598,46 +543,13 @@ async function resolveRequestedSessionModelState(
 }
 
 async function refreshSessionModelStateForTarget(
-  ctx: AppContext,
-  target: ProviderTargetDescriptor,
+  _ctx: AppContext,
+  _target: ProviderTargetDescriptor,
   session: SessionInfo,
 ): Promise<SessionInfo> {
-  const normalizedLegacyModel = normalizeLegacyModelForTarget(target, session.model);
-  if (!session.modelSelection) {
-    if (!normalizedLegacyModel || normalizedLegacyModel === session.model) {
-      return session;
-    }
-
-    ctx.registry.updateSessionMetadata(session.id, {
-      model: normalizedLegacyModel,
-    });
-    return ctx.registry.get(session.id) ?? session;
-  }
-
-  if (
-    normalizedLegacyModel
-    && normalizedLegacyModel !== session.model
-  ) {
-    ctx.registry.updateSessionMetadata(session.id, {
-      model: normalizedLegacyModel,
-    });
-    session = ctx.registry.get(session.id) ?? session;
-  }
-
-  const refreshed = await resolveRequestedSessionModelState(ctx, target, {
-    legacyModel: session.model,
-    selection: session.modelSelection,
-    enforceLegacyMatch: false,
-    fallbackToLegacyModelOnResolutionError: true,
-    preserveSelectionOnFallback: true,
-  });
-  ctx.registry.updateSessionMetadata(session.id, {
-    model: refreshed.model,
-    modelSelection: refreshed.modelSelection,
-    modelResolution: refreshed.modelResolution,
-  });
-
-  return ctx.registry.get(session.id) ?? session;
+  // Bound sessions retain their recorded wire values. Discovered/unbound sessions
+  // retain native settings; neither path reconstructs history from today's catalog.
+  return session;
 }
 
 function buildDeleteCleanupSummary(input: {
@@ -2631,7 +2543,7 @@ sessionRoutes.post('/sessions', async (c) => {
       selection: parsedModelSelection.selection,
     });
   } catch (error) {
-    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, error instanceof CatalogRevisionConflict ? 409 : 400);
   }
 
   const requestedSessionKey = parseOptionalString(body.sessionKey);
@@ -4513,6 +4425,8 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   if (parsedSkills.error) {
     return c.json({ error: parsedSkills.error }, 400);
   }
+  const forkSelection = parseProviderModelSelection(rawBody.modelSelection);
+  if (forkSelection.error) return c.json({ error: forkSelection.error }, 400);
   const body: SessionBranchRequest = {
     mode: rawBody.mode === 'native_fork' || rawBody.mode === 'context_transplant' || rawBody.mode === 'auto'
       ? rawBody.mode
@@ -4562,6 +4476,21 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     return c.json({ error: `${err}` }, 400);
   }
 
+  let childModelState: ResolvedSessionModelState = { warnings: [] };
+  try {
+    childModelState = body.model || forkSelection.selection
+      ? await resolveRequestedSessionModelState(ctx, childTarget, {
+        legacyModel: body.model, selection: forkSelection.selection,
+      })
+      : session.modelSelection && sessionMatchesTarget(session, childTarget)
+        ? { model: session.model, modelSelection: structuredClone(session.modelSelection),
+          modelResolution: session.modelResolution ? structuredClone(session.modelResolution) : undefined,
+          warnings: [] }
+        : { warnings: [] };
+  } catch (error) {
+    return c.json({error: error instanceof Error ? error.message : String(error)}, error instanceof CatalogRevisionConflict ? 409 : 400);
+  }
+
   const parentCaps = runtime.getCapabilities(
     session.providerName,
     session.providerInstanceId,
@@ -4575,7 +4504,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
 
   const branchDecision = resolveSessionBranchDecision({
     parentSession: session,
-    request: body,
+    request: { ...body, model: childModelState.model ?? body.model },
     target: childTarget,
     parentCapabilities: parentCaps,
   });
@@ -4731,34 +4660,6 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     throw error;
   }
 
-  let childModelState: ResolvedSessionModelState = { warnings: [] };
-  try {
-    childModelState = body.model
-      ? await resolveRequestedSessionModelState(ctx, childTarget, {
-        legacyModel: body.model,
-      })
-      : session.modelSelection && sessionMatchesTarget(session, childTarget)
-        ? await resolveRequestedSessionModelState(ctx, childTarget, {
-          legacyModel: session.model,
-          selection: session.modelSelection,
-        })
-        : { warnings: [] };
-  } catch (error) {
-    await discardPreparedWorkspace(ctx, {
-      id: forkId,
-      workspace: forkPrepared.workspace,
-      workspaceMode: forkWorkspaceMode,
-      workspaceIsolation: forkPrepared.workspaceIsolation,
-    });
-    return c.json({
-      error: error instanceof Error ? error.message : String(error),
-      branch: {
-        ...branchDecision,
-        warnings,
-        transplant: summarizeContextTransplant(body.transplant, usedContextTransplant),
-      },
-    }, 400);
-  }
   if (childModelState.warnings.length > 0) {
     warnings.push(...childModelState.warnings);
   }

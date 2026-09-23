@@ -2,6 +2,13 @@
 
 > Environment setup and run instructions for `cats-runtime`.
 
+## Provider model data
+
+To change models on one compatible installation, use the
+[catalog soft-patch workflow](provider-catalog-soft-patches.md). Existing schema-1
+personal catalogs require explicit conversion. The override is optional; Desktop
+does not seed a full factory copy. A custom providers config uses a sibling override.
+
 ## Prerequisites
 
 - Node.js 22.12+

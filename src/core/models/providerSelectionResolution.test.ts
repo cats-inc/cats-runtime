@@ -24,6 +24,7 @@ function createKnowledgeContext(
   };
 
   return {
+    modelsById: {},
     target,
     catalog: overrides.catalog ?? {
       provider: target.providerName,
@@ -190,7 +191,8 @@ describe('provider selection resolution', () => {
         },
         warnings: [],
       },
-      controlsByKey: {
+      modelsById: {},
+    controlsByKey: {
         'ollama.keep_alive': {
           key: 'ollama.keep_alive',
           label: 'Keep alive',
@@ -288,7 +290,8 @@ describe('provider selection resolution', () => {
         'gpt-5.4': { 'codex.reasoning_effort': 'medium' },
         'gpt-5.1-codex-mini': { 'codex.reasoning_effort': 'medium' },
       },
-      controlsByKey: {
+      modelsById: {},
+    controlsByKey: {
         'codex.reasoning_effort': {
           key: 'codex.reasoning_effort',
           label: 'Reasoning effort',
@@ -371,7 +374,8 @@ describe('provider selection resolution', () => {
         'gpt-5.4': { 'codex.reasoning_effort': 'medium' },
         'gpt-5.3-codex-spark': { 'codex.reasoning_effort': 'high' },
       },
-      controlsByKey: {
+      modelsById: {},
+    controlsByKey: {
         'codex.reasoning_effort': {
           key: 'codex.reasoning_effort',
           label: 'Reasoning effort',

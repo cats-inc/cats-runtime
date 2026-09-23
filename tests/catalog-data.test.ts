@@ -150,6 +150,21 @@ describe('activation and read-only projections', () => {
     expect(readCatalogCandidate(paths).document.catalogs[0].models[0].id).toBe('upgraded-factory');
   });
 
+  it('keeps local replacements through a factory upgrade while unpatched scopes adopt the new data', () => {
+    const { paths, override, factory } = fixture();
+    const local = pi('local-only', 'high');
+    writeFileSync(override, JSON.stringify(doc(local)));
+    new CatalogStore(paths);
+    const other: CatalogScope = { provider: 'claude', backend: 'api', transport: 'anthropic', selection_mode: 'discovery',
+      models: [{ id: 'factory-new', label: 'Factory new', execution: { model: 'factory-new' } }] };
+    writeFileSync(factory, JSON.stringify(doc(pi('upgraded-pi'), other)));
+    const upgraded = new CatalogStore(paths);
+    expect(upgraded.current()?.document.catalogs).toEqual([local, other]);
+    rmSync(override);
+    upgraded.reload(upgraded.status().catalogRevision);
+    expect(upgraded.current()?.document.catalogs[0].models[0].id).toBe('upgraded-pi');
+  });
+
   it('treats corrupt factory assets as package errors even with an accepted snapshot', () => {
     const { paths, factory } = fixture();
     new CatalogStore(paths);

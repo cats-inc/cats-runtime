@@ -134,7 +134,7 @@ export function readLocalCatalogProjection(paths: CatalogPaths): CatalogProjecti
 
 export function findCatalogScope(
   snapshot: CatalogSnapshot | undefined,
-  target: { providerName: string; backend: CatalogScope['backend']; remoteInstance?: { transport: string } },
+  target: { providerName: string; backend: CatalogScope['backend']; remoteInstance?: { transport?: string } },
 ): CatalogScope | undefined {
   const key = catalogScopeKey({ provider: target.providerName, backend: target.backend,
     ...(target.backend !== 'cli' ? { transport: target.remoteInstance?.transport } : {}) });

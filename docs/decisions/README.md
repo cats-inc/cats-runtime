@@ -41,7 +41,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
-| [040-use-data-driven-provider-catalogs-and-local-overrides](./040-use-data-driven-provider-catalogs-and-local-overrides.md) | Use Data-Driven Provider Catalogs and Local Overrides | Proposed | 2026-09-23 |
+| [040-use-data-driven-provider-catalogs-and-local-overrides](./040-use-data-driven-provider-catalogs-and-local-overrides.md) | Use Data-Driven Provider Catalogs and Local Overrides | Accepted | 2026-09-23 |
 | [039-use-selected-provider-config-as-the-resource-boundary](./039-use-selected-provider-config-as-the-resource-boundary.md) | Use Selected Provider Config as the Resource Boundary; retain completed setup observations | Accepted; amended | 2026-09-16 |
 | [038-separate-execution-usage-from-provider-account-quota](./038-separate-execution-usage-from-provider-account-quota.md) | Separate Execution Usage from Provider Account Quota | Accepted | 2026-09-10 |
 | [037-adopt-meta-muse-as-an-executable-cli-provider-and-retire-aider](./037-adopt-meta-muse-as-an-executable-cli-provider-and-retire-aider.md) | Adopt Meta Muse as an executable CLI provider family and retire Aider | Accepted | 2026-09-05 |

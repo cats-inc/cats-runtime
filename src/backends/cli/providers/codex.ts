@@ -121,12 +121,12 @@ export class CodexProvider implements Provider {
       : ['app-server'];
 
     if (opts.model) {
-      args.push('-c', `model="${opts.model}"`);
+      args.push('-c', `model=${JSON.stringify(opts.model)}`);
     }
     if (typeof opts.modelControls?.['codex.reasoning_effort'] === 'string') {
       args.push(
         '-c',
-        `model_reasoning_effort="${opts.modelControls['codex.reasoning_effort']}"`,
+        `model_reasoning_effort=${JSON.stringify(opts.modelControls['codex.reasoning_effort'])}`,
       );
     }
 

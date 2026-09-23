@@ -5,6 +5,6 @@ export {
   catalogDigest, stableCatalogJson, resolveCatalogPaths, mergeCatalogDocuments,
   readCatalogFactory, readCatalogCandidate, readLocalCatalogProjection, findCatalogScope,
 } from './resolver.js';
-export { CATALOG_BINDINGS } from './bindings.js';
+export { CATALOG_BINDINGS, CATALOG_BINDING_VERSION } from './bindings.js';
 
-export const catalogCapabilities = Object.freeze({ schemaVersion: 2, localOverrides: true });
+export const catalogCapabilities = Object.freeze({ schemaVersion: 2, bindingVersion: 1, localOverrides: true });

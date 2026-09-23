@@ -1,0 +1,1229 @@
+{
+  "schema_version": 1,
+  "catalogs": [
+    {
+      "cli": "OpenCode",
+      "version": "1.18.31",
+      "last_updated": "2026-09-18",
+      "selection_mode": "shortlist",
+      "notes": [
+        "Operator-selected six-model shortlist, in the supplied order; this is not the complete upstream catalog. Display names are preserved exactly. No model default or effort/options were supplied, so none are asserted.",
+        "Evidence: docs/research/fixtures/opencode-1.18.31/models.redacted.txt and model-id-mappings.redacted.json. Installed 1.18.31 `opencode models --verbose --pure` supplied exact provider/model IDs on 2026-09-18; no inference request was sent.",
+        "Union Alpha Free appeared under both opencode and opencode-go. The operator explicitly selected opencode-go/union-alpha, matching the other five entries. All six are scoped to this machine's configured CLI providers; availability elsewhere is unverified.",
+        "Desktop and Playground initialize to the first row without adding a default marker. Refresh retains this shortlist and custom model-string input remains available. See docs/research/2026-09-18-opencode-shortlist.md."
+      ],
+      "models": [
+        {
+          "name": "opencode-go/union-alpha",
+          "label": "Union Alpha Free"
+        },
+        {
+          "name": "opencode-go/deepseek-v4.1-flash",
+          "label": "DeepSeek V4.1 Flash"
+        },
+        {
+          "name": "opencode-go/hy4-preview",
+          "label": "Hy4 preview"
+        },
+        {
+          "name": "opencode-go/glm-5.3-flash",
+          "label": "GLM-5.3-Flash"
+        },
+        {
+          "name": "opencode-go/qwen3.8-flash",
+          "label": "Qwen3.8 Flash"
+        },
+        {
+          "name": "opencode-go/minimax-m3",
+          "label": "MiniMax-M3"
+        }
+      ]
+    },
+    {
+      "cli": "Claude",
+      "version": "2.1.273",
+      "last_updated": "2026-09-16",
+      "notes": [
+        "Model list and every model's effort screen re-read 2026-09-16 from the operator-pasted `/model` picker on Claude Code 2.1.273. The operator requested exactly four Cats model rows, with the duplicate Default/Opus presentation collapsed to Opus. Scope is the operator's account; entitlement elsewhere is unverified.",
+        "Evidence: docs/research/fixtures/claude-2.1.273/model-picker.success.redacted.txt",
+        "The five source rows are Default (recommended), Opus (1M context), Fable, Sonnet, and Haiku. Default is a provider-default sentinel, not an executable model id. Its row and effort branch remain in evidence; Cats exposes only the four explicit model aliases, with Opus selected by default as the operator requested. This does not claim a provider-default alias will always resolve to Opus.",
+        "Display names follow the operator's version-bearing projection of the picker descriptions: Opus 5 with 1M context, Fable 5.1, Sonnet 5, and Haiku 4.5. Cats adds the status suffix ` (default)` in lowercase across model and effort menus; it is not part of the model name.",
+        "Raw alias mappings are unchanged: `opus`, `sonnet`, and `haiku` retain their 2.1.246 static-extraction provenance; `fable` and `claude-fable-5-1` retain the 2.1.258 help/static-artifact evidence. The existing Claude normalizers map these labels and all six effort values. No raw token is inferred from the new paste.",
+        "For Default, Opus, Fable, and Sonnet separately, the complete ordered effort set is Low, Medium, High, xHigh, Max, Ultracode, with High explicitly marked `(default)`. Haiku displays `Effort not supported for Haiku` and keeps `options: []`. The Max usage warning is retained per model.",
+        "Older effort descriptions remain with their earlier provenance; they were not re-observed in 2.1.273. In particular, the 2.1.258 static artifact maps Ultracode to `ultracode` and describes xHigh effort plus dynamic workflow orchestration; the earlier read-only `claude --effort ultracode --version` parser check accepted that token. This refresh does not repeat execution probes.",
+        "Opus 1M context was re-observed. Sonnet 1M and Haiku 200K context values remain from the 2.1.246 static extraction and were not re-observed; Fable context remains unknown and omitted."
+      ],
+      "models": [
+        {
+          "name": "Opus",
+          "label": "Opus 5 with 1M context",
+          "notes": [
+            "Picker description: Opus 5 with 1M context - best for everyday, complex tasks"
+          ],
+          "default": true,
+          "context": 1000000,
+          "options": [
+            {
+              "name": "Effort",
+              "values": [
+                {
+                  "name": "Low",
+                  "notes": [
+                    "Quick, straightforward implementation with minimal overhead"
+                  ]
+                },
+                {
+                  "name": "Medium",
+                  "notes": [
+                    "Balanced approach with standard implementation and testing"
+                  ]
+                },
+                {
+                  "name": "High",
+                  "notes": [
+                    "Comprehensive implementation with extensive testing and documentation"
+                  ]
+                },
+                {
+                  "name": "xHigh",
+                  "notes": [
+                    "Deeper reasoning than high, just below maximum (Fable 5, Opus 4.7+, Sonnet 5)"
+                  ]
+                },
+                {
+                  "name": "Max",
+                  "notes": [
+                    "Maximum capability with deepest reasoning. May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks."
+                  ]
+                },
+                {
+                  "name": "Ultracode",
+                  "notes": [
+                    "2.1.258 static artifact description: xHigh effort plus dynamic workflow orchestration for this session only"
+                  ]
+                }
+              ],
+              "default": "High"
+            }
+          ]
+        },
+        {
+          "name": "Fable",
+          "label": "Fable 5.1",
+          "notes": [
+            "Picker description: Fable 5.1 - most capable for your hardest and longest-running tasks"
+          ],
+          "options": [
+            {
+              "name": "Effort",
+              "values": [
+                "Low",
+                "Medium",
+                "High",
+                "xHigh",
+                {
+                  "name": "Max",
+                  "notes": [
+                    "May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks."
+                  ]
+                },
+                {
+                  "name": "Ultracode",
+                  "notes": [
+                    "2.1.258 static artifact description: xHigh effort plus dynamic workflow orchestration for this session only"
+                  ]
+                }
+              ],
+              "default": "High"
+            }
+          ]
+        },
+        {
+          "name": "Sonnet",
+          "label": "Sonnet 5",
+          "notes": [
+            "Picker description: Sonnet 5 - efficient for routine tasks"
+          ],
+          "context": 1000000,
+          "options": [
+            {
+              "name": "Effort",
+              "values": [
+                "Low",
+                "Medium",
+                "High",
+                "xHigh",
+                {
+                  "name": "Max",
+                  "notes": [
+                    "May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks."
+                  ]
+                },
+                {
+                  "name": "Ultracode",
+                  "notes": [
+                    "2.1.258 static artifact description: xHigh effort plus dynamic workflow orchestration for this session only"
+                  ]
+                }
+              ],
+              "default": "High"
+            }
+          ]
+        },
+        {
+          "name": "Haiku",
+          "label": "Haiku 4.5",
+          "notes": [
+            "Picker description: Haiku 4.5 - fastest for quick answers"
+          ],
+          "context": 200000,
+          "options": []
+        }
+      ]
+    },
+    {
+      "cli": "Codex",
+      "version": "0.154.0",
+      "last_updated": "2026-09-16",
+      "notes": [
+        "Model list and all per-model reasoning screens re-read 2026-09-16 from the operator-pasted `/model` picker on Codex CLI 0.154.0. The operator confirmed the five visible rows are complete and authorized removing gpt-5.4, gpt-5.4-mini, and gpt-5.3-codex-spark from the Cats picker. Scope is the operator's account; entitlement elsewhere is unverified.",
+        "Evidence: docs/research/fixtures/codex-0.154.0/model-picker.success.redacted.txt",
+        "The model ids, ordering, descriptions, reasoning sets, and defaults below were observed in that paste. gpt-6-astra is explicitly `(default)`; gpt-5.5 is only `(current)`, a session selection. This supersedes the older gpt-5.6-sol model default.",
+        "Display names preserve the raw ids and casing shown by the 0.154.0 picker, as requested by the operator; older GPT-style label overrides are removed. The four retained context values come from `codex debug models` on 0.149.1 (2026-08-26) and were not re-observed. gpt-6-astra has no inferred context limit.",
+        "The picker says legacy models remain accessible through `codex -m <model_name>` or config.toml. Removal from this visible catalog does not claim those ids are invalid for manual use.",
+        "Context values reflect the Codex CLI catalog and may differ from OpenAI API limits",
+        "All four `More reasoning…` submenus were opened: gpt-6-astra, gpt-5.6-sol, and gpt-5.6-terra offer Max and Ultra; gpt-5.6-luna offers Max only; gpt-5.5 stops at Extra high. The Advanced Reasoning screen warns `⚠ Consumes usage limits faster`. The operator explicitly authorized a flat Cats reasoning list; navigation/grouping and usage warnings remain in the evidence.",
+        "Level descriptions are identical across every captured model offering that level, so they are shared below; value availability and defaults remain model-specific. Extra high maps to xhigh through the existing Codex effort normalizer, and Max/Ultra map to max/ultra."
+      ],
+      "shared_options": [
+        {
+          "name": "Reasoning Level",
+          "values": [
+            {
+              "name": "Low",
+              "notes": [
+                "Fast responses with lighter reasoning"
+              ]
+            },
+            {
+              "name": "Medium",
+              "notes": [
+                "Balances speed and reasoning depth for everyday tasks"
+              ]
+            },
+            {
+              "name": "High",
+              "notes": [
+                "Greater reasoning depth for complex problems"
+              ]
+            },
+            {
+              "name": "Extra high",
+              "notes": [
+                "Extra high reasoning depth for complex problems"
+              ]
+            },
+            {
+              "name": "Max",
+              "notes": [
+                "For difficult problems when quality matters more than speed · higher usage"
+              ]
+            },
+            {
+              "name": "Ultra",
+              "notes": [
+                "For demanding work using multiple agents · highest usage"
+              ]
+            }
+          ],
+          "default": "Medium"
+        }
+      ],
+      "models": [
+        {
+          "name": "gpt-6-astra",
+          "notes": [
+            "Our most capable model for complex, demanding work."
+          ],
+          "default": true
+        },
+        {
+          "name": "gpt-5.6-sol",
+          "notes": [
+            "Reliable agentic workhorse for everyday tasks."
+          ],
+          "context": 272000,
+          "options": [
+            {
+              "name": "Reasoning Level",
+              "default": "Low"
+            }
+          ]
+        },
+        {
+          "name": "gpt-5.6-terra",
+          "notes": [
+            "Balanced agentic coding model for everyday work."
+          ],
+          "context": 272000
+        },
+        {
+          "name": "gpt-5.6-luna",
+          "notes": [
+            "Fast and affordable agentic coding model."
+          ],
+          "context": 272000,
+          "options": [
+            {
+              "name": "Reasoning Level",
+              "values": [
+                "Low",
+                "Medium",
+                "High",
+                "Extra high",
+                "Max"
+              ],
+              "default": "Medium"
+            }
+          ]
+        },
+        {
+          "name": "gpt-5.5",
+          "notes": [
+            "Proven previous-generation model for coding and general work."
+          ],
+          "context": 272000,
+          "options": [
+            {
+              "name": "Reasoning Level",
+              "values": [
+                "Low",
+                "Medium",
+                "High",
+                "Extra high"
+              ],
+              "default": "Medium"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "cli": "Antigravity",
+      "version": "1.2.3",
+      "last_updated": "2026-09-16",
+      "notes": [
+        "Complete operator-supplied /model picker and all per-model effort screens on Antigravity CLI 1.2.3, observed 2026-09-16; account scope is the operator's CLI.",
+        "Evidence: docs/research/fixtures/antigravity-1.2.3/model-picker.success.redacted.txt",
+        "Raw execution ids retain the 2026-09-03 agy models capture on 1.1.24: docs/research/fixtures/antigravity-1.1.24/models-command.success.redacted.txt. They were not re-enumerated on 1.2.3.",
+        "One row per picker family. The first effort's verified raw id identifies each Gemini row; Runtime resolves model plus effort to the corresponding verified --model id. All fourteen executable choices remain represented.",
+        "No model or effort is marked default. Cats initializes to the first model and first applicable effort without adding a default label; existing explicit choices are preserved."
+      ],
+      "models": [
+        {
+          "name": "gemini-3.8-flash-low",
+          "label": "Gemini 3.8 Flash",
+          "options": [
+            {
+              "name": "Effort",
+              "values": [
+                {
+                  "name": "low",
+                  "notes": [
+                    "Faster responses, lighter reasoning — great for simpler tasks"
+                  ]
+                },
+                {
+                  "name": "medium",
+                  "notes": [
+                    "Balanced speed and reasoning quality for most tasks"
+                  ]
+                },
+                {
+                  "name": "high",
+                  "notes": [
+                    "Deepest reasoning for complex problems — slower but strongest"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "gemini-3.7-flash-low",
+          "label": "Gemini 3.7 Flash",
+          "options": [
+            {
+              "name": "Effort",
+              "values": [
+                {
+                  "name": "low",
+                  "notes": [
+                    "Faster responses, lighter reasoning — great for simpler tasks"
+                  ]
+                },
+                {
+                  "name": "medium",
+                  "notes": [
+                    "Balanced speed and reasoning quality for most tasks"
+                  ]
+                },
+                {
+                  "name": "high",
+                  "notes": [
+                    "Deepest reasoning for complex problems — slower but strongest"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "gemini-3.6-flash-low",
+          "label": "Gemini 3.6 Flash",
+          "options": [
+            {
+              "name": "Effort",
+              "values": [
+                {
+                  "name": "low",
+                  "notes": [
+                    "Faster responses, lighter reasoning — great for simpler tasks"
+                  ]
+                },
+                {
+                  "name": "medium",
+                  "notes": [
+                    "Balanced speed and reasoning quality for most tasks"
+                  ]
+                },
+                {
+                  "name": "high",
+                  "notes": [
+                    "Deepest reasoning for complex problems — slower but strongest"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "gemini-3.1-pro-low",
+          "label": "Gemini 3.1 Pro",
+          "options": [
+            {
+              "name": "Effort",
+              "values": [
+                {
+                  "name": "low",
+                  "notes": [
+                    "Faster responses, lighter reasoning — great for simpler tasks"
+                  ]
+                },
+                {
+                  "name": "high",
+                  "notes": [
+                    "Deepest reasoning for complex problems — slower but strongest"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "claude-sonnet-4-6",
+          "label": "Claude Sonnet 4.6 (Thinking)",
+          "options": []
+        },
+        {
+          "name": "claude-opus-4-6-thinking",
+          "label": "Claude Opus 4.6 (Thinking)",
+          "options": []
+        },
+        {
+          "name": "gpt-oss-120b-medium",
+          "label": "GPT-OSS 120B (Medium)",
+          "options": []
+        }
+      ]
+    },
+    {
+      "cli": "Grok",
+      "version": "1.0.34",
+      "last_updated": "2026-09-17",
+      "notes": [
+        "Complete two-model /model list and per-model effort menus supplied 2026-09-17 for Grok Build 1.0.34 as operator transcription and screenshots (the TUI cannot copy text). Evidence: docs/research/fixtures/grok-1.0.34/model-picker.success.redacted.txt and effort-grok-4.6.redacted.png / effort-grok-4.5.redacted.png in the same directory.",
+        "The operator confirmed the repeated Grok 4.6 heading on the three-effort screen meant Grok 4.5. Preserve picker order and visible spelling; omit the session-only (active) marker from labels.",
+        "No model or effort default is declared by the supplied picker. Per explicit operator policy, Cats initializes each menu from its first applicable item without marking any item default. This supersedes the earlier curated High effort defaults from the 1.0.13 manifest; it does not claim the upstream manifest defaults changed.",
+        "Raw model ids and effort label-to-token mappings are retained from the 2026-09-03 Grok 1.0.13 manifest: docs/research/fixtures/grok-1.0.13/models-cache.success.redacted.txt. The existing normalizer maps Extra High Effort / High Effort / Medium Effort / Low Effort to xhigh / high / medium / low for --reasoning-effort; the mapping was not re-enumerated on 1.0.34.",
+        "Per-model descriptions from both screenshots remain in option notes, including Higher (Grok 4.6) versus Highest (Grok 4.5) for High Effort. Context 500000 is retained from the 1.0.13 manifest; no context or output limit was re-observed in this picker."
+      ],
+      "models": [
+        {
+          "name": "grok-4.6",
+          "label": "Grok 4.6",
+          "notes": [
+            "Picker description: SpaceXAI's latest frontier model"
+          ],
+          "context": 500000,
+          "options": [
+            {
+              "name": "Effort",
+              "values": [
+                {
+                  "name": "Extra High Effort",
+                  "notes": [
+                    "Extra High Effort - Highest effort and reasoning level"
+                  ]
+                },
+                {
+                  "name": "High Effort",
+                  "notes": [
+                    "High Effort - Higher implementation quality with extensive reasoning"
+                  ]
+                },
+                {
+                  "name": "Medium Effort",
+                  "notes": [
+                    "Medium Effort - Balanced effort with standard implementation and testing"
+                  ]
+                },
+                {
+                  "name": "Low Effort",
+                  "notes": [
+                    "Low Effort - Quick, fast implementations"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "grok-4.5",
+          "label": "Grok 4.5",
+          "notes": [
+            "The 1.0.34 picker row shows the label alone."
+          ],
+          "context": 500000,
+          "options": [
+            {
+              "name": "Effort",
+              "values": [
+                {
+                  "name": "High Effort",
+                  "notes": [
+                    "High Effort - Highest implementation quality with extensive reasoning"
+                  ]
+                },
+                {
+                  "name": "Medium Effort",
+                  "notes": [
+                    "Medium Effort - Balanced effort with standard implementation and testing"
+                  ]
+                },
+                {
+                  "name": "Low Effort",
+                  "notes": [
+                    "Low Effort - Quick, fast implementations"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "cli": "Muse",
+      "version": "1.0.3-R2198.1",
+      "last_updated": "2026-09-05",
+      "notes": [
+        "First curated Meta Muse entry, added with the provider itself on 2026-09-05.",
+        "Model list read 2026-09-05 from muse's own `model/list` reply over the MSP host it serves on stdio (`muse serve`), which is its only enumeration surface - the CLI has no `models` subcommand and `muse exec` cannot list. The reply carried providerId `meta`, profileId `tbh`, and source `providerCatalog`, so the list is account-resolved and complete for this account.",
+        "Evidence: docs/research/2026-09-05-meta-muse-cli-probe.md",
+        "`name` is the raw id `muse --model` accepts (the reply's `modelId`); `label` is a rendering of the reply's `displayLabel`, which upstream sets equal to the id.",
+        "The `-contributor` rows are the same models on terms Meta describes as \"Your content, including inter-session messages, may be used for product improvement.\" They are listed so an operator can choose one deliberately.",
+        "No entry is marked default even though `model/list` flags `muse-spark-1.3-contributor` as `isDefault`. Projecting that here would make every runtime turn opt into content sharing without the operator asking for it; with no `--model` argument muse still uses whatever the account prefers.",
+        "`context: 1007997` and `max_output: 128000` are the reply's `contextLimit` and `outputLimit`, identical across all four rows. `cost` is null upstream and is therefore omitted rather than guessed.",
+        "Effort menus corrected from the operator on 2026-09-18: both 1.3 rows have minimal, low, medium, high, xhigh, max; both 1.2 rows stop at xhigh. No effort default is declared. Evidence: docs/research/fixtures/muse-unknown-version/efforts-2026-09-18.redacted.txt.",
+        "The earlier exec --help list proves parser vocabulary, not per-model picker availability/defaults. Model-list version, freshness, labels, and limits retain their 2026-09-05 provenance; this correction only re-observes effort menus."
+      ],
+      "models": [
+        {
+          "name": "muse-spark-1.3",
+          "label": "muse-spark-1.3",
+          "notes": [
+            "releaseDate 2026-09-02; the catalog carries no description for this row."
+          ],
+          "context": 1007997,
+          "max_output": 128000,
+          "options": [
+            {
+              "name": "Reasoning effort",
+              "values": [
+                {
+                  "name": "minimal"
+                },
+                {
+                  "name": "low"
+                },
+                {
+                  "name": "medium"
+                },
+                {
+                  "name": "high"
+                },
+                {
+                  "name": "xhigh"
+                },
+                {
+                  "name": "max"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "muse-spark-1.3-contributor",
+          "label": "muse-spark-1.3 (contributor)",
+          "notes": [
+            "Catalog description: Your content, including inter-session messages, may be used for product improvement.",
+            "Marked isDefault by `model/list`; deliberately not marked default here."
+          ],
+          "context": 1007997,
+          "max_output": 128000,
+          "options": [
+            {
+              "name": "Reasoning effort",
+              "values": [
+                {
+                  "name": "minimal"
+                },
+                {
+                  "name": "low"
+                },
+                {
+                  "name": "medium"
+                },
+                {
+                  "name": "high"
+                },
+                {
+                  "name": "xhigh"
+                },
+                {
+                  "name": "max"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "muse-spark-1.2",
+          "label": "muse-spark-1.2",
+          "notes": [
+            "releaseDate 2026-08-05; the catalog carries no description for this row."
+          ],
+          "context": 1007997,
+          "max_output": 128000,
+          "options": [
+            {
+              "name": "Reasoning effort",
+              "values": [
+                {
+                  "name": "minimal"
+                },
+                {
+                  "name": "low"
+                },
+                {
+                  "name": "medium"
+                },
+                {
+                  "name": "high"
+                },
+                {
+                  "name": "xhigh"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "muse-spark-1.2-contributor",
+          "label": "muse-spark-1.2 (contributor)",
+          "notes": [
+            "Catalog description: Your content, including inter-session messages, may be used for product improvement."
+          ],
+          "context": 1007997,
+          "max_output": 128000,
+          "options": [
+            {
+              "name": "Reasoning effort",
+              "values": [
+                {
+                  "name": "minimal"
+                },
+                {
+                  "name": "low"
+                },
+                {
+                  "name": "medium"
+                },
+                {
+                  "name": "high"
+                },
+                {
+                  "name": "xhigh"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "cli": "Cursor",
+      "version": "2026.09.15-d2fe57e",
+      "last_updated": "2026-09-18",
+      "selection_mode": "shortlist",
+      "notes": [
+        "Operator-approved six fixed combos in picker order; complete shortlist, not the full upstream catalog. Custom model strings remain supported.",
+        "Source: docs/research/fixtures/cursor-2026.09.15-d2fe57e/picker-transcription.redacted.txt and approved-presets.redacted.txt.",
+        "Exact execution expressions and parameter tokens: docs/research/fixtures/cursor-2026.09.15-d2fe57e/selected-variants.redacted.json, from the installed CLI's account-resolved model-list request.",
+        "2026-09-18: the operator changed only Cursor Grok 4.6 from Extra High Fast to High Fast. Revised shortlist and exact retained variant: docs/research/fixtures/cursor-2026.09.15-d2fe57e/shortlist-2026-09-18.redacted.txt and selected-variants-2026-09-18.redacted.json.",
+        "Use the complete parameterized --model expression. Legacy slugs/list labels can imply a different context. No default metadata; UI initializes from the first entry.",
+        "Refresh re-reads this shortlist without expanding it from discovery or cached models. All parameters are fixed in each model expression."
+      ],
+      "models": [
+        {
+          "name": "grok-4.6[effort=high,fast=true]",
+          "label": "Cursor Grok 4.6 — High Fast"
+        },
+        {
+          "name": "composer-2.5[fast=true]",
+          "label": "Composer 2.5 — Fast"
+        },
+        {
+          "name": "claude-opus-5[thinking=true,context=300k,effort=high,fast=false]",
+          "label": "Claude Opus 5 — 300K High Thinking"
+        },
+        {
+          "name": "gpt-5.6-sol[context=272k,reasoning=medium,fast=false]",
+          "label": "GPT-5.6 Sol — 272K Medium"
+        },
+        {
+          "name": "gemini-3.8-flash[reasoning_effort=high]",
+          "label": "Gemini 3.8 Flash — High"
+        },
+        {
+          "name": "muse-spark-1.3[context=300k,effort=high]",
+          "label": "Muse Spark 1.3 — 300K High"
+        }
+      ]
+    },
+    {
+      "cli": "Copilot",
+      "version": "1.0.85",
+      "last_updated": "2026-09-18",
+      "selection_mode": "shortlist",
+      "notes": [
+        "Operator-selected six fixed model/effort combos; this is a Cats shortlist, not a complete upstream catalog.",
+        "Source: docs/research/fixtures/copilot-1.0.85/picker.redacted.txt and selected-models.redacted.json (account-resolved models.list; no session or model turn).",
+        "2026-09-18 shortlist revision replaces GPT-5.6 Luna with MAI-Code-1.1-Flash at fixed Medium. Source: docs/research/fixtures/copilot-1.0.85/shortlist-2026-09-18.redacted.txt and mai-2026-09-18.redacted.json; models.list verifies mai-code-1.1-flash and medium.",
+        "Gemini was absent from models.list; the operator confirmed its actual session selection as gemini-3.8-flash (medium). All six selected combinations are now mapped.",
+        "Only GPT-5.6 Terra was explicitly marked default. Single-value options encode operator-fixed effort, not upstream effort defaults. Custom strings remain available.",
+        "Picker context figures (400K, 264K, 266K, 328K, unknown, unknown) are informational and retained in the evidence, not selectable context settings or inferred token limits."
+      ],
+      "models": [
+        {
+          "name": "gpt-5.6-terra",
+          "label": "GPT-5.6 Terra — Medium",
+          "default": true,
+          "options": [
+            {
+              "name": "Reasoning effort",
+              "values": [
+                {
+                  "name": "Medium"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "claude-sonnet-5",
+          "label": "Claude Sonnet 5 — Medium",
+          "options": [
+            {
+              "name": "Reasoning effort",
+              "values": [
+                {
+                  "name": "Medium"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "gemini-3.8-flash",
+          "label": "Gemini 3.8 Flash — Medium",
+          "options": [
+            {
+              "name": "Reasoning effort",
+              "values": [
+                {
+                  "name": "Medium"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "grok-4.6",
+          "label": "Grok 4.6 — Medium",
+          "options": [
+            {
+              "name": "Reasoning effort",
+              "values": [
+                {
+                  "name": "Medium"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "mai-code-1.1-flash",
+          "label": "MAI-Code-1.1-Flash — Medium",
+          "options": [
+            {
+              "name": "Reasoning effort",
+              "values": [
+                {
+                  "name": "Medium"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "kimi-k3",
+          "label": "Kimi K3 — High",
+          "options": [
+            {
+              "name": "Reasoning effort",
+              "values": [
+                {
+                  "name": "High"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "cli": "Kilo",
+      "version": "7.7.3",
+      "last_updated": "2026-09-18",
+      "selection_mode": "shortlist",
+      "notes": [
+        "Source: operator-selected six-model shortlist for Kilo Code 7.7.3, supplied 2026-09-18.",
+        "Exact IDs and the final two thinking variant tokens were verified with installed kilo models kilo --verbose --pure; this gateway enumeration supplies mappings, not shortlist membership.",
+        "Seed and Nano Banana use the fixed thinking variant. Other entries leave the variant unspecified. No provider default was supplied; UI initialization uses the first entry without a default label.",
+        "Evidence: docs/research/2026-09-18-kilo-shortlist.md and docs/research/fixtures/kilo-7.7.3/."
+      ],
+      "models": [
+        {
+          "name": "kilo/deepseek/deepseek-v4.1-flash",
+          "label": "DeepSeek: DeepSeek V4.1 Flash"
+        },
+        {
+          "name": "kilo/z-ai/glm-5.3-flash",
+          "label": "Z.ai: GLM 5.3 Flash"
+        },
+        {
+          "name": "kilo/moonshotai/kimi-k3",
+          "label": "MoonshotAI: Kimi K3"
+        },
+        {
+          "name": "kilo/minimax/minimax-m3",
+          "label": "MiniMax: MiniMax M3"
+        },
+        {
+          "name": "kilo/bytedance-seed/seed-2-1-turbo",
+          "label": "ByteDance Seed: Seed 2.1 Turbo Thinking",
+          "options": [
+            {
+              "name": "Variant",
+              "values": [
+                {
+                  "name": "thinking"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "kilo/google/gemini-3-pro-image",
+          "label": "Google: Nano Banana Pro (Gemini 3 Pro Image) Thinking",
+          "options": [
+            {
+              "name": "Variant",
+              "values": [
+                {
+                  "name": "thinking"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "cli": "Kiro",
+      "version": "2.22.0",
+      "last_updated": "2026-09-18",
+      "selection_mode": "shortlist",
+      "notes": [
+        "Source: operator-selected six-model shortlist for Kiro CLI 2.22.0, supplied 2026-09-18. Complete Cats shortlist, not a claim about the full account-gated upstream catalog.",
+        "IDs and display labels are the exact supplied strings, in order. No model default, context, or effort metadata was supplied; none is inferred from CLI-wide help.",
+        "Refresh preserves the six entries and custom model input remains available. Desktop and Playground initialize the first row without marking it default.",
+        "Evidence: docs/research/2026-09-18-kiro-shortlist.md and fixtures/kiro-2.22.0/operator.redacted.txt."
+      ],
+      "models": [
+        {
+          "name": "claude-opus-5"
+        },
+        {
+          "name": "claude-sonnet-5"
+        },
+        {
+          "name": "gpt-5.6-sol"
+        },
+        {
+          "name": "gpt-5.6-terra"
+        },
+        {
+          "name": "gpt-5.6-luna"
+        },
+        {
+          "name": "claude-haiku-4.5"
+        }
+      ]
+    },
+    {
+      "cli": "Junie",
+      "version": "26.9.21",
+      "last_updated": "2026-09-23",
+      "selection_mode": "shortlist",
+      "notes": [
+        "Source: docs/research/2026-09-23-junie-shortlist.md and fixtures/junie-26.9.21/. Installed version: 26.9.21 (3294.5).",
+        "Five operator-selected fixed combinations, not the complete upstream catalog. Gemini 3.7 Flash is explicitly marked Default; effort values are fixed choices, not effort-default claims.",
+        "Preserve picker names as literal --model arguments, including GPT-5.6-SOL. Pass the fixed effort separately with --effort low|medium; custom model strings remain available."
+      ],
+      "models": [
+        {
+          "name": "Gemini 3.7 Flash",
+          "label": "Gemini 3.7 Flash — Medium",
+          "default": true,
+          "options": [
+            {
+              "name": "Effort",
+              "values": [
+                {
+                  "name": "Medium"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Claude Fable 5.1",
+          "label": "Claude Fable 5.1 — Low",
+          "options": [
+            {
+              "name": "Effort",
+              "values": [
+                {
+                  "name": "Low"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Gemini 3.8 Flash",
+          "label": "Gemini 3.8 Flash — Medium",
+          "options": [
+            {
+              "name": "Effort",
+              "values": [
+                {
+                  "name": "Medium"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "GPT-5.6-SOL",
+          "label": "GPT-5.6-SOL — Low",
+          "options": [
+            {
+              "name": "Effort",
+              "values": [
+                {
+                  "name": "Low"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Grok 4.6",
+          "label": "Grok 4.6 — Low",
+          "options": [
+            {
+              "name": "Effort",
+              "values": [
+                {
+                  "name": "Low"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "cli": "Devin",
+      "version": "3000.10.31",
+      "last_updated": "2026-09-18",
+      "selection_mode": "shortlist",
+      "notes": [
+        "Source: docs/research/2026-09-18-devin-shortlist.md and fixtures/devin-3000.10.31/.",
+        "Six operator-selected fixed combinations, not the complete upstream catalog. No model/effort default is claimed.",
+        "Effort is encoded in model_uid; Adaptive has no specified effort. Applied through agent/acp session/set_config_option."
+      ],
+      "models": [
+        {
+          "name": "adaptive",
+          "label": "Adaptive"
+        },
+        {
+          "name": "claude-fable-5-1-medium",
+          "label": "Claude Fable 5.1 — Medium"
+        },
+        {
+          "name": "gemini-3-8-flash-medium",
+          "label": "Gemini 3.8 Flash — Medium"
+        },
+        {
+          "name": "gpt-6-astra-medium",
+          "label": "GPT-6 Astra — Medium"
+        },
+        {
+          "name": "grok-4-6-medium",
+          "label": "Grok 4.6 — Medium"
+        },
+        {
+          "name": "nemotron-3-ultra-high",
+          "label": "Nemotron 3 Ultra — High"
+        }
+      ]
+    },
+    {
+      "cli": "Cline",
+      "version": "3.0.62",
+      "last_updated": "2026-09-18",
+      "selection_mode": "shortlist",
+      "notes": [
+        "Source: docs/research/2026-09-18-cline-shortlist.md and fixtures/cline-3.0.62/.",
+        "Six operator-selected ClinePass combinations with fixed Medium; not the complete upstream catalog. No provider default is claimed.",
+        "Qwen3.8 Max is an explicitly approved display projection of cline-pass/qwen3.8-max.",
+        "Execution uses --provider cline-pass --model <verbatim ID> --thinking medium."
+      ],
+      "shared_options": [
+        {
+          "name": "Effort",
+          "values": [
+            {
+              "name": "Medium"
+            }
+          ]
+        }
+      ],
+      "models": [
+        {
+          "name": "cline-pass/glm-5.3",
+          "label": "GLM-5.3 — Medium"
+        },
+        {
+          "name": "cline-pass/kimi-k3",
+          "label": "Kimi K3 — Medium"
+        },
+        {
+          "name": "cline-pass/qwen3.8-max",
+          "label": "Qwen3.8 Max — Medium"
+        },
+        {
+          "name": "cline-pass/deepseek-v4-pro",
+          "label": "DeepSeek V4 Pro — Medium"
+        },
+        {
+          "name": "cline-pass/minimax-m3",
+          "label": "MiniMax-M3 — Medium"
+        },
+        {
+          "name": "cline-pass/mimo-v2.5-pro",
+          "label": "MiMo-V2.5-Pro — Medium"
+        }
+      ]
+    },
+    {
+      "cli": "Auggie",
+      "version": "0.36.0",
+      "last_updated": "2026-09-23",
+      "selection_mode": "shortlist",
+      "notes": [
+        "Source: operator-selected six-model shortlist; ID/displayName mappings from Auggie 0.36.0 model list --json. Complete Cats shortlist, not the full upstream inventory.",
+        "Preserve supplied labels and order. No model default or option metadata was supplied; UI initializes the first row without marking it default. Custom model input remains available.",
+        "Evidence: docs/research/2026-09-23-auggie-shortlist.md and docs/research/fixtures/auggie-0.36.0/."
+      ],
+      "models": [
+        {
+          "name": "gpt-6-astra",
+          "label": "GPT-6 Astra"
+        },
+        {
+          "name": "gpt-5-6-sol",
+          "label": "GPT-5.6 Sol"
+        },
+        {
+          "name": "claude-fable-5-1",
+          "label": "Claude Fable 5.1"
+        },
+        {
+          "name": "claude-opus-5-5",
+          "label": "Claude Opus 5.5"
+        },
+        {
+          "name": "grok-4-7",
+          "label": "Grok 4.7"
+        },
+        {
+          "name": "butler_a",
+          "label": "Prism (Claude + GPT)"
+        }
+      ]
+    },
+    {
+      "cli": "Goose",
+      "version": "1.51.0",
+      "last_updated": "2026-09-23",
+      "selection_mode": "shortlist",
+      "notes": [
+        "Complete operator-selected six-model shortlist for ChatGPT Codex (OAuth), all fixed Thinking Off. Other Goose providers remain accessible through custom provider/model input.",
+        "Preserve raw picker names and order; append the fixed Off choice to display labels. No model or effort default was supplied; initialize the first row without a default marker.",
+        "Execution uses --provider chatgpt_codex --model <model>-none: Goose normalizes the suffix to Thinking Off. Its Codex backend maps Off to none when supported, otherwise low.",
+        "Evidence and version confirmation: docs/research/2026-09-23-goose-shortlist.md and docs/research/fixtures/goose-1.51.0/operator.redacted.txt."
+      ],
+      "providers": [
+        {
+          "name": "chatgpt_codex",
+          "shared_options": [
+            {
+              "name": "Thinking effort",
+              "values": [
+                {
+                  "name": "Off"
+                }
+              ]
+            }
+          ],
+          "models": [
+            {
+              "name": "chatgpt_codex/gpt-5.6-sol",
+              "label": "gpt-5.6-sol — Off"
+            },
+            {
+              "name": "chatgpt_codex/gpt-5.6-terra",
+              "label": "gpt-5.6-terra — Off"
+            },
+            {
+              "name": "chatgpt_codex/gpt-5.6-luna",
+              "label": "gpt-5.6-luna — Off"
+            },
+            {
+              "name": "chatgpt_codex/gpt-5.6",
+              "label": "gpt-5.6 — Off"
+            },
+            {
+              "name": "chatgpt_codex/gpt-5.5",
+              "label": "gpt-5.5 — Off"
+            },
+            {
+              "name": "chatgpt_codex/gpt-5.4",
+              "label": "gpt-5.4 — Off"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "cli": "Pi",
+      "version": "0.87.1",
+      "last_updated": "2026-09-23",
+      "selection_mode": "shortlist",
+      "notes": [
+        "Complete operator-selected six-model shortlist for the openai-codex subscription provider; every combination fixes thinking to medium.",
+        "Preserve the supplied model names, order and visible [openai-codex] suffix; append the fixed medium value. No provider default was supplied; UI initializes the first row without a default marker.",
+        "Execution uses --provider openai-codex --model <raw ID> --thinking medium. Custom provider/model input remains available.",
+        "Evidence: docs/research/2026-09-23-pi-shortlist.md and docs/research/fixtures/pi-0.87.1/operator.redacted.txt."
+      ],
+      "providers": [
+        {
+          "name": "openai-codex",
+          "shared_options": [
+            {
+              "name": "Thinking",
+              "values": [
+                {
+                  "name": "medium"
+                }
+              ]
+            }
+          ],
+          "models": [
+            {
+              "name": "openai-codex/gpt-5.6-luna",
+              "label": "gpt-5.6-luna [openai-codex] — medium"
+            },
+            {
+              "name": "openai-codex/gpt-5.6-sol",
+              "label": "gpt-5.6-sol [openai-codex] — medium"
+            },
+            {
+              "name": "openai-codex/gpt-5.6-terra",
+              "label": "gpt-5.6-terra [openai-codex] — medium"
+            },
+            {
+              "name": "openai-codex/gpt-6-astra",
+              "label": "gpt-6-astra [openai-codex] — medium"
+            },
+            {
+              "name": "openai-codex/gpt-6-luna",
+              "label": "gpt-6-luna [openai-codex] — medium"
+            },
+            {
+              "name": "openai-codex/gpt-6-sol",
+              "label": "gpt-6-sol [openai-codex] — medium"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

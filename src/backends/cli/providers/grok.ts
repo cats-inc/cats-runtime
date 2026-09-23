@@ -438,7 +438,7 @@ function normalizeGrokAllowedTools(tools: string[]): string[] {
 
 function normalizeGrokModelId(model?: string): string | undefined {
   const trimmed = model?.trim();
-  if (!trimmed || trimmed === 'grok-default') {
+  if (!trimmed) {
     return undefined;
   }
   return trimmed;

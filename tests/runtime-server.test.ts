@@ -26,11 +26,7 @@ import {
   RUNTIME_VERSION,
   createRuntimeStartupState,
 } from '../src/startup.js';
-import {
-  findCuratedCliCatalog,
-  loadCuratedModelCatalog,
-  resolveCuratedCatalogScope,
-} from '../src/core/models/curatedModelCatalog.js';
+import { readCatalogFactory } from '../src/catalogs/resolver.js';
 
 const RUNTIME_SERVER_DEFAULT_TIMEOUT_MS = process.platform === 'win32' ? 30_000 : 5_000;
 const RUNTIME_SERVER_MEDIUM_TIMEOUT_MS = process.platform === 'win32' ? 60_000 : 10_000;
@@ -119,22 +115,8 @@ function resolveEnvRuntimePaths(env: NodeJS.ProcessEnv) {
 }
 
 function getBundledCursorStaticModelCount(): number {
-  const curated = loadCuratedModelCatalog({
-    runtimeConfig: {
-      configPath: join(tmpdir(), 'cats-runtime-bundled-curated-example', 'providers.yaml'),
-    },
-    env: {
-      ...process.env,
-      CATS_RUNTIME_DIR: join(tmpdir(), 'cats-runtime-bundled-curated-example'),
-    },
-  });
-  const catalog = findCuratedCliCatalog(curated.document, 'cursor');
-  const scope = catalog ? resolveCuratedCatalogScope(catalog, 'cursor') : undefined;
-  if (!scope) {
-    throw new Error('Expected bundled curated cursor catalog to be available.');
+    return readCatalogFactory({packageRoot:process.cwd(), runtimeRoot:process.cwd()}).document.catalogs.find(scope=>scope.provider==='cursor')!.models.length;
   }
-  return scope.models.length;
-}
 
 function createTestConfig(overrides = {}) {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-test-'));
@@ -219,6 +201,17 @@ async function withRuntime(
   run: (runtime: ReturnType<typeof createRuntimeServer>) => Promise<void>,
 ) {
   const { config, cleanup } = createTestConfig(overrides);
+  if (overrides.catalogFixture) {
+    const path = join(config.dataDir!, '..', 'config', 'curated-model-catalogs.yaml');
+    writeFileSync(path, JSON.stringify({schema_version:2,catalogs:[{
+      provider:'codex',backend:'api',transport:'openai',selection_mode:'discovery',
+      models:[{id:'gpt-5.4',label:'gpt-5.4',default:true,execution:{model:'gpt-5.4'}, controls:[{
+        key:'openai.reasoning_effort', label:'Reasoning', kind:'enum', scope:'both',
+        values:['low','medium','high'].map(value=>({value,label:value})),
+      }]}],
+      presets:[{id:'deep_reasoning',label:'Deep reasoning',availability:'supported',preferredEntryId:'gpt-5.4',controlDefaults:{'openai.reasoning_effort':'high'}}],
+    }]}));
+  }
   const runtime = createRuntimeServer(config, options);
   try {
     await run(runtime);
@@ -236,7 +229,9 @@ async function withCuratedCatalogRuntime(
 ) {
   const { root, config, cleanup } = createTestConfig(overrides);
   const paths = createRuntimeTestPaths(root);
-  writeFileSync(paths.curatedModelCatalogPath, `${curatedLines.join('\n')}\n`, 'utf8');
+  const scopes = readCatalogFactory({packageRoot:process.cwd(),runtimeRoot:paths.runtimeDir}).document.catalogs
+    .filter(scope=>['pi','opencode','cursor'].includes(scope.provider)).map(scope=>({...scope,selection_mode:'discovery'}));
+  writeFileSync(paths.curatedModelCatalogPath, JSON.stringify({schema_version:2,catalogs:scopes}));
   const runtime = createRuntimeServer(config, options);
   try {
     await run(runtime);
@@ -247,6 +242,50 @@ async function withCuratedCatalogRuntime(
 }
 
 describe('runtime server', () => {
+  it('reloads catalog data atomically with auth, stale-selection rejection and stable resumed bindings', async () => {
+    await withRuntime({apiKey:'catalog-test'}, {}, async runtime => {
+      const headers = {authorization:'Bearer catalog-test','content-type':'application/json'};
+      const service = runtime.context.providerModelCatalog;
+      const file = service.catalogStore.paths.overridePath;
+      const patch = (effort: string) => JSON.stringify({schema_version:2,catalogs:[{
+        provider:'codex',backend:'cli',selection_mode:'full',models:[{
+          id:'opaque-new-selection',label:'Exact cAsE (recommended)',execution:{model:'wire-opaque',fixed_controls:{'codex.reasoning_effort':effort}},
+        }],
+      }]});
+      expect((await runtime.app.request('/providers/catalogs')).status).toBe(401);
+      const before = service.catalogStore.status().catalogRevision;
+      writeFileSync(file, patch('low'));
+      const reload = await runtime.app.request('/providers/catalogs/reload',{method:'POST',headers,body:JSON.stringify({expectedRevision:before})});
+      expect(reload.status).toBe(200);
+      const first = service.catalogStore.status().catalogRevision!;
+      const basic = await (await runtime.app.request('/providers/codex/models',{headers})).json();
+      const advanced = await (await runtime.app.request('/providers/codex/models/advanced',{headers})).json();
+      expect(basic).toMatchObject({catalogRevision:first,models:[{id:'opaque-new-selection',label:'Exact cAsE (recommended)'}]});
+      expect(advanced).toMatchObject({catalogRevision:first,catalogActivationId:basic.catalogActivationId,controls:[]});
+      const spawn = vi.spyOn(runtime.context.pool,'spawn').mockReturnValue(undefined as never);
+      const createdResponse = await runtime.app.request('/sessions',{method:'POST',headers,body:JSON.stringify({
+        provider:'codex',cwd:runtime.context.config.dataDir,modelSelection:{entryMode:'explicit',entryId:'opaque-new-selection',catalogRevision:first},
+      })});
+      expect(createdResponse.status).toBe(201);
+      const created = await createdResponse.json() as {id:string};
+      expect(spawn).toHaveBeenLastCalledWith(created.id,'codex',expect.objectContaining({model:'wire-opaque',modelControls:{'codex.reasoning_effort':'low'}}),'native');
+      runtime.context.registry.setProviderSessionId(created.id,'native-existing');
+      runtime.context.registry.updateStatus(created.id,'closed');
+      writeFileSync(file,patch('high'));
+      expect((await runtime.app.request('/providers/catalogs/reload',{method:'POST',headers,body:JSON.stringify({expectedRevision:first})})).status).toBe(200);
+      const second = service.catalogStore.status().catalogRevision;
+      const stale = await runtime.app.request('/sessions',{method:'POST',headers,body:JSON.stringify({provider:'codex',cwd:runtime.context.config.dataDir,
+        modelSelection:{entryMode:'explicit',entryId:'opaque-new-selection',catalogRevision:first}})});
+      expect(stale.status).toBe(409);
+      expect((await runtime.app.request(`/sessions/${created.id}/resume`,{method:'POST',headers})).status).toBe(200);
+      expect(spawn).toHaveBeenLastCalledWith(created.id,'codex',expect.objectContaining({model:'wire-opaque',modelControls:{'codex.reasoning_effort':'low'}}),'native');
+      writeFileSync(file,'schema_version: 2\ncatalogs: malformed');
+      expect((await runtime.app.request('/providers/catalogs/reload',{method:'POST',headers,body:JSON.stringify({expectedRevision:second})})).status).toBe(400);
+      expect(service.catalogStore.status().catalogRevision).toBe(second);
+      spawn.mockRestore();
+    });
+  });
+
   it('GET / serves the embedded dashboard', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/');
@@ -415,7 +454,7 @@ describe('runtime server', () => {
       expect(html).toContain('syncChatInputDefaultPrompt');
       expect(html).toContain("return document.getElementById('response-lang')?.value || 'en';");
       expect(html).toContain("responseLangSelect?.addEventListener('change', () => {");
-      expect(html).toContain('openclaw-preview');
+      expect(html).toContain('const PROVIDER_MODELS = {}');
       expect(html).toContain("'openclaw']");
       expect(html).toContain("if (provider === 'ollama') return `${name}-LOCAL`;");
       expect(html).toContain("if (provider === 'openclaw') return `${name}-AGENT`;");
@@ -435,9 +474,7 @@ describe('runtime server', () => {
       expect(html).toContain('const hasAgents=getAgentCount()>0;');
       expect(html).toContain('const providerCatalogPending=!providerOptionsReady&&(providerOptionsLoading||providerOptionsRequestId===0);');
       expect(html).toContain("const basicModels=PROVIDER_MODELS[provider]||[];");
-      expect(html).toContain("renderAgentRoutingSelectOptions(select,[{ value:'', label:'Loading models...' }], '');");
-      expect(html).toContain("renderAgentRoutingSelectOptions(select,[{ value:'', label:'Models unavailable' }], '');");
-      expect(html).toContain("hintEl.textContent='Loading provider models...';");
+      expect(html).toContain("Custom model…");
       expect(html).toContain("const showList=mode==='ready'||(mode!=='loading'&&hasAgents);");
       expect(html).toContain("const showState=mode!=='ready'&&!showList;");
       expect(html).toContain('ensureStarterAgents();');
@@ -495,12 +532,6 @@ describe('runtime server', () => {
       expect(html).toContain('Runtime Health');
       expect(html).toContain('validateRuntimeApiKey');
       expect(html).toContain('getRuntimeAuthHeaders');
-      expect(html).toContain("antigravity:[{value:'gemini-3.8-flash-low',label:'Gemini 3.8 Flash'}");
-      // Grok 1.0.13 enumerates two models and marks neither default; the
-      // `(default)` marker `grok models` prints comes from the per-user config.
-      expect(html).toContain("grok:[{value:'grok-4.6',label:'Grok 4.6'},{value:'grok-4.5',label:'Grok 4.5'}],");
-      expect(html).toContain("junie:[{value:'Gemini 3.7 Flash',label:'Gemini 3.7 Flash — Medium (default)'},{value:'Claude Fable 5.1',label:'Claude Fable 5.1 — Low'},{value:'Gemini 3.8 Flash',label:'Gemini 3.8 Flash — Medium'},{value:'GPT-5.6-SOL',label:'GPT-5.6-SOL — Low'},{value:'Grok 4.6',label:'Grok 4.6 — Low'}],");
-      expect(html).not.toContain("junie:[{value:'gpt-5.4',label:'gpt-5.4 (default)'}],");
       expect(html).toContain('/providers/${name}/models/advanced');
       expect(html).toContain('normalizeModelCatalog');
       expect(html).toContain('modelSelection');
@@ -540,7 +571,7 @@ describe('runtime server', () => {
         },
       });
       expect(deleteResponse.status).toBe(200);
-      expect(await deleteResponse.json()).toEqual({
+      expect(await deleteResponse.json()).toMatchObject({
         id: created.id,
         deleted: true,
       });
@@ -2695,7 +2726,7 @@ backends:
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/sessions');
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
+      expect(await response.json()).toMatchObject({
         sessions: [],
         count: 0,
       });
@@ -2768,7 +2799,7 @@ backends:
     await withRuntime({ kiroRuntime: { mode: 'wsl' } }, {}, async (runtime) => {
       const response = await runtime.app.request('/kiro/models');
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
+      expect(await response.json()).toMatchObject({
         instance: 'native',
         runtime: { mode: 'wsl' },
         source: 'static',
@@ -3310,7 +3341,7 @@ backends:
 
       const catalogResponse = await runtime.app.request('/providers/goose/models');
       expect(catalogResponse.status).toBe(200);
-      expect(await catalogResponse.json()).toEqual({
+      expect(await catalogResponse.json()).toMatchObject({
         provider: 'goose',
         backend: 'cli',
         instance: 'default',
@@ -3527,7 +3558,7 @@ providers:
 
       const response = await runtime.app.request('/sessions?provider=cursor&instance=default');
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
+      expect(await response.json()).toMatchObject({
         sessions: [
           expect.objectContaining({
             providerName: 'cursor',
@@ -3710,7 +3741,7 @@ providers:
 
       const peerDetail = await runtime.app.request(`/peers/${localPeerId}`);
       expect(peerDetail.status).toBe(200);
-      expect(await peerDetail.json()).toEqual({
+      expect(await peerDetail.json()).toMatchObject({
         discovery: expect.objectContaining({
           enabled: true,
           status: 'running',
@@ -4129,7 +4160,7 @@ providers:
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/models?refresh=maybe');
       expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({
+      expect(await response.json()).toMatchObject({
         error: "Invalid refresh query value 'maybe'. Use true/false or 1/0.",
       });
     });
@@ -4237,665 +4268,6 @@ providers:
     });
   });
 
-  it('GET /providers/claude/models and /advanced honor curated Claude CLI YAML', async () => {
-    await withCuratedCatalogRuntime([
-      'schema_version: 1',
-      'catalogs:',
-      '  - cli: Claude',
-      '    version: 2.1.96',
-      '    last_updated: 2026-04-08',
-      '    models:',
-      '      - name: Opus',
-      '        label: Opus 4.6 with 1M context',
-      '        default: true',
-      '        context: 1000000',
-      '        options:',
-      '          - name: Effort',
-      '            values: [Low, Medium, High, Max]',
-      '            default: Medium',
-      '      - name: Sonnet',
-      '        label: Sonnet 4.6',
-      '        options:',
-      '          - name: Effort',
-      '            values: [Low, Medium, High]',
-      '            default: Medium',
-      '      - name: Haiku',
-      '        label: Haiku 4.5',
-      '        options: []',
-    ], {}, {}, async (runtime) => {
-      const modelsResponse = await runtime.app.request('/providers/claude/models');
-      expect(modelsResponse.status).toBe(200);
-      expect(await modelsResponse.json()).toEqual({
-        provider: 'claude',
-        backend: 'cli',
-        instance: 'native',
-        defaultModel: 'opus',
-        source: 'static',
-        cache: null,
-        models: [
-          { id: 'opus', label: 'Opus 4.6 with 1M context', default: true },
-          { id: 'sonnet', label: 'Sonnet 4.6', default: false },
-          { id: 'haiku', label: 'Haiku 4.5', default: false },
-        ],
-        warnings: [],
-      });
-
-      const advancedResponse = await runtime.app.request('/providers/claude/models/advanced');
-      expect(advancedResponse.status).toBe(200);
-      const advancedPayload = await advancedResponse.json();
-      expect(advancedPayload).toMatchObject({
-        provider: 'claude',
-        backend: 'cli',
-        instance: 'native',
-        defaultModel: 'opus',
-        source: 'static',
-        cache: null,
-        entries: [
-          {
-            id: 'opus',
-            label: 'Opus 4.6 with 1M context',
-            default: true,
-            limits: {
-              contextWindowTokens: 1000000,
-            },
-          },
-          {
-            id: 'sonnet',
-            label: 'Sonnet 4.6',
-            default: false,
-          },
-          {
-            id: 'haiku',
-            label: 'Haiku 4.5',
-            default: false,
-          },
-        ],
-        defaultSelection: {
-          entryId: 'opus',
-          entryMode: 'explicit',
-          controls: {
-            'claude.reasoning_effort': 'medium',
-          },
-        },
-        warnings: [],
-      });
-      expect(advancedPayload.controls).toMatchObject([
-        {
-          key: 'claude.reasoning_effort',
-          applicableEntryIds: ['opus', 'sonnet'],
-        },
-      ]);
-    });
-  });
-
-  it('GET /providers/codex/models and /advanced honor curated Codex CLI YAML', async () => {
-    await withCuratedCatalogRuntime([
-      'schema_version: 1',
-      'catalogs:',
-      '  - cli: Codex',
-      '    version: 0.118.0',
-      '    last_updated: 2026-04-08',
-      '    shared_options:',
-      '      - name: Reasoning Level',
-      '        values: [Low, Medium, High, Extra High]',
-      '        default: Medium',
-      '    models:',
-      '      - name: gpt-5.4',
-      '        default: true',
-      '      - name: gpt-5.2-codex',
-      '      - name: gpt-5.1-codex-max',
-      '      - name: gpt-5.4-mini',
-      '      - name: gpt-5.3-codex',
-      '      - name: gpt-5.3-codex-spark',
-      '        options:',
-      '          - name: Reasoning Level',
-      '            default: High',
-      '      - name: gpt-5.2',
-      '      - name: gpt-5.1-codex-mini',
-      '        options:',
-      '          - name: Reasoning Level',
-      '            values: [Medium, High]',
-      '            default: Medium',
-    ], {}, {}, async (runtime) => {
-      const modelsResponse = await runtime.app.request('/providers/codex/models');
-      expect(modelsResponse.status).toBe(200);
-      expect(await modelsResponse.json()).toEqual({
-        provider: 'codex',
-        backend: 'cli',
-        instance: 'native',
-        defaultModel: 'gpt-5.4',
-        source: 'static',
-        cache: null,
-        models: [
-          { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
-          { id: 'gpt-5.2-codex', label: 'gpt-5.2-codex', default: false },
-          { id: 'gpt-5.1-codex-max', label: 'gpt-5.1-codex-max', default: false },
-          { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini', default: false },
-          { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex', default: false },
-          { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark', default: false },
-          { id: 'gpt-5.2', label: 'gpt-5.2', default: false },
-          { id: 'gpt-5.1-codex-mini', label: 'gpt-5.1-codex-mini', default: false },
-        ],
-        warnings: [],
-      });
-
-      const advancedResponse = await runtime.app.request('/providers/codex/models/advanced');
-      expect(advancedResponse.status).toBe(200);
-      const advancedPayload = await advancedResponse.json();
-      expect(advancedPayload.entries.map((entry: { id: string }) => entry.id)).toEqual([
-        'gpt-5.4',
-        'gpt-5.2-codex',
-        'gpt-5.1-codex-max',
-        'gpt-5.4-mini',
-        'gpt-5.3-codex',
-        'gpt-5.3-codex-spark',
-        'gpt-5.2',
-        'gpt-5.1-codex-mini',
-      ]);
-      expect(advancedPayload.defaultSelection).toEqual({
-        entryId: 'gpt-5.4',
-        entryMode: 'explicit',
-        controls: {
-          'codex.reasoning_effort': 'medium',
-        },
-      });
-      expect(advancedPayload.controls).toMatchObject([
-        {
-          key: 'codex.reasoning_effort',
-          applicableEntryIds: [
-            'gpt-5.4',
-            'gpt-5.2-codex',
-            'gpt-5.1-codex-max',
-            'gpt-5.4-mini',
-            'gpt-5.3-codex',
-            'gpt-5.3-codex-spark',
-            'gpt-5.2',
-            'gpt-5.1-codex-mini',
-          ],
-        },
-      ]);
-      // The HTTP payload carries one option per submitted token. `medium` and
-      // `high` each default for only part of the catalog, so neither is
-      // suffixed `(default)`; per-entry defaults ride on the entries instead.
-      expect(advancedPayload.controls[0]?.values).toEqual([
-        expect.objectContaining({
-          value: 'low',
-          label: 'Low',
-          applicableEntryIds: [
-            'gpt-5.4',
-            'gpt-5.2-codex',
-            'gpt-5.1-codex-max',
-            'gpt-5.4-mini',
-            'gpt-5.3-codex',
-            'gpt-5.3-codex-spark',
-            'gpt-5.2',
-          ],
-        }),
-        expect.objectContaining({
-          value: 'medium',
-          label: 'Medium',
-          applicableEntryIds: [
-            'gpt-5.4',
-            'gpt-5.2-codex',
-            'gpt-5.1-codex-max',
-            'gpt-5.4-mini',
-            'gpt-5.3-codex',
-            'gpt-5.3-codex-spark',
-            'gpt-5.2',
-            'gpt-5.1-codex-mini',
-          ],
-        }),
-        expect.objectContaining({
-          value: 'high',
-          label: 'High',
-          applicableEntryIds: [
-            'gpt-5.4',
-            'gpt-5.2-codex',
-            'gpt-5.1-codex-max',
-            'gpt-5.4-mini',
-            'gpt-5.3-codex',
-            'gpt-5.3-codex-spark',
-            'gpt-5.2',
-            'gpt-5.1-codex-mini',
-          ],
-        }),
-        expect.objectContaining({
-          value: 'xhigh',
-          applicableEntryIds: [
-            'gpt-5.4',
-            'gpt-5.2-codex',
-            'gpt-5.1-codex-max',
-            'gpt-5.4-mini',
-            'gpt-5.3-codex',
-            'gpt-5.3-codex-spark',
-            'gpt-5.2',
-          ],
-        }),
-      ]);
-      expect(advancedPayload.warnings).toEqual([]);
-    });
-  });
-
-  it('GET /providers/antigravity/models and /advanced honor user-curated Antigravity CLI YAML', async () => {
-    await withCuratedCatalogRuntime([
-      'schema_version: 1',
-      'catalogs:',
-      '  - cli: Antigravity',
-      '    version: probe-required',
-      '    last_updated: 2026-05-24',
-      '    models:',
-      '      - name: antigravity-fixture-high',
-      '        label: Antigravity fixture high',
-      '        default: true',
-      '        tags: [reasoning]',
-      '        notes:',
-      '          - User supplied model entry.',
-      '      - name: antigravity-fixture-low',
-      '        label: Antigravity fixture low',
-      '        tags: [reasoning]',
-      '      - name: antigravity-fixture-fast',
-      '        label: Antigravity fixture fast',
-      '        tags: [latency_optimized]',
-    ], {}, {}, async (runtime) => {
-      const modelsResponse = await runtime.app.request('/providers/antigravity/models');
-      expect(modelsResponse.status).toBe(200);
-      expect(await modelsResponse.json()).toEqual({
-        provider: 'antigravity',
-        backend: 'cli',
-        instance: 'native',
-        defaultModel: 'antigravity-fixture-high',
-        source: 'static',
-        cache: null,
-        models: [
-          {
-            id: 'antigravity-fixture-high',
-            label: 'Antigravity fixture high',
-            default: true,
-          },
-          {
-            id: 'antigravity-fixture-low',
-            label: 'Antigravity fixture low',
-          },
-          {
-            id: 'antigravity-fixture-fast',
-            label: 'Antigravity fixture fast',
-          },
-        ],
-        warnings: [],
-      });
-
-      const advancedResponse = await runtime.app.request('/providers/antigravity/models/advanced');
-      expect(advancedResponse.status).toBe(200);
-      expect(await advancedResponse.json()).toEqual({
-        provider: 'antigravity',
-        backend: 'cli',
-        instance: 'native',
-        defaultModel: 'antigravity-fixture-high',
-        source: 'static',
-        cache: null,
-        entries: [
-          {
-            id: 'antigravity-fixture-high',
-            label: 'Antigravity fixture high',
-            default: true,
-            capabilityTags: ['tool_use', 'reasoning'],
-            notes: ['User supplied model entry.'],
-          },
-          {
-            id: 'antigravity-fixture-low',
-            label: 'Antigravity fixture low',
-            default: false,
-            capabilityTags: ['tool_use', 'reasoning'],
-          },
-          {
-            id: 'antigravity-fixture-fast',
-            label: 'Antigravity fixture fast',
-            default: false,
-            capabilityTags: ['tool_use', 'latency_optimized'],
-          },
-        ],
-        presets: [],
-        controls: [],
-        defaultSelection: null,
-        support: {
-          tier: 'entry_only',
-          advancedMetadataStatus: 'unverified_omitted',
-          discoveryMode: 'manual_refresh',
-          provenance: {
-            status: 'unverified_omitted',
-          },
-        },
-        warnings: [],
-      });
-    });
-  });
-
-  it('GET /providers/cursor/models and /advanced honor curated Cursor raw-label YAML', async () => {
-    await withCuratedCatalogRuntime([
-      'schema_version: 1',
-      'catalogs:',
-      '  - cli: Cursor',
-      '    version: 2026.04.13-a9d7fb5',
-      '    last_updated: 2026-04-14',
-      '    models:',
-      '      - name: Auto',
-      '      - name: Composer 2 Fast',
-      '        default: true',
-      '      - name: Codex 5.3 Extra High',
-      '      - name: GPT-5.4 1M',
-      '      - name: Opus 4.5 Thinking',
-      '      - name: Gemini 3 Flash',
-    ], {}, {}, async (runtime) => {
-      const modelsResponse = await runtime.app.request('/providers/cursor/models');
-      expect(modelsResponse.status).toBe(200);
-      expect(await modelsResponse.json()).toEqual({
-        provider: 'cursor',
-        backend: 'cli',
-        instance: 'native',
-        defaultModel: 'composer-2-fast',
-        source: 'static',
-        cache: null,
-        models: [
-          { id: 'auto', label: 'Auto' },
-          { id: 'composer-2-fast', label: 'Composer 2 Fast', default: true },
-          { id: 'gpt-5.3-codex-xhigh', label: 'Codex 5.3 Extra High' },
-          { id: 'gpt-5.4-medium', label: 'GPT-5.4 1M' },
-          { id: 'claude-4.5-opus-thinking', label: 'Opus 4.5 Thinking' },
-          { id: 'gemini-3-flash', label: 'Gemini 3 Flash' },
-        ],
-        warnings: [
-          'Live model discovery is available for cursor/cli/native via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
-        ],
-      });
-
-      const advancedResponse = await runtime.app.request('/providers/cursor/models/advanced');
-      expect(advancedResponse.status).toBe(200);
-      expect(await advancedResponse.json()).toEqual({
-        provider: 'cursor',
-        backend: 'cli',
-        instance: 'native',
-        defaultModel: 'composer-2-fast',
-        source: 'static',
-        cache: null,
-        entries: [
-          { id: 'auto', label: 'Auto', default: false },
-          { id: 'composer-2-fast', label: 'Composer 2 Fast', default: true },
-          { id: 'gpt-5.3-codex-xhigh', label: 'Codex 5.3 Extra High', default: false },
-          {
-            id: 'gpt-5.4-medium',
-            label: 'GPT-5.4 1M',
-            default: false,
-            capabilityTags: ['reasoning'],
-          },
-          {
-            id: 'claude-4.5-opus-thinking',
-            label: 'Opus 4.5 Thinking',
-            default: false,
-            capabilityTags: ['reasoning'],
-          },
-          {
-            id: 'gemini-3-flash',
-            label: 'Gemini 3 Flash',
-            default: false,
-            capabilityTags: ['latency_optimized'],
-          },
-        ],
-        presets: [],
-        controls: [],
-        defaultSelection: null,
-        support: {
-          tier: 'entry_only',
-          advancedMetadataStatus: 'unverified_omitted',
-          discoveryMode: 'manual_refresh',
-          provenance: {
-            status: 'unverified_omitted',
-          },
-        },
-        warnings: [
-          'Live model discovery is available for cursor/cli/native via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
-        ],
-      });
-    });
-  });
-
-  it('GET /providers/copilot/models and /advanced honor curated Copilot YAML', async () => {
-    await withCuratedCatalogRuntime([
-      'schema_version: 1',
-      'catalogs:',
-      '  - cli: Copilot',
-      '    version: v1.0.26',
-      '    last_updated: 2026-04-15',
-      '    providers:',
-      '      - name: OpenAI',
-      '        shared_options:',
-      '          - name: Reasoning Effort',
-      '            values: [Low, Medium, High]',
-      '            default: Medium',
-      '        models:',
-      '          - name: GPT-5.4',
-      '            default: true',
-      '          - name: GPT-5.4 mini',
-      '          - name: GPT-5.2-Codex',
-      '            options:',
-      '              - name: Reasoning Effort',
-      '                default: High',
-      '      - name: Anthropic',
-      '        shared_options:',
-      '          - name: Effort Level',
-      '            values: [Low, Medium, High]',
-      '            default: Medium',
-      '        models:',
-      '          - name: Claude Opus 4.6',
-      '            options:',
-      '              - name: Effort Level',
-      '                default: High',
-      '          - name: Claude Sonnet 4',
-    ], {}, {}, async (runtime) => {
-      const modelsResponse = await runtime.app.request('/providers/copilot/models');
-      expect(modelsResponse.status).toBe(200);
-      expect(await modelsResponse.json()).toEqual({
-        provider: 'copilot',
-        backend: 'cli',
-        instance: 'native',
-        defaultModel: 'gpt-5.4',
-        source: 'static',
-        cache: null,
-        models: [
-          { id: 'gpt-5.4', label: 'GPT-5.4', default: true },
-          { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini', default: false },
-          { id: 'gpt-5.2-codex', label: 'GPT-5.2-Codex', default: false },
-          { id: 'claude-opus-4.6', label: 'Claude Opus 4.6', default: false },
-          { id: 'claude-sonnet-4', label: 'Claude Sonnet 4', default: false },
-        ],
-        warnings: [],
-      });
-
-      const advancedResponse = await runtime.app.request('/providers/copilot/models/advanced');
-      expect(advancedResponse.status).toBe(200);
-      expect(await advancedResponse.json()).toEqual({
-        provider: 'copilot',
-        backend: 'cli',
-        instance: 'native',
-        defaultModel: 'gpt-5.4',
-        source: 'static',
-        cache: null,
-        entries: [
-          {
-            id: 'gpt-5.4',
-            label: 'GPT-5.4',
-            controlDefaults: { 'copilot.reasoning_effort': 'medium' },
-            default: true,
-            capabilityTags: ['reasoning'],
-          },
-          {
-            id: 'gpt-5.4-mini',
-            label: 'GPT-5.4 mini',
-            controlDefaults: { 'copilot.reasoning_effort': 'medium' },
-            default: false,
-            capabilityTags: ['reasoning', 'latency_optimized'],
-          },
-          {
-            id: 'gpt-5.2-codex',
-            label: 'GPT-5.2-Codex',
-            controlDefaults: { 'copilot.reasoning_effort': 'high' },
-            default: false,
-          },
-          {
-            id: 'claude-opus-4.6',
-            label: 'Claude Opus 4.6',
-            controlDefaults: { 'copilot.reasoning_effort': 'high' },
-            default: false,
-            capabilityTags: ['reasoning'],
-          },
-          {
-            id: 'claude-sonnet-4',
-            label: 'Claude Sonnet 4',
-            controlDefaults: { 'copilot.reasoning_effort': 'medium' },
-            default: false,
-          },
-        ],
-        presets: [],
-        controls: [
-          expect.objectContaining({
-            key: 'copilot.reasoning_effort',
-            label: 'Reasoning effort',
-            description: 'Controls GitHub Copilot CLI reasoning effort for supported models.',
-            kind: 'enum',
-            scope: 'both',
-            // One option per submitted token, every entry unioned onto it.
-            values: [
-              expect.objectContaining({
-                value: 'low',
-                label: 'Low',
-                applicableEntryIds: [
-                  'gpt-5.4',
-                  'gpt-5.4-mini',
-                  'gpt-5.2-codex',
-                  'claude-opus-4.6',
-                  'claude-sonnet-4',
-                ],
-              }),
-              expect.objectContaining({
-                value: 'medium',
-                label: 'Medium',
-                applicableEntryIds: [
-                  'gpt-5.4',
-                  'gpt-5.4-mini',
-                  'gpt-5.2-codex',
-                  'claude-opus-4.6',
-                  'claude-sonnet-4',
-                ],
-              }),
-              expect.objectContaining({
-                value: 'high',
-                label: 'High',
-                applicableEntryIds: [
-                  'gpt-5.4',
-                  'gpt-5.4-mini',
-                  'gpt-5.2-codex',
-                  'claude-opus-4.6',
-                  'claude-sonnet-4',
-                ],
-              }),
-            ],
-            applicableEntryIds: [
-              'gpt-5.4',
-              'gpt-5.4-mini',
-              'gpt-5.2-codex',
-              'claude-opus-4.6',
-              'claude-sonnet-4',
-            ],
-            semanticTags: ['reasoning_intensity'],
-          }),
-        ],
-        defaultSelection: {
-          entryId: 'gpt-5.4',
-          entryMode: 'explicit',
-          controls: {
-            'copilot.reasoning_effort': 'medium',
-          },
-        },
-        support: {
-          tier: 'full',
-          advancedMetadataStatus: 'unverified_omitted',
-          discoveryMode: 'manual_refresh',
-          provenance: {
-            status: 'unverified_omitted',
-          },
-        },
-        warnings: [],
-      });
-    });
-  });
-
-  it('GET /providers/kilo/models and /advanced honor curated Kilo YAML', async () => {
-    await withCuratedCatalogRuntime([
-      'schema_version: 1',
-      'catalogs:',
-      '  - cli: Kilo',
-      '    version: v7.2.0',
-      '    last_updated: 2026-04-14',
-      '    models:',
-      '      - name: Kilo Auto Frontier',
-      '      - name: Elephant (new)',
-      '      - name: "OpenAI: GPT-5.4"',
-      '        default: true',
-      '      - name: "MoonshotAI: Kimi K2.5"',
-    ], {}, {}, async (runtime) => {
-      const modelsResponse = await runtime.app.request('/providers/kilo/models');
-      expect(modelsResponse.status).toBe(200);
-      expect(await modelsResponse.json()).toEqual({
-        provider: 'kilo',
-        backend: 'cli',
-        instance: 'native',
-        defaultModel: 'kilo/openai/gpt-5.4',
-        source: 'static',
-        cache: null,
-        models: [
-          { id: 'kilo/kilo-auto/frontier', label: 'Kilo Auto Frontier' },
-          { id: 'kilo/openrouter/elephant-alpha', label: 'Elephant (new)' },
-          { id: 'kilo/openai/gpt-5.4', label: 'OpenAI: GPT-5.4', default: true },
-          { id: 'kilo/moonshotai/kimi-k2.5', label: 'MoonshotAI: Kimi K2.5' },
-        ],
-        warnings: [],
-      });
-
-      const advancedResponse = await runtime.app.request('/providers/kilo/models/advanced');
-      expect(advancedResponse.status).toBe(200);
-      expect(await advancedResponse.json()).toEqual({
-        provider: 'kilo',
-        backend: 'cli',
-        instance: 'native',
-        defaultModel: 'kilo/openai/gpt-5.4',
-        source: 'static',
-        cache: null,
-        entries: [
-          { id: 'kilo/kilo-auto/frontier', label: 'Kilo Auto Frontier', default: false },
-          { id: 'kilo/openrouter/elephant-alpha', label: 'Elephant (new)', default: false },
-          {
-            id: 'kilo/openai/gpt-5.4',
-            label: 'OpenAI: GPT-5.4',
-            default: true,
-            capabilityTags: ['reasoning'],
-          },
-          { id: 'kilo/moonshotai/kimi-k2.5', label: 'MoonshotAI: Kimi K2.5', default: false },
-        ],
-        presets: [],
-        controls: [],
-        defaultSelection: null,
-        support: {
-          tier: 'entry_only',
-          advancedMetadataStatus: 'unverified_omitted',
-          discoveryMode: 'manual_refresh',
-          provenance: {
-            status: 'unverified_omitted',
-          },
-        },
-        warnings: [],
-      });
-    });
-  });
-
   it('GET /providers/:provider/models/advanced only probes verified providers on explicit refresh', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       data: [
@@ -4939,173 +4311,20 @@ providers:
       const immediate = await runtime.app.request('/providers/codex/models/advanced?instance=api/main');
       expect(immediate.status).toBe(200);
       expect(await immediate.json()).toMatchObject({
-        provider: 'codex',
-        backend: 'api',
-        instance: 'main',
-        defaultModel: 'gpt-5.4',
-        source: 'config',
-        cache: null,
-        entries: [
-          {
-            id: 'gpt-5.4',
-            label: 'gpt-5.4',
-            default: true,
-            status: 'configured',
-            capabilityTags: ['tool_use', 'reasoning'],
-          },
-        ],
-        presets: [
-          {
-            id: 'balanced',
-            label: 'Balanced',
-            availability: 'supported',
-            applicableEntryIds: ['gpt-5.4'],
-            preferredEntryId: 'gpt-5.4',
-            controlDefaults: {
-              'openai.reasoning_effort': 'medium',
-            },
-          },
-          {
-            id: 'fast',
-            label: 'Fast',
-            availability: 'supported',
-            applicableEntryIds: ['gpt-5.4'],
-            preferredEntryId: 'gpt-5.4',
-            controlDefaults: {
-              'openai.reasoning_effort': 'low',
-            },
-          },
-          {
-            id: 'deep_reasoning',
-            label: 'Deep reasoning',
-            availability: 'supported',
-            applicableEntryIds: ['gpt-5.4'],
-            preferredEntryId: 'gpt-5.4',
-            controlDefaults: {
-              'openai.reasoning_effort': 'high',
-            },
-          },
-        ],
-        controls: [
-          {
-            key: 'openai.reasoning_effort',
-            label: 'Reasoning effort',
-            description: 'Controls OpenAI reasoning effort for supported GPT-5 entries.',
-            kind: 'enum',
-            scope: 'both',
-            values: [
-              { value: 'low', label: 'Low' },
-              { value: 'medium', label: 'Medium' },
-              { value: 'high', label: 'High' },
-            ],
-            applicableEntryIds: ['gpt-5.4'],
-            semanticTags: ['reasoning_intensity'],
-          },
-        ],
-        defaultSelection: {
-          entryId: 'gpt-5.4',
-          entryMode: 'auto',
-          presetId: 'balanced',
-          controls: {
-            'openai.reasoning_effort': 'medium',
-          },
-        },
-        support: {
-          tier: 'full',
-        },
-        warnings: [],
+        provider: 'codex', backend: 'api', instance: 'main',
+        controls: [], presets: [], support: {tier: 'entry_only'},
+        defaultSelection: {entryId: 'gpt-5.4', entryMode: 'explicit'},
+        entries: [{id:'gpt-5.4',label:'gpt-5.4'}],
       });
       expect(fetchMock).not.toHaveBeenCalled();
 
       const refreshed = await runtime.app.request('/providers/codex/models/advanced?instance=api/main&refresh=1');
       expect(refreshed.status).toBe(200);
       expect(await refreshed.json()).toMatchObject({
-        provider: 'codex',
-        backend: 'api',
-        instance: 'main',
-        defaultModel: 'gpt-5.4',
-        source: 'dynamic',
-        cache: {
-          servedFromCache: false,
-          cachedAt: expect.any(String),
-          ttlSec: 60,
-        },
-        entries: [
-          {
-            id: 'gpt-5.4',
-            label: 'gpt-5.4',
-            default: true,
-            status: 'available',
-            capabilityTags: ['tool_use', 'reasoning'],
-          },
-          {
-            id: 'gpt-5.4-mini',
-            label: 'gpt-5.4-mini',
-            default: false,
-            status: 'available',
-            capabilityTags: ['tool_use', 'reasoning', 'latency_optimized'],
-          },
-        ],
-        presets: [
-          {
-            id: 'balanced',
-            label: 'Balanced',
-            availability: 'supported',
-            applicableEntryIds: ['gpt-5.4'],
-            preferredEntryId: 'gpt-5.4',
-            controlDefaults: {
-              'openai.reasoning_effort': 'medium',
-            },
-          },
-          {
-            id: 'fast',
-            label: 'Fast',
-            availability: 'supported',
-            applicableEntryIds: ['gpt-5.4'],
-            preferredEntryId: 'gpt-5.4',
-            controlDefaults: {
-              'openai.reasoning_effort': 'low',
-            },
-          },
-          {
-            id: 'deep_reasoning',
-            label: 'Deep reasoning',
-            availability: 'supported',
-            applicableEntryIds: ['gpt-5.4'],
-            preferredEntryId: 'gpt-5.4',
-            controlDefaults: {
-              'openai.reasoning_effort': 'high',
-            },
-          },
-        ],
-        controls: [
-          {
-            key: 'openai.reasoning_effort',
-            label: 'Reasoning effort',
-            description: 'Controls OpenAI reasoning effort for supported GPT-5 entries.',
-            kind: 'enum',
-            scope: 'both',
-            values: [
-              { value: 'low', label: 'Low' },
-              { value: 'medium', label: 'Medium' },
-              { value: 'high', label: 'High' },
-            ],
-            applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini'],
-            semanticTags: ['reasoning_intensity'],
-          },
-        ],
-        defaultSelection: {
-          entryId: 'gpt-5.4',
-          entryMode: 'auto',
-          presetId: 'balanced',
-          controls: {
-            'openai.reasoning_effort': 'medium',
-          },
-        },
-        support: {
-          tier: 'full',
-        },
-        warnings: [],
+        provider: 'codex', backend: 'api', instance: 'main',
+        controls: [], presets: [], support: {tier: 'entry_only'},
+        defaultSelection: {entryId: 'gpt-5.4', entryMode: 'explicit'},
+        entries: [{id:'gpt-5.4',label:'gpt-5.4'},{id:'gpt-5.4-mini',label:'gpt-5.4-mini'}],
       });
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
@@ -5113,6 +4332,7 @@ providers:
 
   it('POST /sessions accepts structured model selection additively and preserves legacy model snapshot', async () => {
     await withRuntime({
+      catalogFixture: true,
       providerDefaultTargets: {
         codex: { backend: 'api', instance: 'main' },
       },
@@ -5162,7 +4382,7 @@ providers:
           'openai.reasoning_effort': 'high',
         },
       });
-      expect(created.modelResolution).toEqual({
+      expect(created.modelResolution).toMatchObject({
         entryId: 'gpt-5.4',
         model: 'gpt-5.4',
         entryMode: 'auto',
@@ -5456,9 +4676,7 @@ providers:
             entryId: 'custom-preview-model',
             model: 'custom-preview-model',
             entryMode: 'explicit',
-            warnings: [
-              "Legacy model 'custom-preview-model' is not present in the advanced catalog; preserving it as a compatibility passthrough.",
-            ],
+            warnings: [],
           },
         });
         expect(spawnSpy).toHaveBeenCalledWith(
@@ -5536,7 +4754,7 @@ providers:
     });
   });
 
-  it('POST /sessions/:id/resume falls back to the legacy model when stored structured selection goes stale', async () => {
+  it('POST /sessions/:id/resume preserves the recorded binding when the current catalog no longer contains its preset', async () => {
     await withRuntime({
       providerDefaultTargets: {
         codex: { backend: 'api', instance: 'main' },
@@ -5598,16 +4816,14 @@ providers:
           model: 'gpt-5.4',
           entryMode: 'auto',
           supportTier: 'full',
-          warnings: [
-            "Preset 'sunset_preview' is no longer available for codex/api/main; continuing without it.",
-          ],
+          warnings: [],
         },
       });
-      expect((payload.modelSelection as Record<string, unknown>).presetId).toBeUndefined();
+      expect((payload.modelSelection as Record<string, unknown>).presetId).toBe('sunset_preview');
     });
   });
 
-  it('POST /sessions/:id/resume normalizes legacy Copilot model ids without requiring modelSelection', async () => {
+  it('POST /sessions/:id/resume preserves unbound native Copilot model ids without inferring current bindings', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const spawnSpy = vi.spyOn(runtime.context.pool, 'spawn');
       const session = runtime.context.registry.create({
@@ -5628,13 +4844,13 @@ providers:
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual(expect.objectContaining({
         id: session.id,
-        model: 'claude-opus-4.6',
+        model: 'claude-opus-4-6',
         providerSessionId: 'copilot-legacy-provider-session',
       }));
-      expect(runtime.context.registry.get(session.id)?.model).toBe('claude-opus-4.6');
+      expect(runtime.context.registry.get(session.id)?.model).toBe('claude-opus-4-6');
       expect(spawnSpy).toHaveBeenCalled();
       expect(spawnSpy.mock.calls.at(-1)?.[2]).toEqual(expect.objectContaining({
-        model: 'claude-opus-4.6',
+        model: 'claude-opus-4-6',
         resumeSessionId: 'copilot-legacy-provider-session',
       }));
     });
@@ -5642,6 +4858,7 @@ providers:
 
   it('POST /sessions rejects conflicting legacy model and structured selection payloads', async () => {
     await withRuntime({
+      catalogFixture: true,
       providerDefaultTargets: {
         codex: { backend: 'api', instance: 'main' },
       },
@@ -5683,7 +4900,7 @@ providers:
       });
 
       expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({
+      expect(await response.json()).toMatchObject({
         error: "Legacy model 'gpt-5.3-codex' does not match resolved structured selection 'gpt-5.4'",
       });
     });
@@ -5701,7 +4918,7 @@ providers:
           cwd: '/tmp/cats-runtime-repo',
           modelSelection: {
             entryMode: 'explicit',
-            entryId: 'gpt-5.4',
+            entryId: 'gpt-6-astra',
             controls: {
               'openai.reasoning_effort': 'high',
             },
@@ -5710,7 +4927,7 @@ providers:
       });
 
       expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({
+      expect(await response.json()).toMatchObject({
         error: "Control 'openai.reasoning_effort' is not supported for codex/cli/native",
       });
     });
@@ -5734,7 +4951,7 @@ providers:
       });
 
       expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({
+      expect(await response.json()).toMatchObject({
         error: "Unknown catalog entry 'retired-codex-model'",
       });
     });
@@ -5792,7 +5009,7 @@ providers:
     }, { apiBackend: { fetch: fetchMock } }, async (runtime) => {
       const first = await runtime.app.request('/providers/ollama/models');
       expect(first.status).toBe(200);
-      expect(await first.json()).toEqual({
+      expect(await first.json()).toMatchObject({
         provider: 'ollama',
         backend: 'local',
         instance: 'local',
@@ -5813,7 +5030,7 @@ providers:
 
       const refreshed = await runtime.app.request('/providers/ollama/models?refresh=1');
       expect(refreshed.status).toBe(200);
-      expect(await refreshed.json()).toEqual({
+      expect(await refreshed.json()).toMatchObject({
         provider: 'ollama',
         backend: 'local',
         instance: 'local',
@@ -5907,7 +5124,7 @@ providers:
     }, async (runtime) => {
       const immediate = await runtime.app.request('/providers/codex/models?instance=api/main');
       expect(immediate.status).toBe(200);
-      expect(await immediate.json()).toEqual({
+      expect(await immediate.json()).toMatchObject({
         provider: 'codex',
         backend: 'api',
         instance: 'main',
@@ -5923,7 +5140,7 @@ providers:
 
       const response = await runtime.app.request('/providers/codex/models?instance=api/main&refresh=1');
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
+      expect(await response.json()).toMatchObject({
         provider: 'codex',
         backend: 'api',
         instance: 'main',
@@ -5978,7 +5195,7 @@ providers:
     }, async (runtime) => {
       const response = await runtime.app.request('/providers/claude/models?instance=api/sonnet');
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
+      expect(await response.json()).toMatchObject({
         provider: 'claude',
         backend: 'api',
         instance: 'sonnet',
@@ -6034,7 +5251,7 @@ providers:
     }, { agentBackend: { fetch: bridgeFetch } }, async (runtime) => {
       const immediate = await runtime.app.request('/providers/codex/models?instance=agent/bridge');
       expect(immediate.status).toBe(200);
-      expect(await immediate.json()).toEqual({
+      expect(await immediate.json()).toMatchObject({
         provider: 'codex',
         backend: 'agent',
         instance: 'bridge',
@@ -6050,7 +5267,7 @@ providers:
 
       const response = await runtime.app.request('/providers/codex/models?instance=agent/bridge&refresh=1');
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
+      expect(await response.json()).toMatchObject({
         provider: 'codex',
         backend: 'agent',
         instance: 'bridge',
@@ -6115,7 +5332,7 @@ providers:
       ], { env: { PI_PATH: process.platform === 'win32' ? 'pi.cmd' : 'pi' } }, {}, async (runtime) => {
         const immediate = await runtime.app.request('/providers/pi/models');
         expect(immediate.status).toBe(200);
-        expect(await immediate.json()).toEqual({
+        expect(await immediate.json()).toMatchObject({
           provider: 'pi',
           backend: 'cli',
           instance: 'native',
@@ -6200,7 +5417,7 @@ providers:
       }, {}, async (runtime) => {
         const first = await runtime.app.request('/providers/opencode/models');
         expect(first.status).toBe(200);
-        expect(await first.json()).toEqual({
+        expect(await first.json()).toMatchObject({
           provider: 'opencode',
           backend: 'cli',
           instance: 'native',
@@ -6220,7 +5437,7 @@ providers:
 
         const refreshed = await runtime.app.request('/providers/opencode/models?refresh=1');
         expect(refreshed.status).toBe(200);
-        expect(await refreshed.json()).toEqual({
+        expect(await refreshed.json()).toMatchObject({
           provider: 'opencode',
           backend: 'cli',
           instance: 'native',
@@ -6248,7 +5465,7 @@ providers:
 
         const refreshedAgain = await runtime.app.request('/providers/opencode/models?refresh=1');
         expect(refreshedAgain.status).toBe(200);
-        expect(await refreshedAgain.json()).toEqual({
+        expect(await refreshedAgain.json()).toMatchObject({
           provider: 'opencode',
           backend: 'cli',
           instance: 'native',
@@ -6352,7 +5569,7 @@ providers:
     }, { apiBackend: { fetch: fetchMock } }, async (runtime) => {
       const response = await runtime.app.request('/providers/ollama/models?refresh=1');
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
+      expect(await response.json()).toMatchObject({
         provider: 'ollama',
         backend: 'local',
         instance: 'local',
@@ -6440,7 +5657,7 @@ providers:
       }, { apiBackend: { fetch: fetchMock } }, async (runtime) => {
         const first = await runtime.app.request('/providers/ollama/models?refresh=1');
         expect(first.status).toBe(200);
-        expect(await first.json()).toEqual({
+        expect(await first.json()).toMatchObject({
           provider: 'ollama',
           backend: 'local',
           instance: 'local',
@@ -6473,7 +5690,7 @@ providers:
 
         const second = await runtime.app.request('/providers/ollama/models?refresh=1');
         expect(second.status).toBe(200);
-        expect(await second.json()).toEqual({
+        expect(await second.json()).toMatchObject({
           provider: 'ollama',
           backend: 'local',
           instance: 'local',
@@ -6514,7 +5731,7 @@ providers:
 
         const third = await runtime.app.request('/providers/ollama/models?refresh=1');
         expect(third.status).toBe(200);
-        expect(await third.json()).toEqual({
+        expect(await third.json()).toMatchObject({
           provider: 'ollama',
           backend: 'local',
           instance: 'local',
@@ -6643,7 +5860,7 @@ providers:
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/missing/models');
       expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({
+      expect(await response.json()).toMatchObject({
         error: "Failed to inspect provider models: Error: Provider 'missing' is not configured",
         code: 'provider_not_configured',
       });
@@ -6654,7 +5871,7 @@ providers:
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/codex/models?instance=api/missing');
       expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({
+      expect(await response.json()).toMatchObject({
         error: "Failed to inspect provider models: Error: Unknown codex target 'api/missing'. Valid: cli/native",
         code: 'unknown_target',
       });

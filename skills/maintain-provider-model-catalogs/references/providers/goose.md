@@ -20,23 +20,15 @@ providers or all their effort menus.
   `goose-provider-types`; follow that reexport instead of repeatedly guessing paths.
   This source proves transport semantics, not account-visible menus or defaults.
 
-## Fixed effort execution
 
-The current approved procedure and evidence are in
-`docs/research/2026-09-23-goose-shortlist.md`. Goose's native reasoning-model `-none`
-suffix maps to Thinking Off. Do not assume an `--effort off` flag exists, silently
-omit Off, or replace it with a guessed API token. The ChatGPT Codex backend may map
-Off to the lowest supported effort when `none` is unavailable; preserve the Goose
-setting and disclose that distinction in evidence.
+## Schema-2 execution data
 
-For fixed combinations, keep provider-qualified base IDs in catalog state and
-resolve the native effort transport in the Goose adapter. Scope the transform to
-the evidenced combinations; preserve other custom provider/model strings. Verify
-both structured and plain-string inputs, new/resumed runs, and absence of a fake
-default marker. Fixed internal defaults do not become editable public controls.
+Use qualified Cats `id`, bare wire `execution.model`, `execution.provider: chatgpt_codex`, and `execution.fixed_controls.goose.thinking_effort: off`. The generic serializer uses Goose’s native `-none` suffix; its backend may map none to the lowest supported effort. No model-keyed lookup remains; unknown custom strings get no inferred Off.
 
-Reuse existing curated provider scopes, entry-only manifests and shortlist lookup.
-Check that active native config cannot expand the approved menu. Update the actual
-Playground model table, custom serialization/reload path, Desktop fallback and
-HTTP metadata consumers. Isolate tests from personal config; do not authenticate,
-run inference, or enumerate user sessions for a catalog update.
+Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
+Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.
+There are no independent Runtime, Playground or Desktop model tables to update. Existing generic
+bindings require no repeated implementation authorization; a new unsupported binding is a separate
+code change. Validate labels, ordered values, defaults, custom input, and actual emitted bindings.
+Discovery tests must explicitly use a `selection_mode: discovery` scope before constructing the
+service. `catalogs: []` inherits factory; `models: []` empties a full/shortlist scope.

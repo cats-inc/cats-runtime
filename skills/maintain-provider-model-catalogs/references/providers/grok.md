@@ -10,9 +10,7 @@ is `docs/research/2026-09-17-grok-model-picker-refresh.md` in cats-runtime.
   copied. Keep each effort menu attached to its confirmed model; `(active)` indicates the session
   selection, not a provider default. Keep the original marker in evidence while excluding it from
   display labels when requested.
-- Inspect retained Grok manifest fixtures for model IDs and effort `value`/`label` pairs. Existing
-  `normalizeGrokEffortValue` in `src/core/models/providerAdvancedKnowledge.ts` accepts evidenced
-  picker labels and emits separate raw tokens. Reuse unchanged proven mappings instead of
+- Inspect retained Grok manifest fixtures for model IDs and effort `value`/`label` pairs. Schema-2 `controls[].values` stores separate picker labels and raw tokens. Reuse unchanged proven mappings instead of
   launching the CLI again; retain their original version/date and verify the evidence path exists.
   A new unmapped value remains an evidence gap.
 - The CLI takes model and effort separately (`--model` and `--reasoning-effort`). Do not derive
@@ -22,35 +20,22 @@ is `docs/research/2026-09-17-grok-model-picker-refresh.md` in cats-runtime.
   default, record this as a Cats display/selection policy; absence of a marker in a newer screenshot
   does not prove the upstream default changed. Without that explicit direction, follow the shared
   conflict/default confirmation rules.
-- Preserve each model's effort description in its own option notes. The existing shared enum
-  deduplicates raw values and keeps the first description; do not overwrite the source notes when
+- Preserve each model's effort description in its own option notes. Keep per-entry descriptions in `controls[].values[].description`; do not overwrite evidence when
   two models word the same effort differently.
 
 Compare the effective local Grok override early; it can hide the bundled refresh. Prepare the
 provider-only replacement, reuse any explicit synchronization authorization, and back up before
 writing. Follow [evidence and scope](../evidence-and-scope.md) for unresolved authorization.
 
-## Inspect the existing consumer path
 
-| Concern | Surface |
-|---|---|
-| Curated data and static fallback | `config/curated-model-catalogs.yaml.example`, `src/core/models/providerModelCatalog.ts` |
-| Effort labels, raw tokens, model applicability | `src/core/models/providerAdvancedKnowledge.ts` |
-| Selection and CLI arguments | `src/core/models/providerSelectionResolution.ts`, `src/backends/cli/providers/grok.ts` |
-| Playground | `src/http/ui/shared.ts`, `src/http/ui/pages/playground.html` |
-| Desktop model fallback | `cats-platform/src/shared/providerCatalogData.ts` |
-| Desktop displayed and persisted effort | `cats-platform/src/design/components/providerModelFieldsSupport.ts`, `ProviderModelFieldControls.tsx`, `useProviderModelFieldActions.ts` in the same directory |
+## Schema-2 execution data
 
-For a first-item policy, the initial displayed effort must also reach `modelSelection.controls`
-and the adapter argument. Grok can otherwise silently use its own configured effort. Preserve
-explicit saved choices, reset on model switches, and keep initialization out of `controlDefaults`
-or default-label decoration. Reuse the existing helpers before adding another defaulting path.
+Use per-model `grok.reasoning_effort` values with exact tokens/labels/descriptions. The adapter sends `--reasoning-effort` separately. Shared token spellings do not merge distinct descriptions across models.
 
-## Focused verification
-
-Follow [catalog surfaces](../catalog-surfaces.md) for validation scheduling and Desktop commands.
-Use `src/core/models/grokModelCatalog.test.ts` for the bundled labels, per-model token mapping,
-supported combinations and adapter argv without spawning a paid turn. Add the affected Playground
-helper and Desktop catalog/default-selector tests; assert emitted initial controls as well as DOM
-values. Keep independent historical/default fixtures intact. Source tests, a dev Playground check,
-an installed Desktop check, and live CLI execution are separate validation claims.
+Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
+Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.
+There are no independent Runtime, Playground or Desktop model tables to update. Existing generic
+bindings require no repeated implementation authorization; a new unsupported binding is a separate
+code change. Validate labels, ordered values, defaults, custom input, and actual emitted bindings.
+Discovery tests must explicitly use a `selection_mode: discovery` scope before constructing the
+service. `catalogs: []` inherits factory; `models: []` empties a full/shortlist scope.

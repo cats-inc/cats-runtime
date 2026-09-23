@@ -742,10 +742,13 @@ path is intentionally narrow:
 - Owns the shared `progress` event helper and metering/guardrail type contracts
 - Carries the shared turn/bootstrap/output contract used across CLI, API/local,
   and agent sessions
-- Owns the provider-model fallback ordering and cache semantics
-  (`dynamic -> config -> static`), including additive model-status metadata such
-  as `running` or `configured` when the runtime can infer warm-state or config
-  injection details
+- Owns the schema-2 catalog store and exact-scope factory/local replacement.
+  Full/shortlist scopes are authoritative; discovery scopes retain dynamic -> config
+  -> data fallback. Basic/advanced/execution consume one immutable revision.
+  Sessions persist resolved bindings; reload cannot change a resumed session.
+- Exports the side-effect-free `@cats-inc/cats-runtime/catalogs` module for local
+  informational host reads. Runtime alone activates/persists accepted snapshots.
+  See [the operational workflow](provider-catalog-soft-patches.md).
 
 ## Data Flow
 

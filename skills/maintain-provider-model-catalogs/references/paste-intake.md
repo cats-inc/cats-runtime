@@ -204,7 +204,7 @@ Capture/preview can defer those questions because it makes no edit.
 
 ## 7. Loss-check projection into YAML
 
-Inspect the typed curated schema and normalizer before projection. Compare every observation-tree
+Inspect `src/catalogs/types.ts`, `schema.ts` and `bindings.ts` before projection. Compare every observation-tree
 branch against what YAML can represent. A branch is lossy if it would be:
 
 - discarded;
@@ -232,3 +232,17 @@ provenance.
 Before persisting or quoting, perform a final manual redaction pass and leave visible placeholders
 for every removal. Report the parsed reading, gaps, selected policy, questions/answers, projection
 loss, and any evidence deliberately kept out of YAML.
+
+## Schema-2 projection
+
+Observation/decision artifacts retain their own `schemaVersion: 1`; that is not the catalog schema.
+Catalog documents use `schema_version: 2` and explicit `provider/backend/transport` scopes.
+Keep `id` (Cats selection), `label` (display) and `execution.model` (wire token) separate.
+Use `execution.provider` for an evidenced CLI provider, `execution.fixed_controls` for an
+approved fixed combination, and `controls[].values` for selectable token/label pairs.
+Conditional tokens belong in exhaustive `execution.variants`, never suffix-building code.
+Only an explicit evidenced default uses `default`; first-row initialization and fixed controls
+do not. Use `controls: []` for an explicit unsupported control on a model with inherited controls.
+The intake helper does not infer this mapping. Author the projection from confirmed evidence, then
+run the real catalog validator via [factory checks](./catalog-surfaces.md) or installed patch
+`validate`. An unsupported binding requires separately scoped implementation, not a guessed field.

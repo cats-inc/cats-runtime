@@ -108,23 +108,6 @@ const MUSE_TOOL_ALIASES: Record<string, string> = {
   write: 'write_file',
 };
 
-/**
- * Parser vocabulary recorded from `muse exec --help`. This is not a model's
- * picker menu: curated per-model options constrain structured selections.
- */
-export const MUSE_REASONING_EFFORTS = [
-  'none',
-  'minimal',
-  'low',
-  'medium',
-  'high',
-  'xhigh',
-  'max',
-  'ultra',
-] as const;
-
-const MUSE_REASONING_EFFORT_SET = new Set<string>(MUSE_REASONING_EFFORTS);
-
 interface MuseStreamRef {
   kind?: unknown;
   id?: unknown;
@@ -230,15 +213,11 @@ export class MuseProvider implements Provider {
     }
 
     const effort = opts.modelControls?.['muse.reasoning_effort'];
-    if (typeof effort === 'string' && effort.trim()) {
-      const normalized = effort.trim().toLowerCase();
-      if (!MUSE_REASONING_EFFORT_SET.has(normalized)) {
-        throw new Error(
-          `Unsupported Meta Muse reasoning effort: ${effort}. `
-          + `Accepted levels: ${MUSE_REASONING_EFFORTS.join(', ')}.`,
-        );
+    if (effort !== undefined) {
+      if (typeof effort !== 'string' || !effort.trim() || /[\u0000-\u001f]/.test(effort)) {
+        throw new Error('Invalid Meta Muse reasoning effort.');
       }
-      args.push('--reasoning-effort', normalized);
+      args.push('--reasoning-effort', effort);
     }
 
     appendMusePermissionArgs(args, opts);
@@ -748,7 +727,7 @@ function normalizeMuseAllowedTools(tools: string[]): Set<string> {
  */
 function normalizeMuseModelId(model?: string): string | undefined {
   const trimmed = model?.trim();
-  if (!trimmed || trimmed === 'muse-default') {
+  if (!trimmed) {
     return undefined;
   }
   return trimmed;

@@ -25,7 +25,6 @@ import {
 } from '../../../core/compatibility/providerEvolution.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
-import { CLINE_EFFORT_CONTROL, getClineFixedEffort } from '../../../core/models/clineModelCatalog.js';
 
 export const CLINE_JSON_PROFILE_ID = 'cline-cli-json-3.0.51';
 
@@ -119,12 +118,13 @@ export class ClineProvider implements Provider {
     if (model) {
       // ClinePass is a separate CLI provider; a qualified model alone does not
       // select it. Other custom strings continue using the user's configured provider.
-      if (model.startsWith('cline-pass/')) args.push('--provider', 'cline-pass');
+      if (opts.modelProvider) args.push('--provider', opts.modelProvider);
+      else if (model.startsWith('cline-pass/')) args.push('--provider', 'cline-pass');
       args.push('--model', model);
     }
-    const effort = opts.modelControls?.[CLINE_EFFORT_CONTROL] ?? getClineFixedEffort(model);
+    const effort = opts.modelControls?.['cline.reasoning_effort'];
     if (effort !== undefined) {
-      if (typeof effort !== 'string' || !['none', 'low', 'medium', 'high', 'xhigh'].includes(effort)) {
+      if (typeof effort !== 'string' || !effort.trim() || /[\u0000-\u001f]/.test(effort)) {
         throw new Error('Unsupported Cline reasoning effort.');
       }
       args.push('--thinking', effort);

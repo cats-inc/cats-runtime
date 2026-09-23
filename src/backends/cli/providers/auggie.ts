@@ -365,43 +365,5 @@ function normalizeAuggieToolName(tool: string): string {
 }
 
 function normalizeAuggieModelId(model?: string): string | undefined {
-  if (!model) return undefined;
-
-  const trimmed = model.trim();
-  if (!trimmed) return undefined;
-
-  const normalized = trimmed
-    .toLowerCase()
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  const aliases: Record<string, string> = {
-    'gpt 5': 'gpt5',
-    'gpt 5.1': 'gpt5.1',
-    'gpt 5.2': 'gpt5.2',
-    'gpt 5.4': 'gpt5.4',
-    'claude opus 4.5': 'opus4.5',
-    'claude opus 4.6': 'opus4.6',
-    'opus 4.5': 'opus4.5',
-    'opus 4.6': 'opus4.6',
-    'haiku 4.5': 'haiku4.5',
-    'claude haiku 4.5': 'haiku4.5',
-    'claude sonnet 4': 'sonnet4',
-    'sonnet 4': 'sonnet4',
-    'claude sonnet 4.5': 'sonnet4.5',
-    'sonnet 4.5': 'sonnet4.5',
-    'claude sonnet 4.6': 'sonnet4.6',
-    'sonnet 4.6': 'sonnet4.6',
-  };
-
-  if (aliases[normalized]) {
-    return aliases[normalized];
-  }
-
-  if (/^(gpt|opus|sonnet|haiku)\d(?:\.\d)?$/.test(trimmed.toLowerCase())) {
-    return trimmed.toLowerCase();
-  }
-
-  return trimmed;
+  return model?.trim() || undefined;
 }

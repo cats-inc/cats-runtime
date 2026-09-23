@@ -47,16 +47,16 @@ describe('GooseProvider', () => {
       expect(args).toContain('claude-sonnet-4');
     });
 
-    it('normalizes generic Codex model aliases into Goose provider/model flags', () => {
+    it('preserves explicit Goose provider/model values', () => {
       const provider = new GooseProvider(createMockNative());
       const args = provider.buildSpawnArgs({
         cwd: '/tmp',
-        model: 'gpt-5.2-codex',
+        model: 'openai/gpt-5.2-codex',
       });
       expect(args).toContain('--provider');
       expect(args).toContain('openai');
       expect(args).toContain('--model');
-      expect(args).toContain('gpt-5-codex');
+      expect(args).toContain('gpt-5.2-codex');
     });
 
     it('includes --name and --resume for session resume', () => {

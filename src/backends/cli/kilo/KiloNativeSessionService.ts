@@ -580,11 +580,6 @@ export function parseKiloModel(
   const trimmed = value.trim();
   if (!trimmed) return undefined;
 
-  const alias = KILO_MODEL_ALIASES[trimmed.toLowerCase()];
-  if (alias) {
-    return alias;
-  }
-
   const separatorIndex = trimmed.includes('/') ? trimmed.indexOf('/') : trimmed.indexOf(':');
   if (separatorIndex <= 0 || separatorIndex >= trimmed.length - 1) {
     return undefined;
@@ -595,33 +590,6 @@ export function parseKiloModel(
     modelID: trimmed.slice(separatorIndex + 1),
   };
 }
-
-const KILO_MODEL_ALIASES: Record<string, { providerID: string; modelID: string }> = {
-  'gpt-5.4': {
-    providerID: 'kilo',
-    modelID: 'openai/gpt-5.4',
-  },
-  'gpt-5.4-mini': {
-    providerID: 'kilo',
-    modelID: 'openai/gpt-5.4-mini',
-  },
-  'claude-opus-4.6': {
-    providerID: 'kilo',
-    modelID: 'anthropic/claude-opus-4.6',
-  },
-  'claude-sonnet-4.6': {
-    providerID: 'kilo',
-    modelID: 'anthropic/claude-sonnet-4.6',
-  },
-  'gemini-3.1-pro-preview': {
-    providerID: 'kilo',
-    modelID: 'google/gemini-3.1-pro-preview',
-  },
-  'glm-5': {
-    providerID: 'kilo',
-    modelID: 'z-ai/glm-5',
-  },
-};
 
 function extractTextFromParts(parts: KiloApiPart[]): string {
   return parts

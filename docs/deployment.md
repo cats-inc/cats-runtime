@@ -3,6 +3,18 @@
 > Deployment and startup guidance for `cats-runtime` in standalone and
 > app-managed local modes.
 
+## Catalog resources and local patches
+
+Builds validate the authored schema-2 catalog and its generated digest. npm packages
+and Desktop sidecars include the same factory YAML, generated JSON, frozen schema-1
+migration mappings, read-only `./catalogs` export and catalog CLI. Desktop bundle
+layout retains these split modules and their dependencies alongside the main bundle.
+
+Keep local overrides under the selected Runtime profile/config path across upgrades.
+Do not seed or overwrite them from a package. Supported data changes need no rebuild;
+see [soft patches](provider-catalog-soft-patches.md). A new package must implement
+the capability before this workflow is supported. Publication remains a separate step.
+
 ## Environments
 
 | Environment | URL | Purpose |

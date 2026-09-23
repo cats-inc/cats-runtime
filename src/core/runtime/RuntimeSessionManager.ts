@@ -28,7 +28,6 @@ import type { RuntimeConfig } from '../config.js';
 import { asRecord, readNumber, readString } from '../usage/utils.js';
 import type { WorkerPool } from '../../backends/cli/pool/WorkerPool.js';
 import type { WorkerProcess } from '../../backends/cli/pool/WorkerProcess.js';
-import { normalizeProviderCatalogModelId } from '../models/providerModelCatalog.js';
 import { resolveProviderTarget } from '../providerCatalog.js';
 import type { BackendKind } from '../../backends/cli/config.js';
 import { ApiBackendManager } from '../../backends/api/runtime/ApiBackendManager.js';
@@ -128,6 +127,7 @@ export class RuntimeSessionManager {
     private readonly pool: WorkerPool,
     private readonly apiBackend?: ApiBackendManager,
     private readonly agentBackend?: AgentBackendManager,
+    private readonly getSessionBinding?: (sessionId: string) => SessionInfo | undefined,
   ) {}
 
   get(sessionId: string): ExecutionHandle | undefined {
@@ -182,12 +182,12 @@ export class RuntimeSessionManager {
         ? `${providerBackend}/${providerInstanceId}`
         : providerInstanceId,
     );
-    const normalizedModel = opts.model
-      ? (normalizeProviderCatalogModelId(target, opts.model) || opts.model)
-      : undefined;
-    const normalizedOpts = normalizedModel && normalizedModel !== opts.model
-      ? { ...opts, model: normalizedModel }
-      : opts;
+    const recorded = this.getSessionBinding?.(sessionId)?.modelResolution;
+    const normalizedOpts = recorded ? {
+      ...opts, model: recorded.model,
+      modelProvider: recorded.executionProvider,
+      modelControls: structuredClone(recorded.controls ?? {}),
+    } : opts;
 
     if (target.backend === 'cli') {
       const cliInstanceId = !providerInstanceId

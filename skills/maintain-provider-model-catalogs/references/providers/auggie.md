@@ -18,15 +18,15 @@ belong in `docs/research/2026-09-23-auggie-shortlist.md`, not in this procedural
 - Do not scan the minified package or launch inference once the selected mappings are resolved.
   Preserve a projected-field artifact honestly as a projection, not a verbatim capture.
 
-## Apply the approved shortlist
 
-Use `selection_mode: shortlist`, raw IDs in `name`, and exact display text in `label`.
-Model-list-only evidence adds no option controls or default flags. Reuse the existing verbatim
-normalizer, static catalog route and entry-only advanced overlay. `AuggieProvider` already passes
-these native IDs through `--model`; verify the current adapter before expanding execution scope.
-The availability of a model-list command alone does not authorize adding runtime discovery.
+## Schema-2 execution data
 
-Follow [new shortlist rollout checks](../catalog-surfaces.md#new-shortlist-rollout-checks),
-including all Playground custom-input conditions, fallback tables and Desktop selection.
-`auggieModelCatalog.test.ts` covers curated/static refresh and actual argument construction;
-Playground and mounted Desktop tests cover initial selection, labels and custom availability.
+Use exact CLI-observed IDs in `id` and `execution.model`, with exact `label`. No effort/default metadata follows from a model list alone. Opaque IDs are valid.
+
+Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
+Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.
+There are no independent Runtime, Playground or Desktop model tables to update. Existing generic
+bindings require no repeated implementation authorization; a new unsupported binding is a separate
+code change. Validate labels, ordered values, defaults, custom input, and actual emitted bindings.
+Discovery tests must explicitly use a `selection_mode: discovery` scope before constructing the
+service. `catalogs: []` inherits factory; `models: []` empties a full/shortlist scope.

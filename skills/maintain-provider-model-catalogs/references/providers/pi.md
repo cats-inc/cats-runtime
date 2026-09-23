@@ -21,23 +21,15 @@ selections. Test new and resumed RPC launches, raw provider/model arguments,
 custom-string preservation, and absence of editable effort/default markers.
 Do not pass the bracketed display label as a model token.
 
-## Shortlist versus discovery tests
 
-Pi has dynamic CLI model discovery. An approved curated shortlist must remain
-stable on explicit refresh and must not invoke that discovery path. Reuse the
-existing shortlist route and verify it with a runner that rejects enumeration.
-An intentionally empty curated file tests unrestricted discovery, not shortlist
-refresh; its results need not match static fallback labels.
+## Schema-2 execution data
 
-Keep historical discovery fixtures independent. Install an empty curated
-fixture before constructing the service, HTTP server, or diagnostics service.
-Retain historical discovery IDs, but remove expectations inherited from an obsolete
-static default. A curated row's default does not configure the dynamic discovery
-default; use an explicit target configuration when testing that behavior.
-Cover the actual bundled shortlist separately. Update Desktop/Playground fallback, custom-input and saved
-selection paths, and search metadata/diagnostics consumers before final builds.
+Retain `[openai-codex]` in `label` when requested. Use qualified Cats `id`, bare `execution.model`, explicit `execution.provider`, and fixed `pi.thinking`. Never send the display suffix to the CLI or derive a provider from a model family.
 
-Search injected discovery runners and operation-lifecycle tests as well as model
-IDs. Bootstrap selection tests may await a discovery-start signal that a shortlist
-correctly bypasses. Give those tests an empty curated fixture and isolated env;
-fail promptly if the catalog returns without starting the intended operation.
+Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
+Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.
+There are no independent Runtime, Playground or Desktop model tables to update. Existing generic
+bindings require no repeated implementation authorization; a new unsupported binding is a separate
+code change. Validate labels, ordered values, defaults, custom input, and actual emitted bindings.
+Discovery tests must explicitly use a `selection_mode: discovery` scope before constructing the
+service. `catalogs: []` inherits factory; `models: []` empties a full/shortlist scope.

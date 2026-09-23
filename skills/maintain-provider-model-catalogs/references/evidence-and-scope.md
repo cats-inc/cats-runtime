@@ -52,11 +52,16 @@ six-entry cap alone does not identify which entries to remove; obtain the operat
 shortlist before changing membership. Full-catalog providers retain complete evidenced options.
 Custom input in either group does not authorize inventing effort choices or other model metadata.
 
-Inspect personal curated-file precedence early. The current loader selects the personal document
-as a whole when it exists; it does not merge missing provider sections from the bundled example.
-Therefore a missing provider block can hide a new bundled shortlist just as an old block can.
-Prepare the selected-provider-only addition or replacement before requesting any missing
-outside-project authorization; compare other providers and back up before an authorized write.
+Inspect effective origins early. Schema 2 merges whole scopes keyed by
+`(provider, backend, transport)`: an absent scope inherits factory, `models: []` intentionally
+empties that scope, and deleting a replacement adopts factory again. A partial personal document
+does not hide unrelated factory providers. Never interpret an empty document as unrestricted
+discovery; discovery must be explicitly declared on its own scope.
+
+Prepare the complete candidate override file while preserving all other local scopes. Reuse
+existing authorization, and obtain missing outside-project authorization only after the concrete
+diff is ready. The [patch workflow](./local-soft-patch.md) checks target capabilities, validates the
+whole file, backs up, compares its digest, and reloads against the active revision.
 
 ## Freshness and partial evidence
 
@@ -82,7 +87,7 @@ from a paste is not removal evidence because scrolling, entitlement, or truncati
   the status suffix to ` (default)` across model/effort menus; this does not authorize changing the
   model name's case or inferring which row is default.
 - Do not map an option label such as `Extra high` to a token such as `xhigh` without an observed
-  mapping or the relevant normalizer proving it.
+  mapping or retained evidence proving it.
 - A selection marker is not an account default until its meaning is confirmed. It may identify only
   the current session selection.
 - Never copy one model's observed option set to another model. Shared options in YAML require
@@ -99,13 +104,13 @@ intentional.
 Before editing YAML:
 
 1. inspect the typed schema;
-2. inspect the provider's normalization path;
+2. inspect the generic binding registry and existing data mappings;
 3. project the observation tree explicitly;
 4. list every discarded, merged, detached, or guessed branch;
 5. stop if loss affects the proposed edit.
 
 A representable subset may be written within scope. An unsupported row is omitted and reported, or
-normalizer/runtime/schema work is performed only after separate authorization with corresponding
+binding/runtime/schema work is performed only after separate authorization with corresponding
 tests and docs.
 
 ## Evidence storage and redaction

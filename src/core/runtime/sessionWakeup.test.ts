@@ -298,7 +298,7 @@ describe('ensureSessionAwake', () => {
     );
   });
 
-  it('normalizes stored Copilot legacy model ids before resuming a session', async () => {
+  it('preserves recorded Copilot model ids before resuming a session', async () => {
     const registry = new SessionRegistry();
     const session = registry.create(makeSession({
       id: 'copilot-legacy-session',
@@ -327,13 +327,13 @@ describe('ensureSessionAwake', () => {
       'copilot',
       expect.objectContaining({
         cwd: '/repo',
-        model: 'claude-opus-4.6',
+        model: 'claude-opus-4-6',
         resumeSessionId: 'copilot-provider-session',
       }),
       'default',
       'cli',
     );
-    expect(registry.get(session.id)?.model).toBe('claude-opus-4.6');
+    expect(registry.get(session.id)?.model).toBe('claude-opus-4-6');
   });
 
   it('rejects generic CLI resume when no provider session id is available', async () => {

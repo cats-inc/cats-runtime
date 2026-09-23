@@ -6,11 +6,13 @@ import type {
   ProviderAdvancedControlValue,
 } from './providerAdvancedCatalog.js';
 import { cloneProviderControls } from './providerControlUtils.js';
-import { ANTIGRAVITY_EFFORT_CONTROL, resolveAntigravityExecutionModel } from './antigravityModelCatalog.js';
+import { CatalogRevisionConflict } from '../../catalogs/store.js';
+import { CATALOG_BINDING_VERSION } from '../../catalogs/bindings.js';
 
 export type ProviderModelSelectionEntryMode = 'auto' | 'explicit';
 
 export interface ProviderModelSelection {
+  catalogRevision?: string;
   entryId?: string;
   entryMode: ProviderModelSelectionEntryMode;
   presetId?: string;
@@ -18,6 +20,10 @@ export interface ProviderModelSelection {
 }
 
 export interface ProviderModelResolution {
+  catalogRevision?: string;
+  bindingVersion?: number;
+  executionProvider?: string;
+  label?: string;
   entryId: string;
   model: string;
   entryMode: ProviderModelSelectionEntryMode;
@@ -29,6 +35,7 @@ export interface ProviderModelResolution {
 
 export interface ProviderSelectionExecutionDetails {
   model: string;
+  provider?: string;
   requestBodyPatch?: Record<string, unknown>;
 }
 
@@ -258,6 +265,9 @@ export function parseProviderModelSelection(
   }
 
   const record = value as Record<string, unknown>;
+  if (record.catalogRevision !== undefined && (typeof record.catalogRevision !== 'string' || !record.catalogRevision.trim())) {
+    return { error: 'modelSelection.catalogRevision must be a nonempty string' };
+  }
   const entryId = trimOptionalString(record.entryId);
   const presetId = trimOptionalString(record.presetId);
   const rawEntryMode = record.entryMode;
@@ -304,6 +314,7 @@ export function parseProviderModelSelection(
 
   return {
     selection: {
+      ...(typeof record.catalogRevision === 'string' ? { catalogRevision: record.catalogRevision } : {}),
       ...(entryId ? { entryId } : {}),
       entryMode,
       ...(presetId ? { presetId } : {}),
@@ -325,6 +336,7 @@ export function canonicalizeProviderModelSelection(
   selection: ProviderModelSelection,
 ): ProviderModelSelection {
   return {
+    ...(selection.catalogRevision ? { catalogRevision: selection.catalogRevision } : {}),
     ...(selection.entryId ? { entryId: selection.entryId } : {}),
     entryMode: selection.entryMode,
     ...(selection.presetId ? { presetId: selection.presetId } : {}),
@@ -407,6 +419,9 @@ export function resolveProviderSelection(
   options: ResolveProviderSelectionOptions = {},
 ): ResolvedProviderSelection {
   const mode = options.mode ?? 'session';
+  if (selection.catalogRevision !== undefined && selection.catalogRevision !== knowledge.catalog.catalogRevision) {
+    throw new CatalogRevisionConflict('Catalog changed; choose the model again from the current catalog.');
+  }
   const normalizedSelection = canonicalizeProviderModelSelection(selection);
   const preset = normalizedSelection.presetId
     ? knowledge.catalog.presets.find((entry) => entry.id === normalizedSelection.presetId)
@@ -414,9 +429,6 @@ export function resolveProviderSelection(
   if (normalizedSelection.presetId && !preset) {
     throw new Error(`Unknown preset '${normalizedSelection.presetId}'`);
   }
-
-  ensureControlsAreAllowed(knowledge, normalizedSelection.controls, mode);
-  ensureControlsAreAllowed(knowledge, options.requestControls, 'request');
 
   let entryId = resolveBaseEntryId(knowledge, normalizedSelection);
   const pinned = normalizedSelection.entryMode === 'explicit';
@@ -430,6 +442,12 @@ export function resolveProviderSelection(
     throw new Error(`Unknown catalog entry '${entryId}'`);
   }
 
+  const entryKnowledge = { ...knowledge, controlsByKey: Object.fromEntries(
+    (entry.controls ?? Object.values(knowledge.controlsByKey)).map(control => [control.key, control]),
+  ) };
+  ensureControlsAreAllowed(entryKnowledge, normalizedSelection.controls, mode);
+  ensureControlsAreAllowed(entryKnowledge, options.requestControls, 'request');
+
   if (
     preset?.applicableEntryIds
     && preset.applicableEntryIds.length > 0
@@ -440,35 +458,36 @@ export function resolveProviderSelection(
     );
   }
 
-  let mergedControls = mergeControls(
-    knowledge.entryDefaults[entry.id],
+  const firstValues = Object.fromEntries((entry.controls ?? []).filter(control =>
+    control.scope !== 'request' && control.kind === 'enum' && control.values?.length)
+    .map(control => [control.key, readControlOptionValue(control.values![0])]));
+  const mergedControls = mergeControls(
+    firstValues,
+    Object.fromEntries(Object.entries(knowledge.entryDefaults[entry.id] ?? {}).filter(([key]) =>
+      mode !== 'session' || entryKnowledge.controlsByKey[key]?.scope !== 'request')),
     cloneProviderControls(preset?.controlDefaults),
     cloneProviderControls(normalizedSelection.controls),
     cloneProviderControls(options.requestControls),
   );
-  if (knowledge.target.backend === 'cli' && knowledge.target.providerName === 'antigravity') {
-    const effortControl = knowledge.controlsByKey[ANTIGRAVITY_EFFORT_CONTROL];
-    const firstEffort = effortControl && effortControl.applicableEntryIds?.includes(entry.id)
-      ? listEnumControlValues(effortControl, entry.id)[0]
-      : undefined;
-    if (firstEffort && mergedControls?.[ANTIGRAVITY_EFFORT_CONTROL] === undefined) {
-      mergedControls = { ...mergedControls, [ANTIGRAVITY_EFFORT_CONTROL]: firstEffort };
-    }
-  }
-  ensureControlApplicability(knowledge, entry.id, mergedControls);
+  ensureControlApplicability(entryKnowledge, entry.id, mergedControls);
 
   const requestBodyPatch = buildProviderExecutionRequestPatch(knowledge.target, mergedControls);
-  const effort = mergedControls?.[ANTIGRAVITY_EFFORT_CONTROL];
-  const model = knowledge.target.backend === 'cli'
-    && knowledge.target.providerName === 'antigravity' && typeof effort === 'string'
-    ? resolveAntigravityExecutionModel(entry.id, effort)
-    : entry.id;
+  const binding = knowledge.modelsById[entry.id]?.execution;
+  const variant = binding?.variants?.find(candidate => Object.entries(candidate.when)
+    .every(([key, value]) => mergedControls?.[key] === value));
+  if (binding?.variants?.length && !variant) throw new Error('No executable model variant matches the selected controls');
+  const model = variant?.model ?? binding?.model ?? entry.id;
+  const executionProvider = variant?.provider ?? binding?.provider;
   const resolution: ProviderModelResolution = {
+    catalogRevision: knowledge.catalog.catalogRevision,
+    bindingVersion: CATALOG_BINDING_VERSION,
+    label: entry.label,
+    ...(executionProvider ? { executionProvider } : {}),
     entryId: entry.id,
     model,
     entryMode: normalizedSelection.entryMode,
     ...(preset ? { presetId: preset.id } : {}),
-    ...(mergedControls ? { controls: mergedControls } : {}),
+    controls: mergedControls ?? {},
     supportTier: knowledge.supportTier,
     warnings: [],
   };
@@ -478,6 +497,7 @@ export function resolveProviderSelection(
     resolution,
     execution: {
       model: resolution.model,
+      ...(executionProvider ? { provider: executionProvider } : {}),
       ...(requestBodyPatch ? { requestBodyPatch } : {}),
     },
   };

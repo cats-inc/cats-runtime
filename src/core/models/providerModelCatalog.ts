@@ -1,9 +1,3 @@
-import { PI_MODELS } from './piModelCatalog.js';
-import { GOOSE_MODELS } from './gooseModelCatalog.js';
-import { JUNIE_MODELS } from './junieModelCatalog.js';
-import { ANTIGRAVITY_MODELS } from './antigravityModelCatalog.js';
-import { DEVIN_MODELS, isDevinAcpModelTarget } from './devinModelCatalog.js';
-import { CLINE_MODELS } from './clineModelCatalog.js';
 import {
   existsSync,
   mkdirSync,
@@ -53,20 +47,11 @@ import {
   type RemoteModelDiscoveryHttpRequest,
   RemoteModelDiscoveryTimeoutError,
 } from './remoteModelDiscovery.js';
-import {
-  findCuratedCliCatalog,
-  loadCuratedModelCatalog,
-  resolveCuratedCatalogScope,
-  type CuratedModelCatalogEntry,
-  type CuratedModelCatalogModel,
-} from './curatedModelCatalog.js';
-import {
-  describeCuratedModelLabel,
-  normalizeCopilotModelName,
-  normalizeCuratedModelId,
-  normalizeCursorModelName,
-  normalizeKiloModelName,
-} from './curatedModelCatalogNormalization.js';
+import { resolve } from 'node:path';
+import { resolveRuntimeRoot, resolveRuntimePackageRoot } from '../../shared/runtimePaths.js';
+import { CatalogStore } from '../../catalogs/store.js';
+import { findCatalogScope, readCatalogFactory, createCatalogSnapshot } from '../../catalogs/resolver.js';
+import type { CatalogPaths } from '../../catalogs/types.js';
 
 export interface ProviderModelCatalogEntry {
   id: string;
@@ -93,6 +78,8 @@ export interface ProviderModelCatalogBackoffMetadata {
 }
 
 export interface ProviderModelCatalogResult {
+  catalogRevision?: string;
+  catalogActivationId?: string;
   provider: string;
   backend: BackendKind;
   instance: string;
@@ -121,6 +108,7 @@ export interface ProviderModelCatalogSummary {
 }
 
 interface ProviderModelCatalogServiceOptions {
+  catalogPaths?: Partial<CatalogPaths>;
   beginProviderOperation?: (target: ProviderTargetDescriptor) => () => void;
   agentBackend?: AgentBackendManager;
   fetch?: typeof fetch;
@@ -188,117 +176,6 @@ const DEFAULT_DISCOVERY_BACKOFF_MS = 60_000;
 const MAX_DISCOVERY_BACKOFF_MS = 15 * 60_000;
 const MAX_GEMINI_MODEL_LIST_PAGES = 5;
 
-const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
-  // Operator-selected Kiro 2.22.0 shortlist; no provider default was supplied.
-  kiro: [
-    { id: 'claude-opus-5', label: 'claude-opus-5' },
-    { id: 'claude-sonnet-5', label: 'claude-sonnet-5' },
-    { id: 'gpt-5.6-sol', label: 'gpt-5.6-sol' },
-    { id: 'gpt-5.6-terra', label: 'gpt-5.6-terra' },
-    { id: 'gpt-5.6-luna', label: 'gpt-5.6-luna' },
-    { id: 'claude-haiku-4.5', label: 'claude-haiku-4.5' },
-  ],
-  // Aligned 2026-09-16 with the Claude Code 2.1.273 picker and the operator's
-  // four version-bearing display names. The duplicate provider-default sentinel
-  // stays evidence-only; Opus is the requested Cats default.
-  claude: [
-    { id: 'opus', label: 'Opus 5 with 1M context', default: true },
-    { id: 'fable', label: 'Fable 5.1' },
-    { id: 'sonnet', label: 'Sonnet 5' },
-    { id: 'haiku', label: 'Haiku 4.5' },
-  ],
-  // Aligned 2026-09-16 with the Codex CLI 0.154.0 interactive `/model` picker,
-  // which the operator confirmed listed exactly these five rows in this order.
-  // Display labels preserve the picker's raw ids and casing, matching the
-  // curated catalog. Do not invent capitalization in this static fallback.
-  codex: [
-    { id: 'gpt-6-astra', label: 'gpt-6-astra', default: true },
-    { id: 'gpt-5.6-sol', label: 'gpt-5.6-sol' },
-    { id: 'gpt-5.6-terra', label: 'gpt-5.6-terra' },
-    { id: 'gpt-5.6-luna', label: 'gpt-5.6-luna' },
-    { id: 'gpt-5.5', label: 'gpt-5.5' },
-  ],
-  antigravity: ANTIGRAVITY_MODELS,
-  // Read 2026-09-03 from the Grok CLI 1.0.13 account-resolved model manifest
-  // (~/.grok/models_cache.json, fetched from the vendor endpoint by the CLI
-  // itself) and corroborated by `grok models` on the same build. No entry is
-  // marked default: the manifest carries no default field, and the `(default)`
-  // marker `grok models` prints comes from the per-user `config.toml`
-  // `[models] default`. The adapter omits `--model` when no model is selected,
-  // so claiming one here would override a preference the runtime cannot see.
-  // This supersedes the 1.0.0 row that claimed `grok-4.5` as default.
-  grok: [
-    { id: 'grok-4.6', label: 'Grok 4.6' },
-    { id: 'grok-4.5', label: 'Grok 4.5' },
-  ],
-  cline: CLINE_MODELS,
-  // Devin execution/model selection is supported only by its ACP stdio target.
-  devin: [],
-  // Read 2026-09-05 from muse 1.0.3's own `model/list` over the MSP host it
-  // serves on stdio (`muse serve`), which is the only enumeration surface the
-  // CLI has — `muse exec` has no models subcommand. The rows come back
-  // newest-first with providerId `meta` and profileId `tbh`; every one of them
-  // reports a 1,007,997-token context and a 128,000-token output cap. The
-  // `-contributor` variants are the same models on terms that let Meta use the
-  // session for product improvement, which is why the catalog default is not
-  // mirrored here: `model/list` marks `muse-spark-1.3-contributor` as
-  // `isDefault`, and silently opting a runtime turn into content sharing is not
-  // the runtime's call to make. With no `--model` argument muse uses whatever
-  // the account already prefers.
-  muse: [
-    { id: 'muse-spark-1.3', label: 'muse-spark-1.3' },
-    { id: 'muse-spark-1.3-contributor', label: 'muse-spark-1.3 (contributor)' },
-    { id: 'muse-spark-1.2', label: 'muse-spark-1.2' },
-    { id: 'muse-spark-1.2-contributor', label: 'muse-spark-1.2 (contributor)' },
-  ],
-  copilot: [
-    { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra — Medium', default: true },
-    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 — Medium' },
-    { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash — Medium' },
-    { id: 'grok-4.6', label: 'Grok 4.6 — Medium' },
-    { id: 'mai-code-1.1-flash', label: 'MAI-Code-1.1-Flash — Medium' },
-    { id: 'kimi-k3', label: 'Kimi K3 — High' },
-  ],
-  opencode: [
-    { id: 'opencode-go/union-alpha', label: 'Union Alpha Free' },
-    { id: 'opencode-go/deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash' },
-    { id: 'opencode-go/hy4-preview', label: 'Hy4 preview' },
-    { id: 'opencode-go/glm-5.3-flash', label: 'GLM-5.3-Flash' },
-    { id: 'opencode-go/qwen3.8-flash', label: 'Qwen3.8 Flash' },
-    { id: 'opencode-go/minimax-m3', label: 'MiniMax-M3' },
-  ],
-  kilo: [
-    { id: 'kilo/deepseek/deepseek-v4.1-flash', label: 'DeepSeek: DeepSeek V4.1 Flash' },
-    { id: 'kilo/z-ai/glm-5.3-flash', label: 'Z.ai: GLM 5.3 Flash' },
-    { id: 'kilo/moonshotai/kimi-k3', label: 'MoonshotAI: Kimi K3' },
-    { id: 'kilo/minimax/minimax-m3', label: 'MiniMax: MiniMax M3' },
-    { id: 'kilo/bytedance-seed/seed-2-1-turbo', label: 'ByteDance Seed: Seed 2.1 Turbo Thinking' },
-    { id: 'kilo/google/gemini-3-pro-image', label: 'Google: Nano Banana Pro (Gemini 3 Pro Image) Thinking' },
-  ],
-  auggie: [
-    { id: 'gpt-6-astra', label: 'GPT-6 Astra' },
-    { id: 'gpt-5-6-sol', label: 'GPT-5.6 Sol' },
-    { id: 'claude-fable-5-1', label: 'Claude Fable 5.1' },
-    { id: 'claude-opus-5-5', label: 'Claude Opus 5.5' },
-    { id: 'grok-4-7', label: 'Grok 4.7' },
-    { id: 'butler_a', label: 'Prism (Claude + GPT)' },
-  ],
-  pi: PI_MODELS,
-  junie: JUNIE_MODELS,
-  cursor: [
-    { id: 'grok-4.6[effort=high,fast=true]', label: 'Cursor Grok 4.6 — High Fast' },
-    { id: 'composer-2.5[fast=true]', label: 'Composer 2.5 — Fast' },
-    { id: 'claude-opus-5[thinking=true,context=300k,effort=high,fast=false]', label: 'Claude Opus 5 — 300K High Thinking' },
-    { id: 'gpt-5.6-sol[context=272k,reasoning=medium,fast=false]', label: 'GPT-5.6 Sol — 272K Medium' },
-    { id: 'gemini-3.8-flash[reasoning_effort=high]', label: 'Gemini 3.8 Flash — High' },
-    { id: 'muse-spark-1.3[context=300k,effort=high]', label: 'Muse Spark 1.3 — 300K High' },
-  ],
-  goose: GOOSE_MODELS,
-  ollama: [
-    { id: 'qwen2.5-coder:7b', label: 'qwen2.5-coder:7b', default: true },
-  ],
-};
-
 function cloneModels(models: ProviderModelCatalogEntry[]): ProviderModelCatalogEntry[] {
   return models.map((model) => ({ ...model }));
 }
@@ -312,43 +189,10 @@ function readNullableString(value: unknown): string | null {
 }
 
 export function normalizeProviderCatalogModelId(
-  target: Pick<ProviderTargetDescriptor, 'providerName' | 'backend'>,
+  _target: Pick<ProviderTargetDescriptor, 'providerName' | 'backend'>,
   modelId: string | null | undefined,
 ): string | null {
-  const normalized = modelId?.trim();
-  if (!normalized) {
-    return null;
-  }
-
-  if (target.providerName === 'claude' && target.backend === 'cli') {
-    const lower = normalized.toLowerCase();
-    if (lower === 'claude-fable-5-1' || lower === 'claude-fable-5' || lower === 'fable') {
-      return 'fable';
-    }
-    if (lower === 'claude-opus-4-6' || lower === 'claude-opus-4.6' || lower === 'opus') {
-      return 'opus';
-    }
-    if (lower === 'claude-sonnet-4-6' || lower === 'claude-sonnet-4.6' || lower === 'sonnet') {
-      return 'sonnet';
-    }
-    if (lower === 'claude-haiku-4-5' || lower === 'claude-haiku-4.5' || lower === 'haiku') {
-      return 'haiku';
-    }
-  }
-
-  if (target.providerName === 'cursor' && target.backend === 'cli') {
-    return normalizeCursorModelName(normalized) || normalized;
-  }
-
-  if (target.providerName === 'copilot' && target.backend === 'cli') {
-    return normalizeCopilotModelName(normalized) || normalized;
-  }
-
-  if (target.providerName === 'kilo' && target.backend === 'cli') {
-    return normalizeKiloModelName(normalized) || normalized;
-  }
-
-  return normalized;
+  return modelId?.trim() || null;
 }
 
 function resolveConfiguredDefaultModel(
@@ -375,20 +219,7 @@ function resolveDefaultModel(
   target: ProviderTargetDescriptor,
   env: NodeJS.ProcessEnv,
 ): string | null {
-  const configuredModel = resolveConfiguredDefaultModel(target, env);
-  if (configuredModel) {
-    return configuredModel;
-  }
-
-  if (target.providerName === 'cursor' && target.backend === 'cli') {
-    return null;
-  }
-
-  const staticModels = getStaticProviderModels(target);
-  return normalizeProviderCatalogModelId(
-    target,
-    staticModels.find((model) => model.default)?.id ?? null,
-  );
+  return resolveConfiguredDefaultModel(target, env);
 }
 
 function resolveBaseUrl(
@@ -638,122 +469,16 @@ export function summarizeProviderModelCatalog(
   };
 }
 
+/** Factory-only projection for package diagnostics; live consumers use the service. */
 export function getStaticProviderModels(
   target: Pick<ProviderTargetDescriptor, 'providerName' | 'cliInstance'>
     & Partial<Pick<ProviderTargetDescriptor, 'backend' | 'remoteInstance'>>,
 ): ProviderModelCatalogEntry[] {
-  if (isDevinAcpModelTarget(target)) {
-    return cloneModels(DEVIN_MODELS);
-  }
-  return cloneModels(STATIC_PROVIDER_MODELS[target.providerName] || []);
-}
-
-function supportsCuratedStaticCliCatalog(providerName: string): boolean {
-  return providerName === 'pi'
-    || providerName === 'goose'
-    || providerName === 'auggie'
-    || providerName === 'claude'
-    || providerName === 'codex'
-    || providerName === 'antigravity'
-    || providerName === 'grok'
-    || providerName === 'cline'
-    || providerName === 'kilo'
-    || providerName === 'kiro'
-    || providerName === 'junie'
-    || providerName === 'copilot'
-    || providerName === 'opencode'
-    || providerName === 'cursor';
-}
-
-function flattenCuratedCatalogProviderModels(
-  catalog: CuratedModelCatalogEntry,
-): CuratedModelCatalogModel[] {
-  return (catalog.providers || []).flatMap((provider) => provider.models);
-}
-
-function resolveCuratedStaticCliModels(
-  catalog: CuratedModelCatalogEntry,
-  providerName: string,
-): CuratedModelCatalogModel[] {
-  if (catalog.models) {
-    return catalog.models;
-  }
-
-  if (providerName === 'cursor' || providerName === 'copilot') {
-    return flattenCuratedCatalogProviderModels(catalog);
-  }
-
-  return resolveCuratedCatalogScope(catalog, providerName)?.models ?? [];
-}
-
-function coerceSingleCuratedDefaultModel(
-  models: ProviderModelCatalogEntry[],
-  cliLabel: string,
-  warnings: string[],
-): ProviderModelCatalogEntry[] {
-  const deduped = dedupeModels(models);
-  const defaultEntries = deduped.filter((entry) => entry.default === true);
-  if (defaultEntries.length <= 1) {
-    return deduped;
-  }
-
-  const keptDefault = defaultEntries[0];
-  warnings.push(
-    `Curated catalog for ${cliLabel} marked multiple defaults; `
-    + `keeping '${keptDefault?.label || keptDefault?.id || 'unknown'}' as the default.`,
-  );
-
-  const keptDefaultId = keptDefault.id;
-  return deduped.map((entry) => ({
-    ...entry,
-    ...(entry.default === true || entry.id === keptDefaultId
-      ? { default: entry.id === keptDefaultId }
-      : {}),
-  }));
-}
-
-function buildCuratedStaticCliModels(
-  target: ProviderTargetDescriptor,
-  config: Pick<CliRuntimeConfig, 'configPath'>,
-  env: NodeJS.ProcessEnv,
-  warnings: string[],
-): ProviderModelCatalogEntry[] | null {
-  if (!isDevinAcpModelTarget(target)
-    && (target.backend !== 'cli' || !supportsCuratedStaticCliCatalog(target.providerName))) {
-    return null;
-  }
-
-  const curatedResult = loadCuratedModelCatalog({
-    runtimeConfig: { configPath: config.configPath },
-    env,
-  });
-  warnings.push(...curatedResult.warnings);
-  if (!curatedResult.document) {
-    return null;
-  }
-
-  const catalog = findCuratedCliCatalog(curatedResult.document, target.providerName);
-  if (!catalog) {
-    return null;
-  }
-
-  const models = resolveCuratedStaticCliModels(catalog, target.providerName).flatMap((model) => {
-    const id = normalizeCuratedModelId(target.providerName, model);
-    if (!id) {
-      warnings.push(
-        `Curated model '${describeCuratedModelLabel(model)}' for ${catalog.cli} could not be normalized and was ignored.`,
-      );
-      return [];
-    }
-
-    return [{
-      id,
-      label: model.label || model.name,
-      ...(model.default !== undefined ? { default: model.default } : {}),
-    }];
-  });
-
-  return models.length > 0 ? coerceSingleCuratedDefaultModel(models, catalog.cli, warnings) : null;
+  const paths = { packageRoot: resolveRuntimePackageRoot(), runtimeRoot: resolveRuntimeRoot() };
+  const factory = readCatalogFactory(paths);
+  const snapshot = createCatalogSnapshot(factory.source);
+  return (findCatalogScope(snapshot, { ...target, backend: target.backend ?? 'cli' })?.models ?? [])
+    .map(({ id, label, default: isDefault }) => ({ id, label, ...(isDefault !== undefined ? { default: isDefault } : {}) }));
 }
 
 function resolveProviderModelCatalogStorageFile(
@@ -782,6 +507,7 @@ function isProviderModelCatalogEntry(value: unknown): value is ProviderModelCata
 }
 
 export class ProviderModelCatalogService {
+  readonly catalogStore: CatalogStore;
   private generation = 0;
   private discoveryController = new AbortController();
   private readonly fetchImpl: typeof fetch;
@@ -803,6 +529,13 @@ export class ProviderModelCatalogService {
     this.remoteDiscoveryTimeoutMs = options.remoteDiscoveryTimeoutMs
       ?? DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS;
     this.storageFile = resolveProviderModelCatalogStorageFile(config);
+    this.catalogStore = new CatalogStore({
+      packageRoot: resolveRuntimePackageRoot(this.env),
+      runtimeRoot: this.env.CATS_RUNTIME_DIR ? resolveRuntimeRoot(this.env)
+        : config.dataDir ? resolve(dirname(config.dataDir)) : resolveRuntimeRoot(this.env),
+      ...(config.configPath ? { configPath: resolve(config.configPath) } : {}),
+      ...options.catalogPaths,
+    }, Boolean(config.dataDir));
     this.loadPersistedState();
   }
 
@@ -858,10 +591,12 @@ export class ProviderModelCatalogService {
     target: ProviderTargetDescriptor,
     options: ProviderModelCatalogRequestOptions = {},
   ): Promise<ProviderAdvancedKnowledgeContext> {
+    const snapshot = this.catalogStore.current();
+    const activation = this.catalogStore.status().activationId;
     const catalog = await this.getCatalogForTarget(target, options);
+    if (activation !== this.catalogStore.status().activationId) throw new Error('Provider catalog changed');
     return buildProviderAdvancedKnowledge(target, catalog, {
-      runtimeConfig: this.config,
-      env: this.env,
+      snapshot,
     });
   }
 
@@ -870,8 +605,7 @@ export class ProviderModelCatalogService {
   ): ProviderAdvancedKnowledgeContext {
     const catalog = this.getImmediateCatalogForTarget(target);
     return buildProviderAdvancedKnowledge(target, catalog, {
-      runtimeConfig: this.config,
-      env: this.env,
+      snapshot: this.catalogStore.current(),
     });
   }
 
@@ -910,7 +644,7 @@ export class ProviderModelCatalogService {
     target: ProviderTargetDescriptor,
   ): ProviderModelCatalogResult {
     this.assertTarget(target);
-    const shortlist = this.tryCuratedShortlistCatalog(target);
+    const shortlist = this.tryManagedCatalog(target);
     if (shortlist) return shortlist;
     const defaultModel = resolveDefaultModel(target, this.env);
     const warnings: string[] = [];
@@ -945,7 +679,7 @@ export class ProviderModelCatalogService {
     options: ProviderModelCatalogRequestOptions = {},
   ): Promise<ProviderModelCatalogResult> {
     this.assertTarget(target);
-    const shortlist = this.tryCuratedShortlistCatalog(target);
+    const shortlist = this.tryManagedCatalog(target);
     if (shortlist) return shortlist;
     const generation = this.generation;
     const defaultModel = resolveDefaultModel(target, this.env);
@@ -965,25 +699,23 @@ export class ProviderModelCatalogService {
     return this.buildStaticCatalog(target, defaultModel, warnings);
   }
 
-  private tryCuratedShortlistCatalog(
-    target: ProviderTargetDescriptor,
-  ): ProviderModelCatalogResult | null {
-    if (target.backend !== 'cli' && !isDevinAcpModelTarget(target)) return null;
-    const loaded = loadCuratedModelCatalog({ runtimeConfig: this.config, env: this.env });
-    const curated = findCuratedCliCatalog(loaded.document, target.providerName);
-    if (curated?.selectionMode !== 'shortlist') return null;
+  reloadCatalogs(expectedRevision: string | null) {
+    const result = this.catalogStore.reload(expectedRevision);
+    this.invalidate();
+    return result;
+  }
 
-    // A refresh re-reads this operator-maintained menu. Live discovery, cached
-    // snapshots, and the CLI's current model must not expand the shortlist.
-    // Arbitrary model strings remain available through explicit custom input.
-    const warnings: string[] = [];
-    const models = buildCuratedStaticCliModels(target, this.config, this.env, warnings) ?? [];
+  private tryManagedCatalog(target: ProviderTargetDescriptor): ProviderModelCatalogResult | null {
+    const snapshot = this.catalogStore.current();
+    if (!snapshot) throw new Error('Provider catalog unavailable; inspect catalog diagnostics.');
+    const scope = findCatalogScope(snapshot, target);
+    if (!scope || scope.selection_mode === 'discovery') return null;
     return this.buildCatalog(target, {
-      defaultModel: models.find((model) => model.default)?.id ?? null,
-      source: 'static',
-      cache: null,
-      models,
-      warnings,
+      defaultModel: scope.models.find(model => model.default)?.id ?? null,
+      source: 'static', cache: null,
+      models: scope.models.map(({ id, label, default: isDefault }) => ({ id, label,
+        ...(isDefault !== undefined ? { default: isDefault } : {}) })),
+      warnings: [],
     });
   }
 
@@ -1621,22 +1353,12 @@ export class ProviderModelCatalogService {
     defaultModel: string | null,
     warnings: string[],
   ): ProviderModelCatalogResult {
-    const curatedModels = buildCuratedStaticCliModels(target, this.config, this.env, warnings);
-    const staticModels = curatedModels || getStaticProviderModels(target);
-    const configuredDefaultModel = resolveConfiguredDefaultModel(target, this.env);
-    const effectiveDefaultModel = configuredDefaultModel
-      ?? (curatedModels
-        ? curatedModels.find((entry) => entry.default === true)?.id ?? null
-        : defaultModel);
-    const normalizedModels = defaultModel
-      ? withDefaultModel(staticModels, effectiveDefaultModel).models
-      : staticModels;
+    const scope = findCatalogScope(this.catalogStore.current(), target);
+    const models = (scope?.models ?? []).map(({ id, label, default: isDefault }) => ({ id, label,
+      ...(isDefault !== undefined ? { default: isDefault } : {}) }));
     return this.buildCatalog(target, {
-      defaultModel: effectiveDefaultModel,
-      source: 'static',
-      cache: null,
-      models: normalizedModels,
-      warnings,
+      defaultModel: defaultModel ?? models.find(model => model.default)?.id ?? null,
+      source: 'static', cache: null, models, warnings,
     });
   }
 
@@ -1762,6 +1484,8 @@ export class ProviderModelCatalogService {
       ?? input.models.find((entry) => entry.default)?.id
       ?? null;
     return {
+      catalogRevision: this.catalogStore.current()?.catalogRevision,
+      catalogActivationId: this.catalogStore.status().activationId,
       provider: target.providerName,
       backend: target.backend,
       instance: target.instanceId,

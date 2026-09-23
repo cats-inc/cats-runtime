@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   MUSE_EXEC_JSON_BASE_ARGS,
   MUSE_EXEC_JSON_PROFILE_ID,
-  MUSE_REASONING_EFFORTS,
   MuseProvider,
 } from './muse.js';
 import type { CompatibilityProfileSelection, StreamEvent } from './types.js';
@@ -106,7 +105,7 @@ describe('MuseProvider', () => {
     expect(args).not.toContain('/tmp/muse-provider-test');
   });
 
-  it('drops the no-selection model sentinel instead of sending it', () => {
+  it('preserves an explicit model token without sentinel rewriting', () => {
     const provider = new MuseProvider(VERIFIED_PROFILE);
     provider.prepareEphemeralTurn({ message: 'Say hi' });
 
@@ -115,7 +114,7 @@ describe('MuseProvider', () => {
       model: 'muse-default',
     });
 
-    expect(args).not.toContain('--model');
+    expect(args).toContain('muse-default');
   });
 
   it('refuses to fork because muse exec has no fork argument', () => {
@@ -130,7 +129,7 @@ describe('MuseProvider', () => {
   });
 
   it('passes accepted parser tokens through as --reasoning-effort independently of picker menus', () => {
-    for (const effort of MUSE_REASONING_EFFORTS) {
+    for (const effort of ['medium', 'max', 'NewCaseSensitiveValue']) {
       const provider = new MuseProvider(VERIFIED_PROFILE);
       provider.prepareEphemeralTurn({ message: 'Say hi' });
       const args = provider.buildSpawnArgs({
@@ -141,14 +140,14 @@ describe('MuseProvider', () => {
     }
   });
 
-  it('rejects a reasoning effort muse does not accept', () => {
+  it('rejects unsafe reasoning control characters', () => {
     const provider = new MuseProvider(VERIFIED_PROFILE);
     provider.prepareEphemeralTurn({ message: 'Say hi' });
 
     expect(() => provider.buildSpawnArgs({
       cwd: '/tmp/muse-provider-test',
-      modelControls: { 'muse.reasoning_effort': 'extreme' },
-    })).toThrow(/Unsupported Meta Muse reasoning effort/);
+      modelControls: { 'muse.reasoning_effort': 'extreme\n' },
+    })).toThrow(/Invalid Meta Muse reasoning effort/);
   });
 
   describe('permission modes', () => {

@@ -4117,6 +4117,27 @@ This metadata is additive. It does not replace setup/compatibility diagnostics,
 but it gives hosts and playgrounds a runtime-owned hint about the provider's
 current local default selection without reviving a sample-only shim route.
 
+### Catalog data status and activation
+
+`GET /providers/catalogs` reports capabilities, availability, `catalogRevision`,
+`activationId`, source, factory/override digests, origins and diagnostics.
+`POST /providers/catalogs/reload` accepts `{"expectedRevision":"<revision>"}`
+(or null for unavailable state), requires the configured authentication and uses
+the selected Runtime's file paths. It validates and atomically activates one
+complete candidate; no provider discovery runs. Success reports the new revision,
+activation and affected scopes. A revision conflict returns 409; invalid candidates
+return 400 and retain the accepted snapshot. Invalid startup data requires a
+compatible accepted snapshot or reports unavailable.
+
+Basic/advanced catalog responses carry `catalogRevision` and `catalogActivationId`.
+Clients must not combine mismatched revisions/activations or targets. Structured
+new-session selections may send `catalogRevision`; stale values return 409 before
+execution. Resumed sessions preserve recorded bindings.
+
+The [soft-patch guide](provider-catalog-soft-patches.md) documents explicit schema-1
+conversion, CLI preview/apply with digest checks, backup and rollback. Discovery
+refresh is separate from local-file reload.
+
 `GET /providers/models` is the runtime-owned aggregate default-target catalog
 route. It accepts additive `?refresh=1|true|refresh|force` semantics and
 returns the same catalog payload shape keyed by configured provider name, using
@@ -4174,15 +4195,14 @@ Catalog semantics:
   keeps this fallback when auth is not configured or when remote listing fails.
   In those cases, `warnings` now records the honest skip/failure reason instead
   of silently degrading.
-- `source: static` means the runtime used a curated compatibility table.
+- `source: static` means the runtime used the accepted effective data catalog. Full/shortlist scopes stay authoritative even during refresh; discovery does not reintroduce removed entries.
 - `cache` is present only for `dynamic` results. Config/static fallbacks return
   `cache: null`. `cache.stale: true` is additive and means the runtime had a
   previously discovered dynamic catalog, the refresh attempt failed after the
   TTL window, and the route deliberately served the retained dynamic snapshot
   instead of dropping straight to `config` or `static`.
 - `refresh=1|true|refresh|force` bypasses a still-fresh dynamic cache and
-  forces the runtime to attempt a new dynamic discovery round for the selected
-  target. Invalid refresh values return HTTP `400`.
+  forces a new dynamic discovery round only for a discovery-owned target. Invalid refresh values return HTTP `400`.
 - `warnings` stays empty on clean discovery, and becomes additive when the
   runtime had to degrade gracefully. For example, dynamic discovery may still
   return `source: dynamic` with warnings if a secondary probe such as Ollama's

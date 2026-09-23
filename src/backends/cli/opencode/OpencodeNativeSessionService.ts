@@ -576,11 +576,6 @@ export function parseOpencodeModel(
   const trimmed = value.trim();
   if (!trimmed) return undefined;
 
-  const alias = OPENCODE_MODEL_ALIASES[trimmed.toLowerCase()];
-  if (alias) {
-    return alias;
-  }
-
   const separatorIndex = trimmed.includes('/') ? trimmed.indexOf('/') : trimmed.indexOf(':');
   if (separatorIndex <= 0 || separatorIndex >= trimmed.length - 1) {
     return undefined;
@@ -591,33 +586,6 @@ export function parseOpencodeModel(
     modelID: trimmed.slice(separatorIndex + 1),
   };
 }
-
-const OPENCODE_MODEL_ALIASES: Record<string, { providerID: string; modelID: string }> = {
-  'minimax m2.5': {
-    providerID: 'opencode-go',
-    modelID: 'minimax-m2.5',
-  },
-  'minimax m2.5 free': {
-    providerID: 'opencode',
-    modelID: 'minimax-m2.5-free',
-  },
-  'kimi k2.5': {
-    providerID: 'opencode-go',
-    modelID: 'kimi-k2.5',
-  },
-  'glm-5': {
-    providerID: 'opencode-go',
-    modelID: 'glm-5',
-  },
-  'mimo v2 flash free': {
-    providerID: 'openrouter',
-    modelID: 'xiaomi/mimo-v2-flash:free',
-  },
-  'big pickle': {
-    providerID: 'opencode',
-    modelID: 'big-pickle',
-  },
-};
 
 function extractTextFromParts(parts: OpencodeApiPart[]): string {
   return parts

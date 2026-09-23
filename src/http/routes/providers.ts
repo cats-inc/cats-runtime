@@ -1,4 +1,6 @@
 import { Hono } from 'hono';
+import { catalogCapabilities } from '../../catalogs/index.js';
+import { CatalogRevisionConflict } from '../../catalogs/store.js';
 import {
   isProviderTargetResolutionError,
   listConfiguredProviders,
@@ -258,6 +260,38 @@ providerRoutes.get('/providers/config', async (c) => {
     revision,
     ...(executionStrategies ? { executionStrategies } : {}),
   });
+});
+
+providerRoutes.get('/providers/catalogs', (c) => {
+  const ctx = c.get('ctx' as never) as AppContext;
+  return c.json({ ...catalogCapabilities, ...ctx.providerModelCatalog.catalogStore.status() });
+});
+
+providerRoutes.post('/providers/catalogs/reload', async (c) => {
+  const ctx = c.get('ctx' as never) as AppContext;
+  const body = await c.req.json<{ expectedRevision?: unknown }>().catch(() => null);
+  if (!body || !(body.expectedRevision === null || typeof body.expectedRevision === 'string')) {
+    return c.json({ error: 'expectedRevision must be the current catalog revision or null' }, 400);
+  }
+  const selection = ctx.bootstrapService?.selection;
+  const operations: string[] = [];
+  try {
+    if (selection) {
+      const revision = selection.getSnapshot().revision;
+      for (const provider of Object.values(listProviderCatalog(ctx.config))) {
+        for (const target of provider.instances) operations.push(selection.acquireOperation({
+          provider: target.providerName, backend: target.backend, instance: target.instanceId,
+        }, revision));
+      }
+    }
+    return c.json(ctx.providerModelCatalog.reloadCatalogs(body.expectedRevision));
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : 'Catalog reload failed',
+      code: error instanceof CatalogRevisionConflict ? error.code : 'catalog_rejected' },
+    error instanceof CatalogRevisionConflict ? 409 : 400);
+  } finally {
+    for (const operation of operations) selection?.releaseOperation(operation);
+  }
 });
 
 providerRoutes.get('/providers/models', async (c) => {

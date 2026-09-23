@@ -31,6 +31,7 @@ export interface ProviderAdvancedCatalogEntry {
   label: string;
   default?: boolean;
   controlDefaults?: Record<string, ProviderAdvancedControlValue>;
+  controls?: ProviderAdvancedCatalogControl[];
   status?: 'configured' | 'available' | 'running';
   capabilityTags?: string[];
   limits?: ProviderAdvancedCatalogEntryLimits;
@@ -75,6 +76,8 @@ export interface ProviderAdvancedCatalogSupport {
 }
 
 export interface ProviderAdvancedCatalogResult {
+  catalogRevision?: string;
+  catalogActivationId?: string;
   provider: string;
   backend: BackendKind;
   instance: string;

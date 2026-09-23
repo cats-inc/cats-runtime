@@ -53,6 +53,24 @@ Pi retains bracketed provider labels and resolves fixed thinking through a separ
 Other shortlist rollouts remain pending.
 No scheduled refresh cadence or automated refresh job has been specified.
 
+## Schema-2 data boundary
+
+The sole authored factory is `config/curated-model-catalogs.yaml.example`.
+Model IDs, exact display labels, explicit defaults, controls, fixed combinations and conditional
+wire mappings belong there or in a scoped personal override. Never add a model table, model-name
+branch or fallback literal to TS/JS/HTML. Runtime and Desktop consume the same validated contract.
+Read [catalog surfaces](./references/catalog-surfaces.md) for current fields and commands.
+
+- **Factory maintenance:** edit the authorized scopes, retain evidence, run `npm run catalog:generate`
+  and focused checks. A catalog refresh normally changes data/evidence/generated JSON only.
+- **Single-machine soft patch:** read [local patch workflow](./references/local-soft-patch.md).
+  Check the selected installed Runtime's schema/binding capability, prepare a complete replacement
+  for each changed scope, validate, preview, then apply/reload within existing authorization.
+  No rebuild or version bump is needed for supported bindings. Old binaries cannot gain this
+  loader from YAML alone. Schema 1 requires explicit conversion and review, never automatic writes.
+- Existing sessions keep their resolved wire bindings. Reload changes menus and future selections;
+  it does not silently change resumed sessions.
+
 ## Route the request
 
 - **Refresh**: collect evidence and edit only the provider scope the operator authorized.
@@ -117,7 +135,7 @@ author that artifact.
    Authentication, paid probes, or quota use require explicit authorization.
 3. Preserve raw ids separately from visible labels. Build a lossless ordered observation tree for
    pasted evidence before considering YAML.
-4. Inspect the typed curated schema and the relevant normalizer. Loss-check every observation-tree
+4. Inspect `src/catalogs/types.ts`, `schema.ts` and `bindings.ts`. Loss-check every observation-tree
    branch against the schema. Distinguish a data refresh using existing defaults/options from a
    demonstrated behavior gap that needs separately scoped implementation; reuse existing support.
 5. Apply only the authorized, representable subset. Partial evidence never removes existing data
@@ -137,7 +155,7 @@ author that artifact.
 ### Audit
 
 1. Derive all registered provider families from current code and reconcile them with curated YAML,
-   static fallback, dynamic discovery, normalization, advanced knowledge, install knowledge, and
+   factory/override scopes, dynamic discovery, advanced projection, install knowledge, and
    tests.
 2. Classify each provider as dynamic, curated, static fallback, intentionally empty,
    account-configured/BYO-model, provider-default sentinel, unsupported, or an actionable gap.
@@ -148,9 +166,12 @@ author that artifact.
 
 ## Validate and report
 
-Choose validation proportional to the changed surface. Catalog edits require YAML/schema loading
-with no unexpected normalization warnings, focused catalog and advanced-knowledge tests, and a
-repo-wide exact-fixture search. Run TypeScript checking when TypeScript or tests changed. Separate
+Choose validation proportional to the changed surface. Factory/repository edits require `npm run catalog:check`, `tests/catalog-data.test.ts` and
+`tests/catalog-runtime.test.ts`, plus a targeted unknown-ID data-only execution check when bindings
+change. An installed-only patch instead uses the selected installed CLI's validate/preview, scope
+diff and activation checks in the local patch workflow; published packages do not contain source
+tests or development scripts. Use the shared factory fixture rather than updating independent UI
+tables. Run TypeScript checking when TypeScript or tests changed. Separate
 pre-existing environment failures from regressions; do not edit unrelated tests to make them pass.
 Follow the owning repository's Local Validation Scope: reuse relevant passing checks and leave
 full-suite CI gates to CI; commit/PR creation alone does not require a full local suite.
@@ -181,7 +202,7 @@ authorizes that external mutation.
 - [Cline](./references/providers/cline.md): bounded installed ClinePass mappings, explicit provider
   routing, fixed thinking arguments and consistent structured/plain-string execution.
 - [Codex](./references/providers/codex.md): supplied picker evidence, existing per-model defaults,
-  exact display labels, fallback locations, and focused Runtime/Desktop validation.
+  exact display labels, data bindings and focused validation.
 - [Copilot](./references/providers/copilot.md): bounded `models.list` reads, picker/session evidence
   for omitted rows, and fixed effort execution without editable controls.
 - [Cursor](./references/providers/cursor.md): exact parameterized variant strings, fixed-combination
@@ -194,7 +215,7 @@ authorizes that external mutation.
   mappings, and first-item selection that reaches the execution arguments.
 - [Junie](./references/providers/junie.md): literal picker names, separate fixed effort arguments,
   informational probes and shortlist/default propagation.
-- [Kiro](./references/providers/kiro.md): raw-ID shortlist updates, Native/WSL fallbacks,
+- [Kiro](./references/providers/kiro.md): raw-ID shortlist updates, Native/WSL scope projections,
   first-row initialization and account-gated model/effort evidence.
 - [Kilo](./references/providers/kilo.md): distinguish gateway mappings from the picker and
   execution variants from display-only thinking flags.

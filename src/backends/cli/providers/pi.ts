@@ -1,4 +1,3 @@
-import { PI_THINKING_CONTROL, getPiFixedThinking } from '../../../core/models/piModelCatalog.js';
 import { parsePiModel, parsePiStreamLine } from '../pi/parser.js';
 import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 import type {
@@ -26,11 +25,12 @@ export class PiProvider implements Provider {
     const args: string[] = ['--mode', 'rpc'];
 
     if (opts.model) {
-      const { provider, modelId } = parsePiModel(opts.model);
+      const { provider, modelId } = opts.modelProvider
+        ? { provider: opts.modelProvider, modelId: opts.model } : parsePiModel(opts.model);
       args.push('--provider', provider);
       args.push('--model', modelId);
-      const thinking = opts.modelControls?.[PI_THINKING_CONTROL] ?? getPiFixedThinking(opts.model);
-      if (thinking === 'medium') args.push('--thinking', thinking);
+      const thinking = opts.modelControls?.['pi.thinking'];
+      if (typeof thinking === 'string') args.push('--thinking', thinking);
     }
 
     const resumeSourcePath = opts.resumeSourcePath || opts.resumeSessionId;

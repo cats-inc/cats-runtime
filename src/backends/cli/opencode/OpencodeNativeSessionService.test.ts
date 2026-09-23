@@ -316,30 +316,9 @@ describe('OpencodeNativeSessionService', () => {
       providerID: 'openai',
       modelID: 'gpt-5',
     });
-    expect(parseOpencodeModel('minimax m2.5')).toEqual({
-      providerID: 'opencode-go',
-      modelID: 'minimax-m2.5',
-    });
-    expect(parseOpencodeModel('kimi k2.5')).toEqual({
-      providerID: 'opencode-go',
-      modelID: 'kimi-k2.5',
-    });
-    expect(parseOpencodeModel('glm-5')).toEqual({
-      providerID: 'opencode-go',
-      modelID: 'glm-5',
-    });
-    expect(parseOpencodeModel('minimax m2.5 free')).toEqual({
-      providerID: 'opencode',
-      modelID: 'minimax-m2.5-free',
-    });
-    expect(parseOpencodeModel('mimo v2 flash free')).toEqual({
-      providerID: 'openrouter',
-      modelID: 'xiaomi/mimo-v2-flash:free',
-    });
-    expect(parseOpencodeModel('big pickle')).toEqual({
-      providerID: 'opencode',
-      modelID: 'big-pickle',
-    });
+    for (const alias of ['minimax m2.5', 'kimi k2.5', 'glm-5', 'minimax m2.5 free', 'mimo v2 flash free', 'big pickle']) {
+      expect(parseOpencodeModel(alias)).toBeUndefined();
+    }
     expect(parseOpencodeModel('gpt-5')).toBeUndefined();
   });
 });

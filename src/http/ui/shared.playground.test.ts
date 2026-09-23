@@ -9,24 +9,22 @@ import { describe, expect, it } from 'vitest';
 
 import { SHARED_UI_SCRIPT } from './shared.js';
 import { buildProviderAdvancedKnowledge } from '../../core/models/providerAdvancedKnowledge.js';
+import { createCatalogSnapshot } from '../../catalogs/resolver.js';
 import { getStaticProviderModels } from '../../core/models/providerModelCatalog.js';
 
 describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'kiro', 'junie', 'auggie', 'goose', 'pi'])('%s shortlists in Playground', (provider) => {
   it('uses the approved fallbacks and preserves custom strings on reload', () => {
     const html = readFileSync(fileURLToPath(new URL('./pages/playground.html', import.meta.url)), 'utf8');
-    const modelTable = html.slice(html.indexOf('const PROVIDER_MODELS ='), html.indexOf('const PROVIDERS ='));
-    const array = modelTable.match(new RegExp(`^  ${provider}:(\\[.*\\]),$`, 'm'))?.[1];
-    expect(array).toBeDefined();
-    const fallback = vm.runInNewContext(`(${array})`) as Array<{ value: string; label: string }>;
+    expect(html).toContain('const PROVIDER_MODELS = {}');
     const models = getStaticProviderModels({ providerName: provider,
       backend: provider === 'devin' ? 'agent' : 'cli',
       ...(provider === 'devin' ? { remoteInstance: {
         providerName: provider, id: 'acp', backend: 'agent', transport: 'acp_stdio', command: 'devin',
       } } : {}),
     });
-    expect(fallback).toEqual(models.map(({ id, label, default: isDefault }) => ({
+    const fallback = models.map(({ id, label, default: isDefault }) => ({
       value: id, label: `${label}${isDefault ? ' (default)' : ''}`,
-    })));
+    }));
     expect(fallback).toHaveLength(provider === 'junie' ? 5 : 6);
     expect(fallback.filter(entry => /default/i.test(entry.label))).toHaveLength(['copilot', 'junie'].includes(provider) ? 1 : 0);
     const catalog = {
@@ -73,6 +71,8 @@ describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'kiro'
         renderedChoices = choices;
       },
       syncAgentPresetField() {}, renderAgentModelChoice() {}, refreshAgentCardSummary() {},
+      getAgentDefaultEntryId: () => models.find(entry=>entry.default)?.id ?? models[0]?.id,
+      getDefaultModel: () => models[0]?.id, applyAgentModelControlValues() {},
     }) as (div: unknown, options: unknown) => void;
     syncField({ querySelector: () => element }, { preserve: false, provider });
     expect(renderedChoices).toEqual([...fallback, { value: '__custom_model__', label: 'Custom model…' }]);
@@ -115,9 +115,7 @@ describe('shared playground selection helpers', () => {
       const { catalog } = buildProviderAdvancedKnowledge(target, {
         provider: 'muse', backend: 'cli', instance: 'native', defaultModel: null,
         source: 'static', cache: null, models: getStaticProviderModels(target), warnings: [],
-      }, { env: createRuntimeTestEnv(root, {
-        CATS_RUNTIME_PACKAGE_ROOT: fileURLToPath(new URL('../../../', import.meta.url)),
-      }) });
+      }, { snapshot: createCatalogSnapshot(readFileSync(new URL('../../../config/curated-model-catalogs.yaml.example', import.meta.url), 'utf8')) });
       const html = readFileSync(fileURLToPath(new URL('./pages/playground.html', import.meta.url)), 'utf8');
       const start = html.indexOf('function renderAgentModelControls(');
       const end = html.indexOf('\nfunction ', start + 1);
@@ -173,9 +171,7 @@ describe('shared playground selection helpers', () => {
       const { catalog } = buildProviderAdvancedKnowledge(target, {
         provider: 'grok', backend: 'cli', instance: 'native', defaultModel: null,
         source: 'static', cache: null, models: getStaticProviderModels(target), warnings: [],
-      }, { env: createRuntimeTestEnv(root, {
-        CATS_RUNTIME_PACKAGE_ROOT: fileURLToPath(new URL('../../../', import.meta.url)),
-      }) });
+      }, { snapshot: createCatalogSnapshot(readFileSync(new URL('../../../config/curated-model-catalogs.yaml.example', import.meta.url), 'utf8')) });
       const html = readFileSync(new URL('./pages/playground.html', import.meta.url), 'utf8');
       const start = html.indexOf('function renderAgentModelControls(');
       const end = html.indexOf('function applyAgentModelControlValues(', start);
@@ -215,7 +211,7 @@ describe('shared playground selection helpers', () => {
     const { catalog } = buildProviderAdvancedKnowledge(target, {
       provider: 'antigravity', backend: 'cli', instance: 'native', defaultModel: null,
       source: 'static', cache: null, models: getStaticProviderModels(target), warnings: [],
-    });
+    }, { snapshot: createCatalogSnapshot(readFileSync(new URL('../../../config/curated-model-catalogs.yaml.example', import.meta.url), 'utf8')) });
     const html = readFileSync(new URL('./pages/playground.html', import.meta.url), 'utf8');
     const start = html.indexOf('function renderAgentModelControls(');
     const end = html.indexOf('function applyAgentModelControlValues(', start);
@@ -343,7 +339,7 @@ describe('shared playground selection helpers', () => {
     });
   });
 
-  it('falls back within the same provider when the requested entry and mode are not available', () => {
+  it('preserves a removed saved entry as a custom model without inferred controls', () => {
     const catsUI = createCatsUI();
 
     const selection = catsUI.normalizePlaygroundAgentSelection({
@@ -402,17 +398,7 @@ describe('shared playground selection helpers', () => {
       },
     });
 
-    expect(selection).toEqual({
-      provider: 'claude',
-      model: '',
-      modelSelection: {
-        entryMode: 'explicit',
-        entryId: 'sonnet',
-        controls: {
-          'claude.reasoning_effort': 'medium',
-        },
-      },
-    });
+    expect(selection).toEqual({ provider: 'claude', model: 'claude-opus-4-6', modelSelection: null });
   });
 
   it('derives per-entry control defaults from explicit enum default labels', () => {

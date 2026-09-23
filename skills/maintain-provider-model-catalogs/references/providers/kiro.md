@@ -7,9 +7,7 @@ strings and order, label the version as operator-reported, and use the establish
 policy. A complete desired shortlist does not claim a complete upstream/account catalog. Do not
 launch Kiro or request another capture merely to corroborate unambiguous supplied IDs.
 
-Reuse `selection_mode: shortlist`, the verbatim Kiro normalizer and entry-only selection. Check the
-current normalizer before adding data: the retired hard-coded ID allowlist dropped new rows even
-when YAML loaded successfully. Do not reinstate that list or convert raw IDs to lower/title case.
+Use `selection_mode: shortlist` with exact IDs. No model allowlist belongs in code.
 
 When fresh account evidence is actually needed, use authenticated `kiro-cli model list` output if
 it succeeds. Logged-out or account-gated output proves only the gate; a newer `--version` does not
@@ -29,23 +27,15 @@ submits the first entry; do not invent a provider default or a new advanced mani
 first-row test pass. Keep arbitrary custom strings verbatim through saved-value reconciliation and
 execution, without inferred controls.
 
-## Surfaces and focused validation
 
-- Trace both Native and WSL fallbacks. They now share the approved Cats shortlist; this menu policy
-  does not prove identical account entitlement on both installations.
-- Inspect the dedicated `/kiro/models` route as well as generic provider catalogs: it reads static
-  fallback data, and its Native/WSL HTTP tests can retain old list expectations.
-- Check Runtime curated/basic/advanced catalogs and both UI fallbacks. Playground needs the
-  existing shortlist custom-action, visibility, serialization and saved-selection paths; Desktop
-  already has generic custom input. Reuse those paths for future data-only refreshes.
-- Search bundled freshness assertions as well as exact old IDs. A previously version-only Kiro
-  observation must stop being asserted as stale after a new complete shortlist is supplied.
-  Retain independent historical model IDs. If default metadata differs, trace basic catalog and
-  advanced overlay behavior separately before changing assertions: omitted and explicit `false`
-  can originate in different layers.
-- Reuse the isolated `kiroModelCatalog.test.ts`, Playground shortlist checks and affected Kiro HTTP
-  tests. Argument checks establish model transport, not login, entitlement or successful inference.
+## Schema-2 execution data
 
-Keep native/WSL, channel, account, and CLI-version scope explicit. If runtime static fallback and the
-account list disagree, report both and inspect resolution behavior rather than silently replacing one
-with the other.
+Use exact raw IDs in `id`, `label`, and `execution.model`, with entry-only metadata unless options are evidenced and supported by the installed binding registry. Native and WSL share this CLI scope; that does not establish equal account entitlement.
+
+Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
+Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.
+There are no independent Runtime, Playground or Desktop model tables to update. Existing generic
+bindings require no repeated implementation authorization; a new unsupported binding is a separate
+code change. Validate labels, ordered values, defaults, custom input, and actual emitted bindings.
+Discovery tests must explicitly use a `selection_mode: discovery` scope before constructing the
+service. `catalogs: []` inherits factory; `models: []` empties a full/shortlist scope.

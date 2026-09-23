@@ -237,6 +237,8 @@ export const SHARED_UI_SCRIPT = `
     }
     return {
       provider: typeof rawCatalog.provider === 'string' ? rawCatalog.provider : '',
+      catalogRevision: rawCatalog.catalogRevision,
+      catalogActivationId: rawCatalog.catalogActivationId,
       backend: typeof rawCatalog.backend === 'string' ? rawCatalog.backend : '',
       instance: typeof rawCatalog.instance === 'string' ? rawCatalog.instance : '',
       defaultModel: typeof rawCatalog.defaultModel === 'string' ? rawCatalog.defaultModel : null,
@@ -256,6 +258,8 @@ export const SHARED_UI_SCRIPT = `
     }
     return {
       provider: typeof rawCatalog.provider === 'string' ? rawCatalog.provider : '',
+      catalogRevision: rawCatalog.catalogRevision,
+      catalogActivationId: rawCatalog.catalogActivationId,
       backend: typeof rawCatalog.backend === 'string' ? rawCatalog.backend : '',
       instance: typeof rawCatalog.instance === 'string' ? rawCatalog.instance : '',
       defaultModel: typeof rawCatalog.defaultModel === 'string' ? rawCatalog.defaultModel : null,
@@ -282,6 +286,11 @@ export const SHARED_UI_SCRIPT = `
       }
     }
     return null;
+  }
+
+  function entryCatalogControls(catalog, entryId) {
+    var entry = findAdvancedCatalogEntry(catalog, entryId);
+    return entry && Array.isArray(entry.controls) ? entry.controls : (catalog.controls || []);
   }
 
   function findAdvancedCatalogPreset(catalog, presetId) {
@@ -429,6 +438,7 @@ export const SHARED_UI_SCRIPT = `
         kind: 'structured',
         entryId: resolveAdvancedChoiceEntryId(normalized, choiceId),
         modelSelection: {
+          catalogRevision: normalized.catalogRevision,
           entryMode: 'auto',
           presetId: presetId,
         },
@@ -440,6 +450,7 @@ export const SHARED_UI_SCRIPT = `
         kind: 'structured',
         entryId: entryId || null,
         modelSelection: {
+          catalogRevision: normalized.catalogRevision,
           entryMode: 'explicit',
           entryId: entryId,
         },
@@ -475,7 +486,7 @@ export const SHARED_UI_SCRIPT = `
     var normalized = normalizeAdvancedCatalog(catalog);
     if (!normalized) return [];
     var entryId = resolveAdvancedChoiceEntryId(normalized, choiceId);
-    var controls = Array.isArray(normalized.controls) ? normalized.controls : [];
+    var controls = entryCatalogControls(normalized, entryId);
     var visible = [];
     for (var i = 0; i < controls.length; i++) {
       var control = controls[i];
@@ -787,180 +798,17 @@ export const SHARED_UI_SCRIPT = `
     }
   }
 
-  function normalizePlaygroundCatalogText(value) {
-    return String(value || '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, ' ')
-      .trim();
-  }
-
-  function tokenizePlaygroundCatalogText(value) {
-    var normalized = normalizePlaygroundCatalogText(value);
-    if (!normalized) return [];
-    var parts = normalized.split(/\s+/);
-    var seen = {};
-    var tokens = [];
-    for (var i = 0; i < parts.length; i++) {
-      var token = parts[i];
-      if (!token || seen[token]) continue;
-      seen[token] = true;
-      tokens.push(token);
-    }
-    return tokens;
-  }
-
-  function getAdvancedEntryAvailabilityRank(entry) {
-    var status = typeof (entry && entry.status) === 'string'
-      ? entry.status.toLowerCase()
-      : 'available';
-    switch (status) {
-      case 'running':
-      case 'available':
-      case 'supported':
-      case 'ready':
-        return 0;
-      case 'unknown':
-        return 1;
-      case 'degraded':
-      case 'limited':
-        return 2;
-      default:
-        return 3;
-    }
-  }
-
-  function collectPlaygroundSelectionReferenceTexts(catalog, model, incomingSelection) {
-    var refs = [];
-    function pushRef(value) {
-      if (typeof value !== 'string' || !value.trim()) return;
-      refs.push(value.trim());
-    }
-    pushRef(model);
-    if (incomingSelection && typeof incomingSelection === 'object') {
-      pushRef(incomingSelection.entryId);
-      if (typeof incomingSelection.presetId === 'string' && incomingSelection.presetId) {
-        pushRef(incomingSelection.presetId);
-        var preset = findAdvancedCatalogPreset(catalog, incomingSelection.presetId);
-        if (preset) {
-          pushRef(preset.label);
-          pushRef(preset.preferredEntryId);
-          var preferredEntry = preset.preferredEntryId
-            ? findAdvancedCatalogEntry(catalog, preset.preferredEntryId)
-            : null;
-          if (preferredEntry) {
-            pushRef(preferredEntry.label);
-          }
-        }
-      }
-    }
-    return refs;
-  }
-
-  function scorePlaygroundAdvancedEntry(entry, referenceTexts) {
-    if (!entry || !entry.id) return Number.NEGATIVE_INFINITY;
-    var candidateTexts = [entry.id, entry.label];
-    if (Array.isArray(entry.notes)) {
-      for (var noteIndex = 0; noteIndex < entry.notes.length; noteIndex++) {
-        candidateTexts.push(entry.notes[noteIndex]);
-      }
-    }
-    var candidateTokens = tokenizePlaygroundCatalogText(candidateTexts.join(' '));
-    var candidateNormalized = candidateTexts
-      .map(normalizePlaygroundCatalogText)
-      .filter(Boolean);
-    var score = entry['default'] === true ? 5 : 0;
-    score += Math.max(0, 3 - getAdvancedEntryAvailabilityRank(entry));
-
-    for (var i = 0; i < referenceTexts.length; i++) {
-      var reference = referenceTexts[i];
-      var normalizedReference = normalizePlaygroundCatalogText(reference);
-      var referenceTokens = tokenizePlaygroundCatalogText(reference);
-      if (!normalizedReference || !referenceTokens.length) continue;
-      if (candidateNormalized.indexOf(normalizedReference) >= 0) {
-        score += 240;
-        continue;
-      }
-      var overlap = 0;
-      for (var tokenIndex = 0; tokenIndex < referenceTokens.length; tokenIndex++) {
-        if (candidateTokens.indexOf(referenceTokens[tokenIndex]) >= 0) {
-          overlap += 1;
-        }
-      }
-      if (overlap === 0) continue;
-      if (overlap === referenceTokens.length) {
-        score += 90;
-      }
-      score += overlap * 18;
-    }
-
-    return score;
-  }
-
-  function findClosestPlaygroundAdvancedEntry(catalog, model, incomingSelection) {
-    var entries = listAdvancedCatalogEntries(catalog);
-    if (!entries.length) return '';
-    var references = collectPlaygroundSelectionReferenceTexts(catalog, model, incomingSelection);
-    if (!references.length) return '';
-    var bestEntryId = '';
-    var bestScore = Number.NEGATIVE_INFINITY;
-    for (var i = 0; i < entries.length; i++) {
-      var entry = entries[i];
-      var score = scorePlaygroundAdvancedEntry(entry, references);
-      if (score > bestScore) {
-        bestScore = score;
-        bestEntryId = entry.id;
-      }
-    }
-    return bestScore > 0 ? bestEntryId : '';
-  }
-
   function listApplicableEnumControlValues(control, entryId) {
-    var options = listApplicableEnumControlOptions(control, entryId);
-    var allowed = [];
-    for (var i = 0; i < options.length; i++) {
-      var value = options[i] && options[i].value;
-      if (typeof value === 'string' && allowed.indexOf(value) < 0) {
-        allowed.push(value);
-      }
-    }
-    return allowed;
+    return listApplicableEnumControlOptions(control, entryId)
+      .map(function(option) { return option.value; })
+      .filter(function(value, index, values) { return typeof value === 'string' && values.indexOf(value) === index; });
   }
 
   function normalizePlaygroundNumericControlValue(control, value) {
     if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
-    var normalized = value;
-    if (control.minimum !== undefined && normalized < control.minimum) {
-      normalized = control.minimum;
-    }
-    if (control.maximum !== undefined && normalized > control.maximum) {
-      normalized = control.maximum;
-    }
-    return normalized;
-  }
-
-  function chooseSemanticEnumFallback(control, allowedValues, requestedValue) {
-    if (
-      !control
-      || !Array.isArray(control.semanticTags)
-      || control.semanticTags.indexOf('reasoning_intensity') < 0
-      || typeof requestedValue !== 'string'
-    ) {
-      return undefined;
-    }
-    var reasoningOrder = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
-    var requestedIndex = reasoningOrder.indexOf(requestedValue);
-    if (requestedIndex < 0) return undefined;
-    for (var cursor = requestedIndex - 1; cursor >= 0; cursor--) {
-      if (allowedValues.indexOf(reasoningOrder[cursor]) >= 0) {
-        return reasoningOrder[cursor];
-      }
-    }
-    for (var forward = requestedIndex + 1; forward < reasoningOrder.length; forward++) {
-      if (allowedValues.indexOf(reasoningOrder[forward]) >= 0) {
-        return reasoningOrder[forward];
-      }
-    }
-    return undefined;
+    if (control.minimum !== undefined && value < control.minimum) return control.minimum;
+    if (control.maximum !== undefined && value > control.maximum) return control.maximum;
+    return value;
   }
 
   function normalizePlaygroundControlValue(control, requestedValue, entryId, defaultValue) {
@@ -989,10 +837,6 @@ export const SHARED_UI_SCRIPT = `
       if (typeof defaultValue === 'string' && allowedValues.indexOf(defaultValue) >= 0) {
         return defaultValue;
       }
-      var semanticFallback = chooseSemanticEnumFallback(control, allowedValues, requestedValue);
-      if (semanticFallback) {
-        return semanticFallback;
-      }
       return allowedValues[0];
     }
     return undefined;
@@ -1005,7 +849,7 @@ export const SHARED_UI_SCRIPT = `
     var normalized = normalizeAdvancedCatalog(catalog);
     if (!normalized || !entryId) return undefined;
     var defaults = getAdvancedEntryControlDefaults(normalized, entryId, presetId || '');
-    var catalogControls = Array.isArray(normalized.controls) ? normalized.controls : [];
+    var catalogControls = entryCatalogControls(normalized, entryId);
     var nextControls = {};
     for (var i = 0; i < catalogControls.length; i++) {
       var control = catalogControls[i];
@@ -1098,39 +942,12 @@ export const SHARED_UI_SCRIPT = `
     if (!entryId && model && entryIds.indexOf(model) >= 0) {
       entryId = model;
     }
-    // An explicit custom string is an execution choice, including parameter
-    // overrides. Do not replace it with a similar curated model on reload.
-    if (!entryId && model && options.allowLegacyModel === true) {
-      return { provider: provider, model: model, modelSelection: null };
-    }
-    if (!entryId && (provider === 'cursor' || provider === 'copilot' || provider === 'opencode' || provider === 'kilo' || provider === 'devin' || provider === 'cline' || provider === 'kiro' || provider === 'junie' || provider === 'auggie' || provider === 'goose' || provider === 'pi') && options.allowLegacyModel === true
-      && incomingSelection && incomingSelection.entryMode === 'explicit'
-      && typeof incomingSelection.entryId === 'string' && incomingSelection.entryId) {
+    if (!entryId && model) return { provider: provider, model: model, modelSelection: null };
+    if (!entryId && incomingSelection && incomingSelection.entryMode === 'explicit' && incomingSelection.entryId) {
       return { provider: provider, model: incomingSelection.entryId, modelSelection: null };
     }
-    if (!entryId) {
-      entryId = findClosestPlaygroundAdvancedEntry(catalog, model, incomingSelection);
-    }
-
-    var allowLegacyModel = options.allowLegacyModel === true;
-    if (!entryId) {
-      if (allowLegacyModel && model) {
-        return {
-          provider: provider,
-          model: model,
-          modelSelection: null,
-        };
-      }
-      entryId = getAdvancedCatalogDefaultEntryId(catalog);
-    }
-
-    if (!entryId) {
-      return {
-        provider: provider,
-        model: allowLegacyModel ? model : '',
-        modelSelection: null,
-      };
-    }
+    if (!entryId) entryId = getAdvancedCatalogDefaultEntryId(catalog);
+    if (!entryId) return { provider: provider, model: '', modelSelection: null };
 
     var applicablePreset = presetId
       ? findApplicableAdvancedPreset(catalog, entryId, presetId)
@@ -1140,6 +957,7 @@ export const SHARED_UI_SCRIPT = `
     }
 
     var nextSelection = {
+      catalogRevision: catalog.catalogRevision,
       entryMode: 'explicit',
       entryId: entryId,
     };
@@ -1193,7 +1011,7 @@ export const SHARED_UI_SCRIPT = `
       }
     }
     var filtered = {};
-    var controls = Array.isArray(normalized.controls) ? normalized.controls : [];
+    var controls = entryCatalogControls(normalized, entryId);
     for (var i = 0; i < controls.length; i++) {
       var control = controls[i];
       if (!control || !control.key || control.scope === 'request' || !advancedControlAppliesToEntry(control, entryId)) {

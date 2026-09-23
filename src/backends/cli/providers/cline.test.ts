@@ -113,6 +113,7 @@ describe('ClineProvider', () => {
         provider.prepareEphemeralTurn({ message });
         const args = provider.buildSpawnArgs({
           cwd: root, model: 'cline-pass/glm-5.3', permissionMode: 'skip',
+          modelProvider: 'cline-pass', modelControls: {'cline.reasoning_effort': 'medium'},
         });
         const config = buildProcessSpawnConfig({
           path: process.platform === 'win32' ? shim : process.execPath,

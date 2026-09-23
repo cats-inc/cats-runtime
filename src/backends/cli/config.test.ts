@@ -45,6 +45,7 @@ function createRuntimeRootTestPaths(runtimeDir: string) {
 function loadConfigWithoutProviderFile(env: NodeJS.ProcessEnv = {}, providerYaml?: string) {
   return loadConfig({
     ...process.env,
+    CATS_RUNTIME_DIR: env.CATS_RUNTIME_DIR || '',
     ...env,
     ...(
       env.CATS_RUNTIME_DIR || env.HOME || env.USERPROFILE
@@ -239,7 +240,7 @@ describe('config platform defaults', () => {
 
     expect(config.dataDir).toBe(join('/home/tester', '.cats', 'runtime', 'data'));
     expect(config.sessionBaseDir).toBe(join('/home/tester', '.cats', 'runtime', 'sessions'));
-    expect(resolveConfigPath('/home/tester')).toBe(
+    expect(resolveConfigPath('/home/tester', {CATS_RUNTIME_DIR: ''})).toBe(
       join('/home/tester', '.cats', 'runtime', 'config', 'providers.yaml'),
     );
     expect(config.configPath).toBe(join('/home/tester', '.cats', 'runtime', 'config', 'providers.yaml'));
@@ -509,6 +510,7 @@ backends:
         ...process.env,
         HOME: root,
         USERPROFILE: root,
+        CATS_RUNTIME_DIR: '',
       }, {
         skipProviderFile: true,
       });

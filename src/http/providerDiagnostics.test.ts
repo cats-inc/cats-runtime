@@ -2692,7 +2692,10 @@ describe('provider diagnostics HTTP contract', () => {
       installCheckRunner: createInstallCheckRunner(),
       now: () => Date.parse('2026-03-23T00:02:00.000Z'),
     });
+    mkdirSync(join(config.dataDir!, '..', 'config'), { recursive: true });
+    writeFileSync(join(config.dataDir!, '..', 'config', 'curated-model-catalogs.yaml'), JSON.stringify({schema_version:2,catalogs:[{provider:'pi',backend:'cli',selection_mode:'discovery',models:[]}]}));
     const providerModelCatalog = new ProviderModelCatalogService(config, {
+      catalogPaths: {overridePath: join(config.dataDir!, '..', 'config', 'curated-model-catalogs.yaml')},
       piModelDiscoveryRunner: {
         run: vi.fn(async () => ({
           exitCode: 0,
@@ -2868,8 +2871,11 @@ describe('provider diagnostics HTTP contract', () => {
         installCheckRunner: createInstallCheckRunner(),
         now: () => Date.parse('2026-03-23T00:02:10.000Z'),
       });
+      mkdirSync(join(config.dataDir!, '..', 'config'), { recursive: true });
+    writeFileSync(join(config.dataDir!, '..', 'config', 'curated-model-catalogs.yaml'), JSON.stringify({schema_version:2,catalogs:[{provider:'opencode',backend:'cli',selection_mode:'discovery',models:[]}]}));
       const providerModelCatalog = new ProviderModelCatalogService(config, {
         env: { HOME: rootDir, USERPROFILE: rootDir },
+        catalogPaths: {overridePath: join(config.dataDir!, '..', 'config', 'curated-model-catalogs.yaml')},
         opencodeModelDiscoveryRunner: {
           run: vi.fn(async () => ({
             exitCode: 0,

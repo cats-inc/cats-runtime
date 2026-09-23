@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted — implementation in progress; see PLAN-040 for delivery evidence |
+| Status | Implemented — final CI in progress; see PLAN-040 for delivery evidence |
 | Owner | Runtime catalog workstream; Platform owns its consumers and packaging |
 | Reviewer | User |
 | Decision | [ADR-040](../decisions/040-use-data-driven-provider-catalogs-and-local-overrides.md) |
@@ -33,8 +33,8 @@ calls, session/workspace retention changes, and publishing a release in this tas
 
 ## FR-1: One Data Contract
 
-The proposed schema is version 2. The exact typed representation is finalized in
-PLAN-040 phase 1 against all current provider mappings before changing the loader.
+The implemented schema is version 2, defined in `src/catalogs/types.ts` and validated
+by `src/catalogs/schema.ts`. Binding version 1 is exported with the read-only module.
 The following information must be representable without model-specific code:
 
 | Data | Required behavior |
@@ -65,8 +65,8 @@ data; a code-owned list of familiar model IDs must not gate them.
 
 ### Illustrative local Pi replacement
 
-This is a proposed schema-2 example, not input supported by today's loader. It
-deliberately demonstrates a one-row local shortlist, not a factory-list change.
+This valid schema-2 example demonstrates a one-row local shortlist. Use the
+[soft-patch workflow](../provider-catalog-soft-patches.md) to validate and activate it.
 
 ```yaml
 schema_version: 2
@@ -124,7 +124,7 @@ suffix. The effective mapping emits `--provider openai-codex --model gpt-6-astra
   Record the factory digest, override digest, schema, and per-scope origin in
   diagnostics; public consumers receive the revision without personal paths.
 - Startup loads the current files. Add an authenticated local-data reload operation
-  (proposed `POST /providers/catalogs/reload`) with `expectedRevision`; mismatches
+  (`POST /providers/catalogs/reload`) with `expectedRevision`; mismatches
   return a conflict. It uses the same provider operation/lifecycle coordination
   as other configuration mutations, and never performs live model discovery.
 - Successful reload returns the activated revision and affected scopes. Existing
@@ -231,7 +231,7 @@ flowchart TD
 
 ## FR-6: Conversion and Packaging
 
-Schema 1 and its human-label normalizers are the current implementation. Provide
+Schema 1 and its human-label normalizers preceded this implementation. Provide
 an explicit offline conversion/preview tool that produces schema 2 using retained
 evidenced mappings. It must report unresolved mappings instead of guessing, preserve
 source labels/order/defaults, and require authorization before writing personal

@@ -277,7 +277,7 @@ describe('session worktree routes', () => {
     );
   });
 
-  it('creates a runtime session by dropping a stale preset from structured model selection', async () => {
+  it('rejects a stale preset before creating a runtime session', async () => {
     ctx.providerModelCatalog = {
       getAdvancedKnowledgeForTarget: vi.fn(async (target) => ({
         target,
@@ -360,36 +360,8 @@ describe('session worktree routes', () => {
       }),
     });
 
-    expect(response.status).toBe(201);
-    const body = await response.json() as {
-      id: string;
-      modelSelection: Record<string, unknown>;
-      modelResolution: {
-        warnings: string[];
-      };
-    };
-    expect(body.modelSelection).toEqual({
-      entryMode: 'auto',
-      entryId: 'gpt-5.4',
-      controls: {
-        'openai.reasoning_effort': 'high',
-      },
-    });
-    expect(body.modelResolution.warnings).toEqual([
-      expect.stringContaining(`Preset 'deep_reasoning'`),
-    ]);
-
-    const stored = registry.get(body.id);
-    expect(stored?.modelSelection).toEqual({
-      entryMode: 'auto',
-      entryId: 'gpt-5.4',
-      controls: {
-        'openai.reasoning_effort': 'high',
-      },
-    });
-    expect(stored?.modelResolution?.warnings).toEqual([
-      expect.stringContaining(`Preset 'deep_reasoning'`),
-    ]);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({error: expect.stringContaining('Unknown preset')});
   });
 
   it('resets a worktree-backed session and discards the runtime worktree', { timeout: 15_000 }, async () => {

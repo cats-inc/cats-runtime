@@ -37,30 +37,15 @@ evidence, not this skill. The initial implementation and capture are recorded in
    not reusable contracts. Prefer an explicit redacted output file: the CLI can suppress console
    logging. Stop collecting once the selected combinations are mapped.
 
-## Preserve the shortlist through the complete path
 
-- Curated `selection_mode: shortlist` makes the menu authoritative on initial reads and refresh,
-  ahead of persisted/live discovery and configured current models. It is not a declaration that
-  the upstream provider offers only those entries. Do not opt unrelated providers into this mode.
-- For fixed combinations, store the exact parameterized expression as the curated `name` and
-  supply the approved display label separately. Inspect `normalizeCursorCuratedModelId`; do not
-  lose brackets or overrides through a label-derived normalization path.
-- Keep curated YAML, Runtime fallback, Playground fallback, and Desktop fallback aligned. Model
-  selection must resolve to the complete expression and pass it as one `--model` argument.
-- Preserve raw custom strings and saved out-of-shortlist explicit Cursor selections. A nearest-model
-  reconciliation must not replace a custom context/effort choice with a similar preset. Verify
-  initial selection, custom-field visibility, refresh/reload, and serialized execution values.
-- Prepare a provider-only local override diff before requesting any missing outside-project
-  authorization. Locate the complete catalog block; a multiline regex `$` can stop at the first
-  line instead of end-of-file. Before writing, parse the proposed file, check the selected tuples
-  and count, compare every other provider, and back up the original. Keep unrelated bytes intact.
+## Schema-2 execution data
 
-## Focused verification
+Store the exact observed `variantStringRepresentation` in `execution.model`. Fixed Context/Effort/Thinking/Fast combinations are single choices. Their approved display composition is `label`; punctuation supplied to separate fields is not necessarily display text.
 
-Follow [catalog surfaces](../catalog-surfaces.md). `src/core/models/cursorPresets.test.ts` covers
-bundled shortlist order, stale discovery snapshots, refresh, selection resolution, and adapter
-argv. Include the affected Playground form/helper and Desktop fallback/selection tests.
-
-Use the shared [new shortlist rollout checks](../catalog-surfaces.md#new-shortlist-rollout-checks)
-for isolated discovery fixtures and custom-input wiring. Distinguish argv/DOM checks from
-installed-app or live-model tests.
+Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
+Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.
+There are no independent Runtime, Playground or Desktop model tables to update. Existing generic
+bindings require no repeated implementation authorization; a new unsupported binding is a separate
+code change. Validate labels, ordered values, defaults, custom input, and actual emitted bindings.
+Discovery tests must explicitly use a `selection_mode: discovery` scope before constructing the
+service. `catalogs: []` inherits factory; `models: []` empties a full/shortlist scope.

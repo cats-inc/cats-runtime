@@ -1,225 +1,75 @@
-# Catalog Surfaces
-
-Use current repository sources instead of a provider list copied into this skill.
-
-## Build the inventory
-
-Use this full inventory for an audit. For a provider-scoped refresh, start at that provider's
-reference and catalog section, then follow only its actual consumers and affected identifiers.
-
-Start with repository searches such as:
-
-```text
-rg -n "KNOWN_PROVIDERS" src/backends/cli/providers/types.ts src
-rg -n "STATIC_PROVIDER_MODELS|loadDynamicModels" src/core/models/providerModelCatalog.ts
-rg -n "CURATED_CLI_ALIASES|CURATED_PROVIDER_ALIASES" src/core/models/curatedModelCatalog.ts
-rg -n "discover.*Models|model discovery" src/backends src/core/models
-```
-
-Read the current values from those results. Do not treat any provider count, current YAML section
-count, or list in older docs as authoritative.
-
-For each registered provider, classify the actual path:
-
-- account-resolved dynamic enumeration;
-- curated static input;
-- runtime static fallback;
-- intentionally empty catalog;
-- account-configured/BYO-model behavior;
-- provider-default sentinel;
-- unsupported execution path;
-- actionable missing coverage.
-
-Installation knowledge is context only. npm-installed providers can still require catalog work, and
-native-installed providers may expose dynamic enumeration.
+# Catalog data and consumers
 
 ## Authoritative surfaces
 
-| Surface | Current location | What to verify |
+| Surface | Location | Maintenance rule |
 |---|---|---|
-| Registered CLI families | `src/backends/cli/providers/types.ts` | `KNOWN_PROVIDERS` and new families |
-| Install/auth knowledge | `src/core/provider-install/knowledge.ts` | install channel, executable, auth limits |
-| Curated input | `config/curated-model-catalogs.yaml.example` | labels, ids, options, provenance, freshness |
-| Typed curated schema/loader | `src/core/models/curatedModelCatalog.ts` | supported YAML fields and warning behavior |
-| Curated normalization | `src/core/models/curatedModelCatalogNormalization.ts` | accepted rows, aliases, option mappings, `null` rejection |
-| Static fallback and routing | `src/core/models/providerModelCatalog.ts` | `STATIC_PROVIDER_MODELS`, default resolution, dynamic branches |
-| Dynamic CLI discovery | `src/backends/cli/**/models.ts` and agent adapters | command, parser, account scope, refresh behavior |
-| Advanced controls | `src/core/models/providerAdvancedKnowledge.ts` | controls/presets and verified provenance |
-| Public per-model defaults | `src/core/models/providerAdvancedCatalog.ts` | `entries[].controlDefaults` alongside catalog defaults |
-| Selection resolution | `src/core/models/providerSelectionResolution.ts` | whether curated defaults/options are honored |
-| Provider adapter | `src/backends/cli/providers/<provider>.ts`, `src/backends/agent/adapters/acp/` | follow the actual target's model/control transport; CLI installation does not imply CLI-backend execution |
-| Playground | `src/http/ui/shared.ts`, `src/http/ui/pages/playground.html` | labels, per-model defaults, static fallback; generate `public/playground.html` with `npm run build:ui` |
-| Desktop consumer | `cats-platform` provider catalog/selector modules | only inspect/change when fallback data or consumer behavior is affected; read that member's instructions first |
+| Factory | `config/curated-model-catalogs.yaml.example` | Single authored schema-2 model/option source |
+| Generated projection | `config/curated-model-catalogs.generated.json` | Run generator; never edit directly |
+| Scoped personal replacement | Config sibling `curated-model-catalogs.yaml` | Explicit authorization, backup, digest check, reload |
+| Types/validation/bindings | `src/catalogs/{types,schema,bindings}.ts` | Generic schema/serializers; no model-ID allowlists |
+| Resolver/activation | `src/catalogs/{resolver,store}.ts` | Immutable accepted revision, origins and diagnostics |
+| Local host export | `@cats-inc/cats-runtime/catalogs` | Read-only informational projection; no process startup |
+| Basic/advanced projections | `src/core/models/provider{ModelCatalog,AdvancedKnowledge}.ts` | Consume the accepted data; no authored tables |
+| Execution | `providerSelectionResolution.ts`, adapters, session binding | Actual provider/model/controls; recorded bindings survive reload |
+| Playground | `src/http/ui` → `public` | Runtime-served menus, custom input, explicit default markers |
+| Desktop | Platform `providerCatalogClient`, `useProviderCatalogState`, label registry | Runtime-observed choices; scoped cache and coherent revisions |
+| Desktop offline labels | Platform `localCatalogProjection.ts` | Same Runtime read-only resolver; never fabricates usable targets |
+| Migration evidence | `config/catalog-schema1-migration.json` | Frozen schema-1 conversion mappings, not a second current catalog |
 
-Do not assume these paths will stay exhaustive. Use repo-wide search for the provider name, exact
-catalog filename, option/control key, and affected ids before editing.
+## Data mapping
 
-On Windows, pass file globs through `rg -g '*.test.ts' src tests`, not positional paths such as
-`src/core/models/*.test.ts`; `rg` receives the latter literally in PowerShell. Keep output bounded
-to relevant files/sections so truncation does not force repeated reads.
+Scope key is `(provider, backend, transport)`; CLI omits transport. `full`/`shortlist` are
+authoritative even on Refresh. `discovery` explicitly retains the target's discovery/config path.
+Scopes absent from overrides inherit factory. `models: []` is an intentional empty list.
+An omitted model `controls` inherits `shared_controls`; `controls: []` disables inheritance.
 
-## Exact bundled-example consumers
+Each model has `id`, exact `label`, and `execution.model`. Optional `execution.provider` selects a
+CLI provider where supported. `execution.fixed_controls` stores approved fixed combinations.
+Selectable `controls` carry token/label pairs and only evidenced `default`. Exhaustive
+`execution.variants` map option tuples to exact wire IDs. Do not guess suffixes or shared options.
+Preserve provenance in notes/source fields. The schema rejects unknown fields, unsupported
+bindings, duplicate IDs/defaults and incomplete/overlapping variants as one whole candidate.
 
-Search each affected repository for `curated-model-catalogs.yaml.example`, its runtime path resolver,
-and exact old model/label strings before running expensive gates. Use `rg -n -F 'old label' src tests`
-from each owning checkout; do not limit the search to selector test names. Distinguish:
+## Factory checks
 
-- tests that read the bundled example;
-- tests with independent inline YAML fixtures;
-- generated/package assertions;
-- runtime static tables that are intentionally separate.
-
-Desktop labels also reach execution chips and audience participants through shared fallback data.
-When that fallback changes, inspect `tests/execution-label.test.js` and
-`tests/audience-participant-builder.test.tsx` alongside selector tests. Classify each exact-string
-match by its data source; leave deliberately supplied historical/inline labels unchanged.
-
-Do not edit an independent fixture merely to resemble the bundled example. When a test, runtime
-output, and curated row disagree, use the conflict procedure in
-[evidence and scope](./evidence-and-scope.md).
-
-## Validation by changed surface
-
-### New shortlist rollout checks
-
-When a provider first adopts an approved shortlist, trace the existing path before the final gate:
-
-- Verify curated lookup, static-catalog support and ID normalization accept the provider. A valid
-  YAML entry alone does not prove the returned menu uses it. Reuse existing shortlist support.
-  Scope this check by backend/transport as well as provider name; a CLI-only lookup can silently
-  exclude an agent/ACP target while that provider's CLI fallback is intentionally empty.
-- Check each UI's custom action, field visibility, serialization and saved-value reconciliation.
-  These paths can use provider-specific conditions: Desktop custom input or another provider's
-  Playground behavior does not establish support for this provider. Test the first selection,
-  actual six-plus-custom menu and saved custom string after refresh.
-- Scope Playground edits and source-based test extraction to `PROVIDER_MODELS`, not the first
-  occurrence of a provider key. The same key exists in the color table; a broad replacement and
-  an equally broad test can agree on the wrong table and leave the real menu unchanged. Check
-  the enclosing declaration and expected match count, preserving line-ending handling.
-- Classify service, HTTP and diagnostics tests by their catalog source. Unrestricted-discovery
-  cases need an explicit empty/non-shortlist curated document in an isolated environment,
-  including at server construction. A temporary home alone can still load the bundled example.
-  Keep current bundled-shortlist coverage separate; do not rewrite independent historical IDs.
-
-### Curated catalog checks
-
-At minimum for a curated catalog edit:
+From the Runtime root:
 
 ```text
-npx vitest run src/core/models/curatedModelCatalog.test.ts src/core/models/curatedModelCatalogNormalization.test.ts src/core/models/providerAdvancedKnowledge.test.ts src/core/models/providerModelCatalog.test.ts --pool=threads --poolOptions.threads.singleThread
+npm run catalog:generate
+npm run catalog:check
+npx vitest run tests/catalog-data.test.ts tests/catalog-runtime.test.ts --pool=threads --poolOptions.threads.singleThread
+node --test skills/maintain-provider-model-catalogs/tests/normalize-picker-paste.node-test.mjs
 ```
 
-Also:
+Routine data refreshes should not change production TS/JS/HTML. The AST boundary guard rejects
+model literals, authored tables, model-keyed branches and non-data generator imports. When adding
+a binding, include an unknown-ID test that changes actual argv/request data without new model code.
+Use isolated profile/config fixtures; never depend on the maintainer's personal override or login.
+Select `discovery` explicitly in discovery tests; an empty override document inherits factory.
 
-- load the YAML through the typed loader and require zero unexpected normalization warnings;
-- run provider-specific discovery/adapter tests when their surface changed;
-- run `npm run typecheck` when TypeScript or tests changed;
-- run the wider suite when risk or repository rules require it;
-- use `git diff --check` and inspect the final diff/status.
+For runtime/UI implementation changes, run affected selection, adapter, HTTP and UI tests plus
+TypeScript checks. Regenerate public assets with `npm run build:ui`. For Platform behavior changes,
+build server/host/test UI once, then run the affected node tests. Serialize heavy cross-repo builds
+and rerun only failures or newly changed surfaces. Distinguish source tests, packaged smoke tests
+and real installed UI checks in the report. Routine data changes do not require every Desktop test.
 
-### Schedule validation once per relevant change
+## Cache and package checks
 
-- Resolve material model-id/option questions before expensive final builds when the answer changes
-  the catalog under test. While waiting, prepare evidence, implementation and focused checks of
-  independent behavior. A provisional subset is not a reason to run the full affected build matrix
-  twice; run the final consumer checks against the settled authorized data.
-- Before the first build/typecheck, expand the relevant package scripts once to avoid duplicate
-  phases. Runtime's `npm run typecheck` includes `build:ui`; after an unchanged successful UI
-  build, a direct `tsc --noEmit -p tsconfig.json` covers the remaining compiler phase. Report the
-  actual commands. Repeating the npm wrapper also repeats its child-process permission needs.
-- Check the current Tailwind inputs when page classes change: the existing UI builder scans
-  `public/**/*.html` before copying source pages there. A first build can therefore leave CSS
-  from the previous page. After HTML is synchronized, regenerate if necessary and inspect the
-  generated CSS delta; source/public HTML equality alone does not verify the CSS.
-- When PR/release work is authorized, inspect the intended base and integrate required upstream
-  changes before the final local gate. Record the tree tested.
-- Follow the owning repository's Local Validation Scope for the final diff too. Commit/PR creation
-  alone does not require a full local suite. Reuse passing checks with unchanged inputs; full local
-  runs need the reasons defined by that policy. Required full CI/release gates still apply, and a
-  focused local pass must be reported as focused.
-- Serialize heavy Runtime and Desktop builds/full suites on one Windows machine. Independent
-  searches can run in parallel; package builds and child-process tests compete for CPU and disk.
-- Record command, scope, exit status, elapsed time, and log path. Keep valid results until another
-  change affects what they tested; do not repeat a successful suite merely to reassure yourself.
-  Inspect `npm pack --json` before parsing it: npm versions can return an array or a package-keyed
-  object. Reuse saved output if only the inspection failed; do not repeat a successful pack/build.
-- On failure, retain the assertion output and rerun affected files first to diagnose. A timeout
-  under contention is not automatically pre-existing or harmless. A focused retry proves only that
-  scope; report the original failure and satisfy any still-required full gate.
-- Quiet package/build tests can run synchronous subprocesses for minutes. Check process/log
-  progress before interrupting; silence alone is not evidence of a hang. Prefer a reporter that
-  emits failure details as they occur.
-- `runtime-ui-build.test.ts` checks both source/generated equality and unstaged Git changes in
-  `public/*.html`. If equality passes and only the latter fails, inspect and stage the intended
-  generated artifact as part of the normal change, then rerun that check alone. Do not change
-  the assertion, stage unrelated files, or rebuild/rerun passing product suites for that failure.
-- If only this skill's Markdown changes, validate frontmatter, links, diff, and discovery sync.
-  Do not run product tests solely for prose edits or the later commit/PR step.
-- A Windows sandbox `spawn EPERM` before collection is a runner restriction, not a failed product
-  assertion. Reuse that diagnosis for commands needing the same child-process capability instead
-  of repeatedly trying blocked launches. Use approved execution when needed; Node's
-  `--test-isolation=none` is an alternative only for selected tests that do not require isolation.
+Basic/advanced must share catalog revision, activation and target. Connection/auth/selection
+changes invalidate observations, and late replies cannot overwrite newer ones. Removed models
+stay removed; saved unknown strings become custom choices. Preserve exact case and `(recommended)`;
+only the explicit default status suffix is normalized. Local informational labels never establish
+picker availability. Remote/disconnected hosts do not read a local factory for remote labels.
 
-### Report live-check limits precisely
+The factory, generated digest, read-only module and catalog CLI must come from one Runtime build.
+Check the npm payload and both Desktop sidecar layouts when packaging code changes. A local scope
+replacement survives factory upgrades; unpatched scopes adopt the new factory. Do not auto-seed a
+whole personal factory snapshot. Follow [local patches](./local-soft-patch.md) for installed users.
 
-A refused localhost connection proves only that the requested endpoint refused the connection.
-Report the endpoint and error; do not infer port occupation or a leftover Runtime process.
-If process cleanup is requested, inspect listeners and process identity before stopping anything.
-No listener or matching process means there is nothing identified to stop. Do not start a service
-merely to turn an unavailable optional live check into a pass.
+## Skill source and mirrors
 
-Before diagnosing a live catalog mismatch, identify the listener's executable and script path.
-An installed Desktop can serve its bundled Runtime on the same port used by checkout development;
-an empty or stale response from that process does not test the edited checkout. On Windows,
-`netstat -ano -p tcp` can identify the listener PID; inspect only that process's command line and
-keep private arguments out of evidence. If the installed bundle owns the port, explain that
-checkout verification requires closing that app and starting the checkout with `npm run dev`.
-Restarting the installed bundle does not load checkout edits. Use live checks only when useful;
-this diagnosis does not require stopping the user's app or starting another Runtime.
-
-### Desktop iteration, only when its consumers change
-
-Read the member's instructions and verify these paths/scripts still exist. Build server output
-once for JavaScript consumers (`npm run build:server`); use `npm run build:test-ui` for TSX consumers.
-Use the official JSX/DOM bundle, not `tsx --test`. Choose affected files from these examples:
-
-```text
-node --test tests/provider-selection.test.js tests/execution-label.test.js
-node --test --test-isolation=none build/test/provider-model-fields.test.js build/test/provider-model-defaults.test.js build/test/provider-model-fields-label-persist.test.js build/test/audience-participant-builder.test.js
-```
-
-Mounted selector tests must wait for catalog loading and initial target reconciliation before
-changing model/effort. Wait for the observable target/control state, not an arbitrary delay; an
-early change can be overwritten by initialization and produce a misleading default-selection failure.
-
-For a menu that renders fixed combinations, verify default labels after Runtime metadata loads as
-well as in the static fallback. Correct fallback text does not prove that a separate loaded-menu
-branch renders the model's `default` flag. Check the displayed default and submitted selection together.
-
-For first-item initialization, assert both the visible value and the emitted/persisted selection
-before any manual effort change, then verify the corresponding execution argument. A select can
-display its first option while the saved control remains absent, leaving execution to a different
-CLI default. Keep this UI initialization separate from provider-default metadata and labels;
-also cover model switches and restoration of an explicit saved value.
-
-Use `--test-reporter=tap` when running a required full Node suite. Package-contract tests can clear
-`build/test`; rebuild that bundle before a later test run if needed. A test-only correction does not
-invalidate unchanged server/host builds, but any required full test gate still needs to pass.
-
-### Authorized PR/release follow-through
-
-Use the owning release guides and current workflow definitions; a catalog refresh alone does not
-authorize publication. Keep only real dependencies on the critical path:
-
-- Submit each ready repository's PR without waiting for the other's local tests. Remote CI can
-  overlap local work; serialize only heavy builds that compete on the same machine.
-- Observe actual merge completion when merge/cleanup is requested. Verify release source commits
-  and pass the intended Runtime commit to Desktop packaging. Start independent authorized npm and
-  preview workflows together; do not wait for registry visibility when packaging uses Git source.
-- Track workflow ids and phase transitions. Report useful progress without treating repeated
-  unchanged polls as new findings. When explaining elapsed time, distinguish local checks, remote
-  jobs, registry propagation, and agent overhead; do not sum overlapping jobs as wall time.
-- After a successful npm publish, verify the exact version, Git commit, and requested dist-tag.
-  Temporary E404/stale tags can be registry propagation: retry reads with bounded backoff while
-  doing independent work, never blindly republish a successful version. If visibility stays
-  unresolved, report that limitation separately from workflow success.
+Edit only `cats-runtime/skills/maintain-provider-model-catalogs`. Run Runtime's
+`scripts/windows/Sync-AgentSkills.ps1`, then parent `cats-one/scripts/windows/Sync-WorkspaceSkills.ps1`
+and its `-Check` mode (or OS equivalents). Compare `.agents` and `.claude` copies. Provider
+references hold evidence acquisition and protocol facts, not current model lists or fallback maps.

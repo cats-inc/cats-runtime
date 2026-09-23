@@ -59,7 +59,7 @@ describe('provider intent and resource scope', () => {
   it('holds non-cancellable CLI model discovery until it completes', async () => {
     const f = fixture();
     // Exercise a running discovery operation independently of the curated shortlist.
-    writeFileSync(f.paths.curatedModelCatalogPath, 'schema_version: 1\ncatalogs: []\n');
+    writeFileSync(f.paths.curatedModelCatalogPath, JSON.stringify({schema_version:2,catalogs:[{provider:'pi',backend:'cli',selection_mode:'discovery',models:[]}]}));
     const pi = { provider: 'pi', backend: 'cli', instance: 'native' };
     const { revision } = f.selection.save([pi], 'missing');
     let release!: () => void;
@@ -248,8 +248,11 @@ routing: {providers: {claude: {default_target: {${alias}: native}}}}
   it('scans only the saved scope and discards late results after deselection', async () => {
     const f = fixture();
     let release!: () => void;
+    let entered!: () => void;
+    const ready = new Promise<void>(resolve => { entered = resolve; });
     const gate = new Promise<void>((resolve) => { release = resolve; });
     const assessCliTarget = vi.fn(async (_target: unknown) => {
+      entered();
       await gate;
       return { setup: { command: { status: 'ready', resolvedCommand: 'fake' }, version: {}, auth: { status: 'unknown' }, remediation: [] } };
     });
@@ -258,7 +261,8 @@ routing: {providers: {claude: {default_target: {${alias}: native}}}}
     const bootstrap = new BootstrapService({ ...f, compatibility, scanConcurrency: 1 });
     bootstrap.saveSelection([claude, codex], 'missing');
     const scan = bootstrap.scan();
-    await vi.waitFor(() => expect(assessCliTarget).toHaveBeenCalledTimes(1));
+    await Promise.race([ready, scan.then(() => { throw new Error('Expected saved-scope assessment to start'); })]);
+    expect(assessCliTarget).toHaveBeenCalledTimes(1);
     expect(assessCliTarget.mock.calls[0]![0]).toMatchObject({ providerName: 'claude' });
     bootstrap.saveSelection([codex], bootstrap.getSelection().revision);
     release();

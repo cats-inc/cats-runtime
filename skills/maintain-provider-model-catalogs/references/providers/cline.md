@@ -23,34 +23,15 @@ operator decisions belong in the
   display projection is authorized. Retain the original in evidence and keep the execution ID
   unchanged; one approved friendly name is not permission to prettify other rows.
 
-## Reuse the provider and fixed-effort execution path
 
-- The Cats provider family remains `cline` on `cli/native`; ClinePass is the CLI's selected
-  provider `cline-pass`, not another Cats backend. A qualified model ID alone does not establish
-  that the CLI switches provider. The existing adapter passes `--provider cline-pass` alongside
-  `--model <verbatim ID>` for this namespace.
-- Approved fixed effort is transported separately as `--thinking <token>`. Reuse the singleton
-  curated option and internal `cline.reasoning_effort` defaults without an editable effort menu
-  or a provider-default label. Keep UI first-item selection separate from default claims.
-- Check `src/core/models/clineModelCatalog.ts`, the Cline curated overlay in
-  `providerAdvancedKnowledge.ts`, and `src/backends/cli/providers/cline.ts` together. Both
-  structured selection and known plain model strings must execute the approved combination;
-  static fallback knowledge and `getClineFixedEffort` must agree with the refreshed catalog.
-- Custom strings keep their exact case. Other `cline-pass/` models select ClinePass but do not
-  inherit a shortlist effort. Other custom strings retain the CLI's configured provider; do not
-  infer a new `--provider` value from an arbitrary slash prefix. An omitted model stays omitted.
-- Routine data refreshes reuse this support. Do not reopen resume/fork/parser investigation,
-  rewrite user Cline settings, or send inference requests merely to refresh a catalog. Changed
-  execution requirements still follow the separate scope gate in the main skill.
+## Schema-2 execution data
 
-## Validate the affected paths
+Set `execution.provider: cline-pass`, preserve the full observed `execution.model`, and put approved thinking in `execution.fixed_controls.cline.reasoning_effort`. The adapter sends separate `--provider`, `--model`, `--thinking` arguments.
 
-Use the generic [catalog checks](../catalog-surfaces.md#curated-catalog-checks), the focused
-`clineModelCatalog.test.ts` suite, and affected Playground/Desktop fallback consumers. Cover the
-curated and static paths, all approved combinations' final argv, first-row selection without a
-default suffix, and custom strings after refresh. When execution changes, include adapter tests
-and ensure unsupported user control overrides are rejected rather than exposing fixed controls.
-
-Help, static mappings and argv tests establish selection/transport behavior, not successful paid
-inference or account entitlement. Identify the running Runtime before using a live response as
-verification, following [live-check limits](../catalog-surfaces.md#report-live-check-limits-precisely).
+Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
+Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.
+There are no independent Runtime, Playground or Desktop model tables to update. Existing generic
+bindings require no repeated implementation authorization; a new unsupported binding is a separate
+code change. Validate labels, ordered values, defaults, custom input, and actual emitted bindings.
+Discovery tests must explicitly use a `selection_mode: discovery` scope before constructing the
+service. `catalogs: []` inherits factory; `models: []` empties a full/shortlist scope.

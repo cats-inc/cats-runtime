@@ -33,6 +33,15 @@ operator suffixes separately from raw IDs. Do not publish other discovered effor
 - Cover catalog resolution through the provider and final native request body, including both
   specified and unspecified variants. Reuse shared shortlist rollout checks for UI/custom input.
 
-See [Kilo shortlist evidence](../../../../docs/research/2026-09-18-kilo-shortlist.md) for the bounded
-mapping capture and [catalog surfaces](../catalog-surfaces.md#new-shortlist-rollout-checks) for
-shared validation. Current model values belong in catalog/evidence data, not this procedure.
+
+## Schema-2 execution data
+
+Put the observed qualified model in `execution.model`, fixed variant in `execution.fixed_controls.kilo.variant`. Native HTTP prompt uses a top-level `variant`; `run --thinking` only displays thinking and does not choose a variant.
+
+Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
+Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.
+There are no independent Runtime, Playground or Desktop model tables to update. Existing generic
+bindings require no repeated implementation authorization; a new unsupported binding is a separate
+code change. Validate labels, ordered values, defaults, custom input, and actual emitted bindings.
+Discovery tests must explicitly use a `selection_mode: discovery` scope before constructing the
+service. `catalogs: []` inherits factory; `models: []` empties a full/shortlist scope.

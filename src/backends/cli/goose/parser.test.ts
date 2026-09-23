@@ -161,22 +161,11 @@ describe('parseGooseModel', () => {
     expect(result.modelId).toBe('gpt-5');
   });
 
-  it('normalizes GPT shorthand to the OpenAI provider/model form', () => {
-    const result = parseGooseModel('gpt-5.4');
-    expect(result.provider).toBe('openai');
-    expect(result.modelId).toBe('gpt-5');
+  it.each(['gpt-5.4', 'gpt-5.2-codex'])('does not infer a provider for %s', model => {
+    expect(() => parseGooseModel(model)).toThrow("Expected 'provider/model'");
   });
-
-  it('normalizes Codex shorthand to the OpenAI codex model', () => {
-    const result = parseGooseModel('gpt-5.2-codex');
-    expect(result.provider).toBe('openai');
-    expect(result.modelId).toBe('gpt-5-codex');
-  });
-
-  it('normalizes OpenAI provider/model aliases', () => {
-    const result = parseGooseModel('openai/gpt-5.4');
-    expect(result.provider).toBe('openai');
-    expect(result.modelId).toBe('gpt-5');
+  it('preserves explicitly qualified wire tokens', () => {
+    expect(parseGooseModel('openai/gpt-5.4')).toEqual({provider:'openai',modelId:'gpt-5.4'});
   });
 
   it('throws for empty string', () => {

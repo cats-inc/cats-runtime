@@ -151,7 +151,8 @@ export function resolveRuntimePublicAssetPath(
 
 export function getRuntimeSessionManager(ctx: AppContext): RuntimeSessionManager {
   if (!ctx.runtime) {
-    ctx.runtime = new RuntimeSessionManager(ctx.config, ctx.pool, ctx.apiBackend, ctx.agentBackend);
+    ctx.runtime = new RuntimeSessionManager(ctx.config, ctx.pool, ctx.apiBackend, ctx.agentBackend,
+      (sessionId) => ctx.registry.get(sessionId));
   }
   return ctx.runtime;
 }

@@ -4,7 +4,7 @@ import { AuggieProvider } from './auggie.js';
 import type { AuggieSessionService } from '../auggie/AuggieSessionService.js';
 
 describe('AuggieProvider', () => {
-  it('builds ephemeral print-mode args with normalized model and resume support', () => {
+  it('builds ephemeral print-mode args with exact model and resume support', () => {
     const sessions = {
       getLatestSession: vi.fn().mockResolvedValue(null),
     } as unknown as AuggieSessionService;
@@ -26,7 +26,7 @@ describe('AuggieProvider', () => {
     expect(args[6]).toBe('--workspace-root');
     expect(args[7]).toBe('/tmp/repo');
     expect(args).toContain('--model');
-    expect(args).toContain('opus4.6');
+    expect(args).toContain('claude opus 4.6');
     expect(args).toContain('--resume');
     expect(args).toContain('auggie-session-1');
     const instructionIndex = args.indexOf('--instruction-file');
