@@ -74,6 +74,28 @@ startup, backup, repeat startup and failed-upgrade recovery using the installed 
 The `automaticSchema1Upgrade` capability belongs to Runtime activation, never the read-only export
 or a second Desktop migration. A successful health check or converter unit test is insufficient.
 
+## Isolated Playground and installed Desktop checks
+
+To check Playground menus, defaults and custom input without the maintainer's runtime state:
+
+- Start a source runtime with a temporary `CATS_RUNTIME_DIR`, an unused `CATS_RUNTIME_PORT` and a
+  minimal `config/providers.yaml` enabling only the native CLI providers under test. Without it,
+  the fresh runtime has no configured providers.
+- `--startup-mode app-managed` exits when stdin closes, so hold stdin open, for example
+  `tail -f /dev/null | npx tsx src/index.ts --startup-mode app-managed ...`. Afterwards, stop only
+  the process listening on that port. A developer's own app-managed runtime stops the same way
+  when its parent exits.
+- Drive `/playground` with `playwright-core` headless Chromium and abort every non-GET request.
+  Wait for `providerOptionsReady` rather than `networkidle`, because the page keeps connections
+  open. Expand a collapsed card before selecting in it.
+- Report the result as an isolated source check, not as an installed Desktop acceptance.
+
+An installed Desktop bundles its own Runtime, built from a selected source commit rather than
+npm. Before claiming that a catalog change reached it, read the app's
+`resources/cats-runtime/package.json`. Also compare that directory's
+`config/curated-model-catalogs.generated.json` `sourceDigest` with the digest generated at the
+Runtime commit in question.
+
 ## Skill source and mirrors
 
 Edit only `cats-runtime/skills/maintain-provider-model-catalogs`. Run Runtime's

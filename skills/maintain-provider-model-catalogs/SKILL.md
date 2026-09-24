@@ -101,6 +101,10 @@ session model. Catalog-maintenance intent must also be present.
 5. For supplied picker text, screenshots, or transcription, read
    [paste intake](./references/paste-intake.md) before interpreting it. Load a provider reference
    only when that provider is in scope.
+6. Prefer a fresh agent session for each provider refresh. Every model call re-reads the whole
+   session context, so a long history can cost far more tokens than the capture's screenshots.
+   The measured 2026-09-25 Claude run in the owning repo's
+   `docs/research/2026-09-25-claude-picker-agent-capture.md` shows this.
 
 ## Select the interaction policy from plain language
 
