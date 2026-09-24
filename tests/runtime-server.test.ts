@@ -4276,7 +4276,7 @@ providers:
           entryId: 'opus',
           entryMode: 'explicit',
           controls: {
-            'claude.reasoning_effort': 'high',
+            'claude.reasoning_effort': 'medium',
           },
         },
         support: {

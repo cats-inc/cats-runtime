@@ -18,6 +18,24 @@ when those screens already establish the requested values/defaults. Follow
   generation names. Check the retained data/adapter mapping.
 
 
+## Agent-operated capture
+
+Use this only when the operator asks the agent to collect the picker. Follow
+[interactive capture](../interactive-capture.md) and its Claude helper.
+
+- Launch a dedicated window with `--safe-mode`. Customizations stay off, while OAuth and model
+  selection work normally. Do not use `--bare`: it never reads OAuth, so its picker would describe
+  API-key access rather than the operator's account.
+- Hash the settings file that `/model` writes before launch. The prompt glyph U+276F is followed by
+  U+00A0, so match separators with `\s`. Type `/model` and open it only when the prompt holds exactly
+  that command.
+- The footer reads `Enter to set as default · s to use this session only · Esc to cancel`. Traverse
+  with arrow keys only. Escape cancels and prints `Kept model as ...`; exit the CLI with `/exit`.
+- A saved model shows a check mark, and a saved effort sets every row's starting effort line. Only
+  an explicit `(default)` suffix, reached by cycling with Right, is default evidence. The check
+  mark and the starting level are not.
+- Unsupported effort shows one line with no `←/→` hint; do not press keys to probe it.
+
 ## Schema-2 execution data
 
 Put verified aliases in `execution.model`, approved version-bearing names in `label`, and per-model `claude.reasoning_effort` controls in data. Explicit unsupported effort uses `controls: []`.
