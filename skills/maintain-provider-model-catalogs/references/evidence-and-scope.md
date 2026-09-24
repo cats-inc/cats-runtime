@@ -98,6 +98,12 @@ from a paste is not removal evidence because scrolling, entitlement, or truncati
   the current session selection.
 - Never copy one model's observed option set to another model. Shared options in YAML require
   evidence that the axis is genuinely shared across the represented scope.
+- A label, limit or capability claim must hold for the model that `execution.model` actually
+  resolves to, not only for the picker row it came from. When a CLI resolves aliases, confirm the
+  resolved id with its own status or enumeration command, for example Claude `/status` or
+  `codex debug models`. A plain alias can resolve to a different variant, such as a
+  standard-context model where the label says 1M. A mismatch is contradicting evidence: correct
+  the token or the claim, and do not invent a replacement value that was not observed.
 
 ## Conflicts and projection
 

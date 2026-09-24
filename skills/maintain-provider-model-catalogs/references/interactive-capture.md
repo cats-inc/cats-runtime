@@ -12,6 +12,9 @@ personal overrides or publication beyond the existing request.
 2. Use a dedicated, uniquely titled terminal window and a new private evidence directory outside
    Git. Keep raw screenshots/logs private. Record the actual launched home/profile/config path;
    hash the relevant config before launch without copying credentials or the whole profile.
+   On Windows, the platform helper's `Start-WindowsUiTerminal` opens that window and
+   `Send-WindowsUiText` types slash commands under the same guards as keys. Wait for the typed
+   command to appear on screen before a separate guarded Enter.
 3. Inspect command help only as needed for startup/isolation flags. Read each screen's footer.
    Navigate menus and cancel leaves; do not submit an inference prompt or assume Enter/Escape
    have the same meaning across model, effort, upgrade and authentication screens.
