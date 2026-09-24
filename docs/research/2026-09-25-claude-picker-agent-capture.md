@@ -15,7 +15,7 @@ account. The text is Windows UI Automation visible text, checked against screens
 
 | Cats label | Execution alias | Efforts (cycle order) | Picker `(default)` |
 | --- | --- | --- | --- |
-| Opus 5.5 with 1M context | `opus` | Low, Medium, High, xHigh, Max, Ultracode | Medium |
+| Opus 5.5 with 1M context | `opus[1m]` (see context aliases) | Low, Medium, High, xHigh, Max, Ultracode | Medium |
 | Fable 5.1 | `fable` | Low, Medium, High, xHigh, Max, Ultracode | High |
 | Sonnet 5 | `sonnet` | Low, Medium, High, xHigh, Max, Ultracode | High |
 | Haiku 4.5 | `haiku` | Effort not supported | None |
@@ -25,8 +25,8 @@ the same Medium default. Compared with 2.1.273, only two things changed: the Opu
 description (and therefore its projected label) now says Opus 5.5, and Opus now marks Medium,
 not High, as its default effort. Aliases, effort tokens, context values and all other rows are
 unchanged. The factory CLI scope and its generated JSON now carry these values. The API and agent
-discovery scopes use the new Opus label only. The CLI picker does not show how those backends
-resolve `opus`.
+discovery scopes first took the new Opus label; the context-alias follow-up below changed it to
+`Opus 5.5`. The CLI picker does not show how those backends resolve `opus`.
 
 ## Evidence and interpretation
 
@@ -41,6 +41,37 @@ resolve `opus`.
   wrap point and matches the 2.1.273 capture. Max keeps its usage warning on every supported row.
 - The observation tree has 30 observed paths and no expected-path gaps. Five change groups were
   ready. The discovery-label change needed scope confirmation, which the operator gave.
+
+## Context aliases (follow-up)
+
+The operator asked whether Cats' `opus` execution is really 1M, then approved a data-only fix.
+The agent launched six aliases (`opus`, `sonnet` and `fable`, each with and without `[1m]`) in
+dedicated windows. For each launch it read the startup banner and the local `/status` Model line
+([evidence](fixtures/claude-2.1.282/model-alias-status.redacted.txt)).
+
+- Plain aliases resolve to standard-context models: `opus` resolves to claude-opus-5-5 and
+  `sonnet` to claude-sonnet-5. Only `opus[1m]` and `sonnet[1m]` add the `[1m]` suffix.
+- `fable[1m]` is accepted but resolves to plain claude-fable-5-1.
+- The banner alone is not evidence: it shows `(1M context)` for `opus[1m]` but not for
+  `sonnet[1m]`.
+- The picker's Opus (1M context) row saves `opus[1m]`.
+- The picker's Default row is `value: null`. The CLI resolves `--model default` to the account's
+  current default rather than to a model named `default`, so Cats keeps its explicit four rows.
+  That is the 2026-04-08 decision in Platform `a053ca45`.
+
+Resulting data change:
+
+- The CLI Opus row now executes `opus[1m]`, so its 1M label and limit are true.
+- Sonnet keeps `sonnet` and loses the 1M limit from the 2.1.246 static extraction. Its
+  standard-context value was not observed, so none is recorded.
+- Fable and Haiku are unchanged.
+- The Claude API and agent discovery scopes still execute `opus`, whose context this CLI evidence
+  cannot establish, so their label is now `Opus 5.5`.
+- Entry ids are unchanged, so saved selections and bound sessions keep their ids.
+
+Print mode (`-p`, which Cats uses) and non-Max accounts were not probed. Both would need a real
+request or another account. The `fable[1m]` result suggests the CLI drops an unsupported suffix
+rather than failing, but entitlement fallback for `opus[1m]` is unverified.
 
 ## Native capture lessons
 

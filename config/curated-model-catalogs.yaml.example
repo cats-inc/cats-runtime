@@ -21,10 +21,16 @@ catalogs:
       - "Display names follow the operator's version-bearing projection of the picker descriptions:
         Opus 5.5 with 1M context, Fable 5.1, Sonnet 5, and Haiku 4.5. Cats adds the status suffix `
         (default)` in lowercase across model and effort menus; it is not part of the model name."
-      - "Raw alias mappings are unchanged: `opus`, `sonnet`, and `haiku` retain their 2.1.246
-        static-extraction provenance; `fable` and `claude-fable-5-1` retain the 2.1.258
-        help/static-artifact evidence. The existing Claude normalizers map these labels and all six
-        effort values. No raw token is inferred from the new capture."
+      - "Raw alias mappings: Opus executes `opus[1m]`, the token the picker's Opus (1M context) row
+        saves. `sonnet` and `haiku` retain their 2.1.246 static-extraction provenance; `fable` and
+        `claude-fable-5-1` retain the 2.1.258 help/static-artifact evidence. The existing Claude
+        normalizers map these labels and all six effort values."
+      - "Context aliases observed 2026-09-25 through `/status` on Claude Code 2.1.282 (interactive
+        mode, operator's Max account): `opus` -> claude-opus-5-5 and `opus[1m]` ->
+        claude-opus-5-5[1m]; `sonnet` -> claude-sonnet-5 and `sonnet[1m]` -> claude-sonnet-5[1m];
+        `fable` and `fable[1m]` -> claude-fable-5-1. Plain aliases therefore run the standard
+        context, and Fable drops the suffix. Print mode and other accounts were not probed.
+        Evidence: docs/research/fixtures/claude-2.1.282/model-alias-status.redacted.txt"
       - "For Default, Opus, Fable, and Sonnet separately, the capture cycled the effort line with
         the Right key through Low, Medium, High, xHigh, Max, and Ultracode before it wrapped. Default
         and Opus mark Medium `(default)`; Fable and Sonnet mark High `(default)`. The starting xHigh
@@ -35,9 +41,10 @@ catalogs:
         describes xHigh effort plus dynamic workflow orchestration; the earlier read-only `claude
         --effort ultracode --version` parser check accepted that token. This refresh does not repeat
         execution probes.
-      - Opus 1M context was re-observed. Sonnet 1M and Haiku 200K context values remain from the
-        2.1.246 static extraction and were not re-observed; Fable context remains unknown and
-        omitted.
+      - Opus 1M context was re-observed and now matches its `opus[1m]` execution. The Sonnet 1M
+        value from the 2.1.246 static extraction is removed because `sonnet` resolves to the
+        standard context; that standard value was not observed, so no limit is recorded. Haiku
+        200K remains unverified 2.1.246 provenance; Fable context remains unknown and omitted.
     models:
       - default: true
         id: opus
@@ -50,12 +57,14 @@ catalogs:
         notes:
           - "Picker description: Opus 5.5 with 1M context - best for everyday, complex tasks"
           - The 2.1.282 picker marks Medium `(default)` for Opus; 2.1.273 marked High.
+          - Executes `opus[1m]` (claude-opus-5-5[1m]); plain `opus` resolves to the standard-context
+            claude-opus-5-5.
         source_names:
           - Opus
           - Opus 5 with 1M context
           - Opus 5.5 with 1M context
         execution:
-          model: opus
+          model: opus[1m]
         controls:
           - key: claude.reasoning_effort
             label: Reasoning effort
@@ -134,10 +143,10 @@ catalogs:
         label: Sonnet 5
         capabilityTags:
           - tool_use
-        limits:
-          contextWindowTokens: 1000000
         notes:
           - "Picker description: Sonnet 5 - efficient for routine tasks"
+          - "`sonnet` resolves to the standard-context claude-sonnet-5; the 1M `sonnet[1m]` alias is
+            not offered by the picker and is not used here."
         source_names:
           - Sonnet
           - Sonnet 5
@@ -1810,11 +1819,13 @@ catalogs:
     selection_mode: discovery
     models:
       - id: opus
-        label: Opus 5.5 with 1M context
+        label: Opus 5.5
         default: true
         capabilityTags:
           - tool_use
           - reasoning
+        notes:
+          - Claude Code CLI context evidence does not establish this backend's context window.
         execution:
           model: opus
         controls: []
@@ -2071,11 +2082,13 @@ catalogs:
     selection_mode: discovery
     models:
       - id: opus
-        label: Opus 5.5 with 1M context
+        label: Opus 5.5
         default: true
         capabilityTags:
           - tool_use
           - reasoning
+        notes:
+          - Claude Code CLI context evidence does not establish this backend's context window.
         execution:
           model: opus
         controls: []

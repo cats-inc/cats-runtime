@@ -35,6 +35,12 @@ Use this only when the operator asks the agent to collect the picker. Follow
   an explicit `(default)` suffix, reached by cycling with Right, is default evidence. The check
   mark and the starting level are not.
 - Unsupported effort shows one line with no `←/→` hint; do not press keys to probe it.
+- Verify context aliases through the local `/status` Model line (for example
+  `opus[1m] (claude-opus-5-5[1m])`) without submitting a prompt. The startup banner does not show
+  `(1M context)` for every 1M alias, and plain aliases may resolve to standard context. A 1M label
+  or limit needs an execution token that resolves to the `[1m]` model.
+- The picker's Default row is `value: null`, and `--model default` resolves to the account's
+  current default. It is not a model id; Cats keeps explicit aliases.
 
 ## Schema-2 execution data
 

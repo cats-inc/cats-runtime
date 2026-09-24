@@ -1,0 +1,38 @@
+# Source: agent-operated Claude Code launches, Windows UI Automation visible text
+# Version: 2.1.282
+# Observed: 2026-09-25
+# Scope: operator subscription account (startup banner: Claude Max); Windows 11 RDP session,
+#   Windows Terminal, interactive mode; each launch used --safe-mode --no-chrome --model <alias>
+# Method: read the startup banner model line, open the local /status panel and read its Model
+#   line, then Escape and /exit. No prompt was submitted, and settings.json kept its prelaunch hash.
+# Redaction: /status account, organization, email, peer-address and working-directory lines are
+#   omitted; only the banner model line and the /status Model line are kept per launch
+# Note: the banner shows "(1M context)" for opus[1m] but not for sonnet[1m], so the /status model
+#   id, not the banner, identifies the 1M variant
+
+--model opus
+  Banner:  Opus 5.5 with xhigh effort · Claude Max
+  Model:   opus (claude-opus-5-5)
+
+--model opus[1m]
+  Banner:  Opus 5.5 (1M context) with xhigh effort · Claude Max
+  Model:   opus[1m] (claude-opus-5-5[1m])
+
+--model sonnet
+  Banner:  Sonnet 5 with xhigh effort · Claude Max
+  Model:   sonnet (claude-sonnet-5)
+
+--model sonnet[1m]
+  Banner:  Sonnet 5 with xhigh effort · Claude Max
+  Model:   sonnet[1m] (claude-sonnet-5[1m])
+
+--model fable
+  Banner:  Fable 5.1 with xhigh effort · Claude Max
+  Model:   fable (claude-fable-5-1)
+
+--model fable[1m]
+  Banner:  Fable 5.1 with xhigh effort · Claude Max
+  Model:   fable[1m] (claude-fable-5-1)
+
+# Picker row token: after the operator chose "Opus (1M context)" in /model, settings.json held
+#   model "opus[1m]", and the 2.1.282 picker showed the check mark on that row.
