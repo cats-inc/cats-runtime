@@ -44,8 +44,8 @@ scheduled polling, verified account linkage and durable history remain deferred.
 ## Provider Detection
 
 [Claude 2.1.282 agent-operated capture](./research/2026-09-25-claude-picker-agent-capture.md)
-records the Opus 5.5 label, Opus's Medium default effort, the arrow-only Claude capture helper
-and the measured screenshot/token cost of the native run.
+records the Opus 5.5 label, Opus's Medium default effort, the `opus[1m]` context alias, the
+arrow-only Claude capture helper and the measured screenshot/token cost of the native run.
 
 [Codex desktop picker pilot](./research/2026-09-24-codex-picker-pilot.md) records the complete
 0.156.1 catalog, native menu capture, default-marker masking and reusable skill workflow.

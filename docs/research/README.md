@@ -6,7 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
-| [2026-09-25-claude-picker-agent-capture](./2026-09-25-claude-picker-agent-capture.md) | Claude 2.1.282 agent-operated picker capture | Opus 5.5 label, Opus Medium default effort, arrow-only capture helper and measured token cost |
+| [2026-09-25-claude-picker-agent-capture](./2026-09-25-claude-picker-agent-capture.md) | Claude 2.1.282 agent-operated picker capture | Opus 5.5 label, Opus Medium default effort, `opus[1m]` context alias, arrow-only capture helper and measured token cost |
 | [2026-09-24-codex-picker-pilot](./2026-09-24-codex-picker-pilot.md) | Codex native picker pilot | Seven observed models, per-model efforts/defaults, data-only refresh and reusable capture |
 | [2026-09-23-pi-shortlist](./2026-09-23-pi-shortlist.md) | Pi subscription shortlist | Six visible provider labels, fixed medium execution and isolated discovery tests |
 | [2026-09-23-goose-shortlist](./2026-09-23-goose-shortlist.md) | Goose ChatGPT Codex shortlist | Six fixed Off models, exact provider routing and native effort suffix |
