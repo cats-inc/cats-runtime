@@ -66,6 +66,34 @@ Exercise traversal, final hash failure and capture policies without launching a 
 powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Test-CodexPicker.ps1
 ```
 
+## Windows Claude helper
+
+[`Capture-ClaudePicker.ps1`](../scripts/Capture-ClaudePicker.ps1) owns Claude Code picker
+semantics and takes the same platform helper path. Start at an inspected Claude Code
+`Select model` picker in a dedicated single-pane Windows Terminal window, already foreground.
+Pass the settings file the picker would write (normally `~/.claude/settings.json`). The helper
+does not launch the CLI, type `/model` or interpret aliases/defaults:
+
+```powershell
+powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/scripts/Capture-ClaudePicker.ps1 `
+  -UiHelperPath $desktopUiHelper -WindowTitle $captureWindowTitle `
+  -OutputDirectory $newEmptyEvidenceDirectory -ConfigPath $claudeSettings `
+  -ExpectedModelCount $independentlyObservedCount
+```
+
+It sends only arrow keys. Up/Down move rows; Right cycles each row's effort line until it returns
+to its starting level. Enter (save default) and `s` (session only) are never sent, and the picker
+is left open at its starting row and effort. `KeyScreens` saves the list plus one default-marked
+(or unsupported) screen per row; the other steps are text-only. The JSON result records each
+row's label, current marker, description and effort cycle with explicit `(default)` markers.
+Order is the Right-key cycle from the starting level; derive linear order from the wrap point.
+
+Exercise traversal, config-change and evidence-directory guards without launching a CLI:
+
+```powershell
+powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Test-ClaudePicker.ps1
+```
+
 ## Turn evidence into data
 
 Trim only terminal padding/chrome, mark redactions visibly, and retain material picker text under
@@ -77,4 +105,11 @@ product code. Personal overrides use the separate [soft-patch workflow](local-so
 
 The [Codex reference](providers/codex.md) records default-marker masking and other tested UI
 details. The owning repo's `docs/research/2026-09-24-codex-picker-pilot.md` records the native run,
-catalog delta, validation and limitations.
+catalog delta, validation and limitations. The [Claude reference](providers/claude.md) and
+`docs/research/2026-09-25-claude-picker-agent-capture.md` do the same for Claude Code.
+
+When the operator asks for cost, report the number and pixel size of saved images separately from
+the images actually sent to the agent. If the agent host keeps a per-message usage transcript, sum
+each message once by phase: preparation, capture and catalog update. Distinguish uncached input,
+cache writes, cache reads and output. The session context re-read on every call usually outweighs
+screenshots, so fewer, larger steps save more than dropping screenshots.

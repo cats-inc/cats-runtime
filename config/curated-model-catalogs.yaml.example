@@ -4,32 +4,34 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Claude
-    cli_version: 2.1.273
-    last_updated: 2026-09-16
+    cli_version: 2.1.282
+    last_updated: 2026-09-25
     notes:
-      - Model list and every model's effort screen re-read 2026-09-16 from the operator-pasted
-        `/model` picker on Claude Code 2.1.273. The operator requested exactly four Cats model rows,
-        with the duplicate Default/Opus presentation collapsed to Opus. Scope is the operator's
-        account; entitlement elsewhere is unverified.
-      - "Evidence: docs/research/fixtures/claude-2.1.273/model-picker.success.redacted.txt"
+      - Model list and every model's effort line re-read 2026-09-25 by an agent-operated capture of
+        the Claude Code 2.1.282 `/model` picker (Windows UI Automation visible text, checked
+        against screenshots). Scope is the operator's subscription account; entitlement elsewhere
+        is unverified. The operator's earlier four-row projection, collapsing the duplicate
+        Default/Opus presentation to Opus, still applies.
+      - "Evidence: docs/research/fixtures/claude-2.1.282/model-picker.agent-capture.redacted.txt"
       - The five source rows are Default (recommended), Opus (1M context), Fable, Sonnet, and Haiku.
         Default is a provider-default sentinel, not an executable model id. Its row and effort
         branch remain in evidence; Cats exposes only the four explicit model aliases, with Opus
         selected by default as the operator requested. This does not claim a provider-default alias
         will always resolve to Opus.
       - "Display names follow the operator's version-bearing projection of the picker descriptions:
-        Opus 5 with 1M context, Fable 5.1, Sonnet 5, and Haiku 4.5. Cats adds the status suffix `
+        Opus 5.5 with 1M context, Fable 5.1, Sonnet 5, and Haiku 4.5. Cats adds the status suffix `
         (default)` in lowercase across model and effort menus; it is not part of the model name."
       - "Raw alias mappings are unchanged: `opus`, `sonnet`, and `haiku` retain their 2.1.246
         static-extraction provenance; `fable` and `claude-fable-5-1` retain the 2.1.258
         help/static-artifact evidence. The existing Claude normalizers map these labels and all six
-        effort values. No raw token is inferred from the new paste."
-      - "For Default, Opus, Fable, and Sonnet separately, the complete ordered effort set is Low,
-        Medium, High, xHigh, Max, Ultracode, with High explicitly marked `(default)`. Haiku displays
-        `Effort not supported for Haiku` and keeps `options: []`. The Max usage warning is retained
-        per model."
+        effort values. No raw token is inferred from the new capture."
+      - "For Default, Opus, Fable, and Sonnet separately, the capture cycled the effort line with
+        the Right key through Low, Medium, High, xHigh, Max, and Ultracode before it wrapped. Default
+        and Opus mark Medium `(default)`; Fable and Sonnet mark High `(default)`. The starting xHigh
+        line reflected the saved session effort, not a default. Haiku displays `Effort not supported
+        for Haiku` and keeps `controls: []`. The Max usage warning is retained per model."
       - Older effort descriptions remain with their earlier provenance; they were not re-observed in
-        2.1.273. In particular, the 2.1.258 static artifact maps Ultracode to `ultracode` and
+        2.1.282. In particular, the 2.1.258 static artifact maps Ultracode to `ultracode` and
         describes xHigh effort plus dynamic workflow orchestration; the earlier read-only `claude
         --effort ultracode --version` parser check accepted that token. This refresh does not repeat
         execution probes.
@@ -39,17 +41,19 @@ catalogs:
     models:
       - default: true
         id: opus
-        label: Opus 5 with 1M context
+        label: Opus 5.5 with 1M context
         capabilityTags:
           - tool_use
           - reasoning
         limits:
           contextWindowTokens: 1000000
         notes:
-          - "Picker description: Opus 5 with 1M context - best for everyday, complex tasks"
+          - "Picker description: Opus 5.5 with 1M context - best for everyday, complex tasks"
+          - The 2.1.282 picker marks Medium `(default)` for Opus; 2.1.273 marked High.
         source_names:
           - Opus
           - Opus 5 with 1M context
+          - Opus 5.5 with 1M context
         execution:
           model: opus
         controls:
@@ -81,7 +85,7 @@ catalogs:
                   for this session only"
             semanticTags:
               - reasoning_intensity
-            default: high
+            default: medium
       - default: false
         id: fable
         label: Fable 5.1
@@ -1806,7 +1810,7 @@ catalogs:
     selection_mode: discovery
     models:
       - id: opus
-        label: Opus 5 with 1M context
+        label: Opus 5.5 with 1M context
         default: true
         capabilityTags:
           - tool_use
@@ -2067,7 +2071,7 @@ catalogs:
     selection_mode: discovery
     models:
       - id: opus
-        label: Opus 5 with 1M context
+        label: Opus 5.5 with 1M context
         default: true
         capabilityTags:
           - tool_use

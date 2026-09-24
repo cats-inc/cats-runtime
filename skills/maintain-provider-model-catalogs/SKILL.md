@@ -202,8 +202,9 @@ authorizes that external mutation.
   executable model ids, first-item initialization without default claims, and structured selection.
 - [Auggie](./references/providers/auggie.md): bounded JSON ID/display-name enumeration, opaque IDs
   and entry-only shortlist wiring without inferred effort/default metadata.
-- [Claude](./references/providers/claude.md): supplied picker fast path, alias/label projection,
-  per-model effort, and existing Runtime/Desktop support; compiled extraction is a possible superset.
+- [Claude](./references/providers/claude.md): supplied picker fast path, arrow-only agent capture,
+  alias/label projection, per-model effort and existing Runtime/Desktop support; compiled
+  extraction is a possible superset.
 - [Cline](./references/providers/cline.md): bounded installed ClinePass mappings, explicit provider
   routing, fixed thinking arguments and consistent structured/plain-string execution.
 - [Codex](./references/providers/codex.md): supplied picker evidence, existing per-model defaults,
