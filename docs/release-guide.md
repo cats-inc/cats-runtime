@@ -43,6 +43,11 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+Runtime `0.2.1` prepares the [Codex 0.156.1 catalog refresh](research/2026-09-24-codex-picker-pilot.md)
+and reusable picker-capture workflow. This compatible patch retains schema 2 and the existing
+upgrade contract; no data migration or new execution binding is required. The version bump and
+PR do not publish npm or a Desktop preview.
+
 Runtime `0.2.0` is prepared for the Desktop `0.4.0` preview's catalog upgrade
 validation. The complete pre-bump implementation passed release preflight at
 `231abff3231ab8a0e3fb4df5c77de13ff33cff02`. Pin the prepared Runtime commit in the
@@ -136,4 +141,4 @@ authorization before applying it; release notes alone do not complete migration.
 - Apps are independently versioned artifacts owned by cats-apps. A Runtime change
   does not bump App versions or change Desktop's selected App artifacts.
 
-*Last updated: 2026-09-23*
+*Last updated: 2026-09-24*

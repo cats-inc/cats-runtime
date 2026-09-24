@@ -4090,6 +4090,8 @@ providers:
 
   it('GET /providers/:provider/models returns structured static fallback for CLI providers', async () => {
     await withRuntime({}, {}, async (runtime) => {
+      const factoryModels = readCatalogFactory({ packageRoot: process.cwd(), runtimeRoot: process.cwd() })
+        .document.catalogs.find(scope => scope.provider === 'codex' && scope.backend === 'cli')!.models;
       const response = await runtime.app.request('/providers/codex/models');
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({
@@ -4099,13 +4101,7 @@ providers:
         defaultModel: 'gpt-6-astra',
         source: 'static',
         cache: null,
-        models: expect.arrayContaining([
-          { id: 'gpt-6-astra', label: 'gpt-6-astra', default: true },
-          { id: 'gpt-5.6-sol', label: 'gpt-5.6-sol', default: false },
-          { id: 'gpt-5.6-terra', label: 'gpt-5.6-terra', default: false },
-          { id: 'gpt-5.6-luna', label: 'gpt-5.6-luna', default: false },
-          { id: 'gpt-5.5', label: 'gpt-5.5', default: false },
-        ]),
+        models: factoryModels.map(({ id, label, default: isDefault }) => ({ id, label, default: isDefault })),
         warnings: [],
       });
     });
@@ -4226,6 +4222,8 @@ providers:
 
   it('GET /providers/:provider/models/advanced adds a runtime-owned advanced catalog without changing v1', async () => {
     await withRuntime({}, {}, async (runtime) => {
+      const factoryIds = readCatalogFactory({ packageRoot: process.cwd(), runtimeRoot: process.cwd() })
+        .document.catalogs.find(scope => scope.provider === 'codex' && scope.backend === 'cli')!.models.map(model => model.id);
       const response = await runtime.app.request('/providers/codex/models/advanced');
       expect(response.status).toBe(200);
       const payload = await response.json();
@@ -4249,23 +4247,11 @@ providers:
         },
         warnings: [],
       });
-      expect(payload.entries.map((entry: { id: string }) => entry.id)).toEqual([
-        'gpt-6-astra',
-        'gpt-5.6-sol',
-        'gpt-5.6-terra',
-        'gpt-5.6-luna',
-        'gpt-5.5',
-      ]);
+      expect(payload.entries.map((entry: { id: string }) => entry.id)).toEqual(factoryIds);
       expect(payload.controls).toMatchObject([
         {
           key: 'codex.reasoning_effort',
-          applicableEntryIds: [
-            'gpt-6-astra',
-            'gpt-5.6-sol',
-            'gpt-5.6-terra',
-            'gpt-5.6-luna',
-            'gpt-5.5',
-          ],
+          applicableEntryIds: factoryIds,
         },
       ]);
       expect(payload.entries.find((entry: { id: string }) => entry.id === 'gpt-5.6-sol'))

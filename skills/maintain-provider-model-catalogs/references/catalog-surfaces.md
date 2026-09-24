@@ -47,6 +47,9 @@ model literals, authored tables, model-keyed branches and non-data generator imp
 a binding, include an unknown-ID test that changes actual argv/request data without new model code.
 Use isolated profile/config fixtures; never depend on the maintainer's personal override or login.
 Select `discovery` explicitly in discovery tests; an empty override document inherits factory.
+Tests of the current factory should read that fixture rather than duplicate its complete model
+list. Frozen migration and isolated UI fixtures describe historical inputs: do not refresh them
+as current catalog data or compare their output with a later factory's model membership/labels.
 
 For runtime/UI implementation changes, run affected selection, adapter, HTTP and UI tests plus
 TypeScript checks. Regenerate public assets with `npm run build:ui`. For Platform behavior changes,
