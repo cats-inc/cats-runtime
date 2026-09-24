@@ -57,9 +57,12 @@ describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'kiro'
     // only the already-decorated offline labels. Copilot's default must survive.
     const syncStart = html.indexOf('function syncAgentModelField(div,options={})');
     const syncEnd = html.indexOf('\nfunction ', syncStart + 1);
+    const ruleStart = html.indexOf('function isAgentCustomModelSelection');
+    const isAgentCustomModelSelection = vm.runInNewContext(`(${html.slice(ruleStart, syncStart)})`);
     let renderedChoices: Array<{ value: string; label: string }> = [];
     const element = { value: '', classList: { remove() {}, add() {} } };
     const syncField = vm.runInNewContext(`(${html.slice(syncStart, syncEnd)})`, {
+      isAgentCustomModelSelection,
       window: { CatsUI: catsUI },
       normalizeAgentSelectionState: () => ({ provider, model: '', modelSelection: null }),
       renderAgentProviderSelectOptions: () => provider,
@@ -74,7 +77,7 @@ describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'kiro'
       getAgentDefaultEntryId: () => models.find(entry=>entry.default)?.id ?? models[0]?.id,
       getDefaultModel: () => models[0]?.id, applyAgentModelControlValues() {},
     }) as (div: unknown, options: unknown) => void;
-    syncField({ querySelector: () => element }, { preserve: false, provider });
+    syncField({ dataset: {}, querySelector: () => element }, { preserve: false, provider });
     expect(renderedChoices).toEqual([...fallback, { value: '__custom_model__', label: 'Custom model…' }]);
   });
 });
