@@ -82,6 +82,10 @@ Read [catalog surfaces](./references/catalog-surfaces.md) for current fields and
 - **Capture/preview**: use for a raw picker paste that is supplied as catalog evidence without an
   edit request. Parse and summarize it, but do not modify repository files, including evidence
   fixtures.
+- **Agent-operated picker capture**: when the operator asks for live menu collection, pair this
+  skill with `desktop-ui-automation` and read [interactive capture](./references/interactive-capture.md).
+  This changes the evidence acquisition method, not edit scope or catalog policy. Reuse a completed
+  capture across pauses and reviews; do not traverse the CLI again just to resume YAML work.
 
 Do not claim a `/model` paste that the operator supplied only to select or troubleshoot the current
 session model. Catalog-maintenance intent must also be present.

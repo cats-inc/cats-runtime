@@ -8,7 +8,8 @@ Compare evidence for the same field, model/option path, version, and account sco
 scope, prefer:
 
 1. account-resolved machine-readable enumeration from the installed CLI;
-2. operator-pasted output from the authenticated interactive picker;
+2. operator-pasted or agent-observed output from the authenticated interactive picker, with the
+   capture method identified and visible state verified;
 3. static extraction from the installed shipped artifact, labeled as a possible superset;
 4. version/help output, which proves only that surface and version.
 
@@ -20,6 +21,11 @@ An enumeration of model ids does not establish their effort menus. Global help/p
 defaults do not override a complete per-model picker observation. An explicit operator correction
 settles the named scope: record it as superseding the earlier inference, remove the faulty rule
 from provider guidance, and do not ask the same question again. Keep unrelated older provenance.
+
+UI Automation text is a picker observation, not machine enumeration. Distinguish visible UI text
+from OCR/transcription and cached/bundled CLI metadata. Different descriptions on a machine API
+and a visible menu can describe different surfaces; compare the same field before calling them
+conflicting evidence. Use the actual picker wording for picker display descriptions.
 
 Record for each observation:
 

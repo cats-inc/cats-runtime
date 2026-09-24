@@ -189,41 +189,40 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Codex
-    cli_version: 0.154.0
-    last_updated: 2026-09-16
+    cli_version: 0.156.1
+    last_updated: 2026-09-24
     notes:
-      - Model list and all per-model reasoning screens re-read 2026-09-16 from the operator-pasted
-        `/model` picker on Codex CLI 0.154.0. The operator confirmed the five visible rows are
-        complete and authorized removing gpt-5.4, gpt-5.4-mini, and gpt-5.3-codex-spark from the
-        Cats picker. Scope is the operator's account; entitlement elsewhere is unverified.
-      - "Evidence: docs/research/fixtures/codex-0.154.0/model-picker.success.redacted.txt"
-      - The model ids, ordering, descriptions, reasoning sets, and defaults below were observed in
-        that paste. gpt-6-astra is explicitly `(default)`; gpt-5.5 is only `(current)`, a session
-        selection. This supersedes the older gpt-5.6-sol model default.
-      - Display names preserve the raw ids and casing shown by the 0.154.0 picker, as requested by
-        the operator; older GPT-style label overrides are removed. The four retained context values
-        come from `codex debug models` on 0.149.1 (2026-08-26) and were not re-observed. gpt-6-astra
-        has no inferred context limit.
-      - The picker says legacy models remain accessible through `codex -m <model_name>` or
-        config.toml. Removal from this visible catalog does not claim those ids are invalid for
-        manual use.
-      - Context values reflect the Codex CLI catalog and may differ from OpenAI API limits
-      - "All four `More reasoning…` submenus were opened: gpt-6-astra, gpt-5.6-sol, and
-        gpt-5.6-terra offer Max and Ultra; gpt-5.6-luna offers Max only; gpt-5.5 stops at Extra
-        high. The Advanced Reasoning screen warns `⚠ Consumes usage limits faster`. The operator
-        explicitly authorized a flat Cats reasoning list; navigation/grouping and usage warnings
-        remain in the evidence."
-      - Level descriptions are identical across every captured model offering that level, so they
-        are shared below; value availability and defaults remain model-specific. Extra high maps to
-        xhigh through the existing Codex effort normalizer, and Max/Ultra map to max/ultra.
+      - Complete visible model list and every per-model reasoning/advanced menu captured on 2026-09-24
+        from Codex CLI 0.156.1 in Windows Terminal using UI Automation text and window screenshots.
+        Scope is the local CLI account; entitlement on other accounts is unverified.
+      - "Evidence: docs/research/fixtures/codex-0.156.1/picker.redacted.txt and
+        docs/research/fixtures/codex-0.156.1/machine-catalog.redacted.json"
+      - The seven picker rows agree with the seven visibility=list entries from codex debug models.
+        The hidden gpt-reserve and codex-auto-review entries are enumeration evidence, not Cats picker
+        rows. No existing picker row was removed.
+      - Display labels preserve the exact GPT-style casing now observed in the picker. Raw slugs
+        remain execution.model. Astra is explicitly (default); (current) masks that marker when Astra
+        is active, so a per-invocation --model override to GPT-6-Sol exposed the default without
+        changing config.toml.
+      - Each model reasoning set/default was observed independently. Astra, GPT-6-Sol, GPT-5.6-Sol and
+        GPT-5.6-Terra offer Max/Ultra; both Luna models offer Max only; GPT-5.5 ends at Extra high.
+        GPT-5.6-Sol defaults to Low, all others to Medium.
+      - The operator previously approved flattening More reasoning into one Cats effort list.
+        Navigation, per-model usage warnings and advanced descriptions remain in the picker fixture.
+        Max/Ultra display descriptions use the visible picker wording rather than the different
+        machine enumeration descriptions.
+      - Raw effort tokens/defaults and all seven 272000 context values were re-observed in codex debug
+        models; these are CLI catalog values, not claims about OpenAI API limits. Older capability
+        tags and migration source_names remain with their earlier provenance; no capability tags were
+        inferred for new models.
     models:
       - default: true
         id: gpt-6-astra
-        label: gpt-6-astra
+        label: GPT-6-Astra
         capabilityTags:
           - tool_use
         notes:
-          - Our most capable model for complex, demanding work.
+          - Frontier intelligence for the most demanding work.
         source_names:
           - gpt-6-astra
         execution:
@@ -256,15 +255,88 @@ catalogs:
             semanticTags:
               - reasoning_intensity
             default: medium
+        limits:
+          contextWindowTokens: 272000
+      - default: false
+        id: gpt-6-sol
+        label: GPT-6-Sol
+        limits:
+          contextWindowTokens: 272000
+        notes:
+          - Workhorse model for coding and everyday work.
+        execution:
+          model: gpt-6-sol
+        controls:
+          - key: codex.reasoning_effort
+            label: Reasoning effort
+            description: Controls Codex CLI reasoning depth for supported models.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: Low
+                description: Fast responses with lighter reasoning
+              - value: medium
+                label: Medium
+                description: Balances speed and reasoning depth for everyday tasks
+              - value: high
+                label: High
+                description: Greater reasoning depth for complex problems
+              - value: xhigh
+                label: Extra high
+                description: Extra high reasoning depth for complex problems
+              - value: max
+                label: Max
+                description: For difficult problems when quality matters more than speed · higher usage
+              - value: ultra
+                label: Ultra
+                description: For demanding work using multiple agents · highest usage
+            semanticTags:
+              - reasoning_intensity
+            default: medium
+      - default: false
+        id: gpt-6-luna
+        label: GPT-6-Luna
+        limits:
+          contextWindowTokens: 272000
+        notes:
+          - Fast and affordable model for easier tasks.
+        execution:
+          model: gpt-6-luna
+        controls:
+          - key: codex.reasoning_effort
+            label: Reasoning effort
+            description: Controls Codex CLI reasoning depth for supported models.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: Low
+                description: Fast responses with lighter reasoning
+              - value: medium
+                label: Medium
+                description: Balances speed and reasoning depth for everyday tasks
+              - value: high
+                label: High
+                description: Greater reasoning depth for complex problems
+              - value: xhigh
+                label: Extra high
+                description: Extra high reasoning depth for complex problems
+              - value: max
+                label: Max
+                description: For difficult problems when quality matters more than speed · higher usage
+            semanticTags:
+              - reasoning_intensity
+            default: medium
       - default: false
         id: gpt-5.6-sol
-        label: gpt-5.6-sol
+        label: GPT-5.6-Sol
         capabilityTags:
           - tool_use
         limits:
           contextWindowTokens: 272000
         notes:
-          - Reliable agentic workhorse for everyday tasks.
+          - Older coding model for complex work.
         source_names:
           - gpt-5.6-sol
         execution:
@@ -299,13 +371,13 @@ catalogs:
             default: low
       - default: false
         id: gpt-5.6-terra
-        label: gpt-5.6-terra
+        label: GPT-5.6-Terra
         capabilityTags:
           - tool_use
         limits:
           contextWindowTokens: 272000
         notes:
-          - Balanced agentic coding model for everyday work.
+          - Older balanced model for straightforward work.
         source_names:
           - gpt-5.6-terra
         execution:
@@ -340,13 +412,13 @@ catalogs:
             default: medium
       - default: false
         id: gpt-5.6-luna
-        label: gpt-5.6-luna
+        label: GPT-5.6-Luna
         capabilityTags:
           - tool_use
         limits:
           contextWindowTokens: 272000
         notes:
-          - Fast and affordable agentic coding model.
+          - Older fast and efficient model.
         source_names:
           - gpt-5.6-luna
         execution:
@@ -378,13 +450,13 @@ catalogs:
             default: medium
       - default: false
         id: gpt-5.5
-        label: gpt-5.5
+        label: GPT-5.5
         capabilityTags:
           - tool_use
         limits:
           contextWindowTokens: 272000
         notes:
-          - Proven previous-generation model for coding and general work.
+          - Legacy coding model.
         source_names:
           - gpt-5.5
         execution:

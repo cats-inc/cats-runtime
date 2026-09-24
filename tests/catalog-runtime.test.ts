@@ -111,8 +111,9 @@ describe('explicit conversion and safe patch apply', () => {
     const converted = convertLegacyCatalog(source, mapping);
     expect(converted.catalogs).toHaveLength(16);
     for (const scope of converted.catalogs) {
-      const expected = snapshot.document.catalogs.find(s => s.provider === scope.provider && s.backend === scope.backend)!;
-      expect(scope.models.map(m => [m.id, m.label, m.execution])).toEqual(expected.models.map(m => [m.id, m.label, { ...m.execution, fixed_controls: m.execution.fixed_controls ?? {} }]));
+      // Migration preserves the old profile; later factory refreshes must not rewrite its choices.
+      const expected = mapping.find(m => m.scope.provider === scope.provider && m.scope.backend === scope.backend)!;
+      expect(scope.models.map(m => [m.id, m.label, m.execution])).toEqual(expected.entries.map(({ model: m }) => [m.id, m.label, { ...m.execution, fixed_controls: m.execution.fixed_controls ?? {} }]));
     }
     const changed = JSON.parse(source); changed.catalogs[0].models[0].name = 'unknown';
     expect(() => convertLegacyCatalog(JSON.stringify(changed), mapping)).toThrow(/Unresolved model/);
