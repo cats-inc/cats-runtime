@@ -1606,6 +1606,13 @@ function renderAgentModelChoice(div){
   hintEl.textContent=bits.join(' · ')||'Advanced catalog selection';
   renderAgentModelControls(div,catalog,entryId,presetId);
 }
+// A card rendered before provider catalogs load has Custom as its only option. Keep an
+// empty Custom selection across refreshes only when the user chose it; otherwise adopt
+// the catalog default once real choices exist.
+function isAgentCustomModelSelection({requestedIsUnlisted,preserveCurrent,currentValue,customChosen}){
+  return Boolean(requestedIsUnlisted)
+    ||Boolean(preserveCurrent&&currentValue==='__custom_model__'&&customChosen);
+}
 function syncAgentModelField(div,options={}){
   const providerEl=div.querySelector('.agent-provider');
   const entryGroup=div.querySelector('.agent-entry-group');
@@ -1638,13 +1645,19 @@ function syncAgentModelField(div,options={}){
     ? entries.map(entry=>({value:entry.id,label:window.CatsUI.formatAdvancedDefaultLabel(entry.label||entry.id,entry.default)}))
     : basicModels.map(entry=>({value:entry.value,label:entry.label||entry.value}));
   const requested=normalizedState.modelSelection?.entryId||normalizedState.model||'';
-  const isCustom=Boolean(requested&&!choices.some(choice=>choice.value===requested))
-    ||(preserveCurrent&&select.value==='__custom_model__');
+  const requestedIsUnlisted=Boolean(requested&&!choices.some(choice=>choice.value===requested));
+  const isCustom=isAgentCustomModelSelection({
+    requestedIsUnlisted,
+    preserveCurrent,
+    currentValue:select.value,
+    customChosen:div.dataset.customModelChosen==='true',
+  });
   const customInput=div.querySelector('.agent-custom-model');
-  if(customInput&&isCustom&&requested&&!choices.some(choice=>choice.value===requested)) customInput.value=requested;
+  if(customInput&&requestedIsUnlisted) customInput.value=requested;
   choices.push({value:'__custom_model__',label:'Custom model…'});
   const preferred=requested||getAgentDefaultEntryId(catalog,entries)||getDefaultModel(provider)||choices[0].value;
   const nextEntryId=renderAgentRoutingSelectOptions(select,choices,isCustom?'__custom_model__':preferred);
+  if(nextEntryId!=='__custom_model__') delete div.dataset.customModelChosen;
   select.disabled=!provider;
   entryGroup.classList.remove('hidden');
   syncAgentPresetField(div,isCustom?null:catalog,nextEntryId,normalizedState.modelSelection?.presetId||'',options.allowDefaultPreset!==false);
@@ -1706,6 +1719,8 @@ function addAgent(name='',provider='claude',model='',tags=[],modelSelection=null
     syncAgentModelField(div,{preserve:false,preserveRequestedProvider:true});
   });
   entrySel.addEventListener('change',()=>{
+    if(entrySel.value==='__custom_model__') div.dataset.customModelChosen='true';
+    else delete div.dataset.customModelChosen;
     const providerName=div.querySelector('.agent-provider')?.value||'';
     syncAgentPresetField(div,getProviderAdvancedCatalog(providerName),entrySel.value||'','',false);
     renderAgentModelChoice(div);
