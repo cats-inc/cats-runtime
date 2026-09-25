@@ -8,13 +8,21 @@ Start `muse serve`, send the
 JSON-RPC `initialize` request, send the `initialized` notification, then call `model/list`. The
 `initialized` notification is required: without it `model/list` returns
 `{"code":-32600,"message":"Not initialized","data":{"kind":"notInitialized"}}`. Frames are
-newline-delimited JSON, not LSP `Content-Length` framing.
+newline-delimited JSON, not LSP `Content-Length` framing. `clientInfo` requires a `name`
+matching `^[a-z0-9_]+$` plus a `version` string; a hyphenated name is rejected with
+`invalidParams`, which then leaves the session uninitialized.
 
 The reply is the account-resolved catalog and carries its own provenance — `providerId`,
 `profileId`, and a `source` field that distinguishes a live provider catalog from a test fake.
 Record all three. Each row carries `modelId`, `displayLabel`, `releaseDate`, `contextLimit`,
 `outputLimit`, `cost`, `isDefault`, and `isActive`; a field the source declared nothing for comes
-back `null` and must be omitted rather than guessed.
+back `null` and must be omitted rather than guessed. Since Muse Code 1.4.0
+(`muse-bin-1.4.0-R4161.1`) each row may also carry an ordered `variants` array holding that
+model's reasoning-effort tokens (observed: both 1.3 rows through `max`, both 1.2 rows through
+`xhigh`; parser-only `none`/`ultra` absent). Treat `variants` as corroboration for retaining
+already-evidenced per-model menus, not as picker evidence: it carries no default marker and
+says nothing about session-current state, so absence-of-default and marker semantics still
+require picker observation.
 
 Two judgements are specific to this provider.
 
