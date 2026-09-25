@@ -18,9 +18,9 @@ and [ADR-118](../../../cats-platform/docs/decisions/118-use-isolated-development
   consumed by the completed PLAN-110 runs; do not reuse them.
 - P1 implements the policy below. Targeted validation and independent re-review
   passed. No preview supplement is shipped by P1 alone.
-- Next P2 adds the three complete Runtime product skills, Desktop staging and
-  actual preview/release/npm inventory and delivery checks. P3/P4 implement
-  bounded practice and reviewed knowledge export in Platform.
+- P2 now adds the three complete Runtime product skills. Paired Desktop staging
+  and real library/npm inventory checks passed on the Platform feature branch.
+  P3/P4 next implement bounded practice and reviewed knowledge export in Platform.
 
 ## P1 behavior
 
@@ -90,3 +90,29 @@ Rolling back to an older binary preserves files but does not enforce this policy
   Earlier failed fixture runs remain diagnosis, not passing evidence.
 - No paid model, installed Desktop, other-OS or full CI acceptance is claimed.
   Normal PR/CI gates still apply before integration.
+
+### P2 supplement/distribution checkpoint
+
+- Three Runtime-owned packages plus optional references are complete under the
+  reserved preview subtree. All 36 source packages pass the canonical Runtime
+  metadata validator. The generic Codex frontmatter validator is not the schema
+  authority for Runtime's additional library fields.
+- Four real-library inventory/delivery cases and 23 catalog tests passed. Actual
+  Claude inline, Pi instruction-file and Codex filesystem input were inspected
+  without starting providers. The filesystem case compares reference bytes too.
+  A Windows full-library case exceeded Vitest's 5-second default initially;
+  its scoped 30-second timeout rerun passed, with no assertion change.
+- `npm pack --dry-run --ignore-scripts --json` inspected 1,255 actual artifact
+  paths: 33 ordinary skills, no preview subtree/resources or source manifest.
+  npm 12 returns an object keyed by package name; the initial array-based
+  inspection script was corrected before recording this result.
+- Platform's `tools/check-skill-distribution.mjs --runtime-root <this checkout>`
+  stages the real library and imports actual compiled Runtime policy/catalog
+  modules in isolated package layouts: preview 36 skills/41 content files;
+  release 33 skills/35 content files. The release artifact cannot elevate via
+  a catalog override pointing at the source preview tree. No provider calls.
+- Platform server/host builds and 28 staging tests passed, including both
+  ordinary knowledge bundles and replacement of a stale preview stage.
+- Independent code review and four text-only skill forward scenarios passed;
+  follow-up clarified existing evidence versus new exercise admission and
+  uncertain mutation replay. This is not native model or task acceptance.

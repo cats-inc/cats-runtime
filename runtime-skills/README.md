@@ -181,6 +181,22 @@ Collaboration note:
 | `advanced-programmer-systems` | `role` | hosts, packaging, and process supervision |
 | `advanced-programmer-runtime` | `role` | runtime seams and lifecycle integrity |
 
+## Preview supplement
+
+The source/preview library includes three additional self-contained packages:
+
+| Skill | Purpose |
+|-------|---------|
+| `cats-inc-development` | Authorized Cats source changes, isolated candidates, independent review and checkpoints |
+| `cats-platform-operation` | Practice with observed product state, actual tools and authoritative results |
+| `cats-practice-and-distill` | Evidence-backed candidate lessons, fixed evaluation and independent promotion |
+
+Their essential workflow is inline for instruction delivery; optional reference
+files travel with filesystem delivery and participate in the package digest.
+Normal release/npm inventory remains the original 33 packages. The source/preview
+inventory has 36. These packages do not grant tool access or permissions, launch
+practice on their own, or replace ordinary Catlas/Orchestrator knowledge.
+
 ## Delivery
 
 The runtime resolves and delivers these product packages when a session requests them.
