@@ -5,6 +5,7 @@ import type { ProviderCommandConfig, ProviderRuntimeConfig } from '../config.js'
 import { resolveRuntimeRoot, resolveRuntimeSessionsDir } from '../../../shared/runtimePaths.js';
 import { resolveWindowsNodeShim } from './windowsNodeShim.js';
 import { resolveWindowsMuseLauncher } from './windowsMuseLauncher.js';
+import { resolveWindowsCodexLauncher } from './windowsCodexLauncher.js';
 import { getProviderProcessPolicy } from './providerProcessPolicy.js';
 import {
   getProviderInstallKnowledge,
@@ -21,7 +22,7 @@ export interface ShellInvocation {
 export interface ProcessSpawnConfig extends ShellInvocation {
   shell: boolean | string;
   cwd?: string;
-  env?: Record<string, string>;
+  env?: NodeJS.ProcessEnv;
   windowsVerbatimArguments?: boolean;
 }
 
@@ -523,6 +524,10 @@ function buildNativeSpawnConfig(
       {
         const shimTarget = resolveWindowsNodeShim(commandPath);
         if (shimTarget) {
+          const codex = providerName === 'codex' ? resolveWindowsCodexLauncher(shimTarget) : null;
+          if (codex) {
+            return { command: codex.command, args, shell: false, cwd, env: codex.env };
+          }
           return {
             command: shimTarget.command,
             args: [...shimTarget.args, ...args],
