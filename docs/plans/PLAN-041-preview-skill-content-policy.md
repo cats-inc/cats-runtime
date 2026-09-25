@@ -1,13 +1,37 @@
 # PLAN-041: Preview Skill Content Policy
 
-Status: in progress, 2026-09-25. Runtime owns managed skill discovery, delivery and
+Status: in progress, 2026-09-26. Runtime owns managed skill discovery, delivery and
 retained-context admission. Platform owns Desktop staging and knowledge practice.
 The cross-repository contract is
 [PLAN-109](../../../cats-platform/docs/plans/PLAN-109-cats-self-development-and-catlas-practice.md),
 [SPEC-117](../../../cats-platform/docs/specs/SPEC-117-cats-self-development-and-catlas-practice.md)
 and [ADR-118](../../../cats-platform/docs/decisions/118-use-isolated-development-and-verified-practice-for-cats-improvement.md).
 
-## Resume checkpoint
+## Resume checkpoint — read-only sandbox delivery (2026-09-26)
+
+- Current checkout: `cats-runtime`, branch `fix/readonly-sandbox-skill-delivery`,
+  base `e464619` (0.3.0). The earlier preview-content branches are merged;
+  the prior worktree checkpoint below is historical.
+- Platform PLAN-109's authorized native authoring attempt stopped before provider
+  dispatch: a read-only sandbox projects legacy `workspaceMode: read_only`, but
+  Codex skill delivery mistook that access policy for shared-workspace ownership.
+  No model request was spent; preserve the failed private attempt.
+- Internal skill resolution now receives canonical workspace kind separately.
+  Runtime may prepare skill files in its owned sandbox, while provider execution
+  retains read-only access and the default permission gate. Canonical source and
+  worktree kinds override stale isolated hints and never receive managed copies.
+  Message rehydration preserves canonical workspace and isolation metadata.
+- Fingerprint/conflict checks and preview exposure/provenance stay in force.
+  This corrects internal propagation; no public field, persisted-format migration,
+  version bump, publication or installed-profile change is needed or authorized.
+- Validation passed: 113 distinct cases across hydration ownership, real HTTP strict create and
+  message rehydration, unchanged provider permissions, source non-materialization,
+  existing catalog/content-policy and Codex read-tool checks; Runtime TypeScript
+  build passed. The first run exposed only a warning-substring regression;
+  wording was corrected and all 23 catalog cases rerun successfully. Independent
+  review found no blockers. Platform native acceptance is still pending.
+
+## Previous checkpoint — preview-content integration
 
 - Runtime worktree: `cats-runtime-preview-skills`, branch
   `feat/preview-content-policy`, base `a694104`.

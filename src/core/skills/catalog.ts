@@ -31,6 +31,7 @@ import type {
   RuntimeSkillPackageKind,
   RuntimeSkillManifest,
   SessionSkillState,
+  WorkspaceKind,
   WorkspaceMode,
 } from '../types.js';
 
@@ -134,6 +135,7 @@ interface ResolveRuntimeSkillManifestOptions {
   providerBackend?: ProviderBackend;
   cwd: string;
   sessionBaseDir: string;
+  workspaceKind?: WorkspaceKind;
   workspaceMode?: WorkspaceMode;
   now?: Date;
   baseInstructionsFile?: string;
@@ -1216,17 +1218,22 @@ function buildRuntimeSkillDeliveryPlan(
   options: ResolveRuntimeSkillManifestOptions,
 ): RuntimeSkillDeliveryPlan {
   if (options.providerBackend === 'cli' && options.providerName === 'codex') {
+    // Runtime prepares its sandbox; provider read-only access is independent
+    // of that ownership. Canonical source/worktree must override legacy hints.
+    const isolatedSandbox = options.workspaceKind !== undefined
+      ? options.workspaceKind === 'sandbox'
+      : options.workspaceMode === 'isolated';
     const warnings: string[] = [];
-    if (options.workspaceMode !== 'isolated') {
+    if (!isolatedSandbox) {
       warnings.push(
-        'Codex runtime skills prefer filesystem delivery; shared/read_only workspaces downgrade to instruction delivery.',
+        'Codex runtime skills prefer filesystem delivery; source/worktree targets or unproven sandbox ownership require a downgrade to instruction delivery.',
       );
     }
 
-    const compatibility = options.workspaceMode === 'isolated'
+    const compatibility = isolatedSandbox
       ? canMaterializeCodexFilesystem(skillPackages, options.cwd)
       : { ok: false, warnings };
-    if (compatibility.ok && options.workspaceMode === 'isolated') {
+    if (compatibility.ok && isolatedSandbox) {
       return {
         preferredMode: 'filesystem',
         mode: 'filesystem',

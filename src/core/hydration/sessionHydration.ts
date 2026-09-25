@@ -202,6 +202,7 @@ function resolveSkillHydration(
     providerName: input.providerName,
     providerBackend: input.providerBackend,
     cwd: input.runtimeCwd,
+    workspaceKind: resolveWorkspaceKind(input),
     workspaceMode: toLegacyWorkspaceMode(resolveWorkspaceKind(input), resolveWorkspaceAccess(input)),
     sessionBaseDir: input.sessionBaseDir,
     baseInstructionsFile: input.baseInstructionsFile,

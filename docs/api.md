@@ -2759,7 +2759,12 @@ delivery contract, the runtime returns `409`.
 When the selected delivery mode is `instructions`, the runtime now applies the
 same layered skill/session/turn instruction contract across Pi instruction
 files, API/agent backends, and prompt-driven CLI providers. Codex can still
-prefer filesystem delivery when the target/runtime shape supports it.
+prefer filesystem delivery when the target/runtime shape supports it. Runtime
+prepares these files in an owned `sandbox`, including one with `read_only`
+agent access; this preparation does not grant the provider write access or change
+its permission gate. Canonical `source` and `worktree` workspaces use instruction
+fallback without managed skill copies, and strict Codex skill requests there
+return `409`. Workspace kind and access remain separate during message hydration.
 
 When a session has wakeup activity, session, history, and observe payloads also
 include an additive `wakeup` block:

@@ -40,7 +40,7 @@ describe('session hydration', () => {
   }
 
   it.each(['canonical', 'legacy'] as const)(
-    'rehydrates a read-only sandbox through %s topology without materializing Codex skill files', async (shape) => {
+    'prepares Codex skill files in an owned read-only sandbox through %s topology', async (shape) => {
       const root = mkdtempSync(join(tmpdir(), 'cats-runtime-hydration-readonly-'));
       cleanupPaths.push(root);
       const sessionBaseDir = join(root, 'sessions');
@@ -55,7 +55,7 @@ describe('session hydration', () => {
           ? { workspace: { kind: 'sandbox' as const, access: 'read_only' as const, runtimeCwd },
               workspaceMode: 'isolated' as const }
           : { workspaceMode: 'read_only' as const, workspaceIsolationMode: 'isolated' as const }),
-        requestedSkills: { requestedSkills: ['companion'] },
+        requestedSkills: { requestedSkills: ['companion'], strict: true },
       });
       expect(result.hydration.workspace).toEqual(expect.objectContaining({
         kind: 'sandbox', access: 'read_only', isolationMode: 'isolated', runtimeCwd,
@@ -64,10 +64,26 @@ describe('session hydration', () => {
       expect(result.hydration.workspace.warnings).toContain(
         'This isolated runtime cwd has no separate source workspace recorded; treat it as session-scoped state only.',
       );
-      expect(result.skills?.delivery.mode).toBe('instructions');
-      expect(existsSync(join(runtimeCwd, '.agents', 'skills', 'companion', 'SKILL.md'))).toBe(false);
+      expect(result.skills?.delivery).toEqual(expect.objectContaining({ mode: 'filesystem', status: 'applied' }));
+      expect(existsSync(join(runtimeCwd, '.agents', 'skills', 'companion', 'SKILL.md'))).toBe(true);
     },
   );
+
+  it.each(['source', 'worktree'] as const)('does not materialize into canonical %s despite a stale isolated hint', async kind => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-hydration-unowned-'));
+    cleanupPaths.push(root);
+    const runtimeCwd = join(root, 'repo'), sessionBaseDir = join(root, 'sessions'), skillsRoot = join(root, 'skills');
+    mkdirSync(runtimeCwd, { recursive: true }); writeSkillPackage(skillsRoot, 'companion');
+    for (const access of ['read_only', 'read_write'] as const) {
+      const input = { trigger: 'create' as const, sessionId: `unowned-${access}`, providerName: 'codex', providerBackend: 'cli' as const,
+        runtimeCwd, sessionBaseDir, skillsRoot, workspace: { kind, access, runtimeCwd }, workspaceMode: 'isolated' as const,
+        requestedSkills: { requestedSkills: ['companion'] } };
+      const result = await hydrateSessionState(input);
+      expect(result.skills?.delivery.mode).toBe('instructions');
+      await expect(hydrateSessionState({ ...input, requestedSkills: { ...input.requestedSkills, strict: true } })).rejects.toThrow('Strict runtime skill delivery');
+      expect(existsSync(join(runtimeCwd, '.agents'))).toBe(false);
+    }
+  });
 
   it('rehydrates persisted skill state for a new backend target during fork', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-hydration-'));
