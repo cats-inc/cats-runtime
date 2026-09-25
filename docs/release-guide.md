@@ -53,7 +53,9 @@ includes the Claude and Muse catalog refreshes (PRs #87 to #90), Claude session
 grouping by recorded cwd, and hidden native Windows Codex launches (PR #92). There is
 no new schema or execution binding. `0.3.0` was never published to npm, but Desktop
 `0.5.0` bundled it from different source, so this release takes a new version instead
-of reusing it.
+of reusing it. Published on 2026-09-26 from `e202eaf4037c648c73caa52c9a9d441793b2df71`:
+npm `latest` is `0.3.1` ([workflow](https://github.com/cats-inc/cats-runtime/actions/runs/36183579493)),
+and Desktop 0.5.1 bundles the same commit on every OS. cats-one 0.2.0 requires `^0.3.1`.
 
 Runtime `0.3.0` is prepared for the Desktop `0.5.0` standard-profile preview. It is
 the minor boundary for the preview-content isolation and retained-context policy
