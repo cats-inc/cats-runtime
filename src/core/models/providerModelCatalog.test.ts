@@ -296,6 +296,14 @@ describe('ProviderModelCatalogService', () => {
 
     expect(catalog.models).toEqual([
       {
+        id: 'grok-4.7',
+        label: 'Grok 4.7',
+      },
+      {
+        id: 'grok-4.7-build-fast',
+        label: 'Grok 4.7 Fast',
+      },
+      {
         id: 'grok-4.6',
         label: 'Grok 4.6',
       },
@@ -304,9 +312,8 @@ describe('ProviderModelCatalogService', () => {
         label: 'Grok 4.5',
       },
     ]);
-    // The 1.0.13 manifest carries no default field; the `(default)` marker
-    // `grok models` prints reports the per-user config.toml `[models] default`,
-    // so the runtime must not pick one on the user's behalf.
+    // 1.0.41 `grok models` marks grok-4.7 (default), but that line no longer
+    // matches the saved config default. Session markers are not catalog defaults.
     expect(catalog.defaultModel).toBeNull();
     expect(catalog.models.some((model) => model.default)).toBe(false);
     expect(catalog.warnings).toEqual([]);

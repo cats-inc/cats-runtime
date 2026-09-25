@@ -51,9 +51,12 @@ describe('factory and executable catalog projections', () => {
 
   it('preserves model-specific descriptions, defaults, and no-default Muse menus', () => {
     const grok = knowledge(snapshot.document.catalogs.find(s => s.provider === 'grok')!);
-    const descriptions = grok.catalog.entries.map(e => e.controls?.[0].values?.find(v => typeof v === 'object' && v.value === 'high'));
-    expect(descriptions[0]).toMatchObject({ description: expect.stringContaining('Higher implementation') });
-    expect(descriptions[1]).toMatchObject({ description: expect.stringContaining('Highest implementation') });
+    const high = (id: string) => grok.catalog.entries.find(e => e.id === id)
+      ?.controls?.[0].values?.find(v => typeof v === 'object' && v.value === 'high');
+    expect(high('grok-4.7')).toMatchObject({ description: 'Thorough reasoning and quality. Recommended.' });
+    expect(high('grok-4.7-build-fast')).toMatchObject({ description: 'Thorough reasoning and quality. Recommended.' });
+    expect(high('grok-4.6')).toMatchObject({ description: expect.stringContaining('Higher implementation') });
+    expect(high('grok-4.5')).toMatchObject({ description: expect.stringContaining('Highest implementation') });
     const muse = knowledge(snapshot.document.catalogs.find(s => s.provider === 'muse')!);
     expect(muse.catalog.entries.map(e => e.controls?.[0].values?.length)).toEqual([6, 6, 5, 5]);
     expect(muse.catalog.entries.every(e => !e.default && !e.controlDefaults)).toBe(true);

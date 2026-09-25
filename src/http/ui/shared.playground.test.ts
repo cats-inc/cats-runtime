@@ -183,7 +183,7 @@ describe('shared playground selection helpers', () => {
         div: { querySelector: () => controls }, catalog, entryId: '' };
       vm.createContext(context);
       vm.runInContext(html.slice(start, end), context);
-      expect(catsUI.getAdvancedCatalogDefaultEntryId(catalog)).toBe('grok-4.6');
+      expect(catsUI.getAdvancedCatalogDefaultEntryId(catalog)).toBe('grok-4.7');
       for (const entry of catalog.entries) {
         context.entryId = entry.id;
         vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
@@ -191,8 +191,8 @@ describe('shared playground selection helpers', () => {
         const options = [...controls.innerHTML.matchAll(/<option value="([^"]+)"[^>]*>([^<]+)<\/option>/g)]
           .map((match) => [match[1], match[2]]);
         expect(options).toEqual([
-          ...(entry.id === 'grok-4.6' ? [['xhigh', 'Extra High Effort']] : []),
-          ['high', 'High Effort'], ['medium', 'Medium Effort'], ['low', 'Low Effort'],
+          ...(entry.id === 'grok-4.5' ? [] : [['xhigh', 'Extra High']]),
+          ['high', 'High'], ['medium', 'Medium'], ['low', 'Low'],
         ]);
         const [value, label] = options[0];
         expect(controls.innerHTML).toContain(`<option value="${value}" selected>${label}</option>`);
