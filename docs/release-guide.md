@@ -43,6 +43,18 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+Runtime `0.3.1` is prepared for the Desktop `0.5.1` standard-profile preview and for
+npm publication on `latest`. It is a compatible patch. Writable startup now retires
+factory copies that earlier Desktop builds seeded (PR #91): an unmodified copy, or an
+untouched conversion of one, is backed up and removed so the current factory applies.
+Edited files keep the existing upgrade behavior. This fixes upgraded installations
+that kept old model menus or reported that catalog settings need attention. It also
+includes the Claude and Muse catalog refreshes (PRs #87 to #90), Claude session
+grouping by recorded cwd, and hidden native Windows Codex launches (PR #92). There is
+no new schema or execution binding. `0.3.0` was never published to npm, but Desktop
+`0.5.0` bundled it from different source, so this release takes a new version instead
+of reusing it.
+
 Runtime `0.3.0` is prepared for the Desktop `0.5.0` standard-profile preview. It is
 the minor boundary for the preview-content isolation and retained-context policy
 (PR #85): release execution no longer resumes retained contexts whose release
