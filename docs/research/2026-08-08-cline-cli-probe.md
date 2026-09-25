@@ -134,7 +134,7 @@ catalog remains possible.
 
 ## Captured fixtures
 
-Stored under `docs/research/fixtures/cline-3.0.51/`, redacted only by replacing the capture
+Stored under `tests/fixtures/provider-captures/cline-3.0.51/`, redacted only by replacing the capture
 host's absolute workspace path with `/workspace`:
 
 - `text.success.redacted.ndjson` — 10 lines, text-only turn.

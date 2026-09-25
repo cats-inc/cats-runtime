@@ -24,7 +24,7 @@ provider is deleted instead of maintained.
 
 Every prompt ran with a newly created temporary directory as the workspace; the
 CLI was never pointed at a Cats checkout. Repository fixtures under
-`fixtures/muse-1.0.3/` are sanitized copies — session, run, task, and tool-call
+`../../tests/fixtures/provider-captures/muse-1.0.3/` are sanitized copies — session, run, task, and tool-call
 identifiers are renumbered, timestamps are frozen, and the probe workspace path
 is rewritten to `/tmp/muse-probe`. Raw captures and probe-created working files
 were deleted after validation.
@@ -106,7 +106,7 @@ default 10s budget that the provider declares `minProbeTimeoutMs: 20_000`.
   as its parser default. The original inference that this was every model's picker
   menu was incorrect; the 2026-09-18 operator correction below supersedes it.
 - `--provider echo` runs the whole record pipeline with no account and no model
-  call. `fixtures/muse-1.0.3/echo-provider.success.redacted.ndjson` is that run
+  call. `../../tests/fixtures/provider-captures/muse-1.0.3/echo-provider.success.redacted.ndjson` is that run
   and is reproducible offline.
 
 ## Stream lifecycle
@@ -382,7 +382,7 @@ Validation:
 
 ## Fixtures
 
-All under `docs/research/fixtures/muse-1.0.3/`:
+All under `tests/fixtures/provider-captures/muse-1.0.3/`:
 
 - `echo-provider.success.redacted.ndjson` — `--provider echo`, no account.
 - `tool-success.redacted.ndjson` — `read_file` tool call and result.

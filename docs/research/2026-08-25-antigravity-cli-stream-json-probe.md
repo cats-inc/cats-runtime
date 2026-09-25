@@ -51,7 +51,7 @@ Three event envelopes:
 `checkpoint`, `agent_response`, `tool`, or `system_message` (the last appears
 only on a resumed turn and carries no text).
 
-Recorded under `docs/research/fixtures/antigravity-1.1.20/`, replayed by
+Recorded under `tests/fixtures/provider-captures/antigravity-1.1.20/`, replayed by
 `src/backends/cli/providers/antigravity.fixture.test.ts`.
 
 ### text_delta is a delta, not a snapshot

@@ -86,7 +86,7 @@ fixtures so a future compatibility profile cannot silently weaken the policy.
 
 ## Redacted fixtures
 
-`fixtures/grok-1.0.0/` contains complete sanitized captures for:
+`../../tests/fixtures/provider-captures/grok-1.0.0/` contains complete sanitized captures for:
 
 - native and Messages-compatible success streams;
 - successful and failed tool lifecycles;

@@ -10,7 +10,43 @@ permissions:
   contents: read
 
 jobs:
+  # A change confined to docs/ skips the application gate. The required
+  # release-preflight check then reports skipped, which branch protection
+  # accepts; any other path, a manual run or a failed detection runs it.
+  # tests/docs-boundary.test.ts keeps tests and scripts from reading docs/.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.paths.outputs.code }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect documentation-only changes
+        id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          case "$EVENT" in
+            pull_request) base=HEAD^1 ;;
+            push) base="$BEFORE" ;;
+            *) base= ;;
+          esac
+          code=true
+          if [ -n "$base" ] && git rev-parse --verify --quiet "$base^{commit}" > /dev/null; then
+            changed=$(git diff --name-only "$base" HEAD)
+            printf 'Changed files:\n%s\n' "$changed"
+            if [ -n "$changed" ] && ! grep -qv '^docs/' <<< "$changed"; then code=false; fi
+          fi
+          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+
   release-preflight:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

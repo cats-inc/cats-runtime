@@ -62,7 +62,7 @@ Detected `grok 1.0.5 (5115b46bc9)` at `~/.grok/bin/grok.exe`. Probe result:
 - unknown event types: 0; schema failures: 0; raw passthrough: 0
 
 Every raw type the 1.0.5 CLI emitted mapped through the 1.0.0 contract, and the
-observed families match `docs/research/fixtures/grok-1.0.0/`. `available_commands`
+observed families match `tests/fixtures/provider-captures/grok-1.0.0/`. `available_commands`
 now advertises a larger tool and command list, which the adapter ignores.
 
 Not covered by `manual_smoke`, and still recorded only for 1.0.0: auth-missing,
@@ -134,7 +134,7 @@ The adapter now handles `content_update`:
 - every other content type stays unknown, so the next shape change surfaces the
   same way this one did
 
-Fresh captures are recorded under `docs/research/fixtures/cline-3.0.57/`:
+Fresh captures are recorded under `tests/fixtures/provider-captures/cline-3.0.57/`:
 `tool-use.success.redacted.ndjson` covers the full tool lifecycle
 (`content_start:tool`, three `content_update:tool`, `content_end:tool`), and
 `tool-denied.completed.redacted.ndjson` covers the refusal path. The 3.0.51

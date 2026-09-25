@@ -250,7 +250,7 @@ describe('runtime server', () => {
   it('retires a factory copy seeded by an older Desktop so the current factory models appear', async () => {
     const { root, config, cleanup } = createTestConfig({ apiKey: 'upgrade-fixture' });
     const paths = createRuntimeTestPaths(root);
-    const seeded = readFileSync('docs/research/fixtures/catalog-schema1/factory-example-2026-04-08.yaml', 'utf8');
+    const seeded = readFileSync('tests/fixtures/catalog-schema1/factory-example-2026-04-08.yaml', 'utf8');
     writeFileSync(paths.curatedModelCatalogPath, seeded);
     const runtime = createRuntimeServer(config);
     const headers = { authorization: 'Bearer upgrade-fixture', 'content-type': 'application/json' };
@@ -273,7 +273,7 @@ describe('runtime server', () => {
   it('upgrades an existing schema-1 profile before the first model request', async () => {
     const { root, config, cleanup } = createTestConfig({ apiKey: 'upgrade-fixture' });
     const paths = createRuntimeTestPaths(root);
-    const original = readFileSync('docs/research/fixtures/catalog-schema1/factory-before-cutover.json', 'utf8');
+    const original = readFileSync('tests/fixtures/catalog-schema1/factory-before-cutover.json', 'utf8');
     writeFileSync(paths.curatedModelCatalogPath, original);
     const runtime = createRuntimeServer(config);
     const headers = { authorization: 'Bearer upgrade-fixture', 'content-type': 'application/json' };
@@ -297,7 +297,7 @@ describe('runtime server', () => {
   it('keeps an unrecognized old profile and exposes a recoverable configuration error without returning fake models', async () => {
     const { root, config, cleanup } = createTestConfig({ apiKey: 'upgrade-fixture' });
     const paths = createRuntimeTestPaths(root);
-    const original = readFileSync('docs/research/fixtures/catalog-schema1/factory-before-cutover.json', 'utf8');
+    const original = readFileSync('tests/fixtures/catalog-schema1/factory-before-cutover.json', 'utf8');
     const invalid = JSON.parse(original);
     invalid.catalogs[0].models[0].name = 'no-reviewed-binding';
     const unknown = JSON.stringify(invalid);

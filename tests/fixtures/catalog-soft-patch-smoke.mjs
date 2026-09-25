@@ -98,7 +98,7 @@ assert.equal(service.getImmediateAdvancedKnowledge('pi').catalog.catalogRevision
 
 // A fresh profile from the previous release must upgrade using only installed resources.
 // The input is a frozen old document; migration code and evidence come from the tarball.
-const legacy = readFileSync(new URL('../../docs/research/fixtures/catalog-schema1/factory-before-cutover.json', import.meta.url), 'utf8');
+const legacy = readFileSync(new URL('./catalog-schema1/factory-before-cutover.json', import.meta.url), 'utf8');
 const upgradeRoot = join(runtimeRoot, 'old-release-profile');
 const upgradeOverride = join(upgradeRoot, 'config', 'curated-model-catalogs.yaml');
 mkdirSync(join(upgradeRoot, 'config'), { recursive: true });
@@ -120,7 +120,7 @@ assert.equal(restarted.catalogStore.status().upgrade.state, 'not_needed');
 assert.equal(readdirSync(join(upgradeRoot, 'config')).filter(name => name.endsWith('.bak')).length, 1);
 
 // A factory copy seeded by an older Desktop is retired, so the installed factory applies.
-const seeded = readFileSync(new URL('../../docs/research/fixtures/catalog-schema1/factory-example-2026-04-08.yaml', import.meta.url), 'utf8');
+const seeded = readFileSync(new URL('./catalog-schema1/factory-example-2026-04-08.yaml', import.meta.url), 'utf8');
 const seededRoot = join(runtimeRoot, 'desktop-seeded-profile');
 const seededOverride = join(seededRoot, 'config', 'curated-model-catalogs.yaml');
 mkdirSync(join(seededRoot, 'config'), { recursive: true });

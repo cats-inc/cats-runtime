@@ -510,7 +510,7 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       // and the adapter learned to normalize it. Future releases use this
       // best-known adapter while drift remains visible in diagnostics and
       // evolution evidence instead of becoming an exact-version gate (ADR-035)
-      // (docs/research/fixtures/cline-3.0.57/, and the research note at
+      // (tests/fixtures/provider-captures/cline-3.0.57/, and the research note at
       // docs/research/2026-08-24-grok-cline-version-drift-probe.md).
       minVersionMajor: 3,
       allowUnknownVersion: true,

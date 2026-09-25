@@ -129,7 +129,9 @@ tests and docs.
 
 Once an update is authorized, material pasted evidence that supports it belongs under
 `docs/research/fixtures/<cli>-<version>/` with a capture-specific name containing `.redacted`.
-Cite it from the affected catalog's `notes`. Capture/preview alone does not authorize creating that
+Cite it from the affected catalog's `notes`. A capture that a test replays is an executable input:
+keep it under `tests/fixtures/provider-captures/<cli>-<version>/` instead, because CI skips
+application checks for docs-only changes and `tests/docs-boundary.test.ts` rejects reads of `docs/`. Capture/preview alone does not authorize creating that
 fixture or any other repository file. Short confirmations may remain in the conversation and be
 summarized in notes after an update is authorized.
 

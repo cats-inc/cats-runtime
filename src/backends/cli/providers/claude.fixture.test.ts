@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { StreamEvent } from './types.js';
 import { ClaudeProvider } from './claude.js';
 
-const fixtureRoot = new URL('../../../../docs/research/fixtures/claude-2.1.267/', import.meta.url);
+const fixtureRoot = new URL('../../../../tests/fixtures/provider-captures/claude-2.1.267/', import.meta.url);
 
 function readFixtureLines(name: string): string[] {
   return readFileSync(fileURLToPath(new URL(name, fixtureRoot)), 'utf8')

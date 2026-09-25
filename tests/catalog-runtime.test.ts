@@ -109,7 +109,7 @@ describe('factory and executable catalog projections', () => {
 
 describe('explicit conversion and safe patch apply', () => {
   it('converts all frozen legacy scopes without a normalizer or dropping scopes', () => {
-    const source = readFileSync('docs/research/fixtures/catalog-schema1/factory-before-cutover.json', 'utf8');
+    const source = readFileSync('tests/fixtures/catalog-schema1/factory-before-cutover.json', 'utf8');
     const mapping = JSON.parse(readFileSync('config/catalog-schema1-migration.json', 'utf8')) as LegacyMigrationScope[];
     const converted = convertLegacyCatalog(source, mapping);
     expect(converted.catalogs).toHaveLength(16);

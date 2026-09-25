@@ -28,7 +28,7 @@ refused until their lifecycle contract is probed. 1.0.5 was admitted on
 across text, tool use, tool result, progress, and final result with no unknown
 event type, schema failure, or raw passthrough. That probe does not cover the
 error, cancellation, resume, fork, or permission-mode paths the 1.0.0 fixtures
-under `docs/research/fixtures/grok-1.0.0/` record.
+under `tests/fixtures/provider-captures/grok-1.0.0/` record.
 
 Grok model ids come from the CLI's own account-resolved manifest, which it
 caches at `~/.grok/models_cache.json` and renders through `grok models`. On
@@ -53,7 +53,7 @@ re-probed. 3.0.57 was admitted on 2026-08-24 after a `manual_tool` probe reached
 the tool path and found the one contract change it introduced: tool output now
 streams through `content_update` events between the call and the result, which
 the adapter normalizes into tool progress
-(`docs/research/fixtures/cline-3.0.57/`). Two
+(`tests/fixtures/provider-captures/cline-3.0.57/`). Two
 limits are inherent to both versions rather than to Cats: sessions cannot be
 resumed, because passing `--id` alongside `--json` fails and the stream never
 emits a resumable id; and the runtime's `whitelist` permission mode is
@@ -115,7 +115,7 @@ labels back. Cats bundles those ids but marks none of them default, because agy
 reads its own default from the per-user `settings.json`.
 
 Evidence is in `docs/research/2026-08-25-antigravity-cli-stream-json-probe.md`
-with recorded streams under `docs/research/fixtures/antigravity-1.1.20/`.
+with recorded streams under `tests/fixtures/provider-captures/antigravity-1.1.20/`.
 
 Devin installs with `irm https://static.devin.ai/cli/setup.ps1 | iex` on Windows
 (PowerShell only; the installed binary works from any shell) or

@@ -199,7 +199,7 @@ describe('package contract', () => {
 
     expect([...packedPaths].some((path) => path.startsWith('src/'))).toBe(false);
     expect([...packedPaths].some((path) => path.startsWith('tests/'))).toBe(false);
-    expect([...packedPaths].some((path) => path.startsWith('docs/'))).toBe(false);
+    expect([...packedPaths].some((path) => path.startsWith('docs/'))).toBe(false); // docs-boundary-ignore: asserts the package excludes docs
     expect([...packedPaths].some((path) => path.startsWith('skills/'))).toBe(false);
     expect([...packedPaths].some((path) => path.startsWith('developer-skills/'))).toBe(false);
     expect([...packedPaths].some((path) => path.startsWith('runtime-skills/preview/'))).toBe(false);
