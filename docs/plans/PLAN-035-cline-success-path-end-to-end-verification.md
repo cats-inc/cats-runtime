@@ -140,7 +140,7 @@ From the probe artifact (`permissionMode: 'skip'`, one turn, 35 events):
 - **No `raw` events**: raw passthrough 0, unknown 0, schema failures 0.
 
 Usage reconciles against the captured stream
-(`docs/research/fixtures/cline-3.0.57/tool-use.success.redacted.ndjson`):
+(`tests/fixtures/provider-captures/cline-3.0.57/tool-use.success.redacted.ndjson`):
 `run_result.aggregateUsage` is `{ inputTokens: 9469, outputTokens: 88 }`, matching the
 running totals on the last per-iteration `usage` event (`totalInputTokens` 9469,
 `totalOutputTokens` 88). The adapter ignores those cumulative events and reads
@@ -149,7 +149,7 @@ running totals on the last per-iteration `usage` event (`totalInputTokens` 9469,
 ### Denied tools — verified, with one behavior change
 
 Run with the runtime's own `default` mode argv (`--auto-approve false`), captured at
-`docs/research/fixtures/cline-3.0.57/tool-denied.completed.redacted.ndjson`:
+`tests/fixtures/provider-captures/cline-3.0.57/tool-denied.completed.redacted.ndjson`:
 
 - The tool **is** refused. `tool_result` carries `isError: true` and the text
   `Tool approval requires an interactive session, but this session is non-interactive.`

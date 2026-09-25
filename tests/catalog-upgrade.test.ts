@@ -16,10 +16,10 @@ vi.mock('node:fs', async (importOriginal) => {
   return { ...actual, writeFileSync: vi.fn(actual.writeFileSync), renameSync: vi.fn(actual.renameSync) };
 });
 const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
-const legacy = fs.readFileSync('docs/research/fixtures/catalog-schema1/factory-before-cutover.json', 'utf8');
+const legacy = fs.readFileSync('tests/fixtures/catalog-schema1/factory-before-cutover.json', 'utf8');
 const mapping = JSON.parse(fs.readFileSync('config/catalog-schema1-migration.json', 'utf8')) as LegacyMigrationScope[];
 // A factory example exactly as Runtime shipped it on 2026-04-08; older Desktop builds seeded such copies.
-const seededExample = fs.readFileSync('docs/research/fixtures/catalog-schema1/factory-example-2026-04-08.yaml', 'utf8');
+const seededExample = fs.readFileSync('tests/fixtures/catalog-schema1/factory-example-2026-04-08.yaml', 'utf8');
 const roots: string[] = [];
 
 function sha256(value: string): string {

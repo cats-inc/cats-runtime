@@ -5,7 +5,7 @@ import type { StreamEvent } from './types.js';
 import { AntigravityProvider } from './antigravity.js';
 
 const fixtureRoot = new URL(
-  '../../../../docs/research/fixtures/antigravity-1.1.20/',
+  '../../../../tests/fixtures/provider-captures/antigravity-1.1.20/',
   import.meta.url,
 );
 

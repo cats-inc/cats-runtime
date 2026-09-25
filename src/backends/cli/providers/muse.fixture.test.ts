@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { StreamEvent } from './types.js';
 import { MuseProvider } from './muse.js';
 
-const fixtureRoot = new URL('../../../../docs/research/fixtures/muse-1.0.3/', import.meta.url);
+const fixtureRoot = new URL('../../../../tests/fixtures/provider-captures/muse-1.0.3/', import.meta.url);
 
 interface MuseFixtureRecord {
   payload_type?: string;

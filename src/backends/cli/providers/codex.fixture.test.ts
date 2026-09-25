@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { StreamEvent } from './types.js';
 import { CodexProvider } from './codex.js';
 
-const fixtureRoot = new URL('../../../../docs/research/fixtures/codex-0.153.4/', import.meta.url);
+const fixtureRoot = new URL('../../../../tests/fixtures/provider-captures/codex-0.153.4/', import.meta.url);
 
 function readFixtureLines(name: string): string[] {
   return readFileSync(fileURLToPath(new URL(name, fixtureRoot)), 'utf8')

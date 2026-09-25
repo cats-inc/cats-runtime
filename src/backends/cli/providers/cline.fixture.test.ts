@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { StreamEvent } from './types.js';
 import { ClineProvider } from './cline.js';
 
-const fixtureRoot = new URL('../../../../docs/research/fixtures/cline-3.0.51/', import.meta.url);
+const fixtureRoot = new URL('../../../../tests/fixtures/provider-captures/cline-3.0.51/', import.meta.url);
 
 function readFixtureLines(name: string): string[] {
   return readFileSync(fileURLToPath(new URL(name, fixtureRoot)), 'utf8')
@@ -182,7 +182,7 @@ describe('Cline 3.0.51 authenticated stream fixtures', () => {
 
 describe('Cline 3.0.57 authenticated stream fixtures', () => {
   const fixture357Root = new URL(
-    '../../../../docs/research/fixtures/cline-3.0.57/',
+    '../../../../tests/fixtures/provider-captures/cline-3.0.57/',
     import.meta.url,
   );
 

@@ -108,12 +108,12 @@ includes the cached tokens (`totalTokens = inputTokens + outputTokens`).
 
 ## Redacted fixtures
 
-- `fixtures/claude-2.1.267/stream-json.rate-limit.redacted.ndjson`: the complete
+- `../../tests/fixtures/provider-captures/claude-2.1.267/stream-json.rate-limit.redacted.ndjson`: the complete
   12-frame capture. Session id, uuids, message ids, cwd, socket and shell paths, memory
   paths, and the tool / command / agent / skill / plugin / capability catalogs are
   replaced with placeholders. Token counts, costs, utilization fractions, and reset
   timestamps are kept verbatim because they are the evidence.
-- `fixtures/codex-0.153.4/app-server.rate-limits.redacted.ndjson`: the three
+- `../../tests/fixtures/provider-captures/codex-0.153.4/app-server.rate-limits.redacted.ndjson`: the three
   notifications that matter (`thread/tokenUsage/updated`, `account/rateLimits/updated`,
   `turn/completed`) with thread, turn, and message ids replaced.
 

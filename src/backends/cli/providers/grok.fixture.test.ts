@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { StreamEvent } from './types.js';
 import { GrokProvider } from './grok.js';
 
-const fixtureRoot = new URL('../../../../docs/research/fixtures/grok-1.0.0/', import.meta.url);
+const fixtureRoot = new URL('../../../../tests/fixtures/provider-captures/grok-1.0.0/', import.meta.url);
 
 function readFixture(name: string): { raw: string; lines: Array<Record<string, unknown>> } {
   const raw = readFileSync(fileURLToPath(new URL(name, fixtureRoot)), 'utf8');
