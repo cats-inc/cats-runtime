@@ -1050,9 +1050,20 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Muse
-    cli_version: 1.3.0-R3401.1
-    last_updated: 2026-09-25
+    cli_version: 1.4.0-R4161.1
+    last_updated: 2026-09-26
     notes:
+      - "Model list re-read 2026-09-26 on Muse Code 1.4.0 (muse-bin-1.4.0-R4161.1): MSP `model/list`
+        over `muse serve --no-session-log` (providerId `meta`, profileId `tbh`, source
+        `providerCatalog`). Same four rows, limits, and descriptions; no additions or removals.
+        Each row now carries ordered `variants` matching the curated per-model effort menus
+        (both 1.3 rows through max, both 1.2 rows through xhigh); parser-only `none`/`ultra`
+        remain excluded. Native picker traversal was attempted but incomplete on this Linux
+        host (no wlrctl/wtype; pty stalled before render), so effort menus retain their
+        2026-09-18 / 2026-09-25 provenance."
+      - "Evidence: docs/research/fixtures/muse-1.4.0/model-list.agent-capture.redacted.txt and
+        docs/research/fixtures/muse-1.4.0/picker-transcription.agent-capture.redacted.txt
+        (limitation log). Full method: docs/research/2026-09-26-muse-picker-agent-capture.md."
       - "Model list re-read 2026-09-25 on Muse Code 1.3.0 (muse-bin-1.3.0-R3401.1): MSP `model/list`
         over `muse serve --no-session-log` (providerId `meta`, profileId `tbh`, source
         `providerCatalog`) plus an agent-operated `/model` picker capture (Windows UI Automation
