@@ -10,14 +10,24 @@ $null = New-Item -ItemType Directory -Path $scratch -Force
 $mock = Join-Path $scratch 'ui.ps1'
 @'
 $script:mockRow = 2
+$script:mockTop = 1
 $script:mockHashReads = 0
+# Effort is one picker-wide level. A row lacking it shows its highest level below it, and a
+# Right press makes the next level of that row the picker-wide level.
+$script:mockRank = @('Low','Medium','High','xHigh','Max')
+$script:mockLevel = if ($global:mockStartLevel) { $global:mockStartLevel } else { 'High' }
 $script:mockModels = @(
     @{ Label='Example Default (recommended)'; Desc='Example One with 1M context'; Current=$false
-       Levels=@('Low','Medium','High'); Default='Medium'; At=2; Detail=@{} }
+       Levels=@('Low','Medium','High'); Default='Medium'; Detail=@{} }
     @{ Label='Example Alpha'; Desc='Example Two'; Current=$true
-       Levels=@('Low','Medium','High','Max'); Default='High'; At=0; Detail=@{ Max='Uses more tokens.' } }
-    @{ Label='Example Mini'; Desc='Example Three'; Current=$false; Levels=@(); Default=$null; At=0; Detail=@{} }
+       Levels=@('Low','Medium','High','Max'); Default='High'; Detail=@{ Max='Uses more tokens.' } }
+    @{ Label='Example Mini'; Desc='Example Three'; Current=$false; Levels=@(); Default=$null; Detail=@{} }
 )
+function Get-MockLevel($m) {
+    if ($m.Levels -contains $script:mockLevel) { return $script:mockLevel }
+    $limit = [array]::IndexOf($script:mockRank, $script:mockLevel)
+    @($m.Levels | Where-Object { [array]::IndexOf($script:mockRank, $_) -le $limit })[-1]
+}
 function Get-WindowsUiTarget { param($Title, $ProcessName); [pscustomobject]@{Title=$Title} }
 function Assert-WindowsUiFocus($Target) { }
 function Get-FileHash { param($LiteralPath, $Algorithm)
@@ -27,18 +37,30 @@ function Get-FileHash { param($LiteralPath, $Algorithm)
 function Get-WindowsUiText($Target) {
     $mark = [char]0x276F; $nbsp = [char]0xA0; $check = [char]0x2714
     $lines = @("$mark$nbsp/model", '', '  Select model', '  Switch between models.', '')
-    for ($i=0; $i -lt $script:mockModels.Count; $i++) {
+    # $global:mockVisible simulates a scrolled window: edge arrows, padded numbers, hidden count.
+    $count = $script:mockModels.Count
+    $visible = if ($global:mockVisible) { $global:mockVisible } else { $count }
+    if ($script:mockRow -lt $script:mockTop) { $script:mockTop = $script:mockRow }
+    if ($script:mockRow -gt $script:mockTop + $visible - 1) { $script:mockTop = $script:mockRow - $visible + 1 }
+    $last = [Math]::Min($count, $script:mockTop + $visible - 1)
+    for ($i=$script:mockTop - 1; $i -lt $last; $i++) {
         $m = $script:mockModels[$i]
-        $lead = if ($i + 1 -eq $script:mockRow) { "  $mark$nbsp" } else { '    ' }
+        $lead = if ($i + 1 -eq $script:mockRow) { "  $mark$nbsp" }
+            elseif ($i + 1 -eq $script:mockTop -and $script:mockTop -gt 1) { "  $([char]0x2191) " }
+            elseif ($i + 1 -eq $last -and $last -lt $count) { "  $([char]0x2193) " }
+            else { '    ' }
+        $number = if ($global:mockVisible) { "$($i + 1).  " } else { "$($i + 1). " }
         $label = if ($m.Current) { "$($m.Label) $check" } else { $m.Label }
-        $lines += "$lead$($i + 1). $label    $($m.Desc)"
+        $lines += "$lead$number$label    $($m.Desc)"
     }
+    $hidden = $count - ($last - $script:mockTop + 1)
+    if ($hidden -gt 0) { $lines += "     $([char]0x2026) +$hidden $(if ($hidden -eq 1) { 'model' } else { 'models' })" }
     $lines += ''
     $m = $script:mockModels[$script:mockRow - 1]
     if ($m.Levels.Count -eq 0) {
         $lines += "  $([char]0x25CB) Effort not supported for $($m.Label)"
     } else {
-        $level = $m.Levels[$m.At]
+        $level = Get-MockLevel $m
         $suffix = if ($level -eq $m.Default) { ' (default)' } else { '' }
         $lines += "  $([char]0x25CF) $level effort$suffix $([char]0x2190)/$([char]0x2192) to adjust"
         if ($m.Detail.ContainsKey($level)) { $lines += "  $($m.Detail[$level])" }
@@ -58,8 +80,10 @@ function Send-WindowsUiKey { param($Target, $Key, $ExpectedText)
     switch ($Key) {
         Down { $script:mockRow++ }
         Up { $script:mockRow-- }
-        Right { if ($m.Levels.Count -gt 0) { $m.At = ($m.At + 1) % $m.Levels.Count } }
-        Left { if ($m.Levels.Count -gt 0) { $m.At = ($m.At + $m.Levels.Count - 1) % $m.Levels.Count } }
+        Right { if ($m.Levels.Count -gt 0) {
+            $script:mockLevel = $m.Levels[([array]::IndexOf($m.Levels, (Get-MockLevel $m)) + 1) % $m.Levels.Count] } }
+        Left { if ($m.Levels.Count -gt 0) {
+            $script:mockLevel = $m.Levels[([array]::IndexOf($m.Levels, (Get-MockLevel $m)) + $m.Levels.Count - 1) % $m.Levels.Count] } }
         default { throw "Capture sent a saving or unexpected key: $Key" }
     }
 }
@@ -137,8 +161,47 @@ try {
     }
     if (-not $failed) {throw 'A missing model row was not rejected'}
     Write-Output 'PASS rejects a visible row count that differs from expected coverage'
+
+    $global:mockVisible = 2
+    $output = Join-Path $scratch 'scrolled'
+    $null = New-Item -ItemType Directory -Path $output
+    $result = & $subject -UiHelperPath $mock -WindowTitle 'Fixture' -OutputDirectory $output `
+        -ConfigPath 'simulated-config' -ExpectedModelCount 3 -Screenshots None | ConvertFrom-Json
+    if (($result.CapturedModels.Label -join '|') -ne 'Example Default (recommended)|Example Alpha|Example Mini' -or
+        -not $result.CapturedModels[1].Current -or -not $result.CapturedModels[2].Unsupported -or
+        (@($result.CapturedModels[0].EffortCycle | Where-Object Default).Level -join ',') -ne 'Medium') {
+        throw 'A scrolled list did not yield every row with its effort cycle'
+    }
+    Write-Output 'PASS scrolled list reads out-of-view rows and returns to the start'
+
+    $output = Join-Path $scratch 'scrolled-count'
+    $null = New-Item -ItemType Directory -Path $output
+    $failed = $false
+    try {
+        $null = & $subject -UiHelperPath $mock -WindowTitle 'Fixture' -OutputDirectory $output `
+            -ConfigPath 'simulated-config' -ExpectedModelCount 2 -Screenshots None
+    } catch {
+        if ($_.Exception.Message -notmatch 'differs from expected coverage') {throw}
+        $failed = $true
+    }
+    if (-not $failed) {throw 'Out-of-view rows were not counted toward expected coverage'}
+    Write-Output 'PASS counts out-of-view rows toward expected coverage'
+
+    $global:mockVisible = $null
+    $global:mockStartLevel = 'Max'
+    $output = Join-Path $scratch 'shared-effort'
+    $null = New-Item -ItemType Directory -Path $output
+    $result = & $subject -UiHelperPath $mock -WindowTitle 'Fixture' -OutputDirectory $output `
+        -ConfigPath 'simulated-config' -ExpectedModelCount 3 -Screenshots None | ConvertFrom-Json
+    if (($result.CapturedModels[0].EffortCycle.Level -join ',') -ne 'High,Low,Medium' -or
+        ($result.CapturedModels[1].EffortCycle.Level -join ',') -ne 'High,Max,Low,Medium') {
+        throw 'A row without the starting level was not cycled from its shown level'
+    }
+    Write-Output 'PASS restores a picker-wide starting effort that another row lacked'
 } finally {
+    Remove-Variable -Name mockStartLevel -Scope Global -ErrorAction SilentlyContinue
     Remove-Variable -Name simulateFinalChange -Scope Global -ErrorAction SilentlyContinue
+    Remove-Variable -Name mockVisible -Scope Global -ErrorAction SilentlyContinue
     $resolved = [IO.Path]::GetFullPath($scratch)
     if (-not $resolved.StartsWith($scratchRoot + [IO.Path]::DirectorySeparatorChar) -or
         (Split-Path -Leaf $resolved) -notlike 'claude-capture-test-*') {throw 'Unsafe fixture cleanup path'}

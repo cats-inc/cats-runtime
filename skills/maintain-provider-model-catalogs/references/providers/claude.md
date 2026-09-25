@@ -31,9 +31,16 @@ Use this only when the operator asks the agent to collect the picker. Follow
   that command.
 - The footer reads `Enter to set as default · s to use this session only · Esc to cancel`. Traverse
   with arrow keys only. Escape cancels and prints `Kept model as ...`; exit the CLI with `/exit`.
-- A saved model shows a check mark, and a saved effort sets every row's starting effort line. Only
-  an explicit `(default)` suffix, reached by cycling with Right, is default evidence. The check
-  mark and the starting level are not.
+- A long list scrolls with eight rows visible. Edge rows carry `↑`/`↓` in the highlight column,
+  and one `… +N models` line counts every row out of view. Read each row while it is highlighted.
+- A saved model shows a check mark. Effort is one picker-wide selection that starts at the saved
+  effort; a row lacking that level shows another one (for example High instead of xHigh), and a
+  Right press there changes the selection for every row. Only an explicit `(default)` suffix,
+  reached by cycling with Right, is default evidence. The check mark and the starting level are not.
+- The picker does not display row values. After the arrow-only traversal, choose each row with `s`
+  in the dedicated window and read `/status`: `alias (id)` means the row sets the alias, and a bare
+  id means it sets that id. Confirm the settings hash after each row; `s` left it unchanged on
+  2.1.282.
 - Unsupported effort shows one line with no `←/→` hint; do not press keys to probe it.
 - Verify context aliases through the local `/status` Model line (for example
   `opus[1m] (claude-opus-5-5[1m])`) without submitting a prompt. The startup banner does not show

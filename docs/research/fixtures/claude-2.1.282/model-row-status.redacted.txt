@@ -1,0 +1,29 @@
+# Source: agent-operated Claude Code /model picker rows plus the local /status panel,
+#   Windows UI Automation visible text
+# Version: 2.1.282
+# Observed: 2026-09-26 (local time, UTC+8)
+# Scope: operator subscription account (startup banner: Claude Max); Windows 11 RDP session,
+#   Windows Terminal, interactive mode, launched with --safe-mode --no-chrome
+# Method: for each row, open /model, highlight the row, press s (use this session only), then
+#   open /status, read its Model line and press Escape. No prompt was submitted; settings.json
+#   kept its prelaunch SHA-256 after every row and after exit.
+# Redaction: /status account, organization, email, session and working-directory lines are
+#   omitted; only the Model line is kept per row
+# Note: "alias (resolved id)" means the row sets the alias; a bare id means the row sets that id
+
+Picker row -> /status Model
+   1. Default (recommended)  Default (Opus 5.5 · Best for everyday, complex tasks)
+   2. Opus 5.5               opus (claude-opus-5-5)
+   3. Fable 5.1              claude-fable-5-1
+   4. Sonnet 5               sonnet (claude-sonnet-5)
+   5. Haiku 4.5              haiku (claude-haiku-4-5-20251001)
+   6. Opus 5                 claude-opus-5
+   7. Fable 5                claude-fable-5
+   8. Opus 4.8               claude-opus-4-8
+   9. Opus 4.7               claude-opus-4-7
+  10. Opus 4.6               claude-opus-4-6
+  11. Sonnet 4.6             claude-sonnet-4-6
+
+# Separate launch with --safe-mode --no-chrome --model opus[1m] (no picker row offers it)
+
+  --model opus[1m]          opus[1m] (claude-opus-5-5[1m])
