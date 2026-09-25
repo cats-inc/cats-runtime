@@ -2,6 +2,12 @@
 
 > This directory contains all project documentation.
 
+## Windows Codex background launch
+
+[Windows Codex hidden launch](research/2026-09-26-windows-codex-hidden-launch.md)
+documents direct npm binary resolution, the managed Code Mode host, compatibility
+fallbacks and native Windows validation. Platform receives this fix through Runtime.
+
 ## Preview content boundary
 
 [PLAN-041](plans/PLAN-041-preview-skill-content-policy.md) records preview-only

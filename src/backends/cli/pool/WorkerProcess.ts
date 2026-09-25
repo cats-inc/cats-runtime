@@ -15,7 +15,8 @@ import type {
   ProviderSpawnOptions,
   RuntimeProviderRefusal,
 } from '../providers/types.js';
-import { buildProcessSpawnConfig } from '../runtime/runtime.js';
+import { buildProcessSpawnConfig, type ProcessSpawnConfig } from '../runtime/runtime.js';
+import { startWindowsCodexHost, windowsCodexHostPath, type ManagedCodexHost } from '../runtime/windowsCodexHost.js';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 
 export interface WorkerProcessEvents {
@@ -44,6 +45,11 @@ function isTerminalStreamEvent(
 
 export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   private process: ChildProcess | null = null;
+  private starting: Promise<void> | null = null;
+  private startupController: AbortController | null = null;
+  private startupError: Error | null = null;
+  private codeModeHost: ManagedCodexHost | null = null;
+  private launchGeneration = 0;
   private provider: Provider;
   private spawnOpts: ProviderSpawnOptions;
   private commandConfig: ProviderCommandConfig;
@@ -72,7 +78,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
 
   get alive(): boolean {
     if (this.provider.ephemeral) return !this._ephemeralKilled;
-    return this.process !== null && this.process.exitCode === null;
+    return this.starting !== null || (this.process !== null && this.process.exitCode === null);
   }
 
   get busy(): boolean {
@@ -85,6 +91,14 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   }
 
   private spawnProcess(): void {
+    const generation = ++this.launchGeneration;
+    this.startupController?.abort();
+    this.startupController = null;
+    this.starting = null;
+    this.stopCodeModeHost();
+    // A cancelled child's close/error can arrive while its replacement waits
+    // for a host. Invalidate it now, rather than only once the new child spawns.
+    this.process = null;
     this.provider.configureExecution?.({
       ...(this.commandConfig.runtime.mode === 'native'
         ? { localWorkspaceCwd: this.spawnOpts.cwd } : {}),
@@ -112,6 +126,46 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       this.commandConfig.path,
     );
 
+    this.startupError = null;
+    const hostPath = windowsCodexHostPath(spawnConfig, this.provider.name);
+    if (hostPath) {
+      const controller = new AbortController();
+      this.startupController = controller;
+      const starting = startWindowsCodexHost(spawnConfig, hostPath, env, controller.signal)
+        .then((host) => {
+          if (controller.signal.aborted || generation !== this.launchGeneration) {
+            host?.stop();
+            throw new Error('Codex startup cancelled.');
+          }
+          this.codeModeHost = host;
+          if (host) spawnConfig.args = [...spawnConfig.args, '--code-mode-host', host.url];
+          this.launchProcess(spawnConfig, env);
+          if (host) void host.closed.then(() => {
+            if (this.codeModeHost !== host) return;
+            this.codeModeHost = null;
+            this.emit('error', new Error('Codex Code Mode host exited during the session.'));
+            this.process?.kill('SIGTERM');
+          });
+        }).finally(() => {
+          if (this.starting === starting) this.starting = null;
+          if (this.startupController === controller) this.startupController = null;
+        });
+      this.starting = starting;
+      // Pool startup is synchronous; streamMessage awaits the same promise.
+      // Observe rejection even if the caller never sends a turn.
+      void starting.catch((error: Error) => {
+        if (generation !== this.launchGeneration) return;
+        this.stopCodeModeHost();
+        this.startupError = error;
+        this.emit('error', error);
+        this.emit('exit', 1, null);
+      });
+      return;
+    }
+    this.launchProcess(spawnConfig, env);
+  }
+
+  private launchProcess(spawnConfig: ProcessSpawnConfig, env: NodeJS.ProcessEnv): void {
     const child = spawn(spawnConfig.command, spawnConfig.args, {
       cwd: spawnConfig.cwd ?? this.spawnOpts.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -181,11 +235,15 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     });
 
     child.on('error', (err) => {
-      if (this.process === child) this.emit('error', err);
+      if (this.process === child) {
+        this.stopCodeModeHost();
+        this.emit('error', err);
+      }
     });
 
     child.on('close', (code, signal) => {
       if (this.process !== child) return;
+      this.stopCodeModeHost();
       this.activeTurnController?.abort();
       this.process = null;
       this.isBusy = false;
@@ -230,6 +288,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   async *streamMessage(content: string | TurnInput): AsyncGenerator<StreamEvent> {
     const turn = typeof content === 'string' ? { message: content } : content;
 
+    if (this.starting) await this.starting;
+    if (this.startupError) throw this.startupError;
     if (!this.alive) {
       throw new Error('Worker process is not running');
     }
@@ -488,6 +548,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   }
 
   cancel(): void {
+    this.startupController?.abort();
+    this.stopCodeModeHost();
     this.activeTurnController?.abort();
 
     if (this.process && this.process.exitCode === null) {
@@ -510,6 +572,12 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     if (this.provider.ephemeral && !this.process) {
       this.emit('exit', 0, null);
     }
+  }
+
+  private stopCodeModeHost(): void {
+    const host = this.codeModeHost;
+    this.codeModeHost = null;
+    host?.stop();
   }
 
   private captureStderr(text: string): void {
@@ -589,14 +657,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     return new Error(details.join('. '));
   }
 
-  private resolveSpawnConfig(args: string[]): {
-    command: string;
-    args: string[];
-    shell: boolean | string;
-    cwd?: string;
-    env?: Record<string, string>;
-    windowsVerbatimArguments?: boolean;
-  } {
+  private resolveSpawnConfig(args: string[]): ProcessSpawnConfig {
     return buildProcessSpawnConfig(
       this.commandConfig,
       this.provider.name,

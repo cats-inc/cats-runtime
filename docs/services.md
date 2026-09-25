@@ -9,6 +9,7 @@
 |---------|------|---------|---------|-------|
 | `cats-runtime` | 3110 | `CATS_RUNTIME_PORT` | Unified runtime service for upper-layer apps | Default host `127.0.0.1` |
 | `opencode` embedded server | 4097 | `OPENCODE_SERVER_PORT` | Local OpenCode HTTP bridge used by the OpenCode backend | Started on demand by `cats-runtime` |
+| Codex Code Mode host (Windows) | OS-assigned ephemeral port | None | Per-worker local gRPC host for hidden native Codex launches | Binds only `127.0.0.1`; starts after capability probing and stops with the worker. See [launch notes](research/2026-09-26-windows-codex-hidden-launch.md). |
 
 ## Environment Variables
 
