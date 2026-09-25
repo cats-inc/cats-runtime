@@ -18,8 +18,20 @@ and [ADR-118](../../../cats-platform/docs/decisions/118-use-isolated-development
   skills/hydration/content policy, Windows Codex host/launcher/guard and docs
   boundary, plus the Runtime TypeScript build. Range-diff preserved the original
   change exactly; independent integration review found no code blockers.
-  Full PR CI and paired Desktop publication remain pending.
-- Checkout: `cats-runtime`, branch `fix/readonly-sandbox-skill-delivery`.
+  [PR #97](https://github.com/cats-inc/cats-runtime/pull/97) passed the full
+  release-preflight CI (2,449 passed, 5 skipped, no failures) and auto-merged at
+  `98b6755f8698300b2c1881c8018e303c02a29c69`.
+  Platform [PR #148](https://github.com/cats-inc/cats-platform/pull/148) also
+  passed full CI and merged. Its
+  [Desktop 0.5.2 workflow](https://github.com/cats-inc/cats-platform/actions/runs/36195340100)
+  passed all 7 jobs and published the
+  [standard-profile preview](https://github.com/cats-inc/cats-platform/releases/tag/v0.5.2)
+  pinned to that Runtime SHA. All three build logs confirm it; ten published
+  assets and three update metadata files were verified. macOS is signed +
+  notarized, Windows unsigned (no certificate), Linux n/a. No npm workflow or
+  new provider inference was dispatched. Installed upgrade acceptance and
+  knowledge evaluation/promotion remain separate open gates.
+- Implementation branch: `fix/readonly-sandbox-skill-delivery`, now merged.
   Historical base was `e464619` (0.3.0); current base is `0a60f31` (0.3.1).
   The earlier preview-content branches are merged;
   the prior worktree checkpoint below is historical.
