@@ -113,6 +113,24 @@ requests into calls into this shared runtime.
   metadata restoration such as ownership or other inode-level attributes
   beyond the current mode/timestamp preservation.
 
+## Explicit Codex read bridge (2026-09-25)
+
+[ADR-041](../decisions/041-bridge-explicit-codex-read-tools-through-runtime.md)
+adds an opt-in adapter for native local Codex sessions. Only exact `read_file`
+and `list_files` entries in `allowedTools` advertise Runtime-managed dynamic
+tools. Each call must validate the original process, active thread/turn,
+namespace, arguments, admitted workspace and granted subset before dispatch.
+The bridge bounds ordinary-file inspection and response size, preserves the
+existing path checks and cannot dispatch a mutation, shell or network tool.
+
+Required verification covers registration without inference, allow/deny and
+path-alias cases, bounded malformed/error responses, cancellation and late
+process replies, plus a real implementation/review trial. Unsupported native
+registration must stop explicitly; shell permission and CLI version equality
+are not compatibility fallbacks. Resume/fork and non-native path mappings must
+not be advertised as supported before their corresponding tests and native
+evidence exist. No public contract or persisted-data version changes are needed.
+
 ## Dependencies
 
 - [ADR 005: Introduce a Backend-Neutral Runtime Facade for CLI and API Backends](../decisions/005-backend-neutral-runtime-and-api-backend.md)

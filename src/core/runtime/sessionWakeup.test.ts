@@ -139,6 +139,25 @@ function makeInstructionSkillState(instructionsFile: string): SessionSkillState 
 }
 
 describe('ensureSessionAwake', () => {
+  it('keeps canonical sandbox read-only access on automatic re-entry', async () => {
+    const registry = new SessionRegistry();
+    registry.create(makeSession({
+      workspace: { kind: 'sandbox', access: 'read_only', runtimeCwd: '/sessions/readonly' },
+      cwd: '/sessions/readonly', workspaceMode: 'isolated',
+    }));
+    registry.setProviderSessionId('session-1', 'provider-session-1');
+    const runtime = makeRuntime();
+    const result = await ensureSessionAwake({
+      config: makeConfig() as never, registry, runtime: runtime as never, sessionId: 'session-1',
+    });
+    expect(result.outcome).toBe('resumed');
+    expect(runtime.spawn).toHaveBeenCalledWith('session-1', 'claude', expect.objectContaining({
+      cwd: '/sessions/readonly', workspaceMode: 'read_only', permissionMode: 'default',
+      resumeSessionId: 'provider-session-1',
+    }), 'default', 'cli');
+    expect(registry.get('session-1')?.workspace.kind).toBe('sandbox');
+  });
+
   it('returns already_awake when an execution handle is already active', async () => {
     const registry = new SessionRegistry();
     registry.create(makeSession());

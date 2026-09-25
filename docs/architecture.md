@@ -393,6 +393,15 @@ src/
 - Resolves `(provider, instance)` into concrete command/runtime settings
 - Discovers external native/file-backed sessions from supported tools per provider instance
 - Encapsulates provider-specific spawn, resume, fork, and permission logic
+- Lets providers compose configured launch arguments around their native
+  subcommands. Codex configuration overrides follow `app-server`, with explicit
+  session model/control selections taking precedence over instance defaults.
+- Bridges explicitly granted Codex `read_file` / `list_files` dynamic tools to
+  the shared local tool runtime for native local workspaces. The adapter binds
+  requests to an active thread/turn; WorkerProcess binds asynchronous replies
+  to the original live child and turn. General shell/file-change approval is
+  unchanged. Resume/fork registration and non-native mappings fail explicitly
+  until verified; see [ADR-041](decisions/041-bridge-explicit-codex-read-tools-through-runtime.md).
 - Hosts runtime-owned CLI model discovery helpers, including Pi's
   `pi --list-models` catalog normalization into canonical `provider/model` refs
 - Normalizes provider-native mid-turn updates onto shared `progress` events for

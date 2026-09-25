@@ -2,6 +2,15 @@
 
 > This directory contains all project documentation.
 
+## Explicit Codex Read Tools
+
+[ADR-041](./decisions/041-bridge-explicit-codex-read-tools-through-runtime.md)
+and [SPEC-002](./specs/SPEC-002-local-tool-runtime.md) define the opt-in bridge
+from native Codex dynamic tools to Runtime's shared workspace read policy.
+General shell approval and ordinary sessions are unchanged. Scoped native
+implementation/review dispatch is verified; the full Platform workflow budget
+gate and unverified resume/fork registration are tracked separately.
+
 ## Provider Catalog Soft Patches
 
 [ADR-040](./decisions/040-use-data-driven-provider-catalogs-and-local-overrides.md),

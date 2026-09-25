@@ -15,6 +15,7 @@ import type {
 import { resolveRuntimeSkillManifest } from '../skills/catalog.js';
 import { WorkspaceSubstrateService } from '../runtime/WorkspaceSubstrateService.js';
 import { deriveWorkspaceIsolationMode } from '../workspace/sessionWorkspace.js';
+import { toLegacyWorkspaceIsolationState, toLegacyWorkspaceMode } from '../workspace/legacyWorkspace.js';
 
 const DEFAULT_WORKSPACE_SUBSTRATE_PROFILE: WorkspaceSubstrateProfileId = 'standard';
 const DEFAULT_WORKSPACE_SUBSTRATE_SERVICE = new WorkspaceSubstrateService();
@@ -169,7 +170,7 @@ function resolveSkillHydration(
     providerName: input.providerName,
     providerBackend: input.providerBackend,
     cwd: input.runtimeCwd,
-    workspaceMode: input.workspaceMode,
+    workspaceMode: toLegacyWorkspaceMode(resolveWorkspaceKind(input), resolveWorkspaceAccess(input)),
     sessionBaseDir: input.sessionBaseDir,
     baseInstructionsFile: input.baseInstructionsFile,
     skillsRoot: input.skillsRoot,
@@ -202,7 +203,7 @@ async function hydrateWorkspace(
     warnings.push(
       'The runtime cwd is an isolated sandbox; re-entry should hydrate from the source workspace.',
     );
-  } else if (input.workspaceMode === 'isolated') {
+  } else if (resolveWorkspaceKind(input) === 'sandbox') {
     warnings.push(
       'This isolated runtime cwd has no separate source workspace recorded; treat it as session-scoped state only.',
     );
@@ -222,7 +223,9 @@ async function hydrateWorkspace(
   return {
     kind: resolveWorkspaceKind(input),
     access: resolveWorkspaceAccess(input),
-    isolationMode: input.workspaceIsolationMode ?? deriveWorkspaceIsolationMode(input.workspaceMode),
+    isolationMode: input.workspace
+      ? toLegacyWorkspaceIsolationState(input.workspace).mode
+      : input.workspaceIsolationMode ?? deriveWorkspaceIsolationMode(input.workspaceMode),
     runtimeCwd: input.runtimeCwd,
     ...(sourceCwd ? { sourceCwd } : {}),
     sourceOfTruth,
@@ -234,7 +237,8 @@ async function hydrateWorkspace(
 function resolveWorkspaceSourceCwd(
   input: HydrateSessionStateInput,
 ): string | undefined {
-  const requested = normalizeOptionalPath(input.requestedWorkspaceSourceCwd);
+  const requested = normalizeOptionalPath(input.requestedWorkspaceSourceCwd)
+    ?? normalizeOptionalPath(input.workspace?.sourceCwd);
   if ((input.workspace?.kind ?? resolveWorkspaceKind(input)) === 'sandbox') {
     return requested ?? normalizeOptionalPath(input.existingHydration?.workspace.sourceCwd);
   }
@@ -251,7 +255,7 @@ function resolveWorkspaceKind(
   if (input.workspaceIsolationMode === 'worktree') {
     return 'worktree';
   }
-  if (input.workspaceMode === 'isolated') {
+  if (input.workspaceIsolationMode === 'isolated' || input.workspaceMode === 'isolated') {
     return 'sandbox';
   }
   return 'source';

@@ -41,6 +41,38 @@ describe('CodexProvider', () => {
     });
   });
 
+  describe('configured launch overrides', () => {
+    it('places native configuration after app-server and before selected model controls', () => {
+      const configured = ['--profile', 'worker', '-c', 'features.apps=false',
+        '--config', 'model="instance-default"', '--config=model_reasoning_effort="low"'];
+      const spawn = provider.buildSpawnArgs({ ...baseOpts, model: 'selected-model',
+        modelControls: { 'codex.reasoning_effort': 'high' } });
+      expect(provider.composeLaunchArgs(configured, spawn)).toEqual([
+        '--profile', 'worker', 'app-server', '-c', 'features.apps=false',
+        '--config', 'model="instance-default"', '--config=model_reasoning_effort="low"',
+        '-c', 'model="selected-model"', '-c', 'model_reasoning_effort="high"',
+      ]);
+      expect(configured[2]).toBe('-c');
+      expect(spawn[0]).toBe('app-server');
+    });
+
+    it('preserves attached override syntax, quoted paths and repeated values in order', () => {
+      const configured = ['-cfeatures.apps=true', '-c=features.apps=false',
+        '-c', 'model_instructions_file="C:/private profile/base.md"'];
+      expect(provider.composeLaunchArgs(configured, ['app-server'])).toEqual(['app-server', ...configured]);
+    });
+
+    it('preserves other invocation shapes, unrelated arguments and malformed options for native validation', () => {
+      expect(provider.composeLaunchArgs(['-c', 'features.apps=false'], ['exec']))
+        .toEqual(['-c', 'features.apps=false', 'exec']);
+      expect(provider.composeLaunchArgs(['--help', '-c'], ['app-server']))
+        .toEqual(['--help', '-c', 'app-server']);
+      expect(provider.composeLaunchArgs(['--', '-c', 'features.apps=false'], ['app-server']))
+        .toEqual(['--', '-c', 'features.apps=false', 'app-server']);
+      expect(provider.composeLaunchArgs([], ['app-server'])).toEqual(['app-server']);
+    });
+  });
+
   describe('buildStdinMessage', () => {
     it('sends pipelined init on first call', () => {
       provider.buildSpawnArgs(baseOpts);
@@ -530,6 +562,31 @@ describe('CodexProvider', () => {
       });
     });
 
+    it('counts both model responses observed in the isolated K4 implementation turn', () => {
+      const first = {
+        inputTokens: 9260, cachedInputTokens: 0, cacheWriteInputTokens: 0,
+        outputTokens: 70, reasoningOutputTokens: 0, totalTokens: 9330,
+      };
+      const last = {
+        inputTokens: 9375, cachedInputTokens: 9088, cacheWriteInputTokens: 0,
+        outputTokens: 102, reasoningOutputTokens: 34, totalTokens: 9477,
+      };
+      const total = {
+        inputTokens: 18635, cachedInputTokens: 9088, cacheWriteInputTokens: 0,
+        outputTokens: 172, reasoningOutputTokens: 34, totalTokens: 18807,
+      };
+      for (const tokenUsage of [{ last: first, total: first }, { last, total }]) {
+        provider.parseStreamLine(JSON.stringify({
+          method: 'thread/tokenUsage/updated', params: { tokenUsage },
+        }));
+      }
+      const event = provider.parseStreamLine(JSON.stringify({ method: 'turn/completed', params: {} }));
+      expect(event?.usage).toEqual({
+        inputTokens: 18635, outputTokens: 172, promptInputTokens: 9547,
+        cacheReadInputTokens: 9088, cacheCreationInputTokens: 0, totalTokens: 18807,
+      });
+    });
+
     it('normalizes account/rateLimits/updated into quota progress and carries it onto turn/completed', () => {
       const resetsAt = new Date(1789593617 * 1000).toISOString();
       const rateLimits = {
@@ -859,6 +916,102 @@ describe('CodexProvider', () => {
         params: {},
       }));
       expect(event?.type).toBe('raw');
+    });
+  });
+
+  describe('usage across model requests and Runtime turns', () => {
+    const counts = (inputTokens: number, outputTokens: number) => ({
+      inputTokens, outputTokens, cachedInputTokens: 0, cacheWriteInputTokens: 0,
+      totalTokens: inputTokens + outputTokens,
+    });
+    const notify = (method: string, params: Record<string, unknown>) =>
+      provider.parseStreamLine(JSON.stringify({ method, params }));
+    const usage = (
+      turnId: string,
+      last: ReturnType<typeof counts>,
+      total?: ReturnType<typeof counts>,
+      threadId = 'usage-thread',
+    ) => notify('thread/tokenUsage/updated', { threadId, turnId, tokenUsage: { last, total } });
+    const completed = (turnId: string) => notify('turn/completed', {
+      threadId: 'usage-thread', turn: { id: turnId, status: 'completed' },
+    });
+    const initialize = (resume = false, fork = false) => {
+      provider.buildSpawnArgs({ ...baseOpts,
+        ...(resume ? { resumeSessionId: 'usage-thread', forkSession: fork } : {}),
+      });
+      provider.buildStdinMessage('first request');
+      provider.parseStreamLine(JSON.stringify({ id: 1, result: { thread: { id: 'usage-thread' } } }));
+    };
+    const start = (turnId: string, first = false) => {
+      const message = first ? provider.getPendingTurnStart() : provider.buildStdinMessage('next request');
+      const request = JSON.parse(message!);
+      provider.parseStreamLine(JSON.stringify({ id: request.id, result: { turn: { id: turnId } } }));
+      notify('turn/started', { threadId: 'usage-thread', turn: { id: turnId } });
+    };
+
+    it('deduplicates cumulative notifications and charges only the next turn delta', () => {
+      initialize();
+      start('turn-one', true);
+      usage('turn-one', counts(100, 10), counts(100, 10));
+      usage('turn-one', counts(100, 10), counts(100, 10));
+      usage('turn-one', counts(100, 10), counts(200, 20));
+      expect(completed('turn-one')?.usage).toMatchObject({ inputTokens: 200, outputTokens: 20, totalTokens: 220 });
+      start('turn-two');
+      usage('turn-one', counts(100, 10), counts(200, 20));
+      usage('turn-two', counts(100, 10), counts(300, 30));
+      expect(completed('turn-two')?.usage).toMatchObject({ inputTokens: 100, outputTokens: 10, totalTokens: 110 });
+      expect(completed('turn-two')?.usage).toBeUndefined();
+    });
+
+    it.each([false, true])('excludes unobserved historical totals after resume (fork=%s)', (fork) => {
+      initialize(true, fork);
+      start('resumed-turn', true);
+      usage('resumed-turn', counts(100, 10), counts(10100, 1010));
+      usage('resumed-turn', counts(200, 20), counts(10300, 1030));
+      expect(completed('resumed-turn')?.usage).toMatchObject({ inputTokens: 300, outputTokens: 30, totalTokens: 330 });
+    });
+
+    it('uses bootstrap and idle notifications as checkpoints without charging old usage', () => {
+      initialize(true);
+      usage('old-turn', counts(100, 10), counts(10000, 1000));
+      const pending = JSON.parse(provider.getPendingTurnStart()!);
+      usage('old-turn', counts(100, 10), counts(10000, 1000));
+      provider.parseStreamLine(JSON.stringify({ id: pending.id, result: { turn: { id: 'new-turn' } } }));
+      usage('new-turn', counts(50, 5), counts(10050, 1005));
+      expect(completed('new-turn')?.usage).toMatchObject({ inputTokens: 50, outputTokens: 5, totalTokens: 55 });
+      usage('new-turn', counts(50, 5), counts(10050, 1005));
+      start('next-turn');
+      usage('next-turn', counts(60, 6), counts(10110, 1011));
+      expect(completed('next-turn')?.usage).toMatchObject({ inputTokens: 60, outputTokens: 6, totalTokens: 66 });
+    });
+
+    it('keeps another thread or turn from changing the accounting checkpoint', () => {
+      initialize();
+      start('current-turn', true);
+      usage('current-turn', counts(100, 10), counts(100, 10));
+      usage('current-turn', counts(900, 90), counts(900, 90), 'unrelated-thread');
+      usage('unrelated-turn', counts(900, 90), counts(900, 90));
+      usage('current-turn', counts(50, 5), counts(150, 15));
+      expect(completed('current-turn')?.usage).toMatchObject({ inputTokens: 150, outputTokens: 15, totalTokens: 165 });
+    });
+
+    it('accumulates last-only observations without later counting them twice', () => {
+      initialize();
+      start('partial-turn', true);
+      usage('partial-turn', counts(100, 10));
+      usage('partial-turn', counts(200, 20));
+      usage('partial-turn', counts(300, 30), counts(10600, 1060));
+      usage('partial-turn', counts(40, 4), counts(10640, 1064));
+      expect(completed('partial-turn')?.usage).toMatchObject({ inputTokens: 640, outputTokens: 64, totalTokens: 704 });
+    });
+
+    it('starts a new checkpoint if native cumulative counters reset', () => {
+      initialize();
+      start('reset-turn', true);
+      usage('reset-turn', counts(100, 10), counts(100, 10));
+      usage('reset-turn', counts(20, 2), counts(20, 2));
+      usage('reset-turn', counts(20, 2), counts(20, 2));
+      expect(completed('reset-turn')?.usage).toMatchObject({ inputTokens: 120, outputTokens: 12, totalTokens: 132 });
     });
   });
 

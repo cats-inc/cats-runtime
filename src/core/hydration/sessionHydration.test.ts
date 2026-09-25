@@ -39,6 +39,36 @@ describe('session hydration', () => {
     ].join('\n'));
   }
 
+  it.each(['canonical', 'legacy'] as const)(
+    'rehydrates a read-only sandbox through %s topology without materializing Codex skill files', async (shape) => {
+      const root = mkdtempSync(join(tmpdir(), 'cats-runtime-hydration-readonly-'));
+      cleanupPaths.push(root);
+      const sessionBaseDir = join(root, 'sessions');
+      const runtimeCwd = join(sessionBaseDir, 'readonly');
+      const skillsRoot = join(root, 'skills');
+      mkdirSync(runtimeCwd, { recursive: true });
+      writeSkillPackage(skillsRoot, 'companion');
+      const result = await hydrateSessionState({
+        trigger: 'resume', sessionId: 'readonly', providerName: 'codex', providerBackend: 'cli',
+        runtimeCwd, sessionBaseDir, skillsRoot,
+        ...(shape === 'canonical'
+          ? { workspace: { kind: 'sandbox' as const, access: 'read_only' as const, runtimeCwd },
+              workspaceMode: 'isolated' as const }
+          : { workspaceMode: 'read_only' as const, workspaceIsolationMode: 'isolated' as const }),
+        requestedSkills: { requestedSkills: ['companion'] },
+      });
+      expect(result.hydration.workspace).toEqual(expect.objectContaining({
+        kind: 'sandbox', access: 'read_only', isolationMode: 'isolated', runtimeCwd,
+        sourceOfTruth: 'runtime_cwd',
+      }));
+      expect(result.hydration.workspace.warnings).toContain(
+        'This isolated runtime cwd has no separate source workspace recorded; treat it as session-scoped state only.',
+      );
+      expect(result.skills?.delivery.mode).toBe('instructions');
+      expect(existsSync(join(runtimeCwd, '.agents', 'skills', 'companion', 'SKILL.md'))).toBe(false);
+    },
+  );
+
   it('rehydrates persisted skill state for a new backend target during fork', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-hydration-'));
     cleanupPaths.push(root);

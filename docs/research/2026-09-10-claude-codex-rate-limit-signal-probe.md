@@ -120,6 +120,36 @@ includes the cached tokens (`totalTokens = inputTokens + outputTokens`).
 `src/backends/cli/providers/claude.fixture.test.ts` and
 `src/backends/cli/providers/codex.fixture.test.ts` pin the adapters to these captures.
 
+## 2026-09-25 follow-up: Codex usage within a turn
+
+The isolated PLAN-110 K4 continuation-02 run with codex-cli 0.156.1 recorded two
+model responses inside one implementation turn. Their token totals were 9,330
+and 9,477; the native cumulative total was 18,807 (18,635 input and 172 output).
+Runtime previously overwrote the cached usage on each notification and reported
+only the final 9,477. The coordinator's 33,246 was correct, leaving 42,723 charged
+against 52,053 actually reported by the native sessions. These are execution
+tokens, including cached input, not account-quota or price estimates.
+
+The adapter now accumulates changes in native cumulative counters until
+`turn/completed`. It retains the counter checkpoint across Runtime turns, so
+repeated notifications add zero and subsequent turns charge only new usage.
+The first observed counter on a resumed or forked thread uses only `last`,
+excluding existing native history. Bootstrap/idle notifications seed the
+checkpoint without charging a turn; supplied thread/turn IDs keep unrelated
+notifications out. Turn identity comes from `turn/started` or the `turn/start`
+response. Missing cumulative counters or a counter reset fall back to the
+current `last` observation and establish a fresh checkpoint. Last-only streams
+cannot distinguish duplicated notifications from equal-cost model responses.
+
+Native cumulative metadata remains intact for independent reconciliation.
+Provider tests preserve the observed two-response numbers and cover repeated
+notifications, later turns, resumed/forked history, idle/bootstrap observations,
+unrelated turn IDs, missing counters and counter resets. This correction adds
+no new public usage fields and does not change inference permissions, execution
+budgets, or in-flight cancellation guarantees. Verification uses recorded
+counters and synthetic protocol frames; it requires no new inference or auth
+file access.
+
 ## Action items
 
 - [x] Normalize both signals into the shared quota contract (this change)

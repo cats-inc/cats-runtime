@@ -184,7 +184,8 @@ function buildCleanupContract(
     ? `/sessions/${encodeURIComponent(session.id)}/workspace/cleanup`
     : undefined;
   const reasonCodes: string[] = [];
-  if (session.workspaceMode === 'isolated') {
+  if (session.workspace?.kind === 'sandbox'
+    || (!session.workspace && (session.workspaceIsolation?.mode ?? session.workspaceMode) === 'isolated')) {
     reasonCodes.push('isolated_workspace_retained');
   }
   if (session.workspaceIsolation?.mode === 'worktree' && session.workspaceIsolation.worktree) {
@@ -353,8 +354,11 @@ function resolveLatestMaintenanceFollowThrough(
 }
 
 function sessionHasRetainedWorkspace(session: SessionInfo): boolean {
-  return session.workspaceMode === 'isolated'
-    || session.workspaceIsolation?.mode === 'worktree';
+  return session.workspace
+    ? session.workspace.kind !== 'source'
+    : session.workspaceMode === 'isolated'
+      || session.workspaceIsolation?.mode === 'isolated'
+      || session.workspaceIsolation?.mode === 'worktree';
 }
 
 function resolveMaintenanceStatus(

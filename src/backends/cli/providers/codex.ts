@@ -4,6 +4,8 @@ import type {
   ProviderCapabilities,
   PermissionMode,
   ProviderSpawnOptions,
+  ProviderExecutionContext,
+  ProviderServerRequestContext,
   TurnInput,
 } from './types.js';
 import type {
@@ -27,6 +29,7 @@ import {
 } from '../../../core/compatibility/providerEvolution.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
+import { CodexReadTools, codexReadToolError, grantedCodexReadTools } from './codexReadTools.js';
 
 interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -37,7 +40,7 @@ interface JsonRpcRequest {
 
 interface JsonRpcResponse {
   jsonrpc: '2.0';
-  id?: number;
+  id?: number | string;
   result?: Record<string, unknown>;
   error?: {
     code?: number;
@@ -75,6 +78,10 @@ export class CodexProvider implements Provider {
   private nextId = 0;
   private _lastUsage: StreamUsage | null = null;
   private _lastUsageNative: Record<string, unknown> | null = null;
+  private _usageTotal: Record<string, number> | null = null;
+  private _collectingUsage = true;
+  private _usageTurnId: string | null = null;
+  private _turnStartRequestId: number | null = null;
   /**
    * Latest account rate-limit snapshot from `account/rateLimits/updated`. Codex emits it once
    * per turn right after `thread/tokenUsage/updated`, so `turn/completed` can carry it as
@@ -86,11 +93,20 @@ export class CodexProvider implements Provider {
   private _spawnOpts: ProviderSpawnOptions | null = null;
   private _permissionMode: PermissionMode = 'skip';
   private _allowedTools: string[] = [];
+  private _executionContext: ProviderExecutionContext = {};
+  private _readTools: CodexReadTools | null = null;
+  private _readToolsBootstrapId: number | null = null;
+  private _readTurnId: string | null = null;
+  private _readCallIds = new Set<string>();
 
   constructor(
     private readonly compatibilityProfile?: CompatibilityProfileSelection,
     private readonly evolutionObserver?: ProviderEvolutionEvidenceObserver,
   ) {}
+
+  configureExecution(context: ProviderExecutionContext): void {
+    this._executionContext = { ...context };
+  }
 
   private makeRequest(method: string, params?: Record<string, unknown>): string {
     const req: JsonRpcRequest = {
@@ -113,8 +129,11 @@ export class CodexProvider implements Provider {
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
     this._spawnOpts = { ...opts };
+    this._collectingUsage = false;
     this._permissionMode = opts.permissionMode ?? 'skip';
     this._allowedTools = [...(opts.allowedTools || [])];
+    this._readTools = grantedCodexReadTools(this._allowedTools).length > 0
+      ? new CodexReadTools(opts, this._executionContext.localWorkspaceCwd) : null;
 
     const args = this.compatibilityProfile?.spawnBaseArgs
       ? [...this.compatibilityProfile.spawnBaseArgs]
@@ -131,6 +150,31 @@ export class CodexProvider implements Provider {
     }
 
     return args;
+  }
+
+  composeLaunchArgs(configuredArgs: readonly string[], spawnArgs: readonly string[]): string[] {
+    const subcommand = spawnArgs.indexOf('app-server');
+    if (subcommand < 0) return [...configuredArgs, ...spawnArgs];
+    const globalArgs: string[] = [];
+    const overrides: string[] = [];
+    for (let index = 0; index < configuredArgs.length; index += 1) {
+      const arg = configuredArgs[index]!;
+      if (arg === '--') {
+        globalArgs.push(...configuredArgs.slice(index));
+        break;
+      }
+      if ((arg === '-c' || arg === '--config') && configuredArgs[index + 1]?.includes('=')) {
+        overrides.push(arg, configuredArgs[++index]!);
+      } else if (arg.startsWith('--config=') || /^-c=?[^=]+=/.test(arg)) {
+        overrides.push(arg);
+      } else {
+        globalArgs.push(arg);
+      }
+    }
+    // App-server does not inherit root-level -c values. Explicit session
+    // model/control choices remain last, after the configured defaults.
+    return [...globalArgs, ...spawnArgs.slice(0, subcommand + 1),
+      ...overrides, ...spawnArgs.slice(subcommand + 1)];
   }
 
   buildStdinMessage(content: string, turn?: TurnInput): string {
@@ -158,6 +202,7 @@ export class CodexProvider implements Provider {
       const lines = [
         this.makeRequest('initialize', {
           clientInfo: { name: 'cats-runtime', version: '1.0.0' },
+          ...(this._readTools ? { capabilities: { experimentalApi: true } } : {}),
         }),
         this.makeNotification('initialized'),
         this.makeRequest(
@@ -189,6 +234,13 @@ export class CodexProvider implements Provider {
     }
 
     const policy = this.resolvePermissionPolicy(this._spawnOpts);
+    this._collectingUsage = true;
+    this._usageTurnId = null;
+    this._lastUsage = null;
+    this._lastUsageNative = null;
+    this._readTurnId = null;
+    this._readCallIds.clear();
+    this._turnStartRequestId = this.nextId;
     return this.makeRequest('turn/start', {
       threadId: this.threadId,
       input: [{ type: 'text', text: content }],
@@ -274,6 +326,48 @@ export class CodexProvider implements Provider {
     return null;
   }
 
+  async buildServerResponse(
+    line: string,
+    context: ProviderServerRequestContext,
+  ): Promise<string | null> {
+    let message: Record<string, unknown> | undefined;
+    try { message = asRecord(JSON.parse(line)); } catch { return null; }
+    if (message?.method !== 'item/tool/call') return null;
+    const requestId = message.id;
+    const validId = (typeof requestId === 'string' && requestId.length > 0 && requestId.length <= 256)
+      || (typeof requestId === 'number' && Number.isSafeInteger(requestId) && requestId >= 0);
+    const respond = (result: Awaited<ReturnType<CodexReadTools['execute']>>) => JSON.stringify({
+      jsonrpc: '2.0', id: validId ? requestId : null, result,
+    }) + '\n';
+    if (!validId || line.length > 16_384) {
+      return respond(codexReadToolError('Malformed or oversized read-tool request.'));
+    }
+    const params = asRecord(message.params);
+    const threadId = this.threadId;
+    const turnId = this._readTurnId;
+    if (!this._readTools || this.state !== 'ready' || context.signal.aborted || !threadId || !turnId
+      || params?.threadId !== threadId || params.turnId !== turnId) {
+      return respond(codexReadToolError('Read request does not belong to an active, admitted thread and turn.'));
+    }
+    if ((params.namespace !== undefined && params.namespace !== null)
+      || typeof params.tool !== 'string' || typeof params.callId !== 'string'
+      || !params.callId || params.callId.length > 256) {
+      return respond(codexReadToolError('Malformed or foreign read-tool request.'));
+    }
+    if (this._readCallIds.size >= 64 || this._readCallIds.has(params.callId)) {
+      return respond(codexReadToolError('Read request is duplicated or exceeds the per-turn call limit.'));
+    }
+    this._readCallIds.add(params.callId);
+    const result = await this._readTools.execute({
+      threadId, callId: params.callId, name: params.tool,
+      arguments: params.arguments, signal: context.signal,
+    });
+    if (context.signal.aborted || this.threadId !== threadId || this._readTurnId !== turnId) {
+      return respond(codexReadToolError('Read request is no longer active.'));
+    }
+    return respond(result);
+  }
+
   parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
     const trimmed = line.trim();
     if (!trimmed) return null;
@@ -313,18 +407,22 @@ export class CodexProvider implements Provider {
 
   private handleResponse(msg: JsonRpcResponse): StreamEvent | null {
     if (msg.error) {
+      const readBootstrapFailed = this.state === 'initializing' && this._readTools !== null;
       if (this.state === 'initializing') {
         this.state = 'failed';
         this._pendingMessage = null;
         this.threadId = null;
       }
+      this._readTurnId = null;
 
       return observeNormalized(this.evolutionObserver, {
         rawEventType: 'jsonrpc:error',
         rawSample: msg,
       }, {
         type: 'error',
-        text: formatJsonRpcError(msg.error),
+        text: readBootstrapFailed
+          ? `Codex read-tool registration failed: ${formatJsonRpcError(msg.error).slice(0, 512)}`
+          : formatJsonRpcError(msg.error),
       } satisfies ErrorStreamEvent);
     }
 
@@ -332,9 +430,10 @@ export class CodexProvider implements Provider {
 
     // thread/start|resume|fork response — extract threadId (may be at result.threadId or result.thread.id)
     if (this.state === 'initializing' && !this.threadId) {
+      if (this._readTools && msg.id !== this._readToolsBootstrapId) return null;
       const tid = (result.threadId as string)
         ?? ((result.thread as Record<string, unknown> | undefined)?.id as string);
-      if (tid) {
+      if (typeof tid === 'string' && tid) {
         this.threadId = tid;
         this.state = 'ready';
         return observeNormalized(this.evolutionObserver, {
@@ -345,12 +444,25 @@ export class CodexProvider implements Provider {
           sessionId: tid,
         } satisfies InitStreamEvent);
       }
+      if (this._readTools) {
+        this.state = 'failed';
+        this._pendingMessage = null;
+        return { type: 'error', text: 'Codex read-tool registration did not return a valid thread.' };
+      }
       // No threadId — this is the initialize response, consume internally
       return observeIgnored(this.evolutionObserver, {
         rawEventType: 'initialize',
         reason: 'bootstrap_initialize_response',
         rawSample: msg,
       }, null);
+    }
+
+    if (msg.id === this._turnStartRequestId) {
+      const turnId = asRecord(result.turn)?.id;
+      if (typeof turnId === 'string') {
+        this._usageTurnId = turnId;
+        this._readTurnId = turnId;
+      }
     }
 
     // turn/start response or other — consume
@@ -367,6 +479,8 @@ export class CodexProvider implements Provider {
 
     // thread/started notification — extract threadId as fallback
     if (method === 'thread/started') {
+      // A notification alone does not acknowledge required dynamic-tool registration.
+      if (this._readTools) return null;
       const thread = params.thread as Record<string, unknown> | undefined;
       if (thread?.id && !this.threadId) {
         this.threadId = thread.id as string;
@@ -443,13 +557,32 @@ export class CodexProvider implements Provider {
       }, null);
     }
 
-    // Token usage arrives separately from turn/completed
+    if (method === 'turn/started'
+      && (!this.threadId || !params.threadId || params.threadId === this.threadId)) {
+      const turnId = asRecord(params.turn)?.id;
+      if (typeof turnId === 'string') {
+        this._collectingUsage = true;
+        this._usageTurnId = turnId;
+      }
+    }
+
+    // A native turn can make several model requests; `last` is only the newest request.
     if (method === 'thread/tokenUsage/updated') {
       const tokenUsage = asRecord(params.tokenUsage);
       const last = asRecord(tokenUsage?.last);
-      if (last) {
-        this._lastUsage = normalizeCodexTokenUsage(last);
-        this._lastUsageNative = buildCodexTokenUsageNative(tokenUsage);
+      const total = readCodexTokenCounters(asRecord(tokenUsage?.total));
+      const differentThread = this.threadId && params.threadId && params.threadId !== this.threadId;
+      const differentTurn = this._usageTurnId && params.turnId && params.turnId !== this._usageTurnId;
+      if (!differentThread && !differentTurn) {
+        const delta = last ? codexTokenUsageDelta(last, total, this._usageTotal) : undefined;
+        this._usageTotal = total;
+        // Resume/bootstrap notifications can contain historical usage. Seed the checkpoint
+        // without charging it, including notifications before the new turn is acknowledged.
+        const awaitingTurn = this._spawnOpts && params.turnId && !this._usageTurnId;
+        if (delta && this._collectingUsage && !awaitingTurn) {
+          this._lastUsage = addCodexTokenUsage(this._lastUsage, delta);
+          this._lastUsageNative = buildCodexTokenUsageNative(tokenUsage);
+        }
       }
       return observeIgnored(this.evolutionObserver, {
         rawEventType: method,
@@ -489,11 +622,15 @@ export class CodexProvider implements Provider {
 
     // Turn completed — attach cached usage plus the latest quota snapshot if available
     if (method === 'turn/completed') {
+      this._readTurnId = null;
       const usage = this._lastUsage ?? undefined;
       const usageNative = this._lastUsageNative;
       const quota = this._lastRateLimits;
       this._lastUsage = null;
       this._lastUsageNative = null;
+      this._collectingUsage = false;
+      this._usageTurnId = null;
+      this._turnStartRequestId = null;
       return observeNormalized(this.evolutionObserver, {
         rawEventType: method,
         rawSample: msg,
@@ -513,6 +650,7 @@ export class CodexProvider implements Provider {
 
     // Turn failed
     if (method === 'turn/failed') {
+      this._readTurnId = null;
       return observeNormalized(this.evolutionObserver, {
         rawEventType: method,
         rawSample: msg,
@@ -531,6 +669,7 @@ export class CodexProvider implements Provider {
       || method === 'mcpServer/elicitation/request'
       || method === 'applyPatchApproval'
       || method === 'execCommandApproval'
+      || method === 'item/tool/call'
     ) {
       return observeIgnored(this.evolutionObserver, {
         rawEventType: method,
@@ -721,6 +860,10 @@ export class CodexProvider implements Provider {
       approvalPolicy: policy.approvalPolicy,
       sandbox: policy.sandbox,
     };
+    if (this._readTools) {
+      this._readToolsBootstrapId = this.nextId;
+      params.dynamicTools = this._readTools.definitions();
+    }
 
     if (!opts.resumeSessionId) {
       params.experimentalRawEvents = false;
@@ -793,7 +936,7 @@ export class CodexProvider implements Provider {
       : 'decline';
   }
 
-  private makeApprovalResponse(id: number, decision: CodexApprovalDecision): string {
+  private makeApprovalResponse(id: number | string, decision: CodexApprovalDecision): string {
     return JSON.stringify({
       jsonrpc: '2.0',
       id,
@@ -1089,6 +1232,52 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
  * "full prompt" `inputTokens`; `promptInputTokens` is the uncached remainder. Observed on
  * codex-cli 0.153.4; see docs/research/2026-09-10-claude-codex-rate-limit-signal-probe.md.
  */
+const CODEX_TOKEN_COUNTERS = [
+  'inputTokens', 'outputTokens', 'cachedInputTokens', 'cacheWriteInputTokens', 'totalTokens',
+] as const;
+
+function readCodexTokenCounters(value: Record<string, unknown> | undefined): Record<string, number> | null {
+  if (!value) return null;
+  const counters: Record<string, number> = {};
+  for (const key of CODEX_TOKEN_COUNTERS) {
+    const count = finiteNumber(value[key]);
+    if (count !== undefined && count >= 0) counters[key] = count;
+  }
+  return counters.inputTokens !== undefined && counters.outputTokens !== undefined ? counters : null;
+}
+
+function codexTokenUsageDelta(
+  last: Record<string, unknown>,
+  total: Record<string, number> | null,
+  previous: Record<string, number> | null,
+): StreamUsage {
+  // The first observed total may include a resumed/forked thread's history. Its
+  // last request is the only new usage known at that boundary. A native counter
+  // reset (for example after compaction) also starts a new checkpoint.
+  if (!total || !previous || CODEX_TOKEN_COUNTERS.some((key) =>
+    total[key] !== undefined && previous[key] !== undefined && total[key]! < previous[key]!,
+  )) return normalizeCodexTokenUsage(last);
+  const delta: Record<string, unknown> = {};
+  for (const key of CODEX_TOKEN_COUNTERS) {
+    delta[key] = total[key] !== undefined && previous[key] !== undefined
+      ? total[key]! - previous[key]!
+      : last[key];
+  }
+  return normalizeCodexTokenUsage(delta);
+}
+
+function addCodexTokenUsage(current: StreamUsage | null, delta: StreamUsage): StreamUsage {
+  if (!current) return delta;
+  const sum: StreamUsage = {
+    inputTokens: current.inputTokens + delta.inputTokens,
+    outputTokens: current.outputTokens + delta.outputTokens,
+  };
+  for (const key of ['promptInputTokens', 'cacheReadInputTokens', 'cacheCreationInputTokens', 'totalTokens'] as const) {
+    if (current[key] !== undefined && delta[key] !== undefined) sum[key] = current[key]! + delta[key]!;
+  }
+  return sum;
+}
+
 function normalizeCodexTokenUsage(last: Record<string, unknown>): StreamUsage {
   const inputTokens = finiteNumber(last.inputTokens) ?? 0;
   const outputTokens = finiteNumber(last.outputTokens) ?? 0;

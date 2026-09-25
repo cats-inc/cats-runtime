@@ -125,10 +125,16 @@ export interface Provider {
   capabilities: ProviderCapabilities;
   ephemeral?: boolean;
   buildSpawnArgs(opts: ProviderSpawnOptions): string[];
+  /** Internal host path mapping; absent for remote/unverified execution environments. */
+  configureExecution?(context: ProviderExecutionContext): void;
+  /** Place configured arguments where the native subcommand actually consumes them. */
+  composeLaunchArgs?(configuredArgs: readonly string[], spawnArgs: readonly string[]): string[];
   buildStdinMessage(content: string, turn?: TurnInput): string;
   parseStreamLine(line: string): StreamEvent | StreamEvent[] | null;
   classifyLaunchFailure?(input: ProviderLaunchFailureInput): RuntimeProviderRefusal | null;
   buildAutoResponse?(line: string): string | null;
+  /** Host-owned asynchronous replies, scoped to one live child and active turn. */
+  buildServerResponse?(line: string, context: ProviderServerRequestContext): Promise<string | null>;
   getPendingTurnStart?(): string | null;
   streamTurn?(turn: TurnInput, opts: ProviderTurnOptions): AsyncGenerator<StreamEvent>;
   /** Called before spawn for ephemeral providers that need the message in args (e.g. -p flag). */
@@ -137,6 +143,14 @@ export interface Provider {
   resolveFirstEventTimeoutMs?(defaultTimeoutMs: number): number;
   beforeTurn?(opts: ProviderSpawnOptions): Promise<void>;
   afterTurn?(opts: ProviderSpawnOptions): Promise<StreamEvent | StreamEvent[] | null>;
+}
+
+export interface ProviderExecutionContext {
+  localWorkspaceCwd?: string;
+}
+
+export interface ProviderServerRequestContext {
+  signal: AbortSignal;
 }
 
 export interface ProviderLaunchFailureInput {

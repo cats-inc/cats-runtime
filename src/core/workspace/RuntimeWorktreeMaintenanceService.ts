@@ -1,5 +1,5 @@
 import { readdir } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
 import type { RuntimeSessionManager } from '../runtime/RuntimeSessionManager.js';
 import type { SessionInfo, WorktreeCleanupPolicy } from '../types.js';
@@ -83,6 +83,8 @@ export class RuntimeWorktreeMaintenanceService {
   private timer: ReturnType<typeof setInterval> | null = null;
   private running = false;
   private lastSweep: RuntimeWorktreeMaintenanceSweepResult | undefined;
+  private readonly preparingSessions = new Map<string, number>();
+  private readonly cleaningSessions = new Map<string, Promise<void>>();
 
   constructor(
     private readonly options: RuntimeWorktreeMaintenanceServiceOptions,
@@ -119,6 +121,22 @@ export class RuntimeWorktreeMaintenanceService {
       },
       retained: this.buildRetainedSummarySnapshot(),
       ...(this.lastSweep ? { lastSweep: cloneSweepResult(this.lastSweep) } : {}),
+    };
+  }
+
+  /** Hold before preparing a workspace until registry publication or rollback has finished. */
+  async reserveSessionWorkspace(sessionId: string): Promise<() => void> {
+    while (this.cleaningSessions.has(sessionId)) {
+      await this.cleaningSessions.get(sessionId);
+    }
+    this.preparingSessions.set(sessionId, (this.preparingSessions.get(sessionId) ?? 0) + 1);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const remaining = (this.preparingSessions.get(sessionId) ?? 1) - 1;
+      if (remaining > 0) this.preparingSessions.set(sessionId, remaining);
+      else this.preparingSessions.delete(sessionId);
     };
   }
 
@@ -169,27 +187,30 @@ export class RuntimeWorktreeMaintenanceService {
       }
     }
 
-    const trackedWorktrees = new Map<string, string>();
-    for (const session of sessions) {
-      const worktreePath = session.workspaceIsolation?.mode === 'worktree'
-        ? session.workspaceIsolation.worktree?.worktreePath
-        : undefined;
-      if (!worktreePath) {
-        continue;
-      }
-      trackedWorktrees.set(normalizePath(worktreePath), session.id);
-    }
-
-    const orphanedWorktreePaths = await this.collectOrphanedWorktreePaths(trackedWorktrees);
+    const candidates = await this.collectOrphanedWorktreePaths();
+    const orphanedWorktreePaths: string[] = [];
     const failedOrphanedWorktreePaths: string[] = [];
     let removedOrphanedWorktreeCount = 0;
 
-    for (const orphanedWorktreePath of orphanedWorktreePaths) {
-      const result = await cleanupOrphanedWorktree(orphanedWorktreePath);
-      if (result.removed) {
-        removedOrphanedWorktreeCount += 1;
-      } else {
-        failedOrphanedWorktreePaths.push(orphanedWorktreePath);
+    for (const orphanedWorktreePath of candidates) {
+      // Directory enumeration and earlier cleanup can await while a session is published.
+      if (this.isWorktreeProtected(orphanedWorktreePath)) continue;
+      const sessionId = basename(orphanedWorktreePath);
+      let finishCleanup!: () => void;
+      this.cleaningSessions.set(sessionId, new Promise<void>((resolveCleanup) => {
+        finishCleanup = resolveCleanup;
+      }));
+      orphanedWorktreePaths.push(orphanedWorktreePath);
+      try {
+        const result = await cleanupOrphanedWorktree(orphanedWorktreePath);
+        if (result.removed) {
+          removedOrphanedWorktreeCount += 1;
+        } else {
+          failedOrphanedWorktreePaths.push(orphanedWorktreePath);
+        }
+      } finally {
+        this.cleaningSessions.delete(sessionId);
+        finishCleanup();
       }
     }
 
@@ -306,9 +327,18 @@ export class RuntimeWorktreeMaintenanceService {
     };
   }
 
-  private async collectOrphanedWorktreePaths(
-    trackedWorktrees: ReadonlyMap<string, string>,
-  ): Promise<string[]> {
+  private isWorktreeProtected(worktreePath: string): boolean {
+    const sessionId = basename(worktreePath);
+    if (this.preparingSessions.has(sessionId) || this.cleaningSessions.has(sessionId)) return true;
+    return this.options.registry.list().some((session) => {
+      const expectedPath = session.workspaceIsolation?.mode === 'worktree'
+        ? session.workspaceIsolation.worktree?.worktreePath
+        : undefined;
+      return expectedPath !== undefined && normalizePath(expectedPath) === worktreePath;
+    });
+  }
+
+  private async collectOrphanedWorktreePaths(): Promise<string[]> {
     const worktreesRoot = join(this.options.sessionBaseDir, 'worktrees');
     try {
       const repoBuckets = await readdir(worktreesRoot, { withFileTypes: true });
@@ -326,17 +356,7 @@ export class RuntimeWorktreeMaintenanceService {
           }
 
           const worktreePath = normalizePath(join(repoBucketPath, worktreeEntry.name));
-          const trackedSessionId = trackedWorktrees.get(worktreePath);
-          if (!trackedSessionId) {
-            orphaned.push(worktreePath);
-            continue;
-          }
-
-          const session = this.options.registry.get(trackedSessionId);
-          const expectedPath = session?.workspaceIsolation?.mode === 'worktree'
-            ? session.workspaceIsolation.worktree?.worktreePath
-            : undefined;
-          if (!expectedPath || normalizePath(expectedPath) !== worktreePath) {
+          if (!this.isWorktreeProtected(worktreePath)) {
             orphaned.push(worktreePath);
           }
         }

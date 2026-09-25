@@ -85,10 +85,14 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   }
 
   private spawnProcess(): void {
-    const args = [
-      ...(this.commandConfig.args ?? []),
-      ...this.provider.buildSpawnArgs(this.spawnOpts),
-    ];
+    this.provider.configureExecution?.({
+      ...(this.commandConfig.runtime.mode === 'native'
+        ? { localWorkspaceCwd: this.spawnOpts.cwd } : {}),
+    });
+    const configuredArgs = this.commandConfig.args ?? [];
+    const providerArgs = this.provider.buildSpawnArgs(this.spawnOpts);
+    const args = this.provider.composeLaunchArgs?.(configuredArgs, providerArgs)
+      ?? [...configuredArgs, ...providerArgs];
 
     // Strip CLAUDECODE env var so nested sessions don't get blocked
     const env = { ...process.env };
@@ -108,7 +112,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       this.commandConfig.path,
     );
 
-    this.process = spawn(spawnConfig.command, spawnConfig.args, {
+    const child = spawn(spawnConfig.command, spawnConfig.args, {
       cwd: spawnConfig.cwd ?? this.spawnOpts.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: spawnConfig.shell,
@@ -116,17 +120,27 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       env,
       ...hiddenWindowsSpawnOptions(),
     });
+    this.process = child;
+    child.stdin?.on('error', () => {
+      const controller = this.activeTurnController;
+      if (this.process !== child || !controller || controller.signal.aborted) return;
+      controller.abort();
+      this.emit('error', new Error('Provider input stream closed during the active turn.'));
+      child.kill('SIGTERM');
+    });
 
     // Read stdout line-by-line (NDJSON)
-    const rl = createInterface({ input: this.process.stdout! });
+    const rl = createInterface({ input: child.stdout! });
     rl.on('line', (line) => {
+      if (this.process !== child || child.exitCode !== null) return;
       // Handle auto-response (e.g. Codex approval requests)
       if (this.provider.buildAutoResponse) {
         const response = this.provider.buildAutoResponse(line);
         if (response) {
-          this.process!.stdin!.write(response);
+          child.stdin!.write(response);
         }
       }
+      this.respondToServerRequest(line, child);
 
       const parsed = this.provider.parseStreamLine(line);
       if (parsed) {
@@ -140,7 +154,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
           if (event.type === 'init' && this.provider.getPendingTurnStart) {
             const pending = this.provider.getPendingTurnStart();
             if (pending) {
-              this.process!.stdin!.write(pending);
+              child.stdin!.write(pending);
             }
           }
           this.emit('event', event);
@@ -149,7 +163,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     });
 
     // Drain stderr to prevent buffer deadlock
-    this.process.stderr?.on('data', (chunk: Buffer) => {
+    child.stderr?.on('data', (chunk: Buffer) => {
+      if (this.process !== child) return;
       const text = chunk.toString('utf-8').trim();
       if (text) {
         this.captureStderr(text);
@@ -165,15 +180,36 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       }
     });
 
-    this.process.on('error', (err) => {
-      this.emit('error', err);
+    child.on('error', (err) => {
+      if (this.process === child) this.emit('error', err);
     });
 
-    this.process.on('close', (code, signal) => {
+    child.on('close', (code, signal) => {
+      if (this.process !== child) return;
+      this.activeTurnController?.abort();
       this.process = null;
       this.isBusy = false;
       this.emit('exit', code, signal);
     });
+  }
+
+  private respondToServerRequest(line: string, child: ChildProcess): void {
+    const controller = this.activeTurnController;
+    const handler = this.provider.buildServerResponse;
+    if (!handler || !controller || controller.signal.aborted) return;
+    const isCurrent = () => this.process === child && child.exitCode === null
+      && !child.killed && this.activeTurnController === controller && !controller.signal.aborted
+      && Boolean(child.stdin && !child.stdin.destroyed && !child.stdin.writableEnded);
+    void Promise.resolve().then(() => isCurrent()
+      ? handler.call(this.provider, line, { signal: controller.signal }) : null)
+      .then((response) => {
+        if (response && isCurrent()) child.stdin!.write(response);
+      }).catch(() => {
+        if (!isCurrent()) return;
+        controller.abort();
+        this.emit('error', new Error('Provider server-request response failed.'));
+        child.kill('SIGTERM');
+      });
   }
 
   /**
@@ -223,6 +259,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
           yield event;
         }
       } finally {
+        controller.abort();
         this.isBusy = false;
         this.activeTurnController = null;
       }
@@ -230,6 +267,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     }
 
     this.isBusy = true;
+    const controller = new AbortController();
+    this.activeTurnController = controller;
 
     // Create a queue-based async iterator
     const queue: Array<StreamEvent | null> = [];
@@ -283,6 +322,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       sawEvent = true;
       const terminal = isTerminalStreamEvent(event);
       if (terminal) {
+        controller.abort();
         sawTerminalEvent = true;
         clearTurnInactivityTimeout();
       } else {
@@ -295,6 +335,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     };
 
     const onError = (err: Error) => {
+      controller.abort();
       clearTurnInactivityTimeout();
       error = err;
       push(null);
@@ -419,7 +460,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         }
       } else {
         await this.runProviderBeforeTurn();
-      const msg = this.provider.buildStdinMessage(turn.message, turn);
+        const msg = this.provider.buildStdinMessage(turn.message, turn);
         this.process!.stdin!.write(msg);
       }
 
@@ -436,6 +477,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         yield item;
       }
     } finally {
+      controller.abort();
+      if (this.activeTurnController === controller) this.activeTurnController = null;
       clearTurnInactivityTimeout();
       this.isBusy = false;
       this.removeListener('event', onEvent);
@@ -448,12 +491,13 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     this.activeTurnController?.abort();
 
     if (this.process && this.process.exitCode === null) {
-      this.process.stdin?.end();
-      this.process.kill('SIGTERM');
+      const child = this.process;
+      child.stdin?.end();
+      child.kill('SIGTERM');
 
       setTimeout(() => {
-        if (this.process && this.process.exitCode === null) {
-          this.process.kill('SIGKILL');
+        if (child.exitCode === null) {
+          child.kill('SIGKILL');
         }
       }, 5000);
     }
