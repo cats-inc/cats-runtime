@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -7,6 +7,8 @@ import { loadConfig } from '../config.js';
 import { PeerExecutionService } from './PeerExecutionService.js';
 import type { PeerExecutionRequest } from './types.js';
 import { createRuntimeTestEnv } from '../../../tests/support/runtimeTestPaths.js';
+import * as hydrationModule from '../hydration/sessionHydration.js';
+import * as contentPolicy from '../skills/contentPolicy.js';
 
 const createdRoots: string[] = [];
 
@@ -104,6 +106,7 @@ function createHandle(
 
 describe('PeerExecutionService', () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     while (createdRoots.length > 0) {
       const root = createdRoots.pop();
       if (root) {
@@ -113,6 +116,9 @@ describe('PeerExecutionService', () => {
   });
 
   it('ignores remote workspace cwd values outside the local session base dir', async () => {
+    vi.spyOn(contentPolicy, 'getRuntimeSkillContentPolicy').mockReturnValue({
+      profile: 'release', fingerprint: 'a'.repeat(64),
+    });
     const config = createConfig();
     const { handle, kill } = createHandle();
     const registry = {
@@ -146,6 +152,9 @@ describe('PeerExecutionService', () => {
     expect(registry.create).toHaveBeenCalledWith(expect.objectContaining({
       cwd: config.sessionBaseDir,
       workspaceMode: 'read_only',
+      hydration: expect.objectContaining({ metadata: expect.objectContaining({
+        runtimeSkillContent: expect.objectContaining({ releaseCompatible: true }),
+      }) }),
     }));
     expect(kill).toHaveBeenCalledTimes(1);
     expect(runtime.dropSession).toHaveBeenCalledTimes(1);
@@ -180,4 +189,37 @@ describe('PeerExecutionService', () => {
     expect(registry.remove).toHaveBeenCalledWith(createdSession.id);
     expect(runtime.dropSession).not.toHaveBeenCalled();
   });
+
+  it.each(['throws', 'cancelled-during-hydration', 'preview-workspace'])(
+    'does not leave work or infer on peer failure: %s', async (failure) => {
+      const config = createConfig();
+      const registry = { create: vi.fn((session) => session), updateStatus: vi.fn(), remove: vi.fn() };
+      const runtime = { getCapabilities: vi.fn(() => ({ permissions: true })),
+        spawn: vi.fn(() => { throw new Error('spawn failed'); }), dropSession: vi.fn() };
+      const controller = new AbortController();
+      if (failure === 'cancelled-during-hydration') {
+        const original = hydrationModule.hydrateSessionState;
+        vi.spyOn(hydrationModule, 'hydrateSessionState').mockImplementationOnce(async (input) => {
+          const result = await original(input);
+          controller.abort();
+          return result;
+        });
+      }
+      if (failure === 'preview-workspace') {
+        const dir = join(config.sessionBaseDir, '.agents', 'skills');
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(join(dir, contentPolicy.PREVIEW_WORKSPACE_MARKER), '{}');
+      }
+      const service = new PeerExecutionService({ config, registry: registry as never,
+        runtime: runtime as never, localPeerId: 'callee' });
+      await expect(collectEvents(service.execute(createRequest(), controller.signal))).rejects.toThrow();
+      if (failure === 'throws') {
+        expect(registry.remove).toHaveBeenCalledTimes(1);
+        expect(runtime.dropSession).toHaveBeenCalledTimes(1);
+      } else {
+        expect(registry.create).not.toHaveBeenCalled();
+        expect(runtime.spawn).not.toHaveBeenCalled();
+      }
+    },
+  );
 });

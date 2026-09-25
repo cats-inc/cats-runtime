@@ -22,6 +22,15 @@ This directory is not:
 
 ## Authoring Reference Boundary
 
+The source library carries a preview content manifest. Preview-only managed
+product skills live in the reserved `preview/` subtree; the ordinary library
+remains available to both profiles. Normal npm artifacts omit that subtree and
+the source manifest, defaulting to release. Desktop staging selects its profile
+explicitly. Content eligibility grants no repository write, model usage or
+publication authority. See [PLAN-041](../docs/plans/PLAN-041-preview-skill-content-policy.md)
+for retained-context provenance, fresh-session recovery and the next-minor
+compatibility requirement.
+
 `agency-agents/` may exist at the monorepo root as an authoring/reference
 source, but shipped `cats-runtime` skills must remain local packages owned by
 this repo. Do not import from `agency-agents` at runtime.
@@ -171,6 +180,22 @@ Collaboration note:
 | `advanced-programmer-frontend` | `role` | UI/state implementation integrity |
 | `advanced-programmer-systems` | `role` | hosts, packaging, and process supervision |
 | `advanced-programmer-runtime` | `role` | runtime seams and lifecycle integrity |
+
+## Preview supplement
+
+The source/preview library includes three additional self-contained packages:
+
+| Skill | Purpose |
+|-------|---------|
+| `cats-inc-development` | Authorized Cats source changes, isolated candidates, independent review and checkpoints |
+| `cats-platform-operation` | Practice with observed product state, actual tools and authoritative results |
+| `cats-practice-and-distill` | Evidence-backed candidate lessons, fixed evaluation and independent promotion |
+
+Their essential workflow is inline for instruction delivery; optional reference
+files travel with filesystem delivery and participate in the package digest.
+Normal release/npm inventory remains the original 33 packages. The source/preview
+inventory has 36. These packages do not grant tool access or permissions, launch
+practice on their own, or replace ordinary Catlas/Orchestrator knowledge.
 
 ## Delivery
 

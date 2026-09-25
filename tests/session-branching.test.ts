@@ -129,7 +129,10 @@ describe('session branching route', () => {
         { sessionId: 'parent-native', provider: 'codex' },
         { sessionId: body.id, provider: 'codex' },
       ]);
-      expect(body.branching.capabilities.nativeFork.available).toBe(true);
+      // The child has no native ID until provider init; the parent's ID is only
+      // the fork input and must never masquerade as the child's retained context.
+      expect(registry.get(body.id)?.providerSessionId).toBeUndefined();
+      expect(body.branching.capabilities.nativeFork.available).toBe(false);
       expect(body.branch).toMatchObject({
         requestedMode: 'auto',
         resolvedMode: 'native_fork',
@@ -159,6 +162,11 @@ describe('session branching route', () => {
         }),
         'native',
       );
+      registry.setProviderSessionId(body.id, 'thread-child');
+      const initialized = await app.request(`/sessions/${body.id}`);
+      expect(initialized.status).toBe(200);
+      const initializedBody = await initialized.json() as typeof body;
+      expect(initializedBody.branching.capabilities.nativeFork.available).toBe(true);
     } finally {
       cleanup();
     }

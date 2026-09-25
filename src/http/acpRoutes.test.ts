@@ -661,7 +661,7 @@ describe('runtime ACP facade routes', () => {
     ]);
   });
 
-  it('passes ACP prompt routing hints through to peer execution and surfaces the effective route in the result meta', async () => {
+  it.each(['clean', 'preview'] as const)('applies peer content admission to ACP routing: %s', async (contentState) => {
     const peerRouting = {
       decide: vi.fn(() => ({
         mode: 'peer',
@@ -683,7 +683,7 @@ describe('runtime ACP facade routes', () => {
     };
     const peerExecutionClient = {
       buildRequest: vi.fn(() => ({
-        request: { route: 'peer' },
+        request: { route: 'peer', caller: { runId: 'pending-local-admission' } },
         trace: {
           requestId: 'peer-trace-1',
           callerPeerId: 'local-peer',
@@ -704,7 +704,8 @@ describe('runtime ACP facade routes', () => {
       ): AsyncGenerator<StreamEvent> {
         void signal;
         expect((peer as { identity: { peerId: string } }).identity.peerId).toBe('lab-peer');
-        expect(request).toEqual({ route: 'peer' });
+        expect(request).toMatchObject({ route: 'peer', caller: { runId: expect.any(String) } });
+        expect((request as { caller: { runId: string } }).caller.runId).not.toBe('pending-local-admission');
         expect(trace).toEqual(expect.objectContaining({
           peerId: 'lab-peer',
           strategy: 'explicit',
@@ -748,10 +749,18 @@ describe('runtime ACP facade routes', () => {
 
     const cwd = join(rootDir, 'workspace-peer');
     mkdirSync(cwd, { recursive: true });
+    const { hydrateSessionState } = await import('../core/hydration/sessionHydration.js');
+    const { invalidateSkillContentProvenance } = await import('../core/skills/contentPolicy.js');
+    const hydrated = await hydrateSessionState({
+      trigger: 'create', sessionId: 'runtime-session-peer', providerName: 'claude', providerBackend: 'cli',
+      runtimeCwd: cwd, sessionBaseDir: join(rootDir, 'sessions'), workspaceMode: 'shared',
+    });
     const session = registry.create({
       id: 'runtime-session-peer',
       providerName: 'claude',
       cwd,
+      hydration: contentState === 'clean'
+        ? hydrated.hydration : invalidateSkillContentProvenance(hydrated.hydration),
     });
     registry.updateStatus(session.id, 'ready');
 
@@ -786,6 +795,12 @@ describe('runtime ACP facade routes', () => {
 
     expect(response.status).toBe(200);
     const body = parseNdjsonBody(await response.text());
+    if (contentState === 'preview') {
+      expect(body.at(-1)).toMatchObject({ error: { data: { code: 'skill_content_profile_conflict' } } });
+      expect(peerExecutionClient.buildRequest).not.toHaveBeenCalled();
+      expect(registry.get(session.id)?.status).toBe('ready');
+      return;
+    }
     expect(body.at(-1)).toEqual({
       jsonrpc: '2.0',
       id: 'prompt-peer',

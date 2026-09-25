@@ -23,6 +23,7 @@ import type {
   ToolUseStreamEvent,
 } from '../../core/types.js';
 import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
+import { assertRetainedSkillContent, getRuntimeSkillContentPolicy } from '../../core/skills/contentPolicy.js';
 import { ManagedExecutionHandle } from '../../core/runtime/ManagedExecutionHandle.js';
 import {
   buildAgentDiagnosticSessionActivity,
@@ -427,6 +428,17 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     return c.json({ error: 'Session not found' }, 404);
   }
 
+  try {
+    assertRetainedSkillContent({
+      policy: getRuntimeSkillContentPolicy(), hydration: session.hydration, skills: session.skills,
+      cwd: session.cwd, sessionBaseDir: ctx.config.sessionBaseDir, sessionId: session.id,
+    });
+  } catch (error) {
+    const response = toRuntimeSkillErrorResponse(error);
+    if (response) return c.json(response.body, response.status);
+    throw error;
+  }
+
   if (session.status === 'closed' || session.status === 'closing') {
     return c.json({ error: 'Session is closed. Resume it first.' }, 400);
   }
@@ -613,12 +625,32 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   }
 
   const peerRouted = routingDecision.mode === 'peer';
+  const wantsNDJSON = (c.req.header('Accept') || '').includes('application/x-ndjson');
+  let preparedPeer: ReturnType<NonNullable<typeof ctx.peerExecutionClient>['buildRequest']> | undefined;
 
   if (peerRouted && (!ctx.peerExecutionClient || !routingInput || !routingDecision.peer)) {
     return c.json({
       error: 'Peer execution client is not initialized.',
       code: 'peer_route_disabled',
     }, 503);
+  }
+
+  if (peerRouted) {
+    try {
+      assertRetainedSkillContent({
+        policy: { ...getRuntimeSkillContentPolicy(), profile: 'release' },
+        hydration: executionSession.hydration, skills: executionSession.skills,
+        cwd: executionSession.cwd, sessionBaseDir: ctx.config.sessionBaseDir, sessionId: executionSession.id,
+      });
+      preparedPeer = ctx.peerExecutionClient!.buildRequest({
+        session: executionSession, turn: turnInput, peer: routingDecision.peer!, routing: routingInput!,
+        runId: 'pending-local-admission', transport: wantsNDJSON ? 'ndjson' : 'sse',
+      });
+    } catch (error) {
+      const response = toRuntimeSkillErrorResponse(error);
+      if (response) return c.json(response.body, response.status);
+      throw error;
+    }
   }
 
   if (!peerRouted && shouldRespawnPi) {
@@ -660,23 +692,14 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   );
   ctx.registry.updateStatus(id, 'busy');
 
-  // Check Accept header for format preference
-  const accept = c.req.header('Accept') || '';
-  const wantsNDJSON = accept.includes('application/x-ndjson');
   let peerHandle: ManagedExecutionHandle | undefined;
 
   if (peerRouted) {
     const peerExecutionClient = ctx.peerExecutionClient!;
     const peerEntry = routingDecision.peer!;
-    const parsedRouting = routingInput!;
-    const { request, trace } = peerExecutionClient.buildRequest({
-      session: executionSession,
-      turn: turnInput,
-      peer: peerEntry,
-      routing: parsedRouting,
-      runId: startedRun.id,
-      transport: wantsNDJSON ? 'ndjson' : 'sse',
-    });
+    const { request, trace } = preparedPeer!;
+    request.caller.runId = startedRun.id;
+    trace.callerRunId = startedRun.id;
     peerHandle = new ManagedExecutionHandle({
       streamMessage: (_, signal) => streamPeerExecutionWithFailures(
         peerExecutionClient,

@@ -302,7 +302,7 @@ describe('session hydration', () => {
       },
     });
 
-    expect(hydrated.hydration.metadata).toEqual({
+    expect(hydrated.hydration.metadata).toMatchObject({
       companionSession: {
         boxId: 'companion-box-1',
       },

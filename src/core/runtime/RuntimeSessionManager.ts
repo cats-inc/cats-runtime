@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { assertRetainedSkillContent, getRuntimeSkillContentPolicy } from '../skills/contentPolicy.js';
 import type {
   AgentRuntimeService,
   ExecutionHandle,
@@ -175,6 +176,11 @@ export class RuntimeSessionManager {
     providerInstanceId?: string,
     providerBackend?: BackendKind,
   ): ExecutionHandle | undefined {
+    const binding = this.getSessionBinding?.(sessionId);
+    assertRetainedSkillContent({
+      policy: getRuntimeSkillContentPolicy(), hydration: binding?.hydration, skills: binding?.skills,
+      cwd: opts.cwd, sessionBaseDir: this.config.sessionBaseDir, sessionId,
+    });
     const target = resolveProviderTarget(
       this.config,
       providerName,
@@ -219,6 +225,10 @@ export class RuntimeSessionManager {
       guardrail?: RuntimeGuardrailResult;
     } = {},
   ): RuntimeRunInspection {
+    assertRetainedSkillContent({
+      policy: getRuntimeSkillContentPolicy(), hydration: session.hydration, skills: session.skills,
+      cwd: session.cwd, sessionBaseDir: this.config.sessionBaseDir, sessionId: session.id,
+    });
     resolveProviderTarget(this.config, session.providerName,
       session.providerBackend && session.providerInstanceId
         ? `${session.providerBackend}/${session.providerInstanceId}` : session.providerInstanceId);

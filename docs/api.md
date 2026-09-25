@@ -7,6 +7,20 @@
 `cats-runtime` serves the runtime contract directly. Requests no longer hop
 through a second local runtime service.
 
+### Skill content profile and retained sessions
+
+The executing artifact determines managed skill eligibility. Requests cannot
+elevate a release Runtime to preview. Release omits preview-only packages from
+the catalog and rejects their explicit resolution and cached instruction use.
+Fresh sessions receive host-owned content provenance in hydration metadata.
+Retained preview-exposed or unverified contexts fail message, resume and fork
+admission with HTTP 409 and `code: "skill_content_profile_conflict"` before
+provider execution. Clear-skills and caller metadata cannot reset provenance.
+Create a fresh session; existing data is preserved. Peer execution requires
+clean provenance at both ends because content profiles are not negotiated.
+This stricter behavior requires a Runtime minor boundary; see
+[PLAN-041](plans/PLAN-041-preview-skill-content-policy.md).
+
 ## Cached usage snapshot
 
 `GET /usage/snapshot` returns the bounded, sanitized `schemaVersion: 1` usage

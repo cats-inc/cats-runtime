@@ -158,6 +158,8 @@ describe('package contract', () => {
       'build/runtime',
       'public',
       'runtime-skills',
+      '!runtime-skills/preview',
+      '!runtime-skills/content-profile.json',
       'config/management.yaml.example',
       'config/providers.yaml.example',
       'config/curated-model-catalogs.yaml.example',
@@ -191,6 +193,7 @@ describe('package contract', () => {
       'public/playground.html',
       'public/provider-setup.html',
       'runtime-skills/README.md',
+      'runtime-skills/chat/companion/SKILL.md',
       'package.json',
     ]));
 
@@ -199,6 +202,8 @@ describe('package contract', () => {
     expect([...packedPaths].some((path) => path.startsWith('docs/'))).toBe(false);
     expect([...packedPaths].some((path) => path.startsWith('skills/'))).toBe(false);
     expect([...packedPaths].some((path) => path.startsWith('developer-skills/'))).toBe(false);
+    expect([...packedPaths].some((path) => path.startsWith('runtime-skills/preview/'))).toBe(false);
+    expect(packedPaths.has('runtime-skills/content-profile.json')).toBe(false);
     expect(packedPaths.has('tsconfig.json')).toBe(false);
     expect(packedPaths.has('vitest.config.ts')).toBe(false);
   }, 20000);

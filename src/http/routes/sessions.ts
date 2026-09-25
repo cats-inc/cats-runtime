@@ -126,6 +126,7 @@ import {
   readRuntimeExecutionStrategyState,
 } from '../../core/runtime/strategies/state.js';
 import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
+import { assertRetainedSkillContent, getRuntimeSkillContentPolicy } from '../../core/skills/contentPolicy.js';
 import {
   extractHydrationMetadata,
   parseInvocationContext,
@@ -1105,6 +1106,20 @@ function recordSessionCompaction(
   const compaction = getRuntimeSessionManager(ctx).recordCompaction(sessionId, record);
   persistTrackedMaintenanceState(ctx, sessionId);
   return compaction;
+}
+
+function sessionContentError(ctx: AppContext, session: SessionInfo) {
+  try {
+    assertRetainedSkillContent({
+      policy: getRuntimeSkillContentPolicy(), hydration: session.hydration, skills: session.skills,
+      cwd: session.cwd, sessionBaseDir: ctx.config.sessionBaseDir, sessionId: session.id,
+    });
+  } catch (error) {
+    const response = toRuntimeSkillErrorResponse(error);
+    if (response) return response;
+    throw error;
+  }
+  return undefined;
 }
 
 async function hydrateSessionForTarget(
@@ -2589,6 +2604,8 @@ sessionRoutes.post('/sessions', async (c) => {
       }
     } else {
       const existingSourceCwd = getSessionWorkspaceSourceCwd(existing) ?? existing.cwd;
+      const contentError = sessionContentError(ctx, existing);
+      if (contentError) return c.json(contentError.body, contentError.status);
       if (
         (body.cwd && existingSourceCwd !== body.cwd)
         || (workspaceKind && resolveSessionWorkspaceKind(existing) !== workspaceKind)
@@ -2633,7 +2650,7 @@ sessionRoutes.post('/sessions', async (c) => {
       let hydration = existing.hydration;
       try {
         const hydrated = await hydrateSessionForTarget(ctx, {
-          trigger: 'create',
+          trigger: 'resume',
           sessionId: preparedExisting.id,
           providerTarget,
           cwd: preparedExisting.cwd,
@@ -2808,6 +2825,7 @@ sessionRoutes.post('/sessions', async (c) => {
         ...strategyPatch,
         instructions,
         skills,
+        hydration,
         context,
         outputDir,
       });
@@ -2899,6 +2917,7 @@ sessionRoutes.post('/sessions', async (c) => {
         ...strategyPatch,
         instructions,
         skills,
+        hydration,
         context,
         outputDir,
       });
@@ -2990,6 +3009,7 @@ sessionRoutes.post('/sessions', async (c) => {
         ...strategyPatch,
         instructions,
         skills,
+        hydration,
         context,
         outputDir,
       });
@@ -4080,6 +4100,8 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   if (!session) {
     return c.json({ error: 'Session not found' }, 404);
   }
+  const contentError = sessionContentError(ctx, session);
+  if (contentError) return c.json(contentError.body, contentError.status);
   try {
     resolveSessionProviderTarget(ctx.config, session);
   } catch {
@@ -4425,6 +4447,8 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   if (!session) {
     return c.json({ error: 'Session not found' }, 404);
   }
+  const contentError = sessionContentError(ctx, session);
+  if (contentError) return c.json(contentError.body, contentError.status);
 
   const rawBody = await c.req.json<Record<string, unknown>>().catch(
     () => ({} as Record<string, unknown>),
@@ -4698,9 +4722,8 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     outputDir: body.outputDir ?? session.outputDir,
     artifacts: usedContextTransplant?.artifacts ?? session.artifacts,
   });
-  if (branchMode === 'native_fork' && session.providerSessionId) {
-    ctx.registry.setProviderSessionId(forked.id, session.providerSessionId);
-  }
+  // The parent's resume ID is a spawn input, never the child's native identity.
+  // Persist only the child's actual init ID so restart cannot merge their histories.
   if (branchMode === 'native_fork' && session.providerState) {
     ctx.registry.setProviderState(forked.id, session.providerState);
   }

@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { hydrateSessionState } from '../hydration/sessionHydration.js';
+import { assertRetainedSkillContent, getRuntimeSkillContentPolicy } from '../skills/contentPolicy.js';
 import { isAbsolute, relative, resolve } from 'node:path';
 import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
 import type { RuntimeConfig } from '../config.js';
@@ -46,12 +48,23 @@ export class PeerExecutionService {
     }
 
     const sessionId = `peer-exec-${randomUUID()}`;
+    const cwd = resolveExecutionCwd(request, this.options.config.sessionBaseDir);
+    const hydrated = await hydrateSessionState({
+      trigger: 'create', sessionId, providerName: target.providerName, providerBackend: target.backend,
+      runtimeCwd: cwd, workspaceMode: 'read_only', sessionBaseDir: this.options.config.sessionBaseDir,
+    });
+    signal?.throwIfAborted();
+    assertRetainedSkillContent({
+      policy: { ...getRuntimeSkillContentPolicy(), profile: 'release' }, hydration: hydrated.hydration,
+      cwd, sessionBaseDir: this.options.config.sessionBaseDir, sessionId,
+    });
     const session = this.options.registry.create({
       id: sessionId,
       providerName: target.providerName,
       providerBackend: target.backend,
       providerInstanceId: target.instanceId,
-      cwd: resolveExecutionCwd(request, this.options.config.sessionBaseDir),
+      cwd,
+      hydration: hydrated.hydration,
       workspaceMode: 'read_only',
       permissionMode: 'default',
       model: request.target.model,
@@ -60,7 +73,9 @@ export class PeerExecutionService {
       context: mergeContext(request, this.options.localPeerId),
     });
 
-    const handle = this.options.runtime.spawn(
+    let handle;
+    try {
+      handle = this.options.runtime.spawn(
       session.id,
       target.providerName,
       {
@@ -71,7 +86,12 @@ export class PeerExecutionService {
       },
       target.instanceId,
       target.backend,
-    );
+      );
+    } catch (error) {
+      this.options.runtime.dropSession(session.id);
+      this.options.registry.remove(session.id);
+      throw error;
+    }
 
     if (!handle) {
       this.options.registry.remove(session.id);
@@ -93,6 +113,7 @@ export class PeerExecutionService {
     signal?.addEventListener('abort', abortExecution, { once: true });
 
     try {
+      signal?.throwIfAborted();
       for await (const event of handle.streamMessage({
         message: request.turn.message,
         instructions: request.turn.instructions,

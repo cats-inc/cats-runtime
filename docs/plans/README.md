@@ -4,6 +4,10 @@
 
 ## Purpose
 
+[PLAN-041: Preview skill content policy](PLAN-041-preview-skill-content-policy.md)
+tracks artifact eligibility, retained-context provenance and the cross-repo
+supplement/practice checkpoints.
+
 Implementation plans break down approved specifications into actionable tasks. They help:
 
 - Coordinate work across multiple developers/agents

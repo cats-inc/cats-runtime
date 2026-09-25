@@ -8,6 +8,7 @@ import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import type { SessionSkillState } from '../core/types.js';
 import { resolveRuntimeSkillManifest } from '../core/skills/catalog.js';
+import * as contentPolicy from '../core/skills/contentPolicy.js';
 
 describe('runtime-managed skills HTTP contract', () => {
   let rootDir: string;
@@ -152,7 +153,47 @@ describe('runtime-managed skills HTTP contract', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     rmSync(rootDir, { recursive: true, force: true });
+  });
+
+  it.each(['messages', 'resume', 'fork'])(
+    'release rejects unknown retained context through %s before provider work', async (route) => {
+      const app = createTestApp();
+      const session = registry.create({ providerName: 'codex', providerBackend: 'cli',
+        providerInstanceId: 'default', cwd: join(rootDir, 'repo'), workspaceMode: 'shared' });
+      registry.updateStatus(session.id, 'ready');
+      vi.spyOn(contentPolicy, 'getRuntimeSkillContentPolicy').mockReturnValue({
+        profile: 'release', fingerprint: 'a'.repeat(64),
+      });
+      const response = await app.request(`/sessions/${session.id}/${route}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'hello', skills: null }),
+      });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ code: 'skill_content_profile_conflict' });
+      expect(pool.spawn).not.toHaveBeenCalled();
+      expect(registry.get(session.id)).toBeDefined();
+    },
+  );
+
+  it('a fresh release session records clean provenance and can resume normally', async () => {
+    const app = createTestApp();
+    vi.spyOn(contentPolicy, 'getRuntimeSkillContentPolicy').mockReturnValue({
+      profile: 'release', fingerprint: 'a'.repeat(64),
+    });
+    const response = await app.request('/sessions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'codex', cwd: join(rootDir, 'repo'), workspaceMode: 'shared' }),
+    });
+    expect(response.status).toBe(201);
+    const created = await response.json() as { id: string };
+    const state = registry.get(created.id)!;
+    expect(contentPolicy.readSkillContentProvenance(state.hydration)?.releaseCompatible).toBe(true);
+    expect(pool.spawn).toHaveBeenCalledTimes(1);
+    registry.setProviderSessionId(state.id, 'new-native-thread');
+    const resumed = await app.request(`/sessions/${state.id}/resume`, { method: 'POST' });
+    expect(resumed.status, await resumed.text()).toBe(200);
   });
 
   it('returns the runtime-owned skill catalog over HTTP', async () => {
@@ -207,6 +248,44 @@ describe('runtime-managed skills HTTP contract', () => {
         }),
       }),
     ]));
+  });
+
+  it('a clean release native fork binds its own init ID and admits its first turn', async () => {
+    const app = createTestApp();
+    vi.spyOn(contentPolicy, 'getRuntimeSkillContentPolicy').mockReturnValue({
+      profile: 'release', fingerprint: 'a'.repeat(64),
+    });
+    const response = await app.request('/sessions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'codex', cwd: join(rootDir, 'repo'), workspaceMode: 'shared' }),
+    });
+    expect(response.status).toBe(201);
+    const parent = await response.json() as { id: string };
+    registry.setProviderSessionId(parent.id, 'parent-native-thread');
+    registry.updateStatus(parent.id, 'ready');
+    vi.mocked(pool.spawn).mockImplementation((id) => {
+      expect(registry.get(id)?.providerSessionId).toBeUndefined();
+      registry.setProviderSessionId(id, 'child-native-thread');
+      return undefined;
+    });
+    const forkResponse = await app.request(`/sessions/${parent.id}/fork`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'native_fork', cwd: join(rootDir, 'repo'), workspaceMode: 'shared' }),
+    });
+    expect(forkResponse.status).toBe(201);
+    const child = await forkResponse.json() as { id: string };
+    const state = registry.get(child.id)!;
+    expect(state.providerSessionId).toBe('child-native-thread');
+    expect(contentPolicy.readSkillContentProvenance(state.hydration)?.releaseCompatible).toBe(true);
+    registry.updateStatus(child.id, 'ready');
+    vi.mocked(pool.get).mockReturnValue({ alive: true, busy: false,
+      streamMessage: async function* () { yield { type: 'result', summary: 'ok' }; },
+    } as never);
+    const turn = await app.request(`/sessions/${child.id}/messages`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'hello' }),
+    });
+    expect(turn.status).toBe(200);
+    expect(await turn.text()).toContain('ok');
   });
 
   it('filters the runtime-owned skill catalog by stable library metadata', async () => {

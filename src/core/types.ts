@@ -962,6 +962,8 @@ export interface RuntimeSkillLibraryMetadata {
 }
 
 export interface ResolvedRuntimeSkill {
+  /** Absent on legacy ordinary skill records. */
+  contentProfile?: 'release' | 'preview';
   id: string;
   slug: string;
   family?: string;
@@ -1000,6 +1002,8 @@ export interface RuntimeSkillDeliveryState {
 }
 
 export interface SessionSkillState {
+  /** Package policy used for resolution; not a caller-granted capability. */
+  contentPolicy?: { profile: 'release' | 'preview'; fingerprint: string; skillsRoot: string };
   profileId?: string;
   requestedSkills: string[];
   requestedSkillRefs?: RequestedSessionSkillRef[];

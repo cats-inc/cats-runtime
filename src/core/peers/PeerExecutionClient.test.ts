@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { SessionInfo, StreamEvent, TurnInput } from '../types.js';
+import type { SessionHydrationState, SessionInfo, StreamEvent, TurnInput } from '../types.js';
 import { createPeerPayloadSignature } from './auth.js';
 import { PeerExecutionClient } from './PeerExecutionClient.js';
 import type { PeerRegistryEntry } from './types.js';
@@ -14,6 +14,11 @@ function createSession(
     providerInstanceId: 'main',
     status: 'ready',
     origin: 'runtime',
+    // Only content provenance is consumed by this pure request-builder fixture.
+    hydration: { metadata: { runtimeSkillContent: {
+      schemaVersion: 1, sessionId: 'session-1', profile: 'release',
+      policyFingerprint: 'a'.repeat(64), releaseCompatible: true,
+    } } } as SessionHydrationState,
     cwd: '/workspace',
     instructions: 'Base instructions.',
     context: {
@@ -87,6 +92,18 @@ async function collectEvents(
 }
 
 describe('PeerExecutionClient', () => {
+  it('refuses to export unknown or preview context before transport', () => {
+    const client = new PeerExecutionClient({ config: { requestTimeoutMs: 1000, sharedSecret: '' }, localPeerId: 'local' });
+    for (const hydration of [undefined, { metadata: { runtimeSkillContent: {
+      schemaVersion: 1, sessionId: 'session-1', profile: 'preview',
+      policyFingerprint: 'a'.repeat(64), releaseCompatible: false,
+    } } } as SessionHydrationState]) {
+      expect(() => client.buildRequest({ session: createSession({ hydration }), turn: { message: 'hello' },
+        peer: createPeerEntry(), routing: { mode: 'peer', peerId: 'peer-a', shareWorkspace: false },
+        runId: 'run', transport: 'ndjson',
+      })).toThrow(/local execution/u);
+    }
+  });
   it('builds a bounded peer execution request and strips caller workspace paths by default', () => {
     const client = new PeerExecutionClient({
       config: {

@@ -13,6 +13,11 @@ import type {
   WorkspaceSubstrateProfileId,
 } from '../types.js';
 import { resolveRuntimeSkillManifest } from '../skills/catalog.js';
+import {
+  assertReleaseWorkspace, assertRetainedSkillContent, getRuntimeSkillContentPolicy,
+  hasPreviewSkillContent, hasPreviewWorkspaceContent, hasRecordedPreviewExposure,
+  readSkillContentProvenance, recordPreviewExposure,
+} from '../skills/contentPolicy.js';
 import { WorkspaceSubstrateService } from '../runtime/WorkspaceSubstrateService.js';
 import { deriveWorkspaceIsolationMode } from '../workspace/sessionWorkspace.js';
 import { toLegacyWorkspaceIsolationState, toLegacyWorkspaceMode } from '../workspace/legacyWorkspace.js';
@@ -91,12 +96,39 @@ export async function hydrateSessionState(
   input: HydrateSessionStateInput,
 ): Promise<HydrateSessionStateResult> {
   const now = (input.now ?? new Date()).toISOString();
+  const contentPolicy = getRuntimeSkillContentPolicy();
+  const previousContent = readSkillContentProvenance(input.existingHydration);
+  const sourceSessionId = input.trigger === 'fork' ? previousContent?.sessionId : input.sessionId;
+  const inheritedExposure = sourceSessionId
+    && hasRecordedPreviewExposure(input.sessionBaseDir, sourceSessionId);
+  if (input.trigger !== 'create' || input.existingHydration || input.existingSkills) {
+    assertRetainedSkillContent({
+      policy: contentPolicy, hydration: input.existingHydration, skills: input.existingSkills,
+      cwd: input.runtimeCwd, sessionBaseDir: input.sessionBaseDir, sessionId: sourceSessionId,
+    });
+  } else {
+    assertReleaseWorkspace(input.runtimeCwd, contentPolicy);
+  }
+  if (input.trigger === 'fork' && inheritedExposure) {
+    recordPreviewExposure(input.sessionBaseDir, input.sessionId);
+  }
   const resolvedSkills = resolveSkillHydration(input);
   const workspace = await hydrateWorkspace(input, now);
-  const metadata = mergeHydrationMetadata(
-    input.existingHydration?.metadata,
-    input.metadata,
-  );
+  const newContext = input.trigger === 'create' && !input.existingHydration && !input.existingSkills;
+  const metadata = {
+    ...mergeHydrationMetadata(input.existingHydration?.metadata, input.metadata),
+    // Caller metadata cannot grant clean provenance or erase earlier exposure.
+    runtimeSkillContent: {
+      schemaVersion: 1, sessionId: input.sessionId, profile: contentPolicy.profile,
+      policyFingerprint: contentPolicy.fingerprint,
+      releaseCompatible: (newContext || previousContent?.releaseCompatible === true)
+        && !hasPreviewSkillContent(resolvedSkills?.skillState)
+        && !hasPreviewWorkspaceContent(input.runtimeCwd)
+        && !(input.existingHydration
+          && hasPreviewWorkspaceContent(input.existingHydration.workspace.runtimeCwd))
+        && !hasRecordedPreviewExposure(input.sessionBaseDir, input.sessionId),
+    },
+  };
 
   return {
     ...(resolvedSkills ? { skills: resolvedSkills.skillState } : {}),

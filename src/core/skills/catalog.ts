@@ -12,6 +12,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { parse as parseYaml } from 'yaml';
+import { RuntimeSkillError } from './errors.js';
+export { RuntimeSkillError } from './errors.js';
+import {
+  assertReleaseWorkspace, contentConflict, fingerprintPreviewSkillPackage, getRuntimeSkillContentPolicy, isPreviewSkillPath,
+  PREVIEW_SKILL_DIRECTORY, PREVIEW_WORKSPACE_MARKER, recordPreviewExposure,
+} from './contentPolicy.js';
 
 import type {
   ProviderBackend,
@@ -75,6 +81,7 @@ const runtimeSkillCatalogCache = new Map<string, {
 }>();
 
 interface RuntimeSkillPackage {
+  skillsRoot: string;
   id: string;
   title: string;
   description: string;
@@ -146,20 +153,6 @@ interface RuntimeSkillDeliveryPlan {
     filePath?: string;
     byteLength: number;
   };
-}
-
-export class RuntimeSkillError extends Error {
-  constructor(
-    message: string,
-    readonly code:
-      | 'unknown_skill'
-      | 'invalid_skill_package'
-      | 'invalid_skill_manifest'
-      | 'strict_skill_delivery_unavailable',
-  ) {
-    super(message);
-    this.name = 'RuntimeSkillError';
-  }
 }
 
 const RUNTIME_SKILL_FAMILY_SET = new Set<RuntimeSkillFamily>([
@@ -381,8 +374,10 @@ function computeFingerprint(content: string): string {
 function buildRuntimeSkillPackageCacheKey(value: {
   entryFile: string;
   fingerprint: string;
+  skillsRoot?: string;
 }): string {
-  return `${value.entryFile}:${value.fingerprint}`;
+  const root = value.skillsRoot ?? inferSkillsRootFromEntryFile(value.entryFile);
+  return `${root}:${getRuntimeSkillContentPolicy(root).fingerprint}:${value.entryFile}:${value.fingerprint}`;
 }
 
 function cacheRuntimeSkillPackage(skillPackage: RuntimeSkillPackage): RuntimeSkillPackage {
@@ -403,6 +398,7 @@ function cacheRuntimeSkillPackage(skillPackage: RuntimeSkillPackage): RuntimeSki
 function getCachedRuntimeSkillPackage(value: {
   entryFile: string;
   fingerprint: string;
+  skillsRoot?: string;
 }): RuntimeSkillPackage | undefined {
   return runtimeSkillPackageCache.get(buildRuntimeSkillPackageCacheKey(value));
 }
@@ -602,6 +598,7 @@ function parseSkillMarkdown(
 
   return {
     id: skillId,
+    skillsRoot,
     title: toSkillTitle(skillId),
     description,
     sourcePath: path.dirname(entryFile),
@@ -634,12 +631,14 @@ function verifyRuntimeOwnedSkillPackageFrontmatter(skillPackage: RuntimeSkillPac
   }
 }
 
-function readRuntimeSkillEntrySource(entryFile: string): RuntimeSkillEntrySource {
+function readRuntimeSkillEntrySource(entryFile: string, skillsRoot?: string): RuntimeSkillEntrySource {
+  const previewFingerprint = skillsRoot && isPreviewSkillPath(skillsRoot, entryFile)
+    ? fingerprintPreviewSkillPackage(path.dirname(entryFile)) : undefined;
   const raw = readFileSync(entryFile, 'utf-8');
   return {
     entryFile,
     raw,
-    fingerprint: computeFingerprint(raw),
+    fingerprint: previewFingerprint ?? computeFingerprint(raw),
   };
 }
 
@@ -651,13 +650,14 @@ function loadRuntimeSkillPackageFromSource(
   const cached = getCachedRuntimeSkillPackage({
     entryFile: source.entryFile,
     fingerprint: source.fingerprint,
+    skillsRoot,
   });
   if (cached) {
     return cached;
   }
 
   return cacheRuntimeSkillPackage(
-    parseSkillMarkdown(skillId, source.entryFile, skillsRoot, source.raw),
+    { ...parseSkillMarkdown(skillId, source.entryFile, skillsRoot, source.raw), fingerprint: source.fingerprint },
   );
 }
 
@@ -668,7 +668,7 @@ function loadRuntimeSkillPackage(
 ): RuntimeSkillPackage {
   return loadRuntimeSkillPackageFromSource(
     skillId,
-    readRuntimeSkillEntrySource(entryFile),
+    readRuntimeSkillEntrySource(entryFile, skillsRoot),
     skillsRoot,
   );
 }
@@ -709,6 +709,8 @@ function discoverRuntimeSkillEntryFiles(
 
   const discovered: string[] = [];
   for (const entry of entries) {
+    if (options.depth === 0 && entry.name === PREVIEW_SKILL_DIRECTORY
+      && getRuntimeSkillContentPolicy(options.skillsRoot).profile === 'release') continue;
     if (entry.isSymbolicLink()) {
       throw new RuntimeSkillError(
         `Runtime skill discovery does not allow symbolic-link or junction entries: '${
@@ -733,7 +735,7 @@ function discoverRuntimeSkillEntrySources(
 ): RuntimeSkillEntrySource[] {
   return discoverRuntimeSkillEntryFiles(skillsRoot)
     .sort()
-    .map((entryFile) => readRuntimeSkillEntrySource(entryFile));
+    .map((entryFile) => readRuntimeSkillEntrySource(entryFile, skillsRoot));
 }
 
 function inferSkillsRootFromEntryFile(entryFile: string): string | undefined {
@@ -773,8 +775,11 @@ function buildSkillsRootWatchKey(
 function buildRuntimeSkillCatalogPackages(
   skillsRoot: string = SKILLS_ROOT,
 ): RuntimeSkillPackage[] {
-  const entrySources = discoverRuntimeSkillEntrySources(skillsRoot);
-  const watchKey = buildSkillsRootWatchKey(skillsRoot, entrySources);
+  const entrySources = discoverRuntimeSkillEntrySources(skillsRoot).filter((entry) =>
+    getRuntimeSkillContentPolicy(skillsRoot).profile === 'preview'
+    || !isPreviewSkillPath(skillsRoot, entry.entryFile));
+  const watchKey = `${getRuntimeSkillContentPolicy(skillsRoot).fingerprint}:`
+    + buildSkillsRootWatchKey(skillsRoot, entrySources);
   const cachedCatalog = runtimeSkillCatalogCache.get(skillsRoot);
   if (cachedCatalog?.watchKey === watchKey) {
     return cachedCatalog.packages;
@@ -959,6 +964,7 @@ function summarizeRuntimeSkillCatalogFingerprint(watchKey: string | undefined): 
 
 function toResolvedSkill(skillPackage: RuntimeSkillPackage): ResolvedRuntimeSkill {
   return {
+    contentProfile: isPreviewSkillPath(skillPackage.skillsRoot, skillPackage.entryFile) ? 'preview' : 'release',
     id: skillPackage.id,
     slug: skillPackage.library.slug,
     ...(skillPackage.library.family ? { family: skillPackage.library.family } : {}),
@@ -1157,7 +1163,8 @@ function canMaterializeCodexFilesystem(
       };
     }
 
-    const currentFingerprint = computeFingerprint(readFileSync(targetSkillFile, 'utf8'));
+    const currentFingerprint = isPreviewSkillPath(skillPackage.skillsRoot, skillPackage.entryFile)
+      ? fingerprintPreviewSkillPackage(targetDir) : computeFingerprint(readFileSync(targetSkillFile, 'utf8'));
     if (currentFingerprint !== skillPackage.fingerprint) {
       return {
         ok: false,
@@ -1180,12 +1187,20 @@ function materializeCodexFilesystem(
 } {
   const targetRoot = path.join(cwd, CODER_SKILLS_ROOT);
   mkdirSync(targetRoot, { recursive: true });
+  if (skillPackages.some((skill) => isPreviewSkillPath(skill.skillsRoot, skill.entryFile))) {
+    // Mark before copy; interrupted materialization must never look release-clean.
+    writeFileSync(path.join(targetRoot, PREVIEW_WORKSPACE_MARKER), '{"schemaVersion":1}\n', 'utf8');
+  }
 
   const entryPaths: string[] = [];
   for (const skillPackage of skillPackages) {
     const targetDir = path.join(targetRoot, skillPackage.id);
     if (!existsSync(targetDir)) {
       cpSync(skillPackage.sourcePath, targetDir, { recursive: true });
+    }
+    if (isPreviewSkillPath(skillPackage.skillsRoot, skillPackage.entryFile)
+      && fingerprintPreviewSkillPackage(targetDir) !== skillPackage.fingerprint) {
+      throw new RuntimeSkillError('Preview skill changed during materialization.', 'invalid_skill_package');
     }
     entryPaths.push(path.join(targetDir, 'SKILL.md'));
   }
@@ -1292,6 +1307,9 @@ export function resolveRuntimeSkillManifest(
   manifest: RuntimeSkillManifest | undefined,
   options: ResolveRuntimeSkillManifestOptions,
 ): SessionSkillState | undefined {
+  const skillsRoot = options.skillsRoot ?? SKILLS_ROOT;
+  const contentPolicy = getRuntimeSkillContentPolicy(skillsRoot);
+  assertReleaseWorkspace(options.cwd, contentPolicy);
   if (!manifest) {
     return undefined;
   }
@@ -1302,6 +1320,9 @@ export function resolveRuntimeSkillManifest(
   }
 
   const skillPackages = resolvedRequests.map((entry) => entry.skillPackage);
+  if (skillPackages.some((skill) => isPreviewSkillPath(skill.skillsRoot, skill.entryFile))) {
+    recordPreviewExposure(options.sessionBaseDir, options.sessionId);
+  }
   const delivery = buildRuntimeSkillDeliveryPlan(skillPackages, options);
 
   if (manifest.strict === true && delivery.status !== 'applied') {
@@ -1312,6 +1333,7 @@ export function resolveRuntimeSkillManifest(
   }
 
   return {
+    contentPolicy: { ...contentPolicy, skillsRoot },
     profileId: manifest.profileId,
     requestedSkills: resolvedRequests.map((entry) => entry.skillPackage.id),
     requestedSkillRefs: resolvedRequests.map((entry) => buildRequestedSessionSkillRef(entry.request)),
@@ -1344,7 +1366,14 @@ function rebuildRuntimeSkillPackages(
   }
 
   return skillState.resolvedSkills.map((skill) => {
-    const cached = getCachedRuntimeSkillPackage(skill);
+    const skillsRoot = skillState.contentPolicy?.skillsRoot ?? inferSkillsRootFromEntryFile(skill.entryFile);
+    const policy = getRuntimeSkillContentPolicy(skillsRoot);
+    if (policy.profile === 'release'
+      && (skill.contentProfile === 'preview'
+        || (skillsRoot && isPreviewSkillPath(skillsRoot, skill.entryFile)))) {
+      throw contentConflict('Preview skill content cannot be rebuilt in a release context.');
+    }
+    const cached = getCachedRuntimeSkillPackage({ ...skill, skillsRoot });
     if (cached) {
       return cached;
     }
