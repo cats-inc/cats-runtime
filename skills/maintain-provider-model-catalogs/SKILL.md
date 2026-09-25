@@ -67,8 +67,9 @@ Read [catalog surfaces](./references/catalog-surfaces.md) for current fields and
   for each changed scope, validate, preview, then apply/reload within existing authorization.
   No rebuild or version bump is needed for supported bindings. Old binaries cannot gain this
   loader from YAML alone. A Runtime advertising `automaticSchema1Upgrade` upgrades recognized
-  schema-1 files at writable startup/reload with validation and backup. Read-only inspection never
-  migrates. Older installations and unresolved mappings need the explicit recovery workflow.
+  schema-1 files at writable startup/reload with validation and backup; with
+  `factorySnapshotRetirement` it retires unmodified Desktop-seeded factory copies instead. Read-only
+  inspection never migrates. Older installations and unresolved mappings need the explicit recovery workflow.
 - Existing sessions keep their resolved wire bindings. Reload changes menus and future selections;
   it does not silently change resumed sessions.
 

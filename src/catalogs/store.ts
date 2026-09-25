@@ -98,7 +98,10 @@ export class CatalogStore {
     if (this.persist) {
       try {
         const upgrade = upgradeCatalogOverride(this.paths);
-        if (upgrade.state === 'completed' || this.upgrade.state !== 'completed') this.upgrade = upgrade;
+        // A completed or retired result stays visible for this process after later no-op reloads.
+        if (upgrade.state !== 'not_needed' || (this.upgrade.state !== 'completed' && this.upgrade.state !== 'retired')) {
+          this.upgrade = upgrade;
+        }
       } catch (error) {
         if (error instanceof CatalogUpgradeError) this.upgrade = { state: 'blocked', message: error.message };
         throw error;

@@ -12,7 +12,7 @@ const { catalogCapabilities, readLocalCatalogProjection } = await fromPackage('b
 const { ProviderModelCatalogService } = await fromPackage('build/runtime/core/models/providerModelCatalog.js');
 const { resolveProviderSelection } = await fromPackage('build/runtime/core/models/providerSelectionResolution.js');
 const { PiProvider } = await fromPackage('build/runtime/backends/cli/providers/pi.js');
-assert.deepEqual(catalogCapabilities, { schemaVersion: 2, bindingVersion: 1, localOverrides: true, automaticSchema1Upgrade: true });
+assert.deepEqual(catalogCapabilities, { schemaVersion: 2, bindingVersion: 1, localOverrides: true, automaticSchema1Upgrade: true, factorySnapshotRetirement: true });
 const paths = { packageRoot, runtimeRoot };
 const configPath = join(runtimeRoot, 'config', 'providers.yaml');
 const overridePath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');
@@ -118,6 +118,21 @@ const restarted = new ProviderModelCatalogService(upgradedConfig, { catalogPaths
 assert.equal(restarted.catalogStore.status().catalogRevision, upgradeStatus.catalogRevision);
 assert.equal(restarted.catalogStore.status().upgrade.state, 'not_needed');
 assert.equal(readdirSync(join(upgradeRoot, 'config')).filter(name => name.endsWith('.bak')).length, 1);
+
+// A factory copy seeded by an older Desktop is retired, so the installed factory applies.
+const seeded = readFileSync(new URL('../../docs/research/fixtures/catalog-schema1/factory-example-2026-04-08.yaml', import.meta.url), 'utf8');
+const seededRoot = join(runtimeRoot, 'desktop-seeded-profile');
+const seededOverride = join(seededRoot, 'config', 'curated-model-catalogs.yaml');
+mkdirSync(join(seededRoot, 'config'), { recursive: true });
+writeFileSync(seededOverride, seeded);
+const seededPaths = { packageRoot, runtimeRoot: seededRoot };
+const seededConfig = { ...config, dataDir: join(seededRoot, 'data'), configPath: join(seededRoot, 'config', 'providers.yaml') };
+const retired = new ProviderModelCatalogService(seededConfig, { catalogPaths: seededPaths }).catalogStore.status();
+assert.equal(retired.upgrade.state, 'retired');
+assert.equal(readFileSync(retired.upgrade.backupPath, 'utf8'), seeded);
+assert.equal(existsSync(seededOverride), false);
+assert.equal(retired.catalogRevision, baseline.snapshot.catalogRevision);
+assert.equal(new ProviderModelCatalogService(seededConfig, { catalogPaths: seededPaths }).catalogStore.status().upgrade.state, 'not_needed');
 assert.deepEqual({ build: hashes(join(packageRoot, 'build')), config: hashes(join(packageRoot, 'config')) }, originalHashes);
 console.log(JSON.stringify({ installedVersion: JSON.parse(readFileSync(join(packageRoot, 'package.json'))).version,
-  factoryDigest: baseline.snapshot.factoryDigest, verified: 'fixed installed build; data-only unknown ID, binding, empty, rollback, invalid, remove, old-profile upgrade and restart' }));
+  factoryDigest: baseline.snapshot.factoryDigest, verified: 'fixed installed build; data-only unknown ID, binding, empty, rollback, invalid, remove, old-profile upgrade and restart, seeded-snapshot retirement' }));

@@ -68,7 +68,10 @@ picker availability. Remote/disconnected hosts do not read a local factory for r
 The factory, generated digest, read-only module and catalog CLI must come from one Runtime build.
 Check the npm payload and both Desktop sidecar layouts when packaging code changes. A local scope
 replacement survives factory upgrades; unpatched scopes adopt the new factory. Do not auto-seed a
-whole personal factory snapshot. Follow [local patches](./local-soft-patch.md) for installed users.
+whole personal factory snapshot: an old one pins every scope. Desktop did seed one until the
+schema-2 cutover, so Runtime activation retires unmodified seeds (`factorySnapshotRetirement`).
+A new migration must decide who owns an existing file before converting it. Follow
+[local patches](./local-soft-patch.md) for installed users.
 Schema changes must also exercise an isolated previous-version profile through writable Runtime
 startup, backup, repeat startup and failed-upgrade recovery using the installed package resources.
 The `automaticSchema1Upgrade` capability belongs to Runtime activation, never the read-only export

@@ -247,6 +247,29 @@ async function withCuratedCatalogRuntime(
 }
 
 describe('runtime server', () => {
+  it('retires a factory copy seeded by an older Desktop so the current factory models appear', async () => {
+    const { root, config, cleanup } = createTestConfig({ apiKey: 'upgrade-fixture' });
+    const paths = createRuntimeTestPaths(root);
+    const seeded = readFileSync('docs/research/fixtures/catalog-schema1/factory-example-2026-04-08.yaml', 'utf8');
+    writeFileSync(paths.curatedModelCatalogPath, seeded);
+    const runtime = createRuntimeServer(config);
+    const headers = { authorization: 'Bearer upgrade-fixture', 'content-type': 'application/json' };
+    try {
+      const status = await (await runtime.app.request('/providers/catalogs', { headers })).json();
+      expect(status).toMatchObject({ available: true, factorySnapshotRetirement: true, overrideDigest: null,
+        diagnostics: [], upgrade: { state: 'retired', reason: 'factory_snapshot' } });
+      expect(readFileSync(status.upgrade.backupPath, 'utf8')).toBe(seeded);
+      expect(existsSync(paths.curatedModelCatalogPath)).toBe(false);
+      const basic = await (await runtime.app.request('/providers/claude/models', { headers })).json();
+      expect(basic.models.map((model: { id: string }) => model.id))
+        .toEqual(getBundledClaudeCliModels().map((model) => model.id));
+    } finally {
+      await runtime.close();
+      await cleanup();
+    }
+  });
+
+  // An operator-authored schema-1 file is converted and keeps its own choices.
   it('upgrades an existing schema-1 profile before the first model request', async () => {
     const { root, config, cleanup } = createTestConfig({ apiKey: 'upgrade-fixture' });
     const paths = createRuntimeTestPaths(root);

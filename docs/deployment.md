@@ -18,6 +18,14 @@ advertises this capability; `GET /providers/catalogs` reports upgrade state and
 Setup & Repair provides details and retry. Read-only hosts never migrate.
 Unknown mappings or failed writes preserve the old file and show a configuration
 error, retaining a compatible accepted snapshot when one exists.
+
+Desktop builds from 2026-04-14 until the schema-2 cutover did seed this file with a
+copy of the factory example. Those copies are not operator intent, so the same
+startup step retires an unmodified one (`factorySnapshotRetirement`): it saves a
+byte-for-byte backup and removes the file, and every scope adopts the factory. This
+also repairs a profile that an earlier Runtime already converted from such a copy.
+An edited copy is treated as an operator override and keeps the behavior above.
+The fix reaches Desktop users only through a Desktop build that bundles this Runtime.
 Supported data changes need no rebuild;
 see [soft patches](provider-catalog-soft-patches.md). A new package must implement
 the capability before this workflow is supported. Publication remains a separate step.

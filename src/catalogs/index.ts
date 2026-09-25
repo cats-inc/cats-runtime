@@ -9,4 +9,5 @@ export { CATALOG_BINDINGS, CATALOG_BINDING_VERSION } from './bindings.js';
 
 export const catalogCapabilities = Object.freeze({
   schemaVersion: 2, bindingVersion: 1, localOverrides: true, automaticSchema1Upgrade: true,
+  factorySnapshotRetirement: true,
 });

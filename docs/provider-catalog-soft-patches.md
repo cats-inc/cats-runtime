@@ -77,11 +77,18 @@ or explicit reload. The converter uses shipped, reviewed mappings without probin
 providers. It validates the complete candidate, saves a unique byte-for-byte backup,
 checks the source digest under an apply lock, and atomically replaces the file.
 All existing scopes stay pinned; labels, order, defaults and controls are preserved.
-Missing overrides and schema 2 are no-ops, including repeat startup. There is no
-automatic Desktop seeding and no second host-owned converter.
+Missing overrides and schema 2 are no-ops, including repeat startup. Desktop no longer
+seeds this file, and there is no second host-owned converter.
+
+Desktop builds from 2026-04-14 until the cutover did copy the factory example here.
+Builds advertising `factorySnapshotRetirement: true` retire such a copy before
+conversion when it is unmodified, or when a schema-2 file is still exactly the
+automatic conversion of one. They save a byte-for-byte backup and remove the file, so
+every scope adopts the factory. An edited copy is an operator override and is kept.
 
 Catalog status includes `upgrade.state`: `completed` (with schema numbers and
-`backupPath`), `blocked` (with a message), or `not_needed`. Setup & Repair shows
+`backupPath`), `retired` (with `reason` and `backupPath`), `blocked` (with a message),
+or `not_needed`. Setup & Repair shows
 upgrade/recovery details and can retry by reloading the current revision after the
 cause is corrected. A failed conversion/write or concurrent edit preserves the
 existing file. An interrupted writer's lock is retained for verified recovery;
