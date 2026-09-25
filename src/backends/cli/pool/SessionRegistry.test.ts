@@ -635,6 +635,72 @@ describe('SessionRegistry', () => {
       expect(registry.list()).toHaveLength(1);
     });
 
+    it('moves a discovered source workspace to a corrected cwd', () => {
+      registry.upsertDiscovered('ext-moved', { providerName: 'claude', cwd: '/repo/cats/inc' });
+      const updated = registry.upsertDiscovered('ext-moved', { providerName: 'claude', cwd: '/repo/cats-inc' });
+
+      expect(updated).toMatchObject({
+        cwd: '/repo/cats-inc',
+        workspace: { kind: 'source', runtimeCwd: '/repo/cats-inc', sourceCwd: '/repo/cats-inc' },
+      });
+    });
+
+    it('repairs a persisted discovered workspace left on a stale cwd', () => {
+      const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-stale-workspace-test-'));
+      writeFileSync(join(persistDir, 'sessions.json'), JSON.stringify([
+        {
+          id: 'stale-workspace',
+          providerSessionId: 'claude-stale',
+          providerName: 'claude',
+          status: 'closed',
+          origin: 'discovered',
+          cwd: 'C:\\Users\\me\\Source\\cats-inc',
+          workspace: {
+            kind: 'source',
+            access: 'read_write',
+            runtimeCwd: 'C:/Users/me/Source/cats/inc',
+            sourceCwd: 'C:/Users/me/Source/cats/inc',
+          },
+          messageCount: 3,
+          totalInputTokens: 0,
+          totalOutputTokens: 0,
+          createdAt: '2026-09-25T00:00:00.000Z',
+          updatedAt: '2026-09-25T00:00:00.000Z',
+        },
+      ], null, 2));
+
+      try {
+        registry = new SessionRegistry(persistDir);
+        const updated = registry.upsertDiscovered('claude-stale', {
+          providerName: 'claude',
+          cwd: 'C:\\Users\\me\\Source\\cats-inc',
+        });
+
+        expect(updated?.workspace).toMatchObject({
+          runtimeCwd: 'C:\\Users\\me\\Source\\cats-inc',
+          sourceCwd: 'C:\\Users\\me\\Source\\cats-inc',
+        });
+      } finally {
+        rmSync(persistDir, { recursive: true, force: true });
+      }
+    });
+
+    it('keeps the workspace of a runtime-owned session when discovery reports another cwd', () => {
+      const runtime = registry.create({ providerName: 'claude', cwd: '/runtime/repo' });
+      registry.setProviderSessionId(runtime.id, 'claude-runtime');
+
+      const merged = registry.upsertDiscovered('claude-runtime', {
+        providerName: 'claude',
+        cwd: '/elsewhere',
+      });
+
+      expect(merged).toMatchObject({
+        id: runtime.id,
+        cwd: '/runtime/repo',
+        workspace: { runtimeCwd: '/runtime/repo', sourceCwd: '/runtime/repo' },
+      });
+    });
+
     it('treats legacy default and configured default instance ids as the same discovered session', () => {
       const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-alias-test-'));
       const persistPath = join(persistDir, 'sessions.json');

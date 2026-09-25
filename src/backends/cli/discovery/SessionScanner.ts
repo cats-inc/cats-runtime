@@ -36,7 +36,10 @@ export class SessionScanner {
         continue;
       }
 
-      const decodedCwd = this.decodeProjectPath(dir);
+      // The project directory name is not a usable cwd: Claude writes every
+      // non-alphanumeric path character as "-", so "cats-inc" and "cats/inc"
+      // share one name. A session without a recorded cwd is skipped until the
+      // transcript carries one.
 
       // Strategy 1: sessions-index.json
       const indexPath = join(projectPath, 'sessions-index.json');
@@ -47,11 +50,15 @@ export class SessionScanner {
         foundIndex = true;
 
         for (const [sessionId, entry] of Object.entries(index)) {
+          const sourcePath = join(projectPath, `${sessionId}.jsonl`);
+          const cwd = entry.cwd || (await this.parseJsonlMetadata(sourcePath)).cwd;
+          if (!cwd) continue;
+
           discovered.push({
             providerSessionId: sessionId,
             projectPath,
-            sourcePath: join(projectPath, `${sessionId}.jsonl`),
-            cwd: entry.cwd || decodedCwd,
+            sourcePath,
+            cwd,
             summary: entry.summary,
             messageCount: entry.message_count,
             lastActivity: entry.last_message_at,
@@ -86,12 +93,13 @@ export class SessionScanner {
         }
 
         const meta = await this.parseJsonlMetadata(jsonlPath);
+        if (!meta.cwd) continue;
 
         discovered.push({
           providerSessionId: sessionId,
           projectPath,
           sourcePath: jsonlPath,
-          cwd: meta.cwd || decodedCwd,
+          cwd: meta.cwd,
           summary: meta.summary,
           messageCount: meta.messageCount,
           lastActivity: meta.lastTimestamp,
@@ -129,9 +137,11 @@ export class SessionScanner {
         try {
           const obj = JSON.parse(line);
 
+          // Startup records such as `system` carry cwd before the first prompt.
+          if (!cwd && typeof obj.cwd === 'string' && obj.cwd) cwd = obj.cwd;
+
           if (obj.type === 'user') {
             messageCount++;
-            if (!cwd && obj.cwd) cwd = obj.cwd;
             if (typeof obj.message?.content === 'string') {
               summary = obj.message.content.slice(0, 100);
             }
@@ -149,27 +159,5 @@ export class SessionScanner {
     }
 
     return { cwd, summary, messageCount, lastTimestamp };
-  }
-
-  /**
-   * Decode an encoded project path back to the original path.
-   * On Windows: "-Users-sammy-Source-project" → "C:/Users/sammy/Source/project"
-   * On Linux/Mac: "-Users-sammy-Source-project" → "/Users/sammy/Source/project"
-   */
-  private decodeProjectPath(encoded: string): string {
-    // The encoding replaces path separators and special chars with hyphens.
-    // On Windows, paths like "C:\Users\sammy\Source\project" become
-    // "C--Users-sammy-Source-project" (drive letter colon → hyphen)
-    // This is a best-effort decode; the actual CWD from the index is preferred.
-    if (process.platform === 'win32') {
-      // Pattern: "C--Users-sammy-..." → "C:/Users/sammy/..."
-      const match = encoded.match(/^([A-Z])--(.*)/);
-      if (match) {
-        return `${match[1]}:/${match[2].replace(/-/g, '/')}`;
-      }
-    }
-
-    // Unix: "-Users-sammy-..." → "/Users/sammy/..."
-    return '/' + encoded.replace(/^-/, '').replace(/-/g, '/');
   }
 }

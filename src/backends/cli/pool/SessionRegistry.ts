@@ -957,6 +957,15 @@ export class SessionRegistry {
     // Only update metadata, never overwrite status or runtime-owned cwd
     if (!session.cwd || session.origin !== 'runtime') {
       session.cwd = data.cwd;
+      // A source workspace runs in the cwd itself, so a corrected discovered cwd
+      // must not leave the workspace (and the dashboard grouping) on the old path.
+      if (session.cwd && session.workspace.kind === 'source') {
+        session.workspace = {
+          ...session.workspace,
+          runtimeCwd: session.cwd,
+          sourceCwd: session.cwd,
+        };
+      }
     }
     if (data.summary) session.summary = data.summary;
     if (data.lastInputPreview) session.lastInputPreview = data.lastInputPreview;
