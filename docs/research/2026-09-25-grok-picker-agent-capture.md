@@ -88,6 +88,8 @@ record uncached input, cache writes, cache reads, or output separately.
   and `src/http/ui/shared.playground.test.ts`. The runtime assertion that still expected
   Grok 4.6's old High description on the first row was updated to the four observed
   descriptions and rerun: 28 tests passed.
+- The basic catalog projection in `providerModelCatalog.test.ts` now expects the four
+  observed ids and still expects no catalog default.
 - Installed Desktop was not part of this data refresh. No release was requested.
 
 Last updated: 2026-09-25.
