@@ -63,6 +63,20 @@ scope for shared contracts or failures as described in AGENTS.md. Full local
 `npm test` and `npm run release:check` remain available for explicit requests,
 full-suite diagnosis, or changes whose impact cannot be bounded confidently.
 
+### Docs-only changes in CI
+
+The release preflight workflow first checks whether every changed file is under
+`docs/`. If so, the required `release-preflight` job is skipped and reported as
+passing, so the pull request still merges. Any other path, a manual run or a failed
+detection runs the full gate.
+
+Tests and scripts must therefore not read repository documentation. Executable
+inputs live under `tests/fixtures/`: captured provider output that tests replay in
+`tests/fixtures/provider-captures/<cli>-<version>/`, and schema-1 catalog profiles in
+`tests/fixtures/catalog-schema1/`. Evidence that notes only cite stays in
+`docs/research/fixtures/`. `tests/docs-boundary.test.ts` enforces the rule. A line that
+names a docs path without reading it carries `// docs-boundary-ignore: <reason>`.
+
 ## Running Tests
 
 ### All Tests
