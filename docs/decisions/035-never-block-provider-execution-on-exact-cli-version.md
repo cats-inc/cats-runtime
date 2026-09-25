@@ -88,6 +88,22 @@ global user settings. Unknown providers do not receive guessed flags. This does
 not establish that every upstream updater can be suppressed during an actual turn.
 See the [incident and validation record](../research/2026-08-27-cline-self-update-and-probe-concurrency.md).
 
+## 2026-09-25 Codex configuration placement evidence
+
+Isolated Codex 0.156.1 app-server probes exposed a concrete invocation mismatch:
+configured `-c` overrides before `app-server` were accepted but absent from
+`config/read`; identical overrides after the subcommand were effective. The
+probes initialized a private, unauthenticated process and started a read-only
+thread without a model turn, then closed the owned process. This establishes
+configuration placement, not inference quality or universal tool suppression.
+
+The CLI pool delegates optional launch-argument composition to the provider.
+Codex places configured `-c` / `--config` overrides after `app-server` and before
+the adapter's selected model/control overrides. Other global flags retain their
+existing position; other providers retain default prepend behavior. The rule
+uses the observed invocation shape, never an exact-version allowlist. Existing
+configuration and persisted-session contracts remain unchanged.
+
 ## Related
 
 - [ADR-025: Keep provider evolution detection manual-first and evidence-driven](./025-keep-provider-evolution-detection-manual-first-and-evidence-driven.md)

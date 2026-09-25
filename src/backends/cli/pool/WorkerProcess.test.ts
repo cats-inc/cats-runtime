@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { once } from 'node:events';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { ProviderCommandConfig } from '../config.js';
 import { WorkerProcess } from './WorkerProcess.js';
+import { CodexProvider } from '../providers/codex.js';
+import { cleanupTempDirWithRetries } from '../../../../tests/tempCleanup.js';
 import { buildPowerShellCommandScript, buildPowerShellExecEnv } from '../runtime/runtime.js';
 import type { Provider, StreamEvent } from '../providers/types.js';
 
@@ -165,6 +171,66 @@ describe('WorkerProcess PowerShell helpers', () => {
     );
     expect(Date.now() - startedAt).toBeLessThan(3000);
   });
+});
+
+it('routes native Codex read requests through the real Worker transport and shared filesystem tools', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'cats-codex-native-read-'));
+  writeFileSync(join(cwd, 'README.md'), 'workspace-read-marker');
+  const script = [
+    "const rl = require('node:readline').createInterface({ input: process.stdin });",
+    "const send = value => process.stdout.write(JSON.stringify(value) + '\\n');",
+    "const fail = text => send({ method: 'turn/failed', params: { text } });",
+    'rl.on("line", line => {',
+    ' const msg = JSON.parse(line);',
+    ' if (msg.method === "initialize") {',
+    '   if (!msg.params.capabilities?.experimentalApi) return fail("missing capability");',
+    '   send({ id: msg.id, result: {} });',
+    ' } else if (msg.method === "thread/start") {',
+    '   const names = msg.params.dynamicTools?.map(tool => tool.type + ":" + tool.name).sort().join(",");',
+    '   if (names !== "function:list_files,function:read_file") return fail("missing read registration");',
+    '   send({ method: "thread/started", params: { thread: { id: "thread" } } });',
+    '   send({ id: msg.id, result: { thread: { id: "thread" } } });',
+    ' } else if (msg.method === "turn/start") {',
+    '   send({ id: msg.id, result: { turn: { id: "turn" } } });',
+    '   send({ id: 90, method: "item/commandExecution/requestApproval",',
+    '     params: { command: "Get-Content README.md", commandActions: [{ type: "read" }] } });',
+    ' } else if (msg.id === 90) {',
+    '   if (msg.result.decision !== "decline") return fail("shell was widened");',
+    '   send({ method: "item/started", params: { item: { id: "read", type: "dynamicToolCall", tool: "read_file" } } });',
+    '   send({ id: 91, method: "item/tool/call", params: { threadId: "thread", turnId: "turn",',
+    '     callId: "read", tool: "read_file", arguments: { path: "README.md" } } });',
+    ' } else if (msg.id === 91) {',
+    '   if (!msg.result.success) return fail("read failed");',
+    '   send({ method: "item/agentMessage/delta", params: { delta: msg.result.contentItems[0].text } });',
+    '   send({ id: 92, method: "item/tool/call", params: { threadId: "thread", turnId: "turn",',
+    '     callId: "list", tool: "list_files", arguments: { path: ".", max_entries: 10 } } });',
+    ' } else if (msg.id === 92) {',
+    '   if (!msg.result.success) return fail("list failed");',
+    '   send({ method: "item/agentMessage/delta", params: { delta: msg.result.contentItems[0].text } });',
+    '   send({ method: "turn/completed", params: { threadId: "thread", turn: { id: "turn" } } });',
+    ' }',
+    '});',
+  ].join('\n');
+  const worker = new WorkerProcess(new CodexProvider(), { cwd, permissionMode: 'whitelist',
+    allowedTools: ['read_file', 'list_files', 'apply_patch'] },
+  { ...createNodeCommandConfig(), runtime: { mode: 'native', environmentId: 'named-native' },
+    args: ['-e', script] });
+  try {
+    worker.start();
+    const events = await worker.sendMessage('Read and list the admitted workspace.');
+    expect(events.filter((event) => event.type === 'text')).toEqual([
+      { type: 'text', text: 'workspace-read-marker' }, { type: 'text', text: 'README.md' },
+    ]);
+    expect(events.some((event) => event.type === 'tool_use' && event.toolName === 'read_file')).toBe(true);
+    expect(events.at(-1)?.type).toBe('result');
+  } finally {
+    if (worker.alive) {
+      const exited = once(worker, 'exit');
+      worker.kill();
+      await exited;
+    }
+    cleanupTempDirWithRetries(cwd);
+  }
 });
 
 function createNodeCommandConfig(): ProviderCommandConfig {

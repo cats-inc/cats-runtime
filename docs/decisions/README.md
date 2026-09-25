@@ -41,6 +41,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [041-bridge-explicit-codex-read-tools-through-runtime](./041-bridge-explicit-codex-read-tools-through-runtime.md) | Bridge Explicit Codex Read Tools Through Runtime | Accepted; native local bridge verified | 2026-09-25 |
 | [040-use-data-driven-provider-catalogs-and-local-overrides](./040-use-data-driven-provider-catalogs-and-local-overrides.md) | Use Data-Driven Provider Catalogs and Local Overrides | Accepted | 2026-09-23 |
 | [039-use-selected-provider-config-as-the-resource-boundary](./039-use-selected-provider-config-as-the-resource-boundary.md) | Use Selected Provider Config as the Resource Boundary; retain completed setup observations | Accepted; amended | 2026-09-16 |
 | [038-separate-execution-usage-from-provider-account-quota](./038-separate-execution-usage-from-provider-account-quota.md) | Separate Execution Usage from Provider Account Quota | Accepted | 2026-09-10 |
