@@ -41,11 +41,10 @@ export function toLegacyWorkspaceMode(
   workspaceKind: WorkspaceKind,
   workspaceAccess: WorkspaceAccess,
 ): WorkspaceMode {
-  if (workspaceKind === 'sandbox') {
-    return 'isolated';
-  }
-
-  return workspaceAccess === 'read_only' ? 'read_only' : 'shared';
+  // Providers consume this access projection. Sandbox topology remains in
+  // workspace.kind / workspaceIsolation and must not erase a read-only grant.
+  if (workspaceAccess === 'read_only') return 'read_only';
+  return workspaceKind === 'sandbox' ? 'isolated' : 'shared';
 }
 
 export function toLegacyWorkspaceIsolationState(

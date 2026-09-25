@@ -94,6 +94,14 @@ compaction can plug in without hidden lifecycle assumptions.
     instead of inventing a parallel lifecycle.
 11. Worktree cleanup shall not be left to caller convention alone; runtime
     shall own the canonical cleanup path.
+12. Canonical workspace access is independent of topology. `read_only` must
+    reach the provider for `sandbox`, `source`, and `worktree` sessions, including
+    resume or re-entry after loading an existing canonical session record. The
+    internal legacy `workspaceMode` projection must preserve that access; sandbox
+    hydration, retained-resource inspection and cleanup continue to use workspace
+    kind/isolation. Read-only sandbox skill delivery must not become filesystem
+    materialization merely because the workspace is isolated. This corrects the
+    derived execution view without changing the public or persisted schema.
 
 ### Non-Functional Requirements
 
@@ -168,6 +176,16 @@ remember raw filesystem paths in order to clean up correctly.
 - [SPEC-011](./SPEC-011-session-fork-and-context-transplant-primitives.md)
 - [ADR-015](../decisions/015-own-workspace-substrate-tools-in-cats-runtime.md)
 
+## Read-only Access Validation (2026-09-25)
+
+Focused Vitest coverage exercised workspace preparation, the CLI pool projection,
+hydration, retained-resource inspection, automatic re-entry, and HTTP create,
+fork, persisted-record reload/resume, and sandbox cleanup. All new read-only
+regressions passed. Across the six files, 70 of 71 tests initially passed; the
+existing worktree reset/preserve case exceeded its 5-second timeout. An isolated
+rerun passed with the original timeout unchanged (1 passed, 19 filtered out).
+This is focused validation, without a full-suite, build, or live-provider claim.
+
 ## Open Questions
 
 - [ ] Resolve [Playground workspace retention](../research/2026-09-18-playground-workspace-retention.md)
@@ -192,4 +210,4 @@ remember raw filesystem paths in order to clean up correctly.
 
 *Created: 2026-03-24*
 *Author: Codex*
-*Last updated: 2026-09-18*
+*Last updated: 2026-09-25*

@@ -80,7 +80,8 @@ describe('resolveWorkspace', () => {
       permissionMode: 'skip',
     });
 
-    expect(result.workspaceMode).toBe('isolated');
+    expect(result.workspaceMode).toBe('read_only');
+    expect(result.workspaceKind).toBe('sandbox');
     expect(result.workspaceAccess).toBe('read_only');
     expect(result.permissionMode).toBe('default');
     expect(result.cwd).toBe(join(testBaseDir, sessionId));

@@ -1171,14 +1171,13 @@ async function rehydratePersistedSessionState(
 function resolveSessionWorkspaceIsolationMode(
   session: Partial<Pick<SessionInfo, 'workspace' | 'workspaceIsolation' | 'workspaceMode'>>,
 ): WorkspaceIsolationMode {
-  return session.workspaceIsolation?.mode
-    ?? (session.workspace?.kind === 'sandbox'
+  return session.workspace?.kind === 'sandbox'
       ? 'isolated'
       : session.workspace?.kind === 'worktree'
         ? 'worktree'
         : session.workspace?.kind === 'source'
           ? 'shared'
-          : deriveWorkspaceIsolationMode(session.workspaceMode));
+          : session.workspaceIsolation?.mode ?? deriveWorkspaceIsolationMode(session.workspaceMode);
 }
 
 function resolveSessionWorkspaceKind(
@@ -1793,6 +1792,8 @@ async function ensureSessionWorkspacePrepared(
     return session;
   }
 
+  const releasePreparation = await ctx.worktreeMaintenance?.reserveSessionWorkspace(session.id);
+  try {
   const prepared = await prepareSessionWorkspace({
     sessionId: session.id,
     sessionBaseDir: ctx.config.sessionBaseDir,
@@ -1815,6 +1816,9 @@ async function ensureSessionWorkspacePrepared(
     workspaceIsolation: prepared.workspaceIsolation,
   });
   throw new Error(`Session '${session.id}' disappeared while applying prepared workspace state.`);
+  } finally {
+    releasePreparation?.();
+  }
 }
 
 function sessionMatchesInstanceFilter(
@@ -2527,6 +2531,7 @@ sessionRoutes.post('/sessions', async (c) => {
   const operationId = selection?.acquireOperation({
     provider: providerTarget.providerName, backend: providerTarget.backend, instance: providerTarget.instanceId,
   }, selection.getSnapshot().revision);
+  let releasePreparation: (() => void) | undefined;
   try {
   const providerInstance = providerTarget.backend === 'cli'
     ? resolveCliProviderInstance(providerTarget)
@@ -2708,6 +2713,7 @@ sessionRoutes.post('/sessions', async (c) => {
   }
 
   const sessionId = randomUUID();
+  releasePreparation = await ctx.worktreeMaintenance?.reserveSessionWorkspace(sessionId);
 
   let resolved: PrepareSessionWorkspaceResult;
   try {
@@ -3126,6 +3132,7 @@ sessionRoutes.post('/sessions', async (c) => {
 
   return c.json({ ...serializeSession(ctx, session), ...(warnings.length ? { warnings } : {}) }, 201);
   } finally {
+    releasePreparation?.();
     if (operationId) selection!.releaseOperation(operationId);
   }
 });
@@ -4011,10 +4018,11 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
         session: serializeSession(ctx, sessionAfterCleanup),
       });
     }
-  } else if (session.workspaceMode === 'isolated') {
-      workspaceCleaned = (await cleanupSessionWorkspace({
+  } else if (resolveSessionWorkspaceKind(session) === 'sandbox') {
+    workspaceCleaned = (await cleanupSessionWorkspace({
       sessionId: id,
       sessionBaseDir: ctx.config.sessionBaseDir,
+      workspace: session.workspace,
       workspaceMode: session.workspaceMode,
       workspaceIsolation: session.workspaceIsolation,
     })).workspaceCleaned;
@@ -4567,6 +4575,8 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     );
   }
 
+  const releasePreparation = await ctx.worktreeMaintenance?.reserveSessionWorkspace(forkId);
+  try {
   try {
     forkPrepared = await prepareSessionWorkspace({
       sessionId: forkId,
@@ -4748,4 +4758,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     branch,
     ...(warnings.length > 0 ? { warnings } : {}),
   }, 201);
+  } finally {
+    releasePreparation?.();
+  }
 });

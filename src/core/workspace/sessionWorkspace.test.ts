@@ -67,6 +67,27 @@ afterEach(() => {
 });
 
 describe('sessionWorkspace', () => {
+  it.each(['sandbox', 'source', 'worktree'] as const)(
+    'preserves read_only provider access independently of %s topology', async (workspaceKind) => {
+      const { repoDir, sessionBaseDir } = createGitWorkspace();
+      const prepared = await prepareSessionWorkspace({
+        sessionId: `readonly-${workspaceKind}`, sessionBaseDir, cwd: repoDir,
+        workspaceKind, workspaceAccess: 'read_only', permissionMode: 'skip',
+      });
+      expect(prepared.workspace).toEqual(expect.objectContaining({
+        kind: workspaceKind, access: 'read_only', runtimeCwd: prepared.cwd,
+      }));
+      expect(prepared.workspaceMode).toBe('read_only');
+      expect(prepared.permissionMode).toBe('default');
+      expect(prepared.workspaceIsolation.mode).toBe(
+        workspaceKind === 'sandbox' ? 'isolated' : workspaceKind === 'source' ? 'shared' : 'worktree',
+      );
+      expect(existsSync(prepared.cwd)).toBe(true);
+      if (workspaceKind === 'sandbox') expect(prepared.cwd).toBe(join(sessionBaseDir, 'readonly-sandbox'));
+      if (workspaceKind === 'source') expect(prepared.cwd).toBe(repoDir);
+    },
+  );
+
   it('prepares a deterministic worktree-backed runtime cwd', async () => {
     const { repoDir, sessionBaseDir } = createGitWorkspace();
     const sourceCwd = join(repoDir, 'subdir');

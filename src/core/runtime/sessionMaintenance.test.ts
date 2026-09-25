@@ -103,6 +103,18 @@ describe('buildSessionMaintenance', () => {
     });
   });
 
+  it('retains cleanup ownership for a canonical read-only sandbox', () => {
+    const maintenance = buildSessionMaintenance({
+      session: createSession({
+        status: 'closed', workspaceMode: 'read_only',
+        workspace: { kind: 'sandbox', access: 'read_only', runtimeCwd: '/sessions/readonly' },
+      }),
+      view: createView({ attached: false, activity: 'inactive' }),
+    });
+    expect(maintenance.status).toBe('cleanup_ready');
+    expect(maintenance.cleanup.reasonCodes).toContain('isolated_workspace_retained');
+  });
+
   it('surfaces a pre-flush hook when a closed worktree session still has retained workspace state', () => {
     const maintenance = buildSessionMaintenance({
       session: createSession({

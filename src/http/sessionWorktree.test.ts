@@ -21,6 +21,8 @@ import type { KiroNativeSessionService } from '../backends/cli/kiro/KiroNativeSe
 import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionService.js';
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
 import { RuntimeWakeupService } from '../core/wakeup/RuntimeWakeupService.js';
+import { WorkspaceSubstrateService } from '../core/runtime/WorkspaceSubstrateService.js';
+import { RuntimeWorktreeMaintenanceService } from '../core/workspace/RuntimeWorktreeMaintenanceService.js';
 import {
   cleanupSessionWorkspace,
   prepareSessionWorkspace,
@@ -220,8 +222,76 @@ describe('session worktree routes', () => {
   });
 
   afterEach(() => {
+    registry.flush();
     wakeup.close();
     cleanupTempDirWithRetries(rootDir);
+  });
+
+  it('creates and forks read-only sandboxes without losing sandbox hydration or cleanup', async () => {
+    const response = await app.request('/sessions', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: 'codex', workspaceKind: 'sandbox',
+        workspaceAccess: 'read_only', permissionMode: 'skip' }),
+    });
+    expect(response.status).toBe(201);
+    const created = await response.json() as { id: string; cwd: string };
+    const parent = registry.get(created.id)!;
+    expect(parent.workspace).toEqual({ kind: 'sandbox', access: 'read_only', runtimeCwd: created.cwd });
+    expect(parent.permissionMode).toBe('default');
+    expect(parent.hydration?.workspace).toEqual(expect.objectContaining({
+      kind: 'sandbox', access: 'read_only', isolationMode: 'isolated',
+    }));
+    expect(vi.mocked(pool.spawn)).toHaveBeenLastCalledWith(created.id, 'codex',
+      expect.objectContaining({ cwd: created.cwd, workspaceMode: 'read_only', permissionMode: 'default' }), 'native');
+    writeFileSync(join(created.cwd, 'retained.txt'), 'session-owned snapshot', 'utf8');
+
+    const fork = await app.request(`/sessions/${created.id}/fork`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ mode: 'context_transplant' }),
+    });
+    expect(fork.status).toBe(201);
+    const child = await fork.json() as { id: string; cwd: string };
+    expect(child.cwd).not.toBe(created.cwd);
+    expect(registry.get(child.id)?.workspace).toEqual(expect.objectContaining({ kind: 'sandbox', access: 'read_only' }));
+    expect(registry.get(child.id)?.hydration?.workspace).toEqual(expect.objectContaining({
+      kind: 'sandbox', access: 'read_only', isolationMode: 'isolated',
+    }));
+    expect(readFileSync(join(child.cwd, 'retained.txt'), 'utf8')).toBe('session-owned snapshot');
+    expect(vi.mocked(pool.spawn)).toHaveBeenLastCalledWith(child.id, 'codex',
+      expect.objectContaining({ cwd: child.cwd, workspaceMode: 'read_only', permissionMode: 'default' }), 'native');
+
+    const deleted = await app.request(`/sessions/${child.id}`, { method: 'DELETE' });
+    expect(deleted.status).toBe(200);
+    expect(await deleted.json()).toEqual(expect.objectContaining({ workspaceCleaned: true }));
+    expect(existsSync(child.cwd)).toBe(false);
+    expect(existsSync(join(created.cwd, 'retained.txt'))).toBe(true);
+  });
+
+  it('resumes an existing canonical read-only sandbox with read-only provider options', async () => {
+    const cwd = join(sessionBaseDir, 'persisted-readonly');
+    mkdirSync(cwd, { recursive: true });
+    const stored = registry.create({ id: 'persisted-readonly', providerName: 'codex', cwd,
+      workspace: { kind: 'sandbox', access: 'read_only', runtimeCwd: cwd }, permissionMode: 'default' });
+    registry.setProviderSessionId(stored.id, 'existing-provider-thread');
+    const { workspaceMode: _mode, workspaceIsolation: _isolation, ...canonicalRecord } = stored;
+    writeFileSync(join(dataDir, 'sessions.json'), JSON.stringify([canonicalRecord]), 'utf8');
+    registry = new SessionRegistry(dataDir, sessionBaseDir);
+    ctx = { ...ctx, registry };
+    app = createApp(ctx);
+    expect(registry.get(stored.id)?.workspaceMode).toBe('read_only');
+    expect(registry.get(stored.id)?.workspaceIsolation?.mode).toBe('isolated');
+
+    const response = await app.request(`/sessions/${stored.id}/resume`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ permissionMode: 'skip' }),
+    });
+    expect(response.status).toBe(200);
+    expect(registry.get(stored.id)?.hydration?.workspace).toEqual(expect.objectContaining({
+      kind: 'sandbox', access: 'read_only', isolationMode: 'isolated', runtimeCwd: cwd,
+    }));
+    expect(vi.mocked(pool.spawn)).toHaveBeenLastCalledWith(stored.id, 'codex',
+      expect.objectContaining({ cwd, workspaceMode: 'read_only', permissionMode: 'default',
+        resumeSessionId: 'existing-provider-thread' }), undefined);
   });
 
   it('creates a worktree-backed runtime session through POST /sessions', { timeout: 15_000 }, async () => {
@@ -275,6 +345,77 @@ describe('session worktree routes', () => {
       }),
       'native',
     );
+  });
+
+  it.each(['create', 'fork'] as const)('preserves a worktree when maintenance sweeps during %s hydration', { timeout: 15_000 }, async (operation) => {
+    const repoDir = createGitWorkspace(rootDir, 'repo-create-sweep');
+    const parent = operation === 'fork' ? registry.create({
+      id: 'fork-parent', providerName: 'codex', cwd: repoDir, workspaceMode: 'shared',
+    }) : undefined;
+    const maintenance = new RuntimeWorktreeMaintenanceService({
+      sessionBaseDir,
+      registry,
+      runtime: { isAttached: () => false },
+    });
+    ctx.worktreeMaintenance = maintenance;
+    const execute = WorkspaceSubstrateService.prototype.execute;
+    let swept = false;
+    const hydration = vi.spyOn(WorkspaceSubstrateService.prototype, 'execute')
+      .mockImplementationOnce(async function (request) {
+        const result = await execute.call(this, request);
+        expect(registry.list()).toHaveLength(parent ? 1 : 0);
+        await maintenance.sweep();
+        swept = true;
+        return result;
+      });
+    try {
+      const response = await app.request(parent ? `/sessions/${parent.id}/fork` : '/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'codex', cwd: repoDir, workspaceKind: 'worktree', workspaceAccess: 'read_write',
+          ...(parent ? { mode: 'context_transplant' } : {}),
+        }),
+      });
+      expect(response.status).toBe(201);
+      const body = await response.json() as { id: string; cwd: string };
+      expect(swept).toBe(true);
+      expect(existsSync(join(body.cwd, 'tracked.txt'))).toBe(true);
+      expect(runGit(body.cwd, ['rev-parse', 'HEAD'])).toBe(runGit(repoDir, ['rev-parse', 'HEAD']));
+      expect(maintenance.snapshot().lastSweep?.removedOrphanedWorktreeCount).toBe(0);
+      registry.remove(body.id);
+      expect((await maintenance.sweep()).removedOrphanedWorktreeCount).toBe(1);
+      expect(existsSync(body.cwd)).toBe(false);
+    } finally {
+      hydration.mockRestore();
+    }
+  });
+
+  it('releases workspace protection when hydration fails before registration', { timeout: 15_000 }, async () => {
+    const repoDir = createGitWorkspace(rootDir, 'repo-create-hydration-failed');
+    const maintenance = new RuntimeWorktreeMaintenanceService({
+      sessionBaseDir,
+      registry,
+      runtime: { isAttached: () => false },
+    });
+    ctx.worktreeMaintenance = maintenance;
+    const hydration = vi.spyOn(WorkspaceSubstrateService.prototype, 'execute')
+      .mockRejectedValueOnce(new Error('hydration fixture failed'));
+    try {
+      const response = await app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'codex', cwd: repoDir, workspaceKind: 'worktree', workspaceAccess: 'read_write',
+        }),
+      });
+      expect(response.status).toBe(500);
+      expect(registry.list()).toHaveLength(0);
+      expect(pool.spawn).not.toHaveBeenCalled();
+      expect((await maintenance.sweep()).removedOrphanedWorktreeCount).toBe(1);
+    } finally {
+      hydration.mockRestore();
+    }
   });
 
   it('rejects a stale preset before creating a runtime session', async () => {

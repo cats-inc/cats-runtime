@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
 import { RuntimeWorktreeMaintenanceService } from './RuntimeWorktreeMaintenanceService.js';
 import { prepareSessionWorkspace } from './sessionWorkspace.js';
+import * as sessionWorkspace from './sessionWorkspace.js';
 
 const cleanupPaths: string[] = [];
 
@@ -170,6 +171,78 @@ describe('RuntimeWorktreeMaintenanceService', () => {
       orphanedWorktreePaths: [prepared.workspaceIsolation.worktree!.worktreePath],
     }));
     expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(false);
+  });
+
+  it('waits to prepare the same session until claimed orphan cleanup finishes', { timeout: 15_000 }, async () => {
+    const { repoDir, sessionBaseDir } = createGitWorkspace();
+    const sessionId = 'preparing-after-cleanup';
+    const prepared = await prepareSessionWorkspace({
+      sessionId, sessionBaseDir, cwd: repoDir, workspaceKind: 'worktree',
+    });
+    const service = new RuntimeWorktreeMaintenanceService({
+      sessionBaseDir, registry: new SessionRegistry(), runtime: { isAttached: () => false },
+    });
+    let cleanupStarted!: () => void;
+    const started = new Promise<void>((resolve) => { cleanupStarted = resolve; });
+    let resumeCleanup!: () => void;
+    const paused = new Promise<void>((resolve) => { resumeCleanup = resolve; });
+    const cleanupOrphanedWorktree = sessionWorkspace.cleanupOrphanedWorktree;
+    const cleanup = vi.spyOn(sessionWorkspace, 'cleanupOrphanedWorktree')
+      .mockImplementationOnce(async (worktreePath) => {
+        cleanupStarted();
+        await paused;
+        return cleanupOrphanedWorktree(worktreePath);
+      });
+    const sweeping = service.sweep();
+    let reservation: Promise<() => void> | undefined;
+    try {
+      await started;
+      let acquired = false;
+      reservation = service.reserveSessionWorkspace(sessionId).then((release) => {
+        acquired = true;
+        return release;
+      });
+      await Promise.resolve();
+      expect(acquired).toBe(false);
+      expect(existsSync(prepared.cwd)).toBe(true);
+      resumeCleanup();
+      expect((await sweeping).removedOrphanedWorktreeCount).toBe(1);
+      await reservation;
+      expect(acquired).toBe(true);
+      expect(existsSync(prepared.cwd)).toBe(false);
+    } finally {
+      resumeCleanup();
+      await sweeping;
+      (await reservation)?.();
+      cleanup.mockRestore();
+    }
+  });
+
+  it('rechecks ownership when a session is registered after the sweep snapshot', async () => {
+    const { repoDir, sessionBaseDir } = createGitWorkspace();
+    const registry = new SessionRegistry();
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'published-during-sweep', sessionBaseDir, cwd: repoDir, workspaceKind: 'worktree',
+    });
+    const list = vi.spyOn(registry, 'list').mockImplementationOnce(() => {
+      queueMicrotask(() => registry.create({
+        id: 'published-during-sweep', providerName: 'codex', cwd: prepared.cwd,
+        workspace: prepared.workspace, workspaceMode: prepared.workspaceMode,
+        workspaceIsolation: prepared.workspaceIsolation,
+      }));
+      return [];
+    });
+    const service = new RuntimeWorktreeMaintenanceService({
+      sessionBaseDir, registry, runtime: { isAttached: () => false },
+    });
+    try {
+      const result = await service.sweep();
+      expect(registry.get('published-during-sweep')).toBeDefined();
+      expect(result.removedOrphanedWorktreeCount).toBe(0);
+      expect(existsSync(join(prepared.cwd, 'tracked.txt'))).toBe(true);
+    } finally {
+      list.mockRestore();
+    }
   });
 
   it('surfaces expired retained worktree sessions for operator follow-through', async () => {
