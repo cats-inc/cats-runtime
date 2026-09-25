@@ -107,7 +107,7 @@ In addition to project-level skills, skills reach Antigravity from user-level ro
 
 ### Personal Memory
 
-(This section is for Antigravity to record long-term observations or preferences specific to this user/project)
+- **Windows Desktop UI Automation boundary**: On Windows hosts, the Antigravity agent CLI subprocess environment is isolated in a separate sandbox Desktop (`exebox-...`), not the interactive user desktop (`WinSta0\default`). Direct calls to UI Automation (`UIAutomationClient`) return 0 top-level windows, and `Start-WindowsUiTerminal` will hang waiting for window appearance. When asked to refresh Antigravity model catalogs or operate desktop UIs, do not attempt `desktop-ui-automation` terminal manipulation from inside this sandbox without a dedicated external host executor; use `agy models` for live machine-readable model IDs and rely on operator-supplied pastes for UI layout.
 
 ---
 
@@ -115,4 +115,4 @@ In addition to project-level skills, skills reach Antigravity from user-level ro
 
 This file is maintained by Antigravity only. Other agents should not modify this file.
 
-Last updated: 2026-09-16
+Last updated: 2026-09-25
