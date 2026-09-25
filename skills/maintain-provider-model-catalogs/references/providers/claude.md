@@ -16,6 +16,12 @@ when those screens already establish the requested values/defaults. Follow
   Unsupported effort is not a missing capture and must not inherit another model's controls.
 - Keep warnings as evidence. Do not invent executable tokens from symbols, display case, or model
   generation names. Check the retained data/adapter mapping.
+- The picker list can change without a CLI update. On 2026-09-26 the same 2.1.282 build and Max
+  account showed five rows, eleven rows, and (operator-reported, on another machine) twelve rows
+  at different times. The CLI caches remote feature flags per machine in `~/.claude.json`. Record
+  the capture machine and time. Treat a longer or shorter list as a new observation, not as proof
+  that a row was added or removed, and let the operator choose which observation the catalog
+  follows.
 
 
 ## Agent-operated capture

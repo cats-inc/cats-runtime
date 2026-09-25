@@ -49,6 +49,13 @@ catalogs:
       - Haiku 200K remains unverified 2.1.246 provenance. Context limits for the other rows were not
         observed and are omitted. Print mode (`-p`, which Cats uses) and other accounts were not
         probed.
+      - The picker list appears to be remotely controlled. On 2026-09-26 the operator reported a
+        twelfth row, which they called Opus 5.5 (1M), on another machine with the same CLI build and
+        Max account. They also saw this machine briefly show the earlier four- or five-row list.
+        Neither report was captured. By operator decision this scope keeps the ten explicit rows
+        captured above. A shorter list later is not removal evidence, and an added row needs its
+        own capture. See the variability section of
+        docs/research/2026-09-26-claude-picker-eleven-rows.md.
     models:
       - default: true
         id: opus

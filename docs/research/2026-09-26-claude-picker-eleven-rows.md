@@ -125,10 +125,46 @@ run then passed with `-ExpectedModelCount 11` in 25 s, using 70 text captures an
 - The exact old-label search found only the frozen schema-1 migration evidence and this catalog's
   own provenance notes. Platform's isolated catalog fixtures are historical and were not refreshed.
 
+## Picker list variability (open question)
+
+After the merge, the operator reported two further observations on 2026-09-26. Their Max
+subscription had not changed.
+
+- On another Windows machine, the same Claude Code 2.1.282 build showed a twelfth row. The operator
+  described it as Opus 5.5 (1M), which is the Opus 1M row this catalog stopped using.
+- On the capture machine, the picker briefly showed the earlier layout of four or five rows.
+
+The agent did not observe either list. Neither has a screenshot or row values, so neither is
+catalog evidence. Two read-only checks by the agent are consistent with a remotely controlled list:
+
+- The 2.1.282 binary already contains the new rows' ids and descriptions (for example
+  `claude-opus-4-8` and "Most capable for ambitious work") and the string "Opus (1M context)".
+  The build therefore ships definitions for every row the picker has shown. Something outside the
+  binary decides which rows appear.
+- `~/.claude.json` caches remote feature flags (`cachedGrowthBookFeatures`, 720 entries, with a
+  `cachedGrowthBookFeaturesAt` timestamp) and experiment assignments. Each machine refreshes its own
+  cache, so two machines, or one machine at different times, can show different lists. The flag
+  that controls the picker was not identified; only key names were read, not values.
+
+Working interpretation, unverified: Anthropic can change the picker list at any time, per account
+or rollout and per cached machine state, without a CLI update. The operator decided that the
+catalog keeps the ten explicit rows captured here.
+
+Consequences for maintenance:
+
+- A capture is a snapshot of one machine at one time. Record both. Its `complete` means complete
+  for that observation, not stable for the account.
+- A later list with fewer rows is not removal evidence. A list with more rows, such as the reported
+  Opus 5.5 (1M) row, needs its own capture, including the row value from `/status`, before the
+  catalog changes. The operator chooses which observation the catalog follows.
+- Open questions: which flag or experiment selects the list; whether the 1M row returns on this
+  account; and whether print mode (`-p`) accepts the same models when the picker hides them.
+  `--model opus[1m]` still resolved in interactive mode while the picker offered no 1M row.
+
 ## Limitations
 
-- Print mode (`-p`, which Cats uses) and other accounts were not probed. The eleven-row list is
-  account- or rollout-dependent and appeared without a CLI update.
+- Print mode (`-p`, which Cats uses) and other accounts were not probed. The picker list changes
+  without a CLI update; see the variability section above.
 - Context limits for the new rows and for standard-context Opus 5.5 were not observed.
 - The launch inherited `CLAUDE_CODE_CHILD_SESSION` from this agent session, which turned off
   transcript saving in the capture windows.
