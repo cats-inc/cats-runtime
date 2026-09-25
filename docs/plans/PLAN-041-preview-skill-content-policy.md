@@ -85,6 +85,17 @@ Rolling back to an older binary preserves files but does not enforce this policy
 
 ## Validation ledger
 
+- Integration PRs: [Runtime #85](https://github.com/cats-inc/cats-runtime/pull/85)
+  and [Platform #139](https://github.com/cats-inc/cats-platform/pull/139). Platform
+  passed full CI and merged as `b36571d2`. Runtime's first full preflight passed
+  2,400 cases with five skipped, and exposed five stale fixture assertions across
+  three files. The package contract now asserts actual packed preview exclusion;
+  registry-built peer fixtures use real fresh hydration; the fork fixture checks
+  that child native identity/capability appears only after a distinct child init.
+  Production policy is unchanged. Independent review and 11 targeted cases passed
+  (six branching, four peer routing, one package contract with its required build).
+  The first peer rerun exposed an incorrect fixture setter name, corrected before
+  the passing run. Full preflight must pass on the pushed correction before merge.
 - P0: independent contract review, documentation diff and 60 local links passed.
 - P1 review found and fixed native create hydration omissions, peer admission
   ordering/cleanup, artifact authority, resource preflight, native alias/fork

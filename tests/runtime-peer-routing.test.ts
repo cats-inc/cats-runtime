@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { listProviderInstances } from '../src/backends/cli/config.js';
 import { KNOWN_PROVIDERS } from '../src/backends/cli/providers/types.js';
 import { loadConfig } from '../src/core/config.js';
+import { hydrateSessionState } from '../src/core/hydration/sessionHydration.js';
 import { createRuntimeServer } from '../src/server.js';
 import { parseCoreNdjson as parseNdjson } from './streamEventTestUtils.js';
 import { cleanupTempDirWithRetriesAsync } from './tempCleanup.js';
@@ -117,6 +118,19 @@ async function waitFor(
   }
 }
 
+async function readyCallerSession(caller: ReturnType<typeof createRuntimeServer>, sessionId: string) {
+  const session = caller.context.registry.get(sessionId)!;
+  // These registry-built fixtures represent fresh host-created sessions. Use
+  // the real hydration path so peer admission receives host-owned provenance.
+  const { hydration } = await hydrateSessionState({
+    trigger: 'create', sessionId, providerName: session.providerName,
+    providerBackend: session.providerBackend ?? 'cli', runtimeCwd: session.cwd,
+    sessionBaseDir: caller.context.config.sessionBaseDir,
+  });
+  caller.context.registry.updateSessionMetadata(sessionId, { hydration });
+  caller.context.registry.updateStatus(sessionId, 'ready');
+}
+
 describe('runtime peer routing integration', () => {
   it('does not include real native CLI targets in the API-only fixture', async () => {
     const fixture = createTestConfig();
@@ -212,7 +226,7 @@ describe('runtime peer routing integration', () => {
         model: 'gpt-5.4',
         instructions: 'Caller instructions.',
       });
-      caller.context.registry.updateStatus(session.id, 'ready');
+      await readyCallerSession(caller, session.id);
 
       const response = await fetch(`http://${caller.context.startup.address!.host}:${caller.context.startup.address!.port}/sessions/${session.id}/messages`, {
         method: 'POST',
@@ -337,7 +351,7 @@ describe('runtime peer routing integration', () => {
         providerInstanceId: 'main',
         cwd: caller.context.config.sessionBaseDir,
       });
-      caller.context.registry.updateStatus(session.id, 'ready');
+      await readyCallerSession(caller, session.id);
 
       const response = await caller.app.request(`/sessions/${session.id}/messages`, {
         method: 'POST',
@@ -457,7 +471,7 @@ describe('runtime peer routing integration', () => {
         providerInstanceId: 'main',
         cwd: caller.context.config.sessionBaseDir,
       });
-      caller.context.registry.updateStatus(session.id, 'ready');
+      await readyCallerSession(caller, session.id);
 
       messagePromise = fetch(`http://${callerAddress.host}:${callerAddress.port}/sessions/${session.id}/messages`, {
         method: 'POST',
