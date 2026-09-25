@@ -9,8 +9,19 @@ and [ADR-118](../../../cats-platform/docs/decisions/118-use-isolated-development
 
 ## Resume checkpoint — read-only sandbox delivery (2026-09-26)
 
-- Current checkout: `cats-runtime`, branch `fix/readonly-sandbox-skill-delivery`,
-  base `e464619` (0.3.0). The earlier preview-content branches are merged;
+- Integration authorized: normal auto-merge PR plus the paired Desktop
+  standard-profile preview; no npm publication. Rebased cleanly onto current
+  main `0a60f31` (Runtime 0.3.1), implementation head `546429d`.
+  Platform's paired branch rebased onto `b45f5d9c` and prepares Desktop 0.5.2.
+  Preserve the existing Runtime package version and pin its merged source SHA
+  in the Desktop build. Rebased focused validation passed: 135 cases across
+  skills/hydration/content policy, Windows Codex host/launcher/guard and docs
+  boundary, plus the Runtime TypeScript build. Range-diff preserved the original
+  change exactly; independent integration review found no code blockers.
+  Full PR CI and paired Desktop publication remain pending.
+- Checkout: `cats-runtime`, branch `fix/readonly-sandbox-skill-delivery`.
+  Historical base was `e464619` (0.3.0); current base is `0a60f31` (0.3.1).
+  The earlier preview-content branches are merged;
   the prior worktree checkpoint below is historical.
 - Platform PLAN-109's authorized native authoring attempt stopped before provider
   dispatch: a read-only sandbox projects legacy `workspaceMode: read_only`, but
@@ -23,13 +34,18 @@ and [ADR-118](../../../cats-platform/docs/decisions/118-use-isolated-development
   Message rehydration preserves canonical workspace and isolation metadata.
 - Fingerprint/conflict checks and preview exposure/provenance stay in force.
   This corrects internal propagation; no public field, persisted-format migration,
-  version bump, publication or installed-profile change is needed or authorized.
+  Runtime version bump, Runtime publication or installed-profile change is needed.
 - Validation passed: 113 distinct cases across hydration ownership, real HTTP strict create and
   message rehydration, unchanged provider permissions, source non-materialization,
   existing catalog/content-policy and Codex read-tool checks; Runtime TypeScript
   build passed. The first run exposed only a warning-substring regression;
   wording was corrected and all 23 catalog cases rerun successfully. Independent
-  review found no blockers. Platform native acceptance is still pending.
+  review found no blockers. Platform subsequently passed native managed authoring
+  at 14,589 measured tokens with exact before/after delivery, one unverified
+  attributed draft and verified cleanup. Evidence is recorded in Platform
+  PLAN-109 against pre-rebase Runtime `4bb1495`; do not replay its consumed model
+  authorization. Knowledge evaluation/promotion and installed combined gates
+  remain open.
 
 ## Previous checkpoint — preview-content integration
 
