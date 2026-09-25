@@ -13,14 +13,22 @@ and [ADR-118](../../../cats-platform/docs/decisions/118-use-isolated-development
   `feat/preview-content-policy`, base `a694104`.
 - Platform worktree: `cats-platform-preview-skills`, branch
   `feat/preview-development-skills`, P0 contract commit `ef97dba8`.
-- The owner authorized branch commits only. No main push/merge, version bump,
-  publication or installed Desktop changes. Prior native-model approvals were
-  consumed by the completed PLAN-110 runs; do not reuse them.
+- After branch-only delivery, the owner authorized pushing both branches,
+  auto-merge PRs through full CI, and cleanup of verified merged branches/worktrees.
+  No direct main push, version bump, publication or installed Desktop changes.
+  Prior native-model approvals were consumed by PLAN-110; do not reuse them.
 - P1 implements the policy below. Targeted validation and independent re-review
   passed. No preview supplement is shipped by P1 alone.
 - P2 now adds the three complete Runtime product skills. Paired Desktop staging
   and real library/npm inventory checks passed on the Platform feature branch.
-  P3/P4 next implement bounded practice and reviewed knowledge export in Platform.
+  Platform P3/P4 now implement bounded practice and independently reviewed
+  knowledge export/revocation, including separate Catlas/Orchestrator fixture
+  consumption. This remains local fixture evidence, not protected-holdout/model
+  or installed Desktop acceptance; PLAN-109 records the precise scope.
+- Both branches rebased without conflicts onto current main: Runtime `b712da2`
+  and Platform `a267b6b0`. Rebased implementation heads are Runtime `758ee63` and
+  Platform `1056c412`. GitHub PR checks/merge state are the authoritative delivery
+  record. Preserve private validation evidence before removing worktrees.
 
 ## P1 behavior
 
