@@ -500,15 +500,15 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Antigravity
-    cli_version: 1.2.3
-    last_updated: 2026-09-16
+    cli_version: 1.2.10
+    last_updated: 2026-09-25
     notes:
       - Complete operator-supplied /model picker and all per-model effort screens on Antigravity CLI
         1.2.3, observed 2026-09-16; account scope is the operator's CLI.
       - "Evidence: docs/research/fixtures/antigravity-1.2.3/model-picker.success.redacted.txt"
-      - "Raw execution ids retain the 2026-09-03 agy models capture on 1.1.24:
-        docs/research/fixtures/antigravity-1.1.24/models-command.success.redacted.txt. They were not
-        re-enumerated on 1.2.3."
+      - "Raw execution ids re-enumerated on 1.2.10 via live agy models on 2026-09-25:
+        docs/research/fixtures/antigravity-1.2.10/models-command.success.redacted.txt.
+        All fourteen execution ids and label associations verified identical to 1.1.24/1.2.3."
       - One row per picker family. The first effort's verified raw id identifies each Gemini row;
         Runtime resolves model plus effort to the corresponding verified --model id. All fourteen
         executable choices remain represented.
