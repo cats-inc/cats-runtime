@@ -1,10 +1,11 @@
 # Antigravity (agy) Catalog Refresh
 
-Last updated: 2026-09-17
+Last updated: 2026-09-25
 
 Use this path for agy model-picker and per-model effort evidence. Current model names, option sets,
-and counts belong in catalog data and evidence, not this guide. The retained procedure comes from
-`docs/research/2026-09-16-antigravity-model-picker-refresh.md` in cats-runtime.
+and counts belong in catalog data and evidence, not this guide. The retained procedures come from
+`docs/research/2026-09-16-antigravity-model-picker-refresh.md` and
+`docs/research/2026-09-25-antigravity-model-catalog-refresh.md` in cats-runtime.
 
 ## Separate picker evidence from execution evidence
 
@@ -38,3 +39,13 @@ bindings require no repeated implementation authorization; a new unsupported bin
 code change. Validate labels, ordered values, defaults, custom input, and actual emitted bindings.
 Discovery tests must explicitly use a `selection_mode: discovery` scope before constructing the
 service. `catalogs: []` inherits factory; `models: []` empties a full/shortlist scope.
+
+## Execution environment and UI automation boundaries
+
+1. **Windows desktop object isolation**: Under an Antigravity agent CLI session on Windows, subprocess execution runs inside an isolated sandbox Desktop (`exebox-...`), not the interactive user desktop (`WinSta0\default`). As a result:
+   - UI Automation (`UIAutomationClient`) queries see 0 top-level windows.
+   - Calling `Start-WindowsUiTerminal` will fail to detect window appearance and will hang waiting for the window.
+   - Agents executing inside this CLI sandbox MUST NOT attempt to operate the interactive picker via `desktop-ui-automation` without a host-level executor outside that desktop boundary.
+2. **Machine-readable enumeration (`agy models`)**:
+   - `agy models` runs without launching a graphical terminal, consumes zero image/turn tokens, and outputs the complete 14-item machine-readable mapping (`<id>\t<label>`) for the installed CLI.
+   - Prefer `agy models` for verifying execution IDs and model availability. Pair with operator-supplied `/model` pastes when verifying interactive UI layout and slider labels.
