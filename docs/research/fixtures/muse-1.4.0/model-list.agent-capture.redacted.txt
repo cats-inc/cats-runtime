@@ -1,0 +1,32 @@
+MSP model/list reply, Muse Code 1.4.0 (muse-bin-1.4.0-R4161.1), observed 2026-09-26.
+Transport: `muse serve --no-session-log` over stdio (newline-delimited JSON-RPC),
+handshake initialize -> initialized notification -> model/list with no sessionId.
+Server: name muse, version 1.4.0, sessionDurability ephemeral, schema fingerprint
+sha256:36466f634c8c78a812462ec941187fd4547b232ee06153e5feb2a1482f0d3d7f.
+Platform: unix/linux. Account scope: provider catalog for the operator's profile;
+identity redacted. museHome redacted below; no session was created (memory-only host).
+Local model-catalog cache (<redacted-home>/.local/share/muse/model-catalog/6d657461__p746268.json,
+4177 bytes) holds the same four rows with per-row reasoning_effort_variants and
+corroborates this MSP reply.
+
+initialize result:
+{"serverInfo":{"name":"muse","version":"1.4.0"},"museHome":"<redacted-home>/.local/share/muse","platformFamily":"unix","platformOs":"linux","sessionDurability":"ephemeral","experimentalApi":false,"grantedCapabilities":[]}
+
+model/list result:
+{"providerId":"meta","profileId":"tbh","source":"providerCatalog","models":[
+{"modelId":"muse-spark-1.3","displayLabel":"muse-spark-1.3","providerId":"meta","profileId":"tbh","releaseDate":"2026-09-02","description":null,"contextLimit":1007997,"outputLimit":128000,"cost":null,"isActive":false,"isDefault":false,"variants":["minimal","low","medium","high","xhigh","max"]},
+{"modelId":"muse-spark-1.3-contributor","displayLabel":"muse-spark-1.3-contributor","providerId":"meta","profileId":"tbh","releaseDate":"2026-09-02","description":"Your content, including inter-session messages, may be used for product improvement.","contextLimit":1007997,"outputLimit":128000,"cost":null,"isActive":false,"isDefault":true,"variants":["minimal","low","medium","high","xhigh","max"]},
+{"modelId":"muse-spark-1.2","displayLabel":"muse-spark-1.2","providerId":"meta","profileId":"tbh","releaseDate":"2026-08-05","description":null,"contextLimit":1007997,"outputLimit":128000,"cost":null,"isActive":false,"isDefault":false,"variants":["minimal","low","medium","high","xhigh"]},
+{"modelId":"muse-spark-1.2-contributor","displayLabel":"muse-spark-1.2-contributor","providerId":"meta","profileId":"tbh","releaseDate":"2026-08-05","description":"Your content, including inter-session messages, may be used for product improvement.","contextLimit":1007997,"outputLimit":128000,"cost":null,"isActive":false,"isDefault":false,"variants":["minimal","low","medium","high","xhigh"]}
+]}
+
+Reading: same four rows as the 2026-09-25 capture (same ids, labels, dates,
+limits, contributor descriptions, and the contributor-row isDefault flag).
+isActive is false on every row because no sessionId was supplied; that is not
+a default claim. New in 1.4.0: each row carries an ordered `variants` array
+(minimal, low, medium, high, xhigh, max on both 1.3 rows; minimal through xhigh
+on both 1.2 rows), matching the curated per-model effort menus exactly. The
+parser vocabulary in `muse --help` (none|minimal|low|medium|high|xhigh|max|ultra,
+default high) is broader and is not imported; `none` and `ultra` remain absent
+from every row's variants. Completeness: complete for this account (machine
+enumeration, not a scrolled view).
