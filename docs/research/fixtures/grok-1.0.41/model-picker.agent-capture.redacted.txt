@@ -1,0 +1,54 @@
+# Source: agent-operated /model picker, Grok Build 1.0.41 (4220f3b224a6)
+# Observed: 2026-09-25
+# Method: Windows UI Automation visible text, checked against 1129x635 window screenshots
+# Account scope: signed-in session on this machine. Identity redacted.
+# Completeness: the model list wrapped after 4 rows. Each effort list wrapped after its
+#   visible rows (4, 4, 4, and 3). No further rows appeared.
+# Markers: (current) and (active) are session markers. They are kept here and omitted
+#   from catalog labels.
+
+Models, picker order:
+  Grok 4.7 (current)   SpaceXAI's latest frontier model
+  Grok 4.7 Fast        Fast variant. 2x the price.
+  Grok 4.6
+  Grok 4.5
+
+Grok 4.7 effort, visual order. The row count was 4. (active) was the session effort.
+  Extra High (active)  Maximum reasoning for the hardest tasks.
+  High                 Thorough reasoning and quality. Recommended.
+  Medium               Strong quality with a faster turnaround.
+  Low                  Fastest responses. Best for simple tasks.
+
+Grok 4.7 Fast effort, visual order. The row count was 4. The cursor opened on High.
+  Extra High  Maximum reasoning for the hardest tasks.
+  High        Thorough reasoning and quality. Recommended.
+  Medium      Strong quality with a faster turnaround.
+  Low         Fastest responses. Best for simple tasks.
+
+Grok 4.6 effort, visual order. The row count was 4. The cursor opened on High.
+  Extra High  Highest effort and reasoning level
+  High        Higher implementation quality with extensive reasoning
+  Medium      Balanced effort with standard implementation and testing
+  Low         Quick, fast implementations
+
+Grok 4.5 effort, visual order. The row count was 3. The cursor opened on High.
+  High    Highest implementation quality with extensive reasoning
+  Medium  Balanced effort with standard implementation and testing
+  Low     Quick, fast implementations
+
+Raw ids, from `grok models` and the same CLI model cache, matched by display name:
+  Grok 4.7       grok-4.7
+  Grok 4.7 Fast  grok-4.7-build-fast
+  Grok 4.6       grok-4.6
+  Grok 4.5       grok-4.5
+
+Effort tokens from the 1.0.41 model cache. Those cache labels match the picker labels.
+  Extra High  xhigh
+  High        high
+  Medium      medium
+  Low         low
+
+The capture session status showed Grok 4.7 (xhigh) while Extra High was marked (active).
+config.toml kept default = grok-4.6 and default_reasoning_effort = xhigh.
+`grok models` printed Default model: grok-4.7 and marked grok-4.7 (default).
+That command marker and the saved config default disagree, so neither is a catalog default.

@@ -1,0 +1,18 @@
+# Source: live `grok models` on the locally installed Grok CLI
+# Version: 1.0.41 (from `grok --version`: grok 1.0.41 (4220f3b224a6))
+# Observed: 2026-09-25
+# Account scope: signed-in session on this machine
+# Completeness: the command printed four models and exited 0
+# The Default model line and the (default) marker do not match config.toml, which
+# still said default = "grok-4.6". This marker is not copied into the catalog.
+# Redaction: the login line's identity source is replaced with a placeholder.
+
+You are logged in with <redacted-auth-source>.
+
+Default model: grok-4.7
+
+Available models:
+  * grok-4.7 (default)
+  - grok-4.7-build-fast
+  - grok-4.6
+  - grok-4.5
