@@ -2,6 +2,13 @@
 
 > This directory contains all project documentation.
 
+## Preview content boundary
+
+[PLAN-041](plans/PLAN-041-preview-skill-content-policy.md) records preview-only
+managed skills, release exclusion and retained-context recovery. Strict release
+admission requires the next Runtime minor before shipping; no version is bumped
+by this implementation branch.
+
 ## Explicit Codex Read Tools
 
 [ADR-041](./decisions/041-bridge-explicit-codex-read-tools-through-runtime.md)

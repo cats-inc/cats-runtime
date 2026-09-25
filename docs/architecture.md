@@ -4,6 +4,15 @@
 
 ## Overview
 
+Managed skill content is bounded by the executing artifact's release/preview
+manifest, independent of signing, provider choice or caller-selected catalog
+roots. Runtime enforces discovery and delivery policy, journals preview exposure
+before handing over content, and stamps host-owned hydration provenance. Release
+execution admits only verifiably clean contexts; workspace markers and retained
+native aliases cannot silently carry preview instructions across the boundary.
+See [PLAN-041](plans/PLAN-041-preview-skill-content-policy.md) for compatibility,
+recovery, peer admission and the remaining Desktop staging work.
+
 `cats-runtime` now runs as a single service. The CLI runtime that previously
 lived behind the `agent-fleet` HTTP boundary has been ported into this repo and
 organized under `src/backends/cli`, while API-key and local-model execution now

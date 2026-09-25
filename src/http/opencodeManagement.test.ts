@@ -144,13 +144,21 @@ describe('OpenCode native session management', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     rmSync(runtimeRootDir, { recursive: true, force: true });
   });
 
   it('creates a native OpenCode session through POST /sessions', async () => {
+    const { mkdirSync } = await import('node:fs');
+    const contentPolicy = await import('../core/skills/contentPolicy.js');
+    vi.spyOn(contentPolicy, 'getRuntimeSkillContentPolicy').mockReturnValue({
+      profile: 'release', fingerprint: 'a'.repeat(64),
+    });
+    const testCwd = join(runtimeRootDir, 'repo');
+    mkdirSync(testCwd, { recursive: true });
     vi.mocked(opencodeNative.createSession).mockResolvedValue({
       providerSessionId: 'oc-123',
-      cwd: 'C:/repo',
+      cwd: testCwd,
       summary: 'Existing OpenCode Session',
       messageCount: 0,
       lastActivity: '2026-03-09T00:00:00Z',
@@ -161,7 +169,7 @@ describe('OpenCode native session management', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         provider: 'opencode',
-        cwd: 'C:/repo',
+        cwd: testCwd,
         workspaceMode: 'shared',
       }),
     });
@@ -176,7 +184,7 @@ describe('OpenCode native session management', () => {
       expect.any(String),
       'opencode',
       expect.objectContaining({
-        cwd: 'C:/repo',
+        cwd: testCwd,
         resumeSessionId: 'oc-123',
       }),
       'native',

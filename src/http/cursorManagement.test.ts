@@ -144,13 +144,21 @@ describe('Cursor native session management', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     rmSync(runtimeRootDir, { recursive: true, force: true });
   });
 
   it('creates a native Cursor session through POST /sessions', async () => {
+    const { mkdirSync } = await import('node:fs');
+    const contentPolicy = await import('../core/skills/contentPolicy.js');
+    vi.spyOn(contentPolicy, 'getRuntimeSkillContentPolicy').mockReturnValue({
+      profile: 'release', fingerprint: 'a'.repeat(64),
+    });
+    const testCwd = join(runtimeRootDir, 'repo');
+    mkdirSync(testCwd, { recursive: true });
     vi.mocked(cursorNative.createSession).mockResolvedValue({
       providerSessionId: 'cursor-123',
-      cwd: 'C:/repo',
+      cwd: testCwd,
       summary: 'Untitled Session',
       messageCount: 0,
     });
@@ -160,7 +168,7 @@ describe('Cursor native session management', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         provider: 'cursor',
-        cwd: 'C:/repo',
+        cwd: testCwd,
         workspaceMode: 'shared',
       }),
     });
@@ -178,7 +186,7 @@ describe('Cursor native session management', () => {
       expect.any(String),
       'cursor',
       expect.objectContaining({
-        cwd: 'C:/repo',
+        cwd: testCwd,
         resumeSessionId: 'cursor-123',
       }),
       'native',

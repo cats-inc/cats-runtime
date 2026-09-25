@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { mergeRuntimeInstructionLayers } from '../skills/catalog.js';
+import { contentConflict, hasPreviewSkillContent, readSkillContentProvenance } from '../skills/contentPolicy.js';
 import type {
   SessionInfo,
   StreamEvent,
@@ -35,6 +36,7 @@ interface BuildPeerExecutionRequestOptions {
     | 'providerInstanceId'
     | 'model'
     | 'skills'
+    | 'hydration'
     | 'instructions'
     | 'context'
     | 'cwd'
@@ -59,6 +61,10 @@ export class PeerExecutionClient {
   buildRequest(
     input: BuildPeerExecutionRequestOptions,
   ): { request: PeerExecutionRequest; trace: PeerExecutionTrace } {
+    if (hasPreviewSkillContent(input.turn.skills ?? input.session.skills)
+      || readSkillContentProvenance(input.session.hydration)?.releaseCompatible !== true) {
+      throw contentConflict('Preview or unverified context requires local execution; peer content profiles are not negotiated.');
+    }
     const requestId = randomUUID();
     const sharedWorkspace = input.routing.shareWorkspace === true;
     const instructions = mergeRuntimeInstructionLayers(

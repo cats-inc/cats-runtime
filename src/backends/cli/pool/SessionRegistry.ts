@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { invalidateSkillContentProvenance } from '../../../core/skills/contentPolicy.js';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import type {
@@ -403,6 +404,7 @@ export class SessionRegistry {
     const previousProviderSessionId = session.providerSessionId;
     session.providerSessionId = providerSessionId;
     if (previousProviderSessionId && previousProviderSessionId !== providerSessionId) {
+      session.hydration = invalidateSkillContentProvenance(session.hydration);
       this.forgetProviderDiscoverySourcePath(
         session.providerName,
         previousProviderSessionId,
@@ -787,6 +789,7 @@ export class SessionRegistry {
     for (const session of this.sessions.values()) {
       if (
         session.providerSessionId === providerSessionId
+        && session.providerName === mergedData.providerName
         && this.sameProviderTarget(
           session.providerName,
           session.providerBackend,
@@ -806,6 +809,8 @@ export class SessionRegistry {
 
     const candidates = this.findPendingRuntimeCandidates(mergedData);
     if (candidates.length === 1) {
+      // A cwd match is not proof this is the new native context we created.
+      candidates[0].hydration = invalidateSkillContentProvenance(candidates[0].hydration);
       return this.mergeDiscoveredIntoSession(candidates[0], providerSessionId, mergedData);
     }
 
@@ -1309,6 +1314,8 @@ export class SessionRegistry {
   }
 
   private mergeLoadedDuplicate(target: SessionInfo, incoming: SessionInfo): void {
+    // Different Runtime IDs may carry exposure journals not owned by the survivor.
+    // Keep their data, but do not certify merged native history as release-clean.
     target.providerBackend = this.normalizeProviderBackend(
       target.providerName,
       target.providerBackend ?? incoming.providerBackend,
@@ -1348,6 +1355,7 @@ export class SessionRegistry {
     if (!target.hydration && incoming.hydration) {
       target.hydration = cloneHydrationState(incoming.hydration);
     }
+    target.hydration = invalidateSkillContentProvenance(target.hydration);
     if (!target.maintenanceState && incoming.maintenanceState) {
       target.maintenanceState = cloneMaintenanceState(incoming.maintenanceState);
     }

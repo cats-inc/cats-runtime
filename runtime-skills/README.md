@@ -22,6 +22,15 @@ This directory is not:
 
 ## Authoring Reference Boundary
 
+The source library carries a preview content manifest. Preview-only managed
+product skills live in the reserved `preview/` subtree; the ordinary library
+remains available to both profiles. Normal npm artifacts omit that subtree and
+the source manifest, defaulting to release. Desktop staging selects its profile
+explicitly. Content eligibility grants no repository write, model usage or
+publication authority. See [PLAN-041](../docs/plans/PLAN-041-preview-skill-content-policy.md)
+for retained-context provenance, fresh-session recovery and the next-minor
+compatibility requirement.
+
 `agency-agents/` may exist at the monorepo root as an authoring/reference
 source, but shipped `cats-runtime` skills must remain local packages owned by
 this repo. Do not import from `agency-agents` at runtime.

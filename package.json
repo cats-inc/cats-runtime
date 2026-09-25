@@ -32,6 +32,8 @@
     "build/runtime",
     "public",
     "runtime-skills",
+    "!runtime-skills/preview",
+    "!runtime-skills/content-profile.json",
     "config/management.yaml.example",
     "config/providers.yaml.example",
     "config/curated-model-catalogs.yaml.example",

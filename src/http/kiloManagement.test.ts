@@ -168,13 +168,21 @@ describe('Kilo native session management', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     rmSync(runtimeRootDir, { recursive: true, force: true });
   });
 
   it('creates a native Kilo session through POST /sessions', async () => {
+    const { mkdirSync } = await import('node:fs');
+    const contentPolicy = await import('../core/skills/contentPolicy.js');
+    vi.spyOn(contentPolicy, 'getRuntimeSkillContentPolicy').mockReturnValue({
+      profile: 'release', fingerprint: 'a'.repeat(64),
+    });
+    const testCwd = join(runtimeRootDir, 'repo');
+    mkdirSync(testCwd, { recursive: true });
     vi.mocked(kiloNative.createSession).mockResolvedValue({
       providerSessionId: 'kilo-123',
-      cwd: 'C:/repo',
+      cwd: testCwd,
       summary: 'Existing Kilo Session',
       messageCount: 0,
       lastActivity: '2026-03-09T00:00:00Z',
@@ -185,7 +193,7 @@ describe('Kilo native session management', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         provider: 'kilo',
-        cwd: 'C:/repo',
+        cwd: testCwd,
         workspaceMode: 'shared',
       }),
     });
@@ -200,7 +208,7 @@ describe('Kilo native session management', () => {
       expect.any(String),
       'kilo',
       expect.objectContaining({
-        cwd: 'C:/repo',
+        cwd: testCwd,
         resumeSessionId: 'kilo-123',
       }),
       'native',
