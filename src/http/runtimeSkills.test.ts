@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -504,6 +504,71 @@ describe('runtime-managed skills HTTP contract', () => {
         }),
       }),
     }));
+  });
+
+  it('strictly delivers preview skills in a read-only sandbox across create and message hydration', async () => {
+    const app = createTestApp();
+    const skills = { requestedSkills: ['cats-practice-and-distill'], strict: true };
+    const allowedTools = ['list_files', 'read_file'];
+    const sourceCwd = join(rootDir, 'repo');
+    const response = await app.request('/sessions', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'codex', cwd: sourceCwd, workspaceKind: 'sandbox', workspaceAccess: 'read_only',
+        permissionMode: 'default', allowedTools, skills,
+      }),
+    });
+    const body = await response.json() as { id: string; cwd: string };
+    expect(response.status, JSON.stringify(body)).toBe(201);
+    expect(body.cwd).not.toBe(sourceCwd);
+    const prepared = registry.get(body.id)!;
+    expect(prepared.workspace).toMatchObject({ kind: 'sandbox', access: 'read_only' });
+    expect(prepared.skills).toMatchObject({
+      strict: true, appliedSkillIds: skills.requestedSkills,
+      delivery: { mode: 'filesystem', status: 'applied' },
+    });
+    const entryPath = prepared.skills!.delivery.filesystem!.entryPaths[0]!;
+    expect(readFileSync(entryPath, 'utf8')).toContain('cats-practice-and-distill');
+    expect(contentPolicy.readSkillContentProvenance(prepared.hydration)).toMatchObject({
+      sessionId: body.id, profile: 'preview', releaseCompatible: false,
+    });
+    expect(pool.spawn).toHaveBeenCalledWith(body.id, 'codex', expect.objectContaining({
+      cwd: body.cwd, workspaceMode: 'read_only', permissionMode: 'default', allowedTools,
+    }), 'default');
+    registry.updateStatus(body.id, 'ready');
+    const streamMessage = vi.fn(async function* () { yield { type: 'result' as const }; });
+    vi.mocked(pool.get).mockReturnValue({ alive: true, busy: false, streamMessage } as never);
+    const message = await app.request(`/sessions/${body.id}/messages`, {
+      method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/x-ndjson' },
+      body: JSON.stringify({ message: 'Inspect the supplied evidence.', skills }),
+    });
+    const output = await message.text();
+    expect(message.status, output).toBe(200);
+    expect(output).toContain('"type":"result"');
+    expect(streamMessage).toHaveBeenCalledTimes(1);
+    expect(registry.get(body.id)).toMatchObject({
+      workspace: { kind: 'sandbox', access: 'read_only' }, permissionMode: 'default', allowedTools,
+      skills: { strict: true, delivery: { mode: 'filesystem', status: 'applied' } },
+      hydration: { workspace: { kind: 'sandbox', access: 'read_only' } },
+    });
+    expect(contentPolicy.readSkillContentProvenance(registry.get(body.id)!.hydration)).toMatchObject({
+      sessionId: body.id, profile: 'preview', releaseCompatible: false,
+    });
+    expect(existsSync(entryPath)).toBe(true);
+    expect(existsSync(join(sourceCwd, '.agents'))).toBe(false);
+  });
+
+  it.each(['read_only', 'read_write'] as const)('refuses strict filesystem delivery into a %s source workspace', async workspaceAccess => {
+    const app = createTestApp();
+    const cwd = join(rootDir, 'repo');
+    const response = await app.request('/sessions', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: 'codex', cwd, workspaceKind: 'source', workspaceAccess,
+        skills: { requestedSkills: ['companion'], strict: true } }),
+    });
+    expect(response.status).toBe(409);
+    expect(pool.spawn).not.toHaveBeenCalled();
+    expect(existsSync(join(cwd, '.agents'))).toBe(false);
   });
 
   it('creates a Pi session with an instruction-file skill delivery contract', async () => {

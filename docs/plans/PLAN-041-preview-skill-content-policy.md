@@ -1,13 +1,53 @@
 # PLAN-041: Preview Skill Content Policy
 
-Status: in progress, 2026-09-25. Runtime owns managed skill discovery, delivery and
+Status: in progress, 2026-09-26. Runtime owns managed skill discovery, delivery and
 retained-context admission. Platform owns Desktop staging and knowledge practice.
 The cross-repository contract is
 [PLAN-109](../../../cats-platform/docs/plans/PLAN-109-cats-self-development-and-catlas-practice.md),
 [SPEC-117](../../../cats-platform/docs/specs/SPEC-117-cats-self-development-and-catlas-practice.md)
 and [ADR-118](../../../cats-platform/docs/decisions/118-use-isolated-development-and-verified-practice-for-cats-improvement.md).
 
-## Resume checkpoint
+## Resume checkpoint — read-only sandbox delivery (2026-09-26)
+
+- Integration authorized: normal auto-merge PR plus the paired Desktop
+  standard-profile preview; no npm publication. Rebased cleanly onto current
+  main `0a60f31` (Runtime 0.3.1), implementation head `546429d`.
+  Platform's paired branch rebased onto `b45f5d9c` and prepares Desktop 0.5.2.
+  Preserve the existing Runtime package version and pin its merged source SHA
+  in the Desktop build. Rebased focused validation passed: 135 cases across
+  skills/hydration/content policy, Windows Codex host/launcher/guard and docs
+  boundary, plus the Runtime TypeScript build. Range-diff preserved the original
+  change exactly; independent integration review found no code blockers.
+  Full PR CI and paired Desktop publication remain pending.
+- Checkout: `cats-runtime`, branch `fix/readonly-sandbox-skill-delivery`.
+  Historical base was `e464619` (0.3.0); current base is `0a60f31` (0.3.1).
+  The earlier preview-content branches are merged;
+  the prior worktree checkpoint below is historical.
+- Platform PLAN-109's authorized native authoring attempt stopped before provider
+  dispatch: a read-only sandbox projects legacy `workspaceMode: read_only`, but
+  Codex skill delivery mistook that access policy for shared-workspace ownership.
+  No model request was spent; preserve the failed private attempt.
+- Internal skill resolution now receives canonical workspace kind separately.
+  Runtime may prepare skill files in its owned sandbox, while provider execution
+  retains read-only access and the default permission gate. Canonical source and
+  worktree kinds override stale isolated hints and never receive managed copies.
+  Message rehydration preserves canonical workspace and isolation metadata.
+- Fingerprint/conflict checks and preview exposure/provenance stay in force.
+  This corrects internal propagation; no public field, persisted-format migration,
+  Runtime version bump, Runtime publication or installed-profile change is needed.
+- Validation passed: 113 distinct cases across hydration ownership, real HTTP strict create and
+  message rehydration, unchanged provider permissions, source non-materialization,
+  existing catalog/content-policy and Codex read-tool checks; Runtime TypeScript
+  build passed. The first run exposed only a warning-substring regression;
+  wording was corrected and all 23 catalog cases rerun successfully. Independent
+  review found no blockers. Platform subsequently passed native managed authoring
+  at 14,589 measured tokens with exact before/after delivery, one unverified
+  attributed draft and verified cleanup. Evidence is recorded in Platform
+  PLAN-109 against pre-rebase Runtime `4bb1495`; do not replay its consumed model
+  authorization. Knowledge evaluation/promotion and installed combined gates
+  remain open.
+
+## Previous checkpoint — preview-content integration
 
 - Runtime worktree: `cats-runtime-preview-skills`, branch
   `feat/preview-content-policy`, base `a694104`.
