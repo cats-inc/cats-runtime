@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -17,7 +18,20 @@ vi.mock('node:fs', async (importOriginal) => {
 const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
 const legacy = fs.readFileSync('docs/research/fixtures/catalog-schema1/factory-before-cutover.json', 'utf8');
 const mapping = JSON.parse(fs.readFileSync('config/catalog-schema1-migration.json', 'utf8')) as LegacyMigrationScope[];
+// A factory example exactly as Runtime shipped it on 2026-04-08; older Desktop builds seeded such copies.
+const seededExample = fs.readFileSync('docs/research/fixtures/catalog-schema1/factory-example-2026-04-08.yaml', 'utf8');
 const roots: string[] = [];
+
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+/** Writes the record Desktop keeps beside the Runtime config after seeding a template. */
+function recordDesktopSeed(overridePath: string, source: string): void {
+  fs.writeFileSync(join(dirname(overridePath), '.bundled-template-seeds.json'), JSON.stringify({
+    'curated-model-catalogs.yaml.example': { sourceHash: sha256(source), updatedAt: '2026-09-20T00:00:00.000Z' },
+  }));
+}
 
 afterEach(() => {
   vi.mocked(fs.writeFileSync).mockReset();
@@ -173,6 +187,14 @@ describe('catalog upgrades at writable Runtime activation', () => {
     expect(fs.readFileSync(overridePath, 'utf8')).toBe(edited);
   });
 
+  it('keeps retired and completed results visible across no-op reloads', () => {
+    const { paths } = fixture(seededExample);
+    const store = new CatalogStore(paths);
+    expect(store.status().upgrade.state).toBe('retired');
+    store.reload(store.status().catalogRevision);
+    expect(store.status().upgrade.state).toBe('retired');
+  });
+
   it('accepts a valid schema-2 file already applied by a concurrent writer without replacing it', () => {
     const { paths, overridePath, backups } = fixture();
     const converted = convertLegacyCatalog(legacy, mapping);
@@ -186,5 +208,116 @@ describe('catalog upgrades at writable Runtime activation', () => {
     expect(store.status()).toMatchObject({ available: true, upgrade: { state: 'not_needed' } });
     expect(fs.readFileSync(overridePath, 'utf8')).toBe(edited);
     expect(backups()).toEqual([]);
+  });
+});
+
+describe('retiring app-seeded factory snapshots at writable Runtime activation', () => {
+  const lf = seededExample.replace(/\r\n/g, '\n');
+
+  function expectFactoryOnly(store: CatalogStore) {
+    const status = store.status();
+    expect(status).toMatchObject({ available: true, source: 'files', diagnostics: [], overrideDigest: null });
+    expect(new Set(Object.values(status.origins))).toEqual(new Set(['factory']));
+  }
+
+  it.each([
+    ['shipped factory example', lf],
+    ['CRLF copy of a shipped factory example', lf.replace(/\n/g, '\r\n')],
+  ])('backs up and removes an unmodified %s instead of converting or blocking it', (_name, original) => {
+    const { paths, overridePath, backups } = fixture(original);
+    const store = new CatalogStore(paths);
+    expect(store.status().upgrade).toMatchObject({ state: 'retired', reason: 'factory_snapshot', sourceDigest: sha256(original) });
+    expectFactoryOnly(store);
+    expect(fs.existsSync(overridePath)).toBe(false);
+    expect(backups()).toHaveLength(1);
+    expect(fs.readFileSync(join(dirname(overridePath), backups()[0]), 'utf8')).toBe(original);
+    expect(new CatalogStore(paths).status().upgrade).toEqual({ state: 'not_needed' });
+    expect(backups()).toHaveLength(1);
+  });
+
+  it('treats an edited seed as operator intent and keeps it when conversion fails', () => {
+    const edited = `${lf}# operator note\n`;
+    const { paths, overridePath, backups } = fixture(edited);
+    const store = new CatalogStore(paths);
+    expect(store.status()).toMatchObject({ available: false, upgrade: { state: 'blocked' } });
+    expect(store.status().diagnostics[0]).toMatch(/explicit mapping review/);
+    expect(fs.readFileSync(overridePath, 'utf8')).toBe(edited);
+    expect(backups()).toEqual([]);
+  });
+
+  it('retires the exact bytes Desktop recorded seeding, but not a file that differs from that record', () => {
+    // A copy from a bundle outside this repository's history that the converter cannot map.
+    const seeded = 'schema_version: 1\ncatalogs:\n  - cli: Retired CLI\n    models: []\n';
+    const recorded = fixture(seeded);
+    recordDesktopSeed(recorded.overridePath, seeded);
+    const store = new CatalogStore(recorded.paths);
+    expect(store.status().upgrade).toMatchObject({ state: 'retired', reason: 'factory_snapshot' });
+    expectFactoryOnly(store);
+    expect(fs.existsSync(recorded.overridePath)).toBe(false);
+
+    const edited = fixture(`${seeded}# edited\n`);
+    recordDesktopSeed(edited.overridePath, seeded);
+    expect(new CatalogStore(edited.paths).status()).toMatchObject({ available: false, upgrade: { state: 'blocked' } });
+    expect(fs.readFileSync(edited.overridePath, 'utf8')).toBe(`${seeded}# edited\n`);
+    expect(edited.backups()).toEqual([]);
+  });
+
+  it('repairs a profile that an earlier Runtime already converted from a seeded snapshot', () => {
+    // The earlier Runtime converted the seeded copy; the Desktop seed record identifies its backup.
+    const { paths, overridePath, backups } = fixture(legacy);
+    expect(new CatalogStore(paths).status().upgrade.state).toBe('completed');
+    recordDesktopSeed(overridePath, legacy);
+    const converted = fs.readFileSync(overridePath, 'utf8');
+    const store = new CatalogStore(paths);
+    expect(store.status().upgrade).toMatchObject({ state: 'retired', reason: 'converted_factory_snapshot', sourceDigest: sha256(converted) });
+    expectFactoryOnly(store);
+    expect(fs.existsSync(overridePath)).toBe(false);
+    const saved = backups().map(name => fs.readFileSync(join(dirname(overridePath), name), 'utf8'));
+    expect(saved.sort()).toEqual([converted, legacy].sort());
+    expect(new CatalogStore(paths).status().upgrade).toEqual({ state: 'not_needed' });
+  });
+
+  it('keeps a converted profile that the operator edited after the upgrade', () => {
+    const { paths, overridePath, backups } = fixture(legacy);
+    expect(new CatalogStore(paths).status().upgrade.state).toBe('completed');
+    recordDesktopSeed(overridePath, legacy);
+    const document = parse(fs.readFileSync(overridePath, 'utf8'));
+    document.catalogs[0].models[0].label = 'Operator label';
+    const edited = stringify(document);
+    fs.writeFileSync(overridePath, edited);
+    const store = new CatalogStore(paths);
+    expect(store.status()).toMatchObject({ available: true, upgrade: { state: 'not_needed' } });
+    expect(Object.values(store.status().origins)).toContain('override');
+    expect(fs.readFileSync(overridePath, 'utf8')).toBe(edited);
+    expect(backups()).toHaveLength(1);
+  });
+
+  it('does not steal an apply lock and retires the snapshot on a later retry', () => {
+    const { paths, overridePath, backups } = fixture(lf);
+    const lock = `${overridePath}.apply-lock`;
+    fs.writeFileSync(lock, 'test-owned-lock');
+    const store = new CatalogStore(paths);
+    expect(store.status()).toMatchObject({ upgrade: { state: 'blocked' } });
+    expect(store.status().diagnostics[0]).toMatch(/interrupted write holds the apply lock/);
+    expect(fs.readFileSync(overridePath, 'utf8')).toBe(lf);
+    expect(backups()).toEqual([]);
+    fs.rmSync(lock);
+    store.reload(store.status().catalogRevision);
+    expect(store.status().upgrade).toMatchObject({ state: 'retired' });
+    expectFactoryOnly(store);
+  });
+
+  it('keeps the snapshot in place when its backup cannot be written', () => {
+    const { paths, overridePath, backups } = fixture(lf);
+    vi.mocked(fs.writeFileSync).mockImplementation((file, ...args) => {
+      if (String(file).endsWith('.bak')) throw new Error('Simulated backup failure');
+      return actualFs.writeFileSync(file, ...args);
+    });
+    const store = new CatalogStore(paths);
+    expect(store.status()).toMatchObject({ upgrade: { state: 'blocked' } });
+    expect(store.status().diagnostics[0]).toContain('Simulated backup failure');
+    expect(fs.readFileSync(overridePath, 'utf8')).toBe(lf);
+    expect(backups()).toEqual([]);
+    expect(fs.existsSync(`${overridePath}.apply-lock`)).toBe(false);
   });
 });

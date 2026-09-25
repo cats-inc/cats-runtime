@@ -63,6 +63,10 @@ scheduled polling, verified account linkage and durable history remain deferred.
 records the four-model picker, per-model effort wording, the decision not to copy a
 conflicting default marker, and the screenshot and context-token cost of the native run.
 
+[Seeded catalog snapshot retirement](./research/2026-09-26-seeded-catalog-snapshot-retirement.md)
+records why upgraded Desktops kept old model menus or showed a catalog configuration notice, the
+evidence that 49 of 53 shipped factory versions could not convert, and the retirement fix.
+
 [Claude 2.1.282 eleven-row picker capture](./research/2026-09-26-claude-picker-eleven-rows.md)
 records the scrolled Default-plus-ten picker, per-row execution values read through `/status`,
 the operator's move from `opus[1m]` to the picker's `opus`, the scrolling and shared-effort fixes

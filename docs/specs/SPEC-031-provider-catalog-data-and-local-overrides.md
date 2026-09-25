@@ -264,6 +264,19 @@ The read-only capability export advertises `automaticSchema1Upgrade: true` witho
 performing migration. A committed conversion remains valid if later accepted-snapshot
 persistence fails; the original backup and failure diagnostics remain available.
 
+Amendment 2026-09-26: Desktop seeded the override path with the factory example from
+2026-04-14 until the cutover, so many "existing overrides" were app-owned snapshots.
+Converting one pinned every scope to its old factory; 49 of the 53 shipped versions
+could not convert at all and left the catalog unavailable. Before conversion, writable
+activation now retires an unmodified snapshot, identified by the frozen digests of every
+shipped schema-1 factory example (after byte-order-mark and CRLF normalization) or by
+the exact hash in Desktop's `.bundled-template-seeds.json`. A schema-2 override that
+still equals the conversion of such a snapshot kept in one of its `.bak` backups is
+retired too. Retirement uses the apply lock, writes a unique byte-for-byte backup, then
+removes the file; status reports `retired` and the capability export advertises
+`factorySnapshotRetirement: true`. Edited files are never retired. Evidence and scope:
+`docs/research/2026-09-26-seeded-catalog-snapshot-retirement.md`.
+
 Package tests must verify npm and installed Desktop contain the exact generated
 factory data, resolver, and source revision. A moved installation, read-only install
 directory, custom Runtime root, and factory upgrade must all retain local-patch

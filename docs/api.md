@@ -4136,10 +4136,17 @@ current local default selection without reviving a sample-only shim route.
 `GET /providers/catalogs` reports capabilities, availability, `catalogRevision`,
 `activationId`, source, factory/override digests, origins and diagnostics.
 `automaticSchema1Upgrade: true` advertises one-time conversion at writable Runtime
-startup and explicit reload. `upgrade.state` is `not_needed`, `completed` (with
-`fromSchema`, `toSchema`, `backupPath`, `sourceDigest`, `candidateDigest`), or
-`blocked` (with `message`). Status GETs never migrate. Completed status persists
-for that process; after restart the converted file reports `not_needed`.
+startup and explicit reload. `factorySnapshotRetirement: true` advertises that the
+same step first retires an unmodified factory copy seeded by an older Desktop: a
+shipped schema-1 factory example, the exact bytes Desktop recorded seeding, or a
+schema-2 file that is still exactly the automatic conversion of such a copy. It is
+backed up byte for byte and removed, so every scope adopts the factory. Edited files
+are never retired. `upgrade.state` is `not_needed`, `completed` (with `fromSchema`,
+`toSchema`, `backupPath`, `sourceDigest`, `candidateDigest`), `retired` (with
+`reason` `factory_snapshot` or `converted_factory_snapshot`, `backupPath`,
+`sourceDigest`), or `blocked` (with `message`). Status GETs never migrate.
+Completed and retired status persist for that process; after restart the result
+reports `not_needed`.
 `POST /providers/catalogs/reload` accepts `{"expectedRevision":"<revision>"}`
 (or null for unavailable state), requires the configured authentication and uses
 the selected Runtime's file paths. It validates and atomically activates one

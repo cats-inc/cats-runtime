@@ -50,8 +50,11 @@ Check the selected installation's `catalogCapabilities.automaticSchema1Upgrade` 
 `GET /providers/catalogs` response before planning manual conversion. When true, Runtime startup
 and explicit reload perform the reviewed schema-1 conversion, validate the complete effective
 catalog, save a unique raw backup, and atomically replace the override under a lock and digest
-check. `upgrade.state` reports `completed`, `blocked`, or `not_needed`; completed includes
-`backupPath`. Schema 2 and missing overrides are no-ops. The Runtime does not seed a new override.
+check. `upgrade.state` reports `completed`, `retired`, `blocked`, or `not_needed`; completed and
+retired include `backupPath`. Schema 2 and missing overrides are no-ops. The Runtime does not seed a
+new override. Desktop builds from 2026-04-14 until the cutover did seed one with the factory
+example; with `factorySnapshotRetirement`, an unmodified seed (or an untouched conversion of one)
+is backed up and removed so the factory applies. Do not hand-convert such a seed.
 Desktop delegates this operation to Runtime. Do not add another converter to the picker/host.
 Read-only `./catalogs`, inspect and preview never migrate or create files. Do not start a real
 personal Runtime merely as a test; use isolated profiles. Product startup migration is distinct
