@@ -85,8 +85,10 @@ powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/scripts/
 ```
 
 It sends only arrow keys. Up/Down move rows; Right cycles each row's effort line until it returns
-to its starting level. Enter (save default) and `s` (session only) are never sent, and the picker
-is left open at its starting row and effort. `KeyScreens` saves the list plus one default-marked
+to its starting level. A scrolled list counts toward `-ExpectedModelCount` through its visible
+rows plus the `… +N models` line, and each row is read while highlighted. Effort is picker-wide,
+so the helper cycles the starting row back at the end. Enter (save default) and `s` (session only)
+are never sent, and the picker is left open at its starting row and effort. `KeyScreens` saves the list plus one default-marked
 (or unsupported) screen per row; the other steps are text-only. The JSON result records each
 row's label, current marker, description and effort cycle with explicit `(default)` markers.
 Order is the Right-key cycle from the starting level; derive linear order from the wrap point.
@@ -109,7 +111,8 @@ product code. Personal overrides use the separate [soft-patch workflow](local-so
 The [Codex reference](providers/codex.md) records default-marker masking and other tested UI
 details. The owning repo's `docs/research/2026-09-24-codex-picker-pilot.md` records the native run,
 catalog delta, validation and limitations. The [Claude reference](providers/claude.md) and
-`docs/research/2026-09-25-claude-picker-agent-capture.md` do the same for Claude Code.
+`docs/research/2026-09-25-claude-picker-agent-capture.md` do the same for Claude Code;
+`docs/research/2026-09-26-claude-picker-eleven-rows.md` adds the scrolled list and row values.
 
 When the operator asks for cost, report the number and pixel size of saved images separately from
 the images actually sent to the agent. If the agent host keeps a per-message usage transcript, sum

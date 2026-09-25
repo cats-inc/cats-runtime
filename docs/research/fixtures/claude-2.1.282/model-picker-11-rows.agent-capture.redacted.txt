@@ -1,0 +1,208 @@
+# Source: agent-operated Claude Code /model picker, Windows UI Automation visible text
+#   (skills/maintain-provider-model-catalogs/scripts/Capture-ClaudePicker.ps1, scrolling support)
+# Version: 2.1.282
+# Observed: 2026-09-26 (local time, UTC+8)
+# Scope: operator subscription account (startup banner: Claude Max); Windows 11 RDP session,
+#   Windows Terminal; launched with --safe-mode --no-chrome; account identity not recorded
+# Completeness: the picker shows eight rows at a time and counts the rest as "+3 models"; the
+#   helper highlighted each of the 11 rows in turn (footer visible throughout) and cycled every
+#   adjustable row's effort line with the Right key until it returned to its starting level
+# Starting state: saved model opus (check mark on row 2) and saved effort xhigh. Effort is one
+#   picker-wide selection: rows without xHigh start at the level they show, and the helper cycled
+#   row 2 back to xHigh at the end. "(default)" appears only on the level the picker marks default
+# Redaction: startup banner (working directory) omitted; no identifiers present; "# " separators
+#   and indentation normalization are editorial
+
+Version: 2.1.282
+
+# Model list as first opened (rows 1-8 visible)
+
+  Select model
+  Switch between Claude models. Your pick becomes the default for new sessions. For other/previous model names,
+  specify with --model.
+
+    1.  Default (recommended)  Opus 5.5 · Best for everyday, complex tasks
+  ❯ 2.  Opus 5.5 ✔             Most capable for ambitious work
+    3.  Fable 5.1              For your toughest challenges
+    4.  Sonnet 5               Most efficient for everyday tasks
+    5.  Haiku 4.5              Fastest for quick answers
+    6.  Opus 5                 Best for everyday, complex tasks
+    7.  Fable 5                Most capable for your hardest and longest-running tasks
+  ↓ 8.  Opus 4.8               Best for everyday, complex tasks
+     … +3 models
+
+  ◉ xHigh effort ←/→ to adjust
+
+  Enter to set as default · s to use this session only · Esc to cancel
+
+# Model list rows with highlight on row 9 (list scrolled one row)
+
+  ↑ 2.  Opus 5.5 ✔             Most capable for ambitious work
+    3.  Fable 5.1              For your toughest challenges
+    4.  Sonnet 5               Most efficient for everyday tasks
+    5.  Haiku 4.5              Fastest for quick answers
+    6.  Opus 5                 Best for everyday, complex tasks
+    7.  Fable 5                Most capable for your hardest and longest-running tasks
+    8.  Opus 4.8               Best for everyday, complex tasks
+  ❯ 9.  Opus 4.7               Best for everyday, complex tasks
+     … +3 models
+
+# Model list rows with highlight on row 11 (last row)
+
+  ↑ 4.  Sonnet 5               Most efficient for everyday tasks
+    5.  Haiku 4.5              Fastest for quick answers
+    6.  Opus 5                 Best for everyday, complex tasks
+    7.  Fable 5                Most capable for your hardest and longest-running tasks
+    8.  Opus 4.8               Best for everyday, complex tasks
+    9.  Opus 4.7               Best for everyday, complex tasks
+    10. Opus 4.6               Best for everyday, complex tasks
+  ❯ 11. Sonnet 4.6             Efficient for routine tasks
+     … +3 models
+
+# Row 1 Default (recommended): effort line after each Right press, from the starting level
+
+  ◉ xHigh effort ←/→ to adjust
+
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+  ✦ Ultracode effort ←/→ to adjust
+
+  ○ Low effort ←/→ to adjust
+
+  ◐ Medium effort (default) ←/→ to adjust
+
+  ● High effort ←/→ to adjust
+
+# Row 2 Opus 5.5: effort line after each Right press, from the starting level
+
+  ◉ xHigh effort ←/→ to adjust
+
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+  ✦ Ultracode effort ←/→ to adjust
+
+  ○ Low effort ←/→ to adjust
+
+  ◐ Medium effort (default) ←/→ to adjust
+
+  ● High effort ←/→ to adjust
+
+# Row 3 Fable 5.1: effort line after each Right press, from the starting level
+
+  ◉ xHigh effort ←/→ to adjust
+
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+  ✦ Ultracode effort ←/→ to adjust
+
+  ○ Low effort ←/→ to adjust
+
+  ◐ Medium effort ←/→ to adjust
+
+  ● High effort (default) ←/→ to adjust
+
+# Row 4 Sonnet 5: effort line after each Right press, from the starting level
+
+  ◉ xHigh effort ←/→ to adjust
+
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+  ✦ Ultracode effort ←/→ to adjust
+
+  ○ Low effort ←/→ to adjust
+
+  ◐ Medium effort ←/→ to adjust
+
+  ● High effort (default) ←/→ to adjust
+
+# Row 5 Haiku 4.5: effort line after each Right press, from the starting level
+
+  ○ Effort not supported for Haiku 4.5
+
+# Row 6 Opus 5: effort line after each Right press, from the starting level
+
+  ◉ xHigh effort ←/→ to adjust
+
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+  ✦ Ultracode effort ←/→ to adjust
+
+  ○ Low effort ←/→ to adjust
+
+  ◐ Medium effort ←/→ to adjust
+
+  ● High effort (default) ←/→ to adjust
+
+# Row 7 Fable 5: effort line after each Right press, from the starting level
+
+  ◉ xHigh effort ←/→ to adjust
+
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+  ✦ Ultracode effort ←/→ to adjust
+
+  ○ Low effort ←/→ to adjust
+
+  ◐ Medium effort ←/→ to adjust
+
+  ● High effort (default) ←/→ to adjust
+
+# Row 8 Opus 4.8: effort line after each Right press, from the starting level
+
+  ◉ xHigh effort ←/→ to adjust
+
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+  ✦ Ultracode effort ←/→ to adjust
+
+  ○ Low effort ←/→ to adjust
+
+  ◐ Medium effort ←/→ to adjust
+
+  ● High effort (default) ←/→ to adjust
+
+# Row 9 Opus 4.7: effort line after each Right press, from the starting level
+
+  ◉ xHigh effort (default) ←/→ to adjust
+
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+  ✦ Ultracode effort ←/→ to adjust
+
+  ○ Low effort ←/→ to adjust
+
+  ◐ Medium effort ←/→ to adjust
+
+  ● High effort ←/→ to adjust
+
+# Row 10 Opus 4.6: effort line after each Right press, from the starting level
+
+  ● High effort (default) ←/→ to adjust
+
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+  ○ Low effort ←/→ to adjust
+
+  ◐ Medium effort ←/→ to adjust
+
+# Row 11 Sonnet 4.6: effort line after each Right press, from the starting level
+
+  ● High effort (default) ←/→ to adjust
+
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+  ○ Low effort ←/→ to adjust
+
+  ◐ Medium effort ←/→ to adjust
+
+# Final: row 2 highlighted again with its starting xHigh effort; Escape cancelled the picker

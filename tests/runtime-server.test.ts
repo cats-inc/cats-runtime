@@ -118,6 +118,11 @@ function getBundledCursorStaticModelCount(): number {
     return readCatalogFactory({packageRoot:process.cwd(), runtimeRoot:process.cwd()}).document.catalogs.find(scope=>scope.provider==='cursor')!.models.length;
   }
 
+function getBundledClaudeCliModels() {
+  return readCatalogFactory({ packageRoot: process.cwd(), runtimeRoot: process.cwd() }).document.catalogs
+    .find((scope) => scope.provider === 'claude' && scope.backend === 'cli')!.models;
+}
+
 function createTestConfig(overrides = {}) {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-test-'));
   const paths = createRuntimeTestPaths(root);
@@ -3513,13 +3518,13 @@ providers:
                 modelCatalog: expect.objectContaining({
                   source: 'static',
                   defaultModel: expect.any(String),
-                  modelCount: 4,
+                  modelCount: getBundledClaudeCliModels().length,
                   warnings: [],
                   statusCounts: {
                     configured: 0,
                     available: 0,
                     running: 0,
-                    unknown: 4,
+                    unknown: getBundledClaudeCliModels().length,
                   },
                 }),
                 tooling: expect.objectContaining({
@@ -4284,19 +4289,20 @@ providers:
         },
         warnings: [],
       });
-      expect(payload.entries.map((entry: { id: string }) => entry.id)).toEqual([
-        'opus',
-        'fable',
-        'sonnet',
-        'haiku',
-      ]);
+      // Expectations come from the shared factory rather than a duplicated model list.
+      const factoryModels = getBundledClaudeCliModels();
+      const factoryEffortEntries = (value?: string): string[] => factoryModels
+        .filter((model) => model.controls?.some((control) => control.key === 'claude.reasoning_effort'
+          && (value === undefined || control.values.some((option) => option.value === value))))
+        .map((model) => model.id)
+        .sort();
+      expect(payload.entries.map((entry: { id: string }) => entry.id))
+        .toEqual(factoryModels.map((model) => model.id));
       const reasoningControl = payload.controls.find(
         (control: { key: string }) => control.key === 'claude.reasoning_effort',
       );
-      expect(reasoningControl).toMatchObject({
-        key: 'claude.reasoning_effort',
-        applicableEntryIds: ['opus', 'fable', 'sonnet'],
-      });
+      expect(reasoningControl?.key).toBe('claude.reasoning_effort');
+      expect([...reasoningControl.applicableEntryIds].sort()).toEqual(factoryEffortEntries());
       const applicableEntriesFor = (value: string): string[] => Array.from(
         new Set(
           reasoningControl?.values
@@ -4307,7 +4313,7 @@ providers:
         ),
       );
       for (const value of ['low', 'medium', 'high', 'xhigh', 'max', 'ultracode']) {
-        expect(applicableEntriesFor(value)).toEqual(['opus', 'fable', 'sonnet']);
+        expect(applicableEntriesFor(value).sort()).toEqual(factoryEffortEntries(value));
       }
     });
   });

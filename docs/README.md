@@ -63,6 +63,11 @@ scheduled polling, verified account linkage and durable history remain deferred.
 records the four-model picker, per-model effort wording, the decision not to copy a
 conflicting default marker, and the screenshot and context-token cost of the native run.
 
+[Claude 2.1.282 eleven-row picker capture](./research/2026-09-26-claude-picker-eleven-rows.md)
+records the scrolled Default-plus-ten picker, per-row execution values read through `/status`,
+the operator's move from `opus[1m]` to the picker's `opus`, the scrolling and shared-effort fixes
+to the capture helper, and the screenshot and token cost of the native run.
+
 [Claude 2.1.282 agent-operated capture](./research/2026-09-25-claude-picker-agent-capture.md)
 records the Opus 5.5 label, Opus's Medium default effort, the `opus[1m]` context alias, the
 arrow-only Claude capture helper and the measured screenshot/token cost of the native run.
