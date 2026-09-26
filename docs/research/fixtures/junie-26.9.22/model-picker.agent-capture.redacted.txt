@@ -1,0 +1,122 @@
+# Source: agent-operated /model picker, Junie 26.9.22 (build 3419.7)
+# Observed: 2026-09-26 (Asia/Taipei), Windows 11 native, Windows Terminal
+# Launch: <user-home>\.local\share\junie\versions\3419.7\junie\junie.exe --skip-update-check
+#   started by the operator in a dedicated window; the agent typed /model and sent only
+#   Up, Down and Right, then one Escape. Enter was never sent.
+# Method: Windows UI Automation visible text. The first list screen was checked against a
+#   1129x635 window screenshot.
+# Account scope: signed-in JetBrains AI session on this machine. No identity, email or
+#   organization appeared on the captured screens. The working-directory header is redacted.
+# Completeness: footer counter i/15. All 15 rows were highlighted in turn, and the list
+#   scrolled to show rows 13-15. Every row's Provider column read JetBrains AI; no BYOK rows.
+# Settings: ~/.junie/settings.json SHA-256 35960eff399200406f4eb19e905c83e1698aa30ef08dc751af9df151e1411c51
+#   before and after the traversal (unchanged).
+# Markers: "Current model" is the session model. The Effort cell shows each row's current
+#   saved effort (settings effortPerModel), not a default. Only row 1 carries a Default label.
+
+First list screen (rows 1-12 visible), padding trimmed:
+
+     Junie   v.26.9.22  <working-directory>
+     Select model
+     Current model: Claude Opus 5.5 JetBrains AI
+   >   Start typing to search for models
+     Name                                   Input     Output               Effort      Provider
+   → Default (Gemini 3.7 Flash)  70% off    $0.40     $2.40 per Mtok     ‹ Medium ›    JetBrains AI
+     Claude Fable 5.1                       $10.00    $50.00 per Mtok    ‹ Low ›       JetBrains AI
+     Claude Opus 5                          $5.00     $25.00 per Mtok    ‹ Low ›       JetBrains AI
+     Claude Opus 5.5                        $4.00     $20.00 per Mtok    ‹ XHigh ›     JetBrains AI
+     Claude Sonnet 5                        $2.00     $10.00 per Mtok    ‹ Low ›       JetBrains AI
+     Gemini 3.6 Flash                       $0.75     $3.75 per Mtok     ‹ High ›      JetBrains AI
+     Gemini 3.8 Flash                       $0.75     $3.75 per Mtok     ‹ Medium ›    JetBrains AI
+     GPT-5.6-LUNA                           $0.20     $1.20 per Mtok     ‹ Low ›       JetBrains AI
+     GPT-5.6-SOL                            $5.00     $30.00 per Mtok    ‹ Low ›       JetBrains AI
+     GPT-5.6-TERRA                          $2.00     $12.00 per Mtok    ‹ Low ›       JetBrains AI
+     GPT-6-ASTRA                            $10.00    $50.00 per Mtok    ‹ Low ›       JetBrains AI
+     GPT-6-LUNA                             $0.10     $0.50 per Mtok     ‹ Low ›       JetBrains AI
+     1/15
+     Top-tier model, good for everyday work.
+
+Scrolled list screen with row 15 highlighted (rows 4-15 visible):
+
+     Claude Opus 5.5                        $4.00     $20.00 per Mtok    ‹ XHigh ›     JetBrains AI
+     Claude Sonnet 5                        $2.00     $10.00 per Mtok    ‹ Low ›       JetBrains AI
+     Gemini 3.6 Flash                       $0.75     $3.75 per Mtok     ‹ High ›      JetBrains AI
+     Gemini 3.8 Flash                       $0.75     $3.75 per Mtok     ‹ Medium ›    JetBrains AI
+     GPT-5.6-LUNA                           $0.20     $1.20 per Mtok     ‹ Low ›       JetBrains AI
+     GPT-5.6-SOL                            $5.00     $30.00 per Mtok    ‹ Low ›       JetBrains AI
+     GPT-5.6-TERRA                          $2.00     $12.00 per Mtok    ‹ Low ›       JetBrains AI
+     GPT-6-ASTRA                            $10.00    $50.00 per Mtok    ‹ Low ›       JetBrains AI
+     GPT-6-LUNA                             $0.10     $0.50 per Mtok     ‹ Low ›       JetBrains AI
+     GPT-6-SOL                              $2.00     $10.00 per Mtok    ‹ Low ›       JetBrains AI
+     Grok 4.6                               $2.00     $6.00 per Mtok     ‹ Low ›       JetBrains AI
+   → Grok 4.7                               $2.00     $6.00 per Mtok     ‹ Low ›       JetBrains AI
+     15/15
+     This top-tier model is recommended for medium or complex tasks. Consumes 2-4x as many credits as the
+     default.
+
+Per-row effort cycles. Right cycles the highlighted row's effort; each row was cycled until
+it returned to its starting value. "Cycle" lists the values seen from the start, in Right-key
+order. The description is the footer text shown while the row was highlighted.
+
+ 1  Default (Gemini 3.7 Flash)  [badge: 70% off]
+    start Medium; cycle Medium > High > Low > (Medium)
+    Top-tier model, good for everyday work.
+    Capture note: the traversal script sent one Right before its start capture, so its own
+    record begins at High. The first list screen shows Medium, and the row returned to Medium.
+ 2  Claude Fable 5.1
+    start Low; cycle Low > Medium > High > XHigh > Max > (Low)
+    The most powerful Anthropic model. Consumes 5-10x as many credits as the default.
+ 3  Claude Opus 5
+    start Low; cycle Low > Medium > High > XHigh > Max > (Low)
+    Previous version of Opus. It is recommended for medium or complex tasks. Consumes 4-5x as many credits as the default.
+ 4  Claude Opus 5.5
+    start XHigh; cycle XHigh > Max > Low > Medium > High > (XHigh)
+    Latest version of Opus. It is recommended for medium or complex tasks. Consumes 3-4x as many credits as the default.
+ 5  Claude Sonnet 5
+    start Low; cycle Low > Medium > High > XHigh > Max > (Low)
+    This top-tier model, good for everyday work, consumes 1.3–2x as many credits as the default.
+ 6  Gemini 3.6 Flash
+    start High; cycle High > Minimal > Low > Medium > (High)
+    Top-tier model, consumes 1.5x as many credits as the default.
+ 7  Gemini 3.8 Flash
+    start Medium; cycle Medium > High > Low > (Medium)
+    Top-tier model, consumes 2x as many credits as the default.
+ 8  GPT-5.6-LUNA
+    start Low; cycle Low > Medium > High > XHigh > Max > None > (Low)
+    Recommended inexpensive model that consumes 5–7x fewer credits than the default.
+ 9  GPT-5.6-SOL
+    start Low; cycle Low > Medium > High > XHigh > Max > None > (Low)
+    This top-tier model consumes 2–5x as many credits as the default.
+10  GPT-5.6-TERRA
+    start Low; cycle Low > Medium > High > XHigh > Max > None > (Low)
+    This model consumes 1.5–2x as many credits as the default.
+11  GPT-6-ASTRA
+    start Low; cycle Low > Medium > High > XHigh > Max > (Low)
+    The most advanced coding model by OpenAI, consumes 3–7x as many credits as the default.
+12  GPT-6-LUNA
+    start Low; cycle Low > Medium > High > XHigh > Max > None > (Low)
+    Inexpensive model that consumes much fewer credits than the default.
+13  GPT-6-SOL
+    start Low; cycle Low > Medium > High > XHigh > Max > None > (Low)
+    This top-tier model consumes 1.5–2x as many credits as the default.
+14  Grok 4.6
+    start Low; cycle Low > Medium > High > XHigh > (Low)
+    This top-tier model is recommended for medium or complex tasks. Consumes 2-4x as many credits as the default.
+15  Grok 4.7
+    start Low; cycle Low > Medium > High > XHigh > (Low)
+    This top-tier model is recommended for medium or complex tasks. Consumes 2-4x as many credits as the default.
+
+Static corroboration from the installed junie-release-3419.7.jar (a possible superset, not
+entitlement or default evidence):
+  - com/intellij/ml/llm/matterhorn/llm/ModelOption$Specific.class contains each of the 15
+    literal names above, exactly (row 1 as "Gemini 3.7 Flash").
+  - com/intellij/ml/llm/matterhorn/llm/EffortLevel.class: $values() order is
+    None, Minimal, Low, Medium, High, XHigh, Max. getWireId() is the enum name lowercased
+    with Locale.ROOT: none, minimal, low, medium, high, xhigh, max.
+  - EffortLevel$Companion.availableForModel builds per-model lists in that same order, with
+    None first where present. This fixes the linear order that the Right-key ring alone
+    cannot show (the ring only shows Max > None > Low).
+  - EffortLevel$Companion.defaultForModel exists, but the picker shows no effort default and
+    it is not used for the catalog.
+  - ModelOptionsGroup declares --effort as a free string option. Its help text reads
+    "Possible values: low, medium, high."; no choice validation was found in that class.

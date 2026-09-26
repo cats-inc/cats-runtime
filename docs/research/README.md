@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-09-26-junie-picker-full-catalog](./2026-09-26-junie-picker-full-catalog.md) | Junie 26.9.22 full catalog, agent-operated picker capture | 15 JetBrains AI models, per-model effort from the Right-key cycle, JAR-backed effort tokens and order, no effort defaults, Defender launch incident and phase token accounting |
 | [2026-09-26-cli-model-setting-dimensions](./2026-09-26-cli-model-setting-dimensions.md) | Model-setting dimensions across the 16 CLI providers | Provider/model/thinking/effort/context/fast coverage, settings outside those six, one-, two- and config-only third-level routing prefixes, which CLIs parse settings from a custom model string, and catalog/adapter discrepancies |
 | [2026-09-25-grok-picker-agent-capture](./2026-09-25-grok-picker-agent-capture.md) | Grok 1.0.41 agent-operated picker capture | Four models, per-model effort labels, no catalog default, screenshot and context-token accounting |
 | [2026-09-25-antigravity-model-catalog-refresh](./2026-09-25-antigravity-model-catalog-refresh.md) | Antigravity 1.2.10 model catalog refresh | Seven families, 14 verified execution IDs, agy 1.2.10 enumeration, desktop UI isolation findings and token accounting |
@@ -14,7 +15,7 @@
 | [2026-09-23-pi-shortlist](./2026-09-23-pi-shortlist.md) | Pi subscription shortlist | Six visible provider labels, fixed medium execution and isolated discovery tests |
 | [2026-09-23-goose-shortlist](./2026-09-23-goose-shortlist.md) | Goose ChatGPT Codex shortlist | Six fixed Off models, exact provider routing and native effort suffix |
 | [2026-09-23-auggie-shortlist](./2026-09-23-auggie-shortlist.md) | Auggie six-model shortlist | Exact labels and CLI IDs, opaque Prism mapping, first-row selection and custom input |
-| [2026-09-23-junie-shortlist](./2026-09-23-junie-shortlist.md) | Junie fixed shortlist | Five literal model names, fixed effort execution, explicit default and custom input |
+| [2026-09-23-junie-shortlist](./2026-09-23-junie-shortlist.md) | Junie fixed shortlist (superseded 2026-09-26) | Five literal model names, fixed effort execution, explicit default and custom input |
 | [2026-09-18-kiro-shortlist](./2026-09-18-kiro-shortlist.md) | Kiro six-model shortlist | Verbatim IDs, Native/WSL fallback, first-row selection and custom input |
 | [2026-09-18-cline-shortlist](./2026-09-18-cline-shortlist.md) | ClinePass six fixed combinations and prompt arguments | Verbatim model IDs, Medium execution, Qwen display projection, custom input, and the single-token/flag-like prompt fix |
 | [2026-09-18-playground-workspace-retention](./2026-09-18-playground-workspace-retention.md) | Playground workspace retention | Stop Chat deletion history, unexpected output loss, and pending joint Runtime/Platform lifecycle review |
