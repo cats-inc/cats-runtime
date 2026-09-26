@@ -387,7 +387,8 @@ What this means for the UI:
 
 - **CLIs that parse settings from the string:** Cursor, Pi, Goose with OpenAI or xAI
   models, Antigravity and Devin need only a syntax hint in the custom field, not
-  controls.
+  controls. Pi is the exception: it also has a wired `--thinking` flag that wins over the
+  suffix, so SPEC-032 assigns Pi to controls instead (operator decision, 2026-09-26).
 - **CLIs that need a flag or body field:** Claude, Codex, Copilot, Grok, Muse, Junie,
   Cline, OpenCode and Kilo, plus Kiro and Auggie once wired, still need controls for a
   custom model. Otherwise effort cannot be set at all.

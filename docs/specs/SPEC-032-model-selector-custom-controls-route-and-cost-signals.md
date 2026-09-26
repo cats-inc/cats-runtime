@@ -90,17 +90,22 @@ this spec addresses:
 4. **FR-4 Single channel per CLI.** A scope with `mode: syntax` must not also expose
    custom controls. This avoids CLI-specific precedence conflicts: Pi's `--thinking`
    overrides a `:level` suffix, and an explicit Goose effort makes the suffix a no-op.
-5. **FR-5 Initial assignment.** This is a proposal to confirm at approval (see Open
-   Questions).
+5. **FR-5 Initial assignment.** The Pi assignment was decided by the operator on
+   2026-09-26. The rest is a proposal to confirm at approval (see Open Questions).
    - `syntax`:
      - Cursor: `model[param=value,…]`.
-     - Pi: `provider/model:<level>`.
      - Goose: `provider/model-<none|low|medium|high|xhigh>`, for OpenAI reasoning and
        xAI models only.
      - Antigravity and Devin: effort-bearing model IDs.
    - `controls`:
      - Existing adapter keys: Claude, Codex, Copilot, Grok, Muse, Junie and Cline effort,
        and the Kilo variant.
+     - Pi `pi.thinking`, sent as `--thinking` (operator decision, 2026-09-26). Pi also
+       parses a `:level` suffix, but only when `--thinking` is absent, so the explicit
+       flag is the single supported channel.
+       - The selector shows no suffix hint for Pi.
+       - A suffix typed anyway stays effective only while the control is left at
+         "CLI default".
      - OpenCode, once its `variant` wiring exists.
    - `none`: Kiro and Auggie until their effort flags are wired.
 6. **FR-6 Route display.** The advanced catalog exposes a read-only route for each entry
@@ -162,8 +167,9 @@ runtime validation ── declared keys/values only ── modelControls ── 
 
 ## Open Questions
 
-- [ ] Approve or amend the FR-5 per-CLI assignment. Pi could use `controls` instead,
-      since `--thinking` is already wired and an explicit flag wins over a suffix.
+- [x] Pi's channel is resolved: `controls` via `pi.thinking` / `--thinking` (operator
+      decision, 2026-09-26).
+- [ ] Approve or amend the rest of the FR-5 per-CLI assignment.
 - [ ] Should custom-model control values be the union of the CLI's known values, or a
       separately curated list?
 - [ ] Choose field names: the scope key, the API field and the two tag values.

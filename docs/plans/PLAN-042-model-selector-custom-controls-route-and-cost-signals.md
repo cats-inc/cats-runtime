@@ -31,8 +31,10 @@ need their own authorization.
 ### Phase 0: Approval Gate
 
 - [ ] 0.1 The user approves SPEC-032, including the FR-5 per-CLI assignment.
-- [ ] 0.2 Resolve the open questions: field names, custom value lists, the Pi channel
-      and the release boundary (Runtime 0.4.0 or additive within 0.3.x).
+- [ ] 0.2 Resolve the open questions: field names, custom value lists and the release
+      boundary (Runtime 0.4.0, or additive within 0.3.x).
+- [x] 0.2a The Pi channel is decided: controls via `pi.thinking` / `--thinking`
+      (operator, 2026-09-26).
 - [ ] 0.3 Update the SPEC-032 and PLAN-042 status and the indexes. Assign an owner.
 
 **Deliverables**: an approved spec with resolved names and a recorded version boundary.
@@ -144,8 +146,10 @@ These are proposed and pending approval with SPEC-032.
     unset control absent.
 - **Integration tests:**
   - Session create, resume and fork with a custom model plus controls. Assert adapter
-    args for Claude (`--effort`), Codex (`model_reasoning_effort`) and Cline
-    (`--thinking`).
+    args for Claude (`--effort`), Codex (`model_reasoning_effort`), Cline
+    (`--thinking`) and Pi (`--thinking`).
+  - Pi precedence: `--thinking` set by a control wins over a `:level` suffix, and the
+    suffix still applies when the control is left at "CLI default".
   - A `syntax`-mode scope rejects custom controls.
   - Existing catalog selections are unchanged.
 - **UI tests:**
@@ -173,6 +177,7 @@ These are proposed and pending approval with SPEC-032.
 | Date | Update |
 |------|--------|
 | 2026-09-26 | Plan drafted from the research note and the operator's UI review. On hold, not approved. |
+| 2026-09-26 | The operator moved Pi from `syntax` to `controls` (SPEC-032 FR-5). The plan stays on hold. |
 
 ---
 
