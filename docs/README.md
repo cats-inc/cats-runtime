@@ -63,6 +63,15 @@ scheduled polling, verified account linkage and durable history remain deferred.
 - [Usage dashboard specification](../../cats-apps/docs/specs/SPEC-002-cats-usage-dashboard.md)
 - [Platform package host and telemetry bridge](../../cats-platform/docs/specs/SPEC-115-versioned-official-app-packages-and-telemetry-bridge.md)
 
+## Model selector proposal (not approved)
+
+[SPEC-032](specs/SPEC-032-model-selector-custom-controls-route-and-cost-signals.md) and
+[PLAN-042](plans/PLAN-042-model-selector-custom-controls-route-and-cost-signals.md) propose
+four selector changes for Desktop and Playground: settings for custom models (a syntax
+hint or declared controls), a read-only routing-channel line, cost and data-use badges,
+and hiding an empty Mode field. Both documents are pending approval, and no
+implementation is authorized.
+
 ## Provider Detection
 
 [CLI model-setting dimensions](./research/2026-09-26-cli-model-setting-dimensions.md)
