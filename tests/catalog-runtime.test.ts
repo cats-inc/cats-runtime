@@ -13,6 +13,7 @@ import type { ProviderTargetDescriptor } from '../src/core/providerCatalog.js';
 import { PiProvider } from '../src/backends/cli/providers/pi.js';
 import { GooseProvider } from '../src/backends/cli/providers/goose.js';
 import { JunieProvider } from '../src/backends/cli/providers/junie.js';
+import { KiroProvider } from '../src/backends/cli/providers/kiro.js';
 import { createRuntimeTestEnv, createRuntimeTestPaths, ensureRuntimeTestDirs } from './support/runtimeTestPaths.js';
 import { cleanupTempDirWithRetries } from './tempCleanup.js';
 
@@ -81,6 +82,59 @@ describe('factory and executable catalog projections', () => {
       modelControls: { 'junie.reasoning_effort': 'none' } });
     expect(args.slice(args.indexOf('--model'), args.indexOf('--model') + 2)).toEqual(['--model', 'GPT-5.6-SOL']);
     expect(args.slice(args.indexOf('--effort'), args.indexOf('--effort') + 2)).toEqual(['--effort', 'none']);
+  });
+
+  it('starts Kiro effort at each row\'s first picker value and sends --effort only where offered', () => {
+    const kiro = knowledge(snapshot.document.catalogs.find(s => s.provider === 'kiro' && s.backend === 'cli')!);
+    expect(kiro.catalog.entries).toHaveLength(20);
+    expect(kiro.catalog.entries[0].id).toBe('auto');
+    // auto is [active] in the picker and default_model in --list-models; neither is a catalog default.
+    expect(kiro.catalog.entries.some(e => e.default)).toBe(false);
+    // First-row initialization only: no default flag and no effort controls on auto.
+    expect(kiro.catalog.defaultSelection).toEqual(expect.objectContaining({ entryId: 'auto', entryMode: 'explicit' }));
+    expect(kiro.catalog.defaultSelection?.controls).toBeUndefined();
+    expect(kiro.catalog.entries.every(e => !e.controlDefaults)).toBe(true);
+    const resolve = (entryId: string, controls?: Record<string, string>) => resolveProviderSelection(kiro,
+      { entryId, entryMode: 'explicit', ...(controls ? { controls } : {}) });
+    const spawn = (entryId: string, controls?: Record<string, string>) => {
+      const selected = resolve(entryId, controls);
+      return new KiroProvider({} as never).buildSpawnArgs({ cwd: '/tmp',
+        model: selected.execution.model, modelControls: selected.resolution.controls });
+    };
+    const effort = (entryId: string) => resolve(entryId).resolution.controls['kiro.reasoning_effort'];
+    expect(effort('claude-opus-5.5')).toBe('low');
+    expect(effort('claude-opus-4.6')).toBe('low');
+    expect(effort('gpt-5.6-sol')).toBe('none');
+    expect(resolve('claude-opus-4.7', { 'kiro.reasoning_effort': 'xhigh' })
+      .resolution.controls['kiro.reasoning_effort']).toBe('xhigh');
+    expect(() => resolve('claude-opus-4.6', { 'kiro.reasoning_effort': 'xhigh' })).toThrow();
+    expect(() => resolve('claude-haiku-4.5', { 'kiro.reasoning_effort': 'low' })).toThrow();
+    expect(kiro.catalog.entries.filter(e => e.controls?.length).map(e => e.id)).toEqual([
+      'claude-opus-5.5', 'claude-opus-5', 'claude-sonnet-5', 'claude-opus-4.8', 'gpt-5.6-sol',
+      'gpt-5.6-terra', 'gpt-5.6-luna', 'claude-opus-4.7', 'claude-opus-4.6', 'claude-sonnet-4.6',
+    ]);
+
+    const auto = spawn('auto');
+    expect(auto.slice(auto.indexOf('--model'), auto.indexOf('--model') + 2)).toEqual(['--model', 'auto']);
+    expect(auto).not.toContain('--effort');
+    expect(spawn('claude-haiku-4.5')).not.toContain('--effort');
+    const sol = spawn('gpt-5.6-sol');
+    expect(sol.slice(sol.indexOf('--model'), sol.indexOf('--model') + 4))
+      .toEqual(['--model', 'gpt-5.6-sol', '--effort', 'none']);
+  });
+
+  it('emits kiro.reasoning_effort for an unknown model id from data alone', () => {
+    const kiro = knowledge({ provider: 'kiro', backend: 'cli', selection_mode: 'full', models: [{
+      id: 'fixture-unlisted-model', label: 'fixture-unlisted-model',
+      execution: { model: 'fixture-unlisted-model' },
+      controls: [{ key: 'kiro.reasoning_effort', label: 'Effort', kind: 'enum', scope: 'both',
+        values: [{ value: 'fixture-effort', label: 'fixture-effort' }] }],
+    }] });
+    const selected = resolveProviderSelection(kiro, { entryId: 'fixture-unlisted-model', entryMode: 'explicit' });
+    const args = new KiroProvider({} as never).buildSpawnArgs({ cwd: '/tmp',
+      model: selected.execution.model, modelControls: selected.resolution.controls });
+    expect(args.slice(args.indexOf('--model'), args.indexOf('--model') + 4))
+      .toEqual(['--model', 'fixture-unlisted-model', '--effort', 'fixture-effort']);
   });
 
   it('validates controls against the selected entry and omits request-only session defaults', () => {

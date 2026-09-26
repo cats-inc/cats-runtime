@@ -2881,6 +2881,14 @@ backends:
     });
   });
 
+  // Complete Kiro 2.24.1 picker, in picker order; the picker shows raw IDs only.
+  const KIRO_PICKER_IDS = [
+    'auto', 'claude-opus-5.5', 'claude-opus-5', 'claude-sonnet-5', 'claude-opus-4.8',
+    'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'claude-opus-4.7', 'claude-opus-4.6',
+    'claude-sonnet-4.6', 'claude-opus-4.5', 'claude-sonnet-4.5', 'claude-sonnet-4',
+    'claude-haiku-4.5', 'deepseek-3.2', 'minimax-m2.5', 'minimax-m2.1', 'glm-5', 'qwen3-coder-next',
+  ];
+
   it('GET /kiro/models returns the local catalog without an upstream proxy', async () => {
     await withRuntime({ kiroRuntime: { mode: 'wsl' } }, {}, async (runtime) => {
       const response = await runtime.app.request('/kiro/models');
@@ -2889,9 +2897,35 @@ backends:
         instance: 'native',
         runtime: { mode: 'wsl' },
         source: 'static',
-        models: ['claude-opus-5', 'claude-sonnet-5', 'gpt-5.6-sol', 'gpt-5.6-terra',
-          'gpt-5.6-luna', 'claude-haiku-4.5'],
+        models: KIRO_PICKER_IDS,
       });
+    });
+  });
+
+  it('GET /providers/kiro/models/advanced returns per-model effort without defaults', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const response = await runtime.app.request('/providers/kiro/models/advanced');
+      expect(response.status).toBe(200);
+      const payload = await response.json();
+      expect(payload).toMatchObject({
+        provider: 'kiro', backend: 'cli', defaultModel: null, source: 'static',
+        entries: KIRO_PICKER_IDS.map(id => ({ id, label: id })),
+        // First-row initialization; auto carries no default flag and no effort.
+        defaultSelection: { entryMode: 'explicit', entryId: 'auto' },
+        support: { tier: 'full', advancedMetadataStatus: 'verified_manifest' },
+        warnings: [],
+      });
+      const values = (id: string) => (payload.entries.find((entry: { id: string }) => entry.id === id)
+        .controls ?? []).flatMap((control: { values: Array<{ value: string }> }) =>
+        control.values.map(value => value.value));
+      expect(values('auto')).toEqual([]);
+      expect(values('claude-haiku-4.5')).toEqual([]);
+      expect(values('claude-opus-5.5')).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
+      expect(values('gpt-5.6-luna')).toEqual(['none', 'low', 'medium', 'high', 'xhigh', 'max']);
+      expect(values('claude-sonnet-4.6')).toEqual(['low', 'medium', 'high', 'max']);
+      expect(payload.entries.some((entry: { default?: boolean }) => entry.default)).toBe(false);
+      expect(payload.defaultSelection.controls).toBeUndefined();
+      expect(JSON.stringify(payload.entries)).not.toMatch(/\(default\)|controlDefaults/);
     });
   });
 

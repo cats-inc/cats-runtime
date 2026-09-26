@@ -2261,65 +2261,474 @@ catalogs:
               - reasoning_intensity
   - provider: kiro
     backend: cli
-    selection_mode: shortlist
+    selection_mode: full
     source_cli: Kiro
-    cli_version: 2.22.0
-    last_updated: 2026-09-18
+    cli_version: 2.24.1
+    last_updated: 2026-09-27
     notes:
-      - "Source: operator-selected six-model shortlist for Kiro CLI 2.22.0, supplied 2026-09-18.
-        Complete Cats shortlist, not a claim about the full account-gated upstream catalog."
-      - IDs and display labels are the exact supplied strings, in order. No model default, context,
-        or effort metadata was supplied; none is inferred from CLI-wide help.
-      - Refresh preserves the six entries and custom model input remains available. Desktop and
-        Playground initialize the first row without marking it default.
-      - "Evidence: docs/research/2026-09-18-kiro-shortlist.md and
-        fixtures/kiro-2.22.0/operator.redacted.txt."
+      - "Complete 20-row /model picker and per-model effort rings, captured 2026-09-27 from
+        kiro-cli-chat 2.24.1 on native Windows 11 by operating the interactive picker. Picker
+        order and raw IDs equal kiro-cli chat --list-models. Evidence:
+        docs/research/fixtures/kiro-2.24.1/model-picker.agent-capture.redacted.txt and
+        docs/research/2026-09-27-kiro-picker-full-catalog.md."
+      - "The picker shows only raw IDs. id, label and execution.model are those verbatim
+        strings, passed to --model. auto is a Kiro routing option kept as row 1 in picker order."
+      - "No model default is declared. The picker marks auto [active], meaning only the current
+        selection. --list-models reports default_model auto (plain output: * = default); that is
+        recorded here as reference only and is not a catalog default."
+      - "Effort tokens and labels are the settings-panel values in linear Right-key order. Only
+        the ten rows whose panel shows effort carry kiro.reasoning_effort; rows showing effort
+        n/a have controls: []. The low/medium/high/xhigh/max list in kiro-cli chat --help is
+        global text, not per-model evidence."
+      - "No effort default is declared. Unset rows displayed default, an unset state outside the
+        ring; claude-opus-4.7 displayed xhigh and claude-opus-4.6/claude-sonnet-4.6 high, with no
+        default marker. Selections start at each row's first value (Claude low, GPT none) and
+        always send --effort, overriding chat.modelDefaults in ~/.kiro/settings/cli.json.
+        Accepted by the operator on 2026-09-27."
+      - "Claude rows with effort, except claude-opus-5.5 (thinking Always on), also show thinking
+        on/off; off makes effort n/a. kiro-cli has no thinking argument, so the adapter cannot
+        pass it and the axis is not represented."
+      - "Context limits are --list-models context_window_tokens. Descriptions and credit rates are
+        the picker text. Captured on Windows native only: WSL shares this scope, but a WSL
+        installation and account may see different models. Custom model strings remain available."
     models:
+      - id: auto
+        label: auto
+        limits:
+          contextWindowTokens: 1000000
+        notes:
+          - "Picker description: Models chosen by task for optimal usage and consistent quality"
+          - "Picker rate: 1.00x credits."
+          - "Kiro routing option. Picker row carries [active], which marks only the current selection."
+        source_names:
+          - auto
+        execution:
+          model: auto
+        controls: []
+      - id: claude-opus-5.5
+        label: claude-opus-5.5
+        limits:
+          contextWindowTokens: 1000000
+        notes:
+          - "Picker description: Experimental preview of Claude Opus 5.5 model with 1M context window"
+          - "Picker rate: 2.00x credits."
+          - "Picker thinking: n/a, Always on for this model."
+        source_names:
+          - claude-opus-5.5
+        execution:
+          model: claude-opus-5.5
+        controls:
+          - key: kiro.reasoning_effort
+            label: Effort
+            description: Sets deliberation level. Higher levels help with complex tasks, but impacts
+              time and credits.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: low
+              - value: medium
+                label: medium
+              - value: high
+                label: high
+              - value: xhigh
+                label: xhigh
+              - value: max
+                label: max
+            semanticTags:
+              - reasoning_intensity
       - id: claude-opus-5
         label: claude-opus-5
         capabilityTags:
           - reasoning
+        limits:
+          contextWindowTokens: 1000000
+        notes:
+          - "Picker description: Claude Opus 5 model with 1M context window"
+          - "Picker rate: 2.20x credits."
         source_names:
           - claude-opus-5
         execution:
           model: claude-opus-5
-        controls: []
+        controls:
+          - key: kiro.reasoning_effort
+            label: Effort
+            description: Sets deliberation level. Higher levels help with complex tasks, but impacts
+              time and credits.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: low
+              - value: medium
+                label: medium
+              - value: high
+                label: high
+              - value: xhigh
+                label: xhigh
+              - value: max
+                label: max
+            semanticTags:
+              - reasoning_intensity
       - id: claude-sonnet-5
         label: claude-sonnet-5
+        limits:
+          contextWindowTokens: 1000000
+        notes:
+          - "Picker description: Claude Sonnet 5 model with 1M context window"
+          - "Picker rate: 1.30x credits."
         source_names:
           - claude-sonnet-5
         execution:
           model: claude-sonnet-5
-        controls: []
+        controls:
+          - key: kiro.reasoning_effort
+            label: Effort
+            description: Sets deliberation level. Higher levels help with complex tasks, but impacts
+              time and credits.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: low
+              - value: medium
+                label: medium
+              - value: high
+                label: high
+              - value: xhigh
+                label: xhigh
+              - value: max
+                label: max
+            semanticTags:
+              - reasoning_intensity
+      - id: claude-opus-4.8
+        label: claude-opus-4.8
+        limits:
+          contextWindowTokens: 1000000
+        notes:
+          - "Picker description: Claude Opus 4.8 model with 1M context window"
+          - "Picker rate: 2.20x credits."
+        source_names:
+          - claude-opus-4.8
+        execution:
+          model: claude-opus-4.8
+        controls:
+          - key: kiro.reasoning_effort
+            label: Effort
+            description: Sets deliberation level. Higher levels help with complex tasks, but impacts
+              time and credits.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: low
+              - value: medium
+                label: medium
+              - value: high
+                label: high
+              - value: xhigh
+                label: xhigh
+              - value: max
+                label: max
+            semanticTags:
+              - reasoning_intensity
       - id: gpt-5.6-sol
         label: gpt-5.6-sol
+        limits:
+          contextWindowTokens: 1000000
+        notes:
+          - "Picker description: Experimental preview of OpenAI GPT 5.6 Sol with 1M context window"
+          - "Picker rate: 4.40x credits."
         source_names:
           - gpt-5.6-sol
         execution:
           model: gpt-5.6-sol
-        controls: []
+        controls:
+          - key: kiro.reasoning_effort
+            label: Effort
+            description: Sets deliberation level. Higher levels help with complex tasks, but impacts
+              time and credits.
+            kind: enum
+            scope: both
+            values:
+              - value: none
+                label: none
+              - value: low
+                label: low
+              - value: medium
+                label: medium
+              - value: high
+                label: high
+              - value: xhigh
+                label: xhigh
+              - value: max
+                label: max
+            semanticTags:
+              - reasoning_intensity
       - id: gpt-5.6-terra
         label: gpt-5.6-terra
+        limits:
+          contextWindowTokens: 1000000
+        notes:
+          - "Picker description: Experimental preview of OpenAI GPT 5.6 Terra with 1M context window"
+          - "Picker rate: 2.20x credits."
         source_names:
           - gpt-5.6-terra
         execution:
           model: gpt-5.6-terra
-        controls: []
+        controls:
+          - key: kiro.reasoning_effort
+            label: Effort
+            description: Sets deliberation level. Higher levels help with complex tasks, but impacts
+              time and credits.
+            kind: enum
+            scope: both
+            values:
+              - value: none
+                label: none
+              - value: low
+                label: low
+              - value: medium
+                label: medium
+              - value: high
+                label: high
+              - value: xhigh
+                label: xhigh
+              - value: max
+                label: max
+            semanticTags:
+              - reasoning_intensity
       - id: gpt-5.6-luna
         label: gpt-5.6-luna
+        limits:
+          contextWindowTokens: 1000000
+        notes:
+          - "Picker description: Experimental preview of OpenAI GPT 5.6 Luna with 1M context window"
+          - "Picker rate: 1.10x credits."
         source_names:
           - gpt-5.6-luna
         execution:
           model: gpt-5.6-luna
+        controls:
+          - key: kiro.reasoning_effort
+            label: Effort
+            description: Sets deliberation level. Higher levels help with complex tasks, but impacts
+              time and credits.
+            kind: enum
+            scope: both
+            values:
+              - value: none
+                label: none
+              - value: low
+                label: low
+              - value: medium
+                label: medium
+              - value: high
+                label: high
+              - value: xhigh
+                label: xhigh
+              - value: max
+                label: max
+            semanticTags:
+              - reasoning_intensity
+      - id: claude-opus-4.7
+        label: claude-opus-4.7
+        limits:
+          contextWindowTokens: 1000000
+        notes:
+          - "Picker description: Claude Opus 4.7 model with 1M context window"
+          - "Picker rate: 2.20x credits."
+        source_names:
+          - claude-opus-4.7
+        execution:
+          model: claude-opus-4.7
+        controls:
+          - key: kiro.reasoning_effort
+            label: Effort
+            description: Sets deliberation level. Higher levels help with complex tasks, but impacts
+              time and credits.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: low
+              - value: medium
+                label: medium
+              - value: high
+                label: high
+              - value: xhigh
+                label: xhigh
+              - value: max
+                label: max
+            semanticTags:
+              - reasoning_intensity
+      - id: claude-opus-4.6
+        label: claude-opus-4.6
+        limits:
+          contextWindowTokens: 1000000
+        notes:
+          - "Picker description: Claude Opus 4.6 model with 1M context window"
+          - "Picker rate: 2.20x credits."
+        source_names:
+          - claude-opus-4.6
+        execution:
+          model: claude-opus-4.6
+        controls:
+          - key: kiro.reasoning_effort
+            label: Effort
+            description: Sets deliberation level. Higher levels help with complex tasks, but impacts
+              time and credits.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: low
+              - value: medium
+                label: medium
+              - value: high
+                label: high
+              - value: max
+                label: max
+            semanticTags:
+              - reasoning_intensity
+      - id: claude-sonnet-4.6
+        label: claude-sonnet-4.6
+        limits:
+          contextWindowTokens: 1000000
+        notes:
+          - "Picker description: Claude Sonnet 4.6 model with 1M context window"
+          - "Picker rate: 1.30x credits."
+        source_names:
+          - claude-sonnet-4.6
+        execution:
+          model: claude-sonnet-4.6
+        controls:
+          - key: kiro.reasoning_effort
+            label: Effort
+            description: Sets deliberation level. Higher levels help with complex tasks, but impacts
+              time and credits.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: low
+              - value: medium
+                label: medium
+              - value: high
+                label: high
+              - value: max
+                label: max
+            semanticTags:
+              - reasoning_intensity
+      - id: claude-opus-4.5
+        label: claude-opus-4.5
+        limits:
+          contextWindowTokens: 200000
+        notes:
+          - "Picker description: Claude Opus 4.5 model"
+          - "Picker rate: 2.20x credits."
+        source_names:
+          - claude-opus-4.5
+        execution:
+          model: claude-opus-4.5
+        controls: []
+      - id: claude-sonnet-4.5
+        label: claude-sonnet-4.5
+        limits:
+          contextWindowTokens: 200000
+        notes:
+          - "Picker description: Claude Sonnet 4.5 model"
+          - "Picker rate: 1.30x credits."
+        source_names:
+          - claude-sonnet-4.5
+        execution:
+          model: claude-sonnet-4.5
+        controls: []
+      - id: claude-sonnet-4
+        label: claude-sonnet-4
+        limits:
+          contextWindowTokens: 200000
+        notes:
+          - "Picker description: Hybrid reasoning and coding for regular use"
+          - "Picker rate: 1.30x credits."
+        source_names:
+          - claude-sonnet-4
+        execution:
+          model: claude-sonnet-4
         controls: []
       - id: claude-haiku-4.5
         label: claude-haiku-4.5
         capabilityTags:
           - latency_optimized
+        limits:
+          contextWindowTokens: 200000
+        notes:
+          - "Picker description: The latest Claude Haiku model"
+          - "Picker rate: 0.40x credits."
         source_names:
           - claude-haiku-4.5
         execution:
           model: claude-haiku-4.5
+        controls: []
+      - id: deepseek-3.2
+        label: deepseek-3.2
+        limits:
+          contextWindowTokens: 164000
+        notes:
+          - "Picker description: Experimental preview of DeepSeek V3.2"
+          - "Picker rate: 0.25x credits."
+        source_names:
+          - deepseek-3.2
+        execution:
+          model: deepseek-3.2
+        controls: []
+      - id: minimax-m2.5
+        label: minimax-m2.5
+        limits:
+          contextWindowTokens: 196000
+        notes:
+          - "Picker description: MiniMax M2.5 model"
+          - "Picker rate: 0.25x credits."
+        source_names:
+          - minimax-m2.5
+        execution:
+          model: minimax-m2.5
+        controls: []
+      - id: minimax-m2.1
+        label: minimax-m2.1
+        limits:
+          contextWindowTokens: 196000
+        notes:
+          - "Picker description: Experimental preview of MiniMax M2.1"
+          - "Picker rate: 0.15x credits."
+        source_names:
+          - minimax-m2.1
+        execution:
+          model: minimax-m2.1
+        controls: []
+      - id: glm-5
+        label: glm-5
+        limits:
+          contextWindowTokens: 200000
+        notes:
+          - "Picker description: GLM-5 model"
+          - "Picker rate: 0.50x credits."
+        source_names:
+          - glm-5
+        execution:
+          model: glm-5
+        controls: []
+      - id: qwen3-coder-next
+        label: qwen3-coder-next
+        limits:
+          contextWindowTokens: 256000
+        notes:
+          - "Picker description: Experimental preview of Qwen3 Coder Next"
+          - "Picker rate: 0.05x credits."
+        source_names:
+          - qwen3-coder-next
+        execution:
+          model: qwen3-coder-next
         controls: []
   - provider: cline
     backend: cli

@@ -31,6 +31,39 @@ describe('KiroProvider', () => {
     ]);
   });
 
+  it('passes the selected effort after the model and omits it when absent', () => {
+    const provider = new KiroProvider({} as unknown as KiroNativeSessionService);
+
+    expect(provider.buildSpawnArgs({
+      cwd: '/tmp/repo',
+      model: 'gpt-5.6-sol',
+      modelControls: { 'kiro.reasoning_effort': 'none' },
+    })).toEqual([
+      'chat', '--no-interactive', '--wrap', 'never',
+      '--model', 'gpt-5.6-sol', '--effort', 'none',
+    ]);
+    expect(provider.buildSpawnArgs({ cwd: '/tmp/repo', model: 'auto', modelControls: {} })).toEqual([
+      'chat', '--no-interactive', '--wrap', 'never', '--model', 'auto',
+    ]);
+    // Another provider's control is never forwarded as a Kiro flag.
+    expect(provider.buildSpawnArgs({
+      cwd: '/tmp/repo', model: 'claude-haiku-4.5',
+      modelControls: { 'claude.reasoning_effort': 'high' },
+    })).not.toContain('--effort');
+  });
+
+  it('rejects a non-string or control-character effort instead of emitting it', () => {
+    const provider = new KiroProvider({} as unknown as KiroNativeSessionService);
+
+    for (const effort of [true, '', ' ', 'low\nhigh']) {
+      expect(() => provider.buildSpawnArgs({
+        cwd: '/tmp/repo',
+        model: 'claude-opus-5',
+        modelControls: { 'kiro.reasoning_effort': effort },
+      })).toThrow('Unsupported Kiro reasoning effort.');
+    }
+  });
+
   it('strips ANSI output and emits text lines', () => {
     const native = {
       canResumeSession: vi.fn(),

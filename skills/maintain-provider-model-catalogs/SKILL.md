@@ -17,10 +17,10 @@ provider-specific model options or expanding the operator's scope.
 The operator-approved policy is recorded in the 2026-09-17 amendment to
 `docs/specs/SPEC-028-provider-model-catalog-maintenance-skill.md` in cats-runtime:
 
-- **Full catalogs:** Codex, Claude, Antigravity (`agy`), Grok, Muse, and Junie. Maintain the complete
-  evidenced CLI model lists and applicable effort/options; offer all of them in Desktop and
+- **Full catalogs:** Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie, and Kiro. Maintain the
+  complete evidenced CLI model lists and applicable effort/options; offer all of them in Desktop and
   Playground, plus custom model-string input. The six-model limit does not apply to this group.
-- **Shortlists:** Cursor Agent, Goose, Devin, Kiro, GitHub Copilot, OpenCode, Kilo Code,
+- **Shortlists:** Cursor Agent, Goose, Devin, GitHub Copilot, OpenCode, Kilo Code,
   Auggie, Pi, and Cline. Maintain at most six explicitly selected model entries per CLI, plus
   custom input. Effort remains attached to its model; the custom-input action is not a model slot.
 - Approved shortlists are recorded in `docs/research/2026-09-17-cursor-fixed-presets.md`,
@@ -29,7 +29,6 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
   `docs/research/2026-09-18-kilo-shortlist.md`,
   `docs/research/2026-09-18-devin-shortlist.md`,
   `docs/research/2026-09-18-cline-shortlist.md`,
-  `docs/research/2026-09-18-kiro-shortlist.md`,
   `docs/research/2026-09-23-auggie-shortlist.md`,
   `docs/research/2026-09-23-goose-shortlist.md`, and
   `docs/research/2026-09-23-pi-shortlist.md`.
@@ -44,8 +43,8 @@ Cursor uses fixed parameterized model strings; Copilot resolves fixed effort sep
 model id; OpenCode uses provider-qualified model IDs without evidenced option controls; Kilo
 resolves approved fixed variants separately from the raw model ID; Devin uses executable variant
 UIDs containing the fixed effort on its agent/ACP target; ClinePass uses explicit CLI provider
-selection plus a separate fixed thinking argument; Kiro uses verbatim model IDs with no
-evidenced option controls; Junie uses literal picker names plus a separate per-model effort control;
+selection plus a separate fixed thinking argument; Kiro uses verbatim picker IDs plus a separate
+per-model effort control; Junie uses literal picker names plus a separate per-model effort control;
 Auggie uses CLI-observed IDs and exact labels without evidenced option controls;
 Goose uses provider-qualified IDs with fixed Thinking Off through its native model suffix;
 Pi retains bracketed provider labels and resolves fixed thinking through a separate CLI argument.
@@ -226,8 +225,8 @@ authorizes that external mutation.
 - [Junie](./references/providers/junie.md): literal picker names, per-model effort from the
   Right-key cycle, JAR-backed effort tokens and order, and operator-launched capture when Windows
   Defender blocks agent-launched startup.
-- [Kiro](./references/providers/kiro.md): raw-ID shortlist updates, Native/WSL scope projections,
-  first-row initialization and account-gated model/effort evidence.
+- [Kiro](./references/providers/kiro.md): raw picker IDs, the settings-panel effort ring,
+  toggles that persist without Enter, auto without a default claim and Windows-only evidence.
 - [Kilo](./references/providers/kilo.md): distinguish gateway mappings from the picker and
   execution variants from display-only thinking flags.
 - [Muse](./references/providers/muse.md): MSP model-id enumeration versus per-model picker efforts;

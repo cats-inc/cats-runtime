@@ -105,8 +105,10 @@ Junie 26.9.22 picker, per-model effort controls without effort defaults, the Mic
 launch incident and phase token cost. It supersedes the
 [Junie shortlist](./research/2026-09-23-junie-shortlist.md).
 
-[Kiro shortlist](./research/2026-09-18-kiro-shortlist.md) records the six raw model
-IDs, first-row initialization without default claims and custom input.
+[Kiro full catalog](./research/2026-09-27-kiro-picker-full-catalog.md) records the complete 20-row
+Kiro 2.24.1 picker, per-model effort on ten rows through the new `kiro.reasoning_effort` binding,
+auto without a default claim, the config-restoring capture and session cost. It supersedes the
+[Kiro shortlist](./research/2026-09-18-kiro-shortlist.md).
 
 [ClinePass shortlist](./research/2026-09-18-cline-shortlist.md) records six fixed Medium
 combinations, explicit provider routing, custom input and the fix for single-token
