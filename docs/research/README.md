@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-09-26-cli-model-setting-dimensions](./2026-09-26-cli-model-setting-dimensions.md) | Model-setting dimensions across the 16 CLI providers | Provider/model/thinking/effort/context/fast coverage, settings outside those six, one-, two- and config-only third-level routing prefixes, which CLIs parse settings from a custom model string, and catalog/adapter discrepancies |
 | [2026-09-25-grok-picker-agent-capture](./2026-09-25-grok-picker-agent-capture.md) | Grok 1.0.41 agent-operated picker capture | Four models, per-model effort labels, no catalog default, screenshot and context-token accounting |
 | [2026-09-25-antigravity-model-catalog-refresh](./2026-09-25-antigravity-model-catalog-refresh.md) | Antigravity 1.2.10 model catalog refresh | Seven families, 14 verified execution IDs, agy 1.2.10 enumeration, desktop UI isolation findings and token accounting |
 | [2026-09-25-claude-picker-agent-capture](./2026-09-25-claude-picker-agent-capture.md) | Claude 2.1.282 agent-operated picker capture | Opus 5.5 label, Opus Medium default effort, `opus[1m]` context alias, arrow-only capture helper and measured token cost |
