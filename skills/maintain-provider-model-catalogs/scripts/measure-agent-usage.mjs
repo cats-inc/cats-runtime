@@ -10,15 +10,20 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-export const HOSTS = ['claude', 'codex', 'junie', 'kiro'];
+export const HOSTS = ['auggie', 'claude', 'codex', 'junie', 'kiro'];
 const TOKEN_FIELDS = ['uncachedInput', 'cacheWrite', 'cacheRead', 'output', 'reasoningOutput'];
 const MARKER_SUPPORT = {
-  at: ['claude', 'codex', 'junie'],
-  text: ['claude', 'codex', 'kiro'],
-  turn: ['junie', 'kiro'],
+  at: ['auggie', 'claude', 'codex', 'junie'],
+  text: ['auggie', 'claude', 'codex', 'kiro'],
+  turn: ['auggie', 'junie', 'kiro'],
 };
 
 const HOST_NOTES = {
+  auggie: [
+    'Each chatHistory exchange is one model call; its token_usage response node gives the tokens.',
+    'A turn starts at an exchange with a non-empty request_message. The call in progress is saved only when it ends.',
+    'Sub-agent usage is only the session-level subAgentCreditsUsed and subAgentCostUsd.',
+  ],
   claude: [
     'Each API message is counted once by message.id, with its last recorded usage.',
     "Transcripts in the session's subagents folder are included.",
@@ -66,6 +71,46 @@ function collectText(value) {
 function toTime(value) {
   const time = typeof value === 'number' ? value : Date.parse(value);
   return Number.isFinite(time) ? time : null;
+}
+
+function readAuggie(path) {
+  const session = JSON.parse(readFileSync(path, 'utf8'));
+  if (!Array.isArray(session.chatHistory)) {
+    throw new Error(`${basename(path)} has no chatHistory array; pass ~/.augment/sessions/<session-id>.json.`);
+  }
+  const records = [];
+  let turn = 0;
+  for (const item of session.chatHistory) {
+    const exchange = item?.exchange ?? {};
+    if (typeof exchange.request_message === 'string' && exchange.request_message.trim()) {
+      turn += 1;
+    }
+    const nodes = exchange.response_nodes ?? [];
+    const usages = nodes.filter((node) => node?.token_usage);
+    if (usages.length === 0) {
+      continue;
+    }
+    // Keep the last usage node if an exchange ever records more than one.
+    const node = usages.at(-1);
+    const usage = node.token_usage;
+    records.push({
+      time: toTime(node.timestamp_ms ?? item.finishedAt),
+      turn: Math.max(turn, 1),
+      model: exchange.model_id ?? null,
+      tokens: {
+        uncachedInput: usage.input_tokens ?? 0,
+        cacheWrite: usage.cache_creation_input_tokens ?? 0,
+        cacheRead: usage.cache_read_input_tokens ?? 0,
+        output: usage.output_tokens ?? 0,
+      },
+      text: nodes.map((entry) => collectText(entry?.content) + collectText(entry?.tool_use)).join(''),
+    });
+  }
+  const subAgents = {
+    credits: typeof session.subAgentCreditsUsed === 'number' ? session.subAgentCreditsUsed : null,
+    costUsd: typeof session.subAgentCostUsd === 'number' ? session.subAgentCostUsd : null,
+  };
+  return { sources: [basename(path)], records, extra: { subAgents } };
 }
 
 function readClaude(path, counters) {
@@ -255,7 +300,7 @@ function readKiro(path, counters) {
   return { sources: [`${basename(base)}.json`, `${basename(base)}.jsonl`], records, turns };
 }
 
-const READERS = { claude: readClaude, codex: readCodex, junie: readJunie, kiro: readKiro };
+const READERS = { auggie: readAuggie, claude: readClaude, codex: readCodex, junie: readJunie, kiro: readKiro };
 
 function round(value) {
   return Math.round(value * 10000) / 10000;
@@ -375,12 +420,13 @@ export function measureAgentUsage({ host, path, phaseStarts = [], phaseNames = [
     }
   }
   const counters = { skippedLines: 0 };
-  const { sources, records, turns } = READERS[host](resolve(path), counters);
+  const { sources, records, turns, extra } = READERS[host](resolve(path), counters);
   const result = {
     host,
     sources,
     totals: summarize(records),
     byModel: byModel(records),
+    ...extra,
   };
   if (markers.length > 0 || phaseNames.length > 0) {
     result.phases = splitPhases(records, markers, phaseNames);
@@ -418,15 +464,16 @@ function cliUsage() {
     '  measure-agent-usage.mjs <host> [session-file] [--phase-start <marker>]... [--phase-name <name>]...',
     '',
     'Hosts and session files:',
+    '  auggie  ~/.augment/sessions/<session-id>.json',
     '  claude  ~/.claude/projects/<project>/<session-id>.jsonl (its subagents folder is included)',
     '  codex   ~/.codex/sessions/<yyyy>/<mm>/<dd>/rollout-*.jsonl',
     '  junie   ~/.junie/sessions/<session>/events.jsonl, or the session folder',
     '  kiro    ~/.kiro/sessions/cli/<session-id>.json; defaults to KIRO_SESSION_ID',
     '',
     'Phase starts, in order; the call that matches starts the next phase:',
-    '  at:<ISO time with zone>  claude, codex, junie',
-    "  text:<literal>           claude, codex, kiro (the agent's own messages and tool calls only)",
-    '  turn:<n>                 junie, kiro',
+    '  at:<ISO time with zone>  auggie, claude, codex, junie',
+    "  text:<literal>           auggie, claude, codex, kiro (the agent's own messages and tool calls only)",
+    '  turn:<n>                 auggie, junie, kiro',
   ].join('\n');
 }
 

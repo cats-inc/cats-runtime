@@ -14,6 +14,7 @@ import { PiProvider } from '../src/backends/cli/providers/pi.js';
 import { GooseProvider } from '../src/backends/cli/providers/goose.js';
 import { JunieProvider } from '../src/backends/cli/providers/junie.js';
 import { KiroProvider } from '../src/backends/cli/providers/kiro.js';
+import { AuggieProvider } from '../src/backends/cli/providers/auggie.js';
 import { createRuntimeTestEnv, createRuntimeTestPaths, ensureRuntimeTestDirs } from './support/runtimeTestPaths.js';
 import { cleanupTempDirWithRetries } from './tempCleanup.js';
 
@@ -121,6 +122,27 @@ describe('factory and executable catalog projections', () => {
     const sol = spawn('gpt-5.6-sol');
     expect(sol.slice(sol.indexOf('--model'), sol.indexOf('--model') + 4))
       .toEqual(['--model', 'gpt-5.6-sol', '--effort', 'none']);
+  });
+
+  it('lists the full Auggie picker with Opus 4.8 as default and sends only --model', () => {
+    const auggie = knowledge(snapshot.document.catalogs.find(s => s.provider === 'auggie' && s.backend === 'cli')!);
+    expect(auggie.catalog.entries).toHaveLength(34);
+    expect(auggie.catalog.entries.slice(0, 3).map(e => e.id)).toEqual(['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna']);
+    expect(auggie.catalog.entries.filter(e => e.default).map(e => e.id)).toEqual(['claude-opus-4-8']);
+    expect(auggie.catalog.defaultSelection).toEqual(expect.objectContaining({ entryId: 'claude-opus-4-8', entryMode: 'explicit' }));
+    // Effort is recorded in notes only; no auggie.reasoning_effort binding exists.
+    expect(auggie.catalog.entries.every(e => !e.controls?.length && !e.controlDefaults)).toBe(true);
+    expect(auggie.catalog.entries.find(e => e.id === 'butler_b')?.label).toBe('Prism (GPT)');
+    const spawn = (entryId: string) => {
+      const selected = resolveProviderSelection(auggie, { entryId, entryMode: 'explicit' });
+      return new AuggieProvider({} as never, 10).buildSpawnArgs({ cwd: '/tmp',
+        model: selected.execution.model, modelControls: selected.resolution.controls });
+    };
+    for (const id of ['butler_b', 'claude-opus-4-8', 'gemini-3-1-pro-preview', 'kimi-k2p7']) {
+      const args = spawn(id);
+      expect(args.slice(args.indexOf('--model'), args.indexOf('--model') + 2)).toEqual(['--model', id]);
+      expect(args).not.toContain('--reasoning-effort');
+    }
   });
 
   it('emits kiro.reasoning_effort for an unknown model id from data alone', () => {

@@ -17,11 +17,11 @@ provider-specific model options or expanding the operator's scope.
 The operator-approved policy is recorded in the 2026-09-17 amendment to
 `docs/specs/SPEC-028-provider-model-catalog-maintenance-skill.md` in cats-runtime:
 
-- **Full catalogs:** Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie, and Kiro. Maintain the
+- **Full catalogs:** Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie, Kiro, and Auggie. Maintain the
   complete evidenced CLI model lists and applicable effort/options; offer all of them in Desktop and
   Playground, plus custom model-string input. The six-model limit does not apply to this group.
 - **Shortlists:** Cursor Agent, Goose, Devin, GitHub Copilot, OpenCode, Kilo Code,
-  Auggie, Pi, and Cline. Maintain at most six explicitly selected model entries per CLI, plus
+  Pi, and Cline. Maintain at most six explicitly selected model entries per CLI, plus
   custom input. Effort remains attached to its model; the custom-input action is not a model slot.
 - Approved shortlists are recorded in `docs/research/2026-09-17-cursor-fixed-presets.md`,
   `docs/research/2026-09-17-copilot-fixed-presets.md`,
@@ -29,7 +29,6 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
   `docs/research/2026-09-18-kilo-shortlist.md`,
   `docs/research/2026-09-18-devin-shortlist.md`,
   `docs/research/2026-09-18-cline-shortlist.md`,
-  `docs/research/2026-09-23-auggie-shortlist.md`,
   `docs/research/2026-09-23-goose-shortlist.md`, and
   `docs/research/2026-09-23-pi-shortlist.md`.
   Shortlist membership and order remain operator decisions. Do not truncate current
@@ -45,7 +44,8 @@ resolves approved fixed variants separately from the raw model ID; Devin uses ex
 UIDs containing the fixed effort on its agent/ACP target; ClinePass uses explicit CLI provider
 selection plus a separate fixed thinking argument; Kiro uses verbatim picker IDs plus a separate
 per-model effort control; Junie uses literal picker names plus a separate per-model effort control;
-Auggie uses CLI-observed IDs and exact labels without evidenced option controls;
+Auggie uses CLI-observed IDs and exact picker labels; its picker shows no effort, so it has no
+option controls;
 Goose uses provider-qualified IDs with fixed Thinking Off through its native model suffix;
 Pi retains bracketed provider labels and resolves fixed thinking through a separate CLI argument.
 No scheduled refresh cadence or automated refresh job has been specified.
@@ -185,7 +185,7 @@ outside Git, like raw evidence.
    at review. In review, audit and capture/preview modes, which make no repository change, list
    and recommend only. If that change has already merged, open a follow-up only when the
    operator's authorization covers it.
-3. **Make a kept script reusable.** The Codex, Claude and Kiro capture helpers in
+3. **Make a kept script reusable.** The Codex, Claude, Kiro and Auggie capture helpers in
    [interactive capture](./references/interactive-capture.md) are the pattern:
    - place it under `scripts/`, with parameters in place of this run's window titles, paths,
      session IDs and resume flags;
@@ -231,8 +231,9 @@ authorizes that external mutation.
 
 - [Antigravity (agy)](./references/providers/antigravity.md): separate picker families/effort from
   executable model ids, first-item initialization without default claims, and structured selection.
-- [Auggie](./references/providers/auggie.md): bounded JSON ID/display-name enumeration, opaque IDs
-  and entry-only shortlist wiring without inferred effort/default metadata.
+- [Auggie](./references/providers/auggie.md): the `/model` picker as the full list, JSON IDs
+  matched by display name, opaque IDs, the picker's `(default)` marker, no effort in the picker,
+  the authorized Enter probe, and Windows-only evidence.
 - [Claude](./references/providers/claude.md): supplied picker fast path, arrow-only agent capture,
   alias/label projection, per-model effort and existing Runtime/Desktop support; compiled
   extraction is a possible superset.

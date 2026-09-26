@@ -12,7 +12,7 @@ import { buildProviderAdvancedKnowledge } from '../../core/models/providerAdvanc
 import { createCatalogSnapshot } from '../../catalogs/resolver.js';
 import { getStaticProviderModels } from '../../core/models/providerModelCatalog.js';
 
-describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'auggie', 'goose', 'pi'])('%s shortlists in Playground', (provider) => {
+describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'goose', 'pi'])('%s shortlists in Playground', (provider) => {
   it('uses the approved fallbacks and preserves custom strings on reload', () => {
     const html = readFileSync(fileURLToPath(new URL('./pages/playground.html', import.meta.url)), 'utf8');
     expect(html).toContain('const PROVIDER_MODELS = {}');
@@ -292,6 +292,39 @@ describe('shared playground selection helpers', () => {
         controls: { 'kiro.reasoning_effort': 'xhigh' } },
       selectableProviders: ['kiro'], providerOrder: ['kiro'], advancedCatalogs: { kiro: catalog },
     }).modelSelection.controls).toEqual({ 'kiro.reasoning_effort': 'xhigh' });
+  });
+
+  it('initializes Auggie at the picker default Opus 4.8 with no effort menu and keeps custom input', () => {
+    const catsUI = createCatsUI();
+    const target = { providerName: 'auggie', backend: 'cli' as const,
+      instanceId: 'native', defaultTarget: true };
+    const models = getStaticProviderModels(target);
+    const { catalog } = buildProviderAdvancedKnowledge(target, {
+      provider: 'auggie', backend: 'cli', instance: 'native', defaultModel: 'claude-opus-4-8',
+      source: 'static', cache: null, models, warnings: [],
+    }, { snapshot: createCatalogSnapshot(readFileSync(new URL('../../../config/curated-model-catalogs.yaml.example', import.meta.url), 'utf8')) });
+    const html = readFileSync(new URL('./pages/playground.html', import.meta.url), 'utf8');
+    const start = html.indexOf('function renderAgentModelControls(');
+    const end = html.indexOf('function applyAgentModelControlValues(', start);
+    const controls = { innerHTML: '' };
+    const context = { window: { CatsUI: catsUI }, escapeHtml: String,
+      div: { querySelector: () => controls }, catalog, entryId: '' };
+    vm.createContext(context);
+    vm.runInContext(html.slice(start, end), context);
+    expect(models).toHaveLength(34);
+    expect(models.filter(model => model.default).map(model => model.id)).toEqual(['claude-opus-4-8']);
+    expect(catsUI.getAdvancedCatalogDefaultEntryId(catalog)).toBe('claude-opus-4-8');
+    const input = { provider: 'auggie', selectableProviders: ['auggie'], providerOrder: ['auggie'],
+      advancedCatalogs: { auggie: catalog } };
+    expect(catsUI.normalizePlaygroundAgentSelection(input).modelSelection.entryId).toBe('claude-opus-4-8');
+    for (const entry of catalog.entries) {
+      context.entryId = entry.id;
+      vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
+      expect(controls.innerHTML).not.toMatch(/<option/);
+    }
+    const custom = 'fixture-unlisted-auggie-model';
+    expect(catsUI.normalizePlaygroundAgentSelection({ ...input, model: custom }))
+      .toEqual({ provider: 'auggie', model: custom, modelSelection: null });
   });
 
   it('renders the Antigravity first effort without default labels and preserves saved effort', () => {
