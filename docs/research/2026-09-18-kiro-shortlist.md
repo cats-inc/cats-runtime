@@ -1,5 +1,8 @@
 # Kiro CLI 2.22.0 shortlist
 
+> Superseded on 2026-09-27 by the [full-catalog picker capture](./2026-09-27-kiro-picker-full-catalog.md).
+> Kiro is now a full-catalog provider with per-model effort controls.
+
 ## Scope and evidence
 
 Refresh, Kiro only, confirm-uncertainty. The operator supplied version 2.22.0 and

@@ -32,6 +32,9 @@ personal overrides or publication beyond the existing request.
    Capture each model's option branches, order, labels, descriptions and explicit defaults. Wait
    for the expected new heading/highlight after each key; never replay a key because rendering
    took longer than a fixed sleep. Stop on a changed window/pane, prompt or ambiguous selection.
+   Some pickers persist an option toggle without Enter (Kiro 2.24.1 rewrites its settings file on
+   every ←→). Before cycling options, hash and privately back up the file the picker writes, and
+   restore it only after the owned CLI exits and no concurrent writer changed it.
 5. Reconcile model coverage with a supported CLI enumeration when available. Check that each
    menu is fully visible through its footer; a model count alone cannot prove effort completeness.
    Resolve only material gaps. Use machine tokens for identity and picker text for its display.
@@ -123,6 +126,8 @@ details. The owning repo's `docs/research/2026-09-24-codex-picker-pilot.md` reco
 catalog delta, validation and limitations. The [Claude reference](providers/claude.md) and
 `docs/research/2026-09-25-claude-picker-agent-capture.md` do the same for Claude Code;
 `docs/research/2026-09-26-claude-picker-eleven-rows.md` adds the scrolled list and row values.
+The [Kiro reference](providers/kiro.md) and `docs/research/2026-09-27-kiro-picker-full-catalog.md`
+record a settings panel whose toggles persist, and its config restore.
 
 When the operator asks for cost, report the number and pixel size of saved images separately from
 the images actually sent to the agent. If the agent host keeps a per-message usage transcript, sum

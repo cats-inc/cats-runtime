@@ -22,6 +22,7 @@ export const CATALOG_BINDINGS: Readonly<Record<string, Binding>> = Object.freeze
   'kilo.variant': { provider: 'kilo', backend: 'cli', type: 'string' },
   'cline.reasoning_effort': { provider: 'cline', backend: 'cli', type: 'string' },
   'junie.reasoning_effort': { provider: 'junie', backend: 'cli', type: 'string' },
+  'kiro.reasoning_effort': { provider: 'kiro', backend: 'cli', type: 'string' },
   'goose.thinking_effort': { provider: 'goose', backend: 'cli', type: 'string' },
   'pi.thinking': { provider: 'pi', backend: 'cli', type: 'string' },
   'openai.reasoning_effort': { backend: 'api', transport: 'openai', type: 'string' },

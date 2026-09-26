@@ -48,8 +48,8 @@ The repository owner approved two maintenance groups for Cats Desktop and Runtim
 
 | Group | CLI providers | Maintained and selectable catalog |
 |---|---|---|
-| Full catalog | Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie CLI | Complete evidenced CLI model lists and all applicable effort/options, plus custom model-string input |
-| Shortlist | Cursor Agent CLI, Goose CLI, Devin CLI, Kiro CLI, GitHub Copilot CLI, OpenCode, Kilo Code CLI, Auggie CLI, Pi, Cline | At most six explicitly selected models per CLI, plus a custom-input action |
+| Full catalog | Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie CLI, Kiro CLI | Complete evidenced CLI model lists and all applicable effort/options, plus custom model-string input |
+| Shortlist | Cursor Agent CLI, Goose CLI, Devin CLI, GitHub Copilot CLI, OpenCode, Kilo Code CLI, Auggie CLI, Pi, Cline | At most six explicitly selected models per CLI, plus a custom-input action |
 
 **2026-09-26 amendment:** the owner moved Junie CLI from the shortlist group to the
 full-catalog group. It now carries the complete JetBrains AI picker list and each model's
@@ -57,6 +57,14 @@ selectable effort, as recorded in
 [the Junie picker capture](../research/2026-09-26-junie-picker-full-catalog.md). BYOK
 channels selected with `--provider` stay out of scope. Membership of the other groups is
 unchanged.
+
+**2026-09-27 amendment:** the owner moved Kiro CLI from the shortlist group to the
+full-catalog group. It now carries the complete `/model` picker list, including the `auto`
+routing row without a default claim, and each model's selectable effort through the
+`kiro.reasoning_effort` binding, as recorded in
+[the Kiro picker capture](../research/2026-09-27-kiro-picker-full-catalog.md). The evidence
+covers Windows native only; the shared scope does not establish equal WSL entitlement.
+Membership of the other groups is unchanged.
 
 The full-catalog group has no six-model cap. The shortlist may contain fewer than six models;
 effort choices remain attached to their model and custom input does not consume a model slot.

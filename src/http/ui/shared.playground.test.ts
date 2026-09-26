@@ -12,7 +12,7 @@ import { buildProviderAdvancedKnowledge } from '../../core/models/providerAdvanc
 import { createCatalogSnapshot } from '../../catalogs/resolver.js';
 import { getStaticProviderModels } from '../../core/models/providerModelCatalog.js';
 
-describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'kiro', 'auggie', 'goose', 'pi'])('%s shortlists in Playground', (provider) => {
+describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'auggie', 'goose', 'pi'])('%s shortlists in Playground', (provider) => {
   it('uses the approved fallbacks and preserves custom strings on reload', () => {
     const html = readFileSync(fileURLToPath(new URL('./pages/playground.html', import.meta.url)), 'utf8');
     expect(html).toContain('const PROVIDER_MODELS = {}');
@@ -248,6 +248,50 @@ describe('shared playground selection helpers', () => {
     } finally {
       cleanupTempDirWithRetries(root);
     }
+  });
+
+  it('renders Kiro per-model effort in picker order, starting at the first value, and none for auto', () => {
+    const catsUI = createCatsUI();
+    const target = { providerName: 'kiro', backend: 'cli' as const,
+      instanceId: 'native', defaultTarget: true };
+    const models = getStaticProviderModels(target);
+    const { catalog } = buildProviderAdvancedKnowledge(target, {
+      provider: 'kiro', backend: 'cli', instance: 'native', defaultModel: null,
+      source: 'static', cache: null, models, warnings: [],
+    }, { snapshot: createCatalogSnapshot(readFileSync(new URL('../../../config/curated-model-catalogs.yaml.example', import.meta.url), 'utf8')) });
+    const html = readFileSync(new URL('./pages/playground.html', import.meta.url), 'utf8');
+    const start = html.indexOf('function renderAgentModelControls(');
+    const end = html.indexOf('function applyAgentModelControlValues(', start);
+    const controls = { innerHTML: '' };
+    const context = { window: { CatsUI: catsUI }, escapeHtml: String,
+      div: { querySelector: () => controls }, catalog, entryId: '' };
+    vm.createContext(context);
+    vm.runInContext(html.slice(start, end), context);
+    expect(models).toHaveLength(20);
+    expect(models.some(model => model.default)).toBe(false);
+    // No default is declared, so the UI initializes the first picker row (auto).
+    expect(catsUI.normalizePlaygroundAgentSelection({ provider: 'kiro', selectableProviders: ['kiro'],
+      providerOrder: ['kiro'], advancedCatalogs: { kiro: catalog } }).modelSelection.entryId).toBe('auto');
+    const firstValues: Record<string, string | null> = {};
+    for (const entry of catalog.entries) {
+      context.entryId = entry.id;
+      vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
+      expect(controls.innerHTML).not.toMatch(/default/i);
+      const options = [...controls.innerHTML.matchAll(/<option value="([^"]+)"[^>]*>([^<]+)<\/option>/g)]
+        .map((match) => [match[1], match[2]]);
+      if (options.length) {
+        const [value, label] = options[0];
+        expect(controls.innerHTML).toContain(`<option value="${value}" selected>${label}</option>`);
+      }
+      firstValues[entry.id] = options[0]?.[0] ?? null;
+    }
+    expect(firstValues).toMatchObject({ auto: null, 'claude-opus-5.5': 'low', 'gpt-5.6-sol': 'none',
+      'claude-sonnet-4.6': 'low', 'claude-haiku-4.5': null, 'qwen3-coder-next': null });
+    expect(catsUI.normalizePlaygroundAgentSelection({
+      provider: 'kiro', modelSelection: { entryId: 'claude-opus-5.5', entryMode: 'explicit',
+        controls: { 'kiro.reasoning_effort': 'xhigh' } },
+      selectableProviders: ['kiro'], providerOrder: ['kiro'], advancedCatalogs: { kiro: catalog },
+    }).modelSelection.controls).toEqual({ 'kiro.reasoning_effort': 'xhigh' });
   });
 
   it('renders the Antigravity first effort without default labels and preserves saved effort', () => {

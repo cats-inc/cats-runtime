@@ -67,6 +67,15 @@ export class KiroProvider implements Provider {
       args.push('--model', opts.model);
     }
 
+    // Per-model values and availability come from catalog data; only the flag is code.
+    const effort = opts.modelControls?.['kiro.reasoning_effort'];
+    if (effort !== undefined) {
+      if (typeof effort !== 'string' || !effort.trim() || /[\u0000-\u001f]/.test(effort)) {
+        throw new Error('Unsupported Kiro reasoning effort.');
+      }
+      args.push('--effort', effort);
+    }
+
     if (opts.permissionMode === 'skip') {
       args.push('--trust-all-tools');
     } else if (opts.permissionMode === 'whitelist') {

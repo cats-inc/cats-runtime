@@ -1,0 +1,138 @@
+Kiro CLI /model picker, agent-operated capture (redacted)
+=========================================================
+
+Captured: 2026-09-27 02:15-02:34 (UTC+8)
+Version: kiro-cli-chat 2.24.1 (`kiro-cli --version`), native Windows 11, Windows Terminal
+Launch: `kiro-cli chat` in a dedicated window, after clearing inherited agent/terminal
+  environment variables (names only recorded in the private log). No task or prompt submitted.
+Method: Windows UI Automation visible text (desktop-ui-automation WindowsUi.ps1); the opened
+  picker screen was checked against a window screenshot.
+Keys: `/model` + Enter (slash command) and `/quit` + Enter (exit). In the picker: Up, Down,
+  Tab, Left, Right and one Escape. Enter was never sent in the picker.
+Account: no email, organization or account identifier appeared on any captured screen.
+  The workspace path appears as `~\...\cwd` (no user name).
+Redaction: terminal padding and banner art trimmed; no other content removed.
+
+--- `kiro-cli chat --list-models` (plain) -------------------------------------------------
+
+Available models (* = default):
+
+* auto                 1.00x credits      Models chosen by task for optimal usage and consistent quality
+  claude-opus-5.5      2.00x credits      Experimental preview of Claude Opus 5.5 model with 1M context window
+  claude-opus-5        2.20x credits      Claude Opus 5 model with 1M context window
+  claude-sonnet-5      1.30x credits      Claude Sonnet 5 model with 1M context window
+  claude-opus-4.8      2.20x credits      Claude Opus 4.8 model with 1M context window
+  gpt-5.6-sol          4.40x credits      Experimental preview of OpenAI GPT 5.6 Sol with 1M context window
+  gpt-5.6-terra        2.20x credits      Experimental preview of OpenAI GPT 5.6 Terra with 1M context window
+  gpt-5.6-luna         1.10x credits      Experimental preview of OpenAI GPT 5.6 Luna with 1M context window
+  claude-opus-4.7      2.20x credits      Claude Opus 4.7 model with 1M context window
+  claude-opus-4.6      2.20x credits      Claude Opus 4.6 model with 1M context window
+  claude-sonnet-4.6    1.30x credits      Claude Sonnet 4.6 model with 1M context window
+  claude-opus-4.5      2.20x credits      Claude Opus 4.5 model
+  claude-sonnet-4.5    1.30x credits      Claude Sonnet 4.5 model
+  claude-sonnet-4      1.30x credits      Hybrid reasoning and coding for regular use
+  claude-haiku-4.5     0.40x credits      The latest Claude Haiku model
+  deepseek-3.2         0.25x credits      Experimental preview of DeepSeek V3.2
+  minimax-m2.5         0.25x credits      MiniMax M2.5 model
+  minimax-m2.1         0.15x credits      Experimental preview of MiniMax M2.1
+  glm-5                0.50x credits      GLM-5 model
+  qwen3-coder-next     0.05x credits      Experimental preview of Qwen3 Coder Next
+
+`--format json-pretty` adds `"default_model": "auto"` and per-model context_window_tokens:
+1000000 for auto through claude-sonnet-4.6; 200000 for claude-opus-4.5, claude-sonnet-4.5,
+claude-sonnet-4, claude-haiku-4.5 and glm-5; 164000 deepseek-3.2; 196000 minimax-m2.5 and
+minimax-m2.1; 256000 qwen3-coder-next. rate_unit is Credit for every row.
+
+--- /model picker, first screen ----------------------------------------------------------
+
+kiro_default · auto · ◔ 4%                                           ~\...\cwd
+
+› /model
+Select model:   type to search
+
+❯ auto                 1.00x credits    Models chosen by task for optimal usage and consistent quality [active]
+  claude-opus-5.5      2.00x credits    Experimental preview of Claude Opus 5.5 model with 1M context window
+  claude-opus-5        2.20x credits    Claude Opus 5 model with 1M context window
+  claude-sonnet-5      1.30x credits    Claude Sonnet 5 model with 1M context window
+  claude-opus-4.8      2.20x credits    Claude Opus 4.8 model with 1M context window
+  gpt-5.6-sol          4.40x credits    Experimental preview of OpenAI GPT 5.6 Sol with 1M context window
+  gpt-5.6-terra        2.20x credits    Experimental preview of OpenAI GPT 5.6 Terra with 1M context window
+  gpt-5.6-luna         1.10x credits    Experimental preview of OpenAI GPT 5.6 Luna with 1M context window
+(+12 more)
+────────────────────────────────────────────────────────────────────────────────
+ Settings for selected model: auto                                 tab to switch panels
+
+  thinking  n/a  Not available for this model.
+  effort    n/a  Not available for this model.
+────────────────────────────────────────────────────────────────────────────────
+ esc to close · ↑↓ to navigate · ↵ to select · tab to switch panels
+
+Scrolling: the window shows 8 rows. `(+N more)` counted down to none at row 16; the last
+screen shows claude-sonnet-4.5 … qwen3-coder-next with no further indicator. Down 0→19 and
+Up 19→0 visited the same 20 rows in the same order. Only auto carries `[active]`.
+
+--- Model rows, settings panel as first shown (header: "Settings for model: <id>") -------
+
+#  id                 thinking                          effort (as shown on arrival)
+00 auto               n/a  Not available for this model.  n/a  Not available for this model.
+01 claude-opus-5.5    n/a  Always on for this model.      xhigh  Sets deliberation level. Higher levels help with complex tasks, but impacts time and credits.
+02 claude-opus-5      default  Shows reasoning before answering. Can improve quality, but impacts time and credits.
+                                                          default  Sets deliberation level. …
+03 claude-sonnet-5    default  Shows reasoning …           default  Sets deliberation level. …
+04 claude-opus-4.8    default  Shows reasoning …           default  Sets deliberation level. …
+05 gpt-5.6-sol        n/a  Not available for this model.  default  Sets deliberation level. …
+06 gpt-5.6-terra      n/a  Not available for this model.  default  Sets deliberation level. …
+07 gpt-5.6-luna       n/a  Not available for this model.  default  Sets deliberation level. …
+08 claude-opus-4.7    default  Shows reasoning …           xhigh  Sets deliberation level. …
+09 claude-opus-4.6    default  Shows reasoning …           high  Sets deliberation level. …
+10 claude-sonnet-4.6  default  Shows reasoning …           high  Sets deliberation level. …
+11 claude-opus-4.5    n/a  Not available for this model.  n/a  Not available for this model.
+12 claude-sonnet-4.5  n/a  Not available for this model.  n/a  Not available for this model.
+13 claude-sonnet-4    n/a  Not available for this model.  n/a  Not available for this model.
+14 claude-haiku-4.5   n/a  Not available for this model.  n/a  Not available for this model.
+15 deepseek-3.2       n/a  Not available for this model.  n/a  Not available for this model.
+16 minimax-m2.5       n/a  Not available for this model.  n/a  Not available for this model.
+17 minimax-m2.1       n/a  Not available for this model.  n/a  Not available for this model.
+18 glm-5              n/a  Not available for this model.  n/a  Not available for this model.
+19 qwen3-coder-next   n/a  Not available for this model.  n/a  Not available for this model.
+
+No value on any row carries a default marker. Row 01's saved effort (xhigh) came from the
+pre-existing ~/.kiro/settings/cli.json; rows 08-10 had no saved entry.
+
+--- Settings panel (Tab from the list) ---------------------------------------------------
+
+Footer: esc to close · ↑↓ to navigate · ←→ to toggle · ↵ back to models · tab to switch panels
+
+Effort, Right-key sequence from the arrival value (wraps back to the start):
+claude-opus-5.5    xhigh > max > low > medium > high > xhigh
+claude-opus-5      default > low > medium > high > xhigh > max > low
+claude-sonnet-5    default > low > medium > high > xhigh > max > low
+claude-opus-4.8    default > low > medium > high > xhigh > max > low
+gpt-5.6-sol        default > none > low > medium > high > xhigh > max > none
+gpt-5.6-terra      default > none > low > medium > high > xhigh > max > none
+gpt-5.6-luna       default > none > low > medium > high > xhigh > max > none
+claude-opus-4.7    xhigh > max > low > medium > high > xhigh
+claude-opus-4.6    high > max > low > medium > high
+claude-sonnet-4.6  high > max > low > medium > high
+
+`default` is left on the first Right and never reappears; Left from low went to max, not
+to default. Linear order is therefore low…max (Claude) and none…max (GPT); claude-opus-4.6
+and claude-sonnet-4.6 offer no xhigh.
+
+Thinking, Right-key sequence (Claude rows with a thinking value):
+claude-opus-5, claude-sonnet-5, claude-opus-4.8, claude-opus-4.6, claude-sonnet-4.6:
+  on > off > on
+claude-opus-4.7: on > off > on (effort changed xhigh → high on returning to on)
+With thinking off the effort row reads: effort n/a  Not available while thinking is off.
+On rows 02-04 the thinking cell changed from default to on once effort reached xhigh.
+
+--- Side effect: settings written without Enter -----------------------------------------
+
+Every Left/Right in the settings panel immediately rewrote ~/.kiro/settings/cli.json under
+chat.modelDefaults.<model-id>:
+  Claude rows: output_config.effort = <value>, plus thinking.type = "adaptive" once thinking is on
+  GPT rows:    reasoning.effort = <value>
+Pre-launch SHA-256 4C87129F3C18E5AC62AC407262DA88E09ACB722E5E4B5B3F45F7D871534E30D7
+(123 bytes; one entry, claude-opus-5.5 output_config.effort xhigh). After Kiro exited
+(exit 0), the file was unchanged since the last toggle and was restored from the pre-launch
+backup; the restored hash equals the pre-launch hash.
