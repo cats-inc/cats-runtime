@@ -7,10 +7,12 @@ two-model `/model` transcription and two effort screenshots on 2026-09-17 (Windo
 operator account). TUI text could not be copied. The operator confirmed the second
 heading repeated `Grok 4.6` by mistake and meant `Grok 4.5`.
 
-- [Transcription](./fixtures/grok-1.0.34/model-picker.success.redacted.txt)
-- [Grok 4.6 screenshot](./fixtures/grok-1.0.34/effort-grok-4.6.redacted.png)
-- [Grok 4.5 screenshot](./fixtures/grok-1.0.34/effort-grok-4.5.redacted.png)
+- [Transcription](./fixtures/grok-1.0.34/model-picker.success.redacted.txt), including the
+  full text of both effort screenshots
 - [Earlier raw-ID evidence](./fixtures/grok-1.0.13/models-cache.success.redacted.txt)
+- Later change (2026-09-27): the two effort screenshots were removed from Git when catalog
+  fixtures became text only. The transcription above still records every row and description
+  they showed.
 
 | Model | Effort labels, in order | CLI tokens |
 |---|---|---|
@@ -34,7 +36,7 @@ tokens remain separate in the public controls and execution arguments. Each
 model's description is retained in its own option notes, including `Higher`
 (4.6) versus `Highest` (4.5). The shared public enum retains its existing
 first-appearance description policy; model-specific wording remains in the YAML
-and source screenshots. No schema change was needed.
+and the transcription. No schema change was needed.
 
 Playground already initializes the first applicable option. Desktop's fallback
 now includes both exact model names, without a default flag, and its Grok effort
@@ -65,4 +67,4 @@ comparison verified all other provider blocks remained unchanged.
   manifest/default fixtures; only the bundled Grok expectations changed.
 - Installed Desktop and live CLI execution were not tested. No release requested.
 
-Last updated: 2026-09-17.
+Last updated: 2026-09-27.

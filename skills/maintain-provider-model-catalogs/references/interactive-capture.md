@@ -10,8 +10,10 @@ personal overrides or publication beyond the existing request.
 1. Read the matching `desktop-ui-automation` platform recipe and prove local observation/control.
    Record CLI version, account scope without identity, terminal host and capture method.
 2. Use a dedicated, uniquely titled terminal window and a new private evidence directory outside
-   Git. Keep raw screenshots/logs private. Record the actual launched home/profile/config path;
-   hash the relevant config before launch without copying credentials or the whole profile.
+   Git. Keep screenshots and raw logs private; images never enter Git, even redacted (see
+   [evidence storage](evidence-and-scope.md#evidence-storage-and-redaction)). Record the actual
+   launched home/profile/config path; hash the relevant config before launch without copying
+   credentials or the whole profile.
    On Windows, the platform helper's `Start-WindowsUiTerminal` opens that window and
    `Send-WindowsUiText` types slash commands under the same guards as keys. Wait for the typed
    command to appear on screen before a separate guarded Enter.

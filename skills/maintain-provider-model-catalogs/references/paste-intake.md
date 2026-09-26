@@ -9,7 +9,9 @@ images and label the resulting text as a transcription, not verbatim terminal ou
 per-screen model context, spelling, order, descriptions, and visible markers in the evidence;
 record any authorized display projection separately. Ask only about material ambiguity, such as
 a repeated model heading that leaves an effort menu's owner uncertain. Apply the same observation
-and decision workflow below; the normalizer processes the transcription, not image pixels.
+and decision workflow below; the normalizer processes the transcription, not image pixels. The
+transcription, not the image, becomes the fixture; see
+[evidence storage](evidence-and-scope.md#evidence-storage-and-redaction).
 
 ## 1. Establish intent without misrouting
 
