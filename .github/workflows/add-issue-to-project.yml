@@ -1,0 +1,17 @@
+name: Add issue to project
+
+# Adds each new issue to the organization Project "Cats Development" with
+# Status Backlog. The logic lives in cats-inc/.github; this file only wires the
+# trigger and the token.
+
+on:
+  issues:
+    types: [opened]
+
+permissions: {}
+
+jobs:
+  add-to-project:
+    uses: cats-inc/.github/.github/workflows/add-issue-to-project.yml@main
+    secrets:
+      project_token: ${{ secrets.CATS_PROJECT_TOKEN }}
