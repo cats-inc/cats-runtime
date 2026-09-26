@@ -44,9 +44,9 @@ personal overrides or publication beyond the existing request.
 7. Keep a checkpoint of captured paths and unresolved gaps. A pause, helper review or later YAML
    edit does not invalidate evidence. Do not rerun a complete traversal without a concrete gap,
    upstream change or changed behavior requiring that validation.
-8. Before the agent session ends, record its cost and list its temporary scripts, as described in
-   [cost and temporary scripts](#cost-and-temporary-scripts). Junie's per-call usage file did not
-   survive to the next day.
+8. Before the agent session ends, record its [cost](#cost); Junie's per-call usage file did not
+   survive to the next day. List and keep the capture's scripts as the skill's
+   [keep reusable scripts](../SKILL.md#keep-reusable-scripts) section describes.
 
 ## Windows Codex helper
 
@@ -209,7 +209,7 @@ catalog delta, validation and limitations. The [Claude reference](providers/clau
 The [Kiro reference](providers/kiro.md) and `docs/research/2026-09-27-kiro-picker-full-catalog.md`
 record a settings panel whose toggles persist, and its config restore.
 
-## Cost and temporary scripts
+## Cost
 
 When the operator asks for cost, report the number and pixel size of saved images separately from
 the images actually sent to the agent; each sent image is about width × height / 750 input tokens.
@@ -257,18 +257,3 @@ Exercise every host reader with synthetic session files:
 ```text
 node --test skills/maintain-provider-model-catalogs/tests/measure-agent-usage.node-test.mjs
 ```
-
-### Temporary scripts
-
-Keep scripts written during a capture private and outside Git, like raw captures. In the research
-note, list each one with its purpose and whether a later CLI version could rerun it unchanged.
-
-Ask the operator before promoting any of them into this skill's `scripts/`. A promoted helper:
-
-- takes parameters in place of the run's window titles, paths and resume flags;
-- reuses the platform `WindowsUi.ps1` for Windows window and input handling instead of copying it;
-- has an offline test under `tests/` that simulates the UI or session files and starts no CLI;
-- gets a usage section in this reference.
-
-The Codex, Claude and Kiro helpers above are the precedent. The Kiro research note shows the kept
-and left-out lists.

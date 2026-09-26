@@ -172,6 +172,31 @@ author that artifact.
 4. Report stale, missing, conflicting, intentionally empty, and unverified coverage. Do not mutate
    drift merely because it was observed.
 
+## Keep reusable scripts
+
+This applies in every mode, not only agent-operated captures. Scripts written along the way, such as
+capture, parsing, bundle or JAR extraction, YAML generation and usage counting, start private and
+outside Git, like raw evidence.
+
+1. **List them all.** In the research note or final report, give each script's purpose and whether
+   a later CLI version could rerun it unchanged. Say why each left-out script was left out.
+2. **Keep the reusable ones without asking.** When the task already includes an authorized
+   repository change, choose them yourself and add them to that same change. The operator decides
+   at review. In review, audit and capture/preview modes, which make no repository change, list
+   and recommend only. If that change has already merged, open a follow-up only when the
+   operator's authorization covers it.
+3. **Make a kept script reusable.** The Codex, Claude and Kiro capture helpers in
+   [interactive capture](./references/interactive-capture.md) are the pattern:
+   - place it under `scripts/`, with parameters in place of this run's window titles, paths,
+     session IDs and resume flags;
+   - reuse existing helpers instead of copying them: `normalize-picker-paste.mjs`,
+     `measure-agent-usage.mjs` and the platform `WindowsUi.ps1`;
+   - add an offline test under `tests/` that uses synthetic input and starts no CLI. A Node suite
+     also gets a case in `tests/agent-skill-sync.test.ts`, which is how CI runs it;
+   - add a usage section to the relevant reference.
+4. **Leave out** one-off or version-specific work. Never commit raw captures, identities or
+   machine-specific absolute paths inside a script.
+
 ## Validate and report
 
 Choose validation proportional to the changed surface. Factory/repository edits require `npm run catalog:check`, `tests/catalog-data.test.ts` and
@@ -195,9 +220,9 @@ any unresolved limitation:
 - every material question asked and the operator's answer;
 - files changed and any intentionally retained existing data;
 - validation results and unrelated failures;
-- for an agent-operated capture, its cost and each temporary script's purpose and reuse verdict.
-  Promote a script into `scripts/` only with the operator's approval and an offline test; see
-  [cost and temporary scripts](./references/interactive-capture.md#cost-and-temporary-scripts).
+- every temporary script with its purpose, reuse verdict and whether it was kept, as described in
+  [keep reusable scripts](#keep-reusable-scripts);
+- for an agent-operated capture, its [cost](./references/interactive-capture.md#cost).
 
 Stop before commit, push, pull request, release, or publication unless the operator separately
 authorizes that external mutation.
