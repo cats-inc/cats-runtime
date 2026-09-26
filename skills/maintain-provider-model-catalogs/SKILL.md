@@ -194,7 +194,10 @@ any unresolved limitation:
 - unknowns, omitted rows/claims, unresolved gaps, and conflict decisions;
 - every material question asked and the operator's answer;
 - files changed and any intentionally retained existing data;
-- validation results and unrelated failures.
+- validation results and unrelated failures;
+- for an agent-operated capture, its cost and each temporary script's purpose and reuse verdict.
+  Promote a script into `scripts/` only with the operator's approval and an offline test; see
+  [cost and temporary scripts](./references/interactive-capture.md#cost-and-temporary-scripts).
 
 Stop before commit, push, pull request, release, or publication unless the operator separately
 authorizes that external mutation.
@@ -227,7 +230,7 @@ authorizes that external mutation.
   Defender blocks agent-launched startup.
 - [Kiro](./references/providers/kiro.md): raw picker IDs, the settings-panel effort ring,
   toggles that persist without Enter, auto without a default claim, Windows-only evidence, and
-  the capture, settings-restore and session-usage helpers.
+  the capture and settings-restore helpers.
 - [Kilo](./references/providers/kilo.md): distinguish gateway mappings from the picker and
   execution variants from display-only thinking flags.
 - [Muse](./references/providers/muse.md): MSP model-id enumeration versus per-model picker efforts;

@@ -219,6 +219,9 @@ Capture WSL separately before relying on it there.
   [Capture tooling](#capture-tooling)). Phase boundaries are the first tool call of each phase.
   Each phase's credits sum that turn's metering entries in request order; every turn had one
   entry per request.
+- **Later replacement:** the same day, the shared `measure-agent-usage.mjs` replaced
+  `Measure-KiroSessionUsage.ps1` for Claude, Codex, Junie and Kiro hosts. On this session it
+  reproduced the turn-1 phases (25/42/10 calls, 13.19/31.73/10.71 credits).
 
 | Turn / phase | Calls | Credits | Notes |
 | --- | --- | --- | --- |

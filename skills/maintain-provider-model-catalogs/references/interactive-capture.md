@@ -44,6 +44,9 @@ personal overrides or publication beyond the existing request.
 7. Keep a checkpoint of captured paths and unresolved gaps. A pause, helper review or later YAML
    edit does not invalidate evidence. Do not rerun a complete traversal without a concrete gap,
    upstream change or changed behavior requiring that validation.
+8. Before the agent session ends, record its cost and list its temporary scripts, as described in
+   [cost and temporary scripts](#cost-and-temporary-scripts). Junie's per-call usage file did not
+   survive to the next day.
 
 ## Windows Codex helper
 
@@ -180,28 +183,13 @@ file with the backup by hand. Otherwise it writes the backup through a same-dire
 file, or removes a file that did not exist at baseline, and checks the baseline digest. A repeated
 run leaves an already restored file alone.
 
-When the capture agent runs inside Kiro CLI,
-[`Measure-KiroSessionUsage.ps1`](../scripts/Measure-KiroSessionUsage.ps1) reports that session's
-cost from `~/.kiro/sessions/cli/<id>.json(l)`. It prints counts and credits only, never message
-content, and runs in either PowerShell edition:
+When the capture agent runs inside Kiro CLI, measure its session with the shared
+[agent usage](#agent-usage) helper.
 
-```powershell
-& skills/maintain-provider-model-catalogs/scripts/Measure-KiroSessionUsage.ps1 -Turn 1 `
-  -PhaseBoundary 'Action Launch', 'final-window' -PhaseName 'Preparation', 'Capture', 'Questions'
-```
-
-- **Per turn:** requests, duration, context use and credits. Kiro 2.24.1 records one
-  `metering_usage` credit entry per request and leaves the token fields at 0, so tokens are
-  reported as not recorded. The turn in progress has no metadata until it ends.
-- **Phases:** each boundary is a literal string from one of the agent's own tool calls, and the
-  message containing it starts the next phase. Phase credits pair metering entries with that
-  turn's assistant messages in order.
-
-Exercise traversal, config guards, restore and usage parsing without a desktop or Kiro:
+Exercise traversal, config guards and restore without a desktop or Kiro:
 
 ```powershell
 powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Test-KiroPicker.ps1
-powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Test-KiroSessionUsage.ps1
 ```
 
 ## Turn evidence into data
@@ -221,8 +209,66 @@ catalog delta, validation and limitations. The [Claude reference](providers/clau
 The [Kiro reference](providers/kiro.md) and `docs/research/2026-09-27-kiro-picker-full-catalog.md`
 record a settings panel whose toggles persist, and its config restore.
 
+## Cost and temporary scripts
+
 When the operator asks for cost, report the number and pixel size of saved images separately from
-the images actually sent to the agent. If the agent host keeps a per-message usage transcript, sum
-each message once by phase: preparation, capture and catalog update. Distinguish uncached input,
-cache writes, cache reads and output. The session context re-read on every call usually outweighs
-screenshots, so fewer, larger steps save more than dropping screenshots.
+the images actually sent to the agent; each sent image is about width × height / 750 input tokens.
+The session context re-read on every call usually outweighs screenshots, so fewer, larger steps
+save more than dropping screenshots.
+
+### Agent usage
+
+[`measure-agent-usage.mjs`](../scripts/measure-agent-usage.mjs) summarizes the capture agent's own
+session from its local files: calls, tokens (uncached input, cache writes, cache reads and
+output), cost or credits, per model and per phase. It prints numbers and model names only, never
+message content, and runs wherever Node runs:
+
+```text
+node skills/maintain-provider-model-catalogs/scripts/measure-agent-usage.mjs <host> <session-file> \
+  --phase-start <marker> --phase-start <marker> \
+  --phase-name Preparation --phase-name Capture --phase-name "Catalog update"
+```
+
+- **Claude Code:** `~/.claude/projects/<project>/<session-id>.jsonl`. Each API message is counted
+  once, and the session's `subagents` folder is included.
+- **Codex:** `~/.codex/sessions/<yyyy>/<mm>/<dd>/rollout-*.jsonl`. Per-call usage is the change in
+  the running total; reasoning output is reported as part of output.
+- **Junie:** `~/.junie/sessions/<session>/events.jsonl`, with Junie's USD cost per call. Measure
+  before ending the session. The 2026-09-26 capture's file was gone the next day, and its
+  `summary.json` covered only $0.29 of the $9.68 that `events.jsonl` had recorded.
+- **Kiro CLI:** `~/.kiro/sessions/cli/<session-id>.json`, or `KIRO_SESSION_ID` from inside Kiro.
+  Kiro 2.24.1 records one credit entry per request and leaves the token fields at 0. The result
+  also lists each turn's requests, duration and context use; the turn in progress has no metadata
+  until it ends.
+- **Grok, Muse and Antigravity:** no reader yet. Grok's session log holds only a cumulative
+  context size, and Muse exposed no per-message usage on the 2026-09-25 and 2026-09-26 hosts.
+  Report estimates and label them as such.
+
+Phase starts apply in order, and the call that matches one starts the next phase:
+
+- `at:<ISO time with zone>` (Claude, Codex, Junie): the first call at or after that time.
+- `text:<literal>` (Claude, Codex, Kiro): the first call whose own message or tool call contains
+  the literal. Prompts and tool output never match, so use a unique command or file name from the
+  agent's own calls, such as the capture window title.
+- `turn:<n>` (Junie, Kiro): the first call of user turn n.
+
+Exercise every host reader with synthetic session files:
+
+```text
+node --test skills/maintain-provider-model-catalogs/tests/measure-agent-usage.node-test.mjs
+```
+
+### Temporary scripts
+
+Keep scripts written during a capture private and outside Git, like raw captures. In the research
+note, list each one with its purpose and whether a later CLI version could rerun it unchanged.
+
+Ask the operator before promoting any of them into this skill's `scripts/`. A promoted helper:
+
+- takes parameters in place of the run's window titles, paths and resume flags;
+- reuses the platform `WindowsUi.ps1` for Windows window and input handling instead of copying it;
+- has an offline test under `tests/` that simulates the UI or session files and starts no CLI;
+- gets a usage section in this reference.
+
+The Codex, Claude and Kiro helpers above are the precedent. The Kiro research note shows the kept
+and left-out lists.
