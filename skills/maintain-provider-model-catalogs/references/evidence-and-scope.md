@@ -135,6 +135,11 @@ application checks for docs-only changes and `tests/docs-boundary.test.ts` rejec
 fixture or any other repository file. Short confirmations may remain in the conversation and be
 summarized in notes after an update is authorized.
 
+Fixtures are text only. Screenshots and other images stay private and out of Git, even when
+cropped or redacted, because an image cannot be diffed, searched or checked by the redaction
+helper. Commit what a screenshot shows as a `.redacted.txt` transcription instead, and name the
+screen it came from.
+
 Before saving or echoing evidence, replace account identifiers, email addresses, organization names,
 and authenticated session material with visible placeholders such as `<redacted-email>` or
 `<redacted-organization>`. Never leave a silent gap. The normalization helper catches common token,
