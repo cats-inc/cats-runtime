@@ -226,7 +226,8 @@ authorizes that external mutation.
   Right-key cycle, JAR-backed effort tokens and order, and operator-launched capture when Windows
   Defender blocks agent-launched startup.
 - [Kiro](./references/providers/kiro.md): raw picker IDs, the settings-panel effort ring,
-  toggles that persist without Enter, auto without a default claim and Windows-only evidence.
+  toggles that persist without Enter, auto without a default claim, Windows-only evidence, and
+  the capture, settings-restore and session-usage helpers.
 - [Kilo](./references/providers/kilo.md): distinguish gateway mappings from the picker and
   execution variants from display-only thinking flags.
 - [Muse](./references/providers/muse.md): MSP model-id enumeration versus per-model picker efforts;

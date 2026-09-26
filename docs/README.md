@@ -107,7 +107,8 @@ launch incident and phase token cost. It supersedes the
 
 [Kiro full catalog](./research/2026-09-27-kiro-picker-full-catalog.md) records the complete 20-row
 Kiro 2.24.1 picker, per-model effort on ten rows through the new `kiro.reasoning_effort` binding,
-auto without a default claim, the config-restoring capture and session cost. It supersedes the
+auto without a default claim, the config-restoring capture, session cost and the reusable Kiro
+capture, restore and usage helpers. It supersedes the
 [Kiro shortlist](./research/2026-09-18-kiro-shortlist.md).
 
 [ClinePass shortlist](./research/2026-09-18-cline-shortlist.md) records six fixed Medium
