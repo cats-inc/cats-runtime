@@ -12,8 +12,11 @@ Do not copy its model values into this reference.
   inference. Use it to check picker IDs and order. It is not effort evidence, and its
   `default_model` (plain output: `* = default`) is not a catalog default.
 - **Picker:** in interactive `kiro-cli chat`, type `/model`, wait for the echo, then press Enter to
-  run the slash command. The list shows raw IDs, credit rate and description. Rows scroll 8 at a
-  time with a `(+N more)` counter; read every row while highlighted.
+  run the slash command. On Windows, `Capture-KiroPicker.ps1` and `Restore-KiroPickerConfig.ps1`
+  implement the traversal and settings restore below; see the Windows Kiro helper in
+  [interactive capture](../interactive-capture.md). The list shows raw IDs, credit rate and
+  description. Rows scroll 8 at a time with a `(+N more)` counter; read every row while
+  highlighted.
   - `[active]` marks the current selection only.
   - Below the list, a per-model panel shows `thinking` and `effort`. Its header is
     `Settings for selected model: <id>` on auto and `Settings for model: <id>` elsewhere.

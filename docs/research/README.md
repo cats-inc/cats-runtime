@@ -6,7 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
-| [2026-09-27-kiro-picker-full-catalog](./2026-09-27-kiro-picker-full-catalog.md) | Kiro 2.24.1 full catalog, agent-operated picker capture | 20 raw IDs including auto without a default, per-model effort on ten rows, new `kiro.reasoning_effort` binding, settings written on toggle and restored, Windows-only scope and session cost |
+| [2026-09-27-kiro-picker-full-catalog](./2026-09-27-kiro-picker-full-catalog.md) | Kiro 2.24.1 full catalog, agent-operated picker capture | 20 raw IDs including auto without a default, per-model effort on ten rows, new `kiro.reasoning_effort` binding, settings written on toggle and restored, Windows-only scope, per-phase session credits and the reusable capture, restore and usage helpers |
 | [2026-09-26-junie-picker-full-catalog](./2026-09-26-junie-picker-full-catalog.md) | Junie 26.9.22 full catalog, agent-operated picker capture | 15 JetBrains AI models, per-model effort from the Right-key cycle, JAR-backed effort tokens and order, no effort defaults, Defender launch incident and phase token accounting |
 | [2026-09-26-cli-model-setting-dimensions](./2026-09-26-cli-model-setting-dimensions.md) | Model-setting dimensions across the 16 CLI providers | Provider/model/thinking/effort/context/fast coverage, settings outside those six, one-, two- and config-only third-level routing prefixes, which CLIs parse settings from a custom model string, and catalog/adapter discrepancies |
 | [2026-09-25-grok-picker-agent-capture](./2026-09-25-grok-picker-agent-capture.md) | Grok 1.0.41 agent-operated picker capture | Four models, per-model effort labels, no catalog default, screenshot and context-token accounting |

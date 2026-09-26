@@ -209,22 +209,77 @@ Capture WSL separately before relying on it there.
   screen and the opened picker. Both were sent to the model, about 960 input tokens each at
   width × height / 750. Everything else was read as UI Automation text.
 - **Host session:** Kiro CLI 2.24.1, `kiro_default` agent, model claude-opus-5.5, effort xhigh.
-  - Kiro's session record gives request counts, duration and context-window usage per user turn.
-    Its token fields were 0 and `metering_usage` was blank, so uncached input, cache writes, cache
-    reads and output tokens could not be measured.
-  - Phase call counts come from the session transcript's assistant messages.
+  - Kiro's session record gives, per user turn, request counts, duration, context-window use and
+    one `metering_usage` credit entry per request.
+  - Its token fields were all 0, so uncached input, cache writes, cache reads and output tokens
+    could not be measured. Credits are the available cost measure.
+  - An earlier version of this note called `metering_usage` blank. That was a display artifact;
+    the entries were there.
+- **Method:** measured with the new `Measure-KiroSessionUsage.ps1` (see
+  [Capture tooling](#capture-tooling)). Phase boundaries are the first tool call of each phase.
+  Each phase's credits sum that turn's metering entries in request order; every turn had one
+  entry per request.
 
-| Phase | Calls | Notes |
+| Turn / phase | Calls | Credits | Notes |
+| --- | --- | --- | --- |
+| 1. Preparation: skill reading, preflight, readiness, `--list-models` | 25 | 13.19 | |
+| 1. Capture: launch to config restore | 42 | 31.73 | Four guard stops sent no key; one wait timed out after a delivered Down, which was not resent |
+| 1. Wrap-up and questions to the operator | 10 | 10.71 | |
+| **Turn 1 total (31 min)** | 77 | 55.64 | Context at end: 16.9% of 1,000,000 tokens (about 169,000) |
+| 2. Catalog, code and tests | 32 | 32.80 | |
+| 2. Evidence, docs and validation | 23 | 32.88 | |
+| 2. Commit, PR, merge and cleanup | 13 | 20.01 | Includes about 4 min waiting for CI |
+| **Turn 2 total (30 min)** | 68 | 85.69 | Context at end: 30.0% |
+| 3. Listing the temporary scripts | 2 | 5.15 | |
+| **Turns 1–3** | 147 | 146.48 | Turn 4, the tooling in this section, had not ended when measured |
+
+Every call re-reads the whole context, so the re-read context dominates cost, not the two
+screenshots. Turn 2's calls cost about 1.26 credits each, against 0.72 in turn 1, as the
+context grew from about 169,000 to 300,000 tokens. This repeats the skill's advice to use a
+fresh session per provider refresh.
+
+## Capture tooling
+
+After the catalog PR merged, the operator asked for the reusable parts of this run's temporary
+scripts to be kept in the skill. The criterion was that a later Kiro version could rerun them
+unchanged. The helpers follow the Claude and Codex conventions and the platform
+`WindowsUi.ps1`; usage is in the Windows Kiro helper section of
+[interactive capture](../../skills/maintain-provider-model-catalogs/references/interactive-capture.md).
+Offline tests use a simulated picker and synthetic session files, and never start Kiro. The
+private screens from this run were also parsed offline by the new capture parser, without
+committing them: 124 of 124 parsed, with the arrival values listed above.
+
+Included:
+
+| Repository file | From | Why it was kept |
 | --- | --- | --- |
-| Preparation: skill reading, preflight, readiness, `--list-models` | 25 | |
-| Capture: launch to config restore | 42 | Four guard stops sent no key; one wait timed out after a delivered Down, which was not resent |
-| Questions to the operator | 10 | |
-| Turn 1 total (31 min) | 77 | Context at end: 16.9% of 1,000,000 tokens (about 169,000) |
-| Turn 2: catalog, code, tests, docs, PR | recorded by Kiro only at turn end | |
+| `scripts/Capture-KiroPicker.ps1` | `Traverse-KiroModels.ps1`, `Cycle-KiroEffort.ps1` | A version-independent picker traversal and settings-ring capture. Merged, with parameters in place of this run's window title, helper path and resume flags. |
+| `scripts/Restore-KiroPickerConfig.ps1` | Ad hoc backup, hash and restore commands | Every capture that cycles settings needs the same backup, concurrent-writer check and verified restore. |
+| `scripts/Measure-KiroSessionUsage.ps1` | Ad hoc session JSON/JSONL queries | Reports requests, credits and phase splits for any Kiro-hosted run without printing transcript content. |
+| `tests/Test-KiroPicker.ps1`, `tests/Test-KiroSessionUsage.ps1` | New | Offline guards for the above: no Enter/Escape, a stop on concurrent edits, restore refusal and idempotency, direction and count checks, and usage parsing. |
 
-Every call re-reads the whole context. The re-read context therefore dominates input volume,
-not the two screenshots: turn 1's context grew to about 169,000 tokens across 77 calls. This
-repeats the skill's advice to use a fresh session per provider refresh.
+Not included (left in the private directory):
+
+| Temporary script | Why it was not kept |
+| --- | --- |
+| `Launch-KiroCapture.ps1` | Claude/Codex helpers do not launch the CLI. The platform `Start-WindowsUiTerminal` plus the documented launch hygiene covers it, and the variables to clear depend on the agent host. |
+| `Invoke-KiroUi.ps1` | A one-action wrapper around generic window operations that `WindowsUi.ps1` already owns. Its guarded Tab moved into the capture helper. |
+| `cats-desk-probe.ps1` (already deleted) | A one-time desktop readiness probe; the platform Windows recipe documents it. |
+| `cats-fg-probe.ps1` (already deleted) | A one-time foreground and idle check, which is generic window work owned by the platform. |
+| `gen-kiro-scope.tmp.mjs` (already deleted) | A single-use generator holding this version's model rows, which belong in YAML, not code. |
+
+`Send-WindowsUiKey` has no Tab key. The Kiro helper therefore sends Tab through the platform
+helper's own focus, screen and focused-surface guards and key primitive. Adding Tab to the
+platform helper would be a separate cats-platform change.
+
+The helpers were validated only offline. The next Kiro refresh will be their first native run.
+
+- `Test-KiroPicker.ps1`: all 9 checks passed. `Test-KiroSessionUsage.ps1`: all 3 passed.
+- The existing `Test-ClaudePicker.ps1` and `Test-CodexPicker.ps1` still pass.
+- `tests/agent-skill-sync.test.ts`: 8 passed. Runtime and workspace skill sync passed, and the
+  mirrors match the canonical files.
+- `Measure-KiroSessionUsage.ps1` on this session reproduced the manually counted turn-1 phases
+  (25/42/10) and produced the credit figures in [Cost](#cost).
 
 ## Capture lessons
 
@@ -237,4 +292,5 @@ and the [interactive capture reference](../../skills/maintain-provider-model-cat
 - The settings header reads `Settings for selected model:` on auto and `Settings for model:` on
   other rows. Match both.
 - Windows PowerShell 5.1 reads a BOM-less script as ANSI. Non-ASCII literals such as `❯` or `─`
-  then fail to match. Use `[char]` code points in private capture scripts.
+  then fail to match. Keep capture scripts ASCII and use `\u` regex escapes or `[char]` code
+  points.
