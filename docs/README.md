@@ -65,6 +65,12 @@ scheduled polling, verified account linkage and durable history remain deferred.
 
 ## Provider Detection
 
+[CLI model-setting dimensions](./research/2026-09-26-cli-model-setting-dimensions.md)
+surveys all 16 CLI providers: which of provider, model, thinking, effort, context and
+fast each CLI exposes versus what the runtime passes, the settings outside those six,
+routing-prefix levels for reseller and aggregator CLIs, which CLIs can carry settings inside
+a custom model string, and catalog/adapter discrepancies.
+
 [Grok 1.0.41 agent-operated capture](./research/2026-09-25-grok-picker-agent-capture.md)
 records the four-model picker, per-model effort wording, the decision not to copy a
 conflicting default marker, and the screenshot and context-token cost of the native run.
