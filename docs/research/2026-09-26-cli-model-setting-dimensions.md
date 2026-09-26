@@ -440,7 +440,9 @@ review.
   - Four Kilo shortlist rows have variants that are not offered.
 - **Custom models lose controls.** Desktop and Playground hide all model controls for a
   custom model. For flag-based CLIs, that makes effort impossible to set on a custom
-  model (see [Custom model strings](#custom-model-strings)).
+  model (see [Custom model strings](#custom-model-strings)). Proposed fix:
+  [SPEC-032](../specs/SPEC-032-model-selector-custom-controls-route-and-cost-signals.md),
+  pending approval.
 - **Junie `--timeout`:** the adapter passes `--timeout` (`providers/junie.ts:89`, added
   in `07fb58e`), but the flag does not appear in 26.9.22 `--help`. It may be a hidden
   option; no turn verified it.

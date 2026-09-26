@@ -48,6 +48,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 | Spec | Title | Status | Related Plan |
 |------|-------|--------|--------------|
+| [SPEC-032](./SPEC-032-model-selector-custom-controls-route-and-cost-signals.md) | Model Selector Custom Controls, Route Display and Cost Signals | Draft — pending approval (not approved) | [PLAN-042](../plans/PLAN-042-model-selector-custom-controls-route-and-cost-signals.md) (on hold) |
 | [SPEC-031](./SPEC-031-provider-catalog-data-and-local-overrides.md) | Provider Catalog Data and Local Overrides | Implemented — Runtime and Platform CI passed | [PLAN-040](../plans/PLAN-040-provider-catalog-data-and-local-overrides.md), [ADR-040](../decisions/040-use-data-driven-provider-catalogs-and-local-overrides.md) |
 | [SPEC-030](./SPEC-030-provider-selection-before-bootstrap-probes.md) | Provider Selection Before Bootstrap Probes | Approved; Runtime UX accepted; integrated acceptance in progress | [PLAN-039](../plans/PLAN-039-provider-selection-bootstrap-rollout.md), [ADR-039](../decisions/039-use-selected-provider-config-as-the-resource-boundary.md) |
 | [SPEC-029](./SPEC-029-provider-account-quota-and-usage-snapshots.md) | Provider Account Quota and Usage Snapshots | Draft — ownership accepted; collectors and snapshot API pending | [PLAN-038](../plans/PLAN-038-provider-account-quota-and-usage-snapshots.md), [ADR-038](../decisions/038-separate-execution-usage-from-provider-account-quota.md) |
