@@ -100,7 +100,10 @@ arrow-only Claude capture helper and the measured screenshot/token cost of the n
 [Codex desktop picker pilot](./research/2026-09-24-codex-picker-pilot.md) records the complete
 0.156.1 catalog, native menu capture, default-marker masking and reusable skill workflow.
 
-[Junie shortlist](./research/2026-09-23-junie-shortlist.md) records five fixed model/effort combinations and the explicit model default.
+[Junie full catalog](./research/2026-09-26-junie-picker-full-catalog.md) records the complete 15-row
+Junie 26.9.22 picker, per-model effort controls without effort defaults, the Microsoft Defender
+launch incident and phase token cost. It supersedes the
+[Junie shortlist](./research/2026-09-23-junie-shortlist.md).
 
 [Kiro shortlist](./research/2026-09-18-kiro-shortlist.md) records the six raw model
 IDs, first-row initialization without default claims and custom input.

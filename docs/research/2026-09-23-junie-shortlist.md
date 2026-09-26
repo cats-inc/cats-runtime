@@ -1,5 +1,8 @@
 # Junie five fixed combinations
 
+> Superseded on 2026-09-26 by the [full-catalog picker capture](./2026-09-26-junie-picker-full-catalog.md).
+> Junie is now a full-catalog provider with per-model effort controls.
+
 Date: 2026-09-23 (Asia/Taipei). Mode: refresh; policy: confirm uncertainty.
 Scope: Junie curated input, static fallback, fixed effort execution, Playground,
 and the Desktop fallback in cats-platform. Other providers are unchanged.

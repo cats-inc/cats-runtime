@@ -12,7 +12,7 @@ import { buildProviderAdvancedKnowledge } from '../../core/models/providerAdvanc
 import { createCatalogSnapshot } from '../../catalogs/resolver.js';
 import { getStaticProviderModels } from '../../core/models/providerModelCatalog.js';
 
-describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'kiro', 'junie', 'auggie', 'goose', 'pi'])('%s shortlists in Playground', (provider) => {
+describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'kiro', 'auggie', 'goose', 'pi'])('%s shortlists in Playground', (provider) => {
   it('uses the approved fallbacks and preserves custom strings on reload', () => {
     const html = readFileSync(fileURLToPath(new URL('./pages/playground.html', import.meta.url)), 'utf8');
     expect(html).toContain('const PROVIDER_MODELS = {}');
@@ -25,8 +25,8 @@ describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'kiro'
     const fallback = models.map(({ id, label, default: isDefault }) => ({
       value: id, label: `${label}${isDefault ? ' (default)' : ''}`,
     }));
-    expect(fallback).toHaveLength(provider === 'junie' ? 5 : 6);
-    expect(fallback.filter(entry => /default/i.test(entry.label))).toHaveLength(['copilot', 'junie'].includes(provider) ? 1 : 0);
+    expect(fallback).toHaveLength(6);
+    expect(fallback.filter(entry => /default/i.test(entry.label))).toHaveLength(provider === 'copilot' ? 1 : 0);
     const catalog = {
       provider, backend: 'cli', instance: 'native', defaultModel: null,
       source: 'static', cache: null, entries: models, controls: [], presets: [],
@@ -202,6 +202,49 @@ describe('shared playground selection helpers', () => {
           controls: { 'grok.reasoning_effort': 'low' } },
         selectableProviders: ['grok'], providerOrder: ['grok'], advancedCatalogs: { grok: catalog },
       }).modelSelection.controls).toEqual({ 'grok.reasoning_effort': 'low' });
+    } finally {
+      cleanupTempDirWithRetries(root);
+    }
+  });
+
+  it('renders Junie per-model effort in picker order and starts at the first value', () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-junie-playground-'));
+    try {
+      const catsUI = createCatsUI();
+      const target = { providerName: 'junie', backend: 'cli' as const,
+        instanceId: 'native', defaultTarget: true };
+      const { catalog } = buildProviderAdvancedKnowledge(target, {
+        provider: 'junie', backend: 'cli', instance: 'native', defaultModel: 'Gemini 3.7 Flash',
+        source: 'static', cache: null, models: getStaticProviderModels(target), warnings: [],
+      }, { snapshot: createCatalogSnapshot(readFileSync(new URL('../../../config/curated-model-catalogs.yaml.example', import.meta.url), 'utf8')) });
+      const html = readFileSync(new URL('./pages/playground.html', import.meta.url), 'utf8');
+      const start = html.indexOf('function renderAgentModelControls(');
+      const end = html.indexOf('function applyAgentModelControlValues(', start);
+      const controls = { innerHTML: '' };
+      const context = { window: { CatsUI: catsUI }, escapeHtml: String,
+        div: { querySelector: () => controls }, catalog, entryId: '' };
+      vm.createContext(context);
+      vm.runInContext(html.slice(start, end), context);
+      expect(catsUI.getAdvancedCatalogDefaultEntryId(catalog)).toBe('Gemini 3.7 Flash');
+      const firstValues: Record<string, string> = {};
+      for (const entry of catalog.entries) {
+        context.entryId = entry.id;
+        vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
+        expect(controls.innerHTML).not.toMatch(/default/i);
+        const options = [...controls.innerHTML.matchAll(/<option value="([^"]+)"[^>]*>([^<]+)<\/option>/g)]
+          .map((match) => [match[1], match[2]]);
+        expect(options.length).toBeGreaterThan(0);
+        const [value, label] = options[0];
+        expect(controls.innerHTML).toContain(`<option value="${value}" selected>${label}</option>`);
+        firstValues[entry.id] = value;
+      }
+      expect(firstValues).toMatchObject({ 'GPT-5.6-SOL': 'none', 'GPT-6-ASTRA': 'low',
+        'Gemini 3.6 Flash': 'minimal', 'Gemini 3.7 Flash': 'low', 'Grok 4.7': 'low' });
+      expect(catsUI.normalizePlaygroundAgentSelection({
+        provider: 'junie', modelSelection: { entryId: 'Claude Opus 5.5', entryMode: 'explicit',
+          controls: { 'junie.reasoning_effort': 'xhigh' } },
+        selectableProviders: ['junie'], providerOrder: ['junie'], advancedCatalogs: { junie: catalog },
+      }).modelSelection.controls).toEqual({ 'junie.reasoning_effort': 'xhigh' });
     } finally {
       cleanupTempDirWithRetries(root);
     }

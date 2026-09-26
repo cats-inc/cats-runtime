@@ -15,6 +15,16 @@ personal overrides or publication beyond the existing request.
    On Windows, the platform helper's `Start-WindowsUiTerminal` opens that window and
    `Send-WindowsUiText` types slash commands under the same guards as keys. Wait for the typed
    command to appear on screen before a separate guarded Enter.
+   Launch hygiene when the agent starts the CLI itself:
+   - **Clean the environment first.** Clear inherited agent variables (`TERM`, `CI`, `NO_COLOR`,
+     pager and git-prompt variables, and the host agent's own variables), because a TUI can
+     refuse a dumb terminal.
+   - **If the CLI exits before its UI, check security software first.** Read the Defender
+     protection history, or `Get-MpThreatDetection`, for events after the launch time before
+     trying anything else. Each retry of a blocked launch adds another detection.
+   - **Never allow, exclude or restore a detection yourself.** Report it, then give the operator
+     the exact uniquely titled launch command and attach to the window they open. The
+     [Junie reference](providers/junie.md) records one such case.
 3. Inspect command help only as needed for startup/isolation flags. Read each screen's footer.
    Navigate menus and cancel leaves; do not submit an inference prompt or assume Enter/Escape
    have the same meaning across model, effort, upgrade and authentication screens.

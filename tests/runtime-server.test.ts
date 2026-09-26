@@ -4168,44 +4168,48 @@ providers:
     });
   });
 
-  it('GET /providers/junie/models returns the five fixed combinations', async () => {
+  // Complete Junie 26.9.22 picker, in picker order; ids and labels are the literal names.
+  const JUNIE_PICKER_NAMES = [
+    'Gemini 3.7 Flash', 'Claude Fable 5.1', 'Claude Opus 5', 'Claude Opus 5.5', 'Claude Sonnet 5',
+    'Gemini 3.6 Flash', 'Gemini 3.8 Flash', 'GPT-5.6-LUNA', 'GPT-5.6-SOL', 'GPT-5.6-TERRA',
+    'GPT-6-ASTRA', 'GPT-6-LUNA', 'GPT-6-SOL', 'Grok 4.6', 'Grok 4.7',
+  ];
+
+  it('GET /providers/junie/models returns the complete picker list', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/junie/models');
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({
         provider: 'junie', backend: 'cli', instance: 'native',
         defaultModel: 'Gemini 3.7 Flash', source: 'static', cache: null,
-        models: [
-          { id: 'Gemini 3.7 Flash', label: 'Gemini 3.7 Flash — Medium', default: true },
-          { id: 'Claude Fable 5.1', label: 'Claude Fable 5.1 — Low' },
-          { id: 'Gemini 3.8 Flash', label: 'Gemini 3.8 Flash — Medium' },
-          { id: 'GPT-5.6-SOL', label: 'GPT-5.6-SOL — Low' },
-          { id: 'Grok 4.6', label: 'Grok 4.6 — Low' },
-        ],
+        models: JUNIE_PICKER_NAMES.map(name => ({ id: name, label: name })),
         warnings: [],
       });
     });
   });
 
-  it('GET /providers/junie/models/advanced returns the five fixed combinations', async () => {
+  it('GET /providers/junie/models/advanced returns per-model effort without effort defaults', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/junie/models/advanced');
       expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({
+      const payload = await response.json();
+      expect(payload).toMatchObject({
         provider: 'junie', backend: 'cli', instance: 'native',
         defaultModel: 'Gemini 3.7 Flash', source: 'static', cache: null,
-        entries: [
-          { id: 'Gemini 3.7 Flash', label: 'Gemini 3.7 Flash — Medium', default: true },
-          { id: 'Claude Fable 5.1', label: 'Claude Fable 5.1 — Low', default: false },
-          { id: 'Gemini 3.8 Flash', label: 'Gemini 3.8 Flash — Medium', default: false },
-          { id: 'GPT-5.6-SOL', label: 'GPT-5.6-SOL — Low', default: false },
-          { id: 'Grok 4.6', label: 'Grok 4.6 — Low', default: false },
-        ],
-        controls: [], presets: [],
+        entries: JUNIE_PICKER_NAMES.map((name, index) => ({ id: name, label: name, ...(index === 0 ? { default: true } : {}) })),
+        presets: [],
         defaultSelection: { entryMode: 'explicit', entryId: 'Gemini 3.7 Flash' },
-        support: { tier: 'entry_only', advancedMetadataStatus: 'verified_manifest' },
+        support: { tier: 'full', advancedMetadataStatus: 'verified_manifest' },
         warnings: [],
       });
+      const values = (id: string) => payload.entries.find((entry: { id: string }) => entry.id === id)
+        .controls[0].values.map((value: { value: string }) => value.value);
+      expect(values('GPT-5.6-SOL')).toEqual(['none', 'low', 'medium', 'high', 'xhigh', 'max']);
+      expect(values('Gemini 3.6 Flash')).toEqual(['minimal', 'low', 'medium', 'high']);
+      expect(values('Gemini 3.7 Flash')).toEqual(['low', 'medium', 'high']);
+      expect(values('Grok 4.7')).toEqual(['low', 'medium', 'high', 'xhigh']);
+      expect(payload.defaultSelection.controls).toBeUndefined();
+      expect(JSON.stringify(payload.entries)).not.toContain('(default)');
     });
   });
 
