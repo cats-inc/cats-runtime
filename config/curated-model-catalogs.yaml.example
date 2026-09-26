@@ -1741,38 +1741,61 @@ catalogs:
         controls: []
   - provider: auggie
     backend: cli
-    selection_mode: shortlist
+    selection_mode: full
     source_cli: Auggie
     cli_version: 0.36.0
-    last_updated: 2026-09-23
+    last_updated: 2026-09-27
     notes:
-      - "Source: operator-selected six-model shortlist; ID/displayName mappings from Auggie 0.36.0
-        model list --json. Complete Cats shortlist, not the full upstream inventory."
-      - Preserve supplied labels and order. No model default or option metadata was supplied; UI
-        initializes the first row without marking it default. Custom model input remains available.
-      - "Evidence: docs/research/2026-09-23-auggie-shortlist.md and
-        docs/research/fixtures/auggie-0.36.0/."
+      - "Complete 34-row /model picker, captured 2026-09-27 (UTC+8) from Auggie 0.36.0 on Windows native by operating the CLI picker. Rows follow picker order; IDs come from auggie model list --json, whose 34 displayName values equal the picker labels one to one. Evidence: docs/research/fixtures/auggie-0.36.0/model-picker.agent-capture.redacted.txt and docs/research/2026-09-27-auggie-picker-full-catalog.md."
+      - "Pass id literally to --model. IDs are opaque; Prism rows use butler_a and butler_b. Each row was selected once in the picker and reported Using model: <label>."
+      - "Opus 4.8 is the only row the picker marks (default), and its JSON row has isDefault true. The (current) suffix on the session model and the JSON envelope defaultModelId, which names no picker row, are not catalog defaults."
+      - "Effort is not bound: the picker shows no effort for any row, and selecting a row opens no effort step, so controls stay empty. JSON effortLevels per model and the global --reasoning-effort flag are recorded in model notes and the research note only."
+      - Capture covers this Windows native installation and account only. WSL shares this scope but may see different models. BYOK is out of scope. Custom model strings remain available.
     models:
       - id: gpt-6-astra
         label: GPT-6 Astra
+        notes:
+          - "Picker description: OpenAI model for complex reasoning and long-horizon agent tasks"
+          - "Picker cost tier: $$$$."
+          - "JSON effortLevels: low, medium, high, xhigh, max. Not bound as a Cats control."
         source_names:
           - gpt-6-astra
           - GPT-6 Astra
         execution:
           model: gpt-6-astra
         controls: []
-      - id: gpt-5-6-sol
-        label: GPT-5.6 Sol
+      - id: gpt-6-sol
+        label: GPT-6 Sol
+        notes:
+          - "Picker description: OpenAI model for complex coding and agentic workflows"
+          - "Picker cost tier: $$."
+          - "JSON effortLevels: none, low, medium, high, xhigh, max. Not bound as a Cats control."
         source_names:
-          - gpt-5-6-sol
-          - GPT-5.6 Sol
+          - gpt-6-sol
+          - GPT-6 Sol
         execution:
-          model: gpt-5-6-sol
+          model: gpt-6-sol
+        controls: []
+      - id: gpt-6-luna
+        label: GPT-6 Luna
+        notes:
+          - "Picker description: OpenAI model for focused, high-volume tasks"
+          - "Picker cost tier: $."
+          - "JSON effortLevels: none, low, medium, high, xhigh, max. Not bound as a Cats control."
+        source_names:
+          - gpt-6-luna
+          - GPT-6 Luna
+        execution:
+          model: gpt-6-luna
         controls: []
       - id: claude-fable-5-1
         label: Claude Fable 5.1
         capabilityTags:
           - reasoning
+        notes:
+          - "Picker description: Latest Anthropic Mythos-class model — Great for long horizon asynchronous tasks"
+          - "Picker cost tier: $$$$."
+          - "JSON effortLevels: low, medium, high, xhigh, max. Not bound as a Cats control."
         source_names:
           - claude-fable-5-1
           - Claude Fable 5.1
@@ -1783,27 +1806,365 @@ catalogs:
         label: Claude Opus 5.5
         capabilityTags:
           - reasoning
+        notes:
+          - "Picker description: Latest Anthropic model for complex tasks"
+          - "Picker cost tier: $$$."
+          - "JSON effortLevels: low, medium, high, xhigh, max. Not bound as a Cats control."
         source_names:
           - claude-opus-5-5
           - Claude Opus 5.5
         execution:
           model: claude-opus-5-5
         controls: []
+      - id: claude-sonnet-5-0
+        label: Claude Sonnet 5
+        notes:
+          - "Picker description: Latest Sonnet model, High effort"
+          - "Picker cost tier: $$."
+          - "JSON effortLevels: low, medium, high, xhigh, max. Not bound as a Cats control."
+        source_names:
+          - claude-sonnet-5-0
+          - Claude Sonnet 5
+        execution:
+          model: claude-sonnet-5-0
+        controls: []
       - id: grok-4-7
         label: Grok 4.7
+        notes:
+          - "Picker description: xAI Grok 4.7 frontier model for coding and agentic tasks"
+          - "Picker cost tier: $$."
+          - "JSON effortLevels: low, medium, high. Not bound as a Cats control."
         source_names:
           - grok-4-7
           - Grok 4.7
         execution:
           model: grok-4-7
         controls: []
+      - id: gemini-3-8-flash
+        label: Gemini 3.8 Flash
+        notes:
+          - "Picker description: Fast and cost-efficient, 1M context"
+          - "Picker cost tier: $."
+          - "JSON effortLevels: low, medium, high, dynamic. Not bound as a Cats control."
+        source_names:
+          - gemini-3-8-flash
+          - Gemini 3.8 Flash
+        execution:
+          model: gemini-3-8-flash
+        controls: []
+      - id: kimi-k3
+        label: Kimi K3
+        notes:
+          - "Picker description: Strong performance at lower cost"
+          - "Picker cost tier: $$."
+          - "JSON effortLevels: low, high, max. Not bound as a Cats control."
+        source_names:
+          - kimi-k3
+          - Kimi K3
+        execution:
+          model: kimi-k3
+        controls: []
+      - id: glm-5-3
+        label: GLM 5.3 Flash
+        notes:
+          - "Picker description: Native vision and strong performance at lower cost, 1M context"
+          - "Picker cost tier: $."
+          - "JSON effortLevels: low, high, max. Not bound as a Cats control."
+        source_names:
+          - glm-5-3
+          - GLM 5.3 Flash
+        execution:
+          model: glm-5-3
+        controls: []
+      - id: deepseek-4-1-flash
+        label: DeepSeek V4.1 Flash
+        notes:
+          - "Picker description: Multimodal DeepSeek model with 1M context"
+          - "Picker cost tier: $."
+          - "JSON effortLevels: low, high, max. Not bound as a Cats control."
+        source_names:
+          - deepseek-4-1-flash
+          - DeepSeek V4.1 Flash
+        execution:
+          model: deepseek-4-1-flash
+        controls: []
       - id: butler_a
         label: Prism (Claude + GPT)
+        notes:
+          - "Picker description: Routes between Claude Opus 5, Claude Sonnet 5, and GPT-5.6 Luna."
+          - "Picker cost tier: $$$; badges: New, Auto."
+          - "JSON effortLevels: none listed. Not bound as a Cats control."
         source_names:
           - butler_a
           - Prism (Claude + GPT)
         execution:
           model: butler_a
+        controls: []
+      - id: butler_b
+        label: Prism (GPT)
+        notes:
+          - "Picker description: Routes between GPT-5.6 Sol deep, GPT-5.6 Luna mid-range, and Luna no-thinking solver tiers"
+          - "Picker cost tier: $$$; badges: New, Auto."
+          - "JSON effortLevels: none listed. Not bound as a Cats control."
+        source_names:
+          - butler_b
+          - Prism (GPT)
+        execution:
+          model: butler_b
+        controls: []
+      - id: gemini-3-1-pro-preview
+        label: Gemini 3.1 Pro
+        notes:
+          - "Picker description: Cost-efficient for complex tasks"
+          - "Picker cost tier: $$."
+          - "JSON effortLevels: low, medium, high, dynamic. Not bound as a Cats control."
+        source_names:
+          - gemini-3-1-pro-preview
+          - Gemini 3.1 Pro
+        execution:
+          model: gemini-3-1-pro-preview
+        controls: []
+      - id: gpt-5-6-sol
+        label: GPT-5.6 Sol
+        notes:
+          - "Picker description: OpenAI model for complex tasks"
+          - "Picker cost tier: $$$."
+          - "JSON effortLevels: none, low, medium, high, xhigh, max. Not bound as a Cats control."
+        source_names:
+          - gpt-5-6-sol
+          - GPT-5.6 Sol
+        execution:
+          model: gpt-5-6-sol
+        controls: []
+      - id: gpt-5-6-terra
+        label: GPT-5.6 Terra
+        notes:
+          - "Picker description: OpenAI model for everyday tasks"
+          - "Picker cost tier: $$."
+          - "JSON effortLevels: none, low, medium, high, xhigh, max. Not bound as a Cats control."
+        source_names:
+          - gpt-5-6-terra
+          - GPT-5.6 Terra
+        execution:
+          model: gpt-5-6-terra
+        controls: []
+      - id: gpt-5-6-luna
+        label: GPT-5.6 Luna
+        notes:
+          - "Picker description: OpenAI model for small-scale automations"
+          - "Picker cost tier: $."
+          - "JSON effortLevels: none, low, medium, high, xhigh, max. Not bound as a Cats control."
+        source_names:
+          - gpt-5-6-luna
+          - GPT-5.6 Luna
+        execution:
+          model: gpt-5-6-luna
+        controls: []
+      - id: gpt-5-5
+        label: GPT-5.5
+        notes:
+          - "Picker description: Best for complex tasks"
+          - "Picker cost tier: $$$."
+          - "JSON effortLevels: none, low, medium, high, xhigh. Not bound as a Cats control."
+        source_names:
+          - gpt-5-5
+          - GPT-5.5
+        execution:
+          model: gpt-5-5
+        controls: []
+      - id: claude-opus-5
+        label: Claude Opus 5
+        notes:
+          - "Picker description: Great for complex tasks"
+          - "Picker cost tier: $$$."
+          - "JSON effortLevels: low, medium, high, xhigh, max. Not bound as a Cats control."
+        source_names:
+          - claude-opus-5
+          - Claude Opus 5
+        execution:
+          model: claude-opus-5
+        controls: []
+      - default: true
+        id: claude-opus-4-8
+        label: Opus 4.8
+        notes:
+          - "Picker description: Great for complex, multi-step agentic tasks"
+          - "Picker cost tier: $$$."
+          - "JSON effortLevels: low, medium, high, xhigh, max. Not bound as a Cats control."
+        source_names:
+          - claude-opus-4-8
+          - Opus 4.8
+          - Opus 4.8 (default)
+        execution:
+          model: claude-opus-4-8
+        controls: []
+      - id: claude-opus-4-7
+        label: Opus 4.7
+        notes:
+          - "Picker description: Great for complex, multi-step agentic tasks"
+          - "Picker cost tier: $$$."
+          - "JSON effortLevels: low, medium, high, xhigh, max. Not bound as a Cats control."
+        source_names:
+          - claude-opus-4-7
+          - Opus 4.7
+        execution:
+          model: claude-opus-4-7
+        controls: []
+      - id: claude-opus-4-7-500k
+        label: Opus 4.7 (500K)
+        notes:
+          - "Picker description: Anthropic Claude Opus 4.7, 500K context window"
+          - "Picker cost tier: $$$."
+          - "JSON effortLevels: low, medium, high, xhigh, max. Not bound as a Cats control."
+        source_names:
+          - claude-opus-4-7-500k
+          - Opus 4.7 (500K)
+        execution:
+          model: claude-opus-4-7-500k
+        controls: []
+      - id: claude-fable-5
+        label: Claude Fable 5
+        notes:
+          - "Picker description: First Anthropic Mythos-class model — Great for long horizon asynchronous tasks"
+          - "Picker cost tier: $$$$."
+          - "JSON effortLevels: low, medium, high, xhigh, max. Not bound as a Cats control."
+        source_names:
+          - claude-fable-5
+          - Claude Fable 5
+        execution:
+          model: claude-fable-5
+        controls: []
+      - id: claude-opus-4-6
+        label: Opus 4.6
+        notes:
+          - "Picker description: Good for complex, multi-step agentic tasks"
+          - "Picker cost tier: $$$."
+          - "JSON effortLevels: low, medium, high, max. Not bound as a Cats control."
+        source_names:
+          - claude-opus-4-6
+          - Opus 4.6
+        execution:
+          model: claude-opus-4-6
+        controls: []
+      - id: claude-opus-4-6-500k
+        label: Opus 4.6 (500K)
+        notes:
+          - "Picker description: Anthropic Claude Opus 4.6, 500K context window"
+          - "Picker cost tier: $$$."
+          - "JSON effortLevels: low, medium, high, max. Not bound as a Cats control."
+        source_names:
+          - claude-opus-4-6-500k
+          - Opus 4.6 (500K)
+        execution:
+          model: claude-opus-4-6-500k
+        controls: []
+      - id: claude-sonnet-5-0-500k
+        label: Claude Sonnet 5 (500K)
+        notes:
+          - "Picker description: Latest Sonnet model, 500K context window"
+          - "Picker cost tier: $$."
+          - "JSON effortLevels: low, medium, high, xhigh, max. Not bound as a Cats control."
+        source_names:
+          - claude-sonnet-5-0-500k
+          - Claude Sonnet 5 (500K)
+        execution:
+          model: claude-sonnet-5-0-500k
+        controls: []
+      - id: claude-sonnet-4-6
+        label: Sonnet 4.6
+        notes:
+          - "Picker description: Latest Sonnet model with improved capabilities"
+          - "Picker cost tier: $$."
+          - "JSON effortLevels: low, medium, high, max. Not bound as a Cats control."
+        source_names:
+          - claude-sonnet-4-6
+          - Sonnet 4.6
+        execution:
+          model: claude-sonnet-4-6
+        controls: []
+      - id: claude-sonnet-4-6-500k
+        label: Sonnet 4.6 (500K)
+        notes:
+          - "Picker description: Anthropic Claude Sonnet 4.6, 500K context window"
+          - "Picker cost tier: $$."
+          - "JSON effortLevels: low, medium, high, max. Not bound as a Cats control."
+        source_names:
+          - claude-sonnet-4-6-500k
+          - Sonnet 4.6 (500K)
+        execution:
+          model: claude-sonnet-4-6-500k
+        controls: []
+      - id: claude-haiku-4-5
+        label: Haiku 4.5
+        notes:
+          - "Picker description: Fast and efficient responses"
+          - "Picker cost tier: $."
+          - "JSON effortLevels: none listed. Not bound as a Cats control."
+        source_names:
+          - claude-haiku-4-5
+          - Haiku 4.5
+        execution:
+          model: claude-haiku-4-5
+        controls: []
+      - id: grok-4-5
+        label: Grok 4.5
+        notes:
+          - "Picker description: xAI Grok 4.5 frontier model for coding and agentic tasks"
+          - "Picker cost tier: $$."
+          - "JSON effortLevels: low, medium, high. Not bound as a Cats control."
+        source_names:
+          - grok-4-5
+          - Grok 4.5
+        execution:
+          model: grok-4-5
+        controls: []
+      - id: grok-4-6
+        label: Grok 4.6
+        notes:
+          - "Picker description: xAI Grok 4.6 frontier model for coding and agentic tasks"
+          - "Picker cost tier: $$."
+          - "JSON effortLevels: low, medium, high. Not bound as a Cats control."
+        source_names:
+          - grok-4-6
+          - Grok 4.6
+        execution:
+          model: grok-4-6
+        controls: []
+      - id: gemini-3-7-flash
+        label: Gemini 3.7 Flash
+        notes:
+          - "Picker description: Fast and cost-efficient, 1M context"
+          - "Picker cost tier: $."
+          - "JSON effortLevels: low, medium, high, dynamic. Not bound as a Cats control."
+        source_names:
+          - gemini-3-7-flash
+          - Gemini 3.7 Flash
+        execution:
+          model: gemini-3-7-flash
+        controls: []
+      - id: kimi-k2p7
+        label: Kimi K2.7 Code
+        notes:
+          - "Picker description: Coding-focused model with strong performance at lower cost"
+          - "Picker cost tier: $."
+          - "JSON effortLevels: none listed. Not bound as a Cats control."
+        source_names:
+          - kimi-k2p7
+          - Kimi K2.7 Code
+        execution:
+          model: kimi-k2p7
+        controls: []
+      - id: glm-5-2
+        label: GLM 5.2
+        notes:
+          - "Picker description: Great performance at lower cost"
+          - "Picker cost tier: $."
+          - "JSON effortLevels: none listed. Not bound as a Cats control."
+        source_names:
+          - glm-5-2
+          - GLM 5.2
+        execution:
+          model: glm-5-2
         controls: []
   - provider: junie
     backend: cli

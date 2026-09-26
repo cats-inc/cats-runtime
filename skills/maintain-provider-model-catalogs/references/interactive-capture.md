@@ -192,6 +192,47 @@ Exercise traversal, config guards and restore without a desktop or Kiro:
 powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Test-KiroPicker.ps1
 ```
 
+## Windows Auggie helper
+
+[`Capture-AuggiePicker.ps1`](../scripts/Capture-AuggiePicker.ps1) owns Auggie CLI picker semantics
+and takes the same platform helper path. It does not launch Auggie or interpret defaults.
+
+1. **Launch.** Clean the environment first (launch hygiene above, plus `AUGMENT_*` and `AUGGIE_*`).
+   Open interactive `auggie` in a uniquely titled window with `Start-WindowsUiTerminal`, from an
+   empty private working directory. The workspace-indexing prompt accepts Escape, which skips
+   indexing for this session only.
+2. **Open the picker.** Type `/`, wait for `Enter command`, type `model`, wait for
+   `model Select the model for this session` and send one guarded Enter. The echo renders as
+   `/ model`, so do not match `/model` literally. Run `auggie model list --json` for
+   `-ExpectedModelCount`.
+3. **Capture.** Pass the settings file, normally `~/.augment/settings.json`:
+
+```powershell
+powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/scripts/Capture-AuggiePicker.ps1 `
+  -UiHelperPath $desktopUiHelper -WindowTitle $captureWindowTitle `
+  -OutputDirectory $newEmptyEvidenceDirectory -ConfigPath $auggieSettings `
+  -ExpectedModelCount $modelListCount
+```
+
+- The walk goes Up to the first row, Down to the last and Up again, reading each highlighted
+  row's label, `(current)` and `(default)` suffixes, badges, cost tier and description, and
+  checks that both directions agree. Edges come from the screen (no `↑`/`↓ N more` line and the
+  highlight on the first or last visible row), so no key is sent past an edge. It sends only Up
+  and Down and leaves the picker open at the first row.
+- `-ProbeSelection`, only with operator authorization, then presses Enter on each row (reopening
+  `/model` for rows after the first) and requires `Using model: <label>`. Any other screen, such
+  as an effort step, stops the probe. Escape is never sent. In 0.36.0 Enter changes only the
+  session model.
+- Before every key the settings file must match its pre-capture SHA-256; there is nothing to
+  restore. `KeyScreens` saves the opened picker once; every step is kept as text.
+- Exit the owned Auggie with the `/exit` slash command. Ctrl+C did not exit 0.36.0.
+
+Exercise the walk, probe and guards without a desktop or Auggie:
+
+```powershell
+powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Test-AuggiePicker.ps1
+```
+
 ## Turn evidence into data
 
 Trim only terminal padding/chrome, mark redactions visibly, and retain material picker text under
@@ -207,7 +248,9 @@ catalog delta, validation and limitations. The [Claude reference](providers/clau
 `docs/research/2026-09-25-claude-picker-agent-capture.md` do the same for Claude Code;
 `docs/research/2026-09-26-claude-picker-eleven-rows.md` adds the scrolled list and row values.
 The [Kiro reference](providers/kiro.md) and `docs/research/2026-09-27-kiro-picker-full-catalog.md`
-record a settings panel whose toggles persist, and its config restore.
+record a settings panel whose toggles persist, and its config restore. The
+[Auggie reference](providers/auggie.md) and `docs/research/2026-09-27-auggie-picker-full-catalog.md`
+record a picker without effort and the authorized Enter probe.
 
 ## Cost
 
@@ -240,17 +283,20 @@ node skills/maintain-provider-model-catalogs/scripts/measure-agent-usage.mjs <ho
   Kiro 2.24.1 records one credit entry per request and leaves the token fields at 0. The result
   also lists each turn's requests, duration and context use; the turn in progress has no metadata
   until it ends.
+- **Auggie:** `~/.augment/sessions/<session-id>.json`. Each `chatHistory` exchange is one call,
+  with tokens in its `token_usage` node. The call in progress is saved only when it ends, and
+  sub-agents appear only as session-level credits and USD.
 - **Grok, Muse and Antigravity:** no reader yet. Grok's session log holds only a cumulative
   context size, and Muse exposed no per-message usage on the 2026-09-25 and 2026-09-26 hosts.
   Report estimates and label them as such.
 
 Phase starts apply in order, and the call that matches one starts the next phase:
 
-- `at:<ISO time with zone>` (Claude, Codex, Junie): the first call at or after that time.
-- `text:<literal>` (Claude, Codex, Kiro): the first call whose own message or tool call contains
+- `at:<ISO time with zone>` (Auggie, Claude, Codex, Junie): the first call at or after that time.
+- `text:<literal>` (Auggie, Claude, Codex, Kiro): the first call whose own message or tool call contains
   the literal. Prompts and tool output never match, so use a unique command or file name from the
   agent's own calls, such as the capture window title.
-- `turn:<n>` (Junie, Kiro): the first call of user turn n.
+- `turn:<n>` (Auggie, Junie, Kiro): the first call of user turn n.
 
 Exercise every host reader with synthetic session files:
 

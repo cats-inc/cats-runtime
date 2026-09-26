@@ -48,8 +48,8 @@ The repository owner approved two maintenance groups for Cats Desktop and Runtim
 
 | Group | CLI providers | Maintained and selectable catalog |
 |---|---|---|
-| Full catalog | Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie CLI, Kiro CLI | Complete evidenced CLI model lists and all applicable effort/options, plus custom model-string input |
-| Shortlist | Cursor Agent CLI, Goose CLI, Devin CLI, GitHub Copilot CLI, OpenCode, Kilo Code CLI, Auggie CLI, Pi, Cline | At most six explicitly selected models per CLI, plus a custom-input action |
+| Full catalog | Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie CLI, Kiro CLI, Auggie CLI | Complete evidenced CLI model lists and all applicable effort/options, plus custom model-string input |
+| Shortlist | Cursor Agent CLI, Goose CLI, Devin CLI, GitHub Copilot CLI, OpenCode, Kilo Code CLI, Pi, Cline | At most six explicitly selected models per CLI, plus a custom-input action |
 
 **2026-09-26 amendment:** the owner moved Junie CLI from the shortlist group to the
 full-catalog group. It now carries the complete JetBrains AI picker list and each model's
@@ -63,6 +63,15 @@ full-catalog group. It now carries the complete `/model` picker list, including 
 routing row without a default claim, and each model's selectable effort through the
 `kiro.reasoning_effort` binding, as recorded in
 [the Kiro picker capture](../research/2026-09-27-kiro-picker-full-catalog.md). The evidence
+covers Windows native only; the shared scope does not establish equal WSL entitlement.
+Membership of the other groups is unchanged.
+
+**2026-09-27 Auggie amendment:** the owner moved Auggie CLI from the shortlist group to the
+full-catalog group. It now carries the complete `/model` picker list in picker order, including
+the Prism routing rows and the `(500K)` context variants, with `default: true` only on the row the
+picker marks `(default)`. The picker shows no effort, so no effort binding was added; the JSON
+`effortLevels` stay in notes. See
+[the Auggie picker capture](../research/2026-09-27-auggie-picker-full-catalog.md). The evidence
 covers Windows native only; the shared scope does not establish equal WSL entitlement.
 Membership of the other groups is unchanged.
 

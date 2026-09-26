@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-09-27-auggie-picker-full-catalog](./2026-09-27-auggie-picker-full-catalog.md) | Auggie 0.36.0 full catalog, agent-operated picker capture | 34 picker rows with opaque JSON IDs, Opus 4.8 as the only picker default, no effort in the picker or after the authorized Enter probe, effort levels in notes only, Windows-only scope, the Auggie usage reader and the reusable capture helper |
 | [2026-09-27-kiro-picker-full-catalog](./2026-09-27-kiro-picker-full-catalog.md) | Kiro 2.24.1 full catalog, agent-operated picker capture | 20 raw IDs including auto without a default, per-model effort on ten rows, new `kiro.reasoning_effort` binding, settings written on toggle and restored, Windows-only scope, per-phase session credits and the reusable capture, restore and usage helpers |
 | [2026-09-26-junie-picker-full-catalog](./2026-09-26-junie-picker-full-catalog.md) | Junie 26.9.22 full catalog, agent-operated picker capture | 15 JetBrains AI models, per-model effort from the Right-key cycle, JAR-backed effort tokens and order, no effort defaults, Defender launch incident and phase token accounting |
 | [2026-09-26-cli-model-setting-dimensions](./2026-09-26-cli-model-setting-dimensions.md) | Model-setting dimensions across the 16 CLI providers | Provider/model/thinking/effort/context/fast coverage, settings outside those six, one-, two- and config-only third-level routing prefixes, which CLIs parse settings from a custom model string, and catalog/adapter discrepancies |
@@ -15,7 +16,7 @@
 | [2026-09-24-codex-picker-pilot](./2026-09-24-codex-picker-pilot.md) | Codex native picker pilot | Seven observed models, per-model efforts/defaults, data-only refresh and reusable capture |
 | [2026-09-23-pi-shortlist](./2026-09-23-pi-shortlist.md) | Pi subscription shortlist | Six visible provider labels, fixed medium execution and isolated discovery tests |
 | [2026-09-23-goose-shortlist](./2026-09-23-goose-shortlist.md) | Goose ChatGPT Codex shortlist | Six fixed Off models, exact provider routing and native effort suffix |
-| [2026-09-23-auggie-shortlist](./2026-09-23-auggie-shortlist.md) | Auggie six-model shortlist | Exact labels and CLI IDs, opaque Prism mapping, first-row selection and custom input |
+| [2026-09-23-auggie-shortlist](./2026-09-23-auggie-shortlist.md) | Auggie six-model shortlist (superseded 2026-09-27) | Exact labels and CLI IDs, opaque Prism mapping, first-row selection and custom input |
 | [2026-09-23-junie-shortlist](./2026-09-23-junie-shortlist.md) | Junie fixed shortlist (superseded 2026-09-26) | Five literal model names, fixed effort execution, explicit default and custom input |
 | [2026-09-18-kiro-shortlist](./2026-09-18-kiro-shortlist.md) | Kiro six-model shortlist (superseded 2026-09-27) | Verbatim IDs, Native/WSL fallback, first-row selection and custom input |
 | [2026-09-18-cline-shortlist](./2026-09-18-cline-shortlist.md) | ClinePass six fixed combinations and prompt arguments | Verbatim model IDs, Medium execution, Qwen display projection, custom input, and the single-token/flag-like prompt fix |

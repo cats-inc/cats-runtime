@@ -1,5 +1,8 @@
 # Auggie 0.36.0 shortlist
 
+> Superseded on 2026-09-27 by the [full-catalog picker capture](./2026-09-27-auggie-picker-full-catalog.md).
+> Auggie is now a full-catalog provider with the complete 34-row `/model` picker list.
+
 ## Scope and evidence
 
 Mode: refresh. Interaction policy: confirm uncertainty. The operator supplied the complete

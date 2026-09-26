@@ -135,6 +135,53 @@ test('junie sums usage and cost per call and splits by turn or time', () => with
   assert.throws(() => measureAgentUsage({ host: 'junie', path: join(root, 'missing') }), /events\.jsonl/);
 }));
 
+test('auggie reads each exchange token_usage and splits by text, time or turn', () => withScratch((root) => {
+  const path = join(root, 'auggie-session.json');
+  const exchange = (message, ms, text, usage, model = 'auggie-model') => ({
+    exchange: {
+      request_message: message, model_id: model,
+      request_nodes: [{ type: 1, tool_result_node: { content: `${SECRET} MARK-CAPTURE in a tool result` } }],
+      response_nodes: [
+        { type: 8, thinking: { summary: `${SECRET} MARK-WRAP thinking` }, timestamp_ms: ms },
+        { type: 0, content: text, timestamp_ms: ms },
+        { type: 5, tool_use: { tool_name: 'launch-process', input_json: `{"command":"${text}"}` }, timestamp_ms: ms },
+        ...(usage ? [{ type: 10, token_usage: {
+          input_tokens: usage[0], cache_creation_input_tokens: usage[1], cache_read_input_tokens: usage[2],
+          output_tokens: usage[3], system_prompt_tokens: 999, max_context_tokens: 200000,
+        }, timestamp_ms: ms }] : []),
+      ],
+    },
+    finishedAt: new Date(ms).toISOString(),
+  });
+  writeFileSync(path, JSON.stringify({
+    sessionId: 'auggie-session', agentState: { userEmail: SECRET },
+    subAgentCreditsUsed: 0, subAgentCostUsd: 0,
+    chatHistory: [
+      exchange(`${SECRET} first request`, 1000, 'reading the skill', [2, 100, 1000, 10]),
+      exchange('', 2000, 'run MARK-CAPTURE now', [1, 20, 1100, 30]),
+      exchange('', 2500, 'no usage recorded', null),
+      exchange('', 3000, 'MARK-WRAP and report', [3, 0, 1200, 5]),
+      exchange(`${SECRET} second request`, 4000, 'second turn', [4, 50, 500, 7], 'auggie-other'),
+    ],
+  }));
+
+  const result = measureAgentUsage({ host: 'auggie', path,
+    phaseStarts: ['text:MARK-CAPTURE', 'text:MARK-WRAP', 'turn:2'], phaseNames: ['Prep', 'Capture', 'Wrap', 'Second'] });
+  assert.deepEqual(result.totals, {
+    calls: 4, uncachedInput: 10, cacheWrite: 170, cacheRead: 3800, output: 52,
+    from: '1970-01-01T00:00:01.000Z', to: '1970-01-01T00:00:04.000Z',
+  });
+  assert.deepEqual(Object.keys(result.byModel), ['auggie-model', 'auggie-other']);
+  assert.deepEqual(result.phases.map((phase) => [phase.phase, phase.firstCall, phase.calls, phase.output]),
+    [['Prep', 1, 1, 10], ['Capture', 2, 1, 30], ['Wrap', 3, 1, 5], ['Second', 4, 1, 7]]);
+  assert.deepEqual(result.subAgents, { credits: 0, costUsd: 0 });
+  assert.doesNotMatch(JSON.stringify(result), /SECRET|reading the skill|MARK/);
+  const byTime = measureAgentUsage({ host: 'auggie', path, phaseStarts: ['at:1970-01-01T00:00:02.500Z'] });
+  assert.deepEqual(byTime.phases.map((phase) => phase.calls), [2, 2]);
+  writeFileSync(path, JSON.stringify({ sessionId: 'x' }));
+  assert.throws(() => measureAgentUsage({ host: 'auggie', path }), /no chatHistory array/);
+}));
+
 function writeKiroSession(root, sessionId) {
   const metering = (values) => values.map((value) => ({ value, unit: 'credit', unitPlural: 'credits' }));
   const turn = (requests, secs, context, meteringValues, inputTokens = 0) => ({

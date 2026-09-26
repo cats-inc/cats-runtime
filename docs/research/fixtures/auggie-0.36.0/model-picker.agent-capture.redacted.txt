@@ -1,0 +1,76 @@
+# Auggie 0.36.0 /model picker, agent-operated capture (redacted projection)
+# Captured 2026-09-27 (UTC+8) on Windows native via Windows UI Automation text.
+# Columns: picker row | picker label as shown | cost | badges | JSON id | JSON effortLevels | Enter probe result
+# The session model (row 5, Claude Opus 5.5) carried a (current) suffix, omitted below. No account data is kept.
+# Picker title: Select model for this session. No row showed an effort value or an effort step after Enter.
+1 | GPT-6 Astra | $$$$ | - | gpt-6-astra | low/medium/high/xhigh/max | Using model: GPT-6 Astra
+2 | GPT-6 Sol | $$ | - | gpt-6-sol | none/low/medium/high/xhigh/max | Using model: GPT-6 Sol
+3 | GPT-6 Luna | $ | - | gpt-6-luna | none/low/medium/high/xhigh/max | Using model: GPT-6 Luna
+4 | Claude Fable 5.1 | $$$$ | - | claude-fable-5-1 | low/medium/high/xhigh/max | Using model: Claude Fable 5.1
+5 | Claude Opus 5.5 | $$$ | - | claude-opus-5-5 | low/medium/high/xhigh/max | Using model: Claude Opus 5.5
+6 | Claude Sonnet 5 | $$ | - | claude-sonnet-5-0 | low/medium/high/xhigh/max | Using model: Claude Sonnet 5
+7 | Grok 4.7 | $$ | - | grok-4-7 | low/medium/high | Using model: Grok 4.7
+8 | Gemini 3.8 Flash | $ | - | gemini-3-8-flash | low/medium/high/dynamic | Using model: Gemini 3.8 Flash
+9 | Kimi K3 | $$ | - | kimi-k3 | low/high/max | Using model: Kimi K3
+10 | GLM 5.3 Flash | $ | - | glm-5-3 | low/high/max | Using model: GLM 5.3 Flash
+11 | DeepSeek V4.1 Flash | $ | - | deepseek-4-1-flash | low/high/max | Using model: DeepSeek V4.1 Flash
+12 | Prism (Claude + GPT) | $$$ | New+Auto | butler_a | - | Using model: Prism (Claude + GPT)
+13 | Prism (GPT) | $$$ | New+Auto | butler_b | - | Using model: Prism (GPT)
+14 | Gemini 3.1 Pro | $$ | - | gemini-3-1-pro-preview | low/medium/high/dynamic | Using model: Gemini 3.1 Pro
+15 | GPT-5.6 Sol | $$$ | - | gpt-5-6-sol | none/low/medium/high/xhigh/max | Using model: GPT-5.6 Sol
+16 | GPT-5.6 Terra | $$ | - | gpt-5-6-terra | none/low/medium/high/xhigh/max | Using model: GPT-5.6 Terra
+17 | GPT-5.6 Luna | $ | - | gpt-5-6-luna | none/low/medium/high/xhigh/max | Using model: GPT-5.6 Luna
+18 | GPT-5.5 | $$$ | - | gpt-5-5 | none/low/medium/high/xhigh | Using model: GPT-5.5
+19 | Claude Opus 5 | $$$ | - | claude-opus-5 | low/medium/high/xhigh/max | Using model: Claude Opus 5
+20 | Opus 4.8 (default) | $$$ | - | claude-opus-4-8 | low/medium/high/xhigh/max | Using model: Opus 4.8
+21 | Opus 4.7 | $$$ | - | claude-opus-4-7 | low/medium/high/xhigh/max | Using model: Opus 4.7
+22 | Opus 4.7 (500K) | $$$ | - | claude-opus-4-7-500k | low/medium/high/xhigh/max | Using model: Opus 4.7 (500K)
+23 | Claude Fable 5 | $$$$ | - | claude-fable-5 | low/medium/high/xhigh/max | Using model: Claude Fable 5
+24 | Opus 4.6 | $$$ | - | claude-opus-4-6 | low/medium/high/max | Using model: Opus 4.6
+25 | Opus 4.6 (500K) | $$$ | - | claude-opus-4-6-500k | low/medium/high/max | Using model: Opus 4.6 (500K)
+26 | Claude Sonnet 5 (500K) | $$ | - | claude-sonnet-5-0-500k | low/medium/high/xhigh/max | Using model: Claude Sonnet 5 (500K)
+27 | Sonnet 4.6 | $$ | - | claude-sonnet-4-6 | low/medium/high/max | Using model: Sonnet 4.6
+28 | Sonnet 4.6 (500K) | $$ | - | claude-sonnet-4-6-500k | low/medium/high/max | Using model: Sonnet 4.6 (500K)
+29 | Haiku 4.5 | $ | - | claude-haiku-4-5 | - | Using model: Haiku 4.5
+30 | Grok 4.5 | $$ | - | grok-4-5 | low/medium/high | Using model: Grok 4.5
+31 | Grok 4.6 | $$ | - | grok-4-6 | low/medium/high | Using model: Grok 4.6
+32 | Gemini 3.7 Flash | $ | - | gemini-3-7-flash | low/medium/high/dynamic | Using model: Gemini 3.7 Flash
+33 | Kimi K2.7 Code | $ | - | kimi-k2p7 | - | Using model: Kimi K2.7 Code
+34 | GLM 5.2 | $ | - | glm-5-2 | - | Using model: GLM 5.2
+# JSON envelope: models=34, registryAvailable=true, defaultModelId=claude-sonnet-5-0-high-c4-p2-agent (no picker row).
+# JSON isDefault=true only on claude-opus-4-8.
+# Picker descriptions:
+1 | OpenAI model for complex reasoning and long-horizon agent tasks
+2 | OpenAI model for complex coding and agentic workflows
+3 | OpenAI model for focused, high-volume tasks
+4 | Latest Anthropic Mythos-class model — Great for long horizon asynchronous tasks
+5 | Latest Anthropic model for complex tasks
+6 | Latest Sonnet model, High effort
+7 | xAI Grok 4.7 frontier model for coding and agentic tasks
+8 | Fast and cost-efficient, 1M context
+9 | Strong performance at lower cost
+10 | Native vision and strong performance at lower cost, 1M context
+11 | Multimodal DeepSeek model with 1M context
+12 | Routes between Claude Opus 5, Claude Sonnet 5, and GPT-5.6 Luna.
+13 | Routes between GPT-5.6 Sol deep, GPT-5.6 Luna mid-range, and Luna no-thinking solver tiers
+14 | Cost-efficient for complex tasks
+15 | OpenAI model for complex tasks
+16 | OpenAI model for everyday tasks
+17 | OpenAI model for small-scale automations
+18 | Best for complex tasks
+19 | Great for complex tasks
+20 | Great for complex, multi-step agentic tasks
+21 | Great for complex, multi-step agentic tasks
+22 | Anthropic Claude Opus 4.7, 500K context window
+23 | First Anthropic Mythos-class model — Great for long horizon asynchronous tasks
+24 | Good for complex, multi-step agentic tasks
+25 | Anthropic Claude Opus 4.6, 500K context window
+26 | Latest Sonnet model, 500K context window
+27 | Latest Sonnet model with improved capabilities
+28 | Anthropic Claude Sonnet 4.6, 500K context window
+29 | Fast and efficient responses
+30 | xAI Grok 4.5 frontier model for coding and agentic tasks
+31 | xAI Grok 4.6 frontier model for coding and agentic tasks
+32 | Fast and cost-efficient, 1M context
+33 | Coding-focused model with strong performance at lower cost
+34 | Great performance at lower cost
