@@ -19,6 +19,21 @@ evidence belong in `docs/research/2026-09-18-opencode-shortlist.md`, not in this
   row. Do not pick the first result or infer it from neighboring rows. A matching name/ID does
   not establish model options, defaults or entitlements on another machine.
 
+## Project the verbose output
+
+`scripts/project-opencode-models.mjs` parses the ID-line-plus-object pairs from a file or stdin,
+starts no CLI, and prints only `id`, `name` and `providerID`:
+
+```text
+OPENCODE_DISABLE_AUTOUPDATE=true opencode models --verbose --pure > verbose.txt
+node scripts/project-opencode-models.mjs --input verbose.txt --ids opencode-go/a,opencode-go/b --match <text>
+```
+
+`--ids` reports each shortlist row as found or `missing: true`; without it every row is printed.
+`--match` lists rows whose ID or name contains the text, which is how to check that a missing row
+was withdrawn rather than renamed. Keep `verbose.txt` private: it is raw output. Commit only the
+projected rows to a `.redacted.json` fixture.
+
 
 ## Schema-2 execution data
 
