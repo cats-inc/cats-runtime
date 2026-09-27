@@ -273,6 +273,134 @@ describe('runtime adapters', () => {
     }
   });
 
+  it('runs Cline\'s extensionless node bin directly so a multi-line prompt arrives whole', () => {
+    if (process.platform !== 'win32') return;
+
+    // A quote in the prompt sent this through Windows PowerShell to cline.cmd,
+    // and cmd.exe ended the prompt at its first newline: Cline saw only
+    // `Instructions:` and rejected it as an unknown command.
+    const binDir = mkdtempSync(join(tmpdir(), 'cats-shim-spawn-'));
+    try {
+      mkdirSync(join(binDir, 'node_modules', 'cline', 'bin'), { recursive: true });
+      const script = join(binDir, 'node_modules', 'cline', 'bin', 'cline');
+      writeFileSync(script, '#!/usr/bin/env node\n');
+      writeFileSync(join(binDir, 'node.exe'), '');
+      writeFileSync(
+        join(binDir, 'cline.cmd'),
+        [
+          'IF EXIST "%dp0%\\node.exe" (',
+          '  SET "_prog=%dp0%\\node.exe"',
+          ') ELSE (',
+          '  SET "_prog=node"',
+          ')',
+          'endLocal & "%_prog%"  "%dp0%\\node_modules\\cline\\bin\\cline" %*',
+        ].join('\r\n'),
+      );
+      const prompt = 'Instructions:\n| Reply "hi".\n\nUser message:\n早安';
+
+      const spawnConfig = buildProcessSpawnConfig(
+        {
+          path: join(binDir, 'cline.cmd'),
+          runner: 'auto',
+          runtime: { mode: 'native' },
+        },
+        'cline',
+        ['--json', '--', prompt],
+        'C:\\Users\\kenne\\repo',
+      );
+
+      expect(spawnConfig.command).toBe(join(binDir, 'node.exe'));
+      expect(spawnConfig.args).toEqual([script, '--json', '--', prompt]);
+      expect(spawnConfig.shell).toBe(false);
+    } finally {
+      rmSync(binDir, { recursive: true, force: true });
+    }
+  });
+
+  it('runs Cursor\'s versioned node directly so a multi-line prompt arrives whole', () => {
+    if (process.platform !== 'win32') return;
+
+    // Through cursor-agent.cmd, Cursor received only `Instructions:`.
+    const installDir = mkdtempSync(join(tmpdir(), 'cats-cursor-spawn-'));
+    try {
+      const versionDir = join(installDir, 'versions', '2026.09.26-dd393fe');
+      mkdirSync(versionDir, { recursive: true });
+      writeFileSync(join(versionDir, 'node.exe'), '');
+      writeFileSync(join(versionDir, 'index.js'), '');
+      writeFileSync(join(installDir, 'cursor-agent.ps1'), '# launcher');
+      writeFileSync(
+        join(installDir, 'cursor-agent.cmd'),
+        '@echo off\r\n%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile '
+          + '-ExecutionPolicy Bypass -File "%SCRIPT_DIR%\\cursor-agent.ps1" %*\r\n',
+      );
+      const prompt = 'Instructions:\n| Reply "hi".\n\nUser message:\n早安';
+
+      const spawnConfig = buildProcessSpawnConfig(
+        {
+          path: join(installDir, 'cursor-agent'),
+          runner: 'auto',
+          runtime: { mode: 'native' },
+        },
+        'cursor',
+        ['-p', '--output-format', 'stream-json', prompt],
+        'C:\\Users\\kenne\\repo',
+      );
+
+      expect(spawnConfig.command).toBe(join(versionDir, 'node.exe'));
+      expect(spawnConfig.args).toEqual([
+        join(versionDir, 'index.js'), '-p', '--output-format', 'stream-json', prompt,
+      ]);
+      expect(spawnConfig.shell).toBe(false);
+      expect(spawnConfig.env?.CURSOR_INVOKED_AS).toBe('cursor-agent.cmd');
+    } finally {
+      rmSync(installDir, { recursive: true, force: true });
+    }
+  });
+
+  it('runs Junie\'s versioned binary directly so a multi-line prompt arrives whole', () => {
+    if (process.platform !== 'win32') return;
+
+    // Through junie.bat, cmd.exe ended the prompt at its first newline.
+    const root = mkdtempSync(join(tmpdir(), 'cats-junie-spawn-'));
+    const savedDataDir = process.env.JUNIE_DATA_DIR;
+    try {
+      const binDir = join(root, 'bin');
+      const junieData = join(root, 'data');
+      const binaryDir = join(junieData, 'versions', '3419.7', 'junie');
+      mkdirSync(binDir, { recursive: true });
+      mkdirSync(binaryDir, { recursive: true });
+      writeFileSync(join(binaryDir, 'junie.exe'), '');
+      writeFileSync(join(junieData, 'current'), '3419.7');
+      writeFileSync(join(binDir, 'junie.bat'), '@echo off\r\n:: JUNIE_MANAGED_SHIM\r\n"%JUNIE_EXE%" %*\r\n');
+      process.env.JUNIE_DATA_DIR = junieData;
+      const prompt = 'Instructions:\n| Reply "hi".\n\nUser message:\n早安';
+
+      const spawnConfig = buildProcessSpawnConfig(
+        {
+          path: join(binDir, 'junie'),
+          runner: 'auto',
+          runtime: { mode: 'native' },
+        },
+        'junie',
+        ['--output-format', 'json', prompt],
+        'C:\\Users\\kenne\\repo',
+      );
+
+      expect(spawnConfig.command).toBe(join(binaryDir, 'junie.exe'));
+      // The process policy's updater opt-out still reaches the binary.
+      expect(spawnConfig.args).toEqual(['--skip-update-check', '--output-format', 'json', prompt]);
+      expect(spawnConfig.shell).toBe(false);
+      expect(spawnConfig.env).toMatchObject({
+        EJ_RUNNER_PWD: 'C:\\Users\\kenne\\repo',
+        JUNIE_DATA: junieData,
+      });
+    } finally {
+      if (savedDataDir === undefined) delete process.env.JUNIE_DATA_DIR;
+      else process.env.JUNIE_DATA_DIR = savedDataDir;
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('keeps explicit PowerShell runners on the env-based PowerShell proxy', () => {
     const spawnConfig = buildProcessSpawnConfig(
       {

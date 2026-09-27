@@ -4,8 +4,11 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resolveWindowsNodeShim } from './windowsNodeShim.js';
 
-/** The shim npm writes today, reproduced from a real `codex.cmd`. */
-function npmShimContents(scriptRelativePath: string): string {
+/**
+ * The shim npm writes today, reproduced from a real `codex.cmd`. `program` is
+ * what npm read from the script's shebang.
+ */
+function npmShimContents(scriptRelativePath: string, program = 'node'): string {
   return [
     '@ECHO off',
     'GOTO start',
@@ -16,10 +19,10 @@ function npmShimContents(scriptRelativePath: string): string {
     'SETLOCAL',
     'CALL :find_dp0',
     '',
-    'IF EXIST "%dp0%\\node.exe" (',
-    '  SET "_prog=%dp0%\\node.exe"',
+    `IF EXIST "%dp0%\\${program}.exe" (`,
+    `  SET "_prog=%dp0%\\${program}.exe"`,
     ') ELSE (',
-    '  SET "_prog=node"',
+    `  SET "_prog=${program}"`,
     ')',
     '',
     'endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & set PATHEXT=%PATHEXT:;.JS;=;% '
@@ -67,6 +70,28 @@ describe('windows node shim resolution', () => {
     const target = resolveWindowsNodeShim(join(binDir, 'tool'));
 
     expect(target?.args).toEqual([scriptPath]);
+  });
+
+  it('resolves a shim whose node script has no extension, like Cline\'s bin\\cline', () => {
+    // Left to the shell proxy, a multi-line prompt reached Cline cut at its
+    // first newline, which Cline rejected as an unknown command.
+    const extensionless = join(binDir, 'node_modules', 'pkg', 'bin', 'cli');
+    writeFileSync(extensionless, '#!/usr/bin/env node\n');
+    writeFileSync(join(binDir, 'tool.cmd'), npmShimContents('node_modules\\pkg\\bin\\cli'));
+    writeFileSync(join(binDir, 'node.exe'), '');
+
+    expect(resolveWindowsNodeShim(join(binDir, 'tool.cmd'))).toEqual({
+      command: join(binDir, 'node.exe'),
+      args: [extensionless],
+    });
+  });
+
+  it('declines a shim whose shebang names a program other than node', () => {
+    writeFileSync(join(binDir, 'node_modules', 'pkg', 'bin', 'cli'), '#!/bin/sh\n');
+    writeFileSync(join(binDir, 'tool.cmd'), npmShimContents('node_modules\\pkg\\bin\\cli', 'sh'));
+    writeFileSync(join(binDir, 'node.exe'), '');
+
+    expect(resolveWindowsNodeShim(join(binDir, 'tool.cmd'))).toBeNull();
   });
 
   it('prefers a node.exe beside the shim over one on PATH, as the shim does', () => {

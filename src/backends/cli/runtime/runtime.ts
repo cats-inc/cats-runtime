@@ -5,6 +5,8 @@ import type { ProviderCommandConfig, ProviderRuntimeConfig } from '../config.js'
 import { resolveRuntimeRoot, resolveRuntimeSessionsDir } from '../../../shared/runtimePaths.js';
 import { resolveWindowsNodeShim } from './windowsNodeShim.js';
 import { resolveWindowsMuseLauncher } from './windowsMuseLauncher.js';
+import { resolveWindowsCursorLauncher } from './windowsCursorLauncher.js';
+import { resolveWindowsJunieLauncher } from './windowsJunieLauncher.js';
 import { resolveWindowsCodexLauncher } from './windowsCodexLauncher.js';
 import { getProviderProcessPolicy } from './providerProcessPolicy.js';
 import {
@@ -512,6 +514,35 @@ function buildNativeSpawnConfig(
             shell: false,
             cwd,
             ...(launcherTarget.env ? { env: launcherTarget.env } : {}),
+          };
+        }
+      }
+      // Cursor's `cursor-agent.cmd` chains through PowerShell to a node.exe in
+      // its newest version directory; neither layer carries a multi-line or
+      // quoted prompt intact. See `windowsCursorLauncher.ts`.
+      if (providerName === 'cursor') {
+        const launcherTarget = resolveWindowsCursorLauncher(commandPath);
+        if (launcherTarget) {
+          return {
+            command: launcherTarget.command,
+            args: [...launcherTarget.args, ...args],
+            shell: false,
+            cwd,
+            env: launcherTarget.env,
+          };
+        }
+      }
+      // JetBrains' `junie.bat` would end a multi-line prompt at its first
+      // newline. See `windowsJunieLauncher.ts`.
+      if (providerName === 'junie') {
+        const launcherTarget = resolveWindowsJunieLauncher(commandPath, cwd);
+        if (launcherTarget) {
+          return {
+            command: launcherTarget.command,
+            args,
+            shell: false,
+            cwd,
+            env: launcherTarget.env,
           };
         }
       }
