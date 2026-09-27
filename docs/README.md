@@ -130,6 +130,11 @@ new `copilot.context` and `copilot.auto_tier` bindings, omitted Pro+ rows, the q
 reusable capture, `models.list` and usage helpers. It supersedes the
 [Copilot fixed presets](./research/2026-09-17-copilot-fixed-presets.md).
 
+[Pi openai-codex channel](./research/2026-09-27-pi-openai-codex-full-catalog.md) records all eight
+Pi 0.87.1 `openai-codex` models read from the installed package, per-model thinking levels with the
+`medium` default Pi's thinking selector marks, and the reusable package extractor. It supersedes the
+[Pi shortlist](./research/2026-09-23-pi-shortlist.md).
+
 [Cursor fixed presets](./research/2026-09-17-cursor-fixed-presets.md) records the six approved
 combinations, parameterized execution, refresh-stable shortlist, and custom input.
 

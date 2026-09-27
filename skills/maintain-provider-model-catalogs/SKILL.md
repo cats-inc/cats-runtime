@@ -17,19 +17,18 @@ provider-specific model options or expanding the operator's scope.
 The operator-approved policy is recorded in the 2026-09-17 amendment to
 `docs/specs/SPEC-028-provider-model-catalog-maintenance-skill.md` in cats-runtime:
 
-- **Full catalogs:** Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie, Kiro, Auggie, and GitHub
-  Copilot. Maintain the
+- **Full catalogs:** Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie, Kiro, Auggie, GitHub
+  Copilot, and Pi (its `openai-codex` channel only). Maintain the
   complete evidenced CLI model lists and applicable effort/options; offer all of them in Desktop and
   Playground, plus custom model-string input. The six-model limit does not apply to this group.
-- **Shortlists:** Cursor Agent, Goose, Devin, OpenCode, Kilo Code, Pi, and Cline. Maintain at most six explicitly selected model entries per CLI, plus
+- **Shortlists:** Cursor Agent, Goose, Devin, OpenCode, Kilo Code, and Cline. Maintain at most six explicitly selected model entries per CLI, plus
   custom input. Effort remains attached to its model; the custom-input action is not a model slot.
 - Approved shortlists are recorded in `docs/research/2026-09-17-cursor-fixed-presets.md`,
   `docs/research/2026-09-18-opencode-shortlist.md`,
   `docs/research/2026-09-18-kilo-shortlist.md`,
   `docs/research/2026-09-18-devin-shortlist.md`,
-  `docs/research/2026-09-18-cline-shortlist.md`,
-  `docs/research/2026-09-23-goose-shortlist.md`, and
-  `docs/research/2026-09-23-pi-shortlist.md`.
+  `docs/research/2026-09-18-cline-shortlist.md`, and
+  `docs/research/2026-09-23-goose-shortlist.md`.
   Shortlist membership and order remain operator decisions. Do not truncate current
   catalogs or select the first six discovered models from this policy alone. These are product
   policy groups, not a substitute for deriving the registered inventory during an audit.
@@ -46,7 +45,7 @@ per-model effort control; Junie uses literal picker names plus a separate per-mo
 Auggie uses CLI-observed IDs and exact picker labels; its picker shows no effort, so it has no
 option controls;
 Goose uses provider-qualified IDs with fixed Thinking Off through its native model suffix;
-Pi retains bracketed provider labels and resolves fixed thinking through a separate CLI argument.
+Pi retains bracketed provider labels plus a separate per-model thinking control and CLI argument.
 No scheduled refresh cadence or automated refresh job has been specified.
 
 ## Schema-2 data boundary
@@ -264,8 +263,9 @@ authorizes that external mutation.
 - [OpenCode](./references/providers/opencode.md): verbose ID/name enumeration, same-name provider
   disambiguation, and entry-only shortlist wiring.
 
-- [Pi](./references/providers/pi.md): bracketed subscription labels, separate provider/model/thinking
-  transport and isolated shortlist versus dynamic-discovery tests.
+- [Pi](./references/providers/pi.md): the full `openai-codex` channel read from the installed
+  package, bracketed subscription labels, per-model thinking levels with the selector's default, and
+  separate provider/model/thinking transport.
 
 For providers without a reference, inspect the current adapter, discovery helper, catalog notes,
 and retained evidence. Add a provider reference only when a stable, non-obvious procedure is proven;

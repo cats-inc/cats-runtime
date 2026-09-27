@@ -12,7 +12,7 @@ import { buildProviderAdvancedKnowledge } from '../../core/models/providerAdvanc
 import { createCatalogSnapshot } from '../../catalogs/resolver.js';
 import { getStaticProviderModels } from '../../core/models/providerModelCatalog.js';
 
-describe.each(['cursor', 'opencode', 'kilo', 'devin', 'cline', 'goose', 'pi'])('%s shortlists in Playground', (provider) => {
+describe.each(['cursor', 'opencode', 'kilo', 'devin', 'cline', 'goose'])('%s shortlists in Playground', (provider) => {
   it('uses the approved fallbacks and preserves custom strings on reload', () => {
     const html = readFileSync(fileURLToPath(new URL('./pages/playground.html', import.meta.url)), 'utf8');
     expect(html).toContain('const PROVIDER_MODELS = {}');
@@ -353,7 +353,7 @@ describe('shared playground selection helpers', () => {
     for (const entry of catalog.entries) {
       context.entryId = entry.id;
       vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
-      const options = [...controls.innerHTML.matchAll(/<option value="([^"]+)"( selected)?>([^<]+)<\/option>/g)];
+      const options = [...controls.innerHTML.matchAll(/<option value="([^"]+)"\s*(selected)?>([^<]+)<\/option>/g)];
       // The context value token is `default`; no visible label may claim a default.
       expect(options.map(match => match[3]).filter(label => /default/i.test(label))).toEqual([]);
       rendered[entry.id] = options.filter(match => match[2]).map(match => [match[1], match[3]]);
@@ -374,6 +374,44 @@ describe('shared playground selection helpers', () => {
     const custom = 'claude-opus-5';
     expect(catsUI.normalizePlaygroundAgentSelection({ ...input, model: custom }))
       .toEqual({ provider: 'copilot', model: custom, modelSelection: null });
+  });
+
+  it('initializes Pi at the first openai-codex row with medium thinking and keeps provider/model input', () => {
+    const catsUI = createCatsUI();
+    const target = { providerName: 'pi', backend: 'cli' as const,
+      instanceId: 'native', defaultTarget: true };
+    const models = getStaticProviderModels(target);
+    const { catalog } = buildProviderAdvancedKnowledge(target, {
+      provider: 'pi', backend: 'cli', instance: 'native', defaultModel: null,
+      source: 'static', cache: null, models, warnings: [],
+    }, { snapshot: createCatalogSnapshot(readFileSync(new URL('../../../config/curated-model-catalogs.yaml.example', import.meta.url), 'utf8')) });
+    const html = readFileSync(new URL('./pages/playground.html', import.meta.url), 'utf8');
+    const start = html.indexOf('function renderAgentModelControls(');
+    const end = html.indexOf('function applyAgentModelControlValues(', start);
+    const controls = { innerHTML: '' };
+    const context = { window: { CatsUI: catsUI }, escapeHtml: String,
+      div: { querySelector: () => controls }, catalog, entryId: '' };
+    vm.createContext(context);
+    vm.runInContext(html.slice(start, end), context);
+    expect(models).toHaveLength(8);
+    expect(models.some(model => model.default)).toBe(false);
+    const input = { provider: 'pi', selectableProviders: ['pi'], providerOrder: ['pi'],
+      advancedCatalogs: { pi: catalog } };
+    expect(catsUI.normalizePlaygroundAgentSelection(input).modelSelection.entryId).toBe('openai-codex/gpt-5.3-codex-spark');
+    const levels: Record<string, string[]> = {};
+    for (const entry of catalog.entries) {
+      context.entryId = entry.id;
+      vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
+      const options = [...controls.innerHTML.matchAll(/<option value="([^"]+)"\s*(selected)?>([^<]+)<\/option>/g)];
+      expect(options.filter(match => match[2]).map(match => match[1])).toEqual(['medium']);
+      levels[entry.id] = options.map(match => match[1]);
+    }
+    expect(levels['openai-codex/gpt-5.5']).toEqual(['off', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+    expect(levels['openai-codex/gpt-6-astra']).toEqual(['minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
+    expect(levels['openai-codex/gpt-6-sol']).toEqual(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
+    const custom = 'anthropic/claude-opus-5';
+    expect(catsUI.normalizePlaygroundAgentSelection({ ...input, model: custom }))
+      .toEqual({ provider: 'pi', model: custom, modelSelection: null });
   });
 
   it('renders the Antigravity first effort without default labels and preserves saved effort', () => {
