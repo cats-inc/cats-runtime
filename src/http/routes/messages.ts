@@ -195,6 +195,26 @@ async function* streamTurnWithPiRecovery(
   }
 }
 
+/**
+ * Ends a turn whose events stopped without a result or error with a result, so
+ * the run, the observed stream and the response all see the turn complete. An
+ * ephemeral provider whose after-turn lookup finds no native session sends none.
+ */
+async function* withTurnTerminalEvent(
+  events: AsyncIterable<StreamEvent>,
+): AsyncGenerator<StreamEvent> {
+  let terminal = false;
+  for await (const event of events) {
+    if (isResultStreamEvent(event) || isErrorStreamEvent(event)) {
+      terminal = true;
+    }
+    yield event;
+  }
+  if (!terminal) {
+    yield { type: 'result' } satisfies ResultStreamEvent;
+  }
+}
+
 function recoverPiUnknownSession(
   ctx: AppContext,
   id: string,
@@ -738,7 +758,6 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     const stream = new ReadableStream({
       async start(controller) {
         let assistantText = '';
-        let completed = false;
         const turnStartedAt = Date.now();
         const contentBlocks = createRuntimeContentBlockProjector();
         try {
@@ -748,11 +767,11 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
               controller.enqueue(new TextEncoder().encode(JSON.stringify(outputEvent) + '\n'));
             }
           }
-          const eventStream = peerRouted
+          const eventStream = withTurnTerminalEvent(peerRouted
             ? worker!.streamMessage(turnInput)
             : streamTurnWithPiRecovery(ctx, id, turnInput, () => {
                 ensureRecoveredPiHistorySourcePath(ctx, id, turnInput, historyState);
-              });
+              }));
           for await (const event of eventStream) {
             const observedEvent = metering.observeEvent(executionSession, event, { turnStartedAt });
             runtime.observeEvent(id, observedEvent);
@@ -792,7 +811,6 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
             }
 
             if (isResultStreamEvent(observedEvent)) {
-              completed = true;
               assistantText = flushAssistantText(historyState.sourcePath, assistantText);
               ctx.registry.recordMessage(
                 id,
@@ -802,16 +820,9 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
             }
 
             if (isErrorStreamEvent(observedEvent)) {
-              completed = true;
               assistantText = flushAssistantText(historyState.sourcePath, assistantText);
               restoreReadyIfSessionStillInteractive(ctx.registry, id);
             }
-          }
-
-          if (!completed) {
-            assistantText = flushAssistantText(historyState.sourcePath, assistantText);
-            ctx.registry.recordMessage(id);
-            restoreReadyIfSessionStillInteractive(ctx.registry, id);
           }
         } catch (err) {
           const errorEvent = metering.observeEvent(executionSession, {
@@ -855,7 +866,6 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
 
   return streamSSE(c, async (stream) => {
     let assistantText = '';
-    let completed = false;
     const turnStartedAt = Date.now();
     const contentBlocks = createRuntimeContentBlockProjector();
     try {
@@ -868,11 +878,11 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           });
         }
       }
-      const eventStream = peerRouted
+      const eventStream = withTurnTerminalEvent(peerRouted
         ? worker!.streamMessage(turnInput)
         : streamTurnWithPiRecovery(ctx, id, turnInput, () => {
             ensureRecoveredPiHistorySourcePath(ctx, id, turnInput, sseHistoryState);
-          });
+          }));
       for await (const event of eventStream) {
         const observedEvent = metering.observeEvent(executionSession, event, { turnStartedAt });
         runtime.observeEvent(id, observedEvent);
@@ -914,7 +924,6 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
         }
 
         if (isResultStreamEvent(observedEvent)) {
-          completed = true;
           assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
           ctx.registry.recordMessage(
             id,
@@ -924,16 +933,9 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
         }
 
         if (isErrorStreamEvent(observedEvent)) {
-          completed = true;
           assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
           restoreReadyIfSessionStillInteractive(ctx.registry, id);
         }
-      }
-
-      if (!completed) {
-        assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
-        ctx.registry.recordMessage(id);
-        restoreReadyIfSessionStillInteractive(ctx.registry, id);
       }
     } catch (err) {
       assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
