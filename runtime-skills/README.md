@@ -200,6 +200,17 @@ practice on their own, or replace ordinary Catlas/Orchestrator knowledge.
 ## Delivery
 
 The runtime resolves and delivers these product packages when a session requests them.
+Codex filesystem delivery also supports a Runtime-owned Git worktree when its
+session identity, physical path and source Git common directory match. Existing
+repository ignore rules must cover every skill/resource and preview marker;
+tracked targets, symlinks, junctions and hardlinks reject delivery. Runtime does
+not change Git configuration or the index to make this possible. Source workspaces
+and unverified worktrees still degrade to instructions (and fail strict mode).
+Provider access, permission mode and tool grants are independent and unchanged.
+Each create/message/resume hydration revalidates delivery; messages trigger
+hydration when skills or hydration context metadata are supplied. Explicit
+version/fingerprint requests must be repeated when the caller requires the same
+package across messages. An ordinary message without either keeps its existing state.
 Run `npm run verify:skills` after editing the library. Repository agent-sync helpers
 read the separate developer `skills/` root and never copy this library.
 

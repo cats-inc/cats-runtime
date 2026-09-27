@@ -2,6 +2,11 @@
 
 > This directory contains all project documentation.
 
+Codex skill delivery now verifies Runtime-owned worktree identity, physical
+containment and existing ignore rules before preparing skill files. Provider
+grants are unchanged; source and unverified targets still reject strict delivery.
+See the [content-policy checkpoint](plans/PLAN-041-preview-skill-content-policy.md).
+
 ## Windows Codex background launch
 
 [Windows Codex hidden launch](research/2026-09-26-windows-codex-hidden-launch.md)

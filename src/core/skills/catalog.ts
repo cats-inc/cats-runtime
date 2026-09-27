@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 import { parse as parseYaml } from 'yaml';
 import { RuntimeSkillError } from './errors.js';
+import { canDeliverSkillsToWorktree } from './worktreeDelivery.js';
 export { RuntimeSkillError } from './errors.js';
 import {
   assertReleaseWorkspace, contentConflict, fingerprintPreviewSkillPackage, getRuntimeSkillContentPolicy, isPreviewSkillPath,
@@ -31,6 +32,7 @@ import type {
   RuntimeSkillPackageKind,
   RuntimeSkillManifest,
   SessionSkillState,
+  SessionWorkspaceState,
   WorkspaceKind,
   WorkspaceMode,
 } from '../types.js';
@@ -136,6 +138,7 @@ interface ResolveRuntimeSkillManifestOptions {
   cwd: string;
   sessionBaseDir: string;
   workspaceKind?: WorkspaceKind;
+  workspace?: SessionWorkspaceState;
   workspaceMode?: WorkspaceMode;
   now?: Date;
   baseInstructionsFile?: string;
@@ -1218,22 +1221,26 @@ function buildRuntimeSkillDeliveryPlan(
   options: ResolveRuntimeSkillManifestOptions,
 ): RuntimeSkillDeliveryPlan {
   if (options.providerBackend === 'cli' && options.providerName === 'codex') {
-    // Runtime prepares its sandbox; provider read-only access is independent
-    // of that ownership. Canonical source/worktree must override legacy hints.
+    // Provider access is independent from Runtime preparation ownership.
+    // A worktree additionally needs physical ownership and existing Git ignores.
     const isolatedSandbox = options.workspaceKind !== undefined
       ? options.workspaceKind === 'sandbox'
       : options.workspaceMode === 'isolated';
     const warnings: string[] = [];
-    if (!isolatedSandbox) {
+    const managedWorktree = options.workspaceKind === 'worktree' && canDeliverSkillsToWorktree({
+      ...options, packages: skillPackages, marker: PREVIEW_WORKSPACE_MARKER,
+    });
+    const owned = isolatedSandbox || managedWorktree;
+    if (!owned) {
       warnings.push(
-        'Codex runtime skills prefer filesystem delivery; source/worktree targets or unproven sandbox ownership require a downgrade to instruction delivery.',
+        'Codex runtime skills prefer filesystem delivery; source/worktree targets without verified ownership and ignored skill paths require a downgrade to instruction delivery.',
       );
     }
 
-    const compatibility = isolatedSandbox
+    const compatibility = owned
       ? canMaterializeCodexFilesystem(skillPackages, options.cwd)
       : { ok: false, warnings };
-    if (compatibility.ok && isolatedSandbox) {
+    if (compatibility.ok && owned) {
       return {
         preferredMode: 'filesystem',
         mode: 'filesystem',

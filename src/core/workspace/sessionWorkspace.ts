@@ -663,11 +663,11 @@ function resolvePermissionMode(
     : permissionMode ?? 'skip';
 }
 
-function buildWorktreeId(sourceRepoRoot: string, sessionId: string): string {
+export function buildWorktreeId(sourceRepoRoot: string, sessionId: string): string {
   return `${sanitizePathSegment(basename(sourceRepoRoot))}-${sessionId}`;
 }
 
-function buildWorktreePath(
+export function buildWorktreePath(
   sessionBaseDir: string,
   sourceRepoRoot: string,
   sessionId: string,

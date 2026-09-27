@@ -7,7 +7,35 @@ The cross-repository contract is
 [SPEC-117](../../../cats-platform/docs/specs/SPEC-117-cats-self-development-and-catlas-practice.md)
 and [ADR-118](../../../cats-platform/docs/decisions/118-use-isolated-development-and-verified-practice-for-cats-improvement.md).
 
-## Resume checkpoint — read-only sandbox delivery (2026-09-26)
+## Resume checkpoint — owned worktree delivery (2026-09-27)
+
+The owner authorized continued PLAN-109 implementation and normal direct main
+commit/push, without another version bump or publication. Platform `5201175d`
+adds an explicit Cats development owner choice with strict pinned skill delivery
+before/after the implementation goal. Codex worktree delivery formerly always
+downgraded, so that strict choice stopped before executing the goal.
+
+Internal hydration now passes existing canonical workspace state to skill
+resolution. Codex can materialize in a worktree only after checking the same
+session-derived worktree ID/path, physical containment, actual Git root/common
+directory, link-free target paths, and existing Git ignore coverage for every
+package/resource and preview marker. Tracked targets reject. Inspection strips
+inherited Git routing, disables global/system config and optional locks; it
+does not mutate the index/config or grant provider permissions. Source and
+unproven worktree requests retain their existing strict rejection. No new HTTP
+field or persisted format is introduced; no migration is required.
+
+Focused real-temporary-Git hydration checks cover create/message/resume, nested
+cwd, unchanged source/index, forged identity, source targets, missing ignores,
+tracked skill/marker, junctions, hardlinks and changed reference contents.
+TypeScript build passed. The final 17 real-worktree regressions pass, alongside
+54 existing catalog/content-policy/hydration cases (71 distinct passing checks).
+Independent review found and cleared hardlink marker and retained nested-root
+issues; no remaining blocker. The first run also exposed Windows Git's rejection
+of Node's device-style null path; inspection now uses Git-compatible `NUL`.
+These checks do not invoke a provider and do not close live delivery acceptance.
+
+## Previous checkpoint — read-only sandbox delivery (2026-09-26)
 
 - Integration authorized: normal auto-merge PR plus the paired Desktop
   standard-profile preview; no npm publication. Rebased cleanly onto current
