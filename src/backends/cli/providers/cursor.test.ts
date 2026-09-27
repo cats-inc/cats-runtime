@@ -1,5 +1,29 @@
 import { describe, expect, it } from 'vitest';
+import type { StreamEvent } from './types.js';
 import { CursorProvider } from './cursor.js';
+
+/** An assistant line as Cursor's stream-json writer shapes it. */
+function assistantLine(text: string, extra: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    type: 'assistant',
+    message: { role: 'assistant', content: [{ type: 'text', text }] },
+    session_id: 'cursor-123',
+    ...extra,
+  });
+}
+
+/** Feed lines through the provider and return the text it would show. */
+function streamedText(provider: CursorProvider, lines: string[]): string {
+  return lines
+    .flatMap((line) => {
+      const parsed = provider.parseStreamLine(line);
+      if (parsed === null) return [];
+      return Array.isArray(parsed) ? parsed : [parsed];
+    })
+    .filter((event): event is Extract<StreamEvent, { type: 'text' }> => event.type === 'text')
+    .map((event) => event.text)
+    .join('');
+}
 
 describe('CursorProvider', () => {
   it('builds ephemeral spawn args with prompt and resume support', () => {
@@ -74,6 +98,58 @@ describe('CursorProvider', () => {
         content: [{ type: 'text', text: 'Hello world' }],
       },
     }))).toBeNull();
+  });
+
+  it('shows text before a tool call once, not again when Cursor replays it', () => {
+    // Cursor replays the streamed segment, tagged model_call_id, before each
+    // tool call; showing it made every such segment appear twice.
+    const provider = new CursorProvider();
+
+    expect(streamedText(provider, [
+      assistantLine('只有「Instructions:」，', { timestamp_ms: 1 }),
+      assistantLine('我先查看工作區。', { timestamp_ms: 2 }),
+      assistantLine('只有「Instructions:」，我先查看工作區。', { timestamp_ms: 3, model_call_id: 'm1' }),
+      JSON.stringify({ type: 'tool_call', subtype: 'started', call_id: 'c1', model_call_id: 'm1', timestamp_ms: 4 }),
+      JSON.stringify({ type: 'tool_call', subtype: 'completed', call_id: 'c1', model_call_id: 'm1', timestamp_ms: 5 }),
+      assistantLine('工作區是空的。', { timestamp_ms: 6 }),
+      assistantLine('工作區是空的。'),
+      JSON.stringify({ type: 'result', subtype: 'success', session_id: 'cursor-123' }),
+    ])).toBe('只有「Instructions:」，我先查看工作區。工作區是空的。');
+  });
+
+  it('drops the untagged replay Cursor writes before a retry or an interaction query', () => {
+    const provider = new CursorProvider();
+
+    expect(streamedText(provider, [
+      assistantLine('Searching ', { timestamp_ms: 1 }),
+      assistantLine('the web.', { timestamp_ms: 2 }),
+      assistantLine('Searching the web.', { timestamp_ms: 3 }),
+      JSON.stringify({ type: 'interaction_query', subtype: 'request', timestamp_ms: 4 }),
+      assistantLine('Found it.', { timestamp_ms: 5 }),
+      assistantLine('Found it.', { timestamp_ms: 6 }),
+      JSON.stringify({ type: 'retry', subtype: 'starting', timestamp_ms: 7 }),
+      assistantLine('Done.', { timestamp_ms: 8 }),
+      assistantLine('Done.'),
+    ])).toBe('Searching the web.Found it.Done.');
+  });
+
+  it('keeps a delta that repeats everything so far, like 好 then 好', () => {
+    const provider = new CursorProvider();
+
+    expect(streamedText(provider, [
+      assistantLine('好', { timestamp_ms: 1 }),
+      assistantLine('好', { timestamp_ms: 2 }),
+      assistantLine('休息。', { timestamp_ms: 3 }),
+      assistantLine('好好休息。'),
+    ])).toBe('好好休息。');
+
+    // Held until the next line, and released even when that line is the end.
+    const another = new CursorProvider();
+    expect(streamedText(another, [
+      assistantLine('好', { timestamp_ms: 1 }),
+      assistantLine('好', { timestamp_ms: 2 }),
+      assistantLine('好好'),
+    ])).toBe('好好');
   });
 
   it('falls back to the full assistant message when no partial chunks were seen', () => {
