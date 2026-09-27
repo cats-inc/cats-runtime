@@ -1,5 +1,8 @@
-import { readFile } from 'node:fs/promises';
-import { describe, expect, it, vi } from 'vitest';
+import { existsSync } from 'node:fs';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   KiroNativeSessionService,
 } from './KiroNativeSessionService.js';
@@ -218,4 +221,96 @@ describe('KiroNativeSessionService', () => {
     await expect(service.listAllSessions({ startIfNeeded: false })).resolves.toEqual([]);
     expect(runner).not.toHaveBeenCalled();
   });
+});
+
+describe('KiroNativeSessionService with the Kiro 2.24 session store', () => {
+  let root: string | null = null;
+
+  afterEach(async () => {
+    if (root) await rm(root, { recursive: true, force: true });
+    root = null;
+  });
+
+  // Runs the real scripts under Python against files shaped like Kiro 2.24's
+  // `~/.kiro/sessions/cli`, with no `data.sqlite3` at all.
+  async function createStore() {
+    root = await mkdtemp(join(tmpdir(), 'cats-kiro-store-'));
+    const store = join(root, 'sessions', 'cli');
+    const workspace = join(root, 'workspace');
+    await mkdir(store, { recursive: true });
+    const writeSession = async (id: string, cwd: string, updatedAt: string, lines: unknown[]) => {
+      await writeFile(join(store, `${id}.json`), JSON.stringify({
+        session_id: id,
+        cwd,
+        created_at: '2026-09-27T22:50:18.100050800Z',
+        updated_at: updatedAt,
+        title: 'Instructions:',
+        session_state: {
+          conversation_metadata: { user_turn_metadatas: [{ model: 'claude-opus-5.5' }] },
+          rts_model_state: { model_info: { model_id: 'auto' } },
+        },
+      }));
+      await writeFile(join(store, `${id}.jsonl`), lines.map((line) => JSON.stringify(line)).join('\n'));
+    };
+    const prompt = (text: string) => ({
+      version: 'v1',
+      kind: 'Prompt',
+      data: { message_id: 'p', content: [{ kind: 'text', data: text }], meta: { timestamp: 1790549418 } },
+    });
+    const answer = (text: string) => ({
+      version: 'v1',
+      kind: 'AssistantMessage',
+      data: {
+        message_id: 'a',
+        content: [{ kind: 'thinking', data: { text: 'hidden' } }, { kind: 'text', data: text }],
+      },
+    });
+    await writeSession('kiro-new', workspace, '2026-09-27T22:50:25.137745600Z', [
+      prompt('Instructions:\nbe brief\n\ngood morning'),
+      answer('Good morning!'),
+    ]);
+    await writeSession('kiro-old', workspace, '2026-09-27T22:40:00.000000000Z', [prompt('earlier')]);
+    await writeSession('kiro-elsewhere', join(root, 'other'), '2026-09-27T23:00:00Z', [prompt('elsewhere')]);
+    await writeFile(join(store, 'kiro-new.lock'), '{"pid":1}');
+    await writeFile(join(store, 'mismatched.json'), JSON.stringify({ session_id: 'kiro-new', cwd: workspace }));
+    const service = new KiroNativeSessionService({
+      command: 'kiro-cli',
+      dbPath: join(root, 'missing', 'data.sqlite3'),
+      sessionsDir: store,
+      runtime: createRuntimeAdapter({ mode: 'native' }),
+    });
+    return { service, store, workspace };
+  }
+
+  it('lists, resumes and reads sessions from the store when the database is absent', async () => {
+    const { service, workspace } = await createStore();
+
+    const sessions = await service.listSessions(workspace);
+    expect(sessions.map((session) => session.providerSessionId)).toEqual(['kiro-new', 'kiro-old']);
+    expect(sessions[0]).toMatchObject({
+      summary: 'Instructions: be brief good morning',
+      messageCount: 1,
+      lastActivity: '2026-09-27T22:50:25.137745Z',
+      model: 'claude-opus-5.5',
+    });
+    await expect(service.canResumeSession(workspace, 'kiro-new')).resolves.toBe(true);
+    await expect(service.loadHistory(workspace, 'kiro-new')).resolves.toEqual([
+      { role: 'user', text: 'Instructions:\nbe brief\n\ngood morning', timestamp: '2026-09-27T22:50:18Z' },
+      { role: 'assistant', text: 'Good morning!', timestamp: null },
+    ]);
+  }, 30_000);
+
+  it('deletes a store session only for its own workspace and leaves Kiro its lock', async () => {
+    const { service, store, workspace } = await createStore();
+
+    await expect(service.deleteSession(join(root!, 'other'), 'kiro-new')).resolves.toBe(false);
+    expect(existsSync(join(store, 'kiro-new.json'))).toBe(true);
+
+    await expect(service.deleteSession(workspace, 'kiro-new')).resolves.toBe(true);
+    expect(existsSync(join(store, 'kiro-new.json'))).toBe(false);
+    expect(existsSync(join(store, 'kiro-new.jsonl'))).toBe(false);
+    expect(existsSync(join(store, 'kiro-new.lock'))).toBe(true);
+    const remaining = await service.listSessions(workspace);
+    expect(remaining.map((session) => session.providerSessionId)).toEqual(['kiro-old']);
+  }, 30_000);
 });
