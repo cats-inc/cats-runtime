@@ -70,8 +70,17 @@ export function resolveWindowsNpmShim(commandPath: string): WindowsNpmShimTarget
  *
  * `%dp0%` already ends in a separator, so the shim's own `\` after it is
  * optional here rather than required.
+ *
+ * The script need not end in `.js`: Cline's is `bin\cline`, an extensionless
+ * `#!/usr/bin/env node` script. npm picks `%_prog%` from the shebang, so for
+ * such a script {@link NPM_SHIM_NODE_PROGRAM} is what says the shim runs node.
  */
-const NPM_SHIM_LAUNCH = /"%_prog%"\s+"%dp0%[\\/]?([^"]+\.[cm]?js)"/u;
+const NPM_SHIM_LAUNCH = /"%_prog%"\s+"%dp0%[\\/]?([^"]+)"/u;
+
+const NODE_SCRIPT_EXTENSION = /\.[cm]?js$/iu;
+
+/** The fallback npm writes when the shebang names node: `SET "_prog=node"`. */
+const NPM_SHIM_NODE_PROGRAM = /SET "_prog=node"/iu;
 
 /** Shims npm may have written; `.bat` is what much older npm versions emit. */
 const SHIM_EXTENSIONS = ['.cmd', '.bat'];
@@ -91,6 +100,9 @@ export function resolveWindowsNodeShim(commandPath: string): WindowsNodeShimTarg
 
   const launch = NPM_SHIM_LAUNCH.exec(contents);
   if (!launch) {
+    return null;
+  }
+  if (!NODE_SCRIPT_EXTENSION.test(launch[1]) && !NPM_SHIM_NODE_PROGRAM.test(contents)) {
     return null;
   }
 
