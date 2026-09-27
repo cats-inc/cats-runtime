@@ -95,6 +95,7 @@ export class CodexProvider implements Provider {
   private _allowedTools: string[] = [];
   private _executionContext: ProviderExecutionContext = {};
   private _readTools: CodexReadTools | null = null;
+  private _initializeRequestId: number | null = null;
   private _threadBootstrapId: number | null = null;
   private _readTurnId: string | null = null;
   private _readCallIds = new Set<string>();
@@ -198,6 +199,7 @@ export class CodexProvider implements Provider {
 
       // Pipeline: initialize + initialized + thread/start|resume|fork + turn/start
       this.state = 'initializing';
+      this._initializeRequestId = this.nextId;
 
       const lines = [
         this.makeRequest('initialize', {
@@ -430,7 +432,14 @@ export class CodexProvider implements Provider {
 
     // thread/start|resume|fork response — extract threadId (may be at result.threadId or result.thread.id)
     if (this.state === 'initializing' && !this.threadId) {
-      if (msg.id !== this._threadBootstrapId) return null;
+      if (msg.id !== this._threadBootstrapId) {
+        const initialize = msg.id === this._initializeRequestId;
+        return observeIgnored(this.evolutionObserver, {
+          rawEventType: initialize ? 'initialize' : 'jsonrpc:response',
+          reason: initialize ? 'bootstrap_initialize_response' : 'unrelated_bootstrap_response',
+          rawSample: msg,
+        }, null);
+      }
       const tid = result.threadId ?? asRecord(result.thread)?.id;
       if (typeof tid !== 'string' || !tid.trim()) {
         return this.failBootstrap(this._readTools

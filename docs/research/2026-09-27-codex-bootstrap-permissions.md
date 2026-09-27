@@ -64,3 +64,9 @@ persisted format, version, package pin or installed profile changes.
   transport, existing permission/usage tests and quota capture replay also passed.
 - These regression responses are synthetic. They are not another native model
   acceptance, a successful draft submission or a fresh provider quota charge.
+- Full CI of `7feb259f` found one additional diagnostic regression: the ignored
+  initialization reply was no longer counted by provider evolution telemetry.
+  The adapter now preserves that correlated diagnostic event while keeping
+  unrelated responses unable to release the pending turn.
+  The follow-up TypeScript build and **41 focused guard/telemetry tests** passed;
+  independent review found no blocker.
