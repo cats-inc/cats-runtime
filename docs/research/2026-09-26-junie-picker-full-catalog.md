@@ -5,6 +5,10 @@ Scope: the `junie` / `cli` catalog scope, changed from a five-row shortlist to
 `selection_mode: full`. Only the default JetBrains AI channel is in scope; BYOK channels
 selected with `--provider` are excluded.
 
+> **Amendment 2026-09-28:** `--model` accepts setting IDs, not these picker names, so every row now
+> executes as its setting ID. See [Junie executes setting IDs](./2026-09-28-junie-execution-ids.md).
+> The model list, labels, defaults and effort findings below still stand.
+
 ## Request and decisions
 
 The operator asked for Junie's catalog to be expanded like the full-catalog providers,

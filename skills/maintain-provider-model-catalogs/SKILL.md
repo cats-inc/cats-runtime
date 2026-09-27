@@ -41,7 +41,8 @@ operator-confirmed IDs plus separate per-row reasoning, context and Auto tier co
 resolves approved fixed variants separately from the raw model ID; Devin uses executable variant
 UIDs containing the fixed effort on its agent/ACP target; ClinePass uses explicit CLI provider
 selection plus a separate fixed thinking argument; Kiro uses verbatim picker IDs plus a separate
-per-model effort control; Junie uses literal picker names plus a separate per-model effort control;
+per-model effort control; Junie uses literal picker names as entry IDs, executed as the JAR's
+setting IDs, plus a separate per-model effort control;
 Auggie uses CLI-observed IDs and exact picker labels; its picker shows no effort, so it has no
 option controls;
 Goose uses provider-qualified IDs with fixed Thinking Off through its native model suffix;
@@ -250,9 +251,9 @@ authorizes that external mutation.
   probes, fixed Thinking Off transport and native-config/shortlist separation.
 - [Grok](./references/providers/grok.md): screenshot/transcription evidence, retained effort-token
   mappings, and first-item selection that reaches the execution arguments.
-- [Junie](./references/providers/junie.md): literal picker names, per-model effort from the
-  Right-key cycle, JAR-backed effort tokens and order, and operator-launched capture when Windows
-  Defender blocks agent-launched startup.
+- [Junie](./references/providers/junie.md): literal picker names executed as JAR setting IDs, the
+  setting-ID reader, per-model effort from the Right-key cycle, JAR-backed effort tokens and order,
+  and operator-launched capture when Windows Defender blocks agent-launched startup.
 - [Kiro](./references/providers/kiro.md): raw picker IDs, the settings-panel effort ring,
   toggles that persist without Enter, auto without a default claim, Windows-only evidence, and
   the capture and settings-restore helpers.

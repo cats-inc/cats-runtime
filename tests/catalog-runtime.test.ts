@@ -80,9 +80,14 @@ describe('factory and executable catalog projections', () => {
     expect(effort('Gemini 3.7 Flash')).toBe('low');
     expect(effort('Claude Opus 5.5', { 'junie.reasoning_effort': 'xhigh' })).toBe('xhigh');
     expect(() => effort('Gemini 3.7 Flash', { 'junie.reasoning_effort': 'xhigh' })).toThrow();
-    const args = new JunieProvider().buildSpawnArgs({ cwd: '/tmp', model: 'GPT-5.6-SOL',
-      modelControls: { 'junie.reasoning_effort': 'none' } });
-    expect(args.slice(args.indexOf('--model'), args.indexOf('--model') + 2)).toEqual(['--model', 'GPT-5.6-SOL']);
+    // --model accepts aliases and setting IDs; Junie rejects picker names as an invalid model.
+    const executed = junie.catalog.entries.map(e =>
+      resolveProviderSelection(junie, { entryId: e.id, entryMode: 'explicit' }).execution.model);
+    expect(executed.filter(model => !/^[a-z0-9][a-z0-9.-]*$/.test(model))).toEqual([]);
+    const selection = resolveProviderSelection(junie, { entryId: 'GPT-5.6-SOL', entryMode: 'explicit' });
+    const args = new JunieProvider().buildSpawnArgs({ cwd: '/tmp', model: selection.execution.model,
+      modelControls: selection.resolution.controls });
+    expect(args.slice(args.indexOf('--model'), args.indexOf('--model') + 2)).toEqual(['--model', 'gpt-5.6-sol']);
     expect(args.slice(args.indexOf('--effort'), args.indexOf('--effort') + 2)).toEqual(['--effort', 'none']);
   });
 

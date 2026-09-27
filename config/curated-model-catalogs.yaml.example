@@ -3016,9 +3016,11 @@ catalogs:
         26.9.22 (build 3419.7) by operating the CLI picker. Every row is on the JetBrains AI
         channel. Evidence: docs/research/fixtures/junie-26.9.22/model-picker.agent-capture.redacted.txt
         and docs/research/2026-09-26-junie-picker-full-catalog.md."
-      - "Pass picker names literally to --model, preserving spelling and case. The picker row
-        Default (Gemini 3.7 Flash) executes as Gemini 3.7 Flash and is the only row marked Default.
-        All 15 names appear verbatim in the installed JAR's ModelOption$Specific."
+      - "Picker names are the entry IDs and labels. --model accepts only aliases and setting IDs
+        and rejects picker names as Invalid model, so each row executes as the setting ID that the
+        installed JAR's ModelOption$Specific pairs with its exact display name, such as
+        gemini-3.7-flash for Gemini 3.7 Flash. The picker row Default (Gemini 3.7 Flash) is the only
+        row marked Default. Evidence: docs/research/2026-09-28-junie-execution-ids.md."
       - "Effort tokens are the JAR's EffortLevel wire ids (enum name lowercased): none, minimal,
         low, medium, high, xhigh, max. Values follow EffortLevel order, which puts None first; the
         Right-key ring alone cannot show that. Only low and medium have run through Cats, and
@@ -3043,7 +3045,7 @@ catalogs:
           - Default (Gemini 3.7 Flash)
           - Gemini 3.7 Flash — Medium
         execution:
-          model: Gemini 3.7 Flash
+          model: gemini-3.7-flash
         controls:
           - key: junie.reasoning_effort
             label: Effort
@@ -3070,7 +3072,7 @@ catalogs:
           - Claude Fable 5.1
           - Claude Fable 5.1 — Low
         execution:
-          model: Claude Fable 5.1
+          model: claude-fable-5-1
         controls:
           - key: junie.reasoning_effort
             label: Effort
@@ -3098,7 +3100,7 @@ catalogs:
         source_names:
           - Claude Opus 5
         execution:
-          model: Claude Opus 5
+          model: claude-opus-5
         controls:
           - key: junie.reasoning_effort
             label: Effort
@@ -3126,7 +3128,7 @@ catalogs:
         source_names:
           - Claude Opus 5.5
         execution:
-          model: Claude Opus 5.5
+          model: claude-opus-5-5
         controls:
           - key: junie.reasoning_effort
             label: Effort
@@ -3154,7 +3156,7 @@ catalogs:
         source_names:
           - Claude Sonnet 5
         execution:
-          model: Claude Sonnet 5
+          model: claude-sonnet-5
         controls:
           - key: junie.reasoning_effort
             label: Effort
@@ -3182,7 +3184,7 @@ catalogs:
         source_names:
           - Gemini 3.6 Flash
         execution:
-          model: Gemini 3.6 Flash
+          model: gemini-3.6-flash
         controls:
           - key: junie.reasoning_effort
             label: Effort
@@ -3211,7 +3213,7 @@ catalogs:
           - Gemini 3.8 Flash
           - Gemini 3.8 Flash — Medium
         execution:
-          model: Gemini 3.8 Flash
+          model: gemini-3.8-flash
         controls:
           - key: junie.reasoning_effort
             label: Effort
@@ -3235,7 +3237,7 @@ catalogs:
         source_names:
           - GPT-5.6-LUNA
         execution:
-          model: GPT-5.6-LUNA
+          model: gpt-5.6-luna
         controls:
           - key: junie.reasoning_effort
             label: Effort
@@ -3266,7 +3268,7 @@ catalogs:
           - GPT-5.6-SOL
           - GPT-5.6-SOL — Low
         execution:
-          model: GPT-5.6-SOL
+          model: gpt-5.6-sol
         controls:
           - key: junie.reasoning_effort
             label: Effort
@@ -3296,7 +3298,7 @@ catalogs:
         source_names:
           - GPT-5.6-TERRA
         execution:
-          model: GPT-5.6-TERRA
+          model: gpt-5.6-terra
         controls:
           - key: junie.reasoning_effort
             label: Effort
@@ -3326,7 +3328,7 @@ catalogs:
         source_names:
           - GPT-6-ASTRA
         execution:
-          model: GPT-6-ASTRA
+          model: gpt-6-astra
         controls:
           - key: junie.reasoning_effort
             label: Effort
@@ -3354,7 +3356,7 @@ catalogs:
         source_names:
           - GPT-6-LUNA
         execution:
-          model: GPT-6-LUNA
+          model: gpt-6-luna
         controls:
           - key: junie.reasoning_effort
             label: Effort
@@ -3384,7 +3386,7 @@ catalogs:
         source_names:
           - GPT-6-SOL
         execution:
-          model: GPT-6-SOL
+          model: gpt-6-sol
         controls:
           - key: junie.reasoning_effort
             label: Effort
@@ -3415,7 +3417,7 @@ catalogs:
           - Grok 4.6
           - Grok 4.6 — Low
         execution:
-          model: Grok 4.6
+          model: grok-4.6
         controls:
           - key: junie.reasoning_effort
             label: Effort
@@ -3441,7 +3443,7 @@ catalogs:
         source_names:
           - Grok 4.7
         execution:
-          model: Grok 4.7
+          model: grok-4.7
         controls:
           - key: junie.reasoning_effort
             label: Effort
