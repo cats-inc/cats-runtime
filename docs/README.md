@@ -9,8 +9,9 @@ See the [content-policy checkpoint](plans/PLAN-041-preview-skill-content-policy.
 
 Codex now checks the effective bootstrap sandbox mode and approval policy before
 starting a model turn. [Native permission mismatch evidence](research/2026-09-27-codex-bootstrap-permissions.md)
-records the bounded failed acceptance, auth-free reproduction and validation
-limits; the native cause and ordinary-contribution acceptance remain open.
+records the bounded failed acceptance, the missing Windows mode in the isolated
+profile, and successful auth-free fixture write/loopback checks. Ordinary model
+contribution acceptance remains open.
 
 ## Windows Codex background launch
 

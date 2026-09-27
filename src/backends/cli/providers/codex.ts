@@ -457,9 +457,13 @@ export class CodexProvider implements Provider {
         const approval = result.approvalPolicy;
         const observedApproval = approval === 'never' || approval === 'untrusted'
           || approval === 'on-request' || approval === 'on-failure' ? approval : 'missing/unsupported';
+        const setupHint = policy.sandbox === 'workspace-write' && sandboxType === 'readOnly'
+          ? ' The selected Codex profile may need sandbox setup. On native Windows, check windows.sandbox and complete the chosen sandbox setup.'
+          : '';
         return this.failBootstrap(`Codex effective permission mismatch: requested ${policy.sandbox}`
           + ` / ${policy.approvalPolicy}, received ${observedSandbox} / ${observedApproval}.`
-          + ' No model turn was started. Check the provider permission configuration before recreating the session.');
+          + ' No model turn was started. Check the provider permission configuration before recreating the session.'
+          + setupHint);
       }
       this.threadId = tid;
       this.state = 'ready';

@@ -23,6 +23,21 @@ function started(provider: CodexProvider) {
 }
 
 describe('Codex effective bootstrap permission checks', () => {
+  it('explains sandbox setup after a write-to-read downgrade without changing the request', () => {
+    const { provider, request, respond } = bootstrap();
+    expect(respond({ ...accepted, sandbox: readOnly })).toMatchObject({ type: 'error',
+      text: expect.stringContaining('check windows.sandbox') });
+    expect(request.params).toMatchObject({ sandbox: 'workspace-write', approvalPolicy: 'never' });
+    expect(request.params.config).toBeUndefined();
+    expect(provider.getPendingTurnStart()).toBeNull();
+  });
+
+  it('does not suggest Windows sandbox setup for an approval-only mismatch', () => {
+    const { respond } = bootstrap();
+    expect(JSON.stringify(respond({ ...accepted, approvalPolicy: 'untrusted' })))
+      .not.toContain('windows.sandbox');
+  });
+
   it.each([
     { options: {}, method: 'thread/start' },
     { options: { resumeSessionId: 'previous' }, method: 'thread/resume' },
