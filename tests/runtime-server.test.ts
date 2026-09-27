@@ -5540,7 +5540,6 @@ providers:
           source: 'static',
           cache: null,
           models: [
-            { id: 'opencode-go/union-alpha', label: 'Union Alpha Free' },
             { id: 'opencode-go/deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash' },
             { id: 'opencode-go/hy4-preview', label: 'Hy4 preview' },
             { id: 'opencode-go/glm-5.3-flash', label: 'GLM-5.3-Flash' },

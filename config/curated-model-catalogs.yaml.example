@@ -2003,30 +2003,26 @@ catalogs:
     backend: cli
     selection_mode: shortlist
     source_cli: OpenCode
-    cli_version: 1.18.31
-    last_updated: 2026-09-18
+    cli_version: 1.18.32
+    last_updated: 2026-09-28
     notes:
-      - Operator-selected six-model shortlist, in the supplied order; this is not the complete
+      - Operator-selected five-model shortlist, in the supplied order; this is not the complete
         upstream catalog. Display names are preserved exactly. No model default or effort/options
         were supplied, so none are asserted.
       - "Evidence: docs/research/fixtures/opencode-1.18.31/models.redacted.txt and
         model-id-mappings.redacted.json. Installed 1.18.31 `opencode models --verbose --pure`
         supplied exact provider/model IDs on 2026-09-18; no inference request was sent."
-      - Union Alpha Free appeared under both opencode and opencode-go. The operator explicitly
-        selected opencode-go/union-alpha, matching the other five entries. All six are scoped to
-        this machine's configured CLI providers; availability elsewhere is unverified.
+      - "Re-read 2026-09-28: installed 1.18.32 `opencode models --verbose --pure` still lists all
+        five rows with the same IDs and names, and no longer lists Union Alpha Free under either
+        opencode or opencode-go; sessions selecting opencode-go/union-alpha failed with
+        ProviderModelNotFoundError. The operator removed that row without a replacement. Evidence:
+        docs/research/fixtures/opencode-1.18.32/model-id-mappings.redacted.json."
+      - All five are scoped to this machine's configured CLI providers; availability elsewhere is
+        unverified.
       - Desktop and Playground initialize to the first row without adding a default marker. Refresh
         retains this shortlist and custom model-string input remains available. See
         docs/research/2026-09-18-opencode-shortlist.md.
     models:
-      - id: opencode-go/union-alpha
-        label: Union Alpha Free
-        source_names:
-          - opencode-go/union-alpha
-          - Union Alpha Free
-        execution:
-          model: opencode-go/union-alpha
-        controls: []
       - id: opencode-go/deepseek-v4.1-flash
         label: DeepSeek V4.1 Flash
         capabilityTags:

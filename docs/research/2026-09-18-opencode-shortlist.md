@@ -1,5 +1,27 @@
 # OpenCode 1.18.31 shortlist
 
+## Amendment 2026-09-28: Union Alpha Free removed (OpenCode 1.18.32)
+
+Refresh, OpenCode only, apply authorized: the operator decided to remove the row with no
+replacement. The shortlist is now five rows, in the original order minus the first.
+
+- Trigger: in Cats Chat, turns selecting `opencode-go/union-alpha` failed with an OpenCode
+  `500 UnknownError`. OpenCode's own log recorded the cause as
+  `ProviderModelNotFoundError: Model not found: opencode-go/union-alpha.`; a turn in the same
+  room that switched to `opencode-go/glm-5.3-flash` completed.
+- [ID/name evidence](./fixtures/opencode-1.18.32/model-id-mappings.redacted.json): installed
+  Windows CLI reports 1.18.32. A read-only `opencode models --verbose --pure` with
+  `OPENCODE_DISABLE_AUTOUPDATE=true` returned 89 entries, complete for this machine's configured
+  providers. No entry has an id or name containing `union`, so both `opencode/union-alpha` and
+  `opencode-go/union-alpha` are gone rather than renamed to anything identifiable. The other
+  five rows are present with unchanged IDs and exact names, so `cli_version` and `last_updated`
+  advance. No inference, login or paid probe was run.
+- This machine has no personal `curated-model-catalogs.yaml`, so it adopts the factory scope once
+  its Desktop bundles a Runtime built from this change. A room whose saved default is still
+  `opencode-go/union-alpha` keeps it as a custom string and fails the same way until reselected.
+
+The table below is the original 1.18.31 record and still lists the removed row.
+
 ## Scope and evidence
 
 Refresh, OpenCode only, confirm-uncertainty. The operator supplied the complete desired
