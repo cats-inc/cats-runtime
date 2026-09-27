@@ -18,6 +18,7 @@ import type {
 import { buildProcessSpawnConfig, type ProcessSpawnConfig } from '../runtime/runtime.js';
 import { startWindowsCodexHost, windowsCodexHostPath, type ManagedCodexHost } from '../runtime/windowsCodexHost.js';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
+import { appendStderrLines } from '../stderrLines.js';
 
 export interface WorkerProcessEvents {
   event: [StreamEvent];
@@ -581,14 +582,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   }
 
   private captureStderr(text: string): void {
-    for (const line of text.split(/\r?\n/)) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      this.stderrLines.push(trimmed);
-    }
-    if (this.stderrLines.length > 12) {
-      this.stderrLines.splice(0, this.stderrLines.length - 12);
-    }
+    appendStderrLines(this.stderrLines, text);
   }
 
   private recordLaunchFailureRefusal(

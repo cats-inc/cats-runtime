@@ -25,6 +25,7 @@ import type {
 } from '../../../core/types.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
+import { appendStderrLines } from '../stderrLines.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
 
 const DEFAULT_JUNIE_SESSIONS_DIR = join(os.homedir(), '.junie', 'sessions');
@@ -308,15 +309,7 @@ export class JunieProvider implements Provider {
     }
 
     child.stderr?.on('data', (chunk: Buffer) => {
-      const text = chunk.toString('utf-8');
-      for (const line of text.split(/\r?\n/)) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        stderrLines.push(trimmed);
-      }
-      if (stderrLines.length > 12) {
-        stderrLines.splice(0, stderrLines.length - 12);
-      }
+      appendStderrLines(stderrLines, chunk.toString('utf-8'));
     });
 
     child.on('error', (error) => {
