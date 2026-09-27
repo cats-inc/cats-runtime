@@ -43,6 +43,16 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+Runtime **0.3.3** is prepared for the Desktop **0.5.9** standard-profile preview. It is
+not published to npm; npm `latest` stays `0.3.2`. This compatible patch fixes Windows
+provider launches whose multi-line or quoted prompts were cut short by `cmd.exe` or
+Windows PowerShell 5.1: npm shims with an extensionless node script (Cline, Kilo),
+Cursor's `cursor-agent.cmd` and Junie's `junie.bat` now resolve to the program they
+would have run. It also stops Cursor segments before a tool call from appearing twice,
+removes OpenCode's withdrawn Union Alpha Free from the shortlist, and logs each run's
+provider, model, outcome and error. No configuration, persisted-data or catalog
+schema contract changes; no migration or cats-one minimum is required.
+
 Runtime **0.3.2** was published on 2026-09-28 (Taipei) to npm `latest` from
 `9fefd8e41512f200de6b7d4f1ed93fb7aa5e4dcb`; the Desktop **0.5.8** standard
 preview bundles that exact commit on every OS. This compatible patch adds the
