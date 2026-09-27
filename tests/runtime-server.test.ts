@@ -5399,17 +5399,19 @@ providers:
     });
   });
 
-  it('GET /providers/pi/models preserves the bundled shortlist on refresh', async () => {
+  it('GET /providers/pi/models preserves the bundled openai-codex channel on refresh', async () => {
     const spawnMock = vi.spyOn(providerInstallRunner, 'runSpawnedCommand');
     try {
       await withRuntime({}, {}, async (runtime) => {
         const expected = [
-          { id: 'openai-codex/gpt-5.6-luna', label: 'gpt-5.6-luna [openai-codex] — medium' },
-          { id: 'openai-codex/gpt-5.6-sol', label: 'gpt-5.6-sol [openai-codex] — medium' },
-          { id: 'openai-codex/gpt-5.6-terra', label: 'gpt-5.6-terra [openai-codex] — medium' },
-          { id: 'openai-codex/gpt-6-astra', label: 'gpt-6-astra [openai-codex] — medium' },
-          { id: 'openai-codex/gpt-6-luna', label: 'gpt-6-luna [openai-codex] — medium' },
-          { id: 'openai-codex/gpt-6-sol', label: 'gpt-6-sol [openai-codex] — medium' },
+          { id: 'openai-codex/gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark [openai-codex]' },
+          { id: 'openai-codex/gpt-5.5', label: 'gpt-5.5 [openai-codex]' },
+          { id: 'openai-codex/gpt-5.6-luna', label: 'gpt-5.6-luna [openai-codex]' },
+          { id: 'openai-codex/gpt-5.6-sol', label: 'gpt-5.6-sol [openai-codex]' },
+          { id: 'openai-codex/gpt-5.6-terra', label: 'gpt-5.6-terra [openai-codex]' },
+          { id: 'openai-codex/gpt-6-astra', label: 'gpt-6-astra [openai-codex]' },
+          { id: 'openai-codex/gpt-6-luna', label: 'gpt-6-luna [openai-codex]' },
+          { id: 'openai-codex/gpt-6-sol', label: 'gpt-6-sol [openai-codex]' },
         ];
         for (const route of ['/providers/pi/models', '/providers/pi/models?refresh=1']) {
           const response = await runtime.app.request(route);
@@ -5451,12 +5453,14 @@ providers:
           source: 'static',
           cache: null,
           models: [
-            { id: 'openai-codex/gpt-5.6-luna', label: 'gpt-5.6-luna [openai-codex] — medium' },
-            { id: 'openai-codex/gpt-5.6-sol', label: 'gpt-5.6-sol [openai-codex] — medium' },
-            { id: 'openai-codex/gpt-5.6-terra', label: 'gpt-5.6-terra [openai-codex] — medium' },
-            { id: 'openai-codex/gpt-6-astra', label: 'gpt-6-astra [openai-codex] — medium' },
-            { id: 'openai-codex/gpt-6-luna', label: 'gpt-6-luna [openai-codex] — medium' },
-            { id: 'openai-codex/gpt-6-sol', label: 'gpt-6-sol [openai-codex] — medium' },
+            { id: 'openai-codex/gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark [openai-codex]' },
+            { id: 'openai-codex/gpt-5.5', label: 'gpt-5.5 [openai-codex]' },
+            { id: 'openai-codex/gpt-5.6-luna', label: 'gpt-5.6-luna [openai-codex]' },
+            { id: 'openai-codex/gpt-5.6-sol', label: 'gpt-5.6-sol [openai-codex]' },
+            { id: 'openai-codex/gpt-5.6-terra', label: 'gpt-5.6-terra [openai-codex]' },
+            { id: 'openai-codex/gpt-6-astra', label: 'gpt-6-astra [openai-codex]' },
+            { id: 'openai-codex/gpt-6-luna', label: 'gpt-6-luna [openai-codex]' },
+            { id: 'openai-codex/gpt-6-sol', label: 'gpt-6-sol [openai-codex]' },
           ],
           warnings: [],
         });

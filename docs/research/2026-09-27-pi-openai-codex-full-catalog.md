@@ -91,7 +91,10 @@ The six `<id> [openai-codex] — medium` rows became 8 rows in registry order:
   `tests/api-backend.test.ts`, `tests/agent-skill-sync.test.ts` and
   `src/core/models/providerModelCatalog.test.ts`: 10 files, 177 tests passed on two consecutive
   runs. One earlier run of the same set reported two failed files; its output was not kept, so the
-  cause is unknown. `npm run typecheck` passed. New checks cover the 8 ids and labels, no model default,
+  cause is unknown. `npm run typecheck` passed.
+- The first PR preflight failed two `tests/runtime-server.test.ts` cases that still expected the six
+  bundled shortlist rows (the old-label search had missed them). They now expect the eight-row
+  channel, and the file's 73 tests pass. New checks cover the 8 ids and labels, no model default,
   spawned arguments with the `medium` default and explicit levels, and rejection of `off` on
   `gpt-6-astra` and `max` on `gpt-5.5`; the Playground renders each row's levels with `medium`
   selected and keeps a custom `provider/model` string.
