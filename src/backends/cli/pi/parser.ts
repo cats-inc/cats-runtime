@@ -1,4 +1,5 @@
 import type {
+  ErrorStreamEvent,
   RawStreamEvent,
   ResultStreamEvent,
   StreamEvent,
@@ -44,6 +45,7 @@ export interface PiStreamEvent {
       cost?: { total?: number };
     };
     stopReason?: string;
+    errorMessage?: string;
     toolCallId?: string;
     toolName?: string;
     isError?: boolean;
@@ -95,6 +97,16 @@ function extractUsage(message: PiStreamEvent['message']): StreamEvent['usage'] |
     promptInputTokens: usage.input ?? 0,
     cacheReadInputTokens: usage.cacheRead ?? 0,
   };
+}
+
+/**
+ * Pi ends a request the provider rejected with stopReason "error" and the
+ * provider's message, such as a model the account's plan does not include.
+ */
+function buildPiErrorEvent(message: PiStreamEvent['message']): ErrorStreamEvent | null {
+  if (message?.stopReason !== 'error') return null;
+  const text = typeof message.errorMessage === 'string' ? message.errorMessage.trim() : '';
+  return { type: 'error', text: text || 'Pi request failed without an error message.' };
 }
 
 function buildPiUsageMetadata(
@@ -197,8 +209,11 @@ function parseCurrentMessageEvent(
     events.push({ type: 'text', text } satisfies TextStreamEvent);
   }
 
+  const failure = buildPiErrorEvent(message);
   const usage = extractUsage(message);
-  if (usage && event.stopReason !== 'toolUse' && (text || !hasToolCall)) {
+  if (failure) {
+    events.push(failure);
+  } else if (usage && event.stopReason !== 'toolUse' && (text || !hasToolCall)) {
     events.push({
       type: 'result',
       usage,
@@ -329,6 +344,13 @@ export function parsePiStreamLine(
         reason: 'tool_use_turn_boundary',
         rawSample: event,
       }, null);
+    }
+    const failure = buildPiErrorEvent(msg);
+    if (failure) {
+      return observeNormalized(observer, {
+        rawEventType: eventType,
+        rawSample: event,
+      }, failure);
     }
 
     const usage = msg.usage;
