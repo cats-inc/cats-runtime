@@ -220,6 +220,48 @@ describe('message route transcript persistence', () => {
     }
   });
 
+  it('completes the run with a result when the worker stream ends without one', async () => {
+    // Kiro's result comes from an after-turn session lookup; when that finds
+    // nothing, the turn used to leave its run running forever.
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
+    const sessionBaseDir = join(root, 'sessions');
+    mkdirSync(sessionBaseDir, { recursive: true });
+
+    try {
+      const { app, session } = makeApp(sessionBaseDir, async function* () {
+        yield { type: 'text', text: 'Good morning!' };
+      });
+
+      const response = await app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'hello' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(parseNdjson(await response.text())).toEqual([
+        { type: 'text', text: 'Good morning!' },
+        expect.objectContaining({ type: 'result' }),
+      ]);
+
+      const historyBody = await (await app.request(`/sessions/${session.id}/history`)).json();
+      expect(historyBody.messages).toMatchObject([
+        { role: 'user', text: 'hello' },
+        { role: 'assistant', text: 'Good morning!' },
+      ]);
+      expect(historyBody.inspection).toMatchObject({
+        state: 'idle',
+        lastRun: { status: 'succeeded', inputPreview: 'hello' },
+      });
+      expect(historyBody.inspection.currentRun).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('flushes assistant text when the worker stream throws after yielding text', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
     const sessionBaseDir = join(root, 'sessions');
