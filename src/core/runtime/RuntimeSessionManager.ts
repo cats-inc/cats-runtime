@@ -34,6 +34,7 @@ import type { BackendKind } from '../../backends/cli/config.js';
 import { ApiBackendManager } from '../../backends/api/runtime/ApiBackendManager.js';
 import { AgentBackendManager } from '../../backends/agent/runtime/AgentBackendManager.js';
 import { extractWakeReason } from './wakeReason.js';
+import { describeRunTarget, formatRunLogLine, type RuntimeRunLogOutcome } from './runLog.js';
 import {
   cloneMaintenanceFollowThrough,
   cloneMaintenanceRequest,
@@ -122,6 +123,9 @@ export class RuntimeSessionManager {
   private readonly handleOverrides = new Map<string, ExecutionHandle>();
 
   private readonly observedStreamStates = new Map<string, RuntimeObservedStreamState>();
+
+  /** What the log line for a session's current run names; see `runLog.ts`. */
+  private readonly runLogTargets = new Map<string, { target: string; startedAtMs: number }>();
 
   constructor(
     private readonly config: RuntimeConfig,
@@ -248,6 +252,10 @@ export class RuntimeSessionManager {
     tracked.state = 'running';
     tracked.wake = wake;
     tracked.currentRun = run;
+
+    const target = describeRunTarget(session);
+    this.runLogTargets.set(session.id, { target, startedAtMs: Date.now() });
+    console.log(formatRunLogLine({ outcome: 'started', sessionId: session.id, runId: run.id, target }));
     return cloneRun(run);
   }
 
@@ -279,6 +287,13 @@ export class RuntimeSessionManager {
     tracked.progress = progress;
     tracked.currentRun = undefined;
     tracked.lastRun = run;
+    console.warn(formatRunLogLine({
+      outcome: status,
+      sessionId: session.id,
+      runId: run.id,
+      target: describeRunTarget(session),
+      error: guardrail.reason,
+    }));
     this.pushRecentEvent(tracked, {
       observedAt: now,
       eventType: 'progress',
@@ -834,8 +849,28 @@ export class RuntimeSessionManager {
       ...(patch.error !== undefined ? { error: patch.error } : {}),
     };
     tracked.lastRun = cloneRun(tracked.currentRun);
+    this.logRunEnd(sessionId, tracked.currentRun);
     tracked.currentRun = undefined;
     tracked.state = this.isAttached(sessionId) ? 'idle' : 'closed';
+  }
+
+  private logRunEnd(sessionId: string, run: RuntimeRunInspection): void {
+    const logTarget = this.runLogTargets.get(sessionId);
+    this.runLogTargets.delete(sessionId);
+    const session = this.getSessionBinding?.(sessionId);
+    const line = formatRunLogLine({
+      // A finalized run is never still running.
+      outcome: run.status as RuntimeRunLogOutcome,
+      sessionId,
+      runId: run.id,
+      target: logTarget?.target ?? (session ? describeRunTarget(session) : 'provider=(unknown)'),
+      ...(logTarget ? { durationMs: Date.now() - logTarget.startedAtMs } : {}),
+      ...(run.status !== 'succeeded' && (run.error || run.resultSummary)
+        ? { error: run.error ?? run.resultSummary }
+        : {}),
+    });
+    if (run.status === 'succeeded') console.log(line);
+    else console.warn(line);
   }
 
   private pushRecentEvent(
