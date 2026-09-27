@@ -43,8 +43,10 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
-Runtime **0.3.2** is prepared for npm `latest` and the Desktop **0.5.8** standard
-preview. This compatible patch adds the intervening Junie, Kiro, Auggie, Copilot
+Runtime **0.3.2** was published on 2026-09-28 (Taipei) to npm `latest` from
+`9fefd8e41512f200de6b7d4f1ed93fb7aa5e4dcb`; the Desktop **0.5.8** standard
+preview bundles that exact commit on every OS. This compatible patch adds the
+intervening Junie, Kiro, Auggie, Copilot
 and Pi catalog updates, verified read-only/managed-worktree skill delivery, and
 truthful Codex native sandbox/bootstrap diagnostics. Codex development can now
 stop with an actionable diagnostic when the actual provider permission mode
@@ -52,8 +54,17 @@ cannot satisfy the admitted worktree grant; it does not silently claim that
 requested sandbox permissions were applied. Catalog schema 2, existing model
 identities and public configuration/data contracts remain compatible; no new
 migration or cats-one minimum is required. Independent compatibility review and
-the paired preview/release skill-distribution check passed. Publication is pending
-the full workflow gate and verification of the published npm package.
+the paired preview/release skill-distribution check passed. The
+[publication workflow](https://github.com/cats-inc/cats-runtime/actions/runs/36350009873)
+passed its full gate (2,510 tests passed, five skipped, none failed), fresh build
+and trusted publication. Public npm `latest`, version, source commit and downloaded
+tarball SHA-512/SHA-1 are verified. The source
+[release preflight](https://github.com/cats-inc/cats-runtime/actions/runs/36349953652)
+also passed. npm's initial processing delay resolved without a repeat publication.
+The downloaded public tarball passed installation into a fresh private prefix,
+the shipped CLI help entry point, and its actual release-profile catalog: 33
+skills with no physical preview supplement. The paired Platform package's English
+and Traditional Chinese knowledge consumers also passed without provider calls.
 
 Runtime `0.3.1` is prepared for the Desktop `0.5.1` standard-profile preview and for
 npm publication on `latest`. It is a compatible patch. Writable startup now retires
