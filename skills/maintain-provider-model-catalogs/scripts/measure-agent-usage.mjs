@@ -10,12 +10,12 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-export const HOSTS = ['auggie', 'claude', 'codex', 'junie', 'kiro'];
+export const HOSTS = ['auggie', 'claude', 'codex', 'copilot', 'junie', 'kiro'];
 const TOKEN_FIELDS = ['uncachedInput', 'cacheWrite', 'cacheRead', 'output', 'reasoningOutput'];
 const MARKER_SUPPORT = {
-  at: ['auggie', 'claude', 'codex', 'junie'],
-  text: ['auggie', 'claude', 'codex', 'kiro'],
-  turn: ['auggie', 'junie', 'kiro'],
+  at: ['auggie', 'claude', 'codex', 'copilot', 'junie'],
+  text: ['auggie', 'claude', 'codex', 'copilot', 'kiro'],
+  turn: ['auggie', 'copilot', 'junie', 'kiro'],
 };
 
 const HOST_NOTES = {
@@ -31,6 +31,12 @@ const HOST_NOTES = {
   codex: [
     'Per-call usage is the change in total_token_usage; repeated counts are skipped.',
     'uncachedInput excludes the cached and cache-write tokens that Codex counts inside input_tokens; reasoningOutput is part of output.',
+  ],
+  copilot: [
+    'Records are assistant.message events. Copilot 1.0.88 leaves outputTokens off them, so totals and phases can lack tokens.',
+    'segments holds each session.shutdown modelMetrics: requests, premium cost and raw token fields. A resumed session writes one segment per exit; recordedSegmentTotals sums them.',
+    'openTail means events after the last shutdown are in no segment yet; exit the session to record them.',
+    'lastUsageCheckpoint is the running total Copilot itself recorded, in nano AIU and premium requests.',
   ],
   junie: [
     'Usage comes from LlmResponseMetadataEvent entries; costUsd is as Junie reported it.',
@@ -111,6 +117,90 @@ function readAuggie(path) {
     costUsd: typeof session.subAgentCostUsd === 'number' ? session.subAgentCostUsd : null,
   };
   return { sources: [basename(path)], records, extra: { subAgents } };
+}
+
+function readCopilot(path, counters) {
+  const eventsPath = existsSync(path) && statSync(path).isDirectory() ? join(path, 'events.jsonl') : path;
+  if (!existsSync(eventsPath)) {
+    throw new Error(`${eventsPath} does not exist. Pass ~/.copilot/session-state/<session-id>/events.jsonl `
+      + 'or its session folder.');
+  }
+  const records = [];
+  const segments = [];
+  let turn = 0;
+  let model = null;
+  let lastCheckpoint = null;
+  let eventsAfterLastShutdown = 0;
+  for (const { value } of readJsonLines(eventsPath, counters)) {
+    const data = value.data ?? {};
+    eventsAfterLastShutdown += 1;
+    if (value.type === 'session.start') {
+      model = data.selectedModel ?? model;
+    } else if (value.type === 'session.model_change') {
+      model = data.newModel ?? model;
+    } else if (value.type === 'user.message') {
+      turn += 1;
+    } else if (value.type === 'assistant.message') {
+      records.push({
+        time: toTime(value.timestamp),
+        turn: Math.max(turn, 1),
+        model: data.model ?? model,
+        ...(typeof data.outputTokens === 'number' ? { tokens: { output: data.outputTokens } } : {}),
+        text: collectText(data.content) + collectText(data.toolRequests),
+      });
+    } else if (value.type === 'session.usage_checkpoint') {
+      lastCheckpoint = {
+        at: value.timestamp ?? null,
+        totalNanoAiu: data.totalNanoAiu ?? null,
+        totalPremiumRequests: data.totalPremiumRequests ?? null,
+      };
+    } else if (value.type === 'session.shutdown') {
+      eventsAfterLastShutdown = 0;
+      segments.push({
+        segment: segments.length + 1,
+        endedAt: value.timestamp ?? null,
+        premiumRequests: data.totalPremiumRequests ?? null,
+        apiDurationMs: data.totalApiDurationMs ?? null,
+        models: Object.fromEntries(Object.entries(data.modelMetrics ?? {}).map(([name, metrics]) => [name, {
+          requests: metrics.requests?.count ?? 0,
+          premiumCost: metrics.requests?.cost ?? 0,
+          tokens: {
+            input: metrics.usage?.inputTokens ?? 0,
+            output: metrics.usage?.outputTokens ?? 0,
+            cacheRead: metrics.usage?.cacheReadTokens ?? 0,
+            cacheWrite: metrics.usage?.cacheWriteTokens ?? 0,
+          },
+        }])),
+      });
+    }
+  }
+  const segmentModels = {};
+  for (const segment of segments) {
+    for (const [name, metrics] of Object.entries(segment.models)) {
+      const total = segmentModels[name] ??= { requests: 0, premiumCost: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+      total.requests += metrics.requests;
+      total.premiumCost = round(total.premiumCost + metrics.premiumCost);
+      for (const field of ['input', 'output', 'cacheRead', 'cacheWrite']) {
+        total[field] += metrics.tokens[field];
+      }
+    }
+  }
+  return {
+    sources: [basename(eventsPath)],
+    records,
+    extra: {
+      assistantMessagesWithoutOutputTokens: records.filter((record) => !record.tokens).length,
+      segments,
+      recordedSegmentTotals: {
+        segments: segments.length,
+        premiumRequests: round(segments.reduce((sum, segment) => sum + (segment.premiumRequests ?? 0), 0)),
+        byModel: segmentModels,
+      },
+      // Events after the last session.shutdown are not in any segment yet.
+      openTail: segments.length === 0 || eventsAfterLastShutdown > 0,
+      lastUsageCheckpoint: lastCheckpoint,
+    },
+  };
 }
 
 function readClaude(path, counters) {
@@ -300,7 +390,9 @@ function readKiro(path, counters) {
   return { sources: [`${basename(base)}.json`, `${basename(base)}.jsonl`], records, turns };
 }
 
-const READERS = { auggie: readAuggie, claude: readClaude, codex: readCodex, junie: readJunie, kiro: readKiro };
+const READERS = {
+  auggie: readAuggie, claude: readClaude, codex: readCodex, copilot: readCopilot, junie: readJunie, kiro: readKiro,
+};
 
 function round(value) {
   return Math.round(value * 10000) / 10000;
@@ -467,13 +559,14 @@ function cliUsage() {
     '  auggie  ~/.augment/sessions/<session-id>.json',
     '  claude  ~/.claude/projects/<project>/<session-id>.jsonl (its subagents folder is included)',
     '  codex   ~/.codex/sessions/<yyyy>/<mm>/<dd>/rollout-*.jsonl',
+    '  copilot ~/.copilot/session-state/<session-id>/events.jsonl, or the session folder',
     '  junie   ~/.junie/sessions/<session>/events.jsonl, or the session folder',
     '  kiro    ~/.kiro/sessions/cli/<session-id>.json; defaults to KIRO_SESSION_ID',
     '',
     'Phase starts, in order; the call that matches starts the next phase:',
-    '  at:<ISO time with zone>  auggie, claude, codex, junie',
-    "  text:<literal>           auggie, claude, codex, kiro (the agent's own messages and tool calls only)",
-    '  turn:<n>                 auggie, junie, kiro',
+    '  at:<ISO time with zone>  auggie, claude, codex, copilot, junie',
+    "  text:<literal>           auggie, claude, codex, copilot, kiro (the agent's own messages and tool calls only)",
+    '  turn:<n>                 auggie, copilot, junie, kiro',
   ].join('\n');
 }
 

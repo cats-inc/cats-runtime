@@ -182,6 +182,61 @@ test('auggie reads each exchange token_usage and splits by text, time or turn', 
   assert.throws(() => measureAgentUsage({ host: 'auggie', path }), /no chatHistory array/);
 }));
 
+test('copilot sums shutdown segments, keeps message records and flags an open tail', () => withScratch((root) => {
+  const folder = join(root, 'copilot-session');
+  const path = join(folder, 'events.jsonl');
+  const at = (seconds) => new Date(seconds * 1000).toISOString();
+  const message = (seconds, text, extra = {}) => ({ type: 'assistant.message', timestamp: at(seconds), data: {
+    content: text, toolRequests: [{ name: 'powershell', arguments: { command: `${text} ${SECRET}` } }],
+    encryptedContent: SECRET, ...extra,
+  } });
+  const shutdown = (seconds, premium, models) => ({ type: 'session.shutdown', timestamp: at(seconds), data: {
+    totalPremiumRequests: premium, totalApiDurationMs: 1000, modelMetrics: Object.fromEntries(models.map(
+      ([name, count, cost, usage]) => [name, { requests: { count, cost }, usage: {
+        inputTokens: usage[0], outputTokens: usage[1], cacheReadTokens: usage[2], cacheWriteTokens: usage[3],
+      } }])),
+  } });
+  const events = [
+    { type: 'session.start', timestamp: at(1), data: { selectedModel: 'copilot-model', context: { cwd: SECRET } } },
+    { type: 'user.message', timestamp: at(2), data: { content: `${SECRET} first prompt` } },
+    message(3, 'reading the skill', { outputTokens: 10 }),
+    message(4, 'MARK-CAPTURE starts', { outputTokens: 20 }),
+    shutdown(5, 1, [['copilot-model', 2, 1, [1000, 30, 800, 0]], ['helper-model', 1, 0, [50, 5, 0, 0]]]),
+    { type: 'session.resume', timestamp: at(6), data: {} },
+    { type: 'session.model_change', timestamp: at(7), data: { newModel: 'copilot-other' } },
+    { type: 'user.message', timestamp: at(8), data: { content: `${SECRET} second prompt` } },
+    message(9, 'second turn without tokens'),
+    shutdown(10, 2, [['copilot-other', 1, 2, [400, 7, 100, 3]], ['helper-model', 1, 0, [60, 6, 0, 0]]]),
+    '{not json',
+  ];
+  writeLines(path, events);
+
+  const result = measureAgentUsage({ host: 'copilot', path: folder,
+    phaseStarts: ['text:MARK-CAPTURE', 'turn:2'], phaseNames: ['Prep', 'Capture', 'Second'] });
+  assert.deepEqual(result.sources, ['events.jsonl']);
+  assert.deepEqual(result.totals, { calls: 3, output: 30, from: at(3), to: at(9) });
+  assert.deepEqual(Object.keys(result.byModel), ['copilot-model', 'copilot-other']);
+  assert.deepEqual(result.phases.map((phase) => [phase.phase, phase.calls, phase.output]),
+    [['Prep', 1, 10], ['Capture', 1, 20], ['Second', 1, undefined]]);
+  assert.equal(result.assistantMessagesWithoutOutputTokens, 1);
+  assert.equal(result.segments.length, 2);
+  assert.deepEqual(result.recordedSegmentTotals, { segments: 2, premiumRequests: 3, byModel: {
+    'copilot-model': { requests: 2, premiumCost: 1, input: 1000, output: 30, cacheRead: 800, cacheWrite: 0 },
+    'helper-model': { requests: 2, premiumCost: 0, input: 110, output: 11, cacheRead: 0, cacheWrite: 0 },
+    'copilot-other': { requests: 1, premiumCost: 2, input: 400, output: 7, cacheRead: 100, cacheWrite: 3 },
+  } });
+  assert.equal(result.openTail, false);
+  assert.equal(result.skippedLines, 1);
+  assert.doesNotMatch(JSON.stringify(result), /SECRET|reading the skill|MARK/);
+
+  writeLines(path, [...events.slice(0, 5), { type: 'user.message', timestamp: at(6), data: { content: 'later' } },
+    { type: 'session.usage_checkpoint', timestamp: at(7), data: { totalNanoAiu: 1500000000, totalPremiumRequests: 2 } }]);
+  const open = measureAgentUsage({ host: 'copilot', path });
+  assert.equal(open.openTail, true);
+  assert.deepEqual(open.lastUsageCheckpoint, { at: at(7), totalNanoAiu: 1500000000, totalPremiumRequests: 2 });
+  assert.throws(() => measureAgentUsage({ host: 'copilot', path: join(root, 'missing') }), /does not exist/);
+}));
+
 function writeKiroSession(root, sessionId) {
   const metering = (values) => values.map((value) => ({ value, unit: 'credit', unitPlural: 'credits' }));
   const turn = (requests, secs, context, meteringValues, inputTokens = 0) => ({

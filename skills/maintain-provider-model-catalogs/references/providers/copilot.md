@@ -1,46 +1,78 @@
 # Copilot Catalog Refresh
 
-Use the supplied picker and retained mappings first. Current selected models and capture details
-belong in `docs/research/2026-09-17-copilot-fixed-presets.md` and its fixtures in cats-runtime,
-not in this skill. Inspect the personal override's version/count early; it can hide bundled updates.
+Copilot is a full-catalog provider: the interactive `/model` picker defines membership and order for
+the account's plan. Current rows, IDs and capture details belong in
+`docs/research/2026-09-27-copilot-picker-full-catalog.md` and its fixtures in cats-runtime, not in
+this skill. Inspect the personal override's version/count early; it can hide bundled updates.
 
-## Resolve only missing execution evidence
+## Read the picker
 
-The installed CLI has a machine-readable `models.list` RPC, verified with 1.0.85. Older notes
-about the absence of a `models` subcommand do not imply that this RPC is unavailable. When a
-supplied display name lacks a raw-id mapping, prefer this bounded read over scanning native
-executables, guessing ids, or installing an SDK solely for enumeration:
+Follow [interactive capture](../interactive-capture.md) and its Copilot helper when the operator asks
+the agent to collect the picker; follow [picker intake](../paste-intake.md) for supplied text.
 
-- Start the resolved installed executable with `--headless --stdio --no-auto-update`, with logs
-  directed to a task temporary directory. Use Content-Length framed JSON-RPC; the request is
-  `{"jsonrpc":"2.0","id":1,"method":"models.list","params":{}}`.
-- Direct `models.list` succeeded in the recorded capture. If the current version requires a
-  handshake, follow the official SDK contract. The existing transport pattern in
-  `src/backends/cli/usage/copilotQuota.ts` demonstrates `connect` with a method-not-found fallback
-  to `ping`; do not call the quota collector to obtain model metadata.
-- Use the CLI's existing login. Bound the read (the capture used 30 seconds), stop the child on
+- Capture on the default `group: recommended` sort; `shift+tab` only re-sorts the same rows. Rows
+  fall under Recent, Recommended, New and Other models. The Recent group follows the account's
+  recently used models, so a later capture can reorder the first rows without an upstream change.
+- Only an explicit `(default)` suffix is a model default. The check mark after a label marks the
+  session's current model, not a default.
+- A row whose Context column shows two figures has a Tab context toggle: the first figure is
+  `--context default`, the second `--context long_context`. The highlighted figure is only a color
+  change, but an unfocused row shows its selected figure as text. A dash means no context control.
+- `←/→` cycles the row's Reasoning values in a linear range; the ends do not wrap. Labels map to
+  CLI tokens by case, except Extra High = `xhigh`. No Reasoning value carries a default marker. A
+  dash with no arrows means the row has no reasoning control.
+- The Auto row's arrows set the routing profile (Tier). Its key graph is irregular (1.0.88: Right
+  from Balance alternated Intelligence and Fast), so record the observed sequences and take the
+  value order from the detail pane and `--help`.
+- Rows under "Unavailable models" show "Your plan doesn't include this model" in the detail pane.
+  Omit them when the operator scopes the catalog to their plan, and list them in notes.
+- The detail pane (cost tier and credits per 1M tokens) can lag the highlight by a render; read it
+  only once it names the highlighted row.
+- Picker changes apply to the session only. Never press Enter in the list: it selects the session
+  model and rewrites `recentModelIds` in `~/.copilot/config.json`.
+
+## Resolve IDs
+
+The installed CLI has a machine-readable `models.list` RPC, verified with 1.0.85 and 1.0.88. Older
+notes about the absence of a `models` subcommand do not imply that this RPC is unavailable. Prefer
+this bounded read over scanning native executables, guessing ids, or installing an SDK solely for
+enumeration:
+
+- Run [`list-copilot-models.mjs`](../../scripts/list-copilot-models.mjs) with
+  `--loader <npm root -g>/@github/copilot/npm-loader.js`. It starts that loader with
+  `--headless --stdio --no-auto-update`, removes `COPILOT_*` and terminal variables, sends
+  Content-Length framed `models.list`, falls back to `connect` then `ping` on method-not-found
+  (the pattern in `src/backends/cli/usage/copilotQuota.ts`), and prints only ids, names, effort
+  tokens, context sizes and discounts. Direct `models.list` succeeded with 1.0.85 and 1.0.88. Do not
+  call the quota collector to obtain model metadata. Its offline suite is
+  `node --test skills/maintain-provider-model-catalogs/tests/list-copilot-models.node-test.mjs`.
+- Use the CLI's existing login. Bound the read (the captures used 30 seconds), stop the child on
   success/failure, and retain only relevant model metadata. Do not create a session, send a prompt,
   extract credentials, start login, or alter installed files. Stop on authentication or protocol
   failure and request the smallest missing picker evidence instead of adding more probe modes.
-- Preserve returned `id`, visible `name`, supported effort tokens and their source. Fetching more
-  account models does not authorize expanding the operator's shortlist.
+- Preserve returned `id`, visible `name`, supported effort tokens and their source. Its
+  `supportedReasoningEfforts` matched the picker's Reasoning order on every listed 1.0.88 row, but
+  the picker remains the per-row evidence.
 
-`models.list` did not include every operator-observed picker row. Absence from that response alone
-is not evidence to remove a selected row. A CLI message of the form
-`Model changed from … to <raw-id> (<effort>) for this session` can establish the missing mapping;
-ask for that selected row's confirmation, not another full picker capture. A settings model field
-can also establish an id; read only the relevant field rather than dumping the configuration.
-Record the discrepancy and both sources. Such a session selection proves neither an account
-default nor the complete effort menu.
+`models.list` does not include every selectable picker row (1.0.88 omitted all four Gemini rows).
+Absence from that response is not evidence to remove a row, and a missing ID is not guessed: ask the
+operator. A CLI message of the form `Model changed from … to <raw-id> (<effort>) for this session`
+also establishes a mapping, but only after an operator-authorized selection. Record the discrepancy
+and both sources. Such a session selection proves neither an account default nor the complete
+effort menu.
 
-Do not diagnose an adapter defect solely because help omits an alias: the retained official
-changelog confirms `--effort` aliases `--reasoning-effort`. Reuse that evidence unless the current
-CLI demonstrably rejects the invocation. CLI help proves flag syntax, not a model's supported values.
-
+CLI help proves flag syntax, not a model's supported values. 1.0.88 lists `--reasoning-effort`
+(`--effort`) with `none, minimal, low, medium, high, xhigh, max`, `--context` with
+`default, long_context`, and `--auto-tier` with `efficiency, balance, intelligence, fast`.
 
 ## Schema-2 execution data
 
-Keep model ID and `copilot.reasoning_effort` separate. Approved fixed effort belongs in `execution.fixed_controls`; an observed model default remains a separate `default: true`. Fixed effort is neither editable nor a default claim.
+Keep the model ID and each control separate. A row with Reasoning arrows gets its own
+`copilot.reasoning_effort` enum with only its picker values; a two-figure row gets `copilot.context`
+with `default` then `long_context`, labeled with the picker figures; the Auto row gets
+`copilot.auto_tier`. Rows showing dashes have `controls: []`. With no default marker, selection
+starts at each control's first value and always sends it, overriding the CLI's saved setting; record
+that in notes. Keep earlier shortlist labels in `source_names`.
 
 Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
 Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.

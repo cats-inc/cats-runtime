@@ -15,6 +15,7 @@ import { GooseProvider } from '../src/backends/cli/providers/goose.js';
 import { JunieProvider } from '../src/backends/cli/providers/junie.js';
 import { KiroProvider } from '../src/backends/cli/providers/kiro.js';
 import { AuggieProvider } from '../src/backends/cli/providers/auggie.js';
+import { CopilotProvider } from '../src/backends/cli/providers/copilot.js';
 import { createRuntimeTestEnv, createRuntimeTestPaths, ensureRuntimeTestDirs } from './support/runtimeTestPaths.js';
 import { cleanupTempDirWithRetries } from './tempCleanup.js';
 
@@ -143,6 +144,49 @@ describe('factory and executable catalog projections', () => {
       expect(args.slice(args.indexOf('--model'), args.indexOf('--model') + 2)).toEqual(['--model', id]);
       expect(args).not.toContain('--reasoning-effort');
     }
+  });
+
+  it('lists the Copilot Pro picker with Terra as default and first-value effort, context and tier', () => {
+    const copilot = knowledge(snapshot.document.catalogs.find(s => s.provider === 'copilot' && s.backend === 'cli')!);
+    expect(copilot.catalog.entries).toHaveLength(20);
+    expect(copilot.catalog.entries.slice(0, 4).map(e => e.id)).toEqual(['auto', 'grok-4.7', 'gpt-5.6-terra', 'mai-code-1.1-flash']);
+    expect(copilot.catalog.entries.filter(e => e.default).map(e => e.id)).toEqual(['gpt-5.6-terra']);
+    // Plan-unavailable picker rows (Pro+ only) are omitted.
+    expect(copilot.catalog.entries.some(e => /opus|fable|astra|sol|^gpt-5\.5$/.test(e.id))).toBe(false);
+    const withContext = copilot.catalog.entries.filter(e => e.controls?.some(c => c.key === 'copilot.context'));
+    expect(withContext).toHaveLength(12);
+    const spawn = (entryId: string, controls?: Record<string, string>) => {
+      const selected = resolveProviderSelection(copilot, { entryId, entryMode: 'explicit', ...(controls ? { controls } : {}) });
+      const args = new CopilotProvider().buildSpawnArgs({ cwd: '/tmp',
+        model: selected.execution.model, modelControls: selected.resolution.controls });
+      return args.slice(args.indexOf('--model'));
+    };
+    expect(spawn('gpt-5.6-terra')).toEqual(['--model', 'gpt-5.6-terra', '--effort', 'none', '--context', 'default']);
+    expect(spawn('gemini-3.5-flash')).toEqual(['--model', 'gemini-3.5-flash', '--effort', 'minimal', '--context', 'default']);
+    expect(spawn('grok-4.7', { 'copilot.reasoning_effort': 'xhigh', 'copilot.context': 'long_context' }))
+      .toEqual(['--model', 'grok-4.7', '--effort', 'xhigh', '--context', 'long_context']);
+    expect(spawn('gpt-5.4-mini')).toEqual(['--model', 'gpt-5.4-mini', '--effort', 'none']);
+    expect(spawn('auto')).toEqual(['--model', 'auto', '--auto-tier', 'efficiency']);
+    expect(spawn('kimi-k2.7-code')).toEqual(['--model', 'kimi-k2.7-code']);
+    expect(() => spawn('gpt-5.4-mini', { 'copilot.context': 'long_context' })).toThrow();
+  });
+
+  it('emits copilot.context and copilot.auto_tier for an unknown model id from data alone', () => {
+    const copilot = knowledge({ provider: 'copilot', backend: 'cli', selection_mode: 'full', models: [{
+      id: 'fixture-unlisted-model', label: 'fixture-unlisted-model',
+      execution: { model: 'fixture-unlisted-model' },
+      controls: [
+        { key: 'copilot.context', label: 'Context', kind: 'enum', scope: 'both',
+          values: [{ value: 'fixture-context', label: 'fixture-context' }] },
+        { key: 'copilot.auto_tier', label: 'Tier', kind: 'enum', scope: 'both',
+          values: [{ value: 'fixture-tier', label: 'fixture-tier' }] },
+      ],
+    }] });
+    const selected = resolveProviderSelection(copilot, { entryId: 'fixture-unlisted-model', entryMode: 'explicit' });
+    const args = new CopilotProvider().buildSpawnArgs({ cwd: '/tmp',
+      model: selected.execution.model, modelControls: selected.resolution.controls });
+    expect(args.slice(args.indexOf('--model'))).toEqual(['--model', 'fixture-unlisted-model',
+      '--context', 'fixture-context', '--auto-tier', 'fixture-tier']);
   });
 
   it('emits kiro.reasoning_effort for an unknown model id from data alone', () => {

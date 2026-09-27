@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-09-27-copilot-picker-full-catalog](./2026-09-27-copilot-picker-full-catalog.md) | GitHub Copilot CLI 1.0.88 full catalog, agent-operated picker capture | 20 rows a Copilot Pro account can select, Pro+ rows omitted, Terra as the only picker default, per-row Reasoning, Context and Auto Tier controls through two new bindings, operator-confirmed Gemini IDs, the quota handoff, the Copilot usage and `models.list` readers and the reusable capture helper |
 | [2026-09-27-auggie-picker-full-catalog](./2026-09-27-auggie-picker-full-catalog.md) | Auggie 0.36.0 full catalog, agent-operated picker capture | 34 picker rows with opaque JSON IDs, Opus 4.8 as the only picker default, no effort in the picker or after the authorized Enter probe, effort levels in notes only, Windows-only scope, the Auggie usage reader and the reusable capture helper |
 | [2026-09-27-kiro-picker-full-catalog](./2026-09-27-kiro-picker-full-catalog.md) | Kiro 2.24.1 full catalog, agent-operated picker capture | 20 raw IDs including auto without a default, per-model effort on ten rows, new `kiro.reasoning_effort` binding, settings written on toggle and restored, Windows-only scope, per-phase session credits and the reusable capture, restore and usage helpers |
 | [2026-09-26-junie-picker-full-catalog](./2026-09-26-junie-picker-full-catalog.md) | Junie 26.9.22 full catalog, agent-operated picker capture | 15 JetBrains AI models, per-model effort from the Right-key cycle, JAR-backed effort tokens and order, no effort defaults, Defender launch incident and phase token accounting |
@@ -24,7 +25,7 @@
 | [2026-09-18-devin-shortlist](./2026-09-18-devin-shortlist.md) | Devin 3000.10.31 fixed shortlist | Six variant UIDs, ACP model application after new/load, no default claims and custom input |
 | [2026-09-18-kilo-shortlist](./2026-09-18-kilo-shortlist.md) | Kilo 7.7.3 six-model shortlist | Exact labels, fixed Thinking variants, native transport and custom input |
 | [2026-09-18-opencode-shortlist](./2026-09-18-opencode-shortlist.md) | OpenCode 1.18.31 six-model shortlist | Exact Go IDs and labels, same-name provider disambiguation, refresh preservation and custom input |
-| [2026-09-17-copilot-fixed-presets](./2026-09-17-copilot-fixed-presets.md) | Copilot 1.0.85 fixed shortlist | Six fixed efforts, Terra default, custom input, models.list and session-selection ID evidence |
+| [2026-09-17-copilot-fixed-presets](./2026-09-17-copilot-fixed-presets.md) | Copilot 1.0.85 fixed shortlist (superseded 2026-09-27) | Six fixed efforts, Terra default, custom input, models.list and session-selection ID evidence |
 | [2026-09-17-cursor-fixed-presets](./2026-09-17-cursor-fixed-presets.md) | Cursor six fixed combinations | Account-resolved parameter expressions, shortlist-preserving refresh, and custom model input |
 | [2026-09-17-grok-model-picker-refresh](./2026-09-17-grok-model-picker-refresh.md) | Grok Build 1.0.34 picker | Exact model/effort labels, seven executable combinations, first-item UI initialization without default or active markers |
 | [2026-09-16-antigravity-model-picker-refresh](./2026-09-16-antigravity-model-picker-refresh.md) | Antigravity 1.2.3 picker | Seven families with per-model effort, verified raw-id mapping and first-item initialization without default claims |
