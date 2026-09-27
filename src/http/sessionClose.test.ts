@@ -1899,6 +1899,44 @@ describe('session close route', () => {
     ]));
   });
 
+  it('ends an ephemeral turn\'s stream after the result that follows its process exit', async () => {
+    // Auggie and Kiro report their result only after the turn's process exits,
+    // while the session itself stays open for the next turn.
+    class MockWorker extends EventEmitter {
+      alive = true;
+      busy = true;
+    }
+
+    const session = registry.create({
+      id: 'session-stream-ephemeral-exit',
+      providerName: 'auggie',
+      cwd: 'C:/repo',
+    });
+    registry.updateStatus(session.id, 'busy');
+    const worker = new MockWorker();
+    attachedWorkers.set(session.id, worker as unknown as { alive: boolean; busy?: boolean });
+
+    const runtime = getRuntimeSessionManager(ctx);
+    runtime.beginRun(session, { message: 'Good morning.' });
+    runtime.observeEvent(session.id, { type: 'text', text: 'Good morning!' });
+
+    setTimeout(() => {
+      worker.busy = false;
+      worker.emit('exit', 0, null);
+      setTimeout(() => {
+        runtime.observeEvent(session.id, { type: 'result', sessionId: 'native-1' });
+      }, 10);
+    }, 10);
+
+    const response = await app.request(`/sessions/${session.id}/stream`);
+    const types = parseSse(await response.text()).map((event) => event.type);
+    expect(types).toContain('result');
+    expect(types.indexOf('result')).toBeLessThan(types.indexOf('session_closed'));
+    expect(types.at(-1)).toBe('session_closed');
+    expect(worker.alive).toBe(true);
+    expect(runtime.getTrackedState(session.id)?.currentRun).toBeUndefined();
+  });
+
   it('does not replay terminal observed events from the previous run when a session starts a new turn', async () => {
     class MockWorker extends EventEmitter {
       alive = true;

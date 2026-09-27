@@ -117,21 +117,42 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
         });
     };
 
+    const closeStream = () => {
+      if (closed) return;
+      closed = true;
+      // Queued behind events already observed, such as the final result.
+      writeQueue = writeQueue
+        .then(() => stream.writeSSE({
+          data: JSON.stringify({ type: 'session_closed' }),
+          event: 'session_closed',
+        }))
+        .catch(() => {});
+    };
+
+    // An ephemeral provider's process exits after every turn, and Auggie and
+    // Kiro report the turn's result only after that exit. Closing on the exit
+    // would drop the result, so the stream then waits for the run to end.
+    let closeWhenRunEnds = false;
+    const runInProgress = () => runtime.getTrackedState(id)?.currentRun !== undefined;
+
     const onObservedEvent = (entry: { seq: number; event: StreamEvent }) => {
       if (closed || entry.seq <= lastObservedSeq) {
         return;
       }
       lastObservedSeq = entry.seq;
       enqueueObservedEvent(entry.seq, entry.event);
+      if (closeWhenRunEnds && (entry.event.type === 'result' || entry.event.type === 'error')) {
+        closeStream();
+      }
     };
 
     const onExit = () => {
       if (closed) return;
-      stream.writeSSE({
-        data: JSON.stringify({ type: 'session_closed' }),
-        event: 'session_closed',
-      }).catch(() => {});
-      closed = true;
+      if (worker.active && runInProgress()) {
+        closeWhenRunEnds = true;
+        return;
+      }
+      closeStream();
     };
 
     const unsubscribeObservedStream = runtime.subscribeObservedStream(id, onObservedEvent);
@@ -156,8 +177,8 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
       // Hold the stream open until client disconnects or worker exits
       while (!closed) {
         await new Promise((r) => setTimeout(r, 1000));
-        if (!worker.active) {
-          onExit();
+        if (!worker.active || (closeWhenRunEnds && !runInProgress())) {
+          closeStream();
           break;
         }
       }
@@ -166,5 +187,6 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
       unsubscribeObservedStream();
       worker.off('exit', onExit);
     }
+    await writeQueue;
   });
 });
