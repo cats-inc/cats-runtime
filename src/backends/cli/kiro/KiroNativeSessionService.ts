@@ -32,10 +32,16 @@ export interface KiroSessionListOptions {
 export interface KiroNativeSessionServiceOptions {
   command: string;
   dbPath: string;
+  /** Kiro 2.24+ session files; defaults to `~/.kiro/sessions/cli` in the runtime's home. */
+  sessionsDir?: string;
   runtime: RuntimeAdapter;
   runner?: KiroCommandRunner;
   wslInspector?: WslDistroInspector;
 }
+
+// Kiro 2.24 moved sessions out of data.sqlite3 into one metadata file
+// (<id>.json, with the session's cwd) and one transcript (<id>.jsonl) each.
+const DEFAULT_KIRO_SESSIONS_DIR = '~/.kiro/sessions/cli';
 
 interface RawKiroSession {
   sessionId?: string;
@@ -55,6 +61,7 @@ interface RawKiroHistoryMessage {
 export class KiroNativeSessionService {
   private readonly command: string;
   private readonly dbPath: string;
+  private readonly sessionsDir: string;
   private readonly runtime: RuntimeAdapter;
   private readonly runner: KiroCommandRunner;
   private readonly wslInspector: WslDistroInspector;
@@ -62,6 +69,7 @@ export class KiroNativeSessionService {
   constructor(options: KiroNativeSessionServiceOptions) {
     this.command = options.command;
     this.dbPath = options.dbPath;
+    this.sessionsDir = options.sessionsDir || DEFAULT_KIRO_SESSIONS_DIR;
     this.runtime = options.runtime;
     this.runner = options.runner || spawnCommandRunner;
     this.wslInspector = options.wslInspector || isWslDistroRunning;
@@ -93,6 +101,7 @@ export class KiroNativeSessionService {
 
     const result = await this.runJsonScript<RawKiroSession[]>(LIST_ALL_KIRO_SESSIONS_PY, [
       this.dbPath,
+      this.sessionsDir,
     ]);
 
     return result
@@ -126,6 +135,7 @@ export class KiroNativeSessionService {
     const workspace = this.normalizeWorkspace(cwd);
     const result = await this.runJsonScript<RawKiroHistoryMessage[]>(LOAD_KIRO_HISTORY_PY, [
       this.dbPath,
+      this.sessionsDir,
       workspace,
       providerSessionId,
     ]);
@@ -144,6 +154,7 @@ export class KiroNativeSessionService {
     const workspace = this.normalizeWorkspace(cwd);
     const result = await this.runJsonScript<{ deleted?: boolean }>(DELETE_KIRO_SESSION_PY, [
       this.dbPath,
+      this.sessionsDir,
       workspace,
       providerSessionId,
     ]);
@@ -192,6 +203,7 @@ export function normalizeKiroWorkspacePath(cwd: string): string {
 const KIRO_PY_SHARED = String.raw`
 import json
 import os
+import re
 import sqlite3
 import sys
 from datetime import datetime, timezone
@@ -249,10 +261,21 @@ def to_iso(value):
         if numeric < 1e12:
             numeric *= 1000
         return datetime.fromtimestamp(numeric / 1000, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+    # Kiro 2.24 writes nanoseconds; fromisoformat before Python 3.11 takes at most six digits.
+    text = re.sub(r"(\.\d{6})\d+", r"\1", text)
     try:
         return datetime.fromisoformat(text.replace("Z", "+00:00")).isoformat().replace("+00:00", "Z")
     except Exception:
         return text
+
+
+def activity_epoch(iso_text):
+    if not iso_text:
+        return 0.0
+    try:
+        return datetime.fromisoformat(iso_text.replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return 0.0
 
 
 def safe_json(value, fallback):
@@ -380,19 +403,141 @@ def load_messages(value):
             })
 
     return messages
+
+
+def list_database_sessions(db_path):
+    # Kiro before 2.24 keeps conversations here; a newer install may have no database.
+    if not os.path.isfile(db_path):
+        return []
+    db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    try:
+        rows = db.execute(
+            "SELECT key, conversation_id, value, created_at, updated_at FROM conversations_v2 ORDER BY updated_at DESC"
+        ).fetchall()
+    except sqlite3.OperationalError:
+        rows = []
+    finally:
+        db.close()
+    return [parse_session_row(row) for row in rows]
+
+
+def read_json_file(path):
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except Exception:
+        return None
+
+
+def strip_verbatim_prefix(path):
+    # Windows extended-length form, as in \\?\C:\...
+    if isinstance(path, str) and path.startswith("\\\\?\\"):
+        return path[4:]
+    return path
+
+
+def read_store_session(store, session_id):
+    # (metadata, workspace) of a Kiro 2.24+ session file, or None.
+    if not isinstance(session_id, str) or not session_id or session_id in (".", ".."):
+        return None
+    if "/" in session_id or "\\" in session_id:
+        return None
+    meta = read_json_file(os.path.join(store, session_id + ".json"))
+    if not isinstance(meta, dict) or meta.get("session_id") != session_id:
+        return None
+    workspace = strip_verbatim_prefix(meta.get("cwd"))
+    if not isinstance(workspace, str) or not workspace:
+        return None
+    return meta, workspace
+
+
+def store_text(content):
+    parts = []
+    if isinstance(content, list):
+        for item in content:
+            if isinstance(item, dict) and item.get("kind") == "text" and isinstance(item.get("data"), str):
+                parts.append(item["data"])
+    return "\n".join(parts).strip()
+
+
+def load_store_messages(store, session_id):
+    messages = []
+    try:
+        handle = open(os.path.join(store, session_id + ".jsonl"), "r", encoding="utf-8")
+    except OSError:
+        return messages
+    with handle:
+        for line in handle:
+            entry = safe_json(line, None)
+            if not isinstance(entry, dict) or not isinstance(entry.get("data"), dict):
+                continue
+            data = entry["data"]
+            text = store_text(data.get("content"))
+            if not text:
+                continue
+            if entry.get("kind") == "Prompt":
+                meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
+                messages.append({"role": "user", "text": text, "timestamp": to_iso(meta.get("timestamp"))})
+            elif entry.get("kind") == "AssistantMessage":
+                messages.append({"role": "assistant", "text": text, "timestamp": None})
+    return messages
+
+
+def store_model(meta):
+    state = meta.get("session_state") if isinstance(meta.get("session_state"), dict) else {}
+    conversation = state.get("conversation_metadata")
+    turns = conversation.get("user_turn_metadatas") if isinstance(conversation, dict) else None
+    if isinstance(turns, list):
+        for turn in reversed(turns):
+            model = turn.get("model") if isinstance(turn, dict) else None
+            if isinstance(model, str) and model.strip():
+                return model.strip()
+    rts = state.get("rts_model_state")
+    info = rts.get("model_info") if isinstance(rts, dict) else None
+    model = info.get("model_id") if isinstance(info, dict) else None
+    if isinstance(model, str) and model.strip():
+        return model.strip()
+    return None
+
+
+def list_store_sessions(store):
+    try:
+        names = os.listdir(store)
+    except OSError:
+        return []
+    sessions = []
+    for name in names:
+        if not name.endswith(".json"):
+            continue
+        found = read_store_session(store, name[:-len(".json")])
+        if found is None:
+            continue
+        meta, workspace = found
+        prompts = [
+            message["text"]
+            for message in load_store_messages(store, meta["session_id"])
+            if message["role"] == "user"
+        ]
+        title = meta.get("title") if isinstance(meta.get("title"), str) else None
+        sessions.append({
+            "sessionId": meta["session_id"],
+            "workspacePath": workspace,
+            "summary": summarize_prompt(prompts[-1] if prompts else title) or "Untitled Session",
+            "messageCount": len(prompts),
+            "lastActivity": to_iso(meta.get("updated_at")) or to_iso(meta.get("created_at")),
+            "model": store_model(meta),
+        })
+    return sessions
 `;
 
 const LIST_ALL_KIRO_SESSIONS_PY = String.raw`
 ${KIRO_PY_SHARED}
 
 db_path = os.path.expanduser(sys.argv[1])
-db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-rows = db.execute(
-    "SELECT key, conversation_id, value, created_at, updated_at FROM conversations_v2 ORDER BY updated_at DESC"
-).fetchall()
-db.close()
+store = os.path.expanduser(sys.argv[2])
 
-result = [parse_session_row(row) for row in rows]
+result = list_database_sessions(db_path) + list_store_sessions(store)
+result.sort(key=lambda session: activity_epoch(session.get("lastActivity")), reverse=True)
 print(json.dumps(result))
 `;
 
@@ -400,8 +545,19 @@ const LOAD_KIRO_HISTORY_PY = String.raw`
 ${KIRO_PY_SHARED}
 
 db_path = os.path.expanduser(sys.argv[1])
-workspace = sys.argv[2]
-conversation_id = sys.argv[3]
+store = os.path.expanduser(sys.argv[2])
+workspace = sys.argv[3]
+conversation_id = sys.argv[4]
+
+found = read_store_session(store, conversation_id)
+if found is not None:
+    matched = found[1] in workspace_key_candidates(workspace)
+    print(json.dumps(load_store_messages(store, conversation_id) if matched else []))
+    raise SystemExit(0)
+
+if not os.path.isfile(db_path):
+    print("[]")
+    raise SystemExit(0)
 
 db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
 matched_key = resolve_stored_key(db, conversation_id, workspace)
@@ -427,8 +583,27 @@ const DELETE_KIRO_SESSION_PY = String.raw`
 ${KIRO_PY_SHARED}
 
 db_path = os.path.expanduser(sys.argv[1])
-workspace = sys.argv[2]
-conversation_id = sys.argv[3]
+store = os.path.expanduser(sys.argv[2])
+workspace = sys.argv[3]
+conversation_id = sys.argv[4]
+
+found = read_store_session(store, conversation_id)
+if found is not None:
+    deleted = False
+    if found[1] in workspace_key_candidates(workspace):
+        # Kiro manages the .lock file. The metadata goes last, so a failed
+        # removal leaves the session listed and the upper-layer verify fails.
+        for suffix in (".jsonl", ".history", ".json"):
+            path = os.path.join(store, conversation_id + suffix)
+            if os.path.isfile(path):
+                os.remove(path)
+                deleted = True
+    print(json.dumps({"deleted": deleted}))
+    raise SystemExit(0)
+
+if not os.path.isfile(db_path):
+    print(json.dumps({"deleted": False}))
+    raise SystemExit(0)
 
 db = sqlite3.connect(db_path)
 # Scope: conversation_id (a globally unique UUID — different separator forms
