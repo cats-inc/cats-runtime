@@ -1,0 +1,183 @@
+{
+  "models": [
+    {
+      "enumName": "GEMINI_3_0_FLASH",
+      "settingId": "gemini-3-flash-preview",
+      "displayName": "Gemini 3 Flash Preview"
+    },
+    {
+      "enumName": "GEMINI_3_1_FLASH_LITE",
+      "settingId": "gemini-3.1-flash-lite",
+      "displayName": "Gemini 3.1 Flash Lite"
+    },
+    {
+      "enumName": "GROK_4_5",
+      "settingId": "grok-4.5",
+      "displayName": "Grok 4.5"
+    },
+    {
+      "enumName": "GROK_4_6",
+      "settingId": "grok-4.6",
+      "displayName": "Grok 4.6"
+    },
+    {
+      "enumName": "GROK_4_7",
+      "settingId": "grok-4.7",
+      "displayName": "Grok 4.7"
+    },
+    {
+      "enumName": "SONNET_5",
+      "settingId": "claude-sonnet-5",
+      "displayName": "Claude Sonnet 5"
+    },
+    {
+      "enumName": "SONNET_4_6",
+      "settingId": "claude-sonnet-4-6",
+      "displayName": "Claude Sonnet 4.6"
+    },
+    {
+      "enumName": "OPUS_4_6",
+      "settingId": "claude-opus-4-6",
+      "displayName": "Claude Opus 4.6"
+    },
+    {
+      "enumName": "OPUS_4_7",
+      "settingId": "claude-opus-4-7",
+      "displayName": "Claude Opus 4.7"
+    },
+    {
+      "enumName": "OPUS_4_8",
+      "settingId": "claude-opus-4-8",
+      "displayName": "Claude Opus 4.8"
+    },
+    {
+      "enumName": "OPUS_5",
+      "settingId": "claude-opus-5",
+      "displayName": "Claude Opus 5"
+    },
+    {
+      "enumName": "OPUS_5_5",
+      "settingId": "claude-opus-5-5",
+      "displayName": "Claude Opus 5.5"
+    },
+    {
+      "enumName": "FABLE_5",
+      "settingId": "claude-fable-5",
+      "displayName": "Claude Fable 5"
+    },
+    {
+      "enumName": "FABLE_5_1",
+      "settingId": "claude-fable-5-1",
+      "displayName": "Claude Fable 5.1"
+    },
+    {
+      "enumName": "GPT5",
+      "settingId": "gpt-5-2025-08-07",
+      "displayName": "GPT-5"
+    },
+    {
+      "enumName": "GPT5_3_CODEX",
+      "settingId": "gpt-5.3-codex",
+      "displayName": "GPT-5.3-codex"
+    },
+    {
+      "enumName": "GPT5_4",
+      "settingId": "gpt-5.4",
+      "displayName": "GPT-5.4"
+    },
+    {
+      "enumName": "GPT5_5",
+      "settingId": "gpt-5.5",
+      "displayName": "GPT-5.5"
+    },
+    {
+      "enumName": "GPT5_6_SOL",
+      "settingId": "gpt-5.6-sol",
+      "displayName": "GPT-5.6-SOL"
+    },
+    {
+      "enumName": "GPT6_ASTRA",
+      "settingId": "gpt-6-astra",
+      "displayName": "GPT-6-ASTRA"
+    },
+    {
+      "enumName": "GPT5_6_TERRA",
+      "settingId": "gpt-5.6-terra",
+      "displayName": "GPT-5.6-TERRA"
+    },
+    {
+      "enumName": "GPT5_6_LUNA",
+      "settingId": "gpt-5.6-luna",
+      "displayName": "GPT-5.6-LUNA"
+    },
+    {
+      "enumName": "GPT6_SOL",
+      "settingId": "gpt-6-sol",
+      "displayName": "GPT-6-SOL"
+    },
+    {
+      "enumName": "GPT6_LUNA",
+      "settingId": "gpt-6-luna",
+      "displayName": "GPT-6-LUNA"
+    },
+    {
+      "enumName": "GPT5_2",
+      "settingId": "gpt-5.2-2025-12-11",
+      "displayName": "GPT-5.2"
+    },
+    {
+      "enumName": "GEMINI_3_1_PRO",
+      "settingId": "gemini-3.1-pro-preview",
+      "displayName": "Gemini 3.1 Pro Preview"
+    },
+    {
+      "enumName": "GROK_4_3",
+      "settingId": "grok-4.3",
+      "displayName": "Grok 4.3"
+    },
+    {
+      "enumName": "GEMINI_3_6_FLASH",
+      "settingId": "gemini-3.6-flash",
+      "displayName": "Gemini 3.6 Flash"
+    },
+    {
+      "enumName": "GEMINI_3_7_FLASH",
+      "settingId": "gemini-3.7-flash",
+      "displayName": "Gemini 3.7 Flash"
+    },
+    {
+      "enumName": "GEMINI_3_8_FLASH",
+      "settingId": "gemini-3.8-flash",
+      "displayName": "Gemini 3.8 Flash"
+    },
+    {
+      "enumName": "GEMINI_3_5_FLASH_LITE",
+      "settingId": "gemini-3.5-flash-lite",
+      "displayName": "Gemini 3.5 Flash Lite"
+    },
+    {
+      "enumName": "JETBRAINS_MIX",
+      "settingId": "junie-mix",
+      "displayName": "Junie Mix"
+    },
+    {
+      "enumName": "JETBRAINS_LITE",
+      "settingId": "junie-lite",
+      "displayName": "Junie Lite"
+    },
+    {
+      "enumName": "DEEPSEEK_V4_FLASH",
+      "settingId": "deepseek-v4-flash",
+      "displayName": "Deepseek V4 Flash"
+    }
+  ],
+  "aliases": [
+    "gpt",
+    "gpt-codex",
+    "opus",
+    "sonnet",
+    "gemini-pro",
+    "gemini-flash",
+    "grok"
+  ]
+}

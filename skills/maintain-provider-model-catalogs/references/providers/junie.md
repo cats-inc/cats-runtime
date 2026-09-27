@@ -19,7 +19,7 @@ out of scope unless the operator asks for them.
   `--effort`, while the picker offers more.
 - **Static corroboration in the installed JAR** (a possible superset, not entitlement or default
   evidence):
-  - `ModelOption$Specific` should contain every literal picker name.
+  - `ModelOption$Specific` should contain every literal picker name as an exact display name.
   - `EffortLevel.$values()` gives the linear order `None, Minimal, Low, Medium, High, XHigh, Max`.
     `getWireId()` lowercases the name. `EffortLevel$Companion.availableForModel` builds each
     model's list in that order.
@@ -46,7 +46,10 @@ out of scope unless the operator asks for them.
 
 ## Schema-2 execution data
 
-- Keep literal model names, spaces and case in both `id` and `execution.model`.
+- Keep the literal picker name, with its spaces and case, as the row's `id` and `label`.
+- Set `execution.model` to the row's setting ID, such as `gemini-3.7-flash` for `Gemini 3.7 Flash`.
+  `--model` accepts only aliases and setting IDs and rejects picker names as `Invalid model`. Read
+  the pairs with the setting-ID reader below; a row without a setting ID is a gap, not a guess.
 - Give each model its own `junie.reasoning_effort` enum `controls`, with only the values observed
   for that model, as token/label pairs such as `xhigh`/`XHigh`. Add `default` only when the
   picker marks one.
@@ -55,6 +58,25 @@ out of scope unless the operator asks for them.
 - `--effort` is a free string option; no choice validation was found in the JAR. Record which
   tokens have actually been executed.
 - Custom model strings get no inferred effort.
+
+## Setting-ID reader
+
+[`scripts/junie-model-ids.mjs`](../../scripts/junie-model-ids.mjs) prints every
+`ModelOption$Specific` row's setting ID, exact display name and enum name, plus the aliases, as
+JSON. It runs an embedded Java source file on the JVM bundled with the installed Junie, so it needs
+no JDK, and it starts neither the Junie CLI nor an agent.
+
+```sh
+node scripts/junie-model-ids.mjs                       # the version named in ~/.local/share/junie/current
+node scripts/junie-model-ids.mjs --junie-home <versions/<v>/junie>
+node scripts/junie-model-ids.mjs --jar <junie-*.jar> --java <bundled bin/java>
+node scripts/junie-model-ids.mjs --input <saved probe output>
+```
+
+`--data-dir` (or `JUNIE_DATA_DIR`) replaces `~/.local/share/junie`. To see what `--model` accepts
+on this account without running an agent, pass a model that cannot exist, such as
+`--model "No Such Model"`, with a one-word prompt: Junie exits with `Invalid model` and lists every
+accepted alias and setting ID.
 
 Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
 Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.
