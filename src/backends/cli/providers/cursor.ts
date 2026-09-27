@@ -43,6 +43,7 @@ interface CursorStreamEvent {
   session_id?: string;
   text?: string;
   timestamp_ms?: number;
+  model_call_id?: string;
   message?: {
     role?: string;
     content?: CursorMessageContent;
@@ -62,6 +63,10 @@ export class CursorProvider implements Provider {
 
   private pendingPrompt: string | null = null;
   private sawAssistantChunk = false;
+  /** Text streamed since Cursor last replayed its segment; see {@link parseAssistantEvent}. */
+  private segmentText = '';
+  /** A timestamped message equal to `segmentText` that the next line will classify. */
+  private heldSegmentEcho: { event: CursorStreamEvent; events: StreamEvent[] } | null = null;
 
   constructor(
     private readonly evolutionObserver?: ProviderEvolutionEvidenceObserver,
@@ -70,6 +75,8 @@ export class CursorProvider implements Provider {
   prepareEphemeralTurn(turn: TurnInput): void {
     this.pendingPrompt = compileRuntimeTurnPrompt(turn.message, turn);
     this.sawAssistantChunk = false;
+    this.segmentText = '';
+    this.heldSegmentEcho = null;
   }
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
@@ -134,13 +141,20 @@ export class CursorProvider implements Provider {
     try {
       event = JSON.parse(trimmed) as CursorStreamEvent;
     } catch {
-      return observeRawPassthrough(this.evolutionObserver, {
-        rawEventType: 'non_json_line',
-        reason: 'stdout_passthrough',
-        rawSample: trimmed,
-      }, { type: 'raw', text: trimmed } satisfies RawStreamEvent);
+      return prependEvents(
+        this.settleHeldSegmentEcho(null),
+        observeRawPassthrough(this.evolutionObserver, {
+          rawEventType: 'non_json_line',
+          reason: 'stdout_passthrough',
+          rawSample: trimmed,
+        }, { type: 'raw', text: trimmed } satisfies RawStreamEvent),
+      );
     }
 
+    return prependEvents(this.settleHeldSegmentEcho(event), this.parseStreamEvent(event));
+  }
+
+  private parseStreamEvent(event: CursorStreamEvent): StreamEvent | StreamEvent[] | null {
     if (event.type === 'system' && event.subtype === 'init') {
       return observeIgnored(this.evolutionObserver, {
         rawEventType: 'system:init',
@@ -179,45 +193,7 @@ export class CursorProvider implements Provider {
     }
 
     if (event.type === 'assistant') {
-      const assistantEvents = extractCursorAssistantEvents(event.message?.content);
-      if (assistantEvents.length === 0) {
-        return observeIgnored(this.evolutionObserver, {
-          rawEventType: 'assistant',
-          reason: 'empty_assistant_content',
-          rawSample: event,
-        }, null);
-      }
-
-      if (event.timestamp_ms) {
-        this.sawAssistantChunk = true;
-        const parsed = assistantEvents.length === 1 ? assistantEvents[0]! : assistantEvents;
-        return observeNormalized(this.evolutionObserver, {
-          rawEventType: 'assistant',
-          rawSample: event,
-        }, parsed);
-      }
-
-      if (this.sawAssistantChunk) {
-        const nonTextEvents = assistantEvents.filter((item) => item.type !== 'text');
-        if (nonTextEvents.length === 0) {
-          return observeIgnored(this.evolutionObserver, {
-            rawEventType: 'assistant',
-            reason: 'duplicate_final_text',
-            rawSample: event,
-          }, null);
-        }
-        const parsed = nonTextEvents.length === 1 ? nonTextEvents[0]! : nonTextEvents;
-        return observeNormalized(this.evolutionObserver, {
-          rawEventType: 'assistant',
-          rawSample: event,
-        }, parsed);
-      }
-
-      const parsed = assistantEvents.length === 1 ? assistantEvents[0]! : assistantEvents;
-      return observeNormalized(this.evolutionObserver, {
-        rawEventType: 'assistant',
-        rawSample: event,
-      }, parsed);
+      return this.parseAssistantEvent(event);
     }
 
     if (event.type === 'result') {
@@ -239,6 +215,125 @@ export class CursorProvider implements Provider {
       rawSample: event,
     }, null);
   }
+
+  /**
+   * With `--stream-partial-output`, Cursor streams each text delta as a
+   * timestamped assistant message and also buffers it. Before a tool call, a
+   * retry, or an interaction query it replays that buffer as one more
+   * timestamped message -- tagged `model_call_id` only before a tool call --
+   * and at the end of the turn replays the rest without a timestamp. Emitting
+   * the replays showed every text segment before a tool call twice.
+   */
+  private parseAssistantEvent(event: CursorStreamEvent): StreamEvent | StreamEvent[] | null {
+    const assistantEvents = extractCursorAssistantEvents(event.message?.content);
+    if (assistantEvents.length === 0) {
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: 'assistant',
+        reason: 'empty_assistant_content',
+        rawSample: event,
+      }, null);
+    }
+
+    if (event.timestamp_ms) {
+      const text = assistantText(assistantEvents);
+      if (this.segmentText && text === this.segmentText) {
+        if (event.model_call_id) {
+          this.segmentText = '';
+          return this.suppressDuplicateText(event, assistantEvents, 'duplicate_segment_text');
+        }
+        // A retry or query replay looks exactly like a delta that happens to
+        // repeat everything so far ("好" then "好"); the next line tells them apart.
+        this.heldSegmentEcho = { event, events: assistantEvents };
+        return null;
+      }
+      return this.emitAssistantDelta(event, assistantEvents);
+    }
+
+    this.segmentText = '';
+    if (this.sawAssistantChunk) {
+      return this.suppressDuplicateText(event, assistantEvents, 'duplicate_final_text');
+    }
+
+    const parsed = assistantEvents.length === 1 ? assistantEvents[0]! : assistantEvents;
+    return observeNormalized(this.evolutionObserver, {
+      rawEventType: 'assistant',
+      rawSample: event,
+    }, parsed);
+  }
+
+  private emitAssistantDelta(
+    event: CursorStreamEvent,
+    assistantEvents: StreamEvent[],
+  ): StreamEvent | StreamEvent[] {
+    this.sawAssistantChunk = true;
+    this.segmentText += assistantText(assistantEvents);
+    const parsed = assistantEvents.length === 1 ? assistantEvents[0]! : assistantEvents;
+    return observeNormalized(this.evolutionObserver, {
+      rawEventType: 'assistant',
+      rawSample: event,
+    }, parsed);
+  }
+
+  /**
+   * Cursor writes the replay immediately before the `tool_call` started,
+   * `retry`, or `interaction_query` event it precedes, so a held message
+   * followed by one of those was the replay; anything else makes it a delta.
+   */
+  private settleHeldSegmentEcho(next: CursorStreamEvent | null): StreamEvent[] {
+    const held = this.heldSegmentEcho;
+    if (!held) {
+      return [];
+    }
+    this.heldSegmentEcho = null;
+
+    const followsReplay = next?.type === 'retry'
+      || next?.type === 'interaction_query'
+      || (next?.type === 'tool_call' && next.subtype === 'started');
+    if (followsReplay) {
+      this.segmentText = '';
+      return toEventArray(this.suppressDuplicateText(held.event, held.events, 'duplicate_segment_text'));
+    }
+    return toEventArray(this.emitAssistantDelta(held.event, held.events));
+  }
+
+  private suppressDuplicateText(
+    event: CursorStreamEvent,
+    assistantEvents: StreamEvent[],
+    reason: string,
+  ): StreamEvent | StreamEvent[] | null {
+    const nonTextEvents = assistantEvents.filter((item) => item.type !== 'text');
+    if (nonTextEvents.length === 0) {
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: 'assistant',
+        reason,
+        rawSample: event,
+      }, null);
+    }
+    const parsed = nonTextEvents.length === 1 ? nonTextEvents[0]! : nonTextEvents;
+    return observeNormalized(this.evolutionObserver, {
+      rawEventType: 'assistant',
+      rawSample: event,
+    }, parsed);
+  }
+}
+
+function assistantText(events: StreamEvent[]): string {
+  const text = events.find((item): item is TextStreamEvent => item.type === 'text');
+  return text?.text ?? '';
+}
+
+function toEventArray(value: StreamEvent | StreamEvent[] | null): StreamEvent[] {
+  if (value === null) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function prependEvents(
+  earlier: StreamEvent[],
+  value: StreamEvent | StreamEvent[] | null,
+): StreamEvent | StreamEvent[] | null {
+  if (earlier.length === 0) return value;
+  const combined = [...earlier, ...toEventArray(value)];
+  return combined.length === 1 ? combined[0]! : combined;
 }
 
 function extractCursorAssistantEvents(
