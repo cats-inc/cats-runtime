@@ -43,6 +43,18 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+Runtime **0.3.2** is prepared for npm `latest` and the Desktop **0.5.8** standard
+preview. This compatible patch adds the intervening Junie, Kiro, Auggie, Copilot
+and Pi catalog updates, verified read-only/managed-worktree skill delivery, and
+truthful Codex native sandbox/bootstrap diagnostics. Codex development can now
+stop with an actionable diagnostic when the actual provider permission mode
+cannot satisfy the admitted worktree grant; it does not silently claim that
+requested sandbox permissions were applied. Catalog schema 2, existing model
+identities and public configuration/data contracts remain compatible; no new
+migration or cats-one minimum is required. Independent compatibility review and
+the paired preview/release skill-distribution check passed. Publication is pending
+the full workflow gate and verification of the published npm package.
+
 Runtime `0.3.1` is prepared for the Desktop `0.5.1` standard-profile preview and for
 npm publication on `latest`. It is a compatible patch. Writable startup now retires
 factory copies that earlier Desktop builds seeded (PR #91): an unmodified copy, or an
@@ -165,4 +177,4 @@ authorization before applying it; release notes alone do not complete migration.
 - Apps are independently versioned artifacts owned by cats-apps. A Runtime change
   does not bump App versions or change Desktop's selected App artifacts.
 
-*Last updated: 2026-09-24*
+*Last updated: 2026-09-28*
