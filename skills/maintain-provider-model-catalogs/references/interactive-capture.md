@@ -235,6 +235,49 @@ Exercise the walk, probe and guards without a desktop or Auggie:
 powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Test-AuggiePicker.ps1
 ```
 
+## Windows Copilot helper
+
+[`Capture-CopilotPicker.ps1`](../scripts/Capture-CopilotPicker.ps1) owns GitHub Copilot CLI picker
+semantics and takes the same platform helper path. It does not launch Copilot or interpret defaults.
+
+1. **Launch.** Clean the environment first (launch hygiene above, plus `COPILOT_*`). Open
+   interactive `copilot --no-auto-update --no-custom-instructions --disable-builtin-mcps
+   --no-remote --no-remote-export` in a uniquely titled window with `Start-WindowsUiTerminal`, from
+   an already trusted folder. The first launch in Windows Terminal adds `askedSetupTerminals` to
+   `~/.copilot/config.json`, so take the settings hash after startup. If focusing fails because
+   Explorer owns the foreground, wait until the operator is idle and call the UI Automation
+   element's `SetFocus()` before the helper.
+2. **Open the picker.** Type `/model`, wait for the command list and send one guarded Enter; that
+   Enter runs the command and selects nothing. The picker must be on `group: recommended`.
+3. **Capture.** Pass the settings file, normally `~/.copilot/config.json`:
+
+```powershell
+powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/scripts/Capture-CopilotPicker.ps1 `
+  -UiHelperPath $desktopUiHelper -WindowTitle $captureWindowTitle `
+  -OutputDirectory $newEmptyEvidenceDirectory -ConfigPath $copilotConfig -CycleOptions
+```
+
+- The walk goes Down until the list wraps to its first row, then Up through every row to check the
+  reverse order. For each highlighted row it reads the group header, label, `(default)` suffix,
+  current-session check mark, Context figures, Reasoning or Tier value, and the detail pane. A
+  plan-unavailable row is recorded from its pane message. The pane can lag the highlight, so each
+  read waits until the pane names the highlighted row (or differs from the previous row's pane),
+  and a pane that never catches up is reported in `PaneUnmatched` instead of being attributed.
+- Two Context figures are recorded as the Tab context toggle; the helper never sends Tab.
+- `-CycleOptions` then presses Left on each row with arrows until the value stops changing or
+  repeats, restores the arrival value, does the same with Right and restores again. `options.json`
+  keeps both sequences; a row that ends at both edges is `linear` with its full `Order`, and the
+  Auto Tier graph is reported as `irregular`. Changes apply to the session only.
+- It sends only Up, Down, Left and Right. Before every key the settings file must match its
+  pre-capture SHA-256. `KeyScreens` saves the opened picker once; every step is kept as text.
+- Afterwards close the picker with Escape and exit the owned Copilot with `/exit`.
+
+Exercise the walk, option cycling and guards without a desktop or Copilot:
+
+```powershell
+powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Test-CopilotPicker.ps1
+```
+
 ## Turn evidence into data
 
 Trim only terminal padding/chrome, mark redactions visibly, and retain material picker text under
@@ -252,7 +295,9 @@ catalog delta, validation and limitations. The [Claude reference](providers/clau
 The [Kiro reference](providers/kiro.md) and `docs/research/2026-09-27-kiro-picker-full-catalog.md`
 record a settings panel whose toggles persist, and its config restore. The
 [Auggie reference](providers/auggie.md) and `docs/research/2026-09-27-auggie-picker-full-catalog.md`
-record a picker without effort and the authorized Enter probe.
+record a picker without effort and the authorized Enter probe. The
+[Copilot reference](providers/copilot.md) and `docs/research/2026-09-27-copilot-picker-full-catalog.md`
+record per-row Reasoning, Context and Tier controls, plan-unavailable rows and a lagging detail pane.
 
 ## Cost
 
@@ -285,6 +330,11 @@ node skills/maintain-provider-model-catalogs/scripts/measure-agent-usage.mjs <ho
   Kiro 2.24.1 records one credit entry per request and leaves the token fields at 0. The result
   also lists each turn's requests, duration and context use; the turn in progress has no metadata
   until it ends.
+- **GitHub Copilot:** `~/.copilot/session-state/<session-id>/events.jsonl`, or that folder. Tokens
+  and premium requests arrive per model in `session.shutdown`, once per exit (a resumed session
+  has several segments, which the reader sums). Copilot 1.0.88 writes no `outputTokens` on its
+  messages, so an open session reports only message counts and Copilot's own nano-AIU checkpoint;
+  exit it to record the rest.
 - **Auggie:** `~/.augment/sessions/<session-id>.json`. Each `chatHistory` exchange is one call,
   with tokens in its `token_usage` node. The call in progress is saved only when it ends, and
   sub-agents appear only as session-level credits and USD.
@@ -294,11 +344,11 @@ node skills/maintain-provider-model-catalogs/scripts/measure-agent-usage.mjs <ho
 
 Phase starts apply in order, and the call that matches one starts the next phase:
 
-- `at:<ISO time with zone>` (Auggie, Claude, Codex, Junie): the first call at or after that time.
-- `text:<literal>` (Auggie, Claude, Codex, Kiro): the first call whose own message or tool call contains
+- `at:<ISO time with zone>` (Auggie, Claude, Codex, Copilot, Junie): the first call at or after that time.
+- `text:<literal>` (Auggie, Claude, Codex, Copilot, Kiro): the first call whose own message or tool call contains
   the literal. Prompts and tool output never match, so use a unique command or file name from the
   agent's own calls, such as the capture window title.
-- `turn:<n>` (Auggie, Junie, Kiro): the first call of user turn n.
+- `turn:<n>` (Auggie, Copilot, Junie, Kiro): the first call of user turn n.
 
 Exercise every host reader with synthetic session files:
 

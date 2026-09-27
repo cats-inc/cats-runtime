@@ -48,8 +48,8 @@ The repository owner approved two maintenance groups for Cats Desktop and Runtim
 
 | Group | CLI providers | Maintained and selectable catalog |
 |---|---|---|
-| Full catalog | Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie CLI, Kiro CLI, Auggie CLI | Complete evidenced CLI model lists and all applicable effort/options, plus custom model-string input |
-| Shortlist | Cursor Agent CLI, Goose CLI, Devin CLI, GitHub Copilot CLI, OpenCode, Kilo Code CLI, Pi, Cline | At most six explicitly selected models per CLI, plus a custom-input action |
+| Full catalog | Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie CLI, Kiro CLI, Auggie CLI, GitHub Copilot CLI | Complete evidenced CLI model lists and all applicable effort/options, plus custom model-string input |
+| Shortlist | Cursor Agent CLI, Goose CLI, Devin CLI, OpenCode, Kilo Code CLI, Pi, Cline | At most six explicitly selected models per CLI, plus a custom-input action |
 
 **2026-09-26 amendment:** the owner moved Junie CLI from the shortlist group to the
 full-catalog group. It now carries the complete JetBrains AI picker list and each model's
@@ -75,6 +75,17 @@ picker marks `(default)`. The picker shows no effort, so no effort binding was a
 covers Windows native only; the shared scope does not establish equal WSL entitlement.
 Membership of the other groups is unchanged.
 
+**2026-09-27 Copilot amendment:** the owner moved GitHub Copilot CLI from the shortlist group to
+the full-catalog group. It now carries every `/model` picker row a Copilot Pro account can select,
+in the default recommended order, with `default: true` only on the row the picker marks
+`(default)`. Rows the plan cannot use (Copilot Pro+ and above) are omitted by the owner's
+direction and listed in notes. Each row's picker Reasoning values, its Context toggle and the Auto
+row's Tier are separate controls through `copilot.reasoning_effort`, the new `copilot.context`
+and the new `copilot.auto_tier` bindings, as recorded in
+[the Copilot picker capture](../research/2026-09-27-copilot-picker-full-catalog.md). The evidence
+covers Windows native only; the shared scope does not establish equal WSL entitlement.
+Membership of the other groups is unchanged.
+
 The full-catalog group has no six-model cap. The shortlist may contain fewer than six models;
 effort choices remain attached to their model and custom input does not consume a model slot.
 Both surfaces shall follow the same policy. Existing evidence, exact-label, per-model applicability,
@@ -93,7 +104,8 @@ different claims and must remain distinguishable.
 **Implementation status:** Cursor's six fixed combos and custom input are implemented as recorded
 in [the Cursor evidence note](../research/2026-09-17-cursor-fixed-presets.md).
 The subsequently approved Copilot six-model shortlist, fixed efforts and custom input are recorded
-in [the Copilot evidence note](../research/2026-09-17-copilot-fixed-presets.md). The owner explicitly
+in [the Copilot evidence note](../research/2026-09-17-copilot-fixed-presets.md); the 2026-09-27
+Copilot amendment above replaced it with the full catalog. The owner explicitly
 chose to specify other shortlists later. No other model membership or order, catalog removal,
 UI enforcement change, automated refresh job, or periodic refresh interval is authorized by this
 amendment. Custom input already has a Desktop implementation; empty-catalog reachability and

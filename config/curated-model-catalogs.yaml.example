@@ -1331,94 +1331,673 @@ catalogs:
         controls: []
   - provider: copilot
     backend: cli
-    selection_mode: shortlist
+    selection_mode: full
     source_cli: Copilot
-    cli_version: 1.0.85
-    last_updated: 2026-09-18
+    cli_version: 1.0.88
+    last_updated: 2026-09-27
     notes:
-      - Operator-selected six fixed model/effort combos; this is a Cats shortlist, not a complete
-        upstream catalog.
-      - "Source: docs/research/fixtures/copilot-1.0.85/picker.redacted.txt and
-        selected-models.redacted.json (account-resolved models.list; no session or model turn)."
-      - "2026-09-18 shortlist revision replaces GPT-5.6 Luna with MAI-Code-1.1-Flash at fixed
-        Medium. Source: docs/research/fixtures/copilot-1.0.85/shortlist-2026-09-18.redacted.txt and
-        mai-2026-09-18.redacted.json; models.list verifies mai-code-1.1-flash and medium."
-      - Gemini was absent from models.list; the operator confirmed its actual session selection as
-        gemini-3.8-flash (medium). All six selected combinations are now mapped.
-      - Only GPT-5.6 Terra was explicitly marked default. Single-value options encode operator-fixed
-        effort, not upstream effort defaults. Custom strings remain available.
-      - Picker context figures (400K, 264K, 266K, 328K, unknown, unknown) are informational and
-        retained in the evidence, not selectable context settings or inferred token limits.
+      - "Complete /model picker for a Copilot Pro account: 20 selectable rows (Auto plus 19 models), captured 2026-09-27 (UTC+8) from GitHub Copilot CLI 1.0.88 on Windows native by operating the picker. Rows follow the default recommended grouping in arrival order. Evidence: docs/research/fixtures/copilot-1.0.88/model-picker.agent-capture.redacted.txt and docs/research/2026-09-27-copilot-picker-full-catalog.md."
+      - "The picker also lists 10 Unavailable models whose detail pane says the plan does not include them (gpt-6-astra, gpt-5.6-sol, gpt-5.5, claude-fable-5.1, claude-fable-5, claude-opus-5, claude-opus-4.8, claude-opus-4.8-fast, claude-opus-4.7, claude-sonnet-4.6). They need Copilot Pro+ or higher and are omitted. Pro+ users can still enter those IDs as custom model strings."
+      - "The picker groups rows as Recent, Recommended, New and Other. The Recent group follows the account's recently used models, so a later capture can reorder the first rows without an upstream catalog change."
+      - "IDs come from the models.list RPC, except the four Gemini rows, which models.list omits. The operator confirmed gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash and gemini-3.5-flash, and selecting Gemini 3.8 Flash printed Model changed from Auto to gemini-3.8-flash (medium)."
+      - "Only GPT-5.6 Terra carries a (default) marker, so it is the only default row. Auto shows a check mark for the current session selection only."
+      - "Reasoning, Context and Tier values follow each row's picker order. No value carries a default marker, so selection starts at the first value and always sends --effort, --context or --auto-tier, overriding the setting Copilot would otherwise use. Picker arrival values (mostly Medium, Auto Balance) were session state, not defaults. This follows the operator's 2026-09-27 instruction, as for Junie and Kiro."
+      - "Context is a Tab toggle on the 12 rows that show two figures: the first figure is --context default and the second --context long_context. Figures are picker text, not token limits. Rows showing a dash have no context control."
+      - "Detail-pane cost tiers and credits per 1M tokens are recorded per row in notes. Captured on Windows native only: WSL shares this scope, but a WSL installation and account may see different models. BYOK and custom providers are out of scope. Custom model strings remain available."
     models:
+      - id: auto
+        label: Auto
+        notes:
+          - "Picker detail: Auto routes based on your task, real-time system health, and model performance. Auto is 10% off right now."
+          - "Tier is the picker's routing profile. Its detail pane describes Efficiency, Balance and Intelligence; Fast appears only in the Tier cycle and --help. Arrival value was Balance, with no default marker."
+        source_names:
+          - auto
+          - Auto
+        execution:
+          model: auto
+        controls:
+          - key: copilot.auto_tier
+            label: Tier
+            description: Auto routing profile, sent as --auto-tier.
+            kind: enum
+            scope: both
+            values:
+              - value: efficiency
+                label: Efficiency
+                description: "Favors faster models while preserving the quality needed for the task."
+              - value: balance
+                label: Balance
+                description: "Balances model quality and speed while adapting to each task."
+              - value: intelligence
+                label: Intelligence
+                description: "Favors stronger models for complex work while remaining adaptive for simpler tasks."
+              - value: fast
+                label: Fast
+      - default: false
+        id: grok-4.7
+        label: Grok 4.7
+        notes:
+          - "Picker group: Recent models. Detail pane: Medium cost; credits per 1M tokens input 200, output 600, cache read 50, cache write 0."
+          - "Picker context figures: 328K (default) and 628K (long_context). Long context raises the credits shown in the detail pane."
+          - "Arrival reasoning value was High, with no default marker."
+        source_names:
+          - grok-4.7
+          - "Grok 4.7"
+        execution:
+          model: grok-4.7
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+              - value: xhigh
+                label: "Extra High"
+          - key: copilot.context
+            label: Context
+            description: Context window tier, sent as --context.
+            kind: enum
+            scope: both
+            values:
+              - value: default
+                label: "328K"
+              - value: long_context
+                label: "628K"
       - default: true
         id: gpt-5.6-terra
-        label: GPT-5.6 Terra — Medium
+        label: GPT-5.6 Terra
+        notes:
+          - "Picker group: Recent models. Detail pane: Medium cost; credits per 1M tokens input 200, output 1200, cache read 20, cache write 250."
+          - "Picker row reads GPT-5.6 Terra (default); the marker is excluded from the label."
+          - "Picker context figures: 400K (default) and 1.1M (long_context). Long context raises the credits shown in the detail pane."
+          - "Arrival reasoning value was Medium, with no default marker."
         source_names:
           - gpt-5.6-terra
-          - GPT-5.6 Terra — Medium
+          - "GPT-5.6 Terra"
+          - "GPT-5.6 Terra — Medium"
         execution:
           model: gpt-5.6-terra
-          fixed_controls:
-            copilot.reasoning_effort: medium
-        controls: []
-      - default: false
-        id: claude-sonnet-5
-        label: Claude Sonnet 5 — Medium
-        source_names:
-          - claude-sonnet-5
-          - Claude Sonnet 5 — Medium
-        execution:
-          model: claude-sonnet-5
-          fixed_controls:
-            copilot.reasoning_effort: medium
-        controls: []
-      - default: false
-        id: gemini-3.8-flash
-        label: Gemini 3.8 Flash — Medium
-        capabilityTags:
-          - latency_optimized
-        source_names:
-          - gemini-3.8-flash
-          - Gemini 3.8 Flash — Medium
-        execution:
-          model: gemini-3.8-flash
-          fixed_controls:
-            copilot.reasoning_effort: medium
-        controls: []
-      - default: false
-        id: grok-4.6
-        label: Grok 4.6 — Medium
-        source_names:
-          - grok-4.6
-          - Grok 4.6 — Medium
-        execution:
-          model: grok-4.6
-          fixed_controls:
-            copilot.reasoning_effort: medium
-        controls: []
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: none
+                label: "None"
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+              - value: xhigh
+                label: "Extra High"
+              - value: max
+                label: "Max"
+          - key: copilot.context
+            label: Context
+            description: Context window tier, sent as --context.
+            kind: enum
+            scope: both
+            values:
+              - value: default
+                label: "400K"
+              - value: long_context
+                label: "1.1M"
       - default: false
         id: mai-code-1.1-flash
-        label: MAI-Code-1.1-Flash — Medium
+        label: MAI-Code-1.1-Flash
         capabilityTags:
           - latency_optimized
+        notes:
+          - "Picker group: Recent models. Detail pane: Low cost; credits per 1M tokens input 20, output 120, cache read 2, cache write 25."
+          - "Picker context column shows a dash: no context control."
+          - "Arrival reasoning value was Medium, with no default marker."
         source_names:
           - mai-code-1.1-flash
-          - MAI-Code-1.1-Flash — Medium
+          - "MAI-Code-1.1-Flash"
+          - "MAI-Code-1.1-Flash — Medium"
         execution:
           model: mai-code-1.1-flash
-          fixed_controls:
-            copilot.reasoning_effort: medium
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+      - default: false
+        id: claude-sonnet-5
+        label: Claude Sonnet 5
+        notes:
+          - "Picker group: Recommended models. Detail pane: Medium cost; credits per 1M tokens input 200, output 1000, cache read 20, cache write 250."
+          - "Picker context figures: 264K (default) and 1M (long_context). Long context shows the same credits for this row; only the highlighted figure changes."
+          - "Arrival reasoning value was Medium, with no default marker."
+        source_names:
+          - claude-sonnet-5
+          - "Claude Sonnet 5"
+          - "Claude Sonnet 5 — Medium"
+        execution:
+          model: claude-sonnet-5
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+              - value: xhigh
+                label: "Extra High"
+              - value: max
+                label: "Max"
+          - key: copilot.context
+            label: Context
+            description: Context window tier, sent as --context.
+            kind: enum
+            scope: both
+            values:
+              - value: default
+                label: "264K"
+              - value: long_context
+                label: "1M"
+      - default: false
+        id: gemini-3.8-flash
+        label: Gemini 3.8 Flash
+        capabilityTags:
+          - latency_optimized
+        notes:
+          - "Picker group: New models. Detail pane: Low cost; credits per 1M tokens input 75, output 375, cache read 7.5, cache write 0."
+          - "Picker context figures: 266K (default) and 1.0M (long_context). Long context raises the credits shown in the detail pane."
+          - "Arrival reasoning value was Medium, with no default marker."
+          - "Absent from models.list; ID confirmed by the operator on 2026-09-27."
+        source_names:
+          - gemini-3.8-flash
+          - "Gemini 3.8 Flash"
+          - "Gemini 3.8 Flash — Medium"
+        execution:
+          model: gemini-3.8-flash
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+          - key: copilot.context
+            label: Context
+            description: Context window tier, sent as --context.
+            kind: enum
+            scope: both
+            values:
+              - value: default
+                label: "266K"
+              - value: long_context
+                label: "1.0M"
+      - default: false
+        id: gpt-6-luna
+        label: GPT-6 Luna
+        notes:
+          - "Picker group: New models. Detail pane: Low cost; credits per 1M tokens input 10, output 50, cache read 1, cache write 12.5."
+          - "Picker context figures: 400K (default) and 1M (long_context). Long context raises the credits shown in the detail pane."
+          - "Arrival reasoning value was Medium, with no default marker."
+        source_names:
+          - gpt-6-luna
+          - "GPT-6 Luna"
+        execution:
+          model: gpt-6-luna
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: none
+                label: "None"
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+              - value: xhigh
+                label: "Extra High"
+              - value: max
+                label: "Max"
+          - key: copilot.context
+            label: Context
+            description: Context window tier, sent as --context.
+            kind: enum
+            scope: both
+            values:
+              - value: default
+                label: "400K"
+              - value: long_context
+                label: "1M"
+      - default: false
+        id: grok-4.6
+        label: Grok 4.6
+        notes:
+          - "Picker group: New models. Detail pane: Medium cost; credits per 1M tokens input 200, output 600, cache read 50, cache write 0."
+          - "Picker context figures: 328K (default) and 628K (long_context). Long context raises the credits shown in the detail pane."
+          - "Arrival reasoning value was Medium, with no default marker."
+        source_names:
+          - grok-4.6
+          - "Grok 4.6"
+          - "Grok 4.6 — Medium"
+        execution:
+          model: grok-4.6
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+              - value: xhigh
+                label: "Extra High"
+          - key: copilot.context
+            label: Context
+            description: Context window tier, sent as --context.
+            kind: enum
+            scope: both
+            values:
+              - value: default
+                label: "328K"
+              - value: long_context
+                label: "628K"
+      - default: false
+        id: gpt-5.6-luna
+        label: GPT-5.6 Luna
+        notes:
+          - "Picker group: Other models. Detail pane: Low cost; credits per 1M tokens input 20, output 120, cache read 2, cache write 25."
+          - "Picker context figures: 328K (default) and 1.1M (long_context). Long context raises the credits shown in the detail pane."
+          - "Arrival reasoning value was Medium, with no default marker."
+        source_names:
+          - gpt-5.6-luna
+          - "GPT-5.6 Luna"
+        execution:
+          model: gpt-5.6-luna
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: none
+                label: "None"
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+              - value: xhigh
+                label: "Extra High"
+              - value: max
+                label: "Max"
+          - key: copilot.context
+            label: Context
+            description: Context window tier, sent as --context.
+            kind: enum
+            scope: both
+            values:
+              - value: default
+                label: "328K"
+              - value: long_context
+                label: "1.1M"
+      - default: false
+        id: gpt-5.4
+        label: GPT-5.4
+        notes:
+          - "Picker group: Other models. Detail pane: Medium cost; credits per 1M tokens input 250, output 1500, cache read 25, cache write 0."
+          - "Picker context figures: 400K (default) and 1.1M (long_context). Long context raises the credits shown in the detail pane."
+          - "Arrival reasoning value was Medium, with no default marker."
+        source_names:
+          - gpt-5.4
+          - "GPT-5.4"
+        execution:
+          model: gpt-5.4
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: none
+                label: "None"
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+              - value: xhigh
+                label: "Extra High"
+          - key: copilot.context
+            label: Context
+            description: Context window tier, sent as --context.
+            kind: enum
+            scope: both
+            values:
+              - value: default
+                label: "400K"
+              - value: long_context
+                label: "1.1M"
+      - default: false
+        id: gpt-5.4-mini
+        label: GPT-5.4 mini
+        notes:
+          - "Picker group: Other models. Detail pane: Low cost; credits per 1M tokens input 75, output 450, cache read 7.5, cache write 0."
+          - "Picker context column shows a dash: no context control."
+          - "Arrival reasoning value was Medium, with no default marker."
+        source_names:
+          - gpt-5.4-mini
+          - "GPT-5.4 mini"
+        execution:
+          model: gpt-5.4-mini
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: none
+                label: "None"
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+              - value: xhigh
+                label: "Extra High"
+      - default: false
+        id: gpt-5.3-codex
+        label: GPT-5.3-Codex
+        notes:
+          - "Picker group: Other models. Detail pane: Medium cost; credits per 1M tokens input 175, output 1400, cache read 17.5, cache write 0."
+          - "Picker context column shows a dash: no context control."
+          - "Arrival reasoning value was Medium, with no default marker."
+        source_names:
+          - gpt-5.3-codex
+          - "GPT-5.3-Codex"
+        execution:
+          model: gpt-5.3-codex
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+              - value: xhigh
+                label: "Extra High"
+      - default: false
+        id: gpt-5-mini
+        label: GPT-5 mini
+        notes:
+          - "Picker group: Other models. Detail pane: Low cost; credits per 1M tokens input 25, output 200, cache read 2.5, cache write 0."
+          - "Picker context column shows a dash: no context control."
+          - "Arrival reasoning value was Medium, with no default marker."
+        source_names:
+          - gpt-5-mini
+          - "GPT-5 mini"
+        execution:
+          model: gpt-5-mini
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+      - default: false
+        id: claude-haiku-4.5
+        label: Claude Haiku 4.5
+        notes:
+          - "Picker group: Other models. Detail pane: Low cost; credits per 1M tokens input 100, output 500, cache read 10, cache write 125."
+          - "Picker context column shows a dash: no context control."
+          - "Picker Reasoning column shows a dash and the row has no effort arrows: no reasoning control."
+        source_names:
+          - claude-haiku-4.5
+          - "Claude Haiku 4.5"
+        execution:
+          model: claude-haiku-4.5
         controls: []
       - default: false
+        id: gemini-3.7-flash
+        label: Gemini 3.7 Flash
+        notes:
+          - "Picker group: Other models. Detail pane: Low cost; credits per 1M tokens input 75, output 375, cache read 7.5, cache write 0."
+          - "Picker context figures: 264K (default) and 1M (long_context). Long context raises the credits shown in the detail pane."
+          - "Arrival reasoning value was Medium, with no default marker."
+          - "Absent from models.list; ID confirmed by the operator on 2026-09-27."
+        source_names:
+          - gemini-3.7-flash
+          - "Gemini 3.7 Flash"
+        execution:
+          model: gemini-3.7-flash
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+          - key: copilot.context
+            label: Context
+            description: Context window tier, sent as --context.
+            kind: enum
+            scope: both
+            values:
+              - value: default
+                label: "264K"
+              - value: long_context
+                label: "1M"
+      - default: false
+        id: gemini-3.6-flash
+        label: Gemini 3.6 Flash
+        notes:
+          - "Picker group: Other models. Detail pane: Low cost; credits per 1M tokens input 75, output 375, cache read 7.5, cache write 0."
+          - "Picker context figures: 264K (default) and 1M (long_context). Long context raises the credits shown in the detail pane."
+          - "Arrival reasoning value was Medium, with no default marker."
+          - "Absent from models.list; ID confirmed by the operator on 2026-09-27."
+        source_names:
+          - gemini-3.6-flash
+          - "Gemini 3.6 Flash"
+        execution:
+          model: gemini-3.6-flash
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: minimal
+                label: "Minimal"
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+          - key: copilot.context
+            label: Context
+            description: Context window tier, sent as --context.
+            kind: enum
+            scope: both
+            values:
+              - value: default
+                label: "264K"
+              - value: long_context
+                label: "1M"
+      - default: false
+        id: gemini-3.5-flash
+        label: Gemini 3.5 Flash
+        notes:
+          - "Picker group: Other models. Detail pane: Medium cost; credits per 1M tokens input 150, output 900, cache read 15, cache write 0."
+          - "Picker context figures: 264K (default) and 1M (long_context). Long context raises the credits shown in the detail pane."
+          - "Arrival reasoning value was Medium, with no default marker."
+          - "Absent from models.list; ID confirmed by the operator on 2026-09-27."
+        source_names:
+          - gemini-3.5-flash
+          - "Gemini 3.5 Flash"
+        execution:
+          model: gemini-3.5-flash
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: minimal
+                label: "Minimal"
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+          - key: copilot.context
+            label: Context
+            description: Context window tier, sent as --context.
+            kind: enum
+            scope: both
+            values:
+              - value: default
+                label: "264K"
+              - value: long_context
+                label: "1M"
+      - default: false
+        id: grok-4.5
+        label: Grok 4.5
+        notes:
+          - "Picker group: Other models. Detail pane: Medium cost; credits per 1M tokens input 200, output 600, cache read 50, cache write 0."
+          - "Picker context figures: 328K (default) and 628K (long_context). Long context raises the credits shown in the detail pane."
+          - "Arrival reasoning value was Medium, with no default marker."
+        source_names:
+          - grok-4.5
+          - "Grok 4.5"
+        execution:
+          model: grok-4.5
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+          - key: copilot.context
+            label: Context
+            description: Context window tier, sent as --context.
+            kind: enum
+            scope: both
+            values:
+              - value: default
+                label: "328K"
+              - value: long_context
+                label: "628K"
+      - default: false
         id: kimi-k3
-        label: Kimi K3 — High
+        label: Kimi K3
+        notes:
+          - "Picker group: Other models. Detail pane: Medium cost; credits per 1M tokens input 300, output 1500, cache read 30, cache write 0."
+          - "Picker context column shows a dash: no context control."
+          - "Arrival reasoning value was High, with no default marker."
         source_names:
           - kimi-k3
-          - Kimi K3 — High
+          - "Kimi K3"
+          - "Kimi K3 — High"
         execution:
           model: kimi-k3
-          fixed_controls:
-            copilot.reasoning_effort: high
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: "Low"
+              - value: high
+                label: "High"
+              - value: max
+                label: "Max"
+      - default: false
+        id: kimi-k2.7-code
+        label: Kimi K2.7 Code
+        notes:
+          - "Picker group: Other models. Detail pane: Low cost; credits per 1M tokens input 95, output 400, cache read 19, cache write 0."
+          - "Picker context column shows a dash: no context control."
+          - "Picker Reasoning column shows a dash and the row has no effort arrows: no reasoning control."
+        source_names:
+          - kimi-k2.7-code
+          - "Kimi K2.7 Code"
+        execution:
+          model: kimi-k2.7-code
         controls: []
   - provider: opencode
     backend: cli

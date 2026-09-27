@@ -19,6 +19,8 @@ export const CATALOG_BINDINGS: Readonly<Record<string, Binding>> = Object.freeze
   'grok.reasoning_effort': { provider: 'grok', backend: 'cli', type: 'string' },
   'muse.reasoning_effort': { provider: 'muse', backend: 'cli', type: 'string' },
   'copilot.reasoning_effort': { provider: 'copilot', backend: 'cli', type: 'string' },
+  'copilot.context': { provider: 'copilot', backend: 'cli', type: 'string' },
+  'copilot.auto_tier': { provider: 'copilot', backend: 'cli', type: 'string' },
   'kilo.variant': { provider: 'kilo', backend: 'cli', type: 'string' },
   'cline.reasoning_effort': { provider: 'cline', backend: 'cli', type: 'string' },
   'junie.reasoning_effort': { provider: 'junie', backend: 'cli', type: 'string' },

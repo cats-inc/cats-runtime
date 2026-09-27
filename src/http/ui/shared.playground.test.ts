@@ -12,7 +12,7 @@ import { buildProviderAdvancedKnowledge } from '../../core/models/providerAdvanc
 import { createCatalogSnapshot } from '../../catalogs/resolver.js';
 import { getStaticProviderModels } from '../../core/models/providerModelCatalog.js';
 
-describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'goose', 'pi'])('%s shortlists in Playground', (provider) => {
+describe.each(['cursor', 'opencode', 'kilo', 'devin', 'cline', 'goose', 'pi'])('%s shortlists in Playground', (provider) => {
   it('uses the approved fallbacks and preserves custom strings on reload', () => {
     const html = readFileSync(fileURLToPath(new URL('./pages/playground.html', import.meta.url)), 'utf8');
     expect(html).toContain('const PROVIDER_MODELS = {}');
@@ -26,7 +26,7 @@ describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'goose
       value: id, label: `${label}${isDefault ? ' (default)' : ''}`,
     }));
     expect(fallback).toHaveLength(6);
-    expect(fallback.filter(entry => /default/i.test(entry.label))).toHaveLength(provider === 'copilot' ? 1 : 0);
+    expect(fallback.filter(entry => /default/i.test(entry.label))).toHaveLength(0);
     const catalog = {
       provider, backend: 'cli', instance: 'native', defaultModel: null,
       source: 'static', cache: null, entries: models, controls: [], presets: [],
@@ -54,7 +54,7 @@ describe.each(['cursor', 'copilot', 'opencode', 'kilo', 'devin', 'cline', 'goose
     } as Record<string, string>)[selector] }) })).toEqual({ model: custom, modelSelection: null });
 
     // Exercise the actual fixed-combo menu path with Runtime metadata, not
-    // only the already-decorated offline labels. Copilot's default must survive.
+    // only the already-decorated offline labels.
     const syncStart = html.indexOf('function syncAgentModelField(div,options={})');
     const syncEnd = html.indexOf('\nfunction ', syncStart + 1);
     const ruleStart = html.indexOf('function isAgentCustomModelSelection');
@@ -325,6 +325,55 @@ describe('shared playground selection helpers', () => {
     const custom = 'fixture-unlisted-auggie-model';
     expect(catsUI.normalizePlaygroundAgentSelection({ ...input, model: custom }))
       .toEqual({ provider: 'auggie', model: custom, modelSelection: null });
+  });
+
+  it('initializes Copilot at GPT-5.6 Terra and renders reasoning, context and tier from the first value', () => {
+    const catsUI = createCatsUI();
+    const target = { providerName: 'copilot', backend: 'cli' as const,
+      instanceId: 'native', defaultTarget: true };
+    const models = getStaticProviderModels(target);
+    const { catalog } = buildProviderAdvancedKnowledge(target, {
+      provider: 'copilot', backend: 'cli', instance: 'native', defaultModel: 'gpt-5.6-terra',
+      source: 'static', cache: null, models, warnings: [],
+    }, { snapshot: createCatalogSnapshot(readFileSync(new URL('../../../config/curated-model-catalogs.yaml.example', import.meta.url), 'utf8')) });
+    const html = readFileSync(new URL('./pages/playground.html', import.meta.url), 'utf8');
+    const start = html.indexOf('function renderAgentModelControls(');
+    const end = html.indexOf('function applyAgentModelControlValues(', start);
+    const controls = { innerHTML: '' };
+    const context = { window: { CatsUI: catsUI }, escapeHtml: String,
+      div: { querySelector: () => controls }, catalog, entryId: '' };
+    vm.createContext(context);
+    vm.runInContext(html.slice(start, end), context);
+    expect(models).toHaveLength(20);
+    expect(models.filter(model => model.default).map(model => model.id)).toEqual(['gpt-5.6-terra']);
+    const input = { provider: 'copilot', selectableProviders: ['copilot'], providerOrder: ['copilot'],
+      advancedCatalogs: { copilot: catalog } };
+    expect(catsUI.normalizePlaygroundAgentSelection(input).modelSelection.entryId).toBe('gpt-5.6-terra');
+    const rendered: Record<string, Array<[string, string]>> = {};
+    for (const entry of catalog.entries) {
+      context.entryId = entry.id;
+      vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
+      const options = [...controls.innerHTML.matchAll(/<option value="([^"]+)"( selected)?>([^<]+)<\/option>/g)];
+      // The context value token is `default`; no visible label may claim a default.
+      expect(options.map(match => match[3]).filter(label => /default/i.test(label))).toEqual([]);
+      rendered[entry.id] = options.filter(match => match[2]).map(match => [match[1], match[3]]);
+    }
+    expect(rendered).toMatchObject({
+      auto: [['efficiency', 'Efficiency']],
+      'gpt-5.6-terra': [['none', 'None'], ['default', '400K']],
+      'claude-sonnet-5': [['low', 'Low'], ['default', '264K']],
+      'gemini-3.6-flash': [['minimal', 'Minimal'], ['default', '264K']],
+      'gpt-5.4-mini': [['none', 'None']],
+      'claude-haiku-4.5': [],
+      'kimi-k2.7-code': [],
+    });
+    expect(catsUI.normalizePlaygroundAgentSelection({ ...input, modelSelection: {
+      entryId: 'grok-4.7', entryMode: 'explicit',
+      controls: { 'copilot.reasoning_effort': 'xhigh', 'copilot.context': 'long_context' },
+    } }).modelSelection.controls).toEqual({ 'copilot.reasoning_effort': 'xhigh', 'copilot.context': 'long_context' });
+    const custom = 'claude-opus-5';
+    expect(catsUI.normalizePlaygroundAgentSelection({ ...input, model: custom }))
+      .toEqual({ provider: 'copilot', model: custom, modelSelection: null });
   });
 
   it('renders the Antigravity first effort without default labels and preserves saved effort', () => {

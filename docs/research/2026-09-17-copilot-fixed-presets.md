@@ -1,3 +1,6 @@
+> Superseded on 2026-09-27 by the [full-catalog picker capture](./2026-09-27-copilot-picker-full-catalog.md).
+> Copilot is now a full-catalog provider with every `/model` row a Copilot Pro account can select.
+
 # Copilot 1.0.85 fixed shortlist
 
 Date: 2026-09-17

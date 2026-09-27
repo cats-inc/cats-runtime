@@ -17,14 +17,13 @@ provider-specific model options or expanding the operator's scope.
 The operator-approved policy is recorded in the 2026-09-17 amendment to
 `docs/specs/SPEC-028-provider-model-catalog-maintenance-skill.md` in cats-runtime:
 
-- **Full catalogs:** Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie, Kiro, and Auggie. Maintain the
+- **Full catalogs:** Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie, Kiro, Auggie, and GitHub
+  Copilot. Maintain the
   complete evidenced CLI model lists and applicable effort/options; offer all of them in Desktop and
   Playground, plus custom model-string input. The six-model limit does not apply to this group.
-- **Shortlists:** Cursor Agent, Goose, Devin, GitHub Copilot, OpenCode, Kilo Code,
-  Pi, and Cline. Maintain at most six explicitly selected model entries per CLI, plus
+- **Shortlists:** Cursor Agent, Goose, Devin, OpenCode, Kilo Code, Pi, and Cline. Maintain at most six explicitly selected model entries per CLI, plus
   custom input. Effort remains attached to its model; the custom-input action is not a model slot.
 - Approved shortlists are recorded in `docs/research/2026-09-17-cursor-fixed-presets.md`,
-  `docs/research/2026-09-17-copilot-fixed-presets.md`,
   `docs/research/2026-09-18-opencode-shortlist.md`,
   `docs/research/2026-09-18-kilo-shortlist.md`,
   `docs/research/2026-09-18-devin-shortlist.md`,
@@ -38,8 +37,8 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
   execution paths. Preserve backend-specific identifiers; this policy does not establish new
   adapter/API support or unknown model capabilities.
 
-Cursor uses fixed parameterized model strings; Copilot resolves fixed effort separately from its
-model id; OpenCode uses provider-qualified model IDs without evidenced option controls; Kilo
+Cursor uses fixed parameterized model strings; Copilot uses picker labels with `models.list` or
+operator-confirmed IDs plus separate per-row reasoning, context and Auto tier controls; OpenCode uses provider-qualified model IDs without evidenced option controls; Kilo
 resolves approved fixed variants separately from the raw model ID; Devin uses executable variant
 UIDs containing the fixed effort on its agent/ACP target; ClinePass uses explicit CLI provider
 selection plus a separate fixed thinking argument; Kiro uses verbatim picker IDs plus a separate
@@ -185,7 +184,7 @@ outside Git, like raw evidence.
    at review. In review, audit and capture/preview modes, which make no repository change, list
    and recommend only. If that change has already merged, open a follow-up only when the
    operator's authorization covers it.
-3. **Make a kept script reusable.** The Codex, Claude, Kiro and Auggie capture helpers in
+3. **Make a kept script reusable.** The Codex, Claude, Kiro, Auggie and Copilot capture helpers in
    [interactive capture](./references/interactive-capture.md) are the pattern:
    - place it under `scripts/`, with parameters in place of this run's window titles, paths,
      session IDs and resume flags;
@@ -241,8 +240,9 @@ authorizes that external mutation.
   routing, fixed thinking arguments and consistent structured/plain-string execution.
 - [Codex](./references/providers/codex.md): supplied picker evidence, existing per-model defaults,
   exact display labels, data bindings and focused validation.
-- [Copilot](./references/providers/copilot.md): bounded `models.list` reads, picker/session evidence
-  for omitted rows, and fixed effort execution without editable controls.
+- [Copilot](./references/providers/copilot.md): the `/model` picker as the full list for the
+  account's plan, `models.list` IDs with confirmation for omitted rows, per-row Reasoning, Context
+  and Auto Tier controls, plan-unavailable rows, and the reusable capture helper.
 - [Cursor](./references/providers/cursor.md): exact parameterized variant strings, fixed-combination
   shortlists, refresh/custom-input preservation, and isolated discovery fixtures.
 - [Devin](./references/providers/devin.md): family versus executable variant UIDs, bounded JSON

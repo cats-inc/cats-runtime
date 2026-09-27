@@ -124,15 +124,18 @@ Thinking transport for the final two entries.
 [OpenCode shortlist](./research/2026-09-18-opencode-shortlist.md) records the six selected models,
 verified Go IDs, exact labels, refresh behavior and custom input.
 
-[Copilot fixed presets](./research/2026-09-17-copilot-fixed-presets.md) records the approved shortlist,
-fixed effort execution and per-model raw-ID evidence.
+[Copilot full catalog](./research/2026-09-27-copilot-picker-full-catalog.md) records the 20 picker rows
+a Copilot Pro 1.0.88 account can select, per-row Reasoning, Context and Auto Tier controls through the
+new `copilot.context` and `copilot.auto_tier` bindings, omitted Pro+ rows, the quota handoff and the
+reusable capture, `models.list` and usage helpers. It supersedes the
+[Copilot fixed presets](./research/2026-09-17-copilot-fixed-presets.md).
 
 [Cursor fixed presets](./research/2026-09-17-cursor-fixed-presets.md) records the six approved
 combinations, parameterized execution, refresh-stable shortlist, and custom input.
 
 [Approved model-menu maintenance policy](./specs/SPEC-028-provider-model-catalog-maintenance-skill.md#approved-maintenance-and-menu-policy-2026-09-17)
 records complete catalogs for Codex/Claude/agy/Grok/Muse, up to six models for the named other
-CLIs, and custom model input for both groups. Cursor, Copilot, OpenCode, Kilo, Devin and Cline shortlists are implemented; the remaining
+CLIs, and custom model input for both groups. Cursor, OpenCode, Kilo, Devin and Cline shortlists are implemented; the remaining
 individual shortlists and rollout are pending.
 
 [Grok Build 1.0.34 picker](./research/2026-09-17-grok-model-picker-refresh.md)

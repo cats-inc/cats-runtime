@@ -76,6 +76,12 @@ export class CopilotProvider implements Provider {
     if (typeof opts.modelControls?.['copilot.reasoning_effort'] === 'string') {
       args.push('--effort', opts.modelControls['copilot.reasoning_effort']);
     }
+    if (typeof opts.modelControls?.['copilot.context'] === 'string') {
+      args.push('--context', opts.modelControls['copilot.context']);
+    }
+    if (typeof opts.modelControls?.['copilot.auto_tier'] === 'string') {
+      args.push('--auto-tier', opts.modelControls['copilot.auto_tier']);
+    }
 
     if (opts.resumeSessionId) {
       args.push('--resume', opts.resumeSessionId);

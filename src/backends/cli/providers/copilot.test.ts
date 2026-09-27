@@ -62,6 +62,29 @@ describe('CopilotProvider', () => {
       expect(args).toContain('high');
     });
 
+    it('adds --context and --auto-tier as flag/value pairs from modelControls', () => {
+      const args = provider.buildSpawnArgs({
+        cwd: '/tmp',
+        model: 'gpt-5.6-terra',
+        modelControls: {
+          'copilot.reasoning_effort': 'none',
+          'copilot.context': 'long_context',
+        },
+      });
+      expect(args.slice(args.indexOf('--effort'), args.indexOf('--effort') + 2)).toEqual(['--effort', 'none']);
+      expect(args.slice(args.indexOf('--context'), args.indexOf('--context') + 2)).toEqual(['--context', 'long_context']);
+      expect(args).not.toContain('--auto-tier');
+
+      const auto = provider.buildSpawnArgs({
+        cwd: '/tmp',
+        model: 'auto',
+        modelControls: { 'copilot.auto_tier': 'efficiency' },
+      });
+      expect(auto.slice(auto.indexOf('--auto-tier'), auto.indexOf('--auto-tier') + 2)).toEqual(['--auto-tier', 'efficiency']);
+      expect(auto).not.toContain('--effort');
+      expect(auto).not.toContain('--context');
+    });
+
     it('adds --resume when resumeSessionId specified', () => {
       const args = provider.buildSpawnArgs({ cwd: '/tmp', resumeSessionId: 'sess-abc' });
       expect(args).toContain('--resume');
