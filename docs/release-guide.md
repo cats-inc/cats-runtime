@@ -43,6 +43,17 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+Runtime **0.3.4** is prepared for the Desktop **0.5.10** standard-profile preview. It is
+not published to npm; npm `latest` stays `0.3.2`. This compatible patch fixes turns whose
+result arrives after the provider's process exits: the session stream now delivers Auggie's
+and Kiro's result before closing, and a turn that ends without a result or error is completed
+instead of leaving its run running. Kiro sessions are read from Kiro 2.24's
+`~/.kiro/sessions/cli` store as well as its database. Junie rows execute as the setting IDs
+its `--model` accepts instead of picker names. A request Pi ends with an error, such as a
+model the account's plan does not include, is reported as a failure with Pi's message, and
+failed launches keep the first stderr lines. No configuration, persisted-data or catalog
+schema contract changes; no migration or cats-one minimum is required.
+
 Runtime **0.3.3** shipped on 2026-09-28 (Taipei) in the
 [Desktop **0.5.9** standard-profile preview](https://github.com/cats-inc/cats-platform/releases/tag/v0.5.9),
 which bundles `d061e9b35bb527633d8448274b8fa6c13ffb8851` on every OS. It is not
