@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { once } from 'node:events';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ProviderCommandConfig } from '../config.js';
@@ -189,7 +189,9 @@ it('routes native Codex read requests through the real Worker transport and shar
     '   const names = msg.params.dynamicTools?.map(tool => tool.type + ":" + tool.name).sort().join(",");',
     '   if (names !== "function:list_files,function:read_file") return fail("missing read registration");',
     '   send({ method: "thread/started", params: { thread: { id: "thread" } } });',
-    '   send({ id: msg.id, result: { thread: { id: "thread" } } });',
+    '   send({ id: msg.id, result: { thread: { id: "thread" }, approvalPolicy: "untrusted",',
+    '     sandbox: { type: "workspaceWrite", writableRoots: [], networkAccess: false,',
+    '       excludeTmpdirEnvVar: false, excludeSlashTmp: false } } });',
     ' } else if (msg.method === "turn/start") {',
     '   send({ id: msg.id, result: { turn: { id: "turn" } } });',
     '   send({ id: 90, method: "item/commandExecution/requestApproval",',
@@ -230,6 +232,42 @@ it('routes native Codex read requests through the real Worker transport and shar
       await exited;
     }
     cleanupTempDirWithRetries(cwd);
+  }
+});
+
+it('never sends a Codex model turn when the child reports a permission downgrade', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'cats-codex-policy-'));
+  const script = [
+    "const rl = require('node:readline').createInterface({ input: process.stdin });",
+    "const send = value => process.stdout.write(JSON.stringify(value) + '\\n');",
+    'rl.on("line", line => {',
+    ' const msg = JSON.parse(line);',
+    ' if (msg.method === "initialize") send({ id: msg.id, result: {} });',
+    ' if (msg.method === "thread/start") {',
+    '   const started = { method: "thread/started", params: { thread: { id: "thread" } } };',
+    '   send(started);',
+    '   send({ id: msg.id, result: { thread: { id: "thread" }, approvalPolicy: "never",',
+    '     sandbox: { type: "readOnly", networkAccess: false } } });',
+    '   send(started);',
+    ' }',
+    ' if (msg.method === "turn/start") require("node:fs").writeFileSync("unexpected-turn", "sent");',
+    '});',
+  ].join('\n');
+  const worker = new WorkerProcess(new CodexProvider(), { cwd, permissionMode: 'skip' },
+    { ...createNodeCommandConfig(), args: ['-e', script] });
+  try {
+    worker.start();
+    expect(await worker.sendMessage('Do work')).toEqual([{ type: 'error',
+      text: expect.stringContaining('requested workspace-write / never, received readOnly / never'),
+    }]);
+  } finally {
+    if (worker.alive) {
+      const exited = once(worker, 'exit');
+      worker.kill();
+      await exited;
+    }
+    try { expect(existsSync(join(cwd, 'unexpected-turn'))).toBe(false); }
+    finally { cleanupTempDirWithRetries(cwd); }
   }
 });
 

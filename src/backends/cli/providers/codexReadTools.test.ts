@@ -34,7 +34,12 @@ describe('Codex explicit local read tools', () => {
     const lines = provider.buildStdinMessage('Inspect the admitted workspace.').trim().split('\n')
       .map((line) => JSON.parse(line));
     provider.parseStreamLine(JSON.stringify({ id: lines[0].id, result: {} }));
-    provider.parseStreamLine(JSON.stringify({ id: lines[2].id, result: { thread: { id: 'thread' } } }));
+    provider.parseStreamLine(JSON.stringify({ id: lines[2].id, result: {
+      thread: { id: 'thread' }, approvalPolicy: lines[2].params.approvalPolicy,
+      sandbox: lines[2].params.sandbox === 'read-only' ? { type: 'readOnly', networkAccess: false }
+        : { type: 'workspaceWrite', writableRoots: [], networkAccess: false,
+          excludeTmpdirEnvVar: false, excludeSlashTmp: false },
+    } }));
     const turn = JSON.parse(provider.getPendingTurnStart()!);
     provider.parseStreamLine(JSON.stringify({ id: turn.id, result: { turn: { id: 'turn' } } }));
     return provider;
@@ -185,7 +190,10 @@ describe('Codex explicit local read tools', () => {
   it('does not execute before turn acknowledgement, after completion or after cancellation', async () => {
     const provider = configured();
     provider.buildStdinMessage('inspect');
-    provider.parseStreamLine(JSON.stringify({ id: 1, result: { threadId: 'thread' } }));
+    provider.parseStreamLine(JSON.stringify({ id: 1, result: { threadId: 'thread',
+      approvalPolicy: 'untrusted', sandbox: { type: 'workspaceWrite', writableRoots: [],
+        networkAccess: false, excludeTmpdirEnvVar: false, excludeSlashTmp: false },
+    } }));
     provider.getPendingTurnStart();
     expect((await call(provider)).result.success).toBe(false);
     const ready = boot();

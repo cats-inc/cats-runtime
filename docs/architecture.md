@@ -405,6 +405,12 @@ src/
 - Lets providers compose configured launch arguments around their native
   subcommands. Codex configuration overrides follow `app-server`, with explicit
   session model/control selections taking precedence over instance defaults.
+- Confirms Codex's effective bootstrap sandbox mode and approval policy against
+  the requested contract before sending any model turn. Start/resume/fork replies
+  must match the request ID; notifications cannot make the worker ready. Missing
+  or mismatched permission fields fail explicitly without retry or escalation.
+  This is not a complete OS/network/writable-root attestation. See the
+  [native permission mismatch evidence](research/2026-09-27-codex-bootstrap-permissions.md).
 - Bridges explicitly granted Codex `read_file` / `list_files` dynamic tools to
   the shared local tool runtime for native local workspaces. The adapter binds
   requests to an active thread/turn; WorkerProcess binds asynchronous replies

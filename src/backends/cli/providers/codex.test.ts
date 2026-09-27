@@ -2,6 +2,12 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { CodexProvider } from './codex.js';
 import type { StreamEvent } from './types.js';
 
+const matchingPermissionResponse = {
+  sandbox: { type: 'workspaceWrite', writableRoots: [], networkAccess: false,
+    excludeTmpdirEnvVar: false, excludeSlashTmp: false },
+  approvalPolicy: 'never',
+};
+
 function toEventList(event: StreamEvent | StreamEvent[] | null): StreamEvent[] {
   if (!event) {
     return [];
@@ -171,7 +177,7 @@ describe('CodexProvider', () => {
       provider.parseStreamLine(JSON.stringify({
         jsonrpc: '2.0',
         id: 1,
-        result: { threadId: 'thread-abc' },
+        result: { threadId: 'thread-abc', ...matchingPermissionResponse },
       }));
       // Consume pending turn start
       provider.getPendingTurnStart();
@@ -190,7 +196,7 @@ describe('CodexProvider', () => {
       provider.parseStreamLine(JSON.stringify({
         jsonrpc: '2.0',
         id: 1,
-        result: { threadId: 'thread-abc' },
+        result: { threadId: 'thread-abc', ...matchingPermissionResponse },
       }));
       provider.getPendingTurnStart();
 
@@ -216,7 +222,7 @@ describe('CodexProvider', () => {
       provider.parseStreamLine(JSON.stringify({
         jsonrpc: '2.0',
         id: 1,
-        result: { threadId: 'thread-123' },
+        result: { threadId: 'thread-123', ...matchingPermissionResponse },
       }));
 
       const pending = provider.getPendingTurnStart();
@@ -237,7 +243,7 @@ describe('CodexProvider', () => {
       provider.parseStreamLine(JSON.stringify({
         jsonrpc: '2.0',
         id: 1,
-        result: { threadId: 'thread-123' },
+        result: { threadId: 'thread-123', ...matchingPermissionResponse },
       }));
       provider.getPendingTurnStart(); // consume
       expect(provider.getPendingTurnStart()).toBeNull();
@@ -276,7 +282,7 @@ describe('CodexProvider', () => {
       const event = provider.parseStreamLine(JSON.stringify({
         jsonrpc: '2.0',
         id: 1,
-        result: { threadId: 'thread-xyz' },
+        result: { threadId: 'thread-xyz', ...matchingPermissionResponse },
       }));
       expect(event?.type).toBe('init');
       expect(event?.sessionId).toBe('thread-xyz');
@@ -289,7 +295,7 @@ describe('CodexProvider', () => {
       const event = provider.parseStreamLine(JSON.stringify({
         jsonrpc: '2.0',
         id: 1,
-        result: { thread: { id: 'thread-nested' } },
+        result: { thread: { id: 'thread-nested' }, ...matchingPermissionResponse },
       }));
       expect(event?.type).toBe('init');
       expect(event?.sessionId).toBe('thread-nested');
@@ -940,7 +946,8 @@ describe('CodexProvider', () => {
         ...(resume ? { resumeSessionId: 'usage-thread', forkSession: fork } : {}),
       });
       provider.buildStdinMessage('first request');
-      provider.parseStreamLine(JSON.stringify({ id: 1, result: { thread: { id: 'usage-thread' } } }));
+      provider.parseStreamLine(JSON.stringify({ id: 1,
+        result: { thread: { id: 'usage-thread' }, ...matchingPermissionResponse } }));
     };
     const start = (turnId: string, first = false) => {
       const message = first ? provider.getPendingTurnStart() : provider.buildStdinMessage('next request');

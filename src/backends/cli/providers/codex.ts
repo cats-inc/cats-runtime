@@ -95,7 +95,7 @@ export class CodexProvider implements Provider {
   private _allowedTools: string[] = [];
   private _executionContext: ProviderExecutionContext = {};
   private _readTools: CodexReadTools | null = null;
-  private _readToolsBootstrapId: number | null = null;
+  private _threadBootstrapId: number | null = null;
   private _readTurnId: string | null = null;
   private _readCallIds = new Set<string>();
 
@@ -426,35 +426,41 @@ export class CodexProvider implements Provider {
       } satisfies ErrorStreamEvent);
     }
 
-    const result = msg.result ?? {};
+    const result = asRecord(msg.result) ?? {};
 
     // thread/start|resume|fork response — extract threadId (may be at result.threadId or result.thread.id)
     if (this.state === 'initializing' && !this.threadId) {
-      if (this._readTools && msg.id !== this._readToolsBootstrapId) return null;
-      const tid = (result.threadId as string)
-        ?? ((result.thread as Record<string, unknown> | undefined)?.id as string);
-      if (typeof tid === 'string' && tid) {
-        this.threadId = tid;
-        this.state = 'ready';
-        return observeNormalized(this.evolutionObserver, {
-          rawEventType: 'thread/start',
-          rawSample: msg,
-        }, {
-          type: 'init',
-          sessionId: tid,
-        } satisfies InitStreamEvent);
+      if (msg.id !== this._threadBootstrapId) return null;
+      const tid = result.threadId ?? asRecord(result.thread)?.id;
+      if (typeof tid !== 'string' || !tid.trim()) {
+        return this.failBootstrap(this._readTools
+          ? 'Codex read-tool registration did not return a valid thread.'
+          : 'Codex bootstrap did not return a valid thread. No model turn was started.');
       }
-      if (this._readTools) {
-        this.state = 'failed';
-        this._pendingMessage = null;
-        return { type: 'error', text: 'Codex read-tool registration did not return a valid thread.' };
+      const policy = this.resolvePermissionPolicy(this._spawnOpts);
+      const expectedSandbox = policy.sandbox === 'read-only' ? 'readOnly' : 'workspaceWrite';
+      const sandboxType = asRecord(result.sandbox)?.type;
+      if (sandboxType !== expectedSandbox || result.approvalPolicy !== policy.approvalPolicy) {
+        // Only report known discriminants, never arbitrary provider response contents.
+        const observedSandbox = sandboxType === 'readOnly' || sandboxType === 'workspaceWrite'
+          || sandboxType === 'dangerFullAccess' || sandboxType === 'externalSandbox'
+          ? sandboxType : 'missing/unsupported';
+        const approval = result.approvalPolicy;
+        const observedApproval = approval === 'never' || approval === 'untrusted'
+          || approval === 'on-request' || approval === 'on-failure' ? approval : 'missing/unsupported';
+        return this.failBootstrap(`Codex effective permission mismatch: requested ${policy.sandbox}`
+          + ` / ${policy.approvalPolicy}, received ${observedSandbox} / ${observedApproval}.`
+          + ' No model turn was started. Check the provider permission configuration before recreating the session.');
       }
-      // No threadId — this is the initialize response, consume internally
-      return observeIgnored(this.evolutionObserver, {
-        rawEventType: 'initialize',
-        reason: 'bootstrap_initialize_response',
+      this.threadId = tid;
+      this.state = 'ready';
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'thread/start',
         rawSample: msg,
-      }, null);
+      }, {
+        type: 'init',
+        sessionId: tid,
+      } satisfies InitStreamEvent);
     }
 
     if (msg.id === this._turnStartRequestId) {
@@ -473,29 +479,23 @@ export class CodexProvider implements Provider {
     }, null);
   }
 
+  private failBootstrap(text: string): ErrorStreamEvent {
+    this.state = 'failed';
+    this._pendingMessage = null;
+    this.threadId = null;
+    this._readTurnId = null;
+    return { type: 'error', text };
+  }
+
   private handleNotification(msg: JsonRpcResponse): StreamEvent | StreamEvent[] | null {
     const method = msg.method!;
     const params = msg.params ?? {};
 
-    // thread/started notification — extract threadId as fallback
+    // Only the correlated bootstrap response confirms the effective permission mode.
     if (method === 'thread/started') {
-      // A notification alone does not acknowledge required dynamic-tool registration.
-      if (this._readTools) return null;
-      const thread = params.thread as Record<string, unknown> | undefined;
-      if (thread?.id && !this.threadId) {
-        this.threadId = thread.id as string;
-        this.state = 'ready';
-        return observeNormalized(this.evolutionObserver, {
-          rawEventType: method,
-          rawSample: msg,
-        }, {
-          type: 'init',
-          sessionId: this.threadId,
-        } satisfies InitStreamEvent);
-      }
-      return observeSchemaFailure(this.evolutionObserver, {
+      return observeIgnored(this.evolutionObserver, {
         rawEventType: method,
-        reason: 'missing_thread_id',
+        reason: 'notification_does_not_confirm_permissions',
         rawSample: msg,
       }, null);
     }
@@ -854,6 +854,7 @@ export class CodexProvider implements Provider {
   }
 
   private buildThreadBootstrapParams(opts: ProviderSpawnOptions): Record<string, unknown> {
+    this._threadBootstrapId = this.nextId;
     const policy = this.resolvePermissionPolicy(opts);
     const params: Record<string, unknown> = {
       cwd: opts.cwd,
@@ -861,7 +862,6 @@ export class CodexProvider implements Provider {
       sandbox: policy.sandbox,
     };
     if (this._readTools) {
-      this._readToolsBootstrapId = this.nextId;
       params.dynamicTools = this._readTools.definitions();
     }
 

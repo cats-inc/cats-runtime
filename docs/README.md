@@ -7,6 +7,11 @@ containment and existing ignore rules before preparing skill files. Provider
 grants are unchanged; source and unverified targets still reject strict delivery.
 See the [content-policy checkpoint](plans/PLAN-041-preview-skill-content-policy.md).
 
+Codex now checks the effective bootstrap sandbox mode and approval policy before
+starting a model turn. [Native permission mismatch evidence](research/2026-09-27-codex-bootstrap-permissions.md)
+records the bounded failed acceptance, auth-free reproduction and validation
+limits; the native cause and ordinary-contribution acceptance remain open.
+
 ## Windows Codex background launch
 
 [Windows Codex hidden launch](research/2026-09-26-windows-codex-hidden-launch.md)
