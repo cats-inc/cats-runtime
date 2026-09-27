@@ -43,8 +43,10 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
-Runtime **0.3.3** is prepared for the Desktop **0.5.9** standard-profile preview. It is
-not published to npm; npm `latest` stays `0.3.2`. This compatible patch fixes Windows
+Runtime **0.3.3** shipped on 2026-09-28 (Taipei) in the
+[Desktop **0.5.9** standard-profile preview](https://github.com/cats-inc/cats-platform/releases/tag/v0.5.9),
+which bundles `d061e9b35bb527633d8448274b8fa6c13ffb8851` on every OS. It is not
+published to npm; npm `latest` stays `0.3.2`. This compatible patch fixes Windows
 provider launches whose multi-line or quoted prompts were cut short by `cmd.exe` or
 Windows PowerShell 5.1: npm shims with an extensionless node script (Cline, Kilo),
 Cursor's `cursor-agent.cmd` and Junie's `junie.bat` now resolve to the program they
