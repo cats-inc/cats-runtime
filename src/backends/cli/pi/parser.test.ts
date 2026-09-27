@@ -93,6 +93,29 @@ describe('parsePiStreamLine', () => {
     expect(event).toBeNull();
   });
 
+  it('ends a turn Pi stopped with an error as an error with its message', () => {
+    // Recorded when the ChatGPT account's plan did not include the selected model.
+    const errorMessage = "Codex error: The 'gpt-5.3-codex-spark' model is not supported when using Codex with a ChatGPT account.";
+    const event = parsePiStreamLine(JSON.stringify({
+      type: 'turn_end',
+      message: {
+        role: 'assistant',
+        content: [],
+        stopReason: 'error',
+        errorMessage,
+        usage: { input: 0, output: 0 },
+      },
+      toolResults: [],
+    }));
+    expect(event).toEqual({ type: 'error', text: errorMessage });
+
+    const withoutMessage = parsePiStreamLine(JSON.stringify({
+      type: 'turn_end',
+      message: { role: 'assistant', content: [], stopReason: 'error' },
+    }));
+    expect(withoutMessage).toEqual({ type: 'error', text: 'Pi request failed without an error message.' });
+  });
+
   it('parses turn_end without message as result', () => {
     const event = parsePiStreamLine(JSON.stringify({ type: 'turn_end' }));
     expect(event?.type).toBe('result');
@@ -336,6 +359,20 @@ describe('parsePiStreamLine current message schema', () => {
         },
       },
     ]);
+  });
+
+  it('parses a failed assistant message from a Pi session as an error', () => {
+    const event = parsePiStreamLine(JSON.stringify({
+      type: 'message',
+      message: {
+        role: 'assistant',
+        content: [],
+        stopReason: 'error',
+        errorMessage: 'Codex error: unsupported model.',
+        usage: { input: 0, output: 0 },
+      },
+    }));
+    expect(event).toEqual({ type: 'error', text: 'Codex error: unsupported model.' });
   });
 
   it('parses tool result messages emitted by current Pi sessions', () => {
