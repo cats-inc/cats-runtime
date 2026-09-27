@@ -1,3 +1,6 @@
+> Superseded on 2026-09-27 by the [full openai-codex channel](./2026-09-27-pi-openai-codex-full-catalog.md).
+> Pi now lists every openai-codex model with per-model thinking levels.
+
 # Pi 0.87.1 subscription shortlist
 
 Date: 2026-09-23. Mode: refresh. Interaction policy: confirm uncertainty.

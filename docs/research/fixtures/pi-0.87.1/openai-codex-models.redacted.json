@@ -1,0 +1,229 @@
+{
+  "piVersion": "0.87.1",
+  "piAiVersion": "0.87.1",
+  "provider": "openai-codex",
+  "defaultThinkingLevel": "medium",
+  "count": 8,
+  "models": [
+    {
+      "id": "gpt-5.3-codex-spark",
+      "name": "GPT-5.3 Codex Spark",
+      "input": [
+        "text"
+      ],
+      "reasoning": true,
+      "thinkingLevels": [
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "thinkingLevelMap": {
+        "xhigh": "xhigh",
+        "minimal": "low"
+      },
+      "contextWindow": 128000,
+      "maxTokens": 128000
+    },
+    {
+      "id": "gpt-5.5",
+      "name": "GPT-5.5",
+      "input": [
+        "text",
+        "image"
+      ],
+      "reasoning": true,
+      "thinkingLevels": [
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "thinkingLevelMap": {
+        "xhigh": "xhigh",
+        "minimal": "low"
+      },
+      "contextWindow": 272000,
+      "maxTokens": 128000
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "name": "GPT-5.6 Luna",
+      "input": [
+        "text",
+        "image"
+      ],
+      "reasoning": true,
+      "thinkingLevels": [
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "thinkingLevelMap": {
+        "xhigh": "xhigh",
+        "max": "max",
+        "minimal": "low"
+      },
+      "contextWindow": 272000,
+      "maxTokens": 128000
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "name": "GPT-5.6 Sol",
+      "input": [
+        "text",
+        "image"
+      ],
+      "reasoning": true,
+      "thinkingLevels": [
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "thinkingLevelMap": {
+        "xhigh": "xhigh",
+        "max": "max",
+        "minimal": "low"
+      },
+      "contextWindow": 272000,
+      "maxTokens": 128000
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "name": "GPT-5.6 Terra",
+      "input": [
+        "text",
+        "image"
+      ],
+      "reasoning": true,
+      "thinkingLevels": [
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "thinkingLevelMap": {
+        "xhigh": "xhigh",
+        "max": "max",
+        "minimal": "low"
+      },
+      "contextWindow": 272000,
+      "maxTokens": 128000
+    },
+    {
+      "id": "gpt-6-astra",
+      "name": "GPT-6 Astra",
+      "input": [
+        "text",
+        "image"
+      ],
+      "reasoning": true,
+      "thinkingLevels": [
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "thinkingLevelMap": {
+        "off": null,
+        "minimal": "low",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "xhigh": "xhigh",
+        "max": "max"
+      },
+      "contextWindow": 272000,
+      "maxTokens": 128000
+    },
+    {
+      "id": "gpt-6-luna",
+      "name": "GPT-6 Luna",
+      "input": [
+        "text",
+        "image"
+      ],
+      "reasoning": true,
+      "thinkingLevels": [
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "thinkingLevelMap": {
+        "off": "none",
+        "minimal": "low",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "xhigh": "xhigh",
+        "max": "max"
+      },
+      "contextWindow": 272000,
+      "maxTokens": 128000
+    },
+    {
+      "id": "gpt-6-sol",
+      "name": "GPT-6 Sol",
+      "input": [
+        "text",
+        "image"
+      ],
+      "reasoning": true,
+      "thinkingLevels": [
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "thinkingLevelMap": {
+        "off": "none",
+        "minimal": "low",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "xhigh": "xhigh",
+        "max": "max"
+      },
+      "contextWindow": 272000,
+      "maxTokens": 128000
+    }
+  ],
+  "store": {
+    "checkedAt": "2026-09-22T22:13:54.795Z",
+    "count": 8,
+    "sameIdsAndOrder": true,
+    "onlyInStore": [],
+    "onlyInRegistry": []
+  },
+  "sources": {
+    "pi-coding-agent/package.json": "627631b613ba4ca29eba8df793f5280fd20b19f01d73826e9ffda14c15def5dc",
+    "pi-coding-agent/dist/core/defaults.js": "13196dce2ddb143f6f4c28af2e34374f84004e50c7b71ba7b900e1acf84479b6",
+    "pi-ai/package.json": "0422fc7227a158c3c843c1540edfff017d2103be33ee48b882e2ff9032a5f7d2",
+    "pi-ai/dist/models.generated.js": "220f1c9fad2cb2f62535492b6022e6ee40a8187d1465c2a3aa492f70f6baf6c6",
+    "pi-ai/dist/models.js": "75fa33149fb608bc4a7b7a0586c8ca8f0024465d580091b0c426c0baf3fbc80a"
+  }
+}

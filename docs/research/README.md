@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-09-27-pi-openai-codex-full-catalog](./2026-09-27-pi-openai-codex-full-catalog.md) | Pi 0.87.1 full openai-codex channel | All 8 channel models read from the installed package, per-model thinking levels from Pi's own rule with the selector's medium default, the Spark entitlement decision and the reusable package extractor |
 | [2026-09-27-copilot-picker-full-catalog](./2026-09-27-copilot-picker-full-catalog.md) | GitHub Copilot CLI 1.0.88 full catalog, agent-operated picker capture | 20 rows a Copilot Pro account can select, Pro+ rows omitted, Terra as the only picker default, per-row Reasoning, Context and Auto Tier controls through two new bindings, operator-confirmed Gemini IDs, the quota handoff, the Copilot usage and `models.list` readers and the reusable capture helper |
 | [2026-09-27-auggie-picker-full-catalog](./2026-09-27-auggie-picker-full-catalog.md) | Auggie 0.36.0 full catalog, agent-operated picker capture | 34 picker rows with opaque JSON IDs, Opus 4.8 as the only picker default, no effort in the picker or after the authorized Enter probe, effort levels in notes only, Windows-only scope, the Auggie usage reader and the reusable capture helper |
 | [2026-09-27-kiro-picker-full-catalog](./2026-09-27-kiro-picker-full-catalog.md) | Kiro 2.24.1 full catalog, agent-operated picker capture | 20 raw IDs including auto without a default, per-model effort on ten rows, new `kiro.reasoning_effort` binding, settings written on toggle and restored, Windows-only scope, per-phase session credits and the reusable capture, restore and usage helpers |
@@ -15,7 +16,7 @@
 | [2026-09-25-antigravity-model-catalog-refresh](./2026-09-25-antigravity-model-catalog-refresh.md) | Antigravity 1.2.10 model catalog refresh | Seven families, 14 verified execution IDs, agy 1.2.10 enumeration, desktop UI isolation findings and token accounting |
 | [2026-09-25-claude-picker-agent-capture](./2026-09-25-claude-picker-agent-capture.md) | Claude 2.1.282 agent-operated picker capture | Opus 5.5 label, Opus Medium default effort, `opus[1m]` context alias, arrow-only capture helper and measured token cost |
 | [2026-09-24-codex-picker-pilot](./2026-09-24-codex-picker-pilot.md) | Codex native picker pilot | Seven observed models, per-model efforts/defaults, data-only refresh and reusable capture |
-| [2026-09-23-pi-shortlist](./2026-09-23-pi-shortlist.md) | Pi subscription shortlist | Six visible provider labels, fixed medium execution and isolated discovery tests |
+| [2026-09-23-pi-shortlist](./2026-09-23-pi-shortlist.md) | Pi subscription shortlist (superseded 2026-09-27) | Six visible provider labels, fixed medium execution and isolated discovery tests |
 | [2026-09-23-goose-shortlist](./2026-09-23-goose-shortlist.md) | Goose ChatGPT Codex shortlist | Six fixed Off models, exact provider routing and native effort suffix |
 | [2026-09-23-auggie-shortlist](./2026-09-23-auggie-shortlist.md) | Auggie six-model shortlist (superseded 2026-09-27) | Exact labels and CLI IDs, opaque Prism mapping, first-row selection and custom input |
 | [2026-09-23-junie-shortlist](./2026-09-23-junie-shortlist.md) | Junie fixed shortlist (superseded 2026-09-26) | Five literal model names, fixed effort execution, explicit default and custom input |

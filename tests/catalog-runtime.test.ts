@@ -146,6 +146,31 @@ describe('factory and executable catalog projections', () => {
     }
   });
 
+  it('lists the full Pi openai-codex channel with per-model thinking defaulting to medium', () => {
+    const pi = knowledge(snapshot.document.catalogs.find(s => s.provider === 'pi' && s.backend === 'cli')!);
+    expect(pi.catalog.entries.map(e => e.id)).toEqual([
+      'openai-codex/gpt-5.3-codex-spark', 'openai-codex/gpt-5.5', 'openai-codex/gpt-5.6-luna',
+      'openai-codex/gpt-5.6-sol', 'openai-codex/gpt-5.6-terra', 'openai-codex/gpt-6-astra',
+      'openai-codex/gpt-6-luna', 'openai-codex/gpt-6-sol',
+    ]);
+    expect(pi.catalog.entries.every(e => /^gpt-[\w.-]+ \[openai-codex\]$/.test(e.label))).toBe(true);
+    // Pi's model selector marks no factory default model; its thinking selector marks medium.
+    expect(pi.catalog.entries.some(e => e.default)).toBe(false);
+    const spawn = (entryId: string, controls?: Record<string, string>) => {
+      const selected = resolveProviderSelection(pi, { entryId, entryMode: 'explicit', ...(controls ? { controls } : {}) });
+      return new PiProvider().buildSpawnArgs({ cwd: '/tmp', model: selected.execution.model,
+        modelProvider: selected.execution.provider, modelControls: selected.resolution.controls });
+    };
+    expect(spawn('openai-codex/gpt-5.3-codex-spark')).toEqual([
+      '--mode', 'rpc', '--provider', 'openai-codex', '--model', 'gpt-5.3-codex-spark', '--thinking', 'medium',
+    ]);
+    expect(spawn('openai-codex/gpt-6-sol', { 'pi.thinking': 'max' }).slice(-2)).toEqual(['--thinking', 'max']);
+    expect(spawn('openai-codex/gpt-5.5', { 'pi.thinking': 'off' }).slice(-2)).toEqual(['--thinking', 'off']);
+    // Levels follow each model's thinkingLevelMap: gpt-6-astra has no off, the 5.3/5.5 rows no max.
+    expect(() => spawn('openai-codex/gpt-6-astra', { 'pi.thinking': 'off' })).toThrow();
+    expect(() => spawn('openai-codex/gpt-5.5', { 'pi.thinking': 'max' })).toThrow();
+  });
+
   it('lists the Copilot Pro picker with Terra as default and first-value effort, context and tier', () => {
     const copilot = knowledge(snapshot.document.catalogs.find(s => s.provider === 'copilot' && s.backend === 'cli')!);
     expect(copilot.catalog.entries).toHaveLength(20);
