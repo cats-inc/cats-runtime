@@ -886,6 +886,7 @@ describe('CodexProvider', () => {
             toModel: 'gpt-5.4-mini',
           },
         },
+        reportedModels: [{ model: 'gpt-5.4-mini', matchesRequest: false }],
       });
     });
 

@@ -49,9 +49,21 @@ export class KiroProvider implements Provider {
     const latest = await this.native.getLatestSession(opts.cwd);
     if (!latest) return null;
 
+    // Kiro records each turn's model. A turn sent with `--model claude-opus-5.5`
+    // has been recorded as `auto`, so the record is compared, not assumed.
+    const reported = latest.model?.trim();
+    const requested = opts.model?.trim();
     return {
       type: 'result',
       sessionId: latest.providerSessionId,
+      ...(reported
+        ? {
+            reportedModels: [{
+              model: reported,
+              ...(requested ? { matchesRequest: reported.toLowerCase() === requested.toLowerCase() } : {}),
+            }],
+          }
+        : {}),
     } satisfies ResultStreamEvent;
   }
 

@@ -253,4 +253,21 @@ describe('PiProvider', () => {
       expect(event?.type).toBe('raw');
     });
   });
+
+  it('compares the model Pi reports for a reply with the one it was started with', () => {
+    const turnEnd = (message: Record<string, unknown>) => JSON.stringify({
+      type: 'turn_end',
+      message: { role: 'assistant', content: 'Hi.', usage: { input: 1, output: 1 }, ...message },
+    });
+    const started = new PiProvider();
+    started.buildSpawnArgs({ cwd: '/repo', model: 'gpt-6-sol', modelProvider: 'openai-codex' });
+
+    expect(started.parseStreamLine(turnEnd({ model: 'gpt-6-sol' }))).toMatchObject({
+      type: 'result',
+      reportedModels: [{ model: 'gpt-6-sol', matchesRequest: true }],
+    });
+    expect(started.parseStreamLine(turnEnd({ model: 'gpt-6-sol', responseModel: 'gpt-6-luna' }))).toMatchObject({
+      reportedModels: [{ model: 'gpt-6-luna', matchesRequest: false }],
+    });
+  });
 });

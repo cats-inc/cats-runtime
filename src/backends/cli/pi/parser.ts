@@ -1,6 +1,7 @@
 import type {
   ErrorStreamEvent,
   RawStreamEvent,
+  ReportedModel,
   ResultStreamEvent,
   StreamEvent,
   TextStreamEvent,
@@ -46,6 +47,10 @@ export interface PiStreamEvent {
     };
     stopReason?: string;
     errorMessage?: string;
+    /** The requested model ID, which Pi records on every assistant message. */
+    model?: string;
+    /** Set by some Pi providers when the upstream response names another model. */
+    responseModel?: string;
     toolCallId?: string;
     toolName?: string;
     isError?: boolean;
@@ -107,6 +112,16 @@ function buildPiErrorEvent(message: PiStreamEvent['message']): ErrorStreamEvent 
   if (message?.stopReason !== 'error') return null;
   const text = typeof message.errorMessage === 'string' ? message.errorMessage.trim() : '';
   return { type: 'error', text: text || 'Pi request failed without an error message.' };
+}
+
+/**
+ * The model Pi reports for a finished reply: the upstream `responseModel` when
+ * a provider sets it, else the `model` Pi requested. The provider compares it
+ * with the request, which this parser does not know.
+ */
+function piReportedModels(message: PiStreamEvent['message']): { reportedModels?: ReportedModel[] } {
+  const model = (message?.responseModel ?? message?.model)?.trim();
+  return model ? { reportedModels: [{ model }] } : {};
 }
 
 function buildPiUsageMetadata(
@@ -218,6 +233,7 @@ function parseCurrentMessageEvent(
       type: 'result',
       usage,
       metadata: buildPiUsageMetadata(message),
+      ...piReportedModels(message),
     } satisfies ResultStreamEvent);
   }
 
@@ -361,6 +377,7 @@ export function parsePiStreamLine(
       type: 'result',
       usage: usage ? extractUsage(msg) : undefined,
       metadata: buildPiUsageMetadata(msg),
+      ...piReportedModels(msg),
     } satisfies ResultStreamEvent);
   }
 

@@ -116,6 +116,17 @@ describe('parsePiStreamLine', () => {
     expect(withoutMessage).toEqual({ type: 'error', text: 'Pi request failed without an error message.' });
   });
 
+  it('reports the model named on a finished reply, preferring the upstream response model', () => {
+    const turnEnd = (message: Record<string, unknown>) => parsePiStreamLine(JSON.stringify({
+      type: 'turn_end',
+      message: { role: 'assistant', content: 'Hi.', usage: { input: 1, output: 1 }, ...message },
+    }));
+    expect(turnEnd({ model: 'gpt-6-sol' })).toMatchObject({ reportedModels: [{ model: 'gpt-6-sol' }] });
+    expect(turnEnd({ model: 'gpt-6-sol', responseModel: 'gpt-6-luna' }))
+      .toMatchObject({ reportedModels: [{ model: 'gpt-6-luna' }] });
+    expect(turnEnd({})).not.toHaveProperty('reportedModels');
+  });
+
   it('parses turn_end without message as result', () => {
     const event = parsePiStreamLine(JSON.stringify({ type: 'turn_end' }));
     expect(event?.type).toBe('result');

@@ -18,17 +18,20 @@ export class PiProvider implements Provider {
   name = 'pi';
   capabilities: ProviderCapabilities = { resume: true, fork: false, permissions: false };
   private activeInstructionsFile?: string;
+  private requestedModelId: string | null = null;
 
   constructor(private readonly options: PiProviderOptions = {}) {}
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
     const args: string[] = ['--mode', 'rpc'];
+    this.requestedModelId = null;
 
     if (opts.model) {
       const { provider, modelId } = opts.modelProvider
         ? { provider: opts.modelProvider, modelId: opts.model } : parsePiModel(opts.model);
       args.push('--provider', provider);
       args.push('--model', modelId);
+      this.requestedModelId = modelId;
       const thinking = opts.modelControls?.['pi.thinking'];
       if (typeof thinking === 'string') args.push('--thinking', thinking);
     }
@@ -64,6 +67,19 @@ export class PiProvider implements Provider {
   }
 
   parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
-    return parsePiStreamLine(line, this.options.evolutionObserver);
+    const parsed = parsePiStreamLine(line, this.options.evolutionObserver);
+    const requested = this.requestedModelId;
+    if (!parsed || !requested) return parsed;
+    const compare = (event: StreamEvent): StreamEvent =>
+      event.type === 'result' && event.reportedModels
+        ? {
+            ...event,
+            reportedModels: event.reportedModels.map((entry) => ({
+              ...entry,
+              matchesRequest: entry.model.toLowerCase() === requested.toLowerCase(),
+            })),
+          }
+        : event;
+    return Array.isArray(parsed) ? parsed.map(compare) : compare(parsed);
   }
 }

@@ -554,4 +554,37 @@ describe('CopilotProvider', () => {
       expect(event).toEqual({ type: 'text', text: 'Fresh answer' });
     });
   });
+
+  describe('reported models', () => {
+    // Field names follow Copilot 1.0.88's session events.
+    const turn = (requested: string, lines: Array<Record<string, unknown>>) => {
+      provider.prepareEphemeralTurn({ message: 'hi' });
+      provider.buildSpawnArgs({ cwd: '/tmp', model: requested });
+      const events = lines.flatMap((line) => {
+        const parsed = provider.parseStreamLine(JSON.stringify(line));
+        return parsed ? (Array.isArray(parsed) ? parsed : [parsed]) : [];
+      });
+      return events.find((event) => event.type === 'result');
+    };
+    const start = { type: 'session.start', data: { sessionId: 'copilot-1', selectedModel: 'auto' } };
+    const reply = (model: string) => ({ type: 'assistant.message', data: { model, content: 'Hello.' } });
+    const done = { type: 'result', sessionId: 'copilot-1' };
+
+    it('reports the model auto mode chose as the request', () => {
+      const result = turn('auto', [
+        start,
+        { type: 'session.auto_mode_resolved', data: { chosenModel: 'gpt-6-luna' } },
+        reply('gpt-6-luna'),
+        done,
+      ]);
+      expect(result).toMatchObject({ reportedModels: [{ model: 'gpt-6-luna', matchesRequest: true }] });
+    });
+
+    it('marks a reply from another model than the explicitly requested one', () => {
+      expect(turn('gpt-5.6-terra', [start, reply('gpt-5.6-terra'), done]))
+        .toMatchObject({ reportedModels: [{ model: 'gpt-5.6-terra', matchesRequest: true }] });
+      expect(turn('gpt-5.6-terra', [start, reply('gpt-6-luna'), done]))
+        .toMatchObject({ reportedModels: [{ model: 'gpt-6-luna', matchesRequest: false }] });
+    });
+  });
 });

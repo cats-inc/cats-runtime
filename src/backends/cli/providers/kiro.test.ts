@@ -109,4 +109,28 @@ describe('KiroProvider', () => {
       sessionId: 'kiro-123',
     });
   });
+
+  it('reports the model Kiro recorded for the turn and whether it was the requested one', async () => {
+    const native = {
+      getLatestSession: vi.fn(async () => ({
+        providerSessionId: 'kiro-123',
+        cwd: 'C:/repo',
+        messageCount: 1,
+        model: 'auto',
+      })),
+    } as unknown as KiroNativeSessionService;
+    const provider = new KiroProvider(native);
+
+    // Recorded on 2026-09-28 for a turn sent with --model claude-opus-5.5.
+    await expect(provider.afterTurn?.({ cwd: 'C:/repo', model: 'claude-opus-5.5' })).resolves.toMatchObject({
+      type: 'result',
+      reportedModels: [{ model: 'auto', matchesRequest: false }],
+    });
+    await expect(provider.afterTurn?.({ cwd: 'C:/repo', model: 'auto' })).resolves.toMatchObject({
+      reportedModels: [{ model: 'auto', matchesRequest: true }],
+    });
+    await expect(provider.afterTurn?.({ cwd: 'C:/repo' })).resolves.toMatchObject({
+      reportedModels: [{ model: 'auto' }],
+    });
+  });
 });

@@ -33,6 +33,27 @@ function fixtureText(name: string): string {
 }
 
 describe('Grok authenticated stream fixtures', () => {
+  it('reports the build model that served the turn and compares it with the request', () => {
+    const fixture = readFixture('streaming-json.success.redacted.ndjson');
+    const resultFor = (requested?: string) => {
+      const provider = new GrokProvider();
+      provider.prepareEphemeralTurn({ message: 'probe' });
+      provider.buildSpawnArgs({ cwd: '/repo', ...(requested ? { model: requested } : {}) });
+      return fixture.raw.trim().split(/\r?\n/)
+        .flatMap((line) => asEvents(provider.parseStreamLine(line)))
+        .findLast((event) => event.type === 'result');
+    };
+
+    // The capture used the default grok-4.5, which its end event names grok-4.5-build.
+    expect(resultFor()).toEqual(expect.objectContaining({ reportedModels: [{ model: 'grok-4.5-build' }] }));
+    expect(resultFor('grok-4.5')).toMatchObject({
+      reportedModels: [{ model: 'grok-4.5-build', matchesRequest: true }],
+    });
+    expect(resultFor('grok-4.7')).toMatchObject({
+      reportedModels: [{ model: 'grok-4.5-build', matchesRequest: false }],
+    });
+  });
+
   it('preserves and normalizes the observed native success sequence', () => {
     const fixture = readFixture('streaming-json.success.redacted.ndjson');
     const provider = new GrokProvider();

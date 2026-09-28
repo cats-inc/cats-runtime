@@ -76,8 +76,12 @@ export interface ClaudeStreamEvent {
   duration_api_ms?: number;
   num_turns?: number;
   modelUsage?: Record<string, Record<string, unknown>>;
+  /** Set on messages from a subagent's conversation rather than the main one. */
+  parent_tool_use_id?: string | null;
   message?: {
     role?: string;
+    /** The model that produced an `assistant` message, as the API reported it. */
+    model?: string;
     content?: Array<{
       type?: string;
       text?: string;
