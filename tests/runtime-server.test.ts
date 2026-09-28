@@ -591,7 +591,8 @@ describe('runtime server', () => {
       expect(html).toContain('<div class="agent-summary-tags agent-card-summary-row"></div>');
       expect(html).toContain('class="agent-remove hover:bg-slate-800/70 hover:text-red-400" title="Remove agent" aria-label="Remove agent"');
       expect(html).toContain('<div class="agent-card-details hidden space-y-3">');
-      expect(html).toContain('<div class="agent-entry-group"><label class="block text-xs text-slate-400">Model</label><select class="agent-entry-choice');
+      expect(html).toContain('<div class="agent-entry-group"><div class="flex items-center gap-1"><label class="block text-xs text-slate-400">Model</label><button type="button" class="agent-basis-info hidden');
+      expect(html).toContain('aria-label="Model list basis">i</button></div><select class="agent-entry-choice');
       expect(html).toContain('<div class="agent-mode-group"><label class="block text-xs text-slate-400">Mode</label><select class="agent-preset-choice');
       expect(html).toContain('title="Browse directory" aria-label="Browse directory"');
       expect(html).toContain('>Stakeholder</span>');
