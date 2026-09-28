@@ -25,7 +25,8 @@ the agent to collect the picker; follow [picker intake](../paste-intake.md) for 
   from Balance alternated Intelligence and Fast), so record the observed sequences and take the
   value order from the detail pane and `--help`.
 - Rows under "Unavailable models" show "Your plan doesn't include this model" in the detail pane.
-  Omit them when the operator scopes the catalog to their plan, and list them in notes.
+  Omit them when the operator scopes the catalog to their plan, list them in notes, and record the
+  plan as the scope's `basis.plan` (for example `Copilot Pro`).
 - The detail pane (cost tier and credits per 1M tokens) can lag the highlight by a render; read it
   only once it names the highlighted row.
 - Picker changes apply to the session only. Never press Enter in the list: it selects the session

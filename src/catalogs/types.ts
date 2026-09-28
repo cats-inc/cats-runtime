@@ -51,6 +51,14 @@ export interface CatalogPreset {
   warnings?: string[];
 }
 
+/** What a scope's list was captured against; shown read-only, recorded only with evidence. */
+export interface CatalogBasis {
+  /** Routing channel inside the CLI host that every entry runs through. */
+  channel?: { id: string; label: string };
+  /** Account plan the list was captured with, where the CLI states entitlement depends on it. */
+  plan?: { label: string };
+}
+
 export interface CatalogScope {
   provider: string;
   backend: CatalogBackend;
@@ -60,6 +68,7 @@ export interface CatalogScope {
   cli_version?: string;
   last_updated?: string;
   notes?: string[];
+  basis?: CatalogBasis;
   shared_controls?: CatalogControl[];
   models: CatalogModel[];
   presets?: CatalogPreset[];

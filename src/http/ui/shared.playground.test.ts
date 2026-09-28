@@ -75,7 +75,7 @@ describe.each(['cursor', 'opencode', 'kilo', 'devin', 'cline', 'goose'])('%s sho
       renderAgentRoutingSelectOptions: (_select: unknown, choices: typeof renderedChoices) => {
         renderedChoices = choices;
       },
-      syncAgentPresetField() {}, renderAgentModelChoice() {}, refreshAgentCardSummary() {},
+      syncAgentPresetField() {}, syncAgentBasisField() {}, renderAgentModelChoice() {}, refreshAgentCardSummary() {},
       getAgentDefaultEntryId: () => models.find(entry=>entry.default)?.id ?? models[0]?.id,
       getDefaultModel: () => models[0]?.id, applyAgentModelControlValues() {},
     }) as (div: unknown, options: unknown) => void;
@@ -376,6 +376,55 @@ describe('shared playground selection helpers', () => {
     const custom = 'claude-opus-5';
     expect(catsUI.normalizePlaygroundAgentSelection({ ...input, model: custom }))
       .toEqual({ provider: 'copilot', model: custom, modelSelection: null });
+  });
+
+  it('shows a recorded basis as one disabled field that is never a model control', () => {
+    const catsUI = createCatsUI();
+    expect(catsUI.describeCatalogBasis(undefined)).toBeNull();
+    expect(catsUI.describeCatalogBasis({})).toBeNull();
+    expect(catsUI.describeCatalogBasis({ channel: { id: 'openai-codex', label: 'openai-codex' } })).toEqual({
+      label: 'openai-codex',
+      hint: 'Models listed for the openai-codex channel. Enter a custom model to use another channel.',
+    });
+    expect(catsUI.describeCatalogBasis({ plan: { label: 'Copilot Pro' } })).toEqual({
+      label: 'Copilot Pro',
+      hint: 'Models listed for a Copilot Pro account. Other plans can offer different models.',
+    });
+    expect(catsUI.describeCatalogBasis({ channel: { id: 'go', label: 'go' }, plan: { label: 'Plan' } })?.label).toBe('go · Plan');
+
+    const html = readFileSync(new URL('./pages/playground.html', import.meta.url), 'utf8');
+    // The card template places the field outside the model controls, without a control key.
+    const template = html.slice(html.indexOf('<div class="agent-basis-group hidden">'));
+    const group = template.slice(0, template.indexOf('<div class="agent-custom-model-group'));
+    expect(group).toContain('disabled');
+    expect(group).not.toContain('data-model-control-key');
+    expect(html.indexOf('<div class="agent-basis-group hidden">')).toBeLessThan(html.indexOf('<div class="agent-model-controls'));
+    // Model controls are collected only through this selector, so the field above is never sent.
+    const collectors = html.match(/querySelectorAll\('[^']*data-model-control-key[^']*'\)/g) ?? [];
+    expect(collectors.length).toBeGreaterThan(0);
+    expect(new Set(collectors)).toEqual(new Set(["querySelectorAll('.agent-model-controls [data-model-control-key]')"]));
+
+    const start = html.indexOf('function syncAgentBasisField(div,catalog)');
+    const end = html.indexOf('\n}\n', start) + 2;
+    const classes = new Set<string>(['hidden']);
+    const elements: Record<string, { innerHTML?: string; textContent?: string; classList?: unknown }> = {
+      '.agent-basis-group': { classList: { toggle: (name: string, on: boolean) => { if (on) classes.add(name); else classes.delete(name); } } },
+      '.agent-basis-choice': { innerHTML: '' },
+      '.agent-basis-hint': { textContent: '' },
+    };
+    const div = { querySelector: (selector: string) => elements[selector] ?? null };
+    const sync = vm.runInNewContext(`(${html.slice(start, end)})`, {
+      window: { CatsUI: catsUI }, escapeHtml: (value: string) => value.replace(/</g, '&lt;'),
+    }) as (div: unknown, catalog: unknown) => void;
+    sync(div, { basis: { channel: { id: 'openai-codex', label: 'openai-codex' } } });
+    expect(classes.has('hidden')).toBe(false);
+    expect(elements['.agent-basis-choice'].innerHTML).toBe('<option selected>openai-codex</option>');
+    expect(elements['.agent-basis-hint'].textContent).toContain('openai-codex channel');
+    sync(div, { basis: { plan: { label: 'Plan <b>' } } });
+    expect(elements['.agent-basis-choice'].innerHTML).toBe('<option selected>Plan &lt;b></option>');
+    sync(div, { entries: [] });
+    expect(classes.has('hidden')).toBe(true);
+    expect(elements['.agent-basis-choice'].innerHTML).toBe('');
   });
 
   it('initializes Pi at the first openai-codex row with medium thinking and keeps provider/model input', () => {

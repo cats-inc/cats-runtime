@@ -1035,6 +1035,17 @@ export const SHARED_UI_SCRIPT = `
     return isDefault ? plainLabel + ' (default)' : plainLabel;
   }
 
+  // Read-only text for a catalog's recorded basis; null when the catalog records none.
+  function describeCatalogBasis(basis) {
+    var channel = basis && basis.channel && basis.channel.label ? String(basis.channel.label) : '';
+    var plan = basis && basis.plan && basis.plan.label ? String(basis.plan.label) : '';
+    if (!channel && !plan) return null;
+    var hints = [];
+    if (channel) hints.push('Models listed for the ' + channel + ' channel. Enter a custom model to use another channel.');
+    if (plan) hints.push('Models listed for a ' + plan + ' account. Other plans can offer different models.');
+    return { label: [channel, plan].filter(Boolean).join(' · '), hint: hints.join(' ') };
+  }
+
   function closeRuntimeSurfaceMenus() {
     var roots = document.querySelectorAll('[data-runtime-surface-switcher]');
     for (var i = 0; i < roots.length; i++) {
@@ -1317,6 +1328,7 @@ export const SHARED_UI_SCRIPT = `
     getAdvancedChoiceControlDefaults: getAdvancedChoiceControlDefaults,
     getAdvancedEntryControlDefaults: getAdvancedEntryControlDefaults,
     formatAdvancedDefaultLabel: formatAdvancedDefaultLabel,
+    describeCatalogBasis: describeCatalogBasis,
     listApplicableEnumControlOptions: listApplicableEnumControlOptions,
     listStoredAdvancedControls: listStoredAdvancedControls,
     setRuntimeTooltip: setRuntimeTooltip,

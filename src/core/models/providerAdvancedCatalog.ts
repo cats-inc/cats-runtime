@@ -1,5 +1,6 @@
 import type { BackendKind } from '../../backends/cli/config.js';
 import type { ProviderModelSelection } from './providerSelectionResolution.js';
+import type { CatalogBasis } from '../../catalogs/types.js';
 
 export type ProviderAdvancedCatalogSource = 'dynamic' | 'config' | 'static';
 export type ProviderAdvancedCatalogSupportTier = 'full' | 'entry_only' | 'read_only';
@@ -89,5 +90,7 @@ export interface ProviderAdvancedCatalogResult {
   controls: ProviderAdvancedCatalogControl[];
   defaultSelection: ProviderModelSelection | null;
   support: ProviderAdvancedCatalogSupport;
+  /** Read-only channel or plan the scope was captured against; absent when not recorded. */
+  basis?: CatalogBasis;
   warnings: string[];
 }

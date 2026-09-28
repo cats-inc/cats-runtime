@@ -106,6 +106,40 @@ describe('catalog schema and local replacements', () => {
   });
 });
 
+describe('catalog basis', () => {
+  const parse = (scope: CatalogScope) => parseCatalogDocument(JSON.stringify(doc(scope)));
+  const withBasis = (scope: CatalogScope, basis: unknown) => ({ ...scope, basis }) as CatalogScope;
+  const prefixed: CatalogScope = { provider: 'opencode', backend: 'cli', selection_mode: 'shortlist', models: [
+    { id: 'go/model-a', label: 'Model A', execution: { model: 'go/model-a' } },
+    { id: 'go/model-b', label: 'Model B', execution: { model: 'go/model-b' } },
+  ] };
+  const bare: CatalogScope = { provider: 'copilot', backend: 'cli', selection_mode: 'full', models: [
+    { id: 'model-c', label: 'Model C', execution: { model: 'model-c' } },
+  ] };
+
+  it('accepts a channel that every entry runs through, a plan, or both', () => {
+    expect(parse(withBasis(pi(), { channel: { id: 'subscription', label: 'subscription' } })).catalogs[0].basis)
+      .toEqual({ channel: { id: 'subscription', label: 'subscription' } });
+    expect(parse(withBasis(prefixed, { channel: { id: 'go', label: 'go' }, plan: { label: 'Fixture Plan' } })).catalogs[0].basis)
+      .toEqual({ channel: { id: 'go', label: 'go' }, plan: { label: 'Fixture Plan' } });
+    expect(parse(withBasis(bare, { plan: { label: 'Fixture Plan' } })).catalogs[0].basis).toEqual({ plan: { label: 'Fixture Plan' } });
+    expect(parse(pi()).catalogs[0].basis).toBeUndefined();
+  });
+
+  it('rejects a channel that disagrees with an entry, missing fields and empty labels', () => {
+    expect(() => parse(withBasis(pi(), { channel: { id: 'other', label: 'other' } })))
+      .toThrow(/channel 'other' does not match 'fixture-original', which runs through 'subscription'/);
+    const mixed = { ...prefixed, models: [...prefixed.models,
+      { id: 'zen/model-d', label: 'Model D', execution: { model: 'zen/model-d' } }] } as CatalogScope;
+    expect(() => parse(withBasis(mixed, { channel: { id: 'go', label: 'go' } }))).toThrow(/does not match 'zen\/model-d'/);
+    expect(() => parse(withBasis(bare, { channel: { id: 'model-c', label: 'model-c' } }))).toThrow(/'model-c' has no executable channel/);
+    expect(() => parse(withBasis(pi(), {}))).toThrow(/needs a channel or a plan/);
+    expect(() => parse(withBasis(pi(), { plan: { label: ' ' } }))).toThrow(/plan\.label must be a nonempty/);
+    expect(() => parse(withBasis(pi(), { channel: { id: 'subscription' } }))).toThrow(/channel\.label must be a nonempty/);
+    expect(() => parse(withBasis(pi(), { plan: { label: 'Plan' }, route: 'x' }))).toThrow(/unknown field 'route'/);
+  });
+});
+
 describe('activation and read-only projections', () => {
   it('rejects invalid reload atomically, uses last accepted on restart, and checks the displayed revision', () => {
     const { paths, override } = fixture();

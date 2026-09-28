@@ -4299,6 +4299,14 @@ with `(default)`. Switching models starts from the new entry's defaults; explici
 saved choices override defaults when reopening a selection. Preset defaults take
 precedence over entry defaults. Missing metadata means no known default.
 
+An optional `basis` says what the listed models were captured against:
+`basis.channel` (`{ id, label }`) is the routing channel inside the CLI host
+that every entry runs through, and `basis.plan` (`{ label }`) is the account
+plan the list depends on. It is display-only: selectors show it read-only and
+never send it as a control, and selection and execution ignore it. It is absent
+when the catalog records none. See the
+[SPEC-031 basis amendment](./specs/SPEC-031-provider-catalog-data-and-local-overrides.md#amendment-2026-09-29-catalog-basis).
+
 The same usability warning applies to the advanced route: advanced entries,
 presets, and controls are runtime-owned model metadata, not a guarantee that
 the underlying target is currently healthy. Selector UIs that must only show
