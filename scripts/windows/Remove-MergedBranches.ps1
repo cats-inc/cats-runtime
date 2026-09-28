@@ -38,7 +38,8 @@
     not merged - its upstream still exists, it was never pushed, or HEAD is
     detached - is left checked out with a warning, and the default branch is not
     fast-forwarded. A fast-forward that fails is reported as a warning and leaves
-    the default branch where it was.
+    the default branch where it was; a default branch with no upstream is left
+    as it is.
 
 .PARAMETER SkipFetch
     Skip `git fetch --prune`. Only useful when a fetch just ran, since without a
@@ -82,7 +83,21 @@ function Invoke-Git {
 function Update-DefaultBranch {
     param([string]$Name)
 
+    Invoke-Git @("rev-parse", "--verify", "--quiet", "HEAD") -AllowFailure | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        # An unborn branch has no commit to fast-forward from yet.
+        Write-Host "  stay   $Name (no commits yet)"
+        return
+    }
+
     $before = (Invoke-Git @("rev-parse", "--short", "HEAD") | Select-Object -First 1).ToString().Trim()
+    Invoke-Git @("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}") -AllowFailure | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        # A default branch that was never pushed has nothing to fast-forward from.
+        Write-Host "  stay   $Name (no upstream to fast-forward from, at $before)"
+        return
+    }
+
     $output = Invoke-Git @("pull", "--ff-only") -AllowFailure
     if ($LASTEXITCODE -ne 0) {
         # Offline, a local branch that diverged, or another process holding the
