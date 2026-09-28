@@ -68,11 +68,17 @@ export class KiroProvider implements Provider {
   }
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
+    // Kiro 2.24's default v2 engine ignores `--model` without a terminal: it
+    // warns "failed to set model ...: Method not found" and runs `auto`. The v1
+    // engine applies `--model` and `--effort`, resumes with `--resume`, prints
+    // the reply as `> text` on stdout and keeps its sessions in data.sqlite3.
     const args: string[] = [
       'chat',
       '--no-interactive',
       '--wrap',
       'never',
+      '--agent-engine',
+      'v1',
     ];
 
     if (opts.model) {

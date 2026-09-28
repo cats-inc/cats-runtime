@@ -62,6 +62,10 @@ Do not copy its model values into this reference.
 - Native and WSL share this scope. That does not establish equal account entitlement: evidence
   from one platform does not prove the other's model or effort list.
 - Custom model strings stay verbatim and get no inferred effort.
+- To check that a row actually runs, read the model Kiro recorded for the turn, not the flags sent.
+  Kiro 2.24's default v2 engine ignored `--model` in `--no-interactive` runs and recorded `auto`,
+  so Cats runs Kiro with `--agent-engine v1`, which applies `--model` and `--effort`. See
+  [the engine probe](../../../../docs/research/2026-09-28-kiro-v2-ignores-model.md).
 
 Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
 Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.

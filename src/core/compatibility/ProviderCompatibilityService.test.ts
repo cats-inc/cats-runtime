@@ -390,7 +390,7 @@ describe('ProviderCompatibilityService', () => {
 
         return {
           exitCode: 0,
-          stdout: 'Usage: kiro-cli chat --no-interactive --resume --wrap\n',
+          stdout: 'Usage: kiro-cli chat --no-interactive --resume --wrap --agent-engine\n',
           stderr: '',
           timedOut: false,
           durationMs: 5,

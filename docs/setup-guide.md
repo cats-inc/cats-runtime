@@ -958,9 +958,12 @@ Path semantics matter:
   runtime-aware native services inside the selected runtime, so `~/.cursor/chats`
   and `~/.local/share/kiro-cli/data.sqlite3` remain valid for WSL-backed
   Cursor/Kiro instances.
-- Kiro 2.24 keeps new sessions in `~/.kiro/sessions/cli` instead of `db_path`:
-  one `<id>.json` with the session's cwd and one `<id>.jsonl` transcript each.
-  The Kiro service reads both places, in the same runtime, and needs no setting.
+- Cats runs Kiro with `--agent-engine v1`, because Kiro 2.24's default v2
+  engine ignores `--model` without a terminal. The v1 engine keeps sessions in
+  `db_path`. Sessions from the v2 engine, such as interactive `kiro-cli chat`,
+  live in `~/.kiro/sessions/cli`: one `<id>.json` with the session's cwd and
+  one `<id>.jsonl` transcript each. The Kiro service reads both places, in the
+  same runtime, and needs no setting.
 
 The embedded dashboard reads `GET /providers/config` and uses it to populate the
 provider-instance selector in the create-session modal. Providers configured in

@@ -50,10 +50,12 @@ const JUNIE_JSON_ARGS = [
   '--skip-update-check',
 ];
 
+// Kiro 2.24's default v2 engine ignores --model without a terminal; see KiroProvider.
 const KIRO_CHAT_ARGS = [
   'chat',
   '--no-interactive',
   '--wrap', 'never',
+  '--agent-engine', 'v1',
 ];
 
 const PI_RPC_ARGS = [
@@ -345,7 +347,7 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       spawnBaseArgs: [...KIRO_CHAT_ARGS],
       minVersionMajor: 1,
       allowUnknownVersion: true,
-      helpTokens: ['chat', '--no-interactive', '--resume'],
+      helpTokens: ['chat', '--no-interactive', '--resume', '--agent-engine'],
       liveProbeArgs: buildLiveHelpArgs(KIRO_CHAT_ARGS),
       liveProbeTokens: ['--no-interactive', '--wrap'],
     },

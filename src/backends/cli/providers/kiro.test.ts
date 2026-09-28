@@ -23,6 +23,8 @@ describe('KiroProvider', () => {
       '--no-interactive',
       '--wrap',
       'never',
+      '--agent-engine',
+      'v1',
       '--model',
       'claude-sonnet-4.5',
       '--trust-all-tools',
@@ -39,11 +41,11 @@ describe('KiroProvider', () => {
       model: 'gpt-5.6-sol',
       modelControls: { 'kiro.reasoning_effort': 'none' },
     })).toEqual([
-      'chat', '--no-interactive', '--wrap', 'never',
+      'chat', '--no-interactive', '--wrap', 'never', '--agent-engine', 'v1',
       '--model', 'gpt-5.6-sol', '--effort', 'none',
     ]);
     expect(provider.buildSpawnArgs({ cwd: '/tmp/repo', model: 'auto', modelControls: {} })).toEqual([
-      'chat', '--no-interactive', '--wrap', 'never', '--model', 'auto',
+      'chat', '--no-interactive', '--wrap', 'never', '--agent-engine', 'v1', '--model', 'auto',
     ]);
     // Another provider's control is never forwarded as a Kiro flag.
     expect(provider.buildSpawnArgs({
