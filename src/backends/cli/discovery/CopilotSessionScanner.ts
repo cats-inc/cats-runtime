@@ -123,10 +123,7 @@ export class CopilotSessionScanner {
           if (event.type === 'user.message') {
             messageCount++;
           }
-          if (event.type === 'session.model_change') {
-            const data = event.data as Record<string, unknown> | undefined;
-            if (data?.model) model = data.model as string;
-          }
+          model = readCopilotSessionModel(event) ?? model;
           // Track timestamp from any event that has one
           const data = event.data as Record<string, unknown> | undefined;
           if (data?.timestamp) lastActivity = data.timestamp as string;
@@ -167,10 +164,7 @@ export class CopilotSessionScanner {
           if (event.type === 'user.message') {
             messageCount++;
           }
-          if (event.type === 'session.model_change') {
-            const data = event.data as Record<string, unknown> | undefined;
-            if (data?.model) model = data.model as string;
-          }
+          model = readCopilotSessionModel(event) ?? model;
         } catch {
           continue;
         }
@@ -203,4 +197,19 @@ async function safeReaddir(dir: string): Promise<string[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * The model a Copilot session event names: the one selected at
+ * `session.start`, then `newModel` on each `session.model_change`
+ * (Copilot 1.0.88; the change event has no `model` field).
+ */
+function readCopilotSessionModel(event: Record<string, unknown>): string | undefined {
+  const data = event.data as Record<string, unknown> | undefined;
+  const value = event.type === 'session.start'
+    ? data?.selectedModel
+    : event.type === 'session.model_change'
+      ? data?.newModel
+      : undefined;
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }

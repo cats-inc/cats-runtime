@@ -61,13 +61,15 @@ describe('CopilotSessionScanner', () => {
     });
 
     it('extracts model from session.model_change events', async () => {
+      // Copilot 1.0.88 names the new model newModel, beside previousModel.
       const sessionDir = join(testDir, 'model-test');
       mkdirSync(sessionDir, { recursive: true });
       writeFileSync(join(sessionDir, 'workspace.yaml'), 'id: model-test\ncwd: /tmp\n');
       writeFileSync(join(sessionDir, 'events.jsonl'), [
-        '{"type":"session.model_change","data":{"model":"gpt-4.1"}}',
+        '{"type":"session.start","data":{"sessionId":"model-test","selectedModel":"auto"}}',
+        '{"type":"session.model_change","data":{"previousModel":"auto","newModel":"gpt-4.1"}}',
         '{"type":"user.message","data":{"text":"hello"}}',
-        '{"type":"session.model_change","data":{"model":"gpt-5.1"}}',
+        '{"type":"session.model_change","data":{"previousModel":"gpt-4.1","newModel":"gpt-5.1"}}',
       ].join('\n'));
 
       const scanner = new CopilotSessionScanner(testDir);
@@ -145,8 +147,8 @@ describe('CopilotSessionScanner', () => {
 
     it('extracts model from model_change events', async () => {
       writeFileSync(join(testDir, 'model.jsonl'), [
-        '{"type":"session.start","data":{"sessionId":"model-sess"}}',
-        '{"type":"session.model_change","data":{"model":"claude-sonnet-4"}}',
+        '{"type":"session.start","data":{"sessionId":"model-sess","selectedModel":"gpt-5.6-terra"}}',
+        '{"type":"session.model_change","data":{"previousModel":"gpt-5.6-terra","newModel":"claude-sonnet-4"}}',
         '{"type":"user.message","data":{"text":"hello"}}',
       ].join('\n'));
 
@@ -155,6 +157,18 @@ describe('CopilotSessionScanner', () => {
 
       expect(results).toHaveLength(1);
       expect(results[0].model).toBe('claude-sonnet-4');
+    });
+
+    it('uses the model selected at start when the session never changes it', async () => {
+      writeFileSync(join(testDir, 'selected.jsonl'), [
+        '{"type":"session.start","data":{"sessionId":"selected-sess","selectedModel":"gpt-5.6-terra"}}',
+        '{"type":"user.message","data":{"text":"hello"}}',
+      ].join('\n'));
+
+      const scanner = new CopilotSessionScanner(testDir);
+      const results = await scanner.scan();
+
+      expect(results.find((result) => result.providerSessionId === 'selected-sess')?.model).toBe('gpt-5.6-terra');
     });
   });
 
