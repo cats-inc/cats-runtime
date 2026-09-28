@@ -5404,7 +5404,6 @@ providers:
     try {
       await withRuntime({}, {}, async (runtime) => {
         const expected = [
-          { id: 'openai-codex/gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark [openai-codex]' },
           { id: 'openai-codex/gpt-5.5', label: 'gpt-5.5 [openai-codex]' },
           { id: 'openai-codex/gpt-5.6-luna', label: 'gpt-5.6-luna [openai-codex]' },
           { id: 'openai-codex/gpt-5.6-sol', label: 'gpt-5.6-sol [openai-codex]' },
@@ -5453,7 +5452,6 @@ providers:
           source: 'static',
           cache: null,
           models: [
-            { id: 'openai-codex/gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark [openai-codex]' },
             { id: 'openai-codex/gpt-5.5', label: 'gpt-5.5 [openai-codex]' },
             { id: 'openai-codex/gpt-5.6-luna', label: 'gpt-5.6-luna [openai-codex]' },
             { id: 'openai-codex/gpt-5.6-sol', label: 'gpt-5.6-sol [openai-codex]' },

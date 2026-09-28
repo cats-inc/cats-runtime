@@ -88,8 +88,8 @@ Membership of the other groups is unchanged.
 
 **2026-09-27 Pi amendment:** the owner moved Pi from the shortlist group to the full-catalog group
 for its `openai-codex` (ChatGPT subscription) channel only. The catalog carries every model Pi
-lists for that channel, including one the same account's Codex CLI did not offer, by the owner's
-choice. Each row's thinking levels are Pi's own per-model levels, with the `medium` default that
+lists for that channel that a ChatGPT account can run; `gpt-5.3-codex-spark`, which the ChatGPT
+backend rejects, was removed on 2026-09-29. Each row's thinking levels are Pi's own per-model levels, with the `medium` default that
 Pi's thinking selector marks. Other Pi providers remain custom input and out of scope, as recorded
 in [the Pi channel note](../research/2026-09-27-pi-openai-codex-full-catalog.md). Full expansion
 of the remaining shortlists is deferred. Membership of the other groups is unchanged.
