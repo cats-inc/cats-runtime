@@ -6,6 +6,7 @@ import { StringDecoder } from 'node:string_decoder';
 import jpeg from 'jpeg-js';
 import { GrokProvider } from '../providers/grok.js';
 import { buildProcessSpawnConfig } from '../runtime/runtime.js';
+import { resolveHostFilesystemPath } from '../hostPaths.js';
 import type { ProviderInstanceConfig } from '../config.js';
 import { IMAGE_MAX_BYTES, ImageError, type ImageMetadata, type ImageRequest } from '../../../core/media/contracts.js';
 import type { StreamEvent } from '../../../core/types.js';
@@ -57,15 +58,67 @@ export function validateImage(bytes: Buffer): ImageMetadata {
   } catch { throw new ImageError('invalid_image'); }
 }
 
-export async function collectGrokImage(input: ImageExecution, source: string): Promise<ImageExecutionResult> {
-  const sessions = input.target.grokSessionsDir;
-  if (!sessions) throw new ImageError('image_source_unavailable');
+function imageFolders(input: ImageExecution) {
+  if (!input.target.grokSessionsDir || input.target.commandConfig.runtime.mode !== 'native') throw new ImageError('image_source_unavailable');
+  const sessions = resolveHostFilesystemPath(input.target.grokSessionsDir, {
+    homeDir: input.env.HOME || input.env.USERPROFILE, runtime: input.target.commandConfig.runtime,
+  });
   const folder = path.join(sessions, encodeURIComponent(input.cwd), input.id, 'images');
-  if (path.dirname(path.resolve(source)) !== path.resolve(folder)) throw new ImageError('invalid_image_source');
-  // Check each newly-created segment; realpath alone would accept a symlinked session root.
+  return { sessions, folder };
+}
+
+async function checkSessionPaths(sessions: string, folder: string, source: string) {
   for (const candidate of [sessions, path.dirname(path.dirname(folder)), path.dirname(folder), folder, source]) {
     if ((await lstat(candidate)).isSymbolicLink()) throw new ImageError('invalid_image_source');
   }
+}
+
+/** Recollect only a receipt whose completed CLI execution failed at source validation. No CLI calls. */
+export async function recoverGrokImage(input: ImageExecution): Promise<ImageExecutionResult> {
+  const { sessions, folder } = imageFolders(input);
+  const updates = path.join(path.dirname(folder), 'updates.jsonl');
+  await checkSessionPaths(sessions, folder, updates);
+  const file = await open(updates, 'r');
+  let text: string;
+  try {
+    const before = await file.stat();
+    if (!before.isFile() || before.nlink !== 1 || before.size > 2 * 1024 * 1024) throw new ImageError('invalid_image_source');
+    const bytes = Buffer.alloc(before.size);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const next = await file.read(bytes, offset, bytes.length - offset, offset);
+      if (!next.bytesRead) throw new ImageError('invalid_image_source');
+      offset += next.bytesRead;
+    }
+    const after = await file.stat();
+    if (before.size !== after.size || before.mtimeMs !== after.mtimeMs) throw new ImageError('invalid_image_source');
+    text = bytes.toString('utf8');
+  } finally { await file.close(); }
+  let toolId: string | null = null; let source: string | null = null;
+  for (const line of text.split('\n').filter((line) => line.trim())) {
+    const params = record(record(JSON.parse(line))?.params);
+    if (params?.sessionId !== input.id) throw new ImageError('invalid_image_source');
+    const update = record(params.update);
+    if (update?.sessionUpdate === 'tool_call') {
+      if (toolId || update.title !== 'image_gen' || typeof update.toolCallId !== 'string'
+        || record(update.rawInput)?.aspect_ratio !== '1:1') throw new ImageError('invalid_image_source');
+      toolId = update.toolCallId;
+    }
+    if (update?.sessionUpdate === 'tool_call_update' && update.toolCallId === toolId && update.status === 'completed') {
+      const output = record(update.rawOutput);
+      if (source || output?.type !== 'ImageGen' || typeof output.path !== 'string') throw new ImageError('invalid_image_source');
+      source = output.path;
+    }
+  }
+  if (!toolId || !source) throw new ImageError('invalid_image_source');
+  return collectGrokImage(input, source);
+}
+
+export async function collectGrokImage(input: ImageExecution, source: string): Promise<ImageExecutionResult> {
+  const { sessions, folder } = imageFolders(input);
+  if (path.dirname(path.resolve(source)) !== path.resolve(folder)) throw new ImageError('invalid_image_source');
+  // Check each newly-created segment; realpath alone would accept a symlinked session root.
+  await checkSessionPaths(sessions, folder, source);
   if (path.dirname(await realpath(source)) !== await realpath(folder)) throw new ImageError('invalid_image_source');
   const file = await open(source, 'r');
   try {

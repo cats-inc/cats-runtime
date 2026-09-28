@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as files from 'node:fs/promises';
-import { mkdtemp, mkdir, readFile, writeFile, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, writeFile, symlink, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -9,7 +9,7 @@ import { Hono } from 'hono';
 import jpeg from 'jpeg-js';
 import { ImageGenerationService } from '../src/core/media/ImageGenerationService.js';
 import { collectGrokImage, executeGrokImage, imageInvocation, validateImage, type ImageExecution } from '../src/backends/cli/media/grokImage.js';
-import { parseImageRequest } from '../src/core/media/contracts.js';
+import { IMAGE_MAX_BYTES, parseImageRequest } from '../src/core/media/contracts.js';
 import { imageRoutes } from '../src/http/routes/images.js';
 import type { RuntimeRouteEnv } from '../src/http/routes/diagnosticsSupport.js';
 import type { AppContext } from '../src/http/app.js';
@@ -42,6 +42,66 @@ async function settle(service: ImageGenerationService, id: string) {
   throw new Error('Fixture did not finish');
 }
 describe('bounded image generation', () => {
+  it('expands the default home-relative session directory before enforcing containment', async () => {
+    const { root, input } = await fixture(); const file = await output(input);
+    input.env.HOME = root; input.env.USERPROFILE = root;
+    input.target.grokSessionsDir = '~/.grok/sessions';
+    expect((await collectGrokImage(input, file)).bytes.equals(picture())).toBe(true);
+    await expect(collectGrokImage({ ...input, id: randomUUID() }, file)).rejects.toThrow('invalid_image_source');
+  });
+  it('recollects a legacy source failure from matching session evidence, backs up its receipt and never executes', async () => {
+    const { root, input } = await fixture();
+    const receiptRoot = path.join(root, 'receipts');
+    input.cwd = path.join(receiptRoot, input.id, 'workspace'); await mkdir(input.cwd, { recursive: true });
+    const file = await output(input);
+    input.env.HOME = root; input.env.USERPROFILE = root; input.target.grokSessionsDir = '~/.grok/sessions';
+    const log = [
+      { sessionUpdate: 'tool_call', toolCallId: 'one', title: 'image_gen', rawInput: { aspect_ratio: '1:1' } },
+      { sessionUpdate: 'tool_call_update', toolCallId: 'one', status: 'completed', rawOutput: { type: 'ImageGen', path: file } },
+    ].map((update) => JSON.stringify({ params: { sessionId: input.id, update } })).join('\n');
+    const logPath = path.join(path.dirname(path.dirname(file)), 'updates.jsonl');
+    const now = new Date().toISOString();
+    const receipt = { schemaVersion: 1, id: input.id, instance: input.instance, prompt: input.prompt,
+      provider: 'grok', agentModel: 'fixture', status: 'failed', error: 'invalid_image_source', output: null, createdAt: now, updatedAt: now };
+    const jobPath = path.join(receiptRoot, input.id, 'job.json');
+    const original = JSON.stringify(receipt); await writeFile(jobPath, original);
+    const execute = vi.fn();
+    const options = { root: receiptRoot, targets: () => [input.target], env: input.env, execute };
+    const service = new ImageGenerationService(options);
+    // No evidence, malformed/mismatched/extra-tool evidence and invalid bytes cannot upgrade a failure.
+    expect((await service.get(input.id)).status).toBe('failed');
+    for (const invalid of ['{', log.replaceAll(input.id, randomUUID()), log.replace('image_gen', 'image_edit'),
+      log + '\n' + log.split('\n')[0], log.replace('"1:1"', '"16:9"'), 'x'.repeat(2 * 1024 * 1024 + 1)]) {
+      await writeFile(logPath, invalid); expect((await service.get(input.id)).status).toBe('failed');
+      expect(await readFile(jobPath, 'utf8')).toBe(original);
+    }
+    await writeFile(logPath, log); await writeFile(file, Buffer.alloc(IMAGE_MAX_BYTES + 1));
+    expect((await service.get(input.id)).status).toBe('failed');
+    await writeFile(file, picture());
+    const backupPath = path.join(receiptRoot, input.id, 'job.before-image-source-recovery.json');
+    await writeFile(backupPath, original.slice(0, 20));
+    expect((await service.get(input.id)).status).toBe('failed');
+    expect(await readFile(jobPath, 'utf8')).toBe(original); await unlink(backupPath);
+    // A persistence failure leaves the original receipt retryable without provider execution.
+    const rename = vi.spyOn(files, 'rename').mockRejectedValue(new Error('disk unavailable'));
+    for (let n = 0; n < 3; n++) expect((await service.get(input.id)).status).toBe('failed');
+    rename.mockRestore();
+    expect((await readdir(path.join(receiptRoot, input.id))).filter((name) => name.endsWith('.tmp'))).toEqual([]);
+    expect(await readFile(jobPath, 'utf8')).toBe(original);
+    expect((await service.get(input.id)).status).toBe('succeeded');
+    expect(await readFile(path.join(receiptRoot, input.id, 'job.before-image-source-recovery.json'), 'utf8')).toBe(original);
+    expect((await service.image(input.id)).equals(picture())).toBe(true);
+    const restarted = new ImageGenerationService(options);
+    expect((await restarted.get(input.id)).status).toBe('succeeded');
+    expect(execute).not.toHaveBeenCalled();
+    for (const status of ['cancelled', 'interrupted', 'running']) {
+      await writeFile(jobPath, JSON.stringify({ ...receipt, status }));
+      expect((await restarted.get(input.id)).status).not.toBe('succeeded');
+    }
+    await writeFile(jobPath, JSON.stringify({ ...receipt, error: 'generation_failed' }));
+    expect((await restarted.get(input.id)).status).toBe('failed');
+    expect(execute).not.toHaveBeenCalled(); await service.close(); await restarted.close();
+  });
   it('records confirmed cancellation during final image persistence', async () => {
     const { root, input } = await fixture();
     let release!: () => void; let writing!: () => void;

@@ -29,6 +29,15 @@ At most 500 receipt directories. An ambiguous pre-spawn directory is never overw
 Receipts and images live under the resolved Runtime data root; atomic receipt/image rename
 precedes success. Startup does not resubmit interrupted attempts.
 
+Resolve native home-relative session paths with the existing host-path resolver before
+containment checks. A failed `invalid_image_source` receipt proves the CLI already met the
+bounded tool/terminal checks. Reading that receipt may recollect its original image from
+the exact session's bounded `updates.jsonl`, requiring one matching square image tool result
+and all normal source/JPEG checks. Back up the failure receipt before atomic image/receipt
+replacement. Missing/invalid evidence or persistence failure preserves the failed receipt;
+later reads may retry collection only. Cancelled/interrupted/other failures never take this
+recovery path. No provider execution, new model usage, or data-format change is involved.
+
 Only matching tool-call completion and terminal evidence authorize collection. Native
 processes may return exit 1 after max_turns_reached despite a valid image. This exception
 requires the complete bounded success evidence, not an arbitrary file left on disk.
