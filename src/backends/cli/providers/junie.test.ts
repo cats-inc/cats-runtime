@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { JunieProvider } from './junie.js';
+import { JunieProvider, stripJvmToolOptionsNotice, withJunieUtf8Stdio } from './junie.js';
+import { appendStderrLines } from '../stderrLines.js';
 
 describe('JunieProvider', () => {
   it('has correct name and capabilities', () => {
@@ -132,6 +133,31 @@ describe('JunieProvider', () => {
     it('returns null for empty lines', () => {
       const provider = new JunieProvider();
       expect(provider.parseStreamLine('')).toBeNull();
+    });
+  });
+
+  describe('UTF-8 stdio', () => {
+    it('tells the JVM to write UTF-8 when nothing is inherited', () => {
+      expect(withJunieUtf8Stdio()).toBe('-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8');
+      expect(withJunieUtf8Stdio('  ')).toBe('-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8');
+    });
+
+    it('keeps inherited options and overrides an inherited encoding', () => {
+      expect(withJunieUtf8Stdio('-Dhttps.proxyHost=proxy -Dstdout.encoding=MS950')).toBe(
+        '-Dhttps.proxyHost=proxy -Dstdout.encoding=MS950'
+          + ' -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8',
+      );
+    });
+
+    it('drops the JVM notice but keeps Junie diagnostics', () => {
+      const stderr = [
+        'Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8',
+        'Junie failed with the message: Invalid model: 午安模型',
+        '',
+      ].join('\r\n');
+      const lines: string[] = [];
+      appendStderrLines(lines, stripJvmToolOptionsNotice(stderr));
+      expect(lines).toEqual(['Junie failed with the message: Invalid model: 午安模型']);
     });
   });
 });
