@@ -120,3 +120,5 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 *See also: [specs/](../specs/) for feature specifications*
 *Last updated: 2026-09-16 (PLAN-039 tracks the shared Runtime, Platform, and Desktop
 selection-first bootstrap rollout and the accepted Runtime UX with retained observations.)*
+
+- [PLAN-043: Bounded image generation](PLAN-043-bounded-image-generation.md) — implementation and fixture validation.

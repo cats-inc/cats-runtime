@@ -55,6 +55,10 @@ temp/
 data/
 output/
 media/
+!src/core/media/
+!src/core/media/**
+!src/backends/cli/media/
+!src/backends/cli/media/**
 datasets/
 workspace/
 !src/core/workspace/

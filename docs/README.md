@@ -299,3 +299,5 @@ later passes:
 
 *Last updated: 2026-09-23 (SPEC-028 records the approved full-catalog/shortlist model-menu
 policy; individual shortlists and UI enforcement remain pending.)*
+
+- Studio: [image API specification](specs/SPEC-033-bounded-image-generation.md) and [delivery plan](plans/PLAN-043-bounded-image-generation.md).

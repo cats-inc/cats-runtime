@@ -106,3 +106,5 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 *See also: [plans/](../plans/) for implementation plans*
 *Last updated: 2026-09-17 (SPEC-028 records the approved full-catalog/shortlist model-menu
 policy; individual shortlists and UI enforcement remain pending.)*
+
+- [SPEC-033: Bounded image generation](SPEC-033-bounded-image-generation.md) — authenticated single-image operation.

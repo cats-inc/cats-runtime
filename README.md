@@ -78,6 +78,12 @@ Current capabilities:
 
 ## Current Status
 
+Studio image execution (2026-09-28): authenticated bounded native Grok image jobs
+now use durable receipts, verified JPEG collection and shared admission/metering.
+Restart/read recovery never regenerates. Isolated process/service tests passed;
+the earlier one-image spike remains the only live call. See
+[SPEC-033](docs/specs/SPEC-033-bounded-image-generation.md).
+
 - [x] Make active provider configuration the selection/resource boundary for
       Runtime, Platform, and Desktop; save choices before scanning, support
       explicit empty idle mode, and reconcile work on revision changes. Native

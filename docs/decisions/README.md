@@ -97,3 +97,5 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 narrow amendment to ADR-021's detection-before-config policy.)*
 
 *See also: [AGENTS.md](../../AGENTS.md) for decision-making protocols*
+
+- [ADR-042: Bound native image generation](042-bound-native-image-generation.md) — accepted, 2026-09-28.

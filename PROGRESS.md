@@ -4,6 +4,13 @@
 
 ## Current Status
 
+Studio image slice (2026-09-28): bounded native execution, durable receipts,
+authenticated routes, source/decoder validation and shared selection/pool/metering
+are implemented. Independent review fixes include direct-only spawn, cancellation
+during persistence and admission accounting. Tests use isolated fake executions;
+no additional Grok calls or Runtime npm release. See
+[PLAN-043](docs/plans/PLAN-043-bounded-image-generation.md).
+
 Desktop provider setup (2026-09-16): Runtime 0.1.24 adds revision-bound scan IDs
 and progress, explicit Ollama/OpenClaw connection checks, safe endpoint edits,
 and retained observations for Desktop onboarding and Settings. Native Windows

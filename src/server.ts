@@ -1,4 +1,8 @@
 import { once } from 'node:events';
+import { ImageGenerationService } from './core/media/ImageGenerationService.js';
+import { executeGrokImage } from './backends/cli/media/grokImage.js';
+import { ImageError } from './core/media/contracts.js';
+import type { SessionInfo } from './core/types.js';
 import type { Server } from 'node:http';
 import os from 'node:os';
 import { join } from 'node:path';
@@ -1093,6 +1097,36 @@ export function createRuntimeServer(
   });
   context.worktreeMaintenance = worktreeMaintenance;
   context.metering = new RuntimeMeteringService(config.metering);
+  context.images = new ImageGenerationService({
+    root: join(getRuntimeResolvedPaths(config).dataDir, 'image-generations'),
+    targets: () => Object.values(config.providerInstances?.grok ?? {}),
+    env: { ...getRuntimeConfigEnv(config) },
+    execute: async (input) => {
+      const selection = context.bootstrapService!.selection;
+      const operation = selection.acquireOperation({ provider: 'grok', backend: 'cli', instance: input.instance }, config.providerSelectionRevision);
+      let release: (() => void) | undefined;
+      try {
+        const now = new Date().toISOString();
+        const session: SessionInfo = { id: input.id, providerSessionId: input.id, providerName: 'grok', providerBackend: 'cli',
+          providerInstanceId: input.instance, cwd: input.cwd, status: 'busy', origin: 'runtime',
+          workspace: { kind: 'sandbox', access: 'read_write', runtimeCwd: input.cwd },
+          createdAt: now, updatedAt: now, messageCount: 1, totalInputTokens: 0, totalOutputTokens: 0 };
+        const guard = context.metering!.evaluatePreflight(session);
+        if (guard.outcome === 'blocked' || guard.outcome === 'cooldown') throw new ImageError('quota_exhausted');
+        const controller = new AbortController();
+        const abort = () => controller.abort();
+        input.signal.addEventListener('abort', abort, { once: true });
+        if (input.signal.aborted) abort();
+        try {
+          try { release = pool.reserveExternalExecution(input.id, 'grok', input.instance, abort); }
+          catch { throw new ImageError('image_service_busy', 429); }
+          const turnStartedAt = Date.now();
+          return await executeGrokImage({ ...input, signal: controller.signal,
+            observe: (event) => { context.metering!.observeEvent(session, event, { turnStartedAt }); } });
+        } finally { input.signal.removeEventListener('abort', abort); }
+      } finally { release?.(); selection.releaseOperation(operation); }
+    },
+  });
   context.quotaRefresh = new QuotaRefreshService({
     collect: async (target, signal) => {
       if (target.backend !== 'cli') return { status: 'unsupported' };
@@ -1322,6 +1356,7 @@ export function createRuntimeServer(
       closePromise = (async () => {
         markRuntimeStopping(startup, startup.shutdownReason);
         await context.quotaRefresh?.close();
+        await context.images?.close();
         const pendingStart = startPromise;
         if (pendingStart) {
           await pendingStart.catch(() => undefined);

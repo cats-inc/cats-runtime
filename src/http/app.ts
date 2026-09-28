@@ -29,6 +29,7 @@ import { ZeaburDeploymentAdapter } from '../core/management/adapters/zeabur/Zeab
 import { WorkspaceSubstrateService } from '../core/runtime/WorkspaceSubstrateService.js';
 import { RuntimeMeteringService } from '../core/usage/RuntimeMeteringService.js';
 import type { QuotaRefreshService } from '../core/usage/QuotaRefreshService.js';
+import type { ImageGenerationService } from '../core/media/ImageGenerationService.js';
 import { RuntimeWorktreeMaintenanceService } from '../core/workspace/RuntimeWorktreeMaintenanceService.js';
 import type { RuntimeWakeupService } from '../core/wakeup/RuntimeWakeupService.js';
 import type { PeerRegistry } from '../core/peers/PeerRegistry.js';
@@ -53,6 +54,7 @@ import { browserRoutes } from './routes/browser.js';
 import { deliveryRoutes } from './routes/delivery.js';
 import { diagnosticsRoutes } from './routes/diagnostics.js';
 import { usageRoutes } from './routes/usage.js';
+import { imageRoutes } from './routes/images.js';
 import { compatibilityEvidenceRoutes } from './routes/compatibilityEvidence.js';
 import { setupDiagnosticsRoutes } from './routes/setupDiagnostics.js';
 import { healthRoutes } from './routes/health.js';
@@ -103,6 +105,7 @@ export interface AppContext {
   workspaceSubstrate?: WorkspaceSubstrateService;
   metering?: RuntimeMeteringService;
   quotaRefresh?: QuotaRefreshService;
+  images?: ImageGenerationService;
   wakeup?: RuntimeWakeupService;
   browser?: RuntimeBrowserService;
   browserMaintenance?: RuntimeBrowserMaintenanceService;
@@ -394,6 +397,7 @@ export function createRuntimeApp(ctx: AppContext) {
   app.route('/', healthRoutes);
   app.route('/', diagnosticsRoutes);
   app.route('/', usageRoutes);
+  app.route('/', imageRoutes);
   app.route('/', compatibilityEvidenceRoutes);
   app.route('/', setupDiagnosticsRoutes);
   app.route('/', setupRoutes);

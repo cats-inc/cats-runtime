@@ -45,6 +45,7 @@ interface ProviderServiceResolvers {
 
 export class WorkerPool {
   private workers = new Map<string, WorkerProcess>();
+  private externalExecutions = new Map<string, { provider: string; cancel: () => void }>();
   private workerSingletonResources = new Map<string, string>();
   private config: CliRuntimeConfig;
   private registry: SessionRegistry;
@@ -79,11 +80,25 @@ export class WorkerPool {
   }
 
   get activeCount(): number {
-    let count = 0;
+    let count = this.externalExecutions.size;
     for (const w of this.workers.values()) {
       if (w.alive) count++;
     }
     return count;
+  }
+
+  /** Bounded native operations share worker admission/singletons, without creating a chat session. */
+  reserveExternalExecution(id: string, provider: ProviderName, instanceId: string, cancel: () => void): () => void {
+    if (this.workers.has(id) || this.externalExecutions.has(id)) throw new Error('Execution already reserved');
+    if (this.activeCount >= this.config.maxSessions) throw new Error('Max sessions reached');
+    const instance = resolveProviderInstance(this.config, provider, instanceId);
+    if (instance.commandConfig.singleton) this.reserveSingletonResource(instance.commandConfig.singleton, id);
+    this.externalExecutions.set(id, { provider, cancel });
+    let released = false;
+    return () => {
+      if (released) return; released = true;
+      this.externalExecutions.delete(id); this.releaseSingletonResource(id);
+    };
   }
 
   private resolveProvider(
@@ -284,7 +299,7 @@ export class WorkerPool {
       }
 
       const worker = this.workers.get(activeSessionId);
-      if (!worker || !worker.alive) {
+      if ((!worker || !worker.alive) && !this.externalExecutions.has(activeSessionId)) {
         console.warn(
           `[pool] Reclaiming singleton '${resource}' from stale session '${activeSessionId}' `
           + '(worker missing or not alive). Exit handler may have been skipped.',
@@ -329,6 +344,7 @@ export class WorkerPool {
   }
 
   killAll(): void {
+    for (const execution of this.externalExecutions.values()) execution.cancel();
     for (const [id, worker] of this.workers) {
       worker.kill();
     }
@@ -336,7 +352,7 @@ export class WorkerPool {
 
   status() {
     const providers: Record<string, number> = {};
-    let busy = 0;
+    let busy = this.externalExecutions.size;
     let idle = 0;
 
     for (const worker of this.workers.values()) {
@@ -351,6 +367,7 @@ export class WorkerPool {
         providers[session.providerName] = (providers[session.providerName] ?? 0) + 1;
       }
     }
+    for (const execution of this.externalExecutions.values()) providers[execution.provider] = (providers[execution.provider] ?? 0) + 1;
 
     return {
       active: this.activeCount,
