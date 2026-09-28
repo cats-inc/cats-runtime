@@ -1464,6 +1464,8 @@ export interface RuntimeRunInspection {
   artifacts?: SessionArtifact[];
   services?: AgentRuntimeService[];
   previewSurfaces?: RuntimePreviewSurface[];
+  /** Models the provider reported serving this run, when it reports them. */
+  reportedModels?: ReportedModel[];
 }
 
 export interface RuntimeAgentSessionInspection {
@@ -1663,7 +1665,23 @@ interface StreamEventBase {
   raw?: unknown;
 }
 
+/**
+ * A model a provider says served a turn, in the provider's own naming. Without
+ * it the runtime knows only the model it asked for, which Kiro, for one, did
+ * not use.
+ */
+export interface ReportedModel {
+  model: string;
+  /**
+   * False when the provider served a model other than the one requested, true
+   * when it is the requested one; absent when the adapter cannot compare them.
+   */
+  matchesRequest?: boolean;
+}
+
 interface StreamEventStatePatch {
+  /** Models the provider reports serving this turn. */
+  reportedModels?: ReportedModel[];
 }
 
 export interface InitStreamEvent extends StreamEventBase, StreamEventStatePatch {

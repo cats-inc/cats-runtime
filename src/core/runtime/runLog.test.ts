@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RuntimeSessionManager } from './RuntimeSessionManager.js';
 import { describeRunTarget, formatRunLogLine } from './runLog.js';
+import { describeReportedModels, mergeReportedModels } from './reportedModels.js';
 import type { SessionInfo } from '../types.js';
 
 function createRuntimeManager(): RuntimeSessionManager {
@@ -93,11 +94,53 @@ describe('RuntimeSessionManager run logging', () => {
     expect(log.mock.calls.map(([line]) => String(line))).toEqual([
       `[run] started session=session-1 run=${failing.id} provider=codex instance=api/gateway model=gpt-withdrawn`,
       `[run] started session=session-1 run=${working.id} provider=codex instance=api/gateway model=gpt-4.1`,
-      expect.stringMatching(new RegExp(`^\\[run\\] succeeded session=session-1 run=${working.id} provider=codex instance=api/gateway model=gpt-4\\.1 duration=\\d+\\.\\ds$`, 'u')),
+      expect.stringMatching(new RegExp(`^\\[run\\] succeeded session=session-1 run=${working.id} provider=codex instance=api/gateway model=gpt-4\\.1 reported=\\(none\\) duration=\\d+\\.\\ds$`, 'u')),
     ]);
     expect(warn.mock.calls.map(([line]) => String(line))).toEqual([
-      expect.stringMatching(new RegExp(`^\\[run\\] failed session=session-1 run=${failing.id} provider=codex instance=api/gateway model=gpt-withdrawn duration=\\d+\\.\\ds error=Model not found: gpt-withdrawn\\.$`, 'u')),
+      expect.stringMatching(new RegExp(`^\\[run\\] failed session=session-1 run=${failing.id} provider=codex instance=api/gateway model=gpt-withdrawn reported=\\(none\\) duration=\\d+\\.\\ds error=Model not found: gpt-withdrawn\\.$`, 'u')),
     ]);
     expect(lines.join('\n')).not.toContain('private user text');
+  });
+
+  it('warns when a provider reports serving a model other than the requested one', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const runtime = createRuntimeManager();
+
+    const run = runtime.beginRun(createSession('claude-opus-5.5'), { message: 'hi' });
+    runtime.observeEvent('session-1', {
+      type: 'result',
+      reportedModels: [{ model: 'auto', matchesRequest: false }],
+    });
+
+    expect(log.mock.calls.map(([line]) => String(line))).toHaveLength(1);
+    expect(warn.mock.calls.map(([line]) => String(line))).toEqual([
+      expect.stringMatching(new RegExp(`^\\[run\\] succeeded session=session-1 run=${run.id} provider=codex instance=api/gateway model=claude-opus-5\\.5 reported=auto\\(differs\\) duration=\\d+\\.\\ds$`, 'u')),
+    ]);
+    expect(runtime.getTrackedState('session-1')?.lastRun?.reportedModels)
+      .toEqual([{ model: 'auto', matchesRequest: false }]);
+  });
+});
+
+describe('reported models', () => {
+  it('keeps each name once and a mismatch once reported', () => {
+    const merged = mergeReportedModels(
+      [{ model: 'claude-opus-5-5', matchesRequest: true }, { model: 'helper' }],
+      [
+        { model: 'claude-opus-5-5' },
+        { model: 'helper', matchesRequest: true },
+        { model: 'gpt-6-luna', matchesRequest: false },
+        { model: '  ' },
+      ],
+    );
+    expect(merged).toEqual([
+      { model: 'claude-opus-5-5', matchesRequest: true },
+      { model: 'helper', matchesRequest: true },
+      { model: 'gpt-6-luna', matchesRequest: false },
+    ]);
+    expect(mergeReportedModels(merged, [{ model: 'claude-opus-5-5', matchesRequest: false }])[0])
+      .toEqual({ model: 'claude-opus-5-5', matchesRequest: false });
+    expect(describeReportedModels(merged)).toBe('claude-opus-5-5,helper,gpt-6-luna(differs)');
+    expect(describeReportedModels(undefined)).toBe('(none)');
   });
 });
