@@ -37,9 +37,11 @@ export interface JunieUsageTotals {
  *     "changes": [...],
  *     "llmUsage": [{ "model": "...", "inputTokens": N, "outputTokens": N, "cost": N, ... }]
  *   }
+ * A failed task has `errors` (strings, as in `CliOutput`) and no `result`.
  */
 export interface JunieResult {
   sessionId?: string;
+  errors?: unknown[];
   taskName?: string;
   result?: string;
   changes?: unknown[];
@@ -83,6 +85,25 @@ export function parseJunieStreamLine(
       reason: 'non_json_stdout',
       rawSample: trimmed,
     }, { type: 'raw', text: trimmed } satisfies RawStreamEvent);
+  }
+
+  // A failed task, such as one refused for an exhausted account balance, would
+  // otherwise end the turn as an empty reply.
+  const errors = readJunieErrors(data.errors);
+  if (!data.result && errors.length > 0) {
+    const usage = aggregateJunieUsage(data.llmUsage);
+    return observeNormalized(observer, {
+      rawEventType: 'JunieResult',
+      details: {
+        source: 'stdout',
+      },
+      rawSample: data,
+    }, {
+      type: 'error',
+      ...(data.sessionId ? { sessionId: data.sessionId } : {}),
+      text: errors.join('\n'),
+      ...(usage ? { usage } : {}),
+    } satisfies ErrorStreamEvent);
   }
 
   // Empty object {} means no result (e.g. failed session resume)
@@ -220,6 +241,20 @@ export function parseJunieSessionEventLine(
         usageDelta: aggregateJunieUsage(agentEvent.modelUsage),
         modelsDelta: junieReportedModels(agentEvent.modelUsage),
       };
+
+    case 'AgentFailureEvent': {
+      const usage = sanitizeUsage(options.usage);
+      return {
+        events: [{
+          type: 'error',
+          sessionId: options.sessionId,
+          text: readString(agentEvent.message)
+            ?? `Junie failed (${readString(agentEvent.errorCode) ?? 'no error code'}) before returning a result.`,
+          ...(usage ? { usage } : {}),
+        } satisfies ErrorStreamEvent],
+        terminal: true,
+      };
+    }
 
     case 'ResultBlockUpdatedEvent': {
       if (agentEvent.cancelled === true) {
@@ -473,6 +508,11 @@ function readString(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function readJunieErrors(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(readString).filter((error): error is string => error !== null);
 }
 
 function readNumber(value: unknown): number {

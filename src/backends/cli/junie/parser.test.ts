@@ -331,4 +331,80 @@ describe('parseJunieStreamLine', () => {
       terminal: true,
     });
   });
+
+  it('reports a failed task\'s errors instead of an empty result', () => {
+    const event = parseJunieStreamLine(JSON.stringify({
+      sessionId: 'session-260928-150014-asw3',
+      errors: ['Junie: Insufficient account balance. All tokens in your account have been spent.'],
+      taskName: '逐行精确重复用户消息任务',
+      llmUsage: [{ model: 'gemini-3.7-flash', inputTokens: 12521, outputTokens: 2248, cost: 0.0104036 }],
+    }));
+
+    expect(event).toEqual({
+      type: 'error',
+      sessionId: 'session-260928-150014-asw3',
+      text: 'Junie: Insufficient account balance. All tokens in your account have been spent.',
+      usage: expect.objectContaining({ inputTokens: 12521, outputTokens: 2248 }),
+    });
+  });
+
+  it('keeps a result that arrives with errors', () => {
+    const events = parseJunieStreamLine(JSON.stringify({
+      sessionId: 'session-5',
+      errors: ['A subagent failed.'],
+      result: 'Done anyway.',
+    }));
+
+    expect(events).toEqual([
+      { type: 'text', text: 'Done anyway.' },
+      { type: 'result', sessionId: 'session-5', usage: undefined },
+    ]);
+  });
+
+  it('ends the turn with Junie\'s failure message', () => {
+    // Recorded by Junie 26.9.22 when the account balance ran out mid-task.
+    const parsed = parseJunieSessionEventLine(JSON.stringify({
+      kind: 'SessionA2uxEvent',
+      event: {
+        state: 'FAILED',
+        agentEvent: {
+          kind: 'AgentFailureEvent',
+          agent: { kind: 'MainAgent', id: 'main', name: 'main', type: 'LINEAR' },
+          message: 'Junie: Insufficient account balance. All tokens in your account have been spent.',
+          errorCode: 'ExitPaymentRequired',
+        },
+      },
+      timestampMs: 1790578837548,
+    }), {
+      sessionId: 'session-260928-150014-asw3',
+      usage: { inputTokens: 12521, outputTokens: 2248 },
+    });
+
+    expect(parsed).toEqual({
+      events: [{
+        type: 'error',
+        sessionId: 'session-260928-150014-asw3',
+        text: 'Junie: Insufficient account balance. All tokens in your account have been spent.',
+        usage: { inputTokens: 12521, outputTokens: 2248 },
+      }],
+      terminal: true,
+    });
+  });
+
+  it('names the error code when a failure has no message', () => {
+    const parsed = parseJunieSessionEventLine(JSON.stringify({
+      kind: 'SessionA2uxEvent',
+      event: {
+        state: 'FAILED',
+        agentEvent: { kind: 'AgentFailureEvent', errorCode: 'ExitPaymentRequired' },
+      },
+    }), { sessionId: 'session-6' });
+
+    expect(parsed?.events).toEqual([{
+      type: 'error',
+      sessionId: 'session-6',
+      text: 'Junie failed (ExitPaymentRequired) before returning a result.',
+    }]);
+    expect(parsed?.terminal).toBe(true);
+  });
 });
