@@ -395,11 +395,11 @@ describe('shared playground selection helpers', () => {
       div: { querySelector: () => controls }, catalog, entryId: '' };
     vm.createContext(context);
     vm.runInContext(html.slice(start, end), context);
-    expect(models).toHaveLength(8);
+    expect(models).toHaveLength(7);
     expect(models.some(model => model.default)).toBe(false);
     const input = { provider: 'pi', selectableProviders: ['pi'], providerOrder: ['pi'],
       advancedCatalogs: { pi: catalog } };
-    expect(catsUI.normalizePlaygroundAgentSelection(input).modelSelection.entryId).toBe('openai-codex/gpt-5.3-codex-spark');
+    expect(catsUI.normalizePlaygroundAgentSelection(input).modelSelection.entryId).toBe('openai-codex/gpt-5.5');
     const levels: Record<string, string[]> = {};
     for (const entry of catalog.entries) {
       context.entryId = entry.id;

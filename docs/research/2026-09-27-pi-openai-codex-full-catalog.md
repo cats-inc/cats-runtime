@@ -15,7 +15,8 @@ Question asked, and the operator's answer:
 
 1. **`gpt-5.3-codex-spark`.** Pi lists it for the channel, but the same ChatGPT account's Codex CLI
    0.156.1 catalog (2026-09-24) did not offer it, not even as a hidden entry. Answer: include it.
-   Selecting it can fail at runtime if the account's plan does not include it.
+   The Codex list alone could not tell a plan limit from Pi's build-time list being out of date.
+   Superseded on 2026-09-29; see [Later change](#later-change-2026-09-29).
 
 Policy: [SPEC-028](../specs/SPEC-028-provider-model-catalog-maintenance-skill.md) now lists Pi's
 `openai-codex` channel in the full-catalog group (2026-09-27 Pi amendment). The
@@ -102,6 +103,17 @@ The six `<id> [openai-codex] — medium` rows became 8 rows in registry order:
   `<option value="x" >`). It is fixed, so that test's "no default label" check now covers every
   option.
 - `extract-pi-models.node-test.mjs` passed 4/4, and CI runs it from `tests/agent-skill-sync.test.ts`.
+
+## Later change (2026-09-29)
+
+A Cats turn on the installed 0.5.6 Desktop that selected `gpt-5.3-codex-spark` failed with
+`The 'gpt-5.3-codex-spark' model is not supported when using Codex with a ChatGPT account.`
+([fixture](./fixtures/pi-0.87.1/spark-rejection.redacted.txt)). The ChatGPT backend rejects it for
+ChatGPT-account Codex use, so the row is removed and the catalog carries the 7 remaining models;
+`gpt-5.5` is kept because the same account's Codex server list offers it. Pi's build-time list and
+its refreshed local store (2026-09-27) both still include Spark, so Pi has not caught up; the row
+stays reachable as a custom `openai-codex/gpt-5.3-codex-spark` string. The first row, and a new
+selection without a saved choice, is now `gpt-5.5`.
 
 ## Scripts
 

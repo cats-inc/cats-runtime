@@ -2236,54 +2236,15 @@ catalogs:
     selection_mode: full
     source_cli: Pi
     cli_version: 0.87.1
-    last_updated: 2026-09-27
+    last_updated: 2026-09-29
     notes:
-      - "Complete openai-codex (ChatGPT subscription) channel of Pi 0.87.1: all 8 models in the installed pi-ai registry, identical to the local model store checked 2026-09-22. Rows keep the model selector format <id> [openai-codex] and registry order; the selector only moves the current and a configured default model to the top. Other Pi providers are out of scope and remain available as custom provider/model strings."
-      - "The channel list is Pi's build-time catalog for ChatGPT Plus/Pro, not account entitlement. The same ChatGPT account's Codex CLI 0.156.1 list (2026-09-24) did not include gpt-5.3-codex-spark; the operator chose to keep it on 2026-09-27."
+      - "The openai-codex (ChatGPT subscription) channel of Pi 0.87.1: the models in the installed pi-ai registry (identical to the local model store refreshed 2026-09-27) that a ChatGPT account can run. Rows keep the model selector format <id> [openai-codex] and registry order; the selector only moves the current and a configured default model to the top. Other Pi providers are out of scope and remain available as custom provider/model strings."
+      - "The channel list is Pi's build-time catalog, not account entitlement. Pi also lists gpt-5.3-codex-spark, which is omitted: the same ChatGPT account's Codex CLI 0.156.1 list (2026-09-24) did not include it, and a Cats turn selecting it failed on 2026-09-29 with \"The 'gpt-5.3-codex-spark' model is not supported when using Codex with a ChatGPT account.\" It remains reachable as a custom provider/model string."
       - "Thinking values per row are Pi's getSupportedThinkingLevels over each model's thinkingLevelMap, in Pi's order, labeled with Pi's tokens and thinking-selector descriptions. gpt-6-astra has no off. Pi sends minimal as the low reasoning effort on every row here."
       - "Pi's thinking selector marks the default thinking level (settings defaultThinkingLevel, or the built-in medium when unset), so medium is the control default. The model selector marks only a user-configured default model, so no row is a default and the UI initializes the first row."
       - "Execution uses --provider openai-codex --model <raw ID> --thinking <level>. Limits are the registry contextWindow and maxTokens."
       - "Evidence: docs/research/2026-09-27-pi-openai-codex-full-catalog.md and docs/research/fixtures/pi-0.87.1/openai-codex-models.redacted.json."
     models:
-      - id: openai-codex/gpt-5.3-codex-spark
-        label: "gpt-5.3-codex-spark [openai-codex]"
-        limits:
-          contextWindowTokens: 128000
-          maxOutputTokens: 128000
-        notes:
-          - "Pi name: GPT-5.3 Codex Spark. Input: text."
-        source_names:
-          - openai-codex/gpt-5.3-codex-spark
-          - "gpt-5.3-codex-spark [openai-codex]"
-        execution:
-          model: gpt-5.3-codex-spark
-          provider: openai-codex
-        controls:
-          - key: pi.thinking
-            label: Thinking
-            description: Pi thinking level, sent as --thinking.
-            kind: enum
-            scope: both
-            values:
-              - value: off
-                label: off
-                description: "No reasoning"
-              - value: minimal
-                label: minimal
-                description: "Very brief reasoning (~1k tokens)"
-              - value: low
-                label: low
-                description: "Light reasoning (~2k tokens)"
-              - value: medium
-                label: medium
-                description: "Moderate reasoning (~8k tokens)"
-              - value: high
-                label: high
-                description: "Deep reasoning (~16k tokens)"
-              - value: xhigh
-                label: xhigh
-                description: "Extra-high reasoning (~32k tokens)"
-            default: medium
       - id: openai-codex/gpt-5.5
         label: "gpt-5.5 [openai-codex]"
         limits:

@@ -1,0 +1,6 @@
+Pi 0.87.1, provider openai-codex, model gpt-5.3-codex-spark
+Operator-supplied error text, 2026-09-29, from a Cats Desktop 0.5.6 turn that selected this row:
+
+Failed to route the message to Orchestrator: cats.runtime.message.send rejected: E_PRECHECK_FAILED Codex error: The 'gpt-5.3-codex-spark' model is not supported when using Codex with a ChatGPT account.
+
+No account identifiers were present in the message.

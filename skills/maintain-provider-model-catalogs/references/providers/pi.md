@@ -28,8 +28,10 @@ the built-in `DEFAULT_THINKING_LEVEL` and hashes every file it read. It never re
 settings. `--store` compares Pi's local model store by id. Its offline suite is
 `node --test skills/maintain-provider-model-catalogs/tests/extract-pi-models.node-test.mjs`.
 
-- The channel list is Pi's build-time catalog, not account entitlement. Compare it with the same
-  account's Codex CLI list and ask the operator about a row that account does not offer.
+- The channel list is Pi's build-time catalog, not account entitlement, and it can lag the backend:
+  Pi 0.87.1 still listed `gpt-5.3-codex-spark` after ChatGPT accounts stopped accepting it ("not
+  supported when using Codex with a ChatGPT account"). Compare it with the same account's Codex CLI
+  list; a row that list does not offer is a likely rejection, so ask the operator before keeping it.
 - Pi's model selector draws `<id> [provider]`, puts the current and a configured default model
   first, then keeps registry order. It marks only a user-configured `defaultModel` (` · default`),
   so a factory catalog has no default row.
