@@ -1,3 +1,4 @@
+import { stopFencedPluginRuns } from './http/routes/managedPlugins.js';
 import { once } from 'node:events';
 import { ImageGenerationService } from './core/media/ImageGenerationService.js';
 import { executeGrokImage } from './backends/cli/media/grokImage.js';
@@ -780,6 +781,7 @@ export function createDiscoveryController(
       }
 
       // Goose enumeration executes the provider CLI (including per-session
+      timers.push(setInterval(() => { void stopFencedPluginRuns(ctx).catch(error => console.warn('[managed-plugins]', String(error))); }, 1000));
       // exports). Keep it available through explicit discovery, never timers.
     },
     stop() {

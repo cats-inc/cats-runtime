@@ -24,6 +24,8 @@ export interface WorkerProcessEvents {
   event: [StreamEvent];
   error: [Error];
   exit: [number | null, NodeJS.Signals | null];
+  'process-stopped': [];
+  'native-session': [string];
   ready: [];
 }
 
@@ -62,6 +64,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   private launchFailureRefusal: RuntimeProviderRefusal | null = null;
   private launchResponseObserved = false;
   private lastLaunchSummary = '';
+  private ownedProcessStarted = false;
+  get startupHasOwnedProcess(): boolean { return this.ownedProcessStarted; }
   private spawnResilience: SpawnResilienceConfig;
 
   constructor(
@@ -69,6 +73,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     spawnOpts: ProviderSpawnOptions,
     commandConfig: ProviderCommandConfig,
     spawnResilience: SpawnResilienceConfig = { retries: 1, timeoutMs: 30_000 },
+    private readonly managedPluginExecution = false,
   ) {
     super();
     this.provider = provider;
@@ -81,6 +86,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     if (this.provider.ephemeral) return !this._ephemeralKilled;
     return this.starting !== null || (this.process !== null && this.process.exitCode === null);
   }
+  get managedPluginLifetime(): boolean { return this.managedPluginExecution; }
 
   get busy(): boolean {
     return this.isBusy;
@@ -92,6 +98,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   }
 
   private spawnProcess(): void {
+    if (this.managedPluginExecution && this.launchGeneration > 0) throw new Error('Managed Plugin worker restart requires a fresh execution receipt.');
     const generation = ++this.launchGeneration;
     this.startupController?.abort();
     this.startupController = null;
@@ -114,9 +121,14 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     delete env.CLAUDECODE;
 
     const spawnConfig = this.resolveSpawnConfig(args);
+    if (this.managedPluginExecution && (this.commandConfig.runtime.mode !== 'native' || spawnConfig.shell
+      || /(?:^|[/\\])(?:cmd|powershell|pwsh|bash|sh|wsl|docker)(?:\.exe)?$/i.test(spawnConfig.command))) {
+      throw new Error('Managed Plugin pilot requires a direct native CLI executable.');
+    }
     if (spawnConfig.env) {
       Object.assign(env, spawnConfig.env);
     }
+    delete env.CATS_PLUGIN_MANAGEMENT_KEY;
     this.stderrLines = [];
     this.launchFailureRefusal = null;
     this.launchResponseObserved = false;
@@ -130,16 +142,21 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     this.startupError = null;
     const hostPath = windowsCodexHostPath(spawnConfig, this.provider.name);
     if (hostPath) {
+      this.ownedProcessStarted = true;
       const controller = new AbortController();
       this.startupController = controller;
-      const starting = startWindowsCodexHost(spawnConfig, hostPath, env, controller.signal)
+      const startupClosures: Promise<void>[] = [];
+      let cliLaunchAttempted = false;
+      const starting = startWindowsCodexHost(spawnConfig, hostPath, env, controller.signal, closed => startupClosures.push(closed))
         .then((host) => {
+          if (host) startupClosures.push(host.closed);
           if (controller.signal.aborted || generation !== this.launchGeneration) {
             host?.stop();
             throw new Error('Codex startup cancelled.');
           }
           this.codeModeHost = host;
           if (host) spawnConfig.args = [...spawnConfig.args, '--code-mode-host', host.url];
+          cliLaunchAttempted = true;
           this.launchProcess(spawnConfig, env);
           if (host) void host.closed.then(() => {
             if (this.codeModeHost !== host) return;
@@ -155,6 +172,9 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       // Pool startup is synchronous; streamMessage awaits the same promise.
       // Observe rejection even if the caller never sends a turn.
       void starting.catch((error: Error) => {
+        // Failure before CLI launch still owns any probe/guard children. Wait
+        // for all their real close events; promise rejection is not stop proof.
+        if (!cliLaunchAttempted) void Promise.all(startupClosures).then(() => this.emit('process-stopped'));
         if (generation !== this.launchGeneration) return;
         this.stopCodeModeHost();
         this.startupError = error;
@@ -167,6 +187,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   }
 
   private launchProcess(spawnConfig: ProcessSpawnConfig, env: NodeJS.ProcessEnv): void {
+    const ownedCodeModeHost = this.codeModeHost;
+    this.ownedProcessStarted = true;
     const child = spawn(spawnConfig.command, spawnConfig.args, {
       cwd: spawnConfig.cwd ?? this.spawnOpts.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -203,6 +225,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         for (const event of events) {
           this.launchResponseObserved = true;
           if (isSessionIdentityEvent(event) && event.sessionId) {
+            try { this.emit('native-session', event.sessionId); }
+            catch (error) { child.kill('SIGTERM'); this.emit('error', error instanceof Error ? error : new Error(String(error))); return; }
             this._providerSessionId = event.sessionId;
           }
           // If provider has pending messages after init, send them
@@ -243,6 +267,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     });
 
     child.on('close', (code, signal) => {
+      if (ownedCodeModeHost && ownedCodeModeHost !== this.codeModeHost) ownedCodeModeHost.stop();
+      void Promise.resolve(ownedCodeModeHost?.closed).then(() => this.emit('process-stopped'));
       if (this.process !== child) return;
       this.stopCodeModeHost();
       this.activeTurnController?.abort();

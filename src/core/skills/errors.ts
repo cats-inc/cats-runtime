@@ -3,6 +3,7 @@ export class RuntimeSkillError extends Error {
     message: string,
     readonly code:
       | 'unknown_skill'
+      | 'managed_plugin_conflict'
       | 'invalid_skill_package'
       | 'invalid_skill_manifest'
       | 'strict_skill_delivery_unavailable'

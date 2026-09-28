@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { parse as parseYaml } from 'yaml';
 import { RuntimeSkillError } from './errors.js';
 import { canDeliverSkillsToWorktree } from './worktreeDelivery.js';
+import { resolveManagedPluginSkills, managedPluginInstructions } from './managedPlugins.js';
 export { RuntimeSkillError } from './errors.js';
 import {
   assertReleaseWorkspace, contentConflict, fingerprintPreviewSkillPackage, getRuntimeSkillContentPolicy, isPreviewSkillPath,
@@ -1324,6 +1325,8 @@ export function resolveRuntimeSkillManifest(
   const skillsRoot = options.skillsRoot ?? SKILLS_ROOT;
   const contentPolicy = getRuntimeSkillContentPolicy(skillsRoot);
   assertReleaseWorkspace(options.cwd, contentPolicy);
+  const managed = resolveManagedPluginSkills(manifest, options);
+  if (managed) return managed;
   if (!manifest) {
     return undefined;
   }
@@ -1419,6 +1422,7 @@ function rebuildRuntimeSkillPackages(
 export function buildRuntimeSkillInstructionOverlay(
   skillState: SessionSkillState | undefined,
 ): string | undefined {
+  if (skillState?.managedPlugin) return managedPluginInstructions(skillState);
   if (!skillState || skillState.delivery.mode !== 'instructions' || skillState.appliedSkillIds.length === 0) {
     return undefined;
   }

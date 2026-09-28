@@ -1127,6 +1127,7 @@ async function hydrateSessionForTarget(
   options: {
     trigger: 'create' | 'resume' | 'fork' | 'message';
     sessionId: string;
+    sourceSessionId?: string;
     providerTarget: ProviderTargetDescriptor;
     cwd: string;
     workspace?: SessionWorkspaceState;
@@ -1142,6 +1143,7 @@ async function hydrateSessionForTarget(
   return hydrateSessionState({
     trigger: options.trigger,
     sessionId: options.sessionId,
+    sourceSessionId: options.sourceSessionId,
     providerName: options.providerTarget.providerName,
     providerBackend: options.providerTarget.backend,
     runtimeCwd: options.cwd,
@@ -4661,6 +4663,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   try {
     const hydrated = await hydrateSessionForTarget(ctx, {
       trigger: 'fork',
+      sourceSessionId: session.id,
       sessionId: forkId,
       providerTarget: childTarget,
       cwd: forkCwd,

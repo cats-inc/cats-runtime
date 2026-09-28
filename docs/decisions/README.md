@@ -1,5 +1,8 @@
 # Architecture Decision Records (ADR)
 
+- [ADR-043: Managed Plugin skills](043-admit-managed-plugin-skills.md) — accepted
+  for the internal Agency content pilot, 2026-09-29.
+
 > This directory contains Architecture Decision Records for documenting significant technical decisions.
 
 ## Purpose

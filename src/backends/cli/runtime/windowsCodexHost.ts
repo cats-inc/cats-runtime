@@ -52,6 +52,7 @@ const supportCache = new Map<string, boolean>();
 /** Capability probe, never a version allowlist. Failed probes remain retryable. */
 async function supportsExternalHost(
   config: ProcessSpawnConfig, host: string, env: NodeJS.ProcessEnv, signal: AbortSignal,
+  observeProcess?: (closed: Promise<void>) => void,
 ): Promise<boolean> {
   const stamp = (path: string) => {
     const stat = statSync(path);
@@ -61,9 +62,10 @@ async function supportsExternalHost(
   const cached = supportCache.get(key);
   if (cached !== undefined) return cached;
   const help = (command: string, args: string[]) => new Promise<string>((resolve, reject) => {
-    execFile(command, args, {
+    const probe = execFile(command, args, {
       cwd: config.cwd, env, windowsHide: true, timeout: 5_000, maxBuffer: 256 * 1024, signal,
     }, (error, stdout) => error ? reject(error) : resolve(stdout));
+    observeProcess?.(new Promise<void>(resolveClosed => probe.once('close', () => resolveClosed())));
   });
   try {
     const serverHelp = await help(config.command, ['app-server', '--help']);
@@ -83,17 +85,18 @@ export async function startWindowsCodexHost(
   hostPath: string,
   env: NodeJS.ProcessEnv,
   signal: AbortSignal,
+  observeProcess?: (closed: Promise<void>) => void,
 ): Promise<ManagedCodexHost | null> {
   signal.throwIfAborted();
-  if (!await supportsExternalHost(config, hostPath, env, signal)) return null;
+  if (!await supportsExternalHost(config, hostPath, env, signal, observeProcess)) return null;
   signal.throwIfAborted();
   const guard = spawn(process.execPath, ['-e', CODEX_HOST_GUARD, hostPath, '--listen', 'grpc://127.0.0.1:0'], {
     cwd: config.cwd, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, shell: false,
   });
-  return waitForHost(guard, signal);
+  return waitForHost(guard, signal, observeProcess);
 }
 
-function waitForHost(guard: ChildProcess, signal: AbortSignal): Promise<ManagedCodexHost> {
+function waitForHost(guard: ChildProcess, signal: AbortSignal, observeProcess?: (closed: Promise<void>) => void): Promise<ManagedCodexHost> {
   return new Promise((resolve, reject) => {
     let ready = false;
     let stopped = false;
@@ -101,6 +104,7 @@ function waitForHost(guard: ChildProcess, signal: AbortSignal): Promise<ManagedC
     let diagnostics = '';
     let resolveClosed!: () => void;
     const closed = new Promise<void>((resolve) => { resolveClosed = resolve; });
+    observeProcess?.(closed);
     const stop = () => {
       if (stopped) return;
       stopped = true;
@@ -122,7 +126,7 @@ function waitForHost(guard: ChildProcess, signal: AbortSignal): Promise<ManagedC
     signal.addEventListener('abort', abort, { once: true });
     if (signal.aborted) abort();
     guard.stdin?.on('error', (error) => fail(error));
-    guard.on('error', (error) => { fail(error); resolveClosed(); });
+    guard.on('error', fail);
     guard.on('close', () => {
       fail(new Error(`Codex Code Mode host exited${diagnostics ? `: ${diagnostics.trim()}` : '.'}`));
       resolveClosed();

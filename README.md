@@ -78,6 +78,11 @@ Current capabilities:
 
 ## Current Status
 
+- Internal Agency managed skills now have authenticated registration, expiring
+  leases and durable context/process fencing. This is a default-off content pilot;
+  see [SPEC-034](docs/specs/SPEC-034-managed-plugin-skills.md). No general Plugin SDK
+  or provider adapter is implied.
+
 Studio image execution (2026-09-28): authenticated bounded native Grok image jobs
 now use durable receipts, verified JPEG collection and shared admission/metering.
 Restart/read recovery never regenerates. Isolated process/service tests passed;

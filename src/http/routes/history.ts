@@ -79,7 +79,7 @@ function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
   const strategyRequest = readRuntimeExecutionStrategyRequest(session);
   const strategyState = readRuntimeExecutionStrategyState(session);
   const dashboardInstructions = ctx.config.dashboardShowSessionDetails
-    ? mergeRuntimeInstructionLayers(session.skills, session.instructions)
+    ? (session.skills?.managedPlugin ? session.instructions : mergeRuntimeInstructionLayers(session.skills, session.instructions))
     : undefined;
   return {
     sessionDetailsEnabled: ctx.config.dashboardShowSessionDetails,

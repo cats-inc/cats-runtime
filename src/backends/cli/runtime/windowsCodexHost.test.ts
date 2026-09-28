@@ -30,7 +30,9 @@ describe('managed Windows Codex host', () => {
     guard = mockGuard();
     spawnMock.mockReturnValue(guard);
     execFileMock.mockImplementation((_command, _args, _options, callback) => {
-      queueMicrotask(() => callback(null, '--code-mode-host URL; grpc://IP:PORT'));
+      const probe = new EventEmitter();
+      queueMicrotask(() => { callback(null, '--code-mode-host URL; grpc://IP:PORT'); probe.emit('close', 0); });
+      return probe;
     });
   });
   afterEach(() => { vi.clearAllMocks(); rmSync(root, { recursive: true, force: true }); });
@@ -77,13 +79,17 @@ describe('managed Windows Codex host', () => {
 
   it('cleans a helper cancelled before readiness', async () => {
     const controller = new AbortController();
-    const result = startWindowsCodexHost(config, host, {}, controller.signal);
+    const lifetimes: Promise<void>[] = [];
+    const result = startWindowsCodexHost(config, host, {}, controller.signal, closed => lifetimes.push(closed));
     const check = expect(result).rejects.toThrow('startup cancelled');
     await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledOnce());
     controller.abort();
     await check;
     expect(guard.stdin.writableEnded).toBe(true);
+    const stopped = vi.fn(); void Promise.all(lifetimes).then(stopped);
+    await Promise.resolve(); expect(stopped).not.toHaveBeenCalled();
     guard.emit('close', 0);
+    await vi.waitFor(() => expect(stopped).toHaveBeenCalledOnce());
   });
 
   it('reports a crashed host during startup', async () => {

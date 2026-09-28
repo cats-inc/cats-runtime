@@ -1,3 +1,4 @@
+import { assertManagedPluginContext } from './managedPlugins.js';
 import { createHash } from 'node:crypto';
 import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeSync } from 'node:fs';
 import path from 'node:path';
@@ -206,6 +207,7 @@ export function assertRetainedSkillContent(input: {
   sessionBaseDir?: string;
   sessionId?: string;
 }): void {
+  if (input.sessionBaseDir && input.sessionId) assertManagedPluginContext(input.sessionBaseDir, input.sessionId, input.skills);
   assertReleaseWorkspace(input.cwd, input.policy);
   if (input.policy.profile === 'release'
     && (readSkillContentProvenance(input.hydration)?.releaseCompatible !== true

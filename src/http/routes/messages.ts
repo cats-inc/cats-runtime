@@ -707,11 +707,15 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     ? metering.createWarningProgressEvent(executionSession, preflight)
     : undefined;
 
-  const startedRun = runtime.beginRun(
-    executionSession,
-    turnInput,
-    preflight.outcome === 'warned' ? { guardrail: preflight } : {},
-  );
+  let startedRun: ReturnType<typeof runtime.beginRun>;
+  try {
+    startedRun = runtime.beginRun(executionSession, turnInput,
+      preflight.outcome === 'warned' ? { guardrail: preflight } : {});
+  } catch (error) {
+    const skillError = toRuntimeSkillErrorResponse(error);
+    if (skillError) return c.json(skillError.body, skillError.status);
+    throw error;
+  }
   ctx.registry.updateStatus(id, 'busy');
 
   let peerHandle: ManagedExecutionHandle | undefined;

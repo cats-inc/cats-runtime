@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { bindManagedNativeIdentity } from '../../../core/skills/managedPlugins.js';
 import { invalidateSkillContentProvenance } from '../../../core/skills/contentPolicy.js';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -411,9 +412,10 @@ export class SessionRegistry {
     return true;
   }
 
-  setProviderSessionId(id: string, providerSessionId: string): boolean {
+  setProviderSessionId(id: string, providerSessionId: string, freshNative = false): boolean {
     const session = this.sessions.get(id);
     if (!session) return false;
+    if (this.sessionBaseDir) bindManagedNativeIdentity(this.sessionBaseDir, session, providerSessionId, freshNative);
     const previousProviderSessionId = session.providerSessionId;
     session.providerSessionId = providerSessionId;
     if (previousProviderSessionId && previousProviderSessionId !== providerSessionId) {

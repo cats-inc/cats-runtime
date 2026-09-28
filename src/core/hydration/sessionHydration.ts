@@ -13,6 +13,7 @@ import type {
   WorkspaceSubstrateProfileId,
 } from '../types.js';
 import { resolveRuntimeSkillManifest } from '../skills/catalog.js';
+import { assertManagedPluginContext, inheritManagedPluginContext, hasManagedPluginExposure } from '../skills/managedPlugins.js';
 import {
   assertReleaseWorkspace, assertRetainedSkillContent, getRuntimeSkillContentPolicy,
   hasPreviewSkillContent, hasPreviewWorkspaceContent, hasRecordedPreviewExposure,
@@ -32,6 +33,7 @@ export interface WorkspaceHydrationSubstrateService {
 export interface HydrateSessionStateInput {
   trigger: SessionHydrationState['trigger'];
   sessionId: string;
+  sourceSessionId?: string;
   providerName: string;
   providerBackend: ProviderBackend;
   runtimeCwd: string;
@@ -70,7 +72,7 @@ export function buildRuntimeSkillManifestFromState(
 
   return {
     ...(skillState.profileId ? { profileId: skillState.profileId } : {}),
-    requestedSkills: skillState.requestedSkillRefs?.length
+    requestedSkills: skillState.managedPlugin ? skillState.resolvedSkills.map(skill => ({ id: skill.id, version: skill.version, fingerprint: skill.fingerprint })) : skillState.requestedSkillRefs?.length
       ? skillState.requestedSkillRefs.map((skillRef) => {
           // Re-entry should preserve identity/family, but not pin sessions to a
           // historical package fingerprint or version that may drift after a
@@ -98,7 +100,11 @@ export async function hydrateSessionState(
   const now = (input.now ?? new Date()).toISOString();
   const contentPolicy = getRuntimeSkillContentPolicy();
   const previousContent = readSkillContentProvenance(input.existingHydration);
-  const sourceSessionId = input.trigger === 'fork' ? previousContent?.sessionId : input.sessionId;
+  const sourceSessionId = input.trigger === 'fork' ? input.sourceSessionId ?? previousContent?.sessionId : input.sessionId;
+  if (sourceSessionId) {
+    assertManagedPluginContext(input.sessionBaseDir, sourceSessionId, input.existingSkills);
+    if (input.trigger === 'fork') inheritManagedPluginContext(input.sessionBaseDir, sourceSessionId, input.sessionId);
+  }
   const inheritedExposure = sourceSessionId
     && hasRecordedPreviewExposure(input.sessionBaseDir, sourceSessionId);
   if (input.trigger !== 'create' || input.existingHydration || input.existingSkills) {
@@ -118,6 +124,7 @@ export async function hydrateSessionState(
   const metadata = {
     ...mergeHydrationMetadata(input.existingHydration?.metadata, input.metadata),
     // Caller metadata cannot grant clean provenance or erase earlier exposure.
+    managedPluginExposure: hasManagedPluginExposure(input.sessionBaseDir, input.sessionId),
     runtimeSkillContent: {
       schemaVersion: 1, sessionId: input.sessionId, profile: contentPolicy.profile,
       policyFingerprint: contentPolicy.fingerprint,
