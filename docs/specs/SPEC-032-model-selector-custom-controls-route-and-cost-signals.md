@@ -28,6 +28,9 @@ this spec addresses:
    expressed today. Only some CLIs parse settings out of the model string itself.
 2. **The routing channel is invisible or inconsistent.** Pi labels show `[openai-codex]`,
    but Goose labels do not show `chatgpt_codex`. The channel decides account and billing.
+   Since 2026-09-29 this gap is covered by the
+   [SPEC-031 basis amendment](./SPEC-031-provider-catalog-data-and-local-overrides.md#amendment-2026-09-29-catalog-basis):
+   a read-only, scope-level Basis field. It is not a selector, so the non-goal below holds.
 3. **Cost and data-use variants look like any other row.** Examples: fast rows, 1M
    context, Muse `-contributor` and Cursor "(NO ZDR)" models.
 4. **Every CLI catalog shows a disabled Mode field.** None of the 16 CLI catalogs define

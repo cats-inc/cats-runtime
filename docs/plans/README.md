@@ -1,5 +1,7 @@
 # Implementation Plans
 
+- [PLAN-045: Catalog basis (channel and plan)](PLAN-045-catalog-basis-channel-and-plan.md) —
+  Runtime then Platform delivery of the SPEC-031 basis amendment.
 - [PLAN-044: Managed Plugin skills](PLAN-044-managed-plugin-skills.md) — internal
   Agency host integration and validation; publication remains separate.
 
@@ -53,6 +55,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
+| [PLAN-045](./PLAN-045-catalog-basis-channel-and-plan.md) | Catalog Basis (Channel and Plan) | Approved — not started | [SPEC-031](../specs/SPEC-031-provider-catalog-data-and-local-overrides.md#amendment-2026-09-29-catalog-basis) |
 | [PLAN-042](./PLAN-042-model-selector-custom-controls-route-and-cost-signals.md) | Model Selector Custom Controls, Route Display and Cost Signals | On Hold — not approved; waiting for SPEC-032 approval | [SPEC-032](../specs/SPEC-032-model-selector-custom-controls-route-and-cost-signals.md) |
 | [PLAN-040](./PLAN-040-provider-catalog-data-and-local-overrides.md) | Provider Catalog Data and Local Overrides | Completed — implementation CI passed; release separate | [SPEC-031](../specs/SPEC-031-provider-catalog-data-and-local-overrides.md), [ADR-040](../decisions/040-use-data-driven-provider-catalogs-and-local-overrides.md) |
 | [PLAN-039](./PLAN-039-provider-selection-bootstrap-rollout.md) | Provider Selection Bootstrap Rollout | Runtime UX accepted; integrated and native packaged acceptance in progress | [SPEC-030](../specs/SPEC-030-provider-selection-before-bootstrap-probes.md), [ADR-039](../decisions/039-use-selected-provider-config-as-the-resource-boundary.md) |

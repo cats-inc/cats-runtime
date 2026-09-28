@@ -94,6 +94,15 @@ Pi's thinking selector marks. Other Pi providers remain custom input and out of 
 in [the Pi channel note](../research/2026-09-27-pi-openai-codex-full-catalog.md). Full expansion
 of the remaining shortlists is deferred. Membership of the other groups is unchanged.
 
+**2026-09-29 basis amendment:** a scope records its routing channel or account plan as
+`basis` only with evidence, as defined in the
+[SPEC-031 basis amendment](./SPEC-031-provider-catalog-data-and-local-overrides.md#amendment-2026-09-29-catalog-basis).
+Multi-channel hosts record the channel their entries use; a plan is recorded only where
+the CLI itself states that entitlement depends on it. First-party lists that change
+through remote updates get no basis; a new capture handles them. A refresh re-checks
+`basis` like any other scope field. Pi labels drop the `[openai-codex]` suffix, which
+the Basis field now shows.
+
 The full-catalog group has no six-model cap. The shortlist may contain fewer than six models;
 effort choices remain attached to their model and custom input does not consume a model slot.
 Both surfaces shall follow the same policy. Existing evidence, exact-label, per-model applicability,
