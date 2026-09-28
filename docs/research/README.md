@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-09-29-cli-provider-branches-outside-adapters](./2026-09-29-cli-provider-branches-outside-adapters.md) | Where CLI provider knowledge leaks out of the adapters | 238 name checks by layer, the native-session, per-provider service and skill-delivery clusters, what to leave alone, a candidate capability shape and when to pick it up; not scheduled |
 | [2026-09-28-kiro-v2-ignores-model](./2026-09-28-kiro-v2-ignores-model.md) | Kiro 2.24 v2 engine ignores `--model` | Truthful session records, the `Method not found` warning, four engine probes and the move to `--agent-engine v1` |
 | [2026-09-28-junie-windows-stdio-encoding](./2026-09-28-junie-windows-stdio-encoding.md) | Junie output mojibake on Windows | CP950 stdout/stderr from Junie's JVM decoded as UTF-8, the `JAVA_TOOL_OPTIONS` fix, the argv loss of non-CP950 characters fixed by sending the task over stdin, and failed tasks reported with Junie's message instead of an empty reply |
 | [2026-09-28-junie-execution-ids](./2026-09-28-junie-execution-ids.md) | Junie `--model` takes setting IDs | Picker names rejected as an invalid model, the JAR's resolution order, all 15 rows remapped to setting IDs and the reusable setting-ID reader |
