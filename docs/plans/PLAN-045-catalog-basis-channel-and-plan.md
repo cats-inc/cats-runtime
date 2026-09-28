@@ -35,17 +35,24 @@ information-icon follow-up.
 
 ## Phase 2: Platform (after Phase 1 merges)
 
-- [ ] Types: accept `basis` on the consumed advanced catalog (`src/shared/providerCatalog.ts`).
-- [ ] Desktop selector: an information icon beside the Model label, reusing the product tooltip
+- [x] Types: accept `basis` on the consumed advanced catalog (`src/shared/providerCatalog.ts`).
+- [x] Desktop selector: an information icon beside the Model label, reusing the product tooltip
       portal, with its tooltip text in `en` and `zh-TW`; focusable, nothing when `basis` is absent,
       and custom input unchanged.
-- [ ] Fixture: `tests/fixtures/catalogs-v2.json` gains only `basis` in the `advanced` objects of
+- [x] Fixture: `tests/fixtures/catalogs-v2.json` gains only `basis` in the `advanced` objects of
       Pi, Goose, Cline, OpenCode, Kilo and Copilot. No other fixture data changes; its models,
       labels and controls stay frozen. Update the comment in `tests/helpers/catalogFixture.js`
       to say so.
-- [ ] Tests: the basis icon renders with its tooltip, stays absent without data and is not
-      submitted with the selection (`tests/provider-model-fields.test.tsx` and neighbours).
-- [ ] Packaging: Desktop builds against a Runtime revision that contains Phase 1.
+- [x] Tests: the basis icon renders with its tooltip, stays absent without data and is not
+      submitted with the selection (`tests/provider-model-basis-info.test.tsx`, with focus and
+      tap coverage in `tests/tooltip-portal.test.tsx`).
+- [ ] Packaging: Desktop builds against a Runtime revision that contains Phase 1. Pending the
+      next Desktop release, whose `runtime_ref` must be at or after `aebfe05`.
+
+Phase 2 delivered through
+[cats-platform PR #169](https://github.com/cats-inc/cats-platform/pull/169). The Desktop icon
+is a focusable image rather than a button, because a button inside the Model label would
+become the label's control and take the select's accessible name.
 
 ## Scope and validation
 
