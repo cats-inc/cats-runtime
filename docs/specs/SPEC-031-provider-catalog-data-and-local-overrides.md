@@ -9,6 +9,7 @@
 | Reviewer | User |
 | Decision | [ADR-040](../decisions/040-use-data-driven-provider-catalogs-and-local-overrides.md) |
 | Plan | [PLAN-040](../plans/PLAN-040-provider-catalog-data-and-local-overrides.md) |
+| Amendment | 2026-09-29 [catalog basis](#amendment-2026-09-29-catalog-basis), approved; [PLAN-045](../plans/PLAN-045-catalog-basis-channel-and-plan.md) |
 
 ## Summary and Goals
 
@@ -300,6 +301,66 @@ Runtime and parent workspace `.agents` and `.claude` copies and verify equality.
 Do not advertise proposed commands or schema support in an active skill before
 their implementation lands. Update the skill in the same cutover delivery.
 
+## Amendment 2026-09-29: Catalog Basis
+
+Approved by the owner on 2026-09-29. Implementation is tracked in
+[PLAN-045](../plans/PLAN-045-catalog-basis-channel-and-plan.md).
+
+Some menus were captured through one routing channel of a multi-channel CLI, or from
+one account plan. Both selectors now say so, read-only, from catalog data. The
+channel evidence is the
+[model-setting survey](../research/2026-09-26-cli-model-setting-dimensions.md); the
+plan evidence is the
+[Copilot picker capture](../research/2026-09-27-copilot-picker-full-catalog.md).
+
+### FR-8: Basis data
+
+- A schema-2 scope may carry an optional `basis` object with two independent fields:
+  - `channel: { id, label }`: the routing channel inside the CLI host that every
+    entry runs through. `id` is the executable value; `label` is the name the CLI
+    itself shows (for example `openai-codex`, `chatgpt_codex`, `cline-pass`,
+    `opencode-go`, `kilo`).
+  - `plan: { label }`: the account plan the list was captured with, only where the
+    CLI itself states that entitlement depends on it (for example `Copilot Pro`,
+    whose picker marks other rows "Your plan doesn't include this model").
+- Record `basis` only with evidence, and omit it otherwise. Placeholder values such
+  as "default" or "not recorded" are invalid. The first-party CLIs (Claude, Codex,
+  Antigravity, Grok and Muse) omit it: their lists change through remote updates,
+  which a new capture handles, not a plan or channel. Single-channel resellers
+  without plan evidence also omit it.
+- Validation rejects an empty label, a `basis` with neither field, and a
+  `basis.channel.id` that differs from any entry's executable channel. An entry's
+  executable channel is `execution.provider` when present, otherwise the segment of
+  `execution.model` before its first `/`.
+- Initial data: `channel` for Pi (`openai-codex`), Goose (`chatgpt_codex`), Cline
+  (`cline-pass`), OpenCode (`opencode-go`) and Kilo (`kilo`); `plan` for Copilot
+  (`Copilot Pro`). Evidence stays in the scope's `notes`.
+
+### FR-9: Basis display
+
+- The advanced catalog result, including the local host projection, carries
+  `basis` unchanged. The basic model list is unchanged. A missing `basis` means
+  the selectors show nothing.
+- Playground and Desktop show one read-only Basis field (依據) beside the model
+  choice: a disabled control holding the channel label, or the plan label when there
+  is no channel, and both when a scope ever has both. An explanation line says the
+  list reflects that channel or plan and that other channels remain reachable as
+  custom input.
+- The field is never a selector. It has no alternative options, never shows a
+  synthetic default, and is not sent as a model control.
+- Custom `provider/model` input stays available beside it.
+- Entry labels need not repeat the channel. By the owner's 2026-09-29 decision, Pi
+  labels drop the `[openai-codex]` suffix required on 2026-09-23; the earlier
+  spellings stay in `source_names`.
+
+### Compatibility
+
+`basis` is an additive, optional scope field inside schema 2, so the schema version
+does not change and catalogs without it stay valid. An older Runtime rejects a
+personal override that uses the field; under the pre-release policy no compatibility
+shim is added. The field changes display only: selection, execution arguments and
+saved selections are unaffected.
+
 ## Acceptance Scenarios
 
 | ID | Scenario and required result |
@@ -319,6 +380,10 @@ their implementation lands. Update the skill in the same cutover delivery.
 | AC-13 | Generation/check fails when a derivative is edited or a production model table returns; intentional fixtures/evidence remain permitted |
 | AC-14 | A fresh agent follows the updated canonical/mirrored skill to perform factory and local fixture changes; no manual production model literals or unsupported capability claims |
 | AC-15 | A packaged Runtime upgrades a previous-release profile before its first model read, preserves all choices with a raw backup, performs no duplicate conversion after restart, and supports explicit retry after a blocked conversion; read-only hosts do not write |
+| AC-16 | Pi, Goose, Cline, OpenCode and Kilo show their channel; Copilot shows its plan; first-party scopes show no Basis field; Playground and Desktop agree |
+| AC-17 | `catalog:check` rejects an empty basis label, a basis with neither field, and a channel id that differs from any entry's executable channel |
+| AC-18 | The Basis field is disabled with one option, is not submitted as a model control, and custom `provider/model` input still works beside it |
+| AC-19 | Selection, spawned arguments and saved selections are identical with and without `basis` |
 
 All execution assertions use isolated fake transports; no user-state sessions,
 authentication, or inference quota are required. Native packaging results must be
@@ -331,4 +396,4 @@ reported per OS; documentation alone is not execution/packaging validation.
 - [Selected-provider boundary](./SPEC-030-provider-selection-before-bootstrap-probes.md)
 - [Platform selector contract](../../../cats-platform/docs/specs/SPEC-013-provider-catalog-consumption-and-ui-seam.md)
 
-*Last updated: 2026-09-23*
+*Last updated: 2026-09-29*
