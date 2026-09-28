@@ -346,8 +346,9 @@ plan evidence is the
   when there is no channel, and both when a scope ever has both. It says the list
   reflects that channel or plan and that other channels remain reachable as custom
   input. (Owner decision 2026-09-29, replacing the first design's disabled field.)
-- The icon is a focusable button with an accessible name, so the tooltip also appears
-  on keyboard focus and on tap. It is never a selector, never shows a synthetic
+- The icon is focusable and has an accessible name, so the tooltip also appears on
+  keyboard focus and on tap. Playground uses a button; Desktop uses a focusable image,
+  because a button inside its Model label would take over the select's name. It is never a selector, never shows a synthetic
   default, and is not sent as a model control.
 - Custom `provider/model` input stays available.
 - Entry labels need not repeat the channel. By the owner's 2026-09-29 decision, Pi
@@ -383,7 +384,7 @@ saved selections are unaffected.
 | AC-15 | A packaged Runtime upgrades a previous-release profile before its first model read, preserves all choices with a raw backup, performs no duplicate conversion after restart, and supports explicit retry after a blocked conversion; read-only hosts do not write |
 | AC-16 | Pi, Goose, Cline, OpenCode and Kilo show their channel; Copilot shows its plan; first-party scopes show no basis icon; Playground and Desktop agree |
 | AC-17 | `catalog:check` rejects an empty basis label, a basis with neither field, and a channel id that differs from any entry's executable channel |
-| AC-18 | The basis icon is a focusable button whose tooltip appears on hover and focus, is not submitted as a model control, and custom `provider/model` input still works |
+| AC-18 | The basis icon is focusable, its tooltip appears on hover and focus, it is not submitted as a model control, and custom `provider/model` input still works |
 | AC-19 | Selection, spawned arguments and saved selections are identical with and without `basis` |
 
 All execution assertions use isolated fake transports; no user-state sessions,
