@@ -8,8 +8,8 @@ its fixtures in cats-runtime, not in this skill.
 Keep the selected provider attached to each model. A model-selector row such as
 `model-id [provider-id]` has three separate representations: its visible label,
 Cats' `provider-id/model-id` selection, and separate CLI provider/model arguments.
-Preserve the bracketed provider suffix; it distinguishes subscription routing from another
-provider offering the same model.
+The scope `basis.channel` shows the provider once, so labels are the bare model ids (operator
+decision 2026-09-29, replacing the `<id> [openai-codex]` labels of 2026-09-23).
 
 ## Evidence from the installed package
 
@@ -49,10 +49,10 @@ Do not launch `pi --list-models` for this: it loads account state and queues an 
 
 ## Schema-2 execution data
 
-Use qualified Cats `id` (`openai-codex/<id>`), the `<id> [openai-codex]` label, bare
-`execution.model` and explicit `execution.provider`. Each row carries its own `pi.thinking` enum with
-only its supported levels and `default` set to the thinking selector's default. Never send the
-display suffix to the CLI or derive a provider from a model family. Keep earlier shortlist labels in
+Use qualified Cats `id` (`openai-codex/<id>`), the bare `<id>` label, bare `execution.model`,
+explicit `execution.provider`, and `basis.channel { id: openai-codex, label: openai-codex }` on the
+scope. Each row carries its own `pi.thinking` enum with
+only its supported levels and `default` set to the thinking selector's default. Never derive a provider from a model family. Keep earlier labels, including the bracketed ones, in
 `source_names`.
 
 Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).

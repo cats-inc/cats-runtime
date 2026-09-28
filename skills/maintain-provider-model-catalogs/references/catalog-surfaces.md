@@ -31,6 +31,14 @@ Selectable `controls` carry token/label pairs and only evidenced `default`. Exha
 Preserve provenance in notes/source fields. The schema rejects unknown fields, unsupported
 bindings, duplicate IDs/defaults and incomplete/overlapping variants as one whole candidate.
 
+An optional scope `basis` records what the list was captured against, only with evidence:
+`basis.channel { id, label }` for the routing channel inside a multi-channel host, and
+`basis.plan { label }` where the CLI itself states that entitlement depends on the plan. `id`
+must equal every entry's executable channel (`execution.provider`, otherwise the segment of
+`execution.model` before its first `/`); `label` is the name the CLI shows. First-party lists
+that change through remote updates get no basis. Selectors show it read-only; entry labels need
+not repeat the channel. Re-check it on every refresh of the scope.
+
 ## Factory checks
 
 From the Runtime root:

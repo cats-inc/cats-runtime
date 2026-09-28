@@ -46,7 +46,8 @@ setting IDs, plus a separate per-model effort control;
 Auggie uses CLI-observed IDs and exact picker labels; its picker shows no effort, so it has no
 option controls;
 Goose uses provider-qualified IDs with fixed Thinking Off through its native model suffix;
-Pi retains bracketed provider labels plus a separate per-model thinking control and CLI argument.
+Pi uses bare model-id labels with its channel in the scope basis, plus a separate per-model
+thinking control and CLI argument.
 No scheduled refresh cadence or automated refresh job has been specified.
 
 ## Schema-2 data boundary
@@ -265,8 +266,8 @@ authorizes that external mutation.
   disambiguation, and entry-only shortlist wiring.
 
 - [Pi](./references/providers/pi.md): the full `openai-codex` channel read from the installed
-  package, bracketed subscription labels, per-model thinking levels with the selector's default, and
-  separate provider/model/thinking transport.
+  package, the channel as scope basis with bare labels, per-model thinking levels with the
+  selector's default, and separate provider/model/thinking transport.
 
 For providers without a reference, inspect the current adapter, discovery helper, catalog notes,
 and retained evidence. Add a provider reference only when a stable, non-obvious procedure is proven;

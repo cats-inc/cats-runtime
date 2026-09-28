@@ -159,7 +159,9 @@ describe('factory and executable catalog projections', () => {
       'openai-codex/gpt-5.6-terra', 'openai-codex/gpt-6-astra', 'openai-codex/gpt-6-luna',
       'openai-codex/gpt-6-sol',
     ]);
-    expect(pi.catalog.entries.every(e => /^gpt-[\w.-]+ \[openai-codex\]$/.test(e.label))).toBe(true);
+    // Labels are bare model ids; the openai-codex channel is shown once, as the scope basis.
+    expect(pi.catalog.entries.every(e => e.label === e.id.replace(/^openai-codex\//, ''))).toBe(true);
+    expect(pi.catalog.basis).toEqual({ channel: { id: 'openai-codex', label: 'openai-codex' } });
     // Pi's model selector marks no factory default model; its thinking selector marks medium.
     expect(pi.catalog.entries.some(e => e.default)).toBe(false);
     const spawn = (entryId: string, controls?: Record<string, string>) => {
@@ -175,6 +177,32 @@ describe('factory and executable catalog projections', () => {
     // Levels follow each model's thinkingLevelMap: gpt-6-astra has no off, gpt-5.5 no max.
     expect(() => spawn('openai-codex/gpt-6-astra', { 'pi.thinking': 'off' })).toThrow();
     expect(() => spawn('openai-codex/gpt-5.5', { 'pi.thinking': 'max' })).toThrow();
+  });
+
+  it('carries each recorded basis in the advanced catalog without changing selection or arguments', () => {
+    const scopeOf = (provider: string) => snapshot.document.catalogs.find(s => s.provider === provider && s.backend === 'cli')!;
+    const basisOf = (provider: string) => knowledge(scopeOf(provider)).catalog.basis;
+    expect(basisOf('pi')).toEqual({ channel: { id: 'openai-codex', label: 'openai-codex' } });
+    expect(basisOf('goose')).toEqual({ channel: { id: 'chatgpt_codex', label: 'chatgpt_codex' } });
+    expect(basisOf('cline')).toEqual({ channel: { id: 'cline-pass', label: 'cline-pass' } });
+    expect(basisOf('opencode')).toEqual({ channel: { id: 'opencode-go', label: 'opencode-go' } });
+    expect(basisOf('kilo')).toEqual({ channel: { id: 'kilo', label: 'kilo' } });
+    expect(basisOf('copilot')).toEqual({ plan: { label: 'Copilot Pro' } });
+    // First-party lists change through remote updates, not a channel or plan: no basis.
+    for (const provider of ['claude', 'codex', 'antigravity', 'grok', 'muse']) expect(basisOf(provider)).toBeUndefined();
+
+    // The field is display-only: the same selection spawns the same arguments without it.
+    const pi = scopeOf('pi');
+    const { basis: _basis, ...withoutBasis } = pi;
+    const spawn = (scope: CatalogScope) => {
+      const k = knowledge(scope);
+      const selected = resolveProviderSelection(k, { entryId: 'openai-codex/gpt-6-sol', entryMode: 'explicit',
+        controls: { 'pi.thinking': 'high' } });
+      return new PiProvider().buildSpawnArgs({ cwd: '/tmp', model: selected.execution.model,
+        modelProvider: selected.execution.provider, modelControls: selected.resolution.controls });
+    };
+    expect(spawn(pi)).toEqual(spawn(withoutBasis as CatalogScope));
+    expect(spawn(pi)).toEqual(['--mode', 'rpc', '--provider', 'openai-codex', '--model', 'gpt-6-sol', '--thinking', 'high']);
   });
 
   it('lists the Copilot Pro picker with Terra as default and first-value effort, context and tier', () => {

@@ -102,9 +102,36 @@ export function effectiveModelControls(scope: CatalogScope, model: CatalogModel)
   return [...merged.values()];
 }
 
+// A channel must be the one every entry actually runs through, so the display cannot drift
+// from the wire value: execution.provider when set, otherwise the model's first path segment.
+// An empty model list has no entry to contradict it, so the check passes by design.
+function validateBasis(raw: unknown, scope: CatalogScope, at: string): void {
+  const data = record(raw, at);
+  keys(data, ['channel', 'plan'], at);
+  if (data.channel === undefined && data.plan === undefined) throw new Error(`${at} needs a channel or a plan`);
+  if (data.plan !== undefined) {
+    const plan = record(data.plan, `${at}.plan`);
+    keys(plan, ['label'], `${at}.plan`);
+    text(plan.label, `${at}.plan.label`);
+  }
+  if (data.channel === undefined) return;
+  const channel = record(data.channel, `${at}.channel`);
+  keys(channel, ['id', 'label'], `${at}.channel`);
+  text(channel.id, `${at}.channel.id`);
+  text(channel.label, `${at}.channel.label`);
+  for (const model of scope.models) {
+    const { provider, model: executionModel } = model.execution;
+    const executable = provider ?? (executionModel.includes('/') ? executionModel.split('/')[0] : null);
+    if (executable === null) throw new Error(`${at}: '${model.id}' has no executable channel`);
+    if (executable !== channel.id) {
+      throw new Error(`${at}: channel '${channel.id}' does not match '${model.id}', which runs through '${executable}'`);
+    }
+  }
+}
+
 function validateScope(raw: unknown, at: string): CatalogScope {
   const data = record(raw, at);
-  keys(data, ['provider', 'backend', 'transport', 'selection_mode', 'source_cli', 'cli_version', 'last_updated', 'notes', 'shared_controls', 'models', 'presets'], at);
+  keys(data, ['provider', 'backend', 'transport', 'selection_mode', 'source_cli', 'cli_version', 'last_updated', 'notes', 'basis', 'shared_controls', 'models', 'presets'], at);
   text(data.provider, at);
   if (!/^[a-z][a-z0-9_-]*$/.test(data.provider)) throw new Error(`${at}: invalid provider family`);
   if (typeof data.backend !== 'string' || !['cli', 'api', 'local', 'agent'].includes(data.backend)) throw new Error(`${at}: invalid backend`);
@@ -187,6 +214,7 @@ function validateScope(raw: unknown, at: string): CatalogScope {
   }
   unique(scope.models.map(m => m.id), `${at}.models`);
   if (scope.models.filter(m => m.default).length > 1) throw new Error(`${at}: multiple model defaults`);
+  if (data.basis !== undefined) validateBasis(data.basis, scope, `${at}.basis`);
   if (data.presets !== undefined) {
     array(data.presets, `${at}.presets`);
     for (const rawPreset of data.presets) {

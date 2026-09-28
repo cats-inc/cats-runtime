@@ -95,6 +95,7 @@ export function buildProviderAdvancedKnowledge(
         manifestId: `${scope.provider}/${scope.backend}/${scope.transport ?? ''}`,
         manifestVersion: modelCatalog.catalogRevision } } : {}),
     },
+    ...(scope?.basis ? { basis: structuredClone(scope.basis) } : {}),
     warnings: [...modelCatalog.warnings],
   };
   return { target, catalog, supportTier, entryDefaults, scope, modelsById,

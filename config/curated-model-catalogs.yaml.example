@@ -1335,6 +1335,9 @@ catalogs:
     source_cli: Copilot
     cli_version: 1.0.88
     last_updated: 2026-09-27
+    basis:
+      plan:
+        label: Copilot Pro
     notes:
       - "Complete /model picker for a Copilot Pro account: 20 selectable rows (Auto plus 19 models), captured 2026-09-27 (UTC+8) from GitHub Copilot CLI 1.0.88 on Windows native by operating the picker. Rows follow the default recommended grouping in arrival order. Evidence: docs/research/fixtures/copilot-1.0.88/model-picker.agent-capture.redacted.txt and docs/research/2026-09-27-copilot-picker-full-catalog.md."
       - "The picker also lists 10 Unavailable models whose detail pane says the plan does not include them (gpt-6-astra, gpt-5.6-sol, gpt-5.5, claude-fable-5.1, claude-fable-5, claude-opus-5, claude-opus-4.8, claude-opus-4.8-fast, claude-opus-4.7, claude-sonnet-4.6). They need Copilot Pro+ or higher and are omitted. Pro+ users can still enter those IDs as custom model strings."
@@ -2005,6 +2008,10 @@ catalogs:
     source_cli: OpenCode
     cli_version: 1.18.32
     last_updated: 2026-09-28
+    basis:
+      channel:
+        id: opencode-go
+        label: opencode-go
     notes:
       - Operator-selected five-model shortlist, in the supplied order; this is not the complete
         upstream catalog. Display names are preserved exactly. No model default or effort/options
@@ -2077,6 +2084,10 @@ catalogs:
     source_cli: Kilo
     cli_version: 7.7.3
     last_updated: 2026-09-18
+    basis:
+      channel:
+        id: kilo
+        label: kilo
     notes:
       - "Source: operator-selected six-model shortlist for Kilo Code 7.7.3, supplied 2026-09-18."
       - Exact IDs and the final two thinking variant tokens were verified with installed kilo models
@@ -2153,6 +2164,10 @@ catalogs:
     source_cli: Goose
     cli_version: 1.51.0
     last_updated: 2026-09-23
+    basis:
+      channel:
+        id: chatgpt_codex
+        label: chatgpt_codex
     notes:
       - Complete operator-selected six-model shortlist for ChatGPT Codex (OAuth), all fixed Thinking
         Off. Other Goose providers remain accessible through custom provider/model input.
@@ -2237,8 +2252,12 @@ catalogs:
     source_cli: Pi
     cli_version: 0.87.1
     last_updated: 2026-09-29
+    basis:
+      channel:
+        id: openai-codex
+        label: openai-codex
     notes:
-      - "The openai-codex (ChatGPT subscription) channel of Pi 0.87.1: the models in the installed pi-ai registry (identical to the local model store refreshed 2026-09-27) that a ChatGPT account can run. Rows keep the model selector format <id> [openai-codex] and registry order; the selector only moves the current and a configured default model to the top. Other Pi providers are out of scope and remain available as custom provider/model strings."
+      - "The openai-codex (ChatGPT subscription) channel of Pi 0.87.1: the models in the installed pi-ai registry (identical to the local model store refreshed 2026-09-27) that a ChatGPT account can run. Labels are the bare model ids, since the scope basis shows the openai-codex channel (operator decision 2026-09-29, replacing the <id> [openai-codex] labels); rows keep registry order; the selector only moves the current and a configured default model to the top. Other Pi providers are out of scope and remain available as custom provider/model strings."
       - "The channel list is Pi's build-time catalog, not account entitlement. Pi also lists gpt-5.3-codex-spark, which is omitted: the same ChatGPT account's Codex CLI 0.156.1 list (2026-09-24) did not include it, and a Cats turn selecting it failed on 2026-09-29 with \"The 'gpt-5.3-codex-spark' model is not supported when using Codex with a ChatGPT account.\" It remains reachable as a custom provider/model string."
       - "Thinking values per row are Pi's getSupportedThinkingLevels over each model's thinkingLevelMap, in Pi's order, labeled with Pi's tokens and thinking-selector descriptions. gpt-6-astra has no off. Pi sends minimal as the low reasoning effort on every row here."
       - "Pi's thinking selector marks the default thinking level (settings defaultThinkingLevel, or the built-in medium when unset), so medium is the control default. The model selector marks only a user-configured default model, so no row is a default and the UI initializes the first row."
@@ -2246,7 +2265,7 @@ catalogs:
       - "Evidence: docs/research/2026-09-27-pi-openai-codex-full-catalog.md and docs/research/fixtures/pi-0.87.1/openai-codex-models.redacted.json."
     models:
       - id: openai-codex/gpt-5.5
-        label: "gpt-5.5 [openai-codex]"
+        label: gpt-5.5
         limits:
           contextWindowTokens: 272000
           maxOutputTokens: 128000
@@ -2285,7 +2304,7 @@ catalogs:
                 description: "Extra-high reasoning (~32k tokens)"
             default: medium
       - id: openai-codex/gpt-5.6-luna
-        label: "gpt-5.6-luna [openai-codex]"
+        label: gpt-5.6-luna
         limits:
           contextWindowTokens: 272000
           maxOutputTokens: 128000
@@ -2328,7 +2347,7 @@ catalogs:
                 description: "Maximum reasoning"
             default: medium
       - id: openai-codex/gpt-5.6-sol
-        label: "gpt-5.6-sol [openai-codex]"
+        label: gpt-5.6-sol
         limits:
           contextWindowTokens: 272000
           maxOutputTokens: 128000
@@ -2371,7 +2390,7 @@ catalogs:
                 description: "Maximum reasoning"
             default: medium
       - id: openai-codex/gpt-5.6-terra
-        label: "gpt-5.6-terra [openai-codex]"
+        label: gpt-5.6-terra
         limits:
           contextWindowTokens: 272000
           maxOutputTokens: 128000
@@ -2414,7 +2433,7 @@ catalogs:
                 description: "Maximum reasoning"
             default: medium
       - id: openai-codex/gpt-6-astra
-        label: "gpt-6-astra [openai-codex]"
+        label: gpt-6-astra
         limits:
           contextWindowTokens: 272000
           maxOutputTokens: 128000
@@ -2454,7 +2473,7 @@ catalogs:
                 description: "Maximum reasoning"
             default: medium
       - id: openai-codex/gpt-6-luna
-        label: "gpt-6-luna [openai-codex]"
+        label: gpt-6-luna
         limits:
           contextWindowTokens: 272000
           maxOutputTokens: 128000
@@ -2497,7 +2516,7 @@ catalogs:
                 description: "Maximum reasoning"
             default: medium
       - id: openai-codex/gpt-6-sol
-        label: "gpt-6-sol [openai-codex]"
+        label: gpt-6-sol
         limits:
           contextWindowTokens: 272000
           maxOutputTokens: 128000
@@ -3899,6 +3918,10 @@ catalogs:
     source_cli: Cline
     cli_version: 3.0.62
     last_updated: 2026-09-18
+    basis:
+      channel:
+        id: cline-pass
+        label: cline-pass
     notes:
       - "Source: docs/research/2026-09-18-cline-shortlist.md and fixtures/cline-3.0.62/."
       - Six operator-selected ClinePass combinations with fixed Medium; not the complete upstream

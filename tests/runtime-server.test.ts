@@ -5404,13 +5404,13 @@ providers:
     try {
       await withRuntime({}, {}, async (runtime) => {
         const expected = [
-          { id: 'openai-codex/gpt-5.5', label: 'gpt-5.5 [openai-codex]' },
-          { id: 'openai-codex/gpt-5.6-luna', label: 'gpt-5.6-luna [openai-codex]' },
-          { id: 'openai-codex/gpt-5.6-sol', label: 'gpt-5.6-sol [openai-codex]' },
-          { id: 'openai-codex/gpt-5.6-terra', label: 'gpt-5.6-terra [openai-codex]' },
-          { id: 'openai-codex/gpt-6-astra', label: 'gpt-6-astra [openai-codex]' },
-          { id: 'openai-codex/gpt-6-luna', label: 'gpt-6-luna [openai-codex]' },
-          { id: 'openai-codex/gpt-6-sol', label: 'gpt-6-sol [openai-codex]' },
+          { id: 'openai-codex/gpt-5.5', label: 'gpt-5.5' },
+          { id: 'openai-codex/gpt-5.6-luna', label: 'gpt-5.6-luna' },
+          { id: 'openai-codex/gpt-5.6-sol', label: 'gpt-5.6-sol' },
+          { id: 'openai-codex/gpt-5.6-terra', label: 'gpt-5.6-terra' },
+          { id: 'openai-codex/gpt-6-astra', label: 'gpt-6-astra' },
+          { id: 'openai-codex/gpt-6-luna', label: 'gpt-6-luna' },
+          { id: 'openai-codex/gpt-6-sol', label: 'gpt-6-sol' },
         ];
         for (const route of ['/providers/pi/models', '/providers/pi/models?refresh=1']) {
           const response = await runtime.app.request(route);
@@ -5452,13 +5452,13 @@ providers:
           source: 'static',
           cache: null,
           models: [
-            { id: 'openai-codex/gpt-5.5', label: 'gpt-5.5 [openai-codex]' },
-            { id: 'openai-codex/gpt-5.6-luna', label: 'gpt-5.6-luna [openai-codex]' },
-            { id: 'openai-codex/gpt-5.6-sol', label: 'gpt-5.6-sol [openai-codex]' },
-            { id: 'openai-codex/gpt-5.6-terra', label: 'gpt-5.6-terra [openai-codex]' },
-            { id: 'openai-codex/gpt-6-astra', label: 'gpt-6-astra [openai-codex]' },
-            { id: 'openai-codex/gpt-6-luna', label: 'gpt-6-luna [openai-codex]' },
-            { id: 'openai-codex/gpt-6-sol', label: 'gpt-6-sol [openai-codex]' },
+            { id: 'openai-codex/gpt-5.5', label: 'gpt-5.5' },
+            { id: 'openai-codex/gpt-5.6-luna', label: 'gpt-5.6-luna' },
+            { id: 'openai-codex/gpt-5.6-sol', label: 'gpt-5.6-sol' },
+            { id: 'openai-codex/gpt-5.6-terra', label: 'gpt-5.6-terra' },
+            { id: 'openai-codex/gpt-6-astra', label: 'gpt-6-astra' },
+            { id: 'openai-codex/gpt-6-luna', label: 'gpt-6-luna' },
+            { id: 'openai-codex/gpt-6-sol', label: 'gpt-6-sol' },
           ],
           warnings: [],
         });
