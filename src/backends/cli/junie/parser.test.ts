@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseJunieSessionEventLine, parseJunieStreamLine } from './parser.js';
+import { junieReportedModels, parseJunieSessionEventLine, parseJunieStreamLine } from './parser.js';
 
 describe('parseJunieStreamLine', () => {
   it('returns null for empty lines', () => {
@@ -140,6 +140,26 @@ describe('parseJunieStreamLine', () => {
         cacheCreationInputTokens: 2,
         estimatedCost: undefined,
       },
+      modelsDelta: [{ model: 'gpt-5.2' }],
+    });
+  });
+
+  it('reports each model a task called, once, without comparing it with the request', () => {
+    expect(junieReportedModels([
+      { model: 'claude-opus-5-5', inputTokens: 10 },
+      { model: 'gemini-3.1-flash-lite', inputTokens: 2 },
+      { model: 'claude-opus-5-5', inputTokens: 4 },
+      { inputTokens: 1 },
+    ])).toEqual([{ model: 'claude-opus-5-5' }, { model: 'gemini-3.1-flash-lite' }]);
+    expect(junieReportedModels(undefined)).toEqual([]);
+
+    const result = parseJunieSessionEventLine(JSON.stringify({
+      kind: 'SessionA2uxEvent',
+      event: { state: 'COMPLETED', agentEvent: { kind: 'ResultBlockUpdatedEvent', result: 'Done.' } },
+    }), { sessionId: 'junie-1', models: [{ model: 'claude-opus-5-5' }] });
+    expect(result?.events.at(-1)).toMatchObject({
+      type: 'result',
+      reportedModels: [{ model: 'claude-opus-5-5' }],
     });
   });
 

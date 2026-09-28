@@ -814,10 +814,7 @@ export class CodexProvider implements Provider {
 
     if (method === 'model/rerouted') {
       const reroute = extractCodexModelReroute(params);
-      return observeNormalized(this.evolutionObserver, {
-        rawEventType: method,
-        rawSample: msg,
-      }, createCodexProgressEvent({
+      const progress = createCodexProgressEvent({
         text: formatCodexModelRerouteText(reroute.fromModel, reroute.toModel),
         kind: 'model_state',
         status: 'updated',
@@ -826,7 +823,15 @@ export class CodexProvider implements Provider {
           ...(reroute.fromModel ? { fromModel: reroute.fromModel } : {}),
           ...(reroute.toModel ? { toModel: reroute.toModel } : {}),
         },
-      }));
+      });
+      // Codex otherwise only echoes the requested model; a reroute is the one
+      // time it says another model served the turn.
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: method,
+        rawSample: msg,
+      }, reroute.toModel
+        ? { ...progress, reportedModels: [{ model: reroute.toModel, matchesRequest: false }] }
+        : progress);
     }
 
     // Informational notifications — consume silently

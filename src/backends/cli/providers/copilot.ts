@@ -13,6 +13,7 @@ import type {
 } from './types.js';
 import type {
   InitStreamEvent,
+  ReportedModel,
   ResultStreamEvent,
   TextStreamEvent,
   ToolResultStreamEvent,
@@ -42,6 +43,8 @@ export class CopilotProvider implements Provider {
   private _sessionId: string | undefined;
   private _lastOutputTokens = 0;
   private _sawMessageDelta = false;
+  private _requestedModel: string | null = null;
+  private _turnModels: ReportedModel[] = [];
 
   constructor(
     private readonly compatibilityProfile?: CompatibilityProfileSelection,
@@ -53,6 +56,30 @@ export class CopilotProvider implements Provider {
     this._pendingPrompt = compileRuntimeTurnPrompt(turn.message, turn);
     this._lastOutputTokens = 0;
     this._sawMessageDelta = false;
+    this._turnModels = [];
+  }
+
+  /**
+   * Auto mode names the model it chose, and every reply names its model. With
+   * `auto` requested any choice is the request; otherwise the IDs must match.
+   */
+  private noteServedModel(model: unknown): void {
+    if (typeof model !== 'string' || !model.trim()) return;
+    const served = model.trim();
+    if (this._turnModels.some((entry) => entry.model === served)) return;
+    const requested = this._requestedModel;
+    this._turnModels.push({
+      model: served,
+      ...(requested
+        ? { matchesRequest: requested === 'auto' || requested.toLowerCase() === served.toLowerCase() }
+        : {}),
+    });
+  }
+
+  private takeReportedModels(): { reportedModels?: ReportedModel[] } {
+    const models = this._turnModels;
+    this._turnModels = [];
+    return models.length > 0 ? { reportedModels: models } : {};
   }
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
@@ -73,6 +100,7 @@ export class CopilotProvider implements Provider {
     if (opts.model) {
       args.push('--model', opts.model);
     }
+    this._requestedModel = opts.model?.trim() || null;
     if (typeof opts.modelControls?.['copilot.reasoning_effort'] === 'string') {
       args.push('--effort', opts.modelControls['copilot.reasoning_effort']);
     }
@@ -191,6 +219,7 @@ export class CopilotProvider implements Provider {
         if (inner?.outputTokens) {
           this._lastOutputTokens = inner.outputTokens as number;
         }
+        this.noteServedModel(inner?.model);
 
         const content = extractContent(inner?.content);
         const toolRequestEvents = extractCopilotToolRequests(inner?.toolRequests);
@@ -255,6 +284,7 @@ export class CopilotProvider implements Provider {
                 },
               }
             : undefined,
+          ...this.takeReportedModels(),
         } satisfies ResultStreamEvent);
 
       case 'session.shutdown': {
@@ -268,7 +298,29 @@ export class CopilotProvider implements Provider {
           sessionId: this._sessionId,
           usage,
           metadata: runtimeUsage ? { runtimeUsage } : undefined,
+          ...this.takeReportedModels(),
         } satisfies ResultStreamEvent);
+      }
+
+      case 'session.auto_mode_resolved': {
+        // Sent before the first model call when `auto` is requested.
+        const chosen = typeof inner?.chosenModel === 'string' ? inner.chosenModel.trim() : '';
+        this.noteServedModel(chosen);
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: eventType,
+          rawSample: parsed,
+        }, createRuntimeProgressEvent({
+          text: chosen ? `Copilot auto mode chose ${chosen}.` : 'Copilot auto mode chose a model.',
+          provider: 'copilot',
+          backend: 'cli',
+          kind: 'model_state',
+          status: 'updated',
+          source: 'provider',
+          native: {
+            sourceEvent: eventType,
+            ...(chosen ? { chosenModel: chosen } : {}),
+          },
+        }));
       }
 
       case 'session.model_change':

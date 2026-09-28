@@ -21,11 +21,13 @@ import type {
 import type {
   ErrorStreamEvent,
   InitStreamEvent,
+  ReportedModel,
   ResultStreamEvent,
 } from '../../../core/types.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 import { appendStderrLines } from '../stderrLines.js';
+import { mergeReportedModels } from '../../../core/runtime/reportedModels.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
 
 const DEFAULT_JUNIE_SESSIONS_DIR = join(os.homedir(), '.junie', 'sessions');
@@ -177,6 +179,7 @@ export class JunieProvider implements Provider {
         ? await this.readEventLineCount(opts.resumeSessionId)
         : 0,
       usage: { inputTokens: 0, outputTokens: 0 },
+      models: [],
       lastProgressKey: '',
       lastProgressText: '',
       lastMeaningfulProgressText: '',
@@ -254,11 +257,15 @@ export class JunieProvider implements Provider {
       const parsed = parseJunieSessionEventLine(line, {
         sessionId: state.sessionId,
         usage: state.usage,
+        models: state.models,
       });
       if (!parsed) return;
 
       if (parsed.usageDelta) {
         state.usage = mergeUsage(state.usage, parsed.usageDelta);
+      }
+      if (parsed.modelsDelta?.length) {
+        state.models = mergeReportedModels(state.models, parsed.modelsDelta);
       }
 
       for (const event of parsed.events) {
@@ -456,6 +463,7 @@ interface LiveJunieTurnState {
   initEmitted: boolean;
   processedLineCount: number;
   usage: JunieUsageTotals;
+  models: ReportedModel[];
   lastProgressKey: string;
   lastProgressText: string;
   lastMeaningfulProgressText: string;

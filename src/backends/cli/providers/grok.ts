@@ -11,6 +11,7 @@ import type {
 import type {
   ErrorStreamEvent,
   RawStreamEvent,
+  ReportedModel,
   ResultStreamEvent,
   TextStreamEvent,
   ToolResultStreamEvent,
@@ -92,6 +93,8 @@ interface GrokNativeStreamEvent {
   stopReason?: unknown;
   total_cost_usd?: unknown;
   usage?: GrokNativeUsage;
+  /** On `end`: usage keyed by each model that served the turn, such as `grok-4.5-build`. */
+  modelUsage?: unknown;
   toolCallId?: unknown;
   toolName?: unknown;
   title?: unknown;
@@ -113,6 +116,7 @@ export class GrokProvider implements Provider {
   capabilities: ProviderCapabilities = { resume: true, fork: true, permissions: true };
 
   private pendingPrompt: string | null = null;
+  private requestedModel: string | null = null;
   private readonly pendingTools = new Map<string, PendingGrokTool>();
 
   constructor(
@@ -144,6 +148,7 @@ export class GrokProvider implements Provider {
     if (model) {
       args.push('--model', model);
     }
+    this.requestedModel = model ?? null;
     // `--reasoning-effort` is the documented spelling; `--effort` is its alias.
     // The accepted level differs per model, so the curated per-model menu is
     // what bounds the value rather than a single provider-wide list.
@@ -296,6 +301,7 @@ export class GrokProvider implements Provider {
         type: 'result',
         ...(typeof event.sessionId === 'string' ? { sessionId: event.sessionId } : {}),
         ...(event.usage ? { usage: normalizeGrokUsage(event.usage, event.total_cost_usd) } : {}),
+        ...grokReportedModels(event.modelUsage, this.requestedModel),
         raw: event,
       } satisfies ResultStreamEvent);
     }
@@ -442,6 +448,26 @@ function normalizeGrokModelId(model?: string): string | undefined {
     return undefined;
   }
   return trimmed;
+}
+
+/**
+ * Grok serves a model as its `-build` form: `grok-4.5` ran as `grok-4.5-build`
+ * and `grok-4.7` as `grok-4.7-build`, so that segment is ignored when comparing.
+ */
+function grokReportedModels(
+  modelUsage: unknown,
+  requested: string | null,
+): { reportedModels?: ReportedModel[] } {
+  if (!modelUsage || typeof modelUsage !== 'object' || Array.isArray(modelUsage)) return {};
+  const models = Object.keys(modelUsage).map((model) => model.trim()).filter(Boolean);
+  if (models.length === 0) return {};
+  const withoutBuild = (model: string) => model.toLowerCase().replace(/-build(?=-|$)/u, '');
+  return {
+    reportedModels: models.map((model) => ({
+      model,
+      ...(requested ? { matchesRequest: withoutBuild(model) === withoutBuild(requested) } : {}),
+    })),
+  };
 }
 
 function normalizeGrokUsage(usage: GrokNativeUsage, totalCostUsd: unknown) {

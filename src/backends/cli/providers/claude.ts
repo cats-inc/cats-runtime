@@ -12,6 +12,7 @@ import type {
   InitStreamEvent,
   ProgressStreamEvent,
   RawStreamEvent,
+  ReportedModel,
   ResultStreamEvent,
   RuntimeProgressStatus,
   TextStreamEvent,
@@ -36,6 +37,9 @@ export class ClaudeProvider implements Provider {
    * snapshot as `metadata.runtimeUsage.quota` without any extra request or credential access.
    */
   private _lastRateLimit: ClaudeQuotaSnapshot | null = null;
+  private requestedModel: string | null = null;
+  /** Models of this turn's main-conversation replies, reported with its result. */
+  private turnModels: string[] = [];
 
   constructor(
     private readonly compatibilityProfile?: CompatibilityProfileSelection,
@@ -56,6 +60,7 @@ export class ClaudeProvider implements Provider {
     if (opts.model) {
       args.push('--model', opts.model);
     }
+    this.requestedModel = opts.model?.trim() || null;
     if (typeof opts.modelControls?.['claude.reasoning_effort'] === 'string') {
       args.push('--effort', opts.modelControls['claude.reasoning_effort']);
     }
@@ -94,6 +99,33 @@ export class ClaudeProvider implements Provider {
     return JSON.stringify(msg) + '\n';
   }
 
+  /**
+   * Claude Code resolves an alias such as `opus` to a full model ID and names it
+   * on every API reply. Subagent replies (`parent_tool_use_id`) may use other
+   * models by design, and `<synthetic>` marks locally generated messages.
+   */
+  private noteServedModel(event: ClaudeStreamEvent): void {
+    const model = event.type === 'assistant' && !event.parent_tool_use_id
+      ? event.message?.model?.trim()
+      : undefined;
+    if (model && !model.startsWith('<') && !this.turnModels.includes(model)) {
+      this.turnModels.push(model);
+    }
+  }
+
+  private takeReportedModels(): { reportedModels?: ReportedModel[] } {
+    const models = this.turnModels;
+    this.turnModels = [];
+    if (models.length === 0) return {};
+    const requested = this.requestedModel;
+    return {
+      reportedModels: models.map((model) => ({
+        model,
+        ...(requested ? { matchesRequest: claudeServedRequestedModel(requested, model) } : {}),
+      })),
+    };
+  }
+
   parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
     const trimmed = line.trim();
     if (!trimmed) return null;
@@ -111,6 +143,8 @@ export class ClaudeProvider implements Provider {
         text: trimmed,
       } satisfies RawStreamEvent);
     }
+
+    this.noteServedModel(event);
 
     // system/init — session ID
     if (event.type === 'system' && event.subtype === 'init') {
@@ -208,6 +242,7 @@ export class ClaudeProvider implements Provider {
           ...(estimatedCost === undefined ? {} : { estimatedCost, currency: 'USD' }),
         } : undefined,
         metadata: buildClaudeResultMetadata(event, this._lastRateLimit),
+        ...this.takeReportedModels(),
         raw: event,
       } satisfies ResultStreamEvent);
     }
@@ -555,6 +590,22 @@ function buildClaudeResultMetadata(
       ...(modelUsage ? { modelUsage } : {}),
     },
   };
+}
+
+/**
+ * Whether a reply's model is the one requested with `--model`: the same ID, the
+ * same ID with a release date (`claude-haiku-4-5-20251001`), or, for an alias
+ * such as `opus`, any model of that family. `claude-opus-5` and
+ * `claude-opus-5-5` are different models.
+ */
+export function claudeServedRequestedModel(requested: string, served: string): boolean {
+  const withoutContext = (model: string) => model.trim().toLowerCase().replace(/\[[^\]]*\]$/u, '');
+  const request = withoutContext(requested);
+  const reply = withoutContext(served);
+  if (reply === request || (reply.startsWith(`${request}-`) && /^\d{8}$/u.test(reply.slice(request.length + 1)))) {
+    return true;
+  }
+  return /^[a-z]+$/u.test(request) && reply.startsWith(`claude-${request}-`);
 }
 
 function finiteNumber(value: unknown): number | undefined {

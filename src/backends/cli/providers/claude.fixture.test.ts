@@ -18,6 +18,27 @@ function asEvents(event: StreamEvent | StreamEvent[] | null): StreamEvent[] {
 }
 
 describe('Claude Code 2.1.267 stream-json fixtures', () => {
+  it('reports the model that answered the turn and compares it with the requested one', () => {
+    const lines = readFixtureLines('stream-json.rate-limit.redacted.ndjson');
+    const resultFor = (requested?: string) => {
+      const provider = new ClaudeProvider();
+      provider.buildSpawnArgs({ cwd: '/repo', ...(requested ? { model: requested } : {}) });
+      return lines.flatMap((line) => asEvents(provider.parseStreamLine(line)))
+        .find((event) => event.type === 'result');
+    };
+
+    // The capture ran without --model; its reply names claude-fable-5-1.
+    expect(resultFor()).toEqual(expect.objectContaining({
+      reportedModels: [{ model: 'claude-fable-5-1' }],
+    }));
+    expect(resultFor('fable')).toMatchObject({
+      reportedModels: [{ model: 'claude-fable-5-1', matchesRequest: true }],
+    });
+    expect(resultFor('opus')).toMatchObject({
+      reportedModels: [{ model: 'claude-fable-5-1', matchesRequest: false }],
+    });
+  });
+
   it('normalizes the observed rate-limit and cost frames of a subscription-backed turn', () => {
     const provider = new ClaudeProvider();
     const lines = readFixtureLines('stream-json.rate-limit.redacted.ndjson');

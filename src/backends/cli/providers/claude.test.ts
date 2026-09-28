@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ClaudeProvider } from './claude.js';
+import { ClaudeProvider, claudeServedRequestedModel } from './claude.js';
 import type { StreamEvent } from './types.js';
 
 function toEventList(event: StreamEvent | StreamEvent[] | null): StreamEvent[] {
@@ -584,5 +584,21 @@ describe('ClaudeProvider', () => {
       expect(provider.parseStreamLine('')).toBeNull();
       expect(provider.parseStreamLine('  ')).toBeNull();
     });
+  });
+});
+
+describe('claudeServedRequestedModel', () => {
+  it('accepts an alias resolved within its family, a dated ID and a context suffix', () => {
+    expect(claudeServedRequestedModel('opus', 'claude-opus-5-5')).toBe(true);
+    expect(claudeServedRequestedModel('haiku', 'claude-haiku-4-5-20251001')).toBe(true);
+    expect(claudeServedRequestedModel('claude-haiku-4-5', 'claude-haiku-4-5-20251001')).toBe(true);
+    expect(claudeServedRequestedModel('opus[1m]', 'claude-opus-5-5[1m]')).toBe(true);
+    expect(claudeServedRequestedModel('claude-fable-5-1', 'claude-fable-5-1')).toBe(true);
+  });
+
+  it('rejects another model, including a newer version of the requested one', () => {
+    expect(claudeServedRequestedModel('claude-opus-5', 'claude-opus-5-5')).toBe(false);
+    expect(claudeServedRequestedModel('sonnet', 'claude-opus-5-5')).toBe(false);
+    expect(claudeServedRequestedModel('claude-opus-4-8', 'claude-sonnet-5')).toBe(false);
   });
 });

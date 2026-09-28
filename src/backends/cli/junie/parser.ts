@@ -2,6 +2,7 @@ import type {
   ErrorStreamEvent,
   ProgressStreamEvent,
   RawStreamEvent,
+  ReportedModel,
   ResultStreamEvent,
   StreamEvent,
   TextStreamEvent,
@@ -55,6 +56,7 @@ export interface JunieResult {
 export interface ParsedJunieSessionEvent {
   events: StreamEvent[];
   usageDelta?: JunieUsageTotals;
+  modelsDelta?: ReportedModel[];
   terminal?: boolean;
 }
 
@@ -98,11 +100,13 @@ export function parseJunieStreamLine(
   if (data.result) {
     events.push({ type: 'text', text: data.result } satisfies TextStreamEvent);
   }
+  const reportedModels = junieReportedModels(data.llmUsage);
   events.push({
     type: 'result',
     sessionId: data.sessionId,
     usage,
     metadata: usage ? { runtimeUsage: toJunieRuntimeUsage(usage) } : undefined,
+    ...(reportedModels.length > 0 ? { reportedModels } : {}),
   } satisfies ResultStreamEvent);
 
   return observeNormalized(observer, {
@@ -119,6 +123,7 @@ export function parseJunieSessionEventLine(
   options: {
     sessionId?: string;
     usage?: JunieUsageTotals;
+    models?: ReportedModel[];
   } = {},
 ): ParsedJunieSessionEvent | null {
   const trimmed = line.trim();
@@ -213,6 +218,7 @@ export function parseJunieSessionEventLine(
       return {
         events: [],
         usageDelta: aggregateJunieUsage(agentEvent.modelUsage),
+        modelsDelta: junieReportedModels(agentEvent.modelUsage),
       };
 
     case 'ResultBlockUpdatedEvent': {
@@ -237,6 +243,7 @@ export function parseJunieSessionEventLine(
         sessionId: options.sessionId,
         usage: sanitizeUsage(options.usage),
         metadata: options.usage ? { runtimeUsage: toJunieRuntimeUsage(options.usage) } : undefined,
+        ...(options.models?.length ? { reportedModels: options.models } : {}),
       } satisfies ResultStreamEvent);
       return {
         events,
@@ -358,6 +365,24 @@ function readCurrentPlanStep(items: unknown): string | null {
   });
   const currentRecord = asRecord(current);
   return readString(currentRecord?.description) ?? null;
+}
+
+/**
+ * Every model a Junie task called, from its usage entries. Junie also calls
+ * smaller models for summarization and routing, and the naming of these entries
+ * relative to `--model` setting IDs is unverified, so they are not compared
+ * with the request.
+ */
+export function junieReportedModels(entries: unknown): ReportedModel[] {
+  if (!Array.isArray(entries)) return [];
+  const models: ReportedModel[] = [];
+  for (const entry of entries) {
+    const model = readString(asRecord(entry)?.model)?.trim();
+    if (model && !models.some((candidate) => candidate.model === model)) {
+      models.push({ model });
+    }
+  }
+  return models;
 }
 
 function aggregateJunieUsage(entries: unknown): JunieUsageTotals | undefined {
