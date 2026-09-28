@@ -5,11 +5,10 @@ import { extname, join, resolve } from 'node:path';
  * Resolve JetBrains' Windows `junie.bat` shim to the `junie.exe` it would have
  * run, so the runtime spawns that directly instead of going through `cmd.exe`.
  *
- * Junie takes the prompt as an argument, and `cmd.exe` ends an argument at its
- * first newline: a multi-line prompt reached Junie cut down to `Instructions:`.
- * That cannot be quoted around, so the only fix is not to pass through the
- * shim. It also removes the console handoff that makes Windows Terminal flash
- * a window on every launch; see `windowsNodeShim.ts`.
+ * Going through `cmd.exe` rewrites arguments -- it once cut a multi-line prompt,
+ * which Junie now reads from stdin, down to `Instructions:` -- so skipping the
+ * shim keeps them verbatim. It also removes the console handoff that makes
+ * Windows Terminal flash a window on every launch; see `windowsNodeShim.ts`.
  *
  * Bypassing it means a Cats launch does not apply an update Junie has staged
  * under `updates\`. Cats already starts Junie with `--skip-update-check`

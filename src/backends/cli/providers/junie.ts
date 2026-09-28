@@ -59,7 +59,6 @@ export class JunieProvider implements Provider {
   ephemeral = true;
   capabilities: ProviderCapabilities = { resume: true, fork: false, permissions: false };
 
-  private pendingPrompt: string | null = null;
   private readonly commandConfig?: ProviderCommandConfig;
   private readonly sessionsDir: string;
 
@@ -72,32 +71,22 @@ export class JunieProvider implements Provider {
     this.sessionsDir = sessionsDir;
   }
 
-  prepareEphemeralTurn(turn: TurnInput): void {
-    this.pendingPrompt = compileRuntimeTurnPrompt(turn.message, turn);
-  }
-
   resolveFirstEventTimeoutMs(_defaultTimeoutMs: number): number {
     // Junie only writes its JSON result after the task finishes.
     return 0;
   }
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
-    const args = this.buildArgs(
-      opts,
-      this.pendingPrompt,
-      resolveJunieTurnTimeoutMs(),
-    );
-    this.pendingPrompt = null;
-    return args;
+    return this.buildArgs(opts, resolveJunieTurnTimeoutMs());
   }
 
   private buildArgs(
     opts: ProviderSpawnOptions,
-    prompt?: string | null,
-    turnTimeoutMs: number = resolveJunieTurnTimeoutMs(),
+    turnTimeoutMs: number,
   ): string[] {
     const args: string[] = [
       '--output-format', 'json',
+      '--input-format', 'text',
       '--skip-update-check',
     ];
 
@@ -126,15 +115,17 @@ export class JunieProvider implements Provider {
       args.push('--session-id', opts.resumeSessionId);
     }
 
-    if (prompt) {
-      args.push(prompt);
-    }
-
     return args;
   }
 
-  buildStdinMessage(_content: string): string {
-    return '';
+  /**
+   * The task goes over stdin, not as an argument. On Windows, Junie's launcher
+   * hands its command line to the JVM through the ANSI code page, so characters
+   * the code page lacks -- Simplified Chinese or emoji on a CP950 machine --
+   * reached Junie as `?`. Junie reads stdin as UTF-8.
+   */
+  buildStdinMessage(content: string, turn?: TurnInput): string {
+    return compileRuntimeTurnPrompt(content, turn);
   }
 
   parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
@@ -147,11 +138,7 @@ export class JunieProvider implements Provider {
     }
 
     const turnTimeoutMs = resolveJunieTurnTimeoutMs();
-    const args = this.buildArgs(
-      opts,
-      compileRuntimeTurnPrompt(turn.message, turn),
-      turnTimeoutMs,
-    );
+    const args = this.buildArgs(opts, turnTimeoutMs);
     const env = { ...process.env };
     delete env.CLAUDECODE;
 
@@ -177,7 +164,9 @@ export class JunieProvider implements Provider {
       env,
       ...hiddenWindowsSpawnOptions(),
     });
-    child.stdin?.end();
+    // A launch failure ends Junie before it reads the task; the exit path reports it.
+    child.stdin?.on('error', () => {});
+    child.stdin?.end(this.buildStdinMessage(turn.message, turn));
 
     const queue: StreamEvent[] = [];
     let notify: (() => void) | null = null;

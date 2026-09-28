@@ -50,6 +50,13 @@ const JUNIE_JSON_ARGS = [
   '--skip-update-check',
 ];
 
+// JunieProvider writes the task to stdin; the help probe has no task to read.
+const JUNIE_SPAWN_ARGS = [
+  '--output-format', 'json',
+  '--input-format', 'text',
+  '--skip-update-check',
+];
+
 // Kiro 2.24's default v2 engine ignores --model without a terminal; see KiroProvider.
 const KIRO_CHAT_ARGS = [
   'chat',
@@ -315,10 +322,10 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       provider: 'junie',
       protocolFamily: 'json-result',
       parserId: 'junie-json',
-      spawnBaseArgs: [...JUNIE_JSON_ARGS],
+      spawnBaseArgs: [...JUNIE_SPAWN_ARGS],
       minVersionMajor: 1,
       allowUnknownVersion: true,
-      helpTokens: ['--output-format', '--project', '--session-id'],
+      helpTokens: ['--output-format', '--input-format', '--project', '--session-id'],
       liveProbeArgs: buildLiveHelpArgs(JUNIE_JSON_ARGS),
       liveProbeTokens: ['--output-format'],
     },
@@ -328,7 +335,7 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       provider: 'junie',
       protocolFamily: 'json-result',
       parserId: 'junie-json',
-      spawnBaseArgs: [...JUNIE_JSON_ARGS],
+      spawnBaseArgs: [...JUNIE_SPAWN_ARGS],
       allowUnknownVersion: true,
       helpTokens: ['--output-format', '--session-id'],
       liveProbeArgs: buildLiveHelpArgs(JUNIE_JSON_ARGS),

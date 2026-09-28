@@ -86,18 +86,22 @@ describe('JunieProvider', () => {
       expect(args).toContain('session-260317-070403-d8r2');
     });
 
-    it('includes prompt from prepareEphemeralTurn', () => {
+    it('reads the task as text from stdin instead of taking it as an argument', () => {
       const provider = new JunieProvider();
-      provider.prepareEphemeralTurn({ message: 'Fix the bug' });
       const args = provider.buildSpawnArgs({ cwd: '/tmp' });
-      expect(args).toContain('Fix the bug');
+      expect(args.slice(0, 4)).toEqual(['--output-format', 'json', '--input-format', 'text']);
+      expect(args.at(-1)).toBe('/tmp');
     });
   });
 
   describe('buildStdinMessage', () => {
-    it('returns empty string (prompt goes as positional arg)', () => {
+    it('writes the whole compiled prompt, including characters outside the code page', () => {
       const provider = new JunieProvider();
-      expect(provider.buildStdinMessage('hello')).toBe('');
+      expect(provider.buildStdinMessage('午安 简体 🐱', {
+        message: '午安 简体 🐱',
+        instructions: 'Reply in the user\'s language.',
+      })).toBe('Instructions:\nReply in the user\'s language.\n\nUser message:\n午安 简体 🐱');
+      expect(provider.buildStdinMessage('hello')).toBe('hello');
     });
   });
 
