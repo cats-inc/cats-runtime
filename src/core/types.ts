@@ -1002,6 +1002,7 @@ export interface RuntimeSkillDeliveryState {
 }
 
 export interface SessionSkillState {
+  managedPlugin?: import('./skills/managedPlugins.js').ManagedPluginContext;
   /** Package policy used for resolution; not a caller-granted capability. */
   contentPolicy?: { profile: 'release' | 'preview'; fingerprint: string; skillsRoot: string };
   profileId?: string;

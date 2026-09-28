@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
 import { listRuntimeSkillCatalog } from '../../core/skills/catalog.js';
+import { listManagedPluginSkills } from '../../core/skills/managedPlugins.js';
+import type { AppContext } from '../app.js';
 import type {
   RuntimeSkillCatalogEntry,
   RuntimeSkillDeliveryMode,
@@ -7,7 +9,7 @@ import type {
   RuntimeSkillPackageKind,
 } from '../../core/types.js';
 
-export const skillRoutes = new Hono();
+export const skillRoutes = new Hono<{ Variables: { ctx: AppContext } }>();
 
 const RUNTIME_SKILL_FAMILY_VALUES = [
   'base',
@@ -362,7 +364,8 @@ skillRoutes.get('/skills/catalog', (c) => {
     const offset = readOptionalSingleIntegerQueryValue(searchParams, 'offset', 0) ?? 0;
     const limit = readOptionalSingleIntegerQueryValue(searchParams, 'limit', 1);
     const appliedFilters = buildAppliedRuntimeSkillCatalogFilters(filters);
-    const filteredSkills = filterRuntimeSkillCatalog(listRuntimeSkillCatalog(), filters);
+    const ctx = c.get('ctx') as AppContext;
+    const filteredSkills = filterRuntimeSkillCatalog([...listRuntimeSkillCatalog(), ...listManagedPluginSkills(ctx.config.sessionBaseDir)], filters);
     const sortedSkills = sortRuntimeSkillCatalog(filteredSkills, sort);
     const { skills, pagination } = paginateRuntimeSkillCatalog(sortedSkills, offset, limit);
     return c.json({

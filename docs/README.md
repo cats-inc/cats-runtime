@@ -1,5 +1,10 @@
 # Documentation Index
 
+[Managed Plugin skills](specs/SPEC-034-managed-plugin-skills.md) documents the
+default-off Agency instruction pilot, authenticated local management and durable
+revocation. See [ADR-043](decisions/043-admit-managed-plugin-skills.md) and
+[PLAN-044](plans/PLAN-044-managed-plugin-skills.md) for scope and validation.
+
 > This directory contains all project documentation.
 
 [Grok single-image spike](research/2026-09-28-grok-single-image-spike.md) records

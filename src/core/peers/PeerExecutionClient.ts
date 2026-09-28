@@ -61,7 +61,9 @@ export class PeerExecutionClient {
   buildRequest(
     input: BuildPeerExecutionRequestOptions,
   ): { request: PeerExecutionRequest; trace: PeerExecutionTrace } {
-    if (hasPreviewSkillContent(input.turn.skills ?? input.session.skills)
+    if (input.session.hydration?.metadata?.managedPluginExposure === true
+      || (input.turn.skills ?? input.session.skills)?.managedPlugin
+      || hasPreviewSkillContent(input.turn.skills ?? input.session.skills)
       || readSkillContentProvenance(input.session.hydration)?.releaseCompatible !== true) {
       throw contentConflict('Preview or unverified context requires local execution; peer content profiles are not negotiated.');
     }

@@ -9,6 +9,7 @@ import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import type { SessionSkillState } from '../core/types.js';
 import { resolveRuntimeSkillManifest } from '../core/skills/catalog.js';
 import * as contentPolicy from '../core/skills/contentPolicy.js';
+import { AGENCY_DIGEST, AGENCY_SKILLS, registerManagedPlugin } from '../core/skills/managedPlugins.js';
 
 describe('runtime-managed skills HTTP contract', () => {
   let rootDir: string;
@@ -248,6 +249,22 @@ describe('runtime-managed skills HTTP contract', () => {
         }),
       }),
     ]));
+  });
+
+  it('rejects hot Plugin instruction delivery into an existing unmanaged CLI worker', async () => {
+    const app = createTestApp();
+    registerManagedPlugin(sessionBaseDir, { protocol: 1, hostId: 'test-platform-profile', id: 'agency-agents', version: '0.1.0', digest: AGENCY_DIGEST, generation: 1, enabled: true,
+      skills: Object.keys(AGENCY_SKILLS).map(id => ({ id, markdown: readFileSync(new URL(`../../tests/fixtures/managed-plugins/${id.split('/').at(-1)}.md`, import.meta.url), 'utf8') })) });
+    const created = await app.request('/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: 'codex', cwd: join(rootDir, 'repo'), workspaceMode: 'shared' }) });
+    expect(created.status).toBe(201);
+    const session = await created.json() as { id: string };
+    registry.updateStatus(session.id, 'ready');
+    const streamMessage = vi.fn(async function* () { yield { type: 'result' as const }; });
+    vi.mocked(pool.get).mockReturnValue({ alive: true, busy: false, managedPluginLifetime: false, streamMessage } as never);
+    const response = await app.request(`/sessions/${session.id}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Review', skills: { requestedSkills: [Object.keys(AGENCY_SKILLS)[0]] } }) });
+    expect(response.status, await response.clone().text()).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'managed_plugin_conflict' });
+    expect(streamMessage).not.toHaveBeenCalled();
   });
 
   it('a clean release native fork binds its own init ID and admits its first turn', async () => {

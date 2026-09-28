@@ -1,5 +1,8 @@
 # Implementation Plans
 
+- [PLAN-044: Managed Plugin skills](PLAN-044-managed-plugin-skills.md) — internal
+  Agency host integration and validation; publication remains separate.
+
 > This directory contains implementation plans that define *how* to build features.
 
 ## Purpose

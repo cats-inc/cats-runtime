@@ -1,5 +1,8 @@
 # Feature Specifications
 
+- [SPEC-034: Managed Plugin skills](SPEC-034-managed-plugin-skills.md) — local
+  protocol-1 registration, instruction delivery and revocation.
+
 > This directory contains feature specifications that define *what* to build and *why*.
 
 ## Purpose

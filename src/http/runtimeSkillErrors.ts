@@ -7,9 +7,9 @@ export function toRuntimeSkillErrorResponse(error: unknown) {
 
   return {
     status: error.code === 'strict_skill_delivery_unavailable'
-      || error.code === 'skill_content_profile_conflict' ? 409 as const : 400 as const,
+      || error.code === 'managed_plugin_conflict' || error.code === 'skill_content_profile_conflict' ? 409 as const : 400 as const,
     body: { error: error.message,
-      ...(error.code === 'skill_content_profile_conflict' ? { code: error.code } : {}),
+      ...(['managed_plugin_conflict', 'skill_content_profile_conflict'].includes(error.code) ? { code: error.code } : {}),
     },
   };
 }

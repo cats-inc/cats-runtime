@@ -77,6 +77,7 @@ import { providerRoutes } from './routes/providers.js';
 import { peerRoutes } from './routes/peers.js';
 import { peerExecutionRoutes } from './routes/peerExecutions.js';
 import { skillRoutes } from './routes/skills.js';
+import { managedPluginRoutes } from './routes/managedPlugins.js';
 import { wakeupRoutes } from './routes/wakeup.js';
 import { managementRoutes } from './routes/management.js';
 import { workspaceSubstrateRoutes } from './routes/workspaceSubstrate.js';
@@ -423,6 +424,7 @@ export function createRuntimeApp(ctx: AppContext) {
   app.route('/', opencodeRoutes);
   app.route('/', providerRoutes);
   app.route('/', skillRoutes);
+  app.route('/', managedPluginRoutes);
   app.route('/', wakeupRoutes);
   app.route('/', managementRoutes);
   app.route('/', workspaceSubstrateRoutes);

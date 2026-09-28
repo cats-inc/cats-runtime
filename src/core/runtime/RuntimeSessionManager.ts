@@ -1,3 +1,5 @@
+import { bindManagedNativeIdentity, hasManagedPluginExposure } from '../skills/managedPlugins.js';
+import { RuntimeSkillError } from '../skills/errors.js';
 import { randomUUID } from 'node:crypto';
 import { assertRetainedSkillContent, getRuntimeSkillContentPolicy } from '../skills/contentPolicy.js';
 import type {
@@ -182,6 +184,7 @@ export class RuntimeSessionManager {
     providerBackend?: BackendKind,
   ): ExecutionHandle | undefined {
     const binding = this.getSessionBinding?.(sessionId);
+    if (binding) bindManagedNativeIdentity(this.config.sessionBaseDir, binding, opts.resumeSessionId ?? binding.providerSessionId);
     assertRetainedSkillContent({
       policy: getRuntimeSkillContentPolicy(), hydration: binding?.hydration, skills: binding?.skills,
       cwd: opts.cwd, sessionBaseDir: this.config.sessionBaseDir, sessionId,
@@ -230,6 +233,11 @@ export class RuntimeSessionManager {
       guardrail?: RuntimeGuardrailResult;
     } = {},
   ): RuntimeRunInspection {
+    bindManagedNativeIdentity(this.config.sessionBaseDir, session, session.providerSessionId);
+    if (hasManagedPluginExposure(this.config.sessionBaseDir, session.id)
+      && !this.pool.get(session.id)?.managedPluginLifetime) {
+      throw new RuntimeSkillError('Plugin skills require a freshly managed native CLI session. Start a new conversation.', 'managed_plugin_conflict');
+    }
     assertRetainedSkillContent({
       policy: getRuntimeSkillContentPolicy(), hydration: session.hydration, skills: session.skills,
       cwd: session.cwd, sessionBaseDir: this.config.sessionBaseDir, sessionId: session.id,

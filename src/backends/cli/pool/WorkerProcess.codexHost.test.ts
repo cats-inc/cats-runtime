@@ -44,6 +44,7 @@ describe('WorkerProcess with a managed Codex host', () => {
   afterEach(() => { child.emit('close', 0); vi.clearAllMocks(); });
 
   it('holds the first turn until the hidden host is ready and reaps it on exit', async () => {
+    const processStopped = vi.fn(); worker.on('process-stopped', processStopped);
     worker.start();
     expect(worker.alive).toBe(true);
     const turn = worker.sendMessage('hello');
@@ -56,10 +57,13 @@ describe('WorkerProcess with a managed Codex host', () => {
     await expect(turn).resolves.toMatchObject([{ type: 'result' }]);
     child.emit('close', 0);
     expect(host.stop).toHaveBeenCalledOnce();
+    expect(processStopped).not.toHaveBeenCalled();
     closed.resolve();
+    await vi.waitFor(() => expect(processStopped).toHaveBeenCalledOnce());
   });
 
   it('prevents a late startup from resurrecting a cancelled worker', async () => {
+    const stopped = vi.fn(); worker.on('process-stopped', stopped);
     worker.start(); worker.kill();
     expect(startHostMock.mock.calls[0][3].aborted).toBe(true);
     pending.resolve(host);
@@ -67,6 +71,18 @@ describe('WorkerProcess with a managed Codex host', () => {
     expect(spawnMock).not.toHaveBeenCalled();
     expect(worker.alive).toBe(false);
     await expect(worker.sendMessage('hello')).rejects.toThrow('startup cancelled');
+    expect(stopped).not.toHaveBeenCalled();
+    closed.resolve(); await vi.waitFor(() => expect(stopped).toHaveBeenCalledOnce());
+  });
+
+  it('waits for a rejected startup guard to close before declaring the lifetime stopped', async () => {
+    const stopped = vi.fn(); worker.on('process-stopped', stopped);
+    worker.start();
+    startHostMock.mock.calls[0][4](closed.promise);
+    worker.cancel(); pending.reject(new Error('host startup cancelled'));
+    await vi.waitFor(() => expect(worker.alive).toBe(false));
+    expect(spawnMock).not.toHaveBeenCalled(); expect(stopped).not.toHaveBeenCalled();
+    closed.resolve(); await vi.waitFor(() => expect(stopped).toHaveBeenCalledOnce());
   });
 
   it('retains legacy launch arguments when external hosts are unsupported', async () => {

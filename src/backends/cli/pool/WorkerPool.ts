@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { hasManagedPluginExposure, recordManagedPluginRun, finishManagedPluginRun } from '../../../core/skills/managedPlugins.js';
 import {
   resolveProviderInstance,
   type CliRuntimeConfig,
@@ -228,6 +230,7 @@ export class WorkerPool {
     const singletonResource = instance.commandConfig.singleton;
     let singletonReserved = false;
     let worker: WorkerProcess | undefined;
+    let pluginExecutionId: string | undefined;
 
     try {
       if (singletonResource) {
@@ -251,11 +254,23 @@ export class WorkerPool {
           this.config.spawnTimeoutMs,
         ),
       };
-      worker = new WorkerProcess(provider, opts, commandConfig, resilience);
+      const managed = hasManagedPluginExposure(this.config.sessionBaseDir, sessionId);
+      const executionId = randomUUID();
+      if (managed && (!['codex', 'claude'].includes(providerName) || commandConfig.runtime.mode !== 'native')) throw new Error('Managed Plugins require native Codex or Claude.');
+      worker = new WorkerProcess(provider, opts, commandConfig, resilience, managed);
+      worker.on('native-session', nativeId => { this.registry.setProviderSessionId(sessionId, nativeId, !opts.resumeSessionId); });
+      if (managed) {
+        pluginExecutionId = executionId;
+        recordManagedPluginRun(this.config.sessionBaseDir, sessionId, executionId);
+        worker.on('process-stopped', () => { finishManagedPluginRun(this.config.sessionBaseDir, sessionId, executionId); });
+      }
 
       worker.on('event', (event) => {
         if ((event.type === 'init' || event.type === 'result') && event.sessionId) {
-          this.registry.setProviderSessionId(sessionId, event.sessionId);
+          if (this.registry.get(sessionId)?.providerSessionId !== event.sessionId) {
+            try { this.registry.setProviderSessionId(sessionId, event.sessionId); }
+            catch (error) { worker?.cancel(); worker?.emit('error', error instanceof Error ? error : new Error(String(error))); return; }
+          }
           this.registry.updateStatus(sessionId, 'ready');
         }
       });
@@ -282,6 +297,7 @@ export class WorkerPool {
 
       return worker;
     } catch (error) {
+      if (pluginExecutionId && worker && !worker.startupHasOwnedProcess) finishManagedPluginRun(this.config.sessionBaseDir, sessionId, pluginExecutionId);
       if (worker && this.workers.get(sessionId) === worker) {
         this.workers.delete(sessionId);
       }
