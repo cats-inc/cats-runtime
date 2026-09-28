@@ -547,7 +547,8 @@ Agent-specific instructions and handoff checklists MUST use this scope.
   meant to open a session in this shared clone. It stops on a dirty working tree,
   never touches a branch that was never pushed, and skips any branch held by
   another worktree. `-WhatIf` previews; `-ReturnToDefault` also lands you on an
-  up-to-date default branch.
+  up-to-date default branch, but only moves off a branch whose upstream is gone
+  and warns when the fast-forward fails.
 
 ### PR Title Format
 

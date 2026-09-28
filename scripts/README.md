@@ -88,7 +88,10 @@ as merged once it had an upstream and that upstream is gone.
 ```
 
 It refuses to run on a dirty working tree, never sweeps a branch that was never
-pushed, and skips branches checked out in another worktree. Run
+pushed, and skips branches checked out in another worktree. `-ReturnToDefault`
+only leaves a branch whose upstream is gone: a clean checkout on an unmerged
+branch may be another agent waiting on CI, so it stays put with a warning. A
+fast-forward that fails is reported as a warning, not as success. Run
 `git config --global fetch.prune true` once so the `gone` markers it reads
 appear without remembering `--prune`.
 
