@@ -341,14 +341,15 @@ plan evidence is the
 - The advanced catalog result, including the local host projection, carries
   `basis` unchanged. The basic model list is unchanged. A missing `basis` means
   the selectors show nothing.
-- Playground and Desktop show one read-only Basis field (依據) beside the model
-  choice: a disabled control holding the channel label, or the plan label when there
-  is no channel, and both when a scope ever has both. An explanation line says the
-  list reflects that channel or plan and that other channels remain reachable as
-  custom input.
-- The field is never a selector. It has no alternative options, never shows a
-  synthetic default, and is not sent as a model control.
-- Custom `provider/model` input stays available beside it.
+- Playground and Desktop show a small, unobtrusive information icon ("i", not a
+  warning mark) beside the Model label. Its tooltip names the channel, or the plan
+  when there is no channel, and both when a scope ever has both. It says the list
+  reflects that channel or plan and that other channels remain reachable as custom
+  input. (Owner decision 2026-09-29, replacing the first design's disabled field.)
+- The icon is a focusable button with an accessible name, so the tooltip also appears
+  on keyboard focus and on tap. It is never a selector, never shows a synthetic
+  default, and is not sent as a model control.
+- Custom `provider/model` input stays available.
 - Entry labels need not repeat the channel. By the owner's 2026-09-29 decision, Pi
   labels drop the `[openai-codex]` suffix required on 2026-09-23; the earlier
   spellings stay in `source_names`.
@@ -380,9 +381,9 @@ saved selections are unaffected.
 | AC-13 | Generation/check fails when a derivative is edited or a production model table returns; intentional fixtures/evidence remain permitted |
 | AC-14 | A fresh agent follows the updated canonical/mirrored skill to perform factory and local fixture changes; no manual production model literals or unsupported capability claims |
 | AC-15 | A packaged Runtime upgrades a previous-release profile before its first model read, preserves all choices with a raw backup, performs no duplicate conversion after restart, and supports explicit retry after a blocked conversion; read-only hosts do not write |
-| AC-16 | Pi, Goose, Cline, OpenCode and Kilo show their channel; Copilot shows its plan; first-party scopes show no Basis field; Playground and Desktop agree |
+| AC-16 | Pi, Goose, Cline, OpenCode and Kilo show their channel; Copilot shows its plan; first-party scopes show no basis icon; Playground and Desktop agree |
 | AC-17 | `catalog:check` rejects an empty basis label, a basis with neither field, and a channel id that differs from any entry's executable channel |
-| AC-18 | The Basis field is disabled with one option, is not submitted as a model control, and custom `provider/model` input still works beside it |
+| AC-18 | The basis icon is a focusable button whose tooltip appears on hover and focus, is not submitted as a model control, and custom `provider/model` input still works |
 | AC-19 | Selection, spawned arguments and saved selections are identical with and without `basis` |
 
 All execution assertions use isolated fake transports; no user-state sessions,
