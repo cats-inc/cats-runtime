@@ -35,6 +35,19 @@ const SESSION_POLL_INTERVAL_MS = 250;
 const DEFAULT_JUNIE_TURN_TIMEOUT_MS = 10 * 60 * 1000;
 const JUNIE_TURN_TIMEOUT_ENV = 'CATS_JUNIE_TURN_TIMEOUT_MS';
 
+/**
+ * Junie runs on its bundled JVM, which writes piped stdout and stderr in the
+ * platform's native encoding -- on Windows the ANSI code page (CP950 on a
+ * zh-TW machine), not UTF-8. This adapter reads both as UTF-8, so a Chinese
+ * result arrived as mojibake, and characters the code page lacks were already
+ * `?` before they left Junie. Decoding with the code page here cannot recover
+ * those, so the JVM is told to write UTF-8 instead.
+ */
+const JUNIE_UTF8_STDIO_OPTIONS = '-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8';
+
+/** The JVM's stderr announcement of JAVA_TOOL_OPTIONS, which is not a Junie diagnostic. */
+const JVM_TOOL_OPTIONS_NOTICE = /^Picked up JAVA_TOOL_OPTIONS:.*$/gmu;
+
 function isSessionIdentityEvent(
   event: StreamEvent,
 ): event is InitStreamEvent | ResultStreamEvent {
@@ -150,6 +163,10 @@ export class JunieProvider implements Provider {
     );
     if (spawnConfig.env) {
       Object.assign(env, spawnConfig.env);
+    }
+    // WSL and Docker start Junie from their payload, not this environment.
+    if (this.commandConfig.runtime.mode === 'native') {
+      env.JAVA_TOOL_OPTIONS = withJunieUtf8Stdio(env.JAVA_TOOL_OPTIONS);
     }
 
     const child = spawn(spawnConfig.command, spawnConfig.args, {
@@ -316,7 +333,7 @@ export class JunieProvider implements Provider {
     }
 
     child.stderr?.on('data', (chunk: Buffer) => {
-      appendStderrLines(stderrLines, chunk.toString('utf-8'));
+      appendStderrLines(stderrLines, stripJvmToolOptionsNotice(chunk.toString('utf-8')));
     });
 
     child.on('error', (error) => {
@@ -447,6 +464,16 @@ export class JunieProvider implements Provider {
     knownSessionIds.add(selected.sessionId);
     return selected.sessionId;
   }
+}
+
+/** Appended last, so it overrides an inherited encoding without dropping the user's options. */
+export function withJunieUtf8Stdio(javaToolOptions?: string): string {
+  const inherited = javaToolOptions?.trim();
+  return inherited ? `${inherited} ${JUNIE_UTF8_STDIO_OPTIONS}` : JUNIE_UTF8_STDIO_OPTIONS;
+}
+
+export function stripJvmToolOptionsNotice(stderrText: string): string {
+  return stderrText.replace(JVM_TOOL_OPTIONS_NOTICE, '');
 }
 
 function normalizeJunieModelId(model?: string): string | undefined {
