@@ -60,7 +60,12 @@ that a Desktop Cats Chat reply from Junie quoted their message `junie午安` as 
   and 2946.613 after the first two probes, and exhausted during the multi-line run. The `cost` field
   reported US$0.008 to US$0.017 per task. How credits map to that field is not known; do not size
   probes from it.
-- **Failures arrive as empty replies.** That failure produced no `error` event: `parseJunieSessionEventLine`
-  ignores `AgentFailureEvent`, so the turn ended without text. Not changed here.
+- **Failures arrived as empty replies.** That failure produced no `error` event: the session parser
+  ignored `AgentFailureEvent`, and the stdout parser ignored `errors`, a string list in Junie's
+  `CliOutput` (`sessionId`, `errors`, `taskName`, `result`, `changes`, `llmUsage`, read from
+  `junie-release-3419.7.jar`) that a failed task fills instead of `result`. Both now end the turn with
+  Junie's message. Replaying this session's `events.jsonl` through the parser yields
+  `Junie: Insufficient account balance. …` with the task's token usage; the stdout shape is
+  inferred from the class, not captured from a failed run.
 - The Junie ACP profile on the agent backend reads the same JVM's stdout and does not get the
   `JAVA_TOOL_OPTIONS` change.

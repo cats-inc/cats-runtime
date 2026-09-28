@@ -7,7 +7,7 @@
 | Entry | Topic | Focus |
 |-------|-------|-------|
 | [2026-09-28-kiro-v2-ignores-model](./2026-09-28-kiro-v2-ignores-model.md) | Kiro 2.24 v2 engine ignores `--model` | Truthful session records, the `Method not found` warning, four engine probes and the move to `--agent-engine v1` |
-| [2026-09-28-junie-windows-stdio-encoding](./2026-09-28-junie-windows-stdio-encoding.md) | Junie output mojibake on Windows | CP950 stdout/stderr from Junie's JVM decoded as UTF-8, the `JAVA_TOOL_OPTIONS` fix, and the argv loss of non-CP950 characters fixed by sending the task over stdin |
+| [2026-09-28-junie-windows-stdio-encoding](./2026-09-28-junie-windows-stdio-encoding.md) | Junie output mojibake on Windows | CP950 stdout/stderr from Junie's JVM decoded as UTF-8, the `JAVA_TOOL_OPTIONS` fix, the argv loss of non-CP950 characters fixed by sending the task over stdin, and failed tasks reported with Junie's message instead of an empty reply |
 | [2026-09-28-junie-execution-ids](./2026-09-28-junie-execution-ids.md) | Junie `--model` takes setting IDs | Picker names rejected as an invalid model, the JAR's resolution order, all 15 rows remapped to setting IDs and the reusable setting-ID reader |
 | [2026-09-28-grok-single-image-spike](./2026-09-28-grok-single-image-spike.md) | One-image Grok headless adapter spike | One model round and image_gen call, valid 1024-square JPEG, session-owned output, max-turn terminal distinction and reported model usage; editing/video deferred |
 | [2026-09-27-codex-bootstrap-permissions](./2026-09-27-codex-bootstrap-permissions.md) | Effective Codex bootstrap permissions | Failed bounded ordinary-agent contribution, isolated Windows mode omission, auth-free readiness/write/loopback checks and pre-inference mismatch guard |
