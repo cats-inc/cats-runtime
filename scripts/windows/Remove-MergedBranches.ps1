@@ -73,7 +73,12 @@ $ErrorActionPreference = "Stop"
 function Invoke-Git {
     param([string[]]$Arguments, [switch]$AllowFailure)
 
-    $output = & git -C $script:RepoRoot @Arguments 2>&1
+    # git reports ordinary progress such as "From <remote>" or "Switched to
+    # branch" on stderr. Windows PowerShell 5.1 turns each of those lines into an
+    # error record under 2>&1, which "Stop" throws on even when git succeeded, so
+    # judge git by its exit code and keep its lines as text.
+    $ErrorActionPreference = "Continue"
+    $output = & git -C $script:RepoRoot @Arguments 2>&1 | ForEach-Object { "$_" }
     if ($LASTEXITCODE -ne 0 -and -not $AllowFailure) {
         throw "git $($Arguments -join ' ') failed with exit code $LASTEXITCODE`n$output"
     }
@@ -160,7 +165,12 @@ function Resolve-DefaultBranch {
 
 # Resolve the repository first so every later call is explicitly scoped to it.
 $startDir = if ($RepositoryRoot) { $RepositoryRoot } else { (Get-Location).Path }
-$script:RepoRoot = & git -C $startDir rev-parse --show-toplevel 2>$null
+$script:RepoRoot = & {
+    # See Invoke-Git: outside a repository git's stderr would otherwise throw on
+    # Windows PowerShell 5.1 before the clearer message below.
+    $ErrorActionPreference = "Continue"
+    & git -C $startDir rev-parse --show-toplevel 2>$null
+}
 if ($LASTEXITCODE -ne 0 -or -not $script:RepoRoot) {
     throw "Not a git repository: $startDir"
 }
