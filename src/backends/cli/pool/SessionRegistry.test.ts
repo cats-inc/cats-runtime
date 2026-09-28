@@ -477,6 +477,25 @@ describe('SessionRegistry', () => {
     expect(registry.get(resumed!.id)?.status).toBe('ready');
   });
 
+  it('merges a live turn\'s native session reported with forward slashes into its runtime session', () => {
+    // Kiro's discovery reports the runtime session's own Windows cwd with
+    // forward slashes while the turn is still running.
+    const session = registry.create({
+      providerName: 'kiro',
+      cwd: 'C:\\Users\\tester\\.cats\\runtime\\sessions\\run-1',
+    });
+    registry.updateStatus(session.id, 'busy');
+
+    const merged = registry.upsertDiscovered('kiro-native-1', {
+      providerName: 'kiro',
+      cwd: 'C:/Users/tester/.cats/runtime/sessions/run-1/',
+    });
+
+    expect(merged?.id).toBe(session.id);
+    expect(registry.get(session.id)?.providerSessionId).toBe('kiro-native-1');
+    expect(registry.list({ provider: 'kiro' })).toHaveLength(1);
+  });
+
   it('reattaches Pi providerSourcePath after runtime-managed history takes over', () => {
     registry = new SessionRegistry(undefined, '/tmp/cats-runtime/sessions');
 

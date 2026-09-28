@@ -35,6 +35,19 @@ import {
   readRuntimeExecutionStrategyState,
 } from '../../../core/runtime/strategies/state.js';
 
+/**
+ * A runtime session records its cwd as the host wrote it, and a native discovery
+ * service may report the same directory with forward slashes (Kiro does), so a
+ * live turn's native session was imported as a separate external session.
+ */
+function sameSessionCwd(left: string, right: string): boolean {
+  const normalize = (path: string): string => {
+    const forward = path.replace(/\\/g, '/').replace(/\/+$/, '');
+    return process.platform === 'win32' ? forward.toLowerCase() : forward;
+  };
+  return normalize(left) === normalize(right);
+}
+
 function isMissingPersistencePathError(error: unknown): boolean {
   return typeof error === 'object'
     && error !== null
@@ -923,7 +936,7 @@ export class SessionRegistry {
         data.providerBackend,
         data.providerInstanceId,
       )
-      && session.cwd === data.cwd
+      && sameSessionCwd(session.cwd, data.cwd)
       && session.status !== 'closed'
       && session.status !== 'closing'
     );
