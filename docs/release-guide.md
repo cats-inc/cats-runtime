@@ -43,8 +43,10 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
-Runtime **0.3.4** is prepared for the Desktop **0.5.10** standard-profile preview. It is
-not published to npm; npm `latest` stays `0.3.2`. This compatible patch fixes turns whose
+Runtime **0.3.4** shipped on 2026-09-28 (Taipei) in the
+[Desktop **0.5.10** standard-profile preview](https://github.com/cats-inc/cats-platform/releases/tag/v0.5.10),
+which bundles `0804e238e1c9b6a29c3357301336400ea4e3ac64` on every OS. It is not
+published to npm; npm `latest` stays `0.3.2`. This compatible patch fixes turns whose
 result arrives after the provider's process exits: the session stream now delivers Auggie's
 and Kiro's result before closing, and a turn that ends without a result or error is completed
 instead of leaving its run running. Kiro sessions are read from Kiro 2.24's
