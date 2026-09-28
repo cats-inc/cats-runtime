@@ -1,4 +1,5 @@
-import type { RuntimeRunStatus, SessionInfo } from '../types.js';
+import type { ReportedModel, RuntimeRunStatus, SessionInfo } from '../types.js';
+import { describeReportedModels } from './reportedModels.js';
 
 /**
  * One line per run in the runtime's own output, which the desktop host keeps as
@@ -31,6 +32,8 @@ export function formatRunLogLine(input: {
   target: string;
   durationMs?: number;
   error?: string;
+  /** Given for a finished run; `model=` alone is only what was requested. */
+  reportedModels?: readonly ReportedModel[] | null;
 }): string {
   const parts = [
     `[run] ${input.outcome}`,
@@ -38,6 +41,9 @@ export function formatRunLogLine(input: {
     `run=${input.runId}`,
     input.target,
   ];
+  if (input.reportedModels !== undefined) {
+    parts.push(`reported=${describeReportedModels(input.reportedModels ?? undefined)}`);
+  }
   if (input.durationMs !== undefined) {
     parts.push(`duration=${(input.durationMs / 1000).toFixed(1)}s`);
   }

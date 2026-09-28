@@ -35,6 +35,7 @@ import { ApiBackendManager } from '../../backends/api/runtime/ApiBackendManager.
 import { AgentBackendManager } from '../../backends/agent/runtime/AgentBackendManager.js';
 import { extractWakeReason } from './wakeReason.js';
 import { describeRunTarget, formatRunLogLine, type RuntimeRunLogOutcome } from './runLog.js';
+import { hasReportedModelMismatch, mergeReportedModels } from './reportedModels.js';
 import {
   cloneMaintenanceFollowThrough,
   cloneMaintenanceRequest,
@@ -354,6 +355,10 @@ export class RuntimeSessionManager {
     const usage = extractRuntimeUsageSignal(event);
     if (usage) {
       currentRun.usage = usage;
+    }
+
+    if ('reportedModels' in event && event.reportedModels?.length) {
+      currentRun.reportedModels = mergeReportedModels(currentRun.reportedModels, event.reportedModels);
     }
 
     if (event.type === 'result') {
@@ -868,8 +873,11 @@ export class RuntimeSessionManager {
       ...(run.status !== 'succeeded' && (run.error || run.resultSummary)
         ? { error: run.error ?? run.resultSummary }
         : {}),
+      reportedModels: run.reportedModels ?? null,
     });
-    if (run.status === 'succeeded') console.log(line);
+    // A provider serving another model than requested is worth a warning even
+    // when the turn itself succeeded.
+    if (run.status === 'succeeded' && !hasReportedModelMismatch(run.reportedModels)) console.log(line);
     else console.warn(line);
   }
 
@@ -1047,6 +1055,7 @@ function cloneRun(run: RuntimeRunInspection): RuntimeRunInspection {
     ...(run.incident ? { incident: { ...run.incident, ...(run.incident.metadata ? { metadata: { ...run.incident.metadata } } : {}) } } : {}),
     ...(run.artifacts ? { artifacts: cloneArtifacts(run.artifacts) } : {}),
     ...(run.services ? { services: cloneServices(run.services) } : {}),
+    ...(run.reportedModels ? { reportedModels: run.reportedModels.map((entry) => ({ ...entry })) } : {}),
   };
 }
 

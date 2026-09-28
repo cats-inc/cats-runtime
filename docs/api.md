@@ -2534,6 +2534,26 @@ intended for host/dashboard run inspectors:
 status when the runtime is actively canceling or closing a run. The block is
 additive: existing session fields remain stable.
 
+`currentRun.reportedModels` and `lastRun.reportedModels` list the models the
+provider says served the run, each as `{ model, matchesRequest? }`, in the
+provider's own naming. `matchesRequest: false` means the provider served another
+model than the requested one; it is absent when the adapter cannot compare the
+two names. The field is absent when the provider reported no model. Adapters
+set it from `result` or `progress` events (`reportedModels` on the event):
+
+- Claude: each main-conversation reply's model; an alias such as `opus`
+  matches any model of its family.
+- Copilot: the model auto mode chose and each reply's model.
+- Grok: the `end` event's `modelUsage` models; the `-build` suffix is ignored.
+- Codex: the target of a `model/rerouted` notice, which never matches.
+- Pi: the reply's `responseModel`, else its `model`.
+- Kiro: the model its session record gives the turn.
+- Junie: every model the task called, without a comparison.
+
+Other providers only echo the requested model, or report none. Each run's
+`[run]` log line shows `reported=` beside `model=`, `(none)` when nothing was
+reported, and is written as a warning when any reported model does not match.
+
 For agent-backed sessions, `inspection.agentSession` is also additive and
 runtime-owned. It re-surfaces the provider-managed session pointer plus a
 bounded `activity` summary (`toolUseCount`, `toolResultCount`,
