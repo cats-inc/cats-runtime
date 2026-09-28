@@ -2,6 +2,10 @@
 
 > This directory contains all project documentation.
 
+[Grok single-image spike](research/2026-09-28-grok-single-image-spike.md) records
+one authorized native CLI image through the Runtime adapter, verified JPEG output
+and model usage. Editing, video and installed App integration remain unverified.
+
 Codex skill delivery now verifies Runtime-owned worktree identity, physical
 containment and existing ignore rules before preparing skill files. Provider
 grants are unchanged; source and unverified targets still reject strict delivery.
