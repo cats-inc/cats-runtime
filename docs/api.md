@@ -2124,6 +2124,7 @@ Example `providerTarget` shape:
       "resume": true,
       "fork": true,
       "permissions": true,
+      "sessionMcpServers": false,
       "providerManagedSessions": false,
       "sessionKey": false,
       "providerSessionState": true,
@@ -2715,7 +2716,9 @@ servers a provider CLI connects to. `mcpServers` is optional on `POST /sessions`
 - **Where it applies.** The set is used only by adapters that declare support,
   in a `native` CLI runtime. Claude Code and Codex declare support. Other adapters,
   Docker/WSL instances, non-CLI backends and peer-routed turns report
-  `unsupported`.
+  `unsupported`. Provider reads and session `providerTarget` reads expose this
+  per target as `continuity.sessionMcpServers`, so a host can check it before
+  sending the field. Peer routing is decided per turn and is not reflected there.
 - **Changing the set.** When a send changes the set of a live supporting worker,
   Runtime restarts that worker through resume before writing the turn. If the
   restart fails, the session is closed and the send returns `500`.
@@ -3975,6 +3978,14 @@ Each instance entry also exposes additive `continuity` metadata:
   - `provider_managed`: an external agent runtime owns provider-managed session
     continuity while `cats-runtime` keeps the caller-visible facade local
 - `resume`, `fork`, `permissions`: the resolved capability truth for the target
+- `sessionMcpServers`: whether the target delivers per-session `mcpServers`
+  sent on session create, resume and message
+  ([SPEC-035](specs/SPEC-035-session-mcp-servers.md),
+  [Session MCP servers](#session-mcp-servers)). It is `true` only for a CLI
+  adapter that declares support (Claude Code, Codex) on an instance whose runtime
+  is `native`. Docker/WSL instances and `api`, `local` and `agent` targets
+  report `false`: the request field stays valid there, but the delivery report
+  is `unsupported`.
 - `providerManagedSessions`, `sessionKey`, `providerSessionState`,
   `remoteCancel`: bounded continuity affordances describing upstream-owned
   session state

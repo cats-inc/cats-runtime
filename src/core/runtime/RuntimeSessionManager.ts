@@ -32,6 +32,7 @@ import { asRecord, readNumber, readString } from '../usage/utils.js';
 import type { WorkerPool } from '../../backends/cli/pool/WorkerPool.js';
 import type { WorkerProcess } from '../../backends/cli/pool/WorkerProcess.js';
 import { resolveProviderTarget } from '../providerCatalog.js';
+import { targetSupportsSessionMcpServers } from '../providerContinuity.js';
 import type { BackendKind } from '../../backends/cli/config.js';
 import { ApiBackendManager } from '../../backends/api/runtime/ApiBackendManager.js';
 import { AgentBackendManager } from '../../backends/agent/runtime/AgentBackendManager.js';
@@ -286,9 +287,9 @@ export class RuntimeSessionManager {
     providerName: string,
     cliInstanceId: string | undefined,
   ): boolean {
+    // Provider reads report the same gate as `continuity.sessionMcpServers`.
     return target.backend === 'cli'
-      && target.cliInstance?.commandConfig.runtime.mode === 'native'
-      && this.pool.getCapabilities(providerName, cliInstanceId).sessionMcpServers === true;
+      && targetSupportsSessionMcpServers(target, this.pool.getCapabilities(providerName, cliInstanceId));
   }
 
   beginRun(

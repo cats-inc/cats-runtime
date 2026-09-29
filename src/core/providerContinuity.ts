@@ -8,6 +8,8 @@ export interface ProviderContinuitySummary {
   resume: boolean;
   fork: boolean;
   permissions: boolean;
+  /** Target accepts SPEC-035 per-session `mcpServers` (a supporting CLI adapter in a native runtime). */
+  sessionMcpServers: boolean;
   providerManagedSessions: boolean;
   sessionKey: boolean;
   providerSessionState: boolean;
@@ -17,6 +19,20 @@ export interface ProviderContinuitySummary {
 interface ProviderContinuitySummaryOptions {
   capabilities: ProviderCapabilities;
   agentRuntime?: AgentAdapterInspection;
+}
+
+/**
+ * Whether Runtime delivers SPEC-035 session MCP servers for a target. This mirrors the
+ * gate that session create, resume and send apply: only a CLI adapter that declares
+ * support, running in a native runtime, receives the set.
+ */
+export function targetSupportsSessionMcpServers(
+  target: Pick<ProviderTargetDescriptor, 'backend' | 'cliInstance'>,
+  capabilities: Pick<ProviderCapabilities, 'sessionMcpServers'>,
+): boolean {
+  return target.backend === 'cli'
+    && target.cliInstance?.commandConfig.runtime.mode === 'native'
+    && capabilities.sessionMcpServers === true;
 }
 
 export function buildProviderContinuitySummary(
@@ -31,6 +47,7 @@ export function buildProviderContinuitySummary(
       resume: options.capabilities.resume,
       fork: options.capabilities.fork,
       permissions: options.capabilities.permissions,
+      sessionMcpServers: false,
       providerManagedSessions: false,
       sessionKey: false,
       providerSessionState: true,
@@ -47,6 +64,7 @@ export function buildProviderContinuitySummary(
       resume: options.capabilities.resume,
       fork: options.capabilities.fork,
       permissions: options.capabilities.permissions,
+      sessionMcpServers: false,
       providerManagedSessions: continuity?.providerManagedSessions === true,
       sessionKey: continuity?.sessionKey === true,
       providerSessionState: continuity?.providerSessionState === true,
@@ -61,6 +79,7 @@ export function buildProviderContinuitySummary(
     resume: options.capabilities.resume,
     fork: options.capabilities.fork,
     permissions: options.capabilities.permissions,
+    sessionMcpServers: targetSupportsSessionMcpServers(target, options.capabilities),
     providerManagedSessions: true,
     sessionKey: false,
     providerSessionState: false,
