@@ -16,6 +16,7 @@ describe('CopilotProvider', () => {
       resume: true,
       fork: false,
       permissions: false,
+      sessionMcpServers: true,
     });
   });
 

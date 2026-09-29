@@ -1,7 +1,8 @@
 # PLAN-046: Session MCP servers
 
 Status: Complete (2026-09-30). R1 merged in #130, R2 in #132, R3 in #134 and R4
-in #140. Release remains separate (see R4).
+in #140. The F3 follow-up adds GitHub Copilot CLI and records why the other
+adapters cannot take the set yet. Release remains separate (see R4 and F3).
 [SPEC-035](../specs/SPEC-035-session-mcp-servers.md) and
 [ADR-044](../decisions/044-configure-session-mcp-servers-for-provider-clis.md)
 govern this work. The Platform consumer is PLAN-116, which tracks the matching
@@ -125,6 +126,78 @@ R3 notes for consumers:
   SOP. This plan authorizes no bump. Runtime 0.4.0 was published from
   `2f167ad5` (#139, recorded in #141) with R1–R3 but before R4 merged, so the
   read field first ships in a later compatible 0.4.x release.
+
+## F3 — More provider CLIs (follow-up for PLAN-116 F3)
+
+The Platform task is PLAN-116 F3: extend delivery to other providers or record
+why each one cannot take it. The per-provider decisions and evidence are in the
+SPEC-035 provider matrix.
+
+- [x] Survey every other CLI adapter against the SPEC-035 bar. Only GitHub
+  Copilot CLI qualifies today: a per-run flag plus bearer expansion from the
+  environment, without writing any user or workspace config.
+- [x] Copilot: add `--additional-mcp-config` inline JSON with
+  `Authorization: Bearer ${CATS_MCP_<NAME>_TOKEN}`. Enable the capability, and
+  add Copilot to the session-list fallback capabilities so that list and
+  detail reads agree. Normalize `session.mcp_server_status_changed` and
+  `session.mcp_servers_loaded` for session servers into provider `mcp_servers`
+  progress events. Other servers, such as the built-in GitHub server, are
+  ignored.
+- [x] Recycling needs no adapter work. Copilot runs one process per turn, and
+  the existing SMCP-08 recycle replaces the logical worker and its launch
+  environment. The next process resumes the same Copilot session with the new
+  set.
+- [x] Commit the loopback stub used by the smokes as
+  `scripts/testing/session-mcp-stub-server.mjs`, with an offline test. It reads
+  the expected bearer from an environment variable, and its log records only
+  an auth classification: `ok`, `absent`, `literal-placeholder` or `other`.
+- [x] Isolated live smoke (2026-09-30, Windows, Copilot CLI 1.0.89,
+  `gpt-5-mini`, permission mode `default`). Runtime ran from the branch with a
+  temporary `CATS_RUNTIME_DIR` and a Copilot-only `providers.yaml`.
+  - `GET /providers/copilot/tools` reported `continuity.sessionMcpServers: true`.
+  - Create reported `delivered` with `connection: unknown`.
+  - In turn 1, the stub logged `initialize`, `tools/list` and the SSE `GET`,
+    all with the expanded bearer (`auth: ok`). The stream carried the provider
+    statuses `pending` then `connected`.
+  - Turn 2 reported `connection: connected`.
+  - A send that changed the URL recycled the worker. The report returned to
+    `unknown`, the stub saw the new path with the bearer, and the same Copilot
+    session was resumed.
+  - The token did not appear in create, list, detail or stream bodies, in the
+    temporary Runtime directory, in Runtime output or under `~/.copilot`.
+  - Not covered: `tools/call`. The account's Copilot quota rejected every
+    model call with HTTP 402 (`quota_exceeded`), including the 0x-premium
+    `gpt-5-mini`, so the model never reached a tool call.
+  - Direct probes of Kiro, Grok and Auggie ran against the same stub. Their
+    Kiro and Grok sessions were deleted with each CLI's own delete command.
+    Auggie ran with `--dont-save-session`. Copilot has no non-interactive
+    delete, so its three probe sessions remain in `~/.copilot/session-state`.
+
+F3 notes for consumers:
+
+- Treat Copilot like Claude for instructions: name the tools the model should
+  call. Connection evidence arrives during a turn, so the first report after
+  create or recycle shows `connection: unknown`.
+- The inline JSON always contains `"`. It reaches Copilot intact when Runtime
+  resolves the npm shim to `node <script>` (the default, and the smoke path).
+  If that resolution fails, the Windows launcher falls back to the PowerShell
+  proxy, which was not exercised with this argument.
+- A server that stalls while connecting is still bounded by the instance
+  `timeout_ms`. The worker re-arms its inactivity timer on each event, and
+  Copilot emits `pending` before it connects.
+- Known gap, not changed here: the Copilot adapter does not surface
+  `session.error`. A quota rejection therefore ends the Runtime stream with an
+  empty `result` and no error text.
+- Grok and Kiro are the closest candidates. Each has a working per-run route
+  (a Grok agent file with `bearer_token_env_var`, or the Kiro v2 agent
+  directory), but it would replace the session's primary agent or give up
+  model selection. Revisit either one if the CLI adds a per-run MCP flag.
+
+Release boundary: an additive capability within the current 0.x line. No HTTP,
+configuration or persisted-data contract changes. The existing
+`continuity.sessionMcpServers` field now reads `true` for native Copilot
+targets. No migration and no version bump. The version is chosen at release
+time under the release SOP.
 
 ## Validation
 

@@ -79,6 +79,13 @@ function buildFallbackCapabilities(
         permissions: true,
         sessionMcpServers: true,
       };
+    case 'copilot':
+      return {
+        resume: true,
+        fork: false,
+        permissions: false,
+        sessionMcpServers: true,
+      };
     case 'auggie':
     case 'kiro':
     case 'kilo':

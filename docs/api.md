@@ -2714,9 +2714,10 @@ servers a provider CLI connects to. `mcpServers` is optional on `POST /sessions`
   session and are not inherited by forks. After a Runtime restart, supply them
   again on resume.
 - **Where it applies.** The set is used only by adapters that declare support,
-  in a `native` CLI runtime. Claude Code and Codex declare support. Other adapters,
-  Docker/WSL instances, non-CLI backends and peer-routed turns report
-  `unsupported`. Provider reads and session `providerTarget` reads expose this
+  in a `native` CLI runtime. Claude Code, Codex and GitHub Copilot CLI declare
+  support. Other adapters, Docker/WSL instances, non-CLI backends and
+  peer-routed turns report `unsupported`. The SPEC-035 provider matrix records
+  why each other CLI cannot take the set yet. Provider reads and session `providerTarget` reads expose this
   per target as `continuity.sessionMcpServers`, so a host can check it before
   sending the field. Peer routing is decided per turn and is not reflected there.
 - **Changing the set.** When a send changes the set of a live supporting worker,
@@ -2726,7 +2727,8 @@ servers a provider CLI connects to. `mcpServers` is optional on `POST /sessions`
   `mcpServers: { status, servers: [{ name, connection }] }`, where `status` is
   `delivered`, `unsupported` or `failed`. `connection` (`connected`, `failed` or
   `unknown`) comes from the provider's own evidence, such as Claude's
-  `system:init` or Codex's MCP startup status, once a turn has produced it.
+  `system:init`, Codex's MCP startup status or Copilot's MCP server status
+  events, once a turn has produced it.
   Providers may also emit their own `mcp_servers` progress events with
   `metadata.source: "provider"`. Read delivery only from the leading
   Runtime-sourced event. The report is omitted when no servers
@@ -3990,8 +3992,8 @@ Each instance entry also exposes additive `continuity` metadata:
   sent on session create, resume and message
   ([SPEC-035](specs/SPEC-035-session-mcp-servers.md),
   [Session MCP servers](#session-mcp-servers)). It is `true` only for a CLI
-  adapter that declares support (Claude Code, Codex) on an instance whose runtime
-  is `native`. Docker/WSL instances and `api`, `local` and `agent` targets
+  adapter that declares support (Claude Code, Codex, GitHub Copilot CLI) on an
+  instance whose runtime is `native`. Docker/WSL instances and `api`, `local` and `agent` targets
   report `false`: the request field stays valid there, but the delivery report
   is `unsupported`.
 - `providerManagedSessions`, `sessionKey`, `providerSessionState`,

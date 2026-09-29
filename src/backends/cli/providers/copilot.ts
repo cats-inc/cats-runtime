@@ -27,6 +27,7 @@ import {
   observeSchemaFailure,
   observeUnknown,
 } from '../../../core/compatibility/providerEvolution.js';
+import type { SessionMcpServerLaunch } from '../../../core/sessionMcpServers.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 /** Regex to strip ANSI escape sequences from Copilot CLI output */
@@ -36,8 +37,15 @@ const COPILOT_INLINE_PROMPT_LIMIT = 2000;
 export class CopilotProvider implements Provider {
   name = 'copilot';
   ephemeral = true;
-  capabilities: ProviderCapabilities = { resume: true, fork: false, permissions: false };
+  capabilities: ProviderCapabilities = {
+    resume: true,
+    fork: false,
+    permissions: false,
+    sessionMcpServers: true,
+  };
 
+  /** Names of the SPEC-035 servers this worker launches with, for connection evidence. */
+  private _sessionMcpServerNames = new Set<string>();
   private _pendingPrompt: string | null = null;
   private _pendingPromptFilePath: string | null = null;
   private _sessionId: string | undefined;
@@ -113,6 +121,14 @@ export class CopilotProvider implements Provider {
 
     if (opts.resumeSessionId) {
       args.push('--resume', opts.resumeSessionId);
+    }
+
+    // SPEC-035: the servers apply to this run only, alongside the user's own
+    // MCP config. `--allow-all-tools` or `--yolo` above already covers their tools.
+    const mcpServers = opts.mcpServers ?? [];
+    this._sessionMcpServerNames = new Set(mcpServers.map((server) => server.name));
+    if (mcpServers.length > 0) {
+      args.push('--additional-mcp-config', buildCopilotSessionMcpConfig(mcpServers));
     }
 
     if (this._pendingPrompt) {
@@ -344,6 +360,21 @@ export class CopilotProvider implements Provider {
           },
         }));
 
+      // SPEC-035 connection evidence. Copilot reports each server's state as it
+      // changes (`pending`, `connected`, `needs-auth`, ...) and again once all load.
+      case 'session.mcp_server_status_changed':
+        return this.sessionMcpServerEvent(eventType, parsed, [{
+          name: inner?.serverName,
+          status: inner?.status,
+        }]);
+
+      case 'session.mcp_servers_loaded':
+        return this.sessionMcpServerEvent(
+          eventType,
+          parsed,
+          Array.isArray(inner?.servers) ? inner.servers as unknown[] : [],
+        );
+
       // Skip these event types
       case 'user.message':
       case 'assistant.turn_end':
@@ -392,6 +423,43 @@ export class CopilotProvider implements Provider {
           rawSample: parsed,
         }, null);
     }
+  }
+
+  /** Report the states of this worker's session servers only; other servers are ignored. */
+  private sessionMcpServerEvent(
+    eventType: string,
+    parsed: Record<string, unknown>,
+    entries: readonly unknown[],
+  ): StreamEvent | null {
+    const mcpServers = entries.flatMap((entry) => {
+      if (typeof entry !== 'object' || entry === null) return [];
+      const { name, status } = entry as { name?: unknown; status?: unknown };
+      return typeof name === 'string' && typeof status === 'string'
+        && this._sessionMcpServerNames.has(name)
+        ? [{ name, status }]
+        : [];
+    });
+    if (mcpServers.length === 0) {
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: eventType,
+        reason: 'not_a_session_mcp_server',
+        rawSample: parsed,
+      }, null);
+    }
+    return observeNormalized(this.evolutionObserver, {
+      rawEventType: eventType,
+      rawSample: parsed,
+    }, {
+      ...createRuntimeProgressEvent({
+        text: mcpServers.map(({ name, status }) => `MCP server ${name}: ${status}`).join('; '),
+        kind: 'mcp_servers',
+        status: 'updated',
+        source: 'provider',
+        provider: 'copilot',
+        backend: 'cli',
+      }),
+      mcpServers,
+    });
   }
 
   private writePendingPromptFile(prompt: string): string {
@@ -625,4 +693,21 @@ function extractRuntimeUsageFromShutdown(
     sourceConfidence: 'reported',
     ...(premiumRequests !== undefined ? { quota: { premiumRequests } } : {}),
   };
+}
+
+/**
+ * SPEC-035: Copilot CLI expands `${VAR}` in MCP headers from its own
+ * environment (verified on 1.0.89), so only the variable name reaches argv.
+ */
+export function buildCopilotSessionMcpConfig(servers: readonly SessionMcpServerLaunch[]): string {
+  return JSON.stringify({
+    mcpServers: Object.fromEntries(servers.map((server) => [server.name, {
+      type: 'http',
+      url: server.url,
+      ...(server.bearerTokenEnvVar
+        ? { headers: { Authorization: 'Bearer ${' + server.bearerTokenEnvVar + '}' } }
+        : {}),
+      tools: ['*'],
+    }])),
+  });
 }
