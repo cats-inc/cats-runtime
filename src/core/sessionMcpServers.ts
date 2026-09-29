@@ -146,6 +146,13 @@ export function toSessionMcpLaunchConfig(servers: readonly SessionMcpServer[]): 
   return { servers: launch, env };
 }
 
+/** Map a provider-reported server status onto the report's connection value. */
+export function toSessionMcpConnection(status: string | undefined): SessionMcpServerConnection {
+  if (status === 'connected') return 'connected';
+  if (status === 'failed' || status === 'needs-auth') return 'failed';
+  return 'unknown';
+}
+
 /** Order-sensitive identity of a set, used to tell whether a worker runs the current set. */
 function fingerprint(servers: readonly SessionMcpServer[]): string {
   return JSON.stringify(servers.map((server) => [

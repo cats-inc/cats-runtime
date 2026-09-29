@@ -46,6 +46,8 @@ interface ProviderServiceResolvers {
 }
 
 export class WorkerPool {
+  private readonly sessionMcpConnections = new Map<string, Map<string, string>>();
+
   private workers = new Map<string, WorkerProcess>();
   private externalExecutions = new Map<string, { provider: string; cancel: () => void }>();
   private workerSingletonResources = new Map<string, string>();
@@ -205,6 +207,11 @@ export class WorkerPool {
     }
   }
 
+  /** Latest provider-reported MCP server states for a session's live worker. */
+  getSessionMcpConnections(sessionId: string): ReadonlyMap<string, string> | undefined {
+    return this.sessionMcpConnections.get(sessionId);
+  }
+
   getCapabilities(providerName: string, providerInstanceId?: string): ProviderCapabilities {
     return this.resolveProvider(
       providerName as ProviderName,
@@ -263,6 +270,7 @@ export class WorkerPool {
         throw new Error('Session MCP servers require a supporting adapter in a native CLI runtime.');
       }
       worker = new WorkerProcess(provider, opts, commandConfig, resilience, managed, launchEnv);
+      this.sessionMcpConnections.delete(sessionId);
       worker.on('native-session', nativeId => { this.registry.setProviderSessionId(sessionId, nativeId, !opts.resumeSessionId); });
       if (managed) {
         pluginExecutionId = executionId;
@@ -271,6 +279,12 @@ export class WorkerPool {
       }
 
       worker.on('event', (event) => {
+        if (event.type === 'init' && event.mcpServers && this.workers.get(sessionId) === worker) {
+          this.sessionMcpConnections.set(
+            sessionId,
+            new Map(event.mcpServers.map((server) => [server.name, server.status])),
+          );
+        }
         if ((event.type === 'init' || event.type === 'result') && event.sessionId) {
           if (this.registry.get(sessionId)?.providerSessionId !== event.sessionId) {
             try { this.registry.setProviderSessionId(sessionId, event.sessionId); }
@@ -287,6 +301,7 @@ export class WorkerPool {
         if (this.workers.get(sessionId) === worker) {
           this.registry.updateStatus(sessionId, 'closed');
           this.workers.delete(sessionId);
+          this.sessionMcpConnections.delete(sessionId);
           this.releaseSingletonResource(sessionId);
         }
       });

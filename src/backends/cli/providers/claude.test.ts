@@ -75,6 +75,65 @@ describe('ClaudeProvider', () => {
       expect(args).toContain('--allowedTools');
       expect(args).toContain('Bash,Read,Edit');
     });
+
+    describe('session MCP servers (SPEC-035)', () => {
+      const mcpServers = [
+        {
+          name: 'cats',
+          transport: 'http' as const,
+          url: 'http://127.0.0.1:3000/api/code/agent-tools/mcp',
+          bearerTokenEnvVar: 'CATS_MCP_CATS_TOKEN',
+        },
+        { name: 'app-ask', transport: 'http' as const, url: 'http://127.0.0.1:4000/mcp' },
+      ];
+
+      function flagValue(args: string[], flag: string): string | undefined {
+        const index = args.indexOf(flag);
+        return index >= 0 ? args[index + 1] : undefined;
+      }
+
+      it('passes an HTTP MCP config that references the bearer by variable name', () => {
+        const args = provider.buildSpawnArgs({ cwd: '/tmp', mcpServers });
+        expect(JSON.parse(flagValue(args, '--mcp-config')!)).toEqual({
+          mcpServers: {
+            cats: {
+              type: 'http',
+              url: 'http://127.0.0.1:3000/api/code/agent-tools/mcp',
+              headers: { Authorization: 'Bearer ${CATS_MCP_CATS_TOKEN}' },
+            },
+            'app-ask': { type: 'http', url: 'http://127.0.0.1:4000/mcp' },
+          },
+        });
+      });
+
+      it('pre-approves the servers in default mode because -p denies unapproved tools', () => {
+        const args = provider.buildSpawnArgs({ cwd: '/tmp', mcpServers });
+        expect(flagValue(args, '--allowedTools')).toBe('mcp__cats,mcp__app-ask');
+      });
+
+      it('merges the servers into a whitelist', () => {
+        const args = provider.buildSpawnArgs({
+          cwd: '/tmp',
+          permissionMode: 'whitelist',
+          allowedTools: ['Read'],
+          mcpServers,
+        });
+        expect(args.filter((arg) => arg === '--allowedTools')).toHaveLength(1);
+        expect(flagValue(args, '--allowedTools')).toBe('Read,mcp__cats,mcp__app-ask');
+      });
+
+      it('adds no allow list when permissions are skipped or no servers are configured', () => {
+        expect(provider.buildSpawnArgs({ cwd: '/tmp', permissionMode: 'skip', mcpServers }))
+          .not.toContain('--allowedTools');
+        const plain = provider.buildSpawnArgs({ cwd: '/tmp' });
+        expect(plain).not.toContain('--mcp-config');
+        expect(plain).not.toContain('--allowedTools');
+      });
+
+      it('declares support for session MCP servers', () => {
+        expect(provider.capabilities.sessionMcpServers).toBe(true);
+      });
+    });
   });
 
   describe('buildStdinMessage', () => {
@@ -110,6 +169,26 @@ describe('ClaudeProvider', () => {
       const event = provider.parseStreamLine(line);
       expect(event?.type).toBe('init');
       expect(event?.sessionId).toBe('claude-abc-123');
+    });
+
+    it('normalizes system/init MCP server states', () => {
+      const event = provider.parseStreamLine(JSON.stringify({
+        type: 'system',
+        subtype: 'init',
+        session_id: 'claude-abc-123',
+        mcp_servers: [
+          { name: 'cats', status: 'connected', source: 'dynamic' },
+          { name: 'broken', status: 'failed' },
+          { status: 'connected' },
+        ],
+      }));
+      expect(event).toMatchObject({
+        type: 'init',
+        mcpServers: [
+          { name: 'cats', status: 'connected' },
+          { name: 'broken', status: 'failed' },
+        ],
+      });
     });
 
     it('parses assistant message with text content', () => {

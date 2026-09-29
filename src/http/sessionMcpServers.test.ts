@@ -206,12 +206,14 @@ describe('session MCP servers HTTP contract (SPEC-035)', () => {
     expect(lastSpawn().env).toEqual({ CATS_MCP_CATS_TOKEN: TOKEN });
   });
 
-  it('reports failed when a supporting worker is not running the requested set', async () => {
+  it('recycles a live supporting worker through resume when a send changes the set', async () => {
     const { app, text } = await createSession({ provider: 'claude' });
     const { id } = JSON.parse(text) as { id: string };
+    registry.setProviderSessionId(id, 'native-claude-session');
     registry.updateStatus(id, 'ready');
     const streamMessage = vi.fn(async function* () { yield { type: 'result' as const }; });
     vi.mocked(pool.get).mockReturnValue({ alive: true, busy: false, streamMessage } as never);
+    vi.mocked(pool.spawn).mockClear();
 
     const response = await app.request(`/sessions/${id}/messages`, {
       method: 'POST',
@@ -221,10 +223,73 @@ describe('session MCP servers HTTP contract (SPEC-035)', () => {
     const body = await response.text();
     expect(response.status, body).toBe(200);
     expect(body).not.toContain(TOKEN);
+    expect(pool.kill).toHaveBeenCalledWith(id);
+    const { opts, env } = lastSpawn();
+    expect(opts).toMatchObject({ resumeSessionId: 'native-claude-session' });
+    expect(opts.mcpServers).toEqual([expect.objectContaining({ name: 'cats', bearerTokenEnvVar: 'CATS_MCP_CATS_TOKEN' })]);
+    expect(env).toEqual({ CATS_MCP_CATS_TOKEN: TOKEN });
     expect(JSON.parse(body.split('\n')[0]!)).toMatchObject({
       type: 'progress',
-      metadata: { kind: 'mcp_servers', mcpServers: { status: 'failed' } },
+      metadata: { kind: 'mcp_servers', mcpServers: { status: 'delivered' } },
     });
+
+    // An unchanged set on the next turn does not restart the worker again.
+    vi.mocked(pool.kill).mockClear();
+    await (await app.request(`/sessions/${id}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
+      body: JSON.stringify({ message: 'again', mcpServers: MCP_SERVERS }),
+    })).text();
+    expect(pool.kill).not.toHaveBeenCalled();
+  });
+
+  it('closes the session and returns 500 when the recycle cannot start a worker', async () => {
+    const { app, text } = await createSession({ provider: 'claude' });
+    const { id } = JSON.parse(text) as { id: string };
+    registry.updateStatus(id, 'ready');
+    const streamMessage = vi.fn(async function* () { yield { type: 'result' as const }; });
+    vi.mocked(pool.get).mockReturnValue({ alive: true, busy: false, streamMessage } as never);
+    vi.mocked(pool.spawn).mockImplementationOnce(() => { throw new Error('synthetic spawn failure'); });
+
+    const response = await app.request(`/sessions/${id}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
+      body: JSON.stringify({ message: 'hello', mcpServers: MCP_SERVERS }),
+    });
+    const body = await response.text();
+    expect(response.status).toBe(500);
+    expect(body).toContain('Failed to apply session MCP servers');
+    expect(body).not.toContain(TOKEN);
+    expect(registry.get(id)?.status).toBe('closed');
+    expect(streamMessage).not.toHaveBeenCalled();
+  });
+
+  it('reports failed on resume when a live worker runs an older set', async () => {
+    const { app, text } = await createSession({ provider: 'claude' });
+    const { id } = JSON.parse(text) as { id: string };
+    vi.mocked(pool.get).mockReturnValue({ alive: true, busy: false } as never);
+
+    const resumed = await app.request(`/sessions/${id}/resume`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mcpServers: MCP_SERVERS }),
+    });
+    const resumedText = await resumed.text();
+    expect(resumed.status, resumedText).toBe(200);
+    expect(JSON.parse(resumedText).mcpServers).toMatchObject({ status: 'failed' });
+  });
+
+  it('reports provider connection evidence for a delivered set', async () => {
+    const connections = new Map([['cats', 'connected']]);
+    (pool as unknown as { getSessionMcpConnections: unknown }).getSessionMcpConnections = vi.fn(() => connections);
+    const { text } = await createSession({ provider: 'claude', mcpServers: MCP_SERVERS });
+    expect(JSON.parse(text).mcpServers).toEqual({
+      status: 'delivered',
+      servers: [{ name: 'cats', connection: 'connected' }],
+    });
+    connections.set('cats', 'needs-auth');
+    const { id } = JSON.parse(text) as { id: string };
+    expect(context.runtime!.mcpServerReport(id)?.servers).toEqual([{ name: 'cats', connection: 'failed' }]);
   });
 
   it('drops descriptors when the session leaves the registry', async () => {

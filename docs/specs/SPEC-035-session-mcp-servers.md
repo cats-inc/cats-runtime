@@ -37,11 +37,12 @@ interface SessionMcpServer {
 
 ## Adapter mappings (PLAN-046 R2/R3)
 
-- **Claude Code:** `--mcp-config` JSON with `type: 'http'`, the URL and
-  `Authorization: Bearer ${CATS_MCP_<NAME>_TOKEN}`. The expansion must be
-  verified against the CLI; otherwise use an owner-only temporary file.
-  `mcp__<name>` is appended to `--allowedTools` in `default` and `whitelist` modes.
-  `system:init.mcp_servers` supplies the `connection` evidence.
+- **Claude Code (implemented in R2):** inline `--mcp-config` JSON with
+  `type: 'http'`, the URL and `Authorization: Bearer ${CATS_MCP_<NAME>_TOKEN}`.
+  Claude Code expands the variable from its own environment, which was verified
+  on 2.1.284. `mcp__<name>` is appended to `--allowedTools` in `default` and
+  `whitelist` modes. `system:init.mcp_servers` supplies the `connection`
+  evidence, starting with the first turn's init.
 - **Codex:** `-c mcp_servers.<name>.url="…"` and
   `-c mcp_servers.<name>.bearer_token_env_var="CATS_MCP_<NAME>_TOKEN"` after
   `app-server`. Runtime approves tool calls and elicitations for that server only.

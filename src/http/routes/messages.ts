@@ -316,6 +316,21 @@ function tryRespawnPiWorkerForSkillMutation(
   return true;
 }
 
+function recycleWorkerForSessionMcpServers(ctx: AppContext, session: SessionInfo): void {
+  const runtime = getRuntimeSessionManager(ctx);
+  runtime.kill(session.id);
+  runtime.spawn(session.id, session.providerName, {
+    cwd: session.cwd,
+    workspaceMode: session.workspaceMode,
+    model: session.model,
+    ...(session.providerSessionId ? { resumeSessionId: session.providerSessionId } : {}),
+    instructionsFile: session.skills?.delivery.instructions?.filePath,
+    permissionMode: session.permissionMode,
+    allowedTools: session.allowedTools,
+  }, session.providerInstanceId, session.providerBackend);
+  ctx.registry.updateStatus(session.id, 'ready');
+}
+
 function guardrailHttpStatus(
   outcome: 'blocked' | 'cooldown',
 ): 403 | 429 {
@@ -699,6 +714,19 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   }
 
   runtime.mcpServers.apply(id, parsedMcpServers.servers);
+  if (!peerRouted && runtime.mcpServerReport(id)?.status === 'failed') {
+    // SPEC-035 SMCP-08: the live worker runs an older set, so restart it through
+    // resume at this turn boundary before any input is written.
+    try {
+      recycleWorkerForSessionMcpServers(ctx, ctx.registry.get(id) ?? session);
+    } catch (error) {
+      ctx.registry.updateStatus(id, 'closed');
+      return c.json({
+        error: `Failed to apply session MCP servers: ${error instanceof Error ? error.message : String(error)}`,
+      }, 500);
+    }
+    worker = runtime.get(id);
+  }
   const mcpReport = runtime.mcpServerReport(id);
   const mcpDelivery = mcpReport && peerRouted ? { ...mcpReport, status: 'unsupported' as const } : mcpReport;
   const mcpServersEvent = mcpDelivery

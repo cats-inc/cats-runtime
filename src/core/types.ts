@@ -1696,6 +1696,8 @@ interface StreamEventStatePatch {
 export interface InitStreamEvent extends StreamEventBase, StreamEventStatePatch {
   type: 'init';
   text?: string;
+  /** Provider-reported MCP server connection states, when the CLI emits them. */
+  mcpServers?: { name: string; status: string }[];
 }
 
 export interface TextStreamEvent extends StreamEventBase {
