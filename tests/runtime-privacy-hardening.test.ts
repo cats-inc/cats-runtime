@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../src/core/config.js';
-import { createRuntimeApp } from '../src/http/app.js';
+import { createRuntimeApp, type AppContext } from '../src/http/app.js';
+import { executeRetainedWorktreeCleanup } from '../src/http/routes/sessions.js';
 import { SessionRegistry } from '../src/backends/cli/pool/SessionRegistry.js';
 import { createRuntimeTestEnvWithAllCliProviders, createRuntimeTestPaths, ensureRuntimeTestDirs } from './support/runtimeTestPaths.js';
 
@@ -38,11 +39,25 @@ describe('Runtime HTTP privacy hardening', () => {
       spawn: vi.fn(), kill: vi.fn(), killAll: vi.fn(),
       status: vi.fn(() => ({ active: 0, busy: 0, idle: 0, providers: {} })),
     };
-    const app = createRuntimeApp({
+    const context = {
       config, registry, pool, cursorNative: {}, gooseNative: {}, kiroNative: {},
       auggieSessions: {}, opencodeNative: {},
-    } as never);
-    return { app, registry, config };
+    } as unknown as AppContext;
+    const app = createRuntimeApp(context);
+    return { app, registry, config, context };
+  }
+
+  function pauseBrowserCleanup(context: AppContext) {
+    let entered!: () => void;
+    let release!: () => void;
+    const started = new Promise<void>((resolve) => { entered = resolve; });
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    vi.spyOn(context.browser!, 'clearRuntimeSessions').mockImplementationOnce(async () => {
+      entered();
+      await gate;
+      return 0;
+    });
+    return { started, release };
   }
 
   it('omits complete queries from actual app access logs while preserving both authentication forms', async () => {
@@ -87,6 +102,128 @@ describe('Runtime HTTP privacy hardening', () => {
     expect(await retried.json()).toMatchObject({ status: 'deleted', fileDeleted: true });
     expect(registry.get(session.id)).toBeUndefined();
     expect(existsSync(archive)).toBe(false);
+  });
+
+  it('deletes provider history in a sibling sharing the Runtime sessions path prefix', async () => {
+    const { app, registry, config } = fixture();
+    const session = registry.create({ id: 'sibling-provider', providerName: 'claude', cwd: root, workspaceMode: 'shared' });
+    const sibling = `${config.sessionBaseDir}-provider`;
+    mkdirSync(sibling);
+    const native = join(sibling, 'native.jsonl');
+    const unrelated = join(sibling, 'unrelated.jsonl');
+    writeFileSync(native, 'synthetic provider history');
+    writeFileSync(unrelated, 'retain another session');
+    registry.setProviderSessionId(session.id, 'native');
+    session.providerSourcePath = native;
+    registry.updateStatus(session.id, 'closed');
+    const response = await app.request(`/sessions/${session.id}`, { method: 'DELETE' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: 'deleted', fileDeleted: true,
+      cleanup: { managedTranscriptDeleted: false, providerDiscoveryCleared: true, registryDropped: true },
+    });
+    expect(existsSync(native)).toBe(false);
+    expect(readFileSync(unrelated, 'utf8')).toBe('retain another session');
+  });
+
+  it('retains malformed root-valued transcript metadata without staging the sessions directory', async () => {
+    const { app, registry, config } = fixture();
+    const session = registry.create({ id: 'root-provider', providerName: 'claude', cwd: root, workspaceMode: 'shared' });
+    const sentinel = join(config.sessionBaseDir, 'unrelated.jsonl');
+    writeFileSync(sentinel, 'retain all Runtime data');
+    registry.setProviderSessionId(session.id, 'root-native');
+    session.providerSourcePath = process.platform === 'win32'
+      ? config.sessionBaseDir.toUpperCase() : join(config.sessionBaseDir, '.');
+    registry.updateStatus(session.id, 'closed');
+    const response = await app.request(`/sessions/${session.id}`, { method: 'DELETE' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: 'retained', fileDeleted: false, maintenance: { reasonCodes: ['cleanup_staging_failed'] },
+    });
+    expect(registry.get(session.id)).toBeDefined();
+    expect(readFileSync(sentinel, 'utf8')).toBe('retain all Runtime data');
+  });
+
+  it('rejects overlapping DELETE across app contexts through finalization and pending-path persistence', async () => {
+    const { app, registry, config, context } = fixture('', true);
+    const otherApp = createRuntimeApp({ ...context }); // Same registry, distinct HTTP app/context.
+    const session = registry.create({ id: 'concurrent-delete', providerName: 'codex', cwd: root, workspaceMode: 'shared' });
+    registry.updateStatus(session.id, 'closed');
+    const archive = join(config.sessionBaseDir, 'compactions', session.id);
+    mkdirSync(archive, { recursive: true });
+    writeFileSync(join(archive, 'snapshot.jsonl'), 'retained history');
+    const internal = registry as unknown as { removeStagedArtifact(path: string): void };
+    vi.spyOn(internal, 'removeStagedArtifact').mockImplementation(() => {
+      mkdirSync(archive);
+      throw new Error('fixture removal and restoration fail');
+    });
+    const paused = pauseBrowserCleanup(context);
+    const first = app.request(`/sessions/${session.id}`, { method: 'DELETE' });
+    await paused.started;
+    try {
+      expect(existsSync(archive)).toBe(false); // First request already staged the archive.
+      const second = await otherApp.request(`/sessions/${session.id}`, { method: 'DELETE' });
+      expect(second.status).toBe(409);
+      expect(await second.json()).toMatchObject({ code: 'session_delete_busy' });
+      await expect(executeRetainedWorktreeCleanup(context, session)).rejects.toMatchObject({ code: 'session_delete_busy' });
+      expect(registry.get(session.id)).toBe(session);
+    } finally {
+      paused.release();
+    }
+    expect(await (await first).json()).toMatchObject({ status: 'retained', fileDeleted: false });
+    const pending = registry.getPendingFileDeletionPaths(session.id);
+    expect(pending).toHaveLength(1);
+    const saved = JSON.parse(readFileSync(join(createRuntimeTestPaths(root).dataDir, 'sessions.json'), 'utf8'));
+    expect(saved.find((record: { id: string }) => record.id === session.id).pendingFileDeletionPaths).toEqual(pending);
+    const retry = await otherApp.request(`/sessions/${session.id}`, { method: 'DELETE' });
+    expect(retry.status).toBe(200); // Lock is released, persistent guard remains authoritative.
+    expect(await retry.json()).toMatchObject({ status: 'retained', maintenance: { reasonCodes: ['cleanup_pending_removal'] } });
+    registry.flush();
+  });
+
+  it('rolls staged files back and returns conflict if the registry entry disappears during async cleanup', async () => {
+    const { app, registry, config, context } = fixture();
+    const session = registry.create({ id: 'stale-delete', providerName: 'codex', cwd: root, workspaceMode: 'shared' });
+    registry.updateStatus(session.id, 'closed');
+    const archive = join(config.sessionBaseDir, 'compactions', session.id);
+    mkdirSync(archive, { recursive: true });
+    writeFileSync(join(archive, 'snapshot.jsonl'), 'preserve stale history');
+    const paused = pauseBrowserCleanup(context);
+    const first = app.request(`/sessions/${session.id}`, { method: 'DELETE' });
+    await paused.started;
+    try {
+      expect(registry.unregister(session.id)).toBe(true); // Simulate an independent registry owner.
+    } finally {
+      paused.release();
+    }
+    const response = await first;
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'session_delete_conflict' });
+    expect(readFileSync(join(archive, 'snapshot.jsonl'), 'utf8')).toBe('preserve stale history');
+    expect(context.runtime!.getTrackedState(session.id)?.maintenance.lastLifecycle?.status).not.toBe('completed');
+    expect((await app.request(`/sessions/${session.id}`, { method: 'DELETE' })).status).toBe(404);
+  });
+
+  it('does not claim completed deletion when unregister refuses a late pending-removal guard', async () => {
+    const { app, registry, config, context } = fixture('', true);
+    const session = registry.create({ id: 'late-guard', providerName: 'codex', cwd: root, workspaceMode: 'shared' });
+    registry.updateStatus(session.id, 'closed');
+    const originalUnregister = registry.unregister.bind(registry);
+    const pending = join(config.sessionBaseDir, '.cats-runtime-delete-late.pending-delete');
+    const spy = vi.spyOn(registry, 'unregister').mockImplementation((id) => {
+      writeFileSync(pending, 'late unresolved history');
+      registry.retainPendingFileDeletions(id, [pending]);
+      return originalUnregister(id);
+    });
+    const response = await app.request(`/sessions/${session.id}`, { method: 'DELETE' });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'session_delete_conflict' });
+    expect(registry.get(session.id)).toBeDefined();
+    expect(context.runtime!.getTrackedState(session.id)?.maintenance.lastLifecycle?.status).not.toBe('completed');
+    spy.mockRestore();
+    const retry = await app.request(`/sessions/${session.id}`, { method: 'DELETE' });
+    expect(await retry.json()).toMatchObject({ status: 'retained', cleanup: { registryDropped: false } });
+    registry.flush();
   });
 
   it('cannot report successful DELETE after an unrestored staged file survives a Runtime restart', async () => {

@@ -3689,6 +3689,16 @@ retained diagnostic/export data.
 - `requireAcknowledgedHooks?: boolean`
 - `worktreeCleanupPolicy: "discard" | "merge" | "preserve"`
 
+Deletion and retained-worktree cleanup share a per-session operation lock within
+one Runtime registry. An overlapping request returns HTTP 409 with
+`code: "session_delete_busy"` before staging any files. The lock covers cleanup,
+file finalization and pending-path persistence; it releases on success, retained
+results and errors. Other session IDs are independent. A stale registry entry or
+a refused unregister returns HTTP 409 with `code: "session_delete_conflict"`
+instead of a completed deletion result. Refresh session state before retrying;
+some cleanup may already have completed. This is an in-process coordination
+boundary, not a lock between separate Runtime processes sharing storage.
+
 For worktree-backed sessions, the runtime closes any attached worker first,
 then either detaches the worktree and removes the session or returns
 `status: "retained"` with machine-readable cleanup metadata when merge/discard

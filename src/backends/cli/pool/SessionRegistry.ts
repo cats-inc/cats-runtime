@@ -7,7 +7,7 @@ import {
   runtimeCompactionDirectory,
 } from '../../../core/runtime/transcriptPaths.js';
 import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import type {
   PermissionMode,
   ProviderModelResolution,
@@ -714,6 +714,11 @@ export class SessionRegistry {
     }
     let paths: string[];
     try {
+      if (this.sessionBaseDir && [session.sourcePath, session.providerSourcePath].some(
+        (path) => path !== undefined && relative(this.sessionBaseDir!, path) === '',
+      )) {
+        throw new Error('The Runtime sessions root is not a transcript artifact');
+      }
       paths = managedOnly ? this.collectManagedTranscriptArtifactPaths(session)
         : this.collectTranscriptArtifactPaths(session);
     } catch {
@@ -1164,7 +1169,7 @@ export class SessionRegistry {
     // Only attach providerSourcePath if session doesn't already have runtime-managed history
     // (prevents /history from duplicating turns from both sources)
     const hasRuntimeHistory = session.sourcePath && this.sessionBaseDir
-      && session.sourcePath.startsWith(this.sessionBaseDir);
+      && isWithinRuntimeSessions(this.sessionBaseDir, session.sourcePath);
     if (data.sourcePath && (!hasRuntimeHistory || session.providerName === 'pi')) {
       session.providerSourcePath = data.sourcePath;
     }
@@ -1505,7 +1510,7 @@ export class SessionRegistry {
   ): sourcePath is string {
     return Boolean(
       sourcePath
-      && (!this.sessionBaseDir || !sourcePath.startsWith(this.sessionBaseDir))
+      && (!this.sessionBaseDir || !isWithinRuntimeSessions(this.sessionBaseDir, sourcePath))
     );
   }
 
