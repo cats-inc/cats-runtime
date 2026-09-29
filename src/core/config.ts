@@ -39,7 +39,7 @@ export function getRuntimeListenerConfig(
   config: Pick<CliRuntimeConfig, 'host' | 'port'>,
 ): { host: string; port: number } {
   return {
-    host: config.host || '0.0.0.0',
+    host: config.host || '127.0.0.1',
     port: config.port,
   };
 }

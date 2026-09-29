@@ -1,5 +1,6 @@
 import { stopFencedPluginRuns } from './http/routes/managedPlugins.js';
 import { once } from 'node:events';
+import { warnIfNonLoopbackBind } from './listener.js';
 import { ImageGenerationService } from './core/media/ImageGenerationService.js';
 import { executeGrokImage } from './backends/cli/media/grokImage.js';
 import { ImageError } from './core/media/contracts.js';
@@ -278,12 +279,7 @@ function listenServer(
     server.once('listening', onListening);
     server.once('error', onError);
 
-    if (host) {
-      server.listen(port, host);
-      return;
-    }
-
-    server.listen(port);
+    server.listen(port, host || '127.0.0.1');
   });
 }
 
@@ -1279,6 +1275,10 @@ export function createRuntimeServer(
               port: config.port,
             });
             await listenServer(server, config.host, config.port);
+            const boundAddress = server.address();
+            if (boundAddress && typeof boundAddress !== 'string') {
+              warnIfNonLoopbackBind(boundAddress.address);
+            }
             startupTrace?.trace('server.listen.ready', {
               host: config.host,
               port: config.port,
@@ -1307,7 +1307,7 @@ export function createRuntimeServer(
 
           const address = server.address();
           if (!address || typeof address === 'string') {
-            const fallback = { host: config.host || '0.0.0.0', port: config.port };
+            const fallback = { host: config.host || '127.0.0.1', port: config.port };
             markRuntimeReady(startup, {
               ...fallback,
               healthUrl: `http://${fallback.host}:${fallback.port}/health`,

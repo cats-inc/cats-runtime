@@ -344,8 +344,9 @@ See [docs/](./docs/) for detailed documentation:
   the Cats maintainer: there is no telemetry, crash reporting or account.
 - The dashboard and playground pages load `marked`, `DOMPurify` and `highlight.js`
   from `cdn.jsdelivr.net`; the API itself only calls the providers you configure.
-- The HTTP server binds `127.0.0.1` by default. Setting `CATS_RUNTIME_API_KEY` without
-  `CATS_RUNTIME_HOST` binds every interface, so set both when exposing Runtime.
+- The HTTP server binds `127.0.0.1` by default, even with `CATS_RUNTIME_API_KEY` set.
+  Remote access requires an explicit `CATS_RUNTIME_HOST` (for example `0.0.0.0`)
+  and logs a startup warning. Protect remote access with an API key and a trusted network.
 - Deleting a session permanently removes its Runtime files and, for providers that keep
   native transcripts, the provider's own copy. There is no recycle bin; back up first.
 
