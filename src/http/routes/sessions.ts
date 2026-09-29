@@ -15,7 +15,7 @@ import {
   type ProviderInstanceConfig,
 } from '../../backends/cli/config.js';
 import type { SessionsIndex } from '../../backends/cli/discovery/types.js';
-import type { PreparedFileDeletion } from '../../backends/cli/pool/SessionRegistry.js';
+import type { FileDeletionResult, PreparedFileDeletion } from '../../backends/cli/pool/SessionRegistry.js';
 import type {
   SessionInfo,
   SessionInvocationContext,
@@ -1397,6 +1397,23 @@ async function finalizeDeleteAfterWorkspaceCleanup(
   }> {
   const runtime = getRuntimeSessionManager(ctx);
   const id = session.id;
+  const pendingPaths = ctx.registry.getPendingFileDeletionPaths(id);
+  if (pendingPaths.length > 0) {
+    const maintenance = recordSessionLifecycle(ctx, id, {
+      action: 'delete', boundary: 'permanent_delete', status: 'retained',
+      reasonCodes: ['cleanup_pending_removal'],
+      cleanup: {
+        workerDetached: !runtime.isAttached(id), workspaceCleaned: input.workspaceCleaned,
+        managedTranscriptDeleted: false, providerDiscoveryCleared: false, registryDropped: false,
+      },
+    });
+    ctx.registry.flush();
+    return {
+      status: 'retained', hadTranscript: true, fileDeleted: false, nativeDeleted: false,
+      reason: `A previous removal left unresolved staged files. Resolve these paths before retrying: ${pendingPaths.join(', ')}`,
+      maintenance, session: serializeSession(ctx, ctx.registry.get(id) ?? session),
+    };
+  }
   const hasNativeSessionState = tracksNativeSessionState(session);
   const hasProviderDiscoveryState = tracksProviderDiscoveryState(session);
   const workerDetached = !runtime.isAttached(id);
@@ -1404,7 +1421,9 @@ async function finalizeDeleteAfterWorkspaceCleanup(
     ? await hydrateProviderDiscoverySourcePathForDelete(ctx, session)
     : undefined;
 
-  const preparedManagedTranscripts = ctx.registry.prepareManagedTranscriptDeletion(id);
+  const preparedManagedTranscripts = ctx.registry.prepareManagedTranscriptDeletion(id, {
+    deferPendingPersistence: true,
+  });
   const preparedProviderDiscovery = prepareProviderDiscoveryDeletion(ctx, session);
   const providerDiscoveryDeleteMode = hasProviderDiscoveryState
     ? (preparedProviderDiscovery.hadFiles ? 'full' : 'registry_only')
@@ -1529,6 +1548,43 @@ async function finalizeDeleteAfterWorkspaceCleanup(
 
   const managedDeletion = preparedManagedTranscripts.finalize();
   const providerDeletion = preparedProviderDiscovery.finalize();
+  // A strict persistence error must not strand an unfinalized provider stage.
+  ctx.registry.retainPendingFileDeletions(id, [
+    ...(managedDeletion.pendingPaths ?? []), ...(providerDeletion.pendingPaths ?? []),
+  ]);
+  const failedPaths = [...(managedDeletion.failedPaths ?? []), ...(providerDeletion.failedPaths ?? [])];
+  if (failedPaths.length > 0) {
+    const maintenance = recordSessionLifecycle(ctx, id, {
+      action: 'delete',
+      boundary: 'permanent_delete',
+      status: 'retained',
+      reasonCodes: ['cleanup_removal_failed'],
+      cleanup: buildDeleteCleanupSummary({
+        workerDetached: !runtime.isAttached(id),
+        wakeupsCleared: false,
+        browserSessionsCleared,
+        workspaceCleaned: input.workspaceCleaned,
+        ...(input.worktreeDetached !== undefined ? { worktreeDetached: input.worktreeDetached } : {}),
+        ...(input.resolvedCleanupPolicy ? { worktreeCleanupPolicy: input.resolvedCleanupPolicy } : {}),
+        ...(input.worktreeMergedPaths !== undefined ? { worktreeMergedPaths: input.worktreeMergedPaths } : {}),
+        managedTranscriptDeleted: managedDeletion.fileDeleted,
+        providerDiscoveryCleared: providerDeletion.fileDeleted,
+        ...(providerDiscoveryDeleteMode ? { providerDiscoveryDeleteMode } : {}),
+        ...(providerDiscoveryHydration ? { providerDiscoveryHydration } : {}),
+        registryDropped: false,
+      }),
+    });
+    ctx.registry.flush();
+    return {
+      status: 'retained',
+      hadTranscript,
+      fileDeleted: false,
+      nativeDeleted: hasNativeSessionState ? nativeDeleted === true : false,
+      reason: `Session file removal was incomplete. Some files may already have been removed; session state was kept. Retry after resolving these paths: ${failedPaths.join(', ')}`,
+      maintenance,
+      session: serializeSession(ctx, ctx.registry.get(id) ?? session),
+    };
+  }
   const wakeupResult = ctx.wakeup?.clearSession(id);
   const maintenance = recordSessionLifecycle(ctx, id, {
     action: 'delete',
@@ -2241,10 +2297,17 @@ function combinePreparedDeletions(
     ready: preparedDeletions.every((prepared) => prepared.ready),
     finalize: () => {
       let fileDeleted = false;
+      const failedPaths: string[] = [];
+      const pendingPaths: string[] = [];
       for (const prepared of preparedDeletions) {
-        fileDeleted = prepared.finalize().fileDeleted || fileDeleted;
+        const result = prepared.finalize();
+        fileDeleted = result.fileDeleted || fileDeleted;
+        failedPaths.push(...(result.failedPaths ?? []));
+        pendingPaths.push(...(result.pendingPaths ?? []));
       }
-      return { fileDeleted };
+      return failedPaths.length > 0 ? {
+        fileDeleted: false, failedPaths, ...(pendingPaths.length > 0 ? { pendingPaths } : {}),
+      } : { fileDeleted };
     },
     rollback: () => {
       for (const prepared of [...preparedDeletions].reverse()) {
@@ -2291,22 +2354,37 @@ function prepareReplacementFileDeletion(
   }
 
   let completed = false;
+  let result: FileDeletionResult = { fileDeleted: false };
 
   return {
     hadFiles: true,
     ready: true,
     finalize: () => {
       if (completed) {
-        return { fileDeleted: true };
+        return result;
       }
 
       completed = true;
       try {
         rmSync(stagedPath, { force: true });
+        result = { fileDeleted: true };
       } catch {
-        // Best effort only. The replacement file is already live at filePath.
+        // Restore the original index for an explicit retry. If restoration is
+        // also blocked, report the surviving staged copy instead of success.
+        let restored = false;
+        try {
+          rmSync(filePath, { force: true });
+          renameSync(stagedPath, filePath);
+          restored = true;
+        } catch {
+          // The failure result below identifies the remaining copy.
+        }
+        result = {
+          fileDeleted: false, failedPaths: [restored ? filePath : stagedPath],
+          ...(!restored ? { pendingPaths: [stagedPath] } : {}),
+        };
       }
-      return { fileDeleted: true };
+      return result;
     },
     rollback: () => {
       if (completed) return;
@@ -4070,7 +4148,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
       status: 'retained',
       hadTranscript: finalizedDelete.hadTranscript,
       fileDeleted: false,
-      nativeDeleted: false,
+      nativeDeleted: finalizedDelete.nativeDeleted,
       workspaceCleaned,
       cleanup: finalizedDelete.maintenance.cleanup,
       reason: finalizedDelete.reason,

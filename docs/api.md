@@ -3650,6 +3650,40 @@ Delete responses also include:
 - `maintenance`: the terminal lifecycle marker for the delete attempt, with
   `status: "completed"` or `status: "retained"`
 
+Managed transcript cleanup includes Runtime's own pre-compaction archives under
+`<sessionBaseDir>/compactions/<sessionId>`. It derives that directory from the
+session ID rather than trusting an archive path stored in a transcript. Unsafe
+IDs and linked descendants of the configured sessions root prevent staging;
+cleanup does not follow those links into another directory.
+
+Final staged-file removal can fail after some files have already been removed.
+In that case delete returns `status: "retained"`, `fileDeleted: false`, and
+`cleanup.registryDropped: false`, with maintenance reason
+`cleanup_removal_failed`. Surviving staged files are restored where possible so
+an explicit delete retry can remove them. The response reason identifies paths
+needing attention; if restoring a file also fails, it names the remaining
+`.pending-delete` path for manual resolution. Runtime persists those unresolved
+paths in optional, Runtime-owned `pendingFileDeletionPaths` session metadata.
+Later delete attempts, including after restart, return `cleanup_pending_removal`
+and retain the session while any such path exists or cannot be verified absent.
+These paths are a retry fence, never automatic deletion targets; malformed
+metadata also blocks deletion. After manual resolution, another explicit delete
+attempt rechecks the paths and can finish. Existing session records without this
+optional field need no conversion.
+
+Registry snapshots use a same-directory temporary file and atomic replacement,
+preserving the previous snapshot if writing or replacement fails. Persisting a
+new unresolved-path fence is a strict write: on failure DELETE returns HTTP 500
+with the residual paths and explains that the fence is only in memory and may
+not survive restart. Resolve that storage failure or recover the reported files
+before restarting; a failed persistence attempt does not establish a durable
+deletion guard.
+
+The fence records observed failures; it is not a crash-recovery journal for an
+interruption before that record is persisted or an atomic secure erase. Cleanup
+does not erase external backups, provider-hosted history, or other independently
+retained diagnostic/export data.
+
 `DELETE /sessions/{id}` accepts the same optional `maintenance` body plus:
 
 - `requireAcknowledgedHooks?: boolean`

@@ -6,6 +6,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
+import { assertUnlinkedRuntimeSessionPath, runtimeCompactionDirectory } from './transcriptPaths.js';
 
 import type {
   RuntimeSessionCompactionRecord,
@@ -403,12 +404,14 @@ function writeTranscriptArchive(
   compactedAt: string,
   repairedLines: string[],
 ): string {
-  const archiveDir = join(sessionBaseDir, 'compactions', sessionId);
+  const archiveDir = runtimeCompactionDirectory(sessionBaseDir, sessionId);
   mkdirSync(archiveDir, { recursive: true });
+  runtimeCompactionDirectory(sessionBaseDir, sessionId);
   const archivePath = join(
     archiveDir,
     `${compactedAt.replace(/[:.]/g, '-')}.jsonl`,
   );
+  assertUnlinkedRuntimeSessionPath(sessionBaseDir, archivePath);
   writeFileSync(archivePath, repairedLines.join('\n') + (repairedLines.length ? '\n' : ''), 'utf8');
   return archivePath;
 }
