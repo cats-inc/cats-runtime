@@ -52,12 +52,6 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
   Desktop/Platform clients and persisted data are unchanged. This breaks an implicit
   configuration contract, so do not ship it as a 0.3.x patch. See the
   [deployment instructions](deployment.md#listener-exposure-next-minor-040).
-- **Session MCP servers (compatible addition).** Session create, resume and send
-  accept an optional `mcpServers` list ([SPEC-035](specs/SPEC-035-session-mcp-servers.md)).
-  Native Claude Code and Codex instances connect to those servers, and provider and
-  session reads report support as `continuity.sessionMcpServers`. Existing requests,
-  configuration and persisted data are unchanged, so this addition alone needs no
-  minor bump or migration.
 
 ### Published versions
 

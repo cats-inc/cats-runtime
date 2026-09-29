@@ -122,7 +122,9 @@ R3 notes for consumers:
   `continuity.sessionMcpServers` read field are compatible additions: no
   existing HTTP, configuration or persisted-data contract changes, and no
   migration is needed. The version is chosen at release time under the release
-  SOP. This plan authorizes no bump.
+  SOP. This plan authorizes no bump. Runtime 0.4.0 was prepared in #139 before
+  R4 merged. Its notes already list session MCP servers; whether the read field
+  ships in 0.4.0 depends on the commit that release publishes.
 
 ## Validation
 
