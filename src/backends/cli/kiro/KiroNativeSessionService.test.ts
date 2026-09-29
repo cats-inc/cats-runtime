@@ -20,8 +20,8 @@ describe('KiroNativeSessionService', () => {
       runner: async () => ({ code: 0, stdout: '', stderr: '' }),
     });
 
-    expect(service.normalizeWorkspace('C:\\Users\\kenne\\Source\\repo'))
-      .toBe('/mnt/c/Users/kenne/Source/repo');
+    expect(service.normalizeWorkspace('C:\\Users\\tester\\Source\\repo'))
+      .toBe('/mnt/c/Users/tester/Source/repo');
   });
 
   it('keeps POSIX workspaces unchanged when using native runtime', () => {
@@ -43,7 +43,7 @@ describe('KiroNativeSessionService', () => {
       stdout: JSON.stringify([
         {
           sessionId: 'kiro-1',
-          workspacePath: '/Users/kenne/Source/SK2/ai-content-storyteller',
+          workspacePath: '/Users/tester/Source/Fixtures/beta-project',
           summary: 'What is pending?',
           messageCount: 2,
           lastActivity: '2026-03-09T00:00:00Z',
@@ -66,7 +66,7 @@ describe('KiroNativeSessionService', () => {
     expect(sessions).toEqual([
       {
         providerSessionId: 'kiro-1',
-        cwd: '/Users/kenne/Source/SK2/ai-content-storyteller',
+        cwd: '/Users/tester/Source/Fixtures/beta-project',
         summary: 'What is pending?',
         messageCount: 2,
         lastActivity: '2026-03-09T00:00:00Z',
@@ -81,14 +81,14 @@ describe('KiroNativeSessionService', () => {
       stdout: JSON.stringify([
         {
           sessionId: 'kiro-latest',
-          workspacePath: '/mnt/c/Users/kenne/Source/SK2/one-man-digital-company',
+          workspacePath: '/mnt/c/Users/tester/Source/Fixtures/alpha-project',
           summary: 'Latest session',
           messageCount: 3,
           lastActivity: '2026-03-09T10:00:00Z',
         },
         {
           sessionId: 'kiro-old',
-          workspacePath: '/mnt/c/Users/kenne/Source/SK2/one-man-digital-company',
+          workspacePath: '/mnt/c/Users/tester/Source/Fixtures/alpha-project',
           summary: 'Older session',
           messageCount: 1,
           lastActivity: '2026-03-09T09:00:00Z',
@@ -106,11 +106,11 @@ describe('KiroNativeSessionService', () => {
       runner,
     });
 
-    const latest = await service.getLatestSession('C:/Users/kenne/Source/SK2/one-man-digital-company');
+    const latest = await service.getLatestSession('C:/Users/tester/Source/Fixtures/alpha-project');
 
     expect(latest?.providerSessionId).toBe('kiro-latest');
     await expect(service.canResumeSession(
-      'C:/Users/kenne/Source/SK2/one-man-digital-company',
+      'C:/Users/tester/Source/Fixtures/alpha-project',
       'kiro-latest',
     )).resolves.toBe(true);
   });
@@ -200,7 +200,7 @@ describe('KiroNativeSessionService', () => {
       stdout: JSON.stringify([
         {
           sessionId: 'kiro-latest',
-          workspacePath: '/mnt/c/Users/kenne/Source/SK2/one-man-digital-company',
+          workspacePath: '/mnt/c/Users/tester/Source/Fixtures/alpha-project',
           summary: 'Latest session',
           messageCount: 3,
         },

@@ -38,8 +38,8 @@ describe('CursorNativeSessionService', () => {
       runner: async () => ({ code: 0, stdout: '', stderr: '' }),
     });
 
-    expect(service.normalizeWorkspace('C:\\Users\\kenne\\Source\\repo'))
-      .toBe('/mnt/c/Users/kenne/Source/repo');
+    expect(service.normalizeWorkspace('C:\\Users\\tester\\Source\\repo'))
+      .toBe('/mnt/c/Users/tester/Source/repo');
   });
 
   it('keeps POSIX workspaces unchanged when using native runtime', () => {
@@ -69,8 +69,8 @@ describe('CursorNativeSessionService', () => {
       runner: async () => ({ code: 0, stdout: '', stderr: '' }),
     });
 
-    expect(service.normalizeWorkspace('C:/Users/kenne/Source/repo'))
-      .toBe('C:\\Users\\kenne\\Source\\repo');
+    expect(service.normalizeWorkspace('C:/Users/tester/Source/repo'))
+      .toBe('C:\\Users\\tester\\Source\\repo');
   });
 
   it('lists globally discovered Cursor sessions without rewriting native macOS/Linux paths', async () => {
@@ -79,7 +79,7 @@ describe('CursorNativeSessionService', () => {
       stdout: JSON.stringify([
         {
           sessionId: 'cursor-1',
-          workspacePath: '/Users/kenne/Source/SK2/ai-content-storyteller',
+          workspacePath: '/Users/tester/Source/Fixtures/beta-project',
           summary: 'Global Cursor Session',
           messageCount: 2,
           lastActivity: '2026-03-09T00:00:00Z',
@@ -102,7 +102,7 @@ describe('CursorNativeSessionService', () => {
     expect(sessions).toEqual([
       {
         providerSessionId: 'cursor-1',
-        cwd: '/Users/kenne/Source/SK2/ai-content-storyteller',
+        cwd: '/Users/tester/Source/Fixtures/beta-project',
         summary: 'Global Cursor Session',
         messageCount: 2,
         lastActivity: '2026-03-09T00:00:00Z',
@@ -117,13 +117,13 @@ describe('CursorNativeSessionService', () => {
       stdout: JSON.stringify([
         {
           sessionId: 'cursor-1',
-          workspacePath: '/mnt/c/Users/kenne/Source/SK2/ai-content-storyteller',
+          workspacePath: '/mnt/c/Users/tester/Source/Fixtures/beta-project',
           summary: 'Storyteller Session',
           messageCount: 2,
         },
         {
           sessionId: 'cursor-2',
-          workspacePath: '/mnt/c/Users/kenne/Source/SK2/one-man-digital-company',
+          workspacePath: '/mnt/c/Users/tester/Source/Fixtures/alpha-project',
           summary: 'Runtime Session',
           messageCount: 1,
         },
@@ -140,12 +140,12 @@ describe('CursorNativeSessionService', () => {
       runner,
     });
 
-    const sessions = await service.listSessions('C:/Users/kenne/Source/SK2/ai-content-storyteller');
+    const sessions = await service.listSessions('C:/Users/tester/Source/Fixtures/beta-project');
 
     expect(sessions).toEqual([
       {
         providerSessionId: 'cursor-1',
-        cwd: 'C:/Users/kenne/Source/SK2/ai-content-storyteller',
+        cwd: 'C:/Users/tester/Source/Fixtures/beta-project',
         summary: 'Storyteller Session',
         messageCount: 2,
         lastActivity: undefined,
@@ -350,7 +350,7 @@ describe('CursorNativeSessionService', () => {
       stdout: JSON.stringify([
         {
           sessionId: 'cursor-1',
-          workspacePath: '/mnt/c/Users/kenne/Source/SK2/ai-content-storyteller',
+          workspacePath: '/mnt/c/Users/tester/Source/Fixtures/beta-project',
           summary: 'Storyteller Session',
           messageCount: 2,
         },

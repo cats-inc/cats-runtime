@@ -89,7 +89,7 @@ describe('OpencodeNativeSessionService', () => {
         },
         '127.0.0.1',
         4097,
-        'C:\\Users\\kenne\\repo',
+        'C:\\Users\\tester\\repo',
       );
 
       expect(spawnConfig).toEqual({
@@ -106,7 +106,7 @@ describe('OpencodeNativeSessionService', () => {
           ]),
         ],
         shell: false,
-        cwd: 'C:\\Users\\kenne\\repo',
+        cwd: 'C:\\Users\\tester\\repo',
         env: { OPENCODE_DISABLE_AUTOUPDATE: 'true' },
         windowsVerbatimArguments: true,
       });

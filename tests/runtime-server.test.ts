@@ -4066,7 +4066,7 @@ providers:
                   ide_state_node: {
                     workspace_folders: [
                       {
-                        folder_root: 'C:/Users/kenne/Source/SK2/one-man-digital-company',
+                        folder_root: 'C:/Users/tester/Source/Fixtures/alpha-project',
                       },
                     ],
                   },

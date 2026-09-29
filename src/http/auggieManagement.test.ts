@@ -152,7 +152,7 @@ describe('Auggie native session management', () => {
       providerName: 'auggie',
       cwd: 'C:/repo',
       summary: 'Existing Auggie Session',
-      sourcePath: 'C:/Users/kenne/.augment/sessions/auggie-123.json',
+      sourcePath: 'C:/Users/tester/.augment/sessions/auggie-123.json',
       messageCount: 1,
     });
     vi.mocked(auggieSessions.loadHistory).mockResolvedValue([
@@ -170,7 +170,7 @@ describe('Auggie native session management', () => {
     ]);
     expect(vi.mocked(auggieSessions.loadHistory)).toHaveBeenCalledWith({
       providerSessionId: 'auggie-123',
-      sourcePath: 'C:/Users/kenne/.augment/sessions/auggie-123.json',
+      sourcePath: 'C:/Users/tester/.augment/sessions/auggie-123.json',
     });
   });
 
@@ -220,7 +220,7 @@ describe('Auggie native session management', () => {
       {
         providerSessionId: 'auggie-abc',
         cwd: 'C:/repo',
-        sourcePath: 'C:/Users/kenne/.augment/sessions/auggie-abc.json',
+        sourcePath: 'C:/Users/tester/.augment/sessions/auggie-abc.json',
         summary: 'Existing Auggie Session',
         messageCount: 3,
         exchangeCount: 3,
@@ -251,8 +251,8 @@ describe('Auggie native session management', () => {
     vi.mocked(auggieSessions.listAllSessions).mockResolvedValue([
       {
         providerSessionId: 'auggie-global-1',
-        cwd: 'C:/Users/kenne/Source/SK2/one-man-digital-company',
-        sourcePath: 'C:/Users/kenne/.augment/sessions/auggie-global-1.json',
+        cwd: 'C:/Users/tester/Source/Fixtures/alpha-project',
+        sourcePath: 'C:/Users/tester/.augment/sessions/auggie-global-1.json',
         summary: 'Global Auggie Session',
         messageCount: 4,
         exchangeCount: 4,
@@ -265,7 +265,7 @@ describe('Auggie native session management', () => {
     const body = await res.json() as { sessions: Array<{ providerSessionId: string; cwd: string }> };
     expect(body.sessions).toHaveLength(1);
     expect(body.sessions[0].providerSessionId).toBe('auggie-global-1');
-    expect(body.sessions[0].cwd).toBe('C:/Users/kenne/Source/SK2/one-man-digital-company');
+    expect(body.sessions[0].cwd).toBe('C:/Users/tester/Source/Fixtures/alpha-project');
   });
 
   it('resumes a discovered Auggie session through the generic resume route', async () => {

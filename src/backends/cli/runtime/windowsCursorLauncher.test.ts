@@ -39,7 +39,7 @@ describe('windows cursor launcher resolution', () => {
     originalCompileCache = process.env.NODE_COMPILE_CACHE;
     originalLocalAppData = process.env.LOCALAPPDATA;
     delete process.env.NODE_COMPILE_CACHE;
-    process.env.LOCALAPPDATA = 'C:\\Users\\kenne\\AppData\\Local';
+    process.env.LOCALAPPDATA = 'C:\\Users\\tester\\AppData\\Local';
   });
 
   afterEach(() => {
@@ -58,7 +58,7 @@ describe('windows cursor launcher resolution', () => {
       args: [join(versionDir, 'index.js')],
       env: {
         CURSOR_INVOKED_AS: 'cursor-agent.cmd',
-        NODE_COMPILE_CACHE: join('C:\\Users\\kenne\\AppData\\Local', 'cursor-compile-cache'),
+        NODE_COMPILE_CACHE: join('C:\\Users\\tester\\AppData\\Local', 'cursor-compile-cache'),
       },
     });
   });

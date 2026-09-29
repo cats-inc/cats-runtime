@@ -32,7 +32,7 @@ describe('AuggieSessionService', () => {
                   ide_state_node: {
                     workspace_folders: [
                       {
-                        folder_root: 'C:/Users/kenne/Source/SK2/one-man-digital-company',
+                        folder_root: 'C:/Users/tester/Source/Fixtures/alpha-project',
                       },
                     ],
                   },
@@ -48,13 +48,13 @@ describe('AuggieSessionService', () => {
 
     const service = new AuggieSessionService(sessionsDir);
     const sessions = await service.listSessions(
-      'C:/Users/kenne/Source/SK2/one-man-digital-company/cats-runtime',
+      'C:/Users/tester/Source/Fixtures/alpha-project/cats-runtime',
     );
 
     expect(sessions).toHaveLength(1);
     expect(sessions[0]).toMatchObject({
       providerSessionId: 'auggie-1',
-      cwd: 'C:/Users/kenne/Source/SK2/one-man-digital-company',
+      cwd: 'C:/Users/tester/Source/Fixtures/alpha-project',
       summary: 'cats-runtime work',
       messageCount: 1,
       exchangeCount: 1,
@@ -79,7 +79,7 @@ describe('AuggieSessionService', () => {
                   ide_state_node: {
                     workspace_folders: [
                       {
-                        folder_root: 'C:/Users/kenne/Source/SK2/one-man-digital-company',
+                        folder_root: 'C:/Users/tester/Source/Fixtures/alpha-project',
                       },
                     ],
                   },
@@ -134,7 +134,7 @@ describe('AuggieSessionService', () => {
                   ide_state_node: {
                     workspace_folders: [
                       {
-                        folder_root: 'C:/Users/kenne/Source/SK2/one-man-digital-company',
+                        folder_root: 'C:/Users/tester/Source/Fixtures/alpha-project',
                       },
                     ],
                   },

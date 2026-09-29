@@ -75,7 +75,7 @@ describe('provider command resolution through install knowledge', () => {
       MUSE_COMMAND_CONFIG,
       'muse',
       ['exec', '--json', '--', 'Say hi'],
-      'C:\\Users\\kenne\\repo',
+      'C:\\Users\\tester\\repo',
     );
 
     // Straight to the binary: no cmd.exe (no console handoff, no terminal
@@ -107,7 +107,7 @@ describe('provider command resolution through install knowledge', () => {
       MUSE_COMMAND_CONFIG,
       'muse',
       ['--version'],
-      'C:\\Users\\kenne\\repo',
+      'C:\\Users\\tester\\repo',
     );
 
     expect(spawnConfig.command.toLowerCase()).toContain('cmd.exe');
@@ -134,7 +134,7 @@ describe('provider command resolution through install knowledge', () => {
       MUSE_COMMAND_CONFIG,
       'muse',
       ['--version'],
-      'C:\\Users\\kenne\\repo',
+      'C:\\Users\\tester\\repo',
     );
 
     expect(spawnConfig.command).toBe(join(onPath, 'muse.exe'));
@@ -157,7 +157,7 @@ describe('provider command resolution through install knowledge', () => {
       MUSE_COMMAND_CONFIG,
       'muse',
       ['exec', '--json', '--', 'Say hi'],
-      '/Users/kenne/repo',
+      '/Users/tester/repo',
     );
 
     expect(spawnConfig.command).toBe(launcher);
@@ -181,7 +181,7 @@ describe('provider command resolution through install knowledge', () => {
       MUSE_COMMAND_CONFIG,
       'muse',
       ['--version'],
-      '/Users/kenne/repo',
+      '/Users/tester/repo',
     );
 
     // Unchanged from before: the spawn does its own PATH lookup.
@@ -217,7 +217,7 @@ describe('provider command resolution through install knowledge', () => {
       { ...MUSE_COMMAND_CONFIG, path: 'my-muse-wrapper' },
       'muse',
       ['--version'],
-      process.platform === 'win32' ? 'C:\\Users\\kenne\\repo' : '/Users/kenne/repo',
+      process.platform === 'win32' ? 'C:\\Users\\tester\\repo' : '/Users/tester/repo',
     );
 
     if (process.platform === 'win32') {
@@ -242,7 +242,7 @@ describe('provider command resolution through install knowledge', () => {
       { path: 'not-a-provider-cli', runner: 'auto', runtime: { mode: 'native' } },
       'not-a-provider',
       ['--version'],
-      process.platform === 'win32' ? 'C:\\Users\\kenne\\repo' : '/Users/kenne/repo',
+      process.platform === 'win32' ? 'C:\\Users\\tester\\repo' : '/Users/tester/repo',
     );
 
     if (process.platform === 'win32') {
