@@ -1739,6 +1739,8 @@ export interface RawStreamEvent extends StreamEventBase {
 export interface ProgressStreamEvent extends StreamEventBase, StreamEventStatePatch {
   type: 'progress';
   text: string;
+  /** Provider-reported MCP server connection states (SPEC-035 evidence). */
+  mcpServers?: { name: string; status: string }[];
   toolName?: string;
   toolId?: string;
   isError?: boolean;
