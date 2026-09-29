@@ -110,7 +110,7 @@ describe('PiSessionScanner', () => {
   });
 
   it('decodes cwd slug as fallback when session line has no cwd', async () => {
-    const cwdDir = join(tmpDir, '--home-sammy-Source-myproject--');
+    const cwdDir = join(tmpDir, '--home-tester-Source-myproject--');
     mkdirSync(cwdDir, { recursive: true });
 
     writeFileSync(
@@ -122,7 +122,7 @@ describe('PiSessionScanner', () => {
     const result = await scanner.scan();
 
     expect(result).toHaveLength(1);
-    expect(result[0].cwd).toBe('/home/sammy/Source/myproject');
+    expect(result[0].cwd).toBe('/home/tester/Source/myproject');
   });
 
   it('skips files without session header', async () => {

@@ -633,11 +633,11 @@ describe('runtime adapters', () => {
     // Host-native fixture paths: runtime-root resolution uses the host
     // platform's path semantics, so a Windows-style root only maps on win32.
     const hostRuntimeDir = process.platform === 'win32'
-      ? 'C:\\Users\\sammy\\.cats\\runtime'
-      : '/home/sammy/.cats/runtime';
+      ? 'C:\\Users\\tester\\.cats\\runtime'
+      : '/home/tester/.cats/runtime';
     const hostSessionDir = process.platform === 'win32'
-      ? 'C:\\Users\\sammy\\.cats\\runtime\\sessions\\sess-1'
-      : '/home/sammy/.cats/runtime/sessions/sess-1';
+      ? 'C:\\Users\\tester\\.cats\\runtime\\sessions\\sess-1'
+      : '/home/tester/.cats/runtime/sessions/sess-1';
     process.env.CATS_RUNTIME_DIR = hostRuntimeDir;
 
     try {

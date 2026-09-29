@@ -27,7 +27,7 @@ minutes later. Afterwards `cline` was gone: no `cline` entry in `npm ls -g`, no
 ```
 verbose title  npm update cline
 verbose argv   "update" "--global" "cline" "--tag" "latest" "--min-release-age" "0"
-verbose cwd    C:\Users\sammy\.cats\runtime\data
+verbose cwd    %USERPROFILE%\.cats\runtime\data
 ```
 
 - The cwd is `ProviderCompatibilityService`'s `probeCwd` (`config.dataDir`), so both npm
@@ -57,7 +57,7 @@ Both npm runs reified the same global root concurrently:
   real work to do.
 - Both runs retired the same paths: `node_modules/cline`, `cline`, `cline.cmd`,
   `cline.ps1` → `.cline-<random>`.
-- `...761Z` failed: `error code EEXIST`, `path C:\Users\sammy\.npm-global\cline`, `exit 1`,
+- `...761Z` failed: `error code EEXIST`, `path %USERPROFILE%\.npm-global\cline`, `exit 1`,
   with `unfinished npm timer reify:build`.
 - `...788Z` succeeded: `exit 0`, `info ok`.
 

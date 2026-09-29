@@ -63,12 +63,12 @@ describe('GrokSessionScanner', () => {
   });
 
   it('recovers the working directory from the group when the summary omits it', async () => {
-    writeSession('C%3A%5CUsers%5Csammy%5CSource%5Ccats-inc', 'session-a', {
+    writeSession('C%3A%5CUsers%5Ctester%5CSource%5Ccats-inc', 'session-a', {
       info: { id: 'session-a' },
     });
 
     const [session] = await new GrokSessionScanner(tmpDir).scan();
-    expect(session.cwd).toBe('C:\\Users\\sammy\\Source\\cats-inc');
+    expect(session.cwd).toBe('C:\\Users\\tester\\Source\\cats-inc');
   });
 
   it('prefers the recorded .cwd file that the slug+hash group form leaves behind', async () => {
