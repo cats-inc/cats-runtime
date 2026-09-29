@@ -1,7 +1,7 @@
 # PLAN-046: Session MCP servers
 
 Status: Complete (2026-09-30). R1 merged in #130, R2 in #132, R3 in #134 and R4
-in #PR_NUMBER. Release remains separate (see R4).
+in #140. Release remains separate (see R4).
 [SPEC-035](../specs/SPEC-035-session-mcp-servers.md) and
 [ADR-044](../decisions/044-configure-session-mcp-servers-for-provider-clis.md)
 govern this work. The Platform consumer is PLAN-116, which tracks the matching
