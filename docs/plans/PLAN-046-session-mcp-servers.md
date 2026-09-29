@@ -1,7 +1,7 @@
 # PLAN-046: Session MCP servers
 
-Status: In progress (2026-09-29). R1 is in PR #130. R2 is on `feat/session-mcp-claude`,
-stacked on R1.
+Status: In progress (2026-09-29). R1 merged in #130 and R2 in #132. R3 is on
+`feat/session-mcp-codex`. R4 remains.
 [SPEC-035](../specs/SPEC-035-session-mcp-servers.md) and
 [ADR-044](../decisions/044-configure-session-mcp-servers-for-provider-clis.md)
 govern this work. The Platform consumer is PLAN-116, which tracks the matching
@@ -70,14 +70,42 @@ R2 findings for consumers:
 
 ## R3 — Codex
 
-- [ ] Add `-c mcp_servers.<name>.url` / `bearer_token_env_var` through
-  `composeLaunchArgs` and enable the capability. Codex 0.158.0 supports
-  `--url` and `--bearer-token-env-var`.
-- [ ] Approve tool calls and elicitations for the configured servers only. Keep
-  the current decline for all other servers.
-- [ ] `startWindowsCodexHost` receives the merged child environment. Decide
-  whether the Code Mode host needs the bearer or should get a stripped env.
-- [ ] Run an isolated live smoke as in R2.
+- [x] Add `-c mcp_servers.<name>.url` and `bearer_token_env_var` after
+  `app-server`, and enable the capability. Configured instance overrides still
+  precede the session's values.
+- [x] Approve tool calls for the configured servers only, using
+  `-c mcp_servers.<name>.default_tools_approval_mode="approve"`. Without it,
+  Codex 0.158.0 fails the call with "MCP tool call requires approval, but
+  approval policy is never". With it, no elicitation or approval request is
+  sent. Elicitations stay declined for every server.
+- [x] The Windows Code Mode host gets the child environment without the
+  `CATS_MCP_*` secrets; only Codex itself needs them.
+- [x] `mcpServer/startupStatus/updated` for a session server becomes a provider
+  `progress` event of kind `mcp_servers` with `mcpServers: [{ name, status }]`.
+  Other servers are ignored. `ready` maps to `connected`, and `failed`/`error`
+  map to `failed`. The pool merges per-server updates.
+- [x] Isolated live smoke (2026-09-29, Windows, Codex 0.158.0, default model).
+  - A direct app-server probe first confirmed the approval failure and the
+    per-server fix.
+  - Through Runtime (temporary `CATS_RUNTIME_DIR`, permission mode `default`):
+    - Create reported `delivered`.
+    - Turn 1 streamed the provider statuses `starting` then `ready`, and the
+      stub logged an authenticated `tools/call` with the requested arguments.
+    - Turn 2 reported `connection: connected`.
+    - The token did not appear in bodies, reads, persisted data or Runtime
+      output.
+  - The two rollouts that the direct probes created under `~/.codex/sessions`
+    were deleted. Session deletion removed the Runtime smoke's own history.
+
+R3 notes for consumers:
+
+- Provider-sourced `mcp_servers` progress events (`metadata.source: "provider"`)
+  may appear in a turn's stream. Hosts should read delivery only from the
+  leading Runtime-sourced event (`metadata.source: "runtime"`, with
+  `metadata.mcpServers`).
+- The Runtime `tool_use` projection for Codex MCP calls carries the bare tool
+  name (`echo`) and no arguments. Hosts must not rely on it to identify the
+  server.
 
 ## R4 — Surfacing and release boundary
 

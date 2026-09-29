@@ -148,8 +148,8 @@ export function toSessionMcpLaunchConfig(servers: readonly SessionMcpServer[]): 
 
 /** Map a provider-reported server status onto the report's connection value. */
 export function toSessionMcpConnection(status: string | undefined): SessionMcpServerConnection {
-  if (status === 'connected') return 'connected';
-  if (status === 'failed' || status === 'needs-auth') return 'failed';
+  if (status === 'connected' || status === 'ready') return 'connected';
+  if (status === 'failed' || status === 'error' || status === 'needs-auth') return 'failed';
   return 'unknown';
 }
 

@@ -279,11 +279,12 @@ export class WorkerPool {
       }
 
       worker.on('event', (event) => {
-        if (event.type === 'init' && event.mcpServers && this.workers.get(sessionId) === worker) {
-          this.sessionMcpConnections.set(
-            sessionId,
-            new Map(event.mcpServers.map((server) => [server.name, server.status])),
-          );
+        if ((event.type === 'init' || event.type === 'progress') && event.mcpServers
+          && this.workers.get(sessionId) === worker) {
+          // Claude reports every server at init; Codex reports one server per update.
+          const connections = this.sessionMcpConnections.get(sessionId) ?? new Map<string, string>();
+          for (const server of event.mcpServers) connections.set(server.name, server.status);
+          this.sessionMcpConnections.set(sessionId, connections);
         }
         if ((event.type === 'init' || event.type === 'result') && event.sessionId) {
           if (this.registry.get(sessionId)?.providerSessionId !== event.sessionId) {

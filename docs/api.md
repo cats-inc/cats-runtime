@@ -2713,7 +2713,7 @@ servers a provider CLI connects to. `mcpServers` is optional on `POST /sessions`
   session and are not inherited by forks. After a Runtime restart, supply them
   again on resume.
 - **Where it applies.** The set is used only by adapters that declare support,
-  in a `native` CLI runtime. Claude Code declares support. Other adapters,
+  in a `native` CLI runtime. Claude Code and Codex declare support. Other adapters,
   Docker/WSL instances, non-CLI backends and peer-routed turns report
   `unsupported`.
 - **Changing the set.** When a send changes the set of a live supporting worker,
@@ -2723,7 +2723,10 @@ servers a provider CLI connects to. `mcpServers` is optional on `POST /sessions`
   `mcpServers: { status, servers: [{ name, connection }] }`, where `status` is
   `delivered`, `unsupported` or `failed`. `connection` (`connected`, `failed` or
   `unknown`) comes from the provider's own evidence, such as Claude's
-  `system:init`, once a turn has produced it. The report is omitted when no servers
+  `system:init` or Codex's MCP startup status, once a turn has produced it.
+  Providers may also emit their own `mcp_servers` progress events with
+  `metadata.source: "provider"`. Read delivery only from the leading
+  Runtime-sourced event. The report is omitted when no servers
   are configured. A message stream starts with a `progress` event whose
   `metadata.kind` is `"mcp_servers"` and whose `metadata.mcpServers` carries
   the same report. It is emitted before any guardrail warning.

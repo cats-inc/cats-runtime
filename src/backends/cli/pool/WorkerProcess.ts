@@ -156,7 +156,10 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       this.startupController = controller;
       const startupClosures: Promise<void>[] = [];
       let cliLaunchAttempted = false;
-      const starting = startWindowsCodexHost(spawnConfig, hostPath, env, controller.signal, closed => startupClosures.push(closed))
+      // The Code Mode host does not need session MCP secrets; only the CLI does.
+      const hostEnv = { ...env };
+      for (const key of Object.keys(this.launchEnv)) delete hostEnv[key];
+      const starting = startWindowsCodexHost(spawnConfig, hostPath, hostEnv, controller.signal, closed => startupClosures.push(closed))
         .then((host) => {
           if (host) startupClosures.push(host.closed);
           if (controller.signal.aborted || generation !== this.launchGeneration) {

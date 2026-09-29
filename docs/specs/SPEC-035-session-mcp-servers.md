@@ -43,9 +43,11 @@ interface SessionMcpServer {
   on 2.1.284. `mcp__<name>` is appended to `--allowedTools` in `default` and
   `whitelist` modes. `system:init.mcp_servers` supplies the `connection`
   evidence, starting with the first turn's init.
-- **Codex:** `-c mcp_servers.<name>.url="…"` and
-  `-c mcp_servers.<name>.bearer_token_env_var="CATS_MCP_<NAME>_TOKEN"` after
-  `app-server`. Runtime approves tool calls and elicitations for that server only.
+- **Codex (implemented in R3):** `-c mcp_servers.<name>.url="…"`,
+  `-c mcp_servers.<name>.bearer_token_env_var="CATS_MCP_<NAME>_TOKEN"` and
+  `-c mcp_servers.<name>.default_tools_approval_mode="approve"` after `app-server`.
+  The last setting approves that server's tools only; elicitations stay declined.
+  `mcpServer/startupStatus/updated` supplies the `connection` evidence.
 
 ## Acceptance
 

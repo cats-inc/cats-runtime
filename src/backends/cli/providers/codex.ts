@@ -28,6 +28,7 @@ import {
   observeUnknown,
 } from '../../../core/compatibility/providerEvolution.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
+import type { SessionMcpServerLaunch } from '../../../core/sessionMcpServers.js';
 import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 import { CodexReadTools, codexReadToolError, grantedCodexReadTools } from './codexReadTools.js';
 
@@ -71,7 +72,12 @@ const CODEX_TOOL_ITEM_TYPES = new Set([
 
 export class CodexProvider implements Provider {
   name = 'codex';
-  capabilities: ProviderCapabilities = { resume: true, fork: true, permissions: true };
+  capabilities: ProviderCapabilities = {
+    resume: true,
+    fork: true,
+    permissions: true,
+    sessionMcpServers: true,
+  };
 
   private state: CodexState = 'uninitialized';
   private threadId: string | null = null;
@@ -149,6 +155,7 @@ export class CodexProvider implements Provider {
         `model_reasoning_effort=${JSON.stringify(opts.modelControls['codex.reasoning_effort'])}`,
       );
     }
+    args.push(...buildCodexSessionMcpOverrides(opts.mcpServers ?? []));
 
     return args;
   }
@@ -503,6 +510,32 @@ export class CodexProvider implements Provider {
   private handleNotification(msg: JsonRpcResponse): StreamEvent | StreamEvent[] | null {
     const method = msg.method!;
     const params = msg.params ?? {};
+
+    // SPEC-035 connection evidence, reported only for this session's own servers.
+    if (method === 'mcpServer/startupStatus/updated') {
+      const name = typeof params.name === 'string' ? params.name : undefined;
+      const status = typeof params.status === 'string' ? params.status : undefined;
+      if (!name || !status || !this._spawnOpts?.mcpServers?.some((server) => server.name === name)) {
+        return observeIgnored(this.evolutionObserver, {
+          rawEventType: method,
+          reason: 'not_a_session_mcp_server',
+          rawSample: msg,
+        }, null);
+      }
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: method,
+        rawSample: msg,
+      }, {
+        ...createRuntimeProgressEvent({
+          text: `MCP server ${name}: ${status}`,
+          kind: 'mcp_servers',
+          status: 'updated',
+          source: 'provider',
+          provider: 'codex',
+        }),
+        mcpServers: [{ name, status }],
+      });
+    }
 
     // Only the correlated bootstrap response confirms the effective permission mode.
     if (method === 'thread/started') {
@@ -1443,4 +1476,19 @@ function unixSecondsToIso(value: unknown): string | undefined {
     return undefined;
   }
   return new Date(seconds * 1000).toISOString();
+}
+
+/**
+ * SPEC-035: configure each session MCP server for app-server. The bearer is read
+ * from the named environment variable, and approval is granted for that server's
+ * tools only; `approvalPolicy: never` otherwise rejects MCP tool calls.
+ */
+export function buildCodexSessionMcpOverrides(servers: readonly SessionMcpServerLaunch[]): string[] {
+  return servers.flatMap((server) => [
+    '-c', `mcp_servers.${server.name}.url=${JSON.stringify(server.url)}`,
+    ...(server.bearerTokenEnvVar
+      ? ['-c', `mcp_servers.${server.name}.bearer_token_env_var=${JSON.stringify(server.bearerTokenEnvVar)}`]
+      : []),
+    '-c', `mcp_servers.${server.name}.default_tools_approval_mode="approve"`,
+  ]);
 }
