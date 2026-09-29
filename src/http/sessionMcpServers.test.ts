@@ -243,6 +243,27 @@ describe('session MCP servers HTTP contract (SPEC-035)', () => {
     expect(pool.kill).not.toHaveBeenCalled();
   });
 
+  it('closes the session and returns 500 when the recycle cannot start a worker', async () => {
+    const { app, text } = await createSession({ provider: 'claude' });
+    const { id } = JSON.parse(text) as { id: string };
+    registry.updateStatus(id, 'ready');
+    const streamMessage = vi.fn(async function* () { yield { type: 'result' as const }; });
+    vi.mocked(pool.get).mockReturnValue({ alive: true, busy: false, streamMessage } as never);
+    vi.mocked(pool.spawn).mockImplementationOnce(() => { throw new Error('synthetic spawn failure'); });
+
+    const response = await app.request(`/sessions/${id}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
+      body: JSON.stringify({ message: 'hello', mcpServers: MCP_SERVERS }),
+    });
+    const body = await response.text();
+    expect(response.status).toBe(500);
+    expect(body).toContain('Failed to apply session MCP servers');
+    expect(body).not.toContain(TOKEN);
+    expect(registry.get(id)?.status).toBe('closed');
+    expect(streamMessage).not.toHaveBeenCalled();
+  });
+
   it('reports failed on resume when a live worker runs an older set', async () => {
     const { app, text } = await createSession({ provider: 'claude' });
     const { id } = JSON.parse(text) as { id: string };

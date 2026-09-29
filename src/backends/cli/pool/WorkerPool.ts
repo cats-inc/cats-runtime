@@ -301,6 +301,7 @@ export class WorkerPool {
         if (this.workers.get(sessionId) === worker) {
           this.registry.updateStatus(sessionId, 'closed');
           this.workers.delete(sessionId);
+          this.sessionMcpConnections.delete(sessionId);
           this.releaseSingletonResource(sessionId);
         }
       });

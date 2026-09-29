@@ -60,6 +60,13 @@ R2 findings for consumers:
 - The config travels as an inline JSON argument. Native `.exe` launches pass it
   unchanged. Instances that run through the Windows `cmd` proxy rely on its
   argument quoting and were not exercised.
+- A recycle kills and respawns the worker synchronously, like the Pi precedent.
+  A session at exactly `maxSessions` can hit "Max sessions reached" while the
+  killed worker still counts as alive. This latent limit is shared with Pi and
+  is not fixed here.
+- Session reads map `resume`/`fork`/`permissions` explicitly and do not surface
+  `sessionMcpServers`, so list and detail reads stay consistent. Exposing the
+  capability remains R4.
 
 ## R3 — Codex
 
