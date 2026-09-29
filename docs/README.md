@@ -1,5 +1,9 @@
 # Documentation Index
 
+[Cats Ask MCP probe](research/2026-09-29-cats-ask-mcp-probe.md) records the isolated
+question/answer experiment, matched Grok Bot synthetic and authenticated bookmark
+receipts, scoped checks and the remaining recency/video/autonomous-dispatch limits.
+
 [Managed Plugin skills](specs/SPEC-034-managed-plugin-skills.md) documents the
 default-off Agency instruction pilot, authenticated local management and durable
 revocation. See [ADR-043](decisions/043-admit-managed-plugin-skills.md) and

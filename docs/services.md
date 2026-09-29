@@ -8,6 +8,7 @@
 | Service | Port | Env Var | Purpose | Notes |
 |---------|------|---------|---------|-------|
 | `cats-runtime` | 3110 | `CATS_RUNTIME_PORT` | Unified runtime service for upper-layer apps | Default host `127.0.0.1` |
+| Cats Ask MCP probe (local experiment, stopped) | OS-assigned ephemeral port | `CATS_ASK_PROBE_PORT` | Synthetic transport test or authenticated bookmarks inquiry | Uncommitted standalone prototype; loopback with temporary ngrok tunnel. See [probe notes](research/2026-09-29-cats-ask-mcp-probe.md). |
 | `opencode` embedded server | 4097 | `OPENCODE_SERVER_PORT` | Local OpenCode HTTP bridge used by the OpenCode backend | Started on demand by `cats-runtime` |
 | Codex Code Mode host (Windows) | OS-assigned ephemeral port | None | Per-worker local gRPC host for hidden native Codex launches | Binds only `127.0.0.1`; starts after capability probing and stops with the worker. See [launch notes](research/2026-09-26-windows-codex-hidden-launch.md). |
 
@@ -18,6 +19,7 @@ Port numbers should be configurable via environment variables so developers can 
 | Variable | Default | Service | Notes |
 |----------|---------|---------|-------|
 | `CATS_RUNTIME_PORT` | `3110` | `cats-runtime` | Main inbound HTTP listener |
+| `CATS_ASK_PROBE_PORT` | `0` | Cats Ask MCP probe | Dedicated loopback listener; never forward the Runtime port |
 | `CATS_RUNTIME_DIR` | `~/.cats/runtime` | `cats-runtime` | Runtime root for `config/`, `data/`, and `sessions/` |
 | `OPENCODE_SERVER_PORT` | `4097` | `opencode` embedded server | Only used when the OpenCode backend is active |
 
@@ -38,4 +40,4 @@ This project was created from **project-bootstrap**, which maintains a central p
 
 ---
 
-*Last updated: 2026-03-11*
+*Last updated: 2026-09-29*
