@@ -22,6 +22,17 @@ an older pinned Runtime commit without these notices cannot pass the new bundle
 gate. This is a private build-artifact requirement, not a public Runtime API or
 stored-data change. It needs a coordinated Desktop build, not a Runtime npm release.
 
+## Dashboard dependency integrity
+
+The dashboard and playground now use bundled libraries from `public/vendor/` instead
+of executing CDN responses. Their exact versions, upstream URLs, licenses and SHA-384
+digests ship with the package. Both pages include integrity and crossorigin attributes
+for those local assets. The UI build verifies the recorded bytes offline; run
+`node scripts/verify-dashboard-vendor.mjs --upstream` to also recompute the hashes from
+the pinned URLs before accepting an update. See [vendor maintenance](../public/vendor/README.md).
+This is compatible with existing installs and changes no API or stored-data format.
+No version bump or publication is part of this change.
+
 ## Catalog resources and local patches
 
 Builds validate the authored schema-2 catalog and its generated digest. npm packages

@@ -1,0 +1,37 @@
+[
+  {
+    "file": "marked-15.0.7.min.js",
+    "url": "https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js",
+    "integrity": "sha384-H+hy9ULve6xfxRkWIh/YOtvDdpXgV2fmAGQkIDTxIgZwNoaoBal14Di2YTMR6MzR"
+  },
+  {
+    "file": "marked-15.0.7.LICENSE",
+    "url": "https://cdn.jsdelivr.net/npm/marked@15.0.7/LICENSE.md",
+    "integrity": "sha384-61EZB/aHzoKVT71zYfgKtxFiu+RWPSi9UH34kVJPMyzaTcFdbvH0liFiUwpiBNqY"
+  },
+  {
+    "file": "dompurify-3.4.16.min.js",
+    "url": "https://cdn.jsdelivr.net/npm/dompurify@3.4.16/dist/purify.min.js",
+    "integrity": "sha384-a7SzOxErzJ3ZpQz0zJ32d67dSitNzPcbfybc/ykU9KJhMgZkwqfSxlhhdJRS+XGL"
+  },
+  {
+    "file": "dompurify-3.4.16.LICENSE",
+    "url": "https://cdn.jsdelivr.net/npm/dompurify@3.4.16/LICENSE",
+    "integrity": "sha384-II9e1ieUDl5AxyiVq3/FflTua1Sr0kMJ25e6imG7rXg7SiAsA2VemsvEqVsLqM7/"
+  },
+  {
+    "file": "highlight-11.11.1.min.js",
+    "url": "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js",
+    "integrity": "sha384-RH2xi4eIQ/gjtbs9fUXM68sLSi99C7ZWBRX1vDrVv6GQXRibxXLbwO2NGZB74MbU"
+  },
+  {
+    "file": "highlight-11.11.1-github-dark.min.css",
+    "url": "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github-dark.min.css",
+    "integrity": "sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH"
+  },
+  {
+    "file": "highlight-11.11.1.LICENSE",
+    "url": "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/LICENSE",
+    "integrity": "sha384-GUnWHVsPcTph6IE9a8MY5Wjz1jVi21qn5joj/BNFpJ9hZz/xg3jw6htOJYCht191"
+  }
+]

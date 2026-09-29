@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { verifyDashboardVendor } from './verify-dashboard-vendor.mjs';
 
 const require = createRequire(import.meta.url);
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -75,4 +76,5 @@ function main() {
   }
 }
 
+await verifyDashboardVendor();
 main();
