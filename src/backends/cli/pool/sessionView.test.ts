@@ -54,11 +54,11 @@ describe('sessionView helpers', () => {
   });
 
   it('builds a case-insensitive workspace key for Windows paths', () => {
-    expect(sessionWorkspaceKey('C:\\Users\\sammy\\Source\\Repo')).toBe(
-      'c:/users/sammy/source/repo',
+    expect(sessionWorkspaceKey('C:\\Users\\tester\\Source\\Repo')).toBe(
+      'c:/users/tester/source/repo',
     );
-    expect(sessionWorkspaceKey('/Users/sammy/Source/Repo')).toBe(
-      '/Users/sammy/Source/Repo',
+    expect(sessionWorkspaceKey('/Users/tester/Source/Repo')).toBe(
+      '/Users/tester/Source/Repo',
     );
   });
 

@@ -21,7 +21,7 @@ describe('CopilotSessionScanner', () => {
       mkdirSync(sessionDir, { recursive: true });
       writeFileSync(join(sessionDir, 'workspace.yaml'), [
         'id: cb763eb4-1234',
-        'cwd: C:\\Users\\sammy\\Source\\Fixtures\\gamma-project',
+        'cwd: C:\\Users\\tester\\Source\\Fixtures\\gamma-project',
         'summary: Initialize Session',
         'created_at: 2026-03-07T15:35:22.790Z',
         'updated_at: 2026-03-07T15:37:21.307Z',
@@ -39,7 +39,7 @@ describe('CopilotSessionScanner', () => {
 
       expect(results).toHaveLength(1);
       expect(results[0].providerSessionId).toBe('cb763eb4-1234');
-      expect(results[0].cwd).toBe('C:\\Users\\sammy\\Source\\Fixtures\\gamma-project');
+      expect(results[0].cwd).toBe('C:\\Users\\tester\\Source\\Fixtures\\gamma-project');
       expect(results[0].summary).toBe('Initialize Session');
       expect(results[0].messageCount).toBe(2);
       expect(results[0].lastActivity).toBe('2026-03-07T15:37:21.307Z');

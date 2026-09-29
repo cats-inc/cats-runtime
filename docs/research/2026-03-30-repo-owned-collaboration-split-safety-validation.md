@@ -17,7 +17,7 @@ Source:
 Throwaway workspace path used for validation:
 
 ```text
-C:\Users\sammy\AppData\Local\Temp\cats-runtime-split-safe-validation
+%USERPROFILE%\AppData\Local\Temp\cats-runtime-split-safe-validation
 ```
 
 Commands run:
@@ -26,8 +26,8 @@ Commands run:
 cd cats-runtime
 npm run build
 npx vitest run tests/workspace-substrate.test.ts tests/workspace-substrate-bin.test.ts --pool=threads --poolOptions.threads.singleThread
-node dist\bin\workspaceSubstrate.js --operation init --workspace-path C:\Users\sammy\AppData\Local\Temp\cats-runtime-split-safe-validation --profile a2a-enabled --agent codex --apply --actor-role boss_cat
-rg -n "project-bootstrap|Initialize-Project|Update-Project" C:\Users\sammy\AppData\Local\Temp\cats-runtime-split-safe-validation
+node dist\bin\workspaceSubstrate.js --operation init --workspace-path %USERPROFILE%\AppData\Local\Temp\cats-runtime-split-safe-validation --profile a2a-enabled --agent codex --apply --actor-role boss_cat
+rg -n "project-bootstrap|Initialize-Project|Update-Project" %USERPROFILE%\AppData\Local\Temp\cats-runtime-split-safe-validation
 
 cd ../cats
 node --test --test-isolation=none tests/skill-sync-scripts.test.js
