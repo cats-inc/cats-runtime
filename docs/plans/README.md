@@ -1,5 +1,7 @@
 # Implementation Plans
 
+- [PLAN-046: Session MCP servers](PLAN-046-session-mcp-servers.md) — contract first, then
+  Claude Code and Codex mappings.
 - [PLAN-045: Catalog basis (channel and plan)](PLAN-045-catalog-basis-channel-and-plan.md) —
   Runtime then Platform delivery of the SPEC-031 basis amendment.
 - [PLAN-044: Managed Plugin skills](PLAN-044-managed-plugin-skills.md) — internal

@@ -1,5 +1,7 @@
 # Architecture Decision Records (ADR)
 
+- [ADR-044: Session MCP servers](044-configure-session-mcp-servers-for-provider-clis.md) — proposed,
+  2026-09-29; host-supplied MCP servers configured into native provider CLIs.
 - [ADR-043: Managed Plugin skills](043-admit-managed-plugin-skills.md) — accepted
   for the internal Agency content pilot, 2026-09-29.
 

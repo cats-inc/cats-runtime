@@ -1,5 +1,7 @@
 # Feature Specifications
 
+- [SPEC-035: Session MCP servers](SPEC-035-session-mcp-servers.md) — create/resume/send
+  descriptors, in-memory secrets and delivery reports.
 - [SPEC-034: Managed Plugin skills](SPEC-034-managed-plugin-skills.md) — local
   protocol-1 registration, instruction delivery and revocation.
 

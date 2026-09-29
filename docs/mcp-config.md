@@ -346,6 +346,12 @@ by the direct API: `initializing`, `ready`, `busy`, `closed`,
 `fork_session.arguments.workspaceIsolation` accept the same isolation modes as
 the direct runtime API: `shared`, `isolated`, and `worktree`.
 
+`create_session` and `send_message` do not accept `mcpServers`. Session MCP
+servers ([SPEC-035](specs/SPEC-035-session-mcp-servers.md)) carry secrets and
+are configured only through the direct HTTP API. This facade is a host and
+orchestrator surface. It is never injected into provider sessions as one of
+their MCP servers.
+
 The browser MCP tools are additive wrappers over the same runtime-owned
 `/browser/*` substrate. `list_browser_sessions` now accepts the same
 `status=ready|closed` filter as direct HTTP, `browser_summary` exposes the

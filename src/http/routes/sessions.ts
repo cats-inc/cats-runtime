@@ -10,6 +10,11 @@ import {
   getRuntimeSessionManager,
   type AppContext,
 } from '../app.js';
+import type { RuntimeSessionManager } from '../../core/runtime/RuntimeSessionManager.js';
+import {
+  parseSessionMcpServers,
+  type SessionMcpDeliveryReport,
+} from '../../core/sessionMcpServers.js';
 import {
   isProviderNotConfiguredError,
   isUnknownProviderInstanceError,
@@ -465,6 +470,15 @@ interface ResolvedSessionModelState {
   modelSelection?: ProviderModelSelection;
   modelResolution?: SessionInfo['modelResolution'];
   warnings: string[];
+}
+
+/** SPEC-035 delivery report for responses; omitted when the session has no servers. */
+function sessionMcpReport(
+  runtime: RuntimeSessionManager,
+  sessionId: string,
+): { mcpServers?: SessionMcpDeliveryReport } {
+  const report = runtime.mcpServerReport(sessionId);
+  return report ? { mcpServers: report } : {};
 }
 
 function buildSpawnOptions(input: {
@@ -2660,6 +2674,7 @@ sessionRoutes.post('/sessions', async (c) => {
     correlation?: Record<string, unknown>;
     instructions?: string;
     skills?: unknown;
+    mcpServers?: unknown;
     context?: SessionInvocationContext;
     outputDir?: string;
   }>();
@@ -2716,6 +2731,10 @@ sessionRoutes.post('/sessions', async (c) => {
   const parsedSkills = parseRuntimeSkillManifest(body.skills);
   if (parsedSkills.error) {
     return c.json({ error: parsedSkills.error }, 400);
+  }
+  const parsedMcpServers = parseSessionMcpServers(body.mcpServers);
+  if (!parsedMcpServers.ok) {
+    return c.json({ error: parsedMcpServers.error }, 400);
   }
   const context = parseInvocationContext(body.context);
   const requestedHydrationMetadata = extractHydrationMetadata(
@@ -2833,6 +2852,7 @@ sessionRoutes.post('/sessions', async (c) => {
       });
 
       const updatedExisting = ctx.registry.get(existing.id) ?? preparedExisting;
+      runtime.mcpServers.apply(existing.id, parsedMcpServers.servers);
       const existingHandle = runtime.get(existing.id);
       if (!existingHandle?.active) {
         if (updatedExisting.providerBackend === 'cli') {
@@ -2864,7 +2884,10 @@ sessionRoutes.post('/sessions', async (c) => {
         }
       }
 
-      return c.json(serializeSession(ctx, ctx.registry.get(existing.id) ?? existing));
+      return c.json({
+        ...serializeSession(ctx, ctx.registry.get(existing.id) ?? existing),
+        ...sessionMcpReport(runtime, existing.id),
+      });
     }
   }
 
@@ -2977,6 +3000,7 @@ sessionRoutes.post('/sessions', async (c) => {
         ctx,
         resolveCliProviderTarget(ctx, providerName, providerInstance!.id),
       );
+      runtime.mcpServers.apply(session.id, parsedMcpServers.servers);
       runtime.spawn(
         session.id,
         providerName,
@@ -2995,7 +3019,7 @@ sessionRoutes.post('/sessions', async (c) => {
       );
       ctx.registry.updateStatus(session.id, 'ready');
 
-      return c.json(serializeSession(ctx, session), 201);
+      return c.json({ ...serializeSession(ctx, session), ...sessionMcpReport(runtime, session.id) }, 201);
     } catch (err) {
       ctx.registry.remove(sessionId);
       if (nativeProviderSessionId) {
@@ -3069,6 +3093,7 @@ sessionRoutes.post('/sessions', async (c) => {
         ctx,
         resolveCliProviderTarget(ctx, providerName, providerInstance!.id),
       );
+      runtime.mcpServers.apply(session.id, parsedMcpServers.servers);
       runtime.spawn(
         session.id,
         providerName,
@@ -3087,7 +3112,7 @@ sessionRoutes.post('/sessions', async (c) => {
       );
       ctx.registry.updateStatus(session.id, 'ready');
 
-      return c.json(serializeSession(ctx, session), 201);
+      return c.json({ ...serializeSession(ctx, session), ...sessionMcpReport(runtime, session.id) }, 201);
     } catch (err) {
       ctx.registry.remove(sessionId);
       if (nativeProviderSessionId) {
@@ -3161,6 +3186,7 @@ sessionRoutes.post('/sessions', async (c) => {
         ctx,
         resolveCliProviderTarget(ctx, providerName, providerInstance!.id),
       );
+      runtime.mcpServers.apply(session.id, parsedMcpServers.servers);
       runtime.spawn(
         session.id,
         providerName,
@@ -3179,7 +3205,7 @@ sessionRoutes.post('/sessions', async (c) => {
       );
       ctx.registry.updateStatus(session.id, 'ready');
 
-      return c.json(serializeSession(ctx, session), 201);
+      return c.json({ ...serializeSession(ctx, session), ...sessionMcpReport(runtime, session.id) }, 201);
     } catch (err) {
       ctx.registry.remove(sessionId);
       if (nativeProviderSessionId) {
@@ -3255,6 +3281,7 @@ sessionRoutes.post('/sessions', async (c) => {
 
   try {
     await primeCliCompatibility(ctx, providerTarget);
+    runtime.mcpServers.apply(session.id, parsedMcpServers.servers);
     runtime.spawn(
       session.id,
       providerName,
@@ -3289,7 +3316,11 @@ sessionRoutes.post('/sessions', async (c) => {
     warnings.push(...skills.warnings);
   }
 
-  return c.json({ ...serializeSession(ctx, session), ...(warnings.length ? { warnings } : {}) }, 201);
+  return c.json({
+    ...serializeSession(ctx, session),
+    ...sessionMcpReport(runtime, session.id),
+    ...(warnings.length ? { warnings } : {}),
+  }, 201);
   } finally {
     releasePreparation?.();
     if (operationId) selection!.releaseOperation(operationId);
@@ -4261,6 +4292,13 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   } catch {
     return c.json({ error: 'This session provider is no longer selected' }, 409);
   }
+  const resumeBody = await c.req.json<{ mcpServers?: unknown }>()
+    .catch(() => ({} as { mcpServers?: unknown }));
+  const parsedMcpServers = parseSessionMcpServers(resumeBody.mcpServers);
+  if (!parsedMcpServers.ok) {
+    return c.json({ error: parsedMcpServers.error }, 400);
+  }
+  runtime.mcpServers.apply(id, parsedMcpServers.servers);
 
   const view = serializeSession(ctx, session);
   if (!view.attached && view.activity === 'interactive') {
@@ -4272,7 +4310,10 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   const existing = runtime.get(id);
   if (existing?.active) {
     ctx.registry.updateStatus(id, 'ready');
-    return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
+    return c.json({
+      ...serializeSession(ctx, ctx.registry.get(id) ?? session),
+      ...sessionMcpReport(runtime, id),
+    });
   }
 
   let preparedSession = session;
@@ -4323,7 +4364,10 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
       return c.json({ error: `Failed to resume: ${err}` }, 500);
     }
 
-    return c.json(serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession));
+    return c.json({
+      ...serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession),
+      ...sessionMcpReport(runtime, id),
+    });
   }
 
   if (session.providerName === 'cursor') {
@@ -4376,7 +4420,10 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
       return c.json({ error: `Failed to resume: ${err}` }, 500);
     }
 
-    return c.json(serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession));
+    return c.json({
+      ...serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession),
+      ...sessionMcpReport(runtime, id),
+    });
   }
 
   if (session.providerName === 'kiro') {
@@ -4440,7 +4487,10 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
       return c.json({ error: `Failed to resume: ${err}` }, 500);
     }
 
-    return c.json(serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession));
+    return c.json({
+      ...serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession),
+      ...sessionMcpReport(runtime, id),
+    });
   }
 
   if (session.providerName === 'pi') {
@@ -4512,7 +4562,10 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
       return c.json({ error: `Failed to resume: ${err}` }, 500);
     }
 
-    return c.json(serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession));
+    return c.json({
+      ...serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession),
+      ...sessionMcpReport(runtime, id),
+    });
   }
 
   if (!preparedSession.providerSessionId) {
@@ -4588,7 +4641,10 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
     return c.json({ error: `Failed to resume: ${err}` }, 500);
   }
 
-  return c.json(serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession));
+  return c.json({
+    ...serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession),
+    ...sessionMcpReport(runtime, id),
+  });
 });
 
 /** POST /sessions/:id/fork — fork a runtime-owned session */

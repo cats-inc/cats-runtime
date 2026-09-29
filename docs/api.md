@@ -2678,6 +2678,51 @@ action-scoped lifecycle coordination without relying on a single global
 - `workspaceKind`: one of `source`, `sandbox`, or `worktree`
 - `workspaceAccess`: one of `read_write` or `read_only`
 - legacy compatibility fields `workspaceMode` and `workspaceIsolation`
+- `mcpServers`: session MCP servers the provider CLI should connect to
+  (see [Session MCP servers](#session-mcp-servers))
+
+### Session MCP servers
+
+[SPEC-035](specs/SPEC-035-session-mcp-servers.md) lets a host configure the MCP
+servers a provider CLI connects to. `mcpServers` is optional on `POST /sessions`,
+`POST /sessions/{id}/resume` and `POST /sessions/{id}/messages`:
+
+```json
+{
+  "mcpServers": [{
+    "name": "cats",
+    "transport": "http",
+    "url": "http://127.0.0.1:3000/api/code/agent-tools/mcp",
+    "auth": { "kind": "bearer_env", "token": "<secret>" }
+  }]
+}
+```
+
+- **Values.** Omitting the field keeps the current set, `[]` clears it, and
+  anything else replaces it. The limit is 8 entries. `name` matches
+  `^[a-z][a-z0-9-]{0,31}$`. `transport` is `http` (Streamable HTTP). The URL
+  must be `http(s)` on `127.0.0.1`, `[::1]` or `localhost`, with no credentials
+  or fragment. `auth.kind` is `bearer_env` or `none`.
+- **Rejections.** `stdio`, `oauth_ref`, unknown keys and invalid values return
+  `400`; the error text never contains the token.
+- **Secrets.** Runtime never proxies MCP traffic. The CLI connects to each
+  server itself. Descriptors stay in memory only: they are not persisted, not
+  returned by session reads, not logged and never placed in argv. The token
+  reaches the child only as `CATS_MCP_<NAME>_TOKEN`.
+- **Lifetime.** Descriptors survive worker restarts, are dropped with the
+  session and are not inherited by forks. After a Runtime restart, supply them
+  again on resume.
+- **Where it applies.** The set is used only by adapters that declare support,
+  in a `native` CLI runtime. Other adapters, Docker/WSL instances, non-CLI
+  backends and peer-routed turns report `unsupported`.
+- **Reports.** Create and resume responses include
+  `mcpServers: { status, servers: [{ name, connection }] }`, where `status` is
+  `delivered`, `unsupported` or `failed`. The report is omitted when no servers
+  are configured. A message stream starts with a `progress` event whose
+  `metadata.kind` is `"mcp_servers"` and whose `metadata.mcpServers` carries
+  the same report. It is emitted before any guardrail warning.
+- **MCP facade.** The Runtime `/mcp` facade `create_session` and `send_message`
+  tools do not accept this field.
 
 When `reusePolicy` is `prefer_existing` or `require_existing`, the runtime will
 try to attach to an existing session with the same provider target and
@@ -2705,7 +2750,8 @@ the migration window, but new callers should prefer `workspaceKind` /
 `workspaceAccess`.
 
 `POST /sessions/{id}/messages` accepts optional `instructions`, `skills`,
-`context`, `outputDir`, additive execution-strategy fields
+`context`, `outputDir`, `mcpServers` (not persisted; see
+[Session MCP servers](#session-mcp-servers)), additive execution-strategy fields
 (`requestedStrategy`, `acceptanceCriteria`, `strategyContext`, `correlation`),
 and additive `routing` fields. These are persisted onto the logical session
 where applicable so later history/resume flows can observe the same bootstrap

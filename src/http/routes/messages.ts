@@ -44,6 +44,8 @@ import {
 } from '../parsing.js';
 import { isPiUnknownSessionError, resolvePiResumeTarget } from '../../backends/cli/pi/resume.js';
 import { toRuntimeSkillErrorResponse } from '../runtimeSkillErrors.js';
+import { createRuntimeProgressEvent } from '../../core/progress.js';
+import { parseSessionMcpServers } from '../../core/sessionMcpServers.js';
 
 function appendHistory(sourcePath: string, entry: Record<string, unknown>): void {
   mkdirSync(dirname(sourcePath), { recursive: true });
@@ -479,6 +481,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     strategyContext?: Record<string, unknown>;
     correlation?: Record<string, unknown>;
     routing?: unknown;
+    mcpServers?: unknown;
   }>();
   const message = parseOptionalString(body.message);
   if (!message) {
@@ -489,6 +492,10 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   const parsedSkills = parseRuntimeSkillManifest(body.skills);
   if (parsedSkills.error) {
     return c.json({ error: parsedSkills.error }, 400);
+  }
+  const parsedMcpServers = parseSessionMcpServers(body.mcpServers);
+  if (!parsedMcpServers.ok) {
+    return c.json({ error: parsedMcpServers.error }, 400);
   }
   const context = parseInvocationContext(body.context);
   const requestedHydrationMetadata = extractHydrationMetadata(
@@ -691,6 +698,23 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     return c.json({ error: 'Worker process has exited' }, 410);
   }
 
+  runtime.mcpServers.apply(id, parsedMcpServers.servers);
+  const mcpReport = runtime.mcpServerReport(id);
+  const mcpDelivery = mcpReport && peerRouted ? { ...mcpReport, status: 'unsupported' as const } : mcpReport;
+  const mcpServersEvent = mcpDelivery
+    ? createRuntimeProgressEvent({
+      text: `Session MCP servers: ${mcpDelivery.status}`,
+      sessionId: executionSession.id,
+      providerSessionId: executionSession.providerSessionId,
+      provider: executionSession.providerName,
+      backend: executionSession.providerBackend || 'cli',
+      instance: executionSession.providerInstanceId || 'default',
+      kind: 'mcp_servers',
+      source: 'runtime',
+      details: { mcpServers: mcpDelivery },
+    })
+    : undefined;
+
   const metering = getRuntimeMeteringService(ctx);
   const preflight = metering.evaluatePreflight(executionSession);
   if (preflight.outcome === 'blocked' || preflight.outcome === 'cooldown') {
@@ -765,9 +789,10 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
         const turnStartedAt = Date.now();
         const contentBlocks = createRuntimeContentBlockProjector();
         try {
-          if (warningEvent) {
-            runtime.observeEvent(id, warningEvent);
-            for (const outputEvent of toStreamOutputEvents(contentBlocks, warningEvent)) {
+          for (const leadingEvent of [mcpServersEvent, warningEvent]) {
+            if (!leadingEvent) continue;
+            runtime.observeEvent(id, leadingEvent);
+            for (const outputEvent of toStreamOutputEvents(contentBlocks, leadingEvent)) {
               controller.enqueue(new TextEncoder().encode(JSON.stringify(outputEvent) + '\n'));
             }
           }
@@ -873,9 +898,10 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     const turnStartedAt = Date.now();
     const contentBlocks = createRuntimeContentBlockProjector();
     try {
-      if (warningEvent) {
-        runtime.observeEvent(id, warningEvent);
-        for (const outputEvent of toStreamOutputEvents(contentBlocks, warningEvent)) {
+      for (const leadingEvent of [mcpServersEvent, warningEvent]) {
+        if (!leadingEvent) continue;
+        runtime.observeEvent(id, leadingEvent);
+        for (const outputEvent of toStreamOutputEvents(contentBlocks, leadingEvent)) {
           await stream.writeSSE({
             data: JSON.stringify(outputEvent),
             event: outputEvent.type,

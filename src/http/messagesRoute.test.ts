@@ -1053,3 +1053,58 @@ describe('message route transcript persistence', () => {
     }
   });
 });
+
+describe('message route session MCP servers (SPEC-035)', () => {
+  const token = 'synthetic-session-mcp-secret';
+  const mcpServers = [{
+    name: 'cats',
+    transport: 'http',
+    url: 'http://127.0.0.1:3000/api/code/agent-tools/mcp',
+    auth: { kind: 'bearer_env', token },
+  }];
+
+  it('starts the stream with the delivery report and never echoes the token', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
+    const sessionBaseDir = join(root, 'sessions');
+    mkdirSync(sessionBaseDir, { recursive: true });
+
+    try {
+      const { app, session } = makeApp(sessionBaseDir, async function* () {
+        yield { type: 'text', text: 'Done.' };
+        yield { type: 'result' };
+      });
+      const send = (body: Record<string, unknown>) => app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/x-ndjson' },
+        body: JSON.stringify({ message: 'hello', ...body }),
+      });
+
+      const response = await send({ mcpServers });
+      const text = await response.text();
+      expect(response.status).toBe(200);
+      expect(text).not.toContain(token);
+      const events = parseNdjson(text);
+      expect(events[0]).toMatchObject({
+        type: 'progress',
+        metadata: {
+          kind: 'mcp_servers',
+          source: 'runtime',
+          mcpServers: { status: 'unsupported', servers: [{ name: 'cats', connection: 'unknown' }] },
+        },
+      });
+      expect(events.slice(1)).toEqual([{ type: 'text', text: 'Done.' }, { type: 'result' }]);
+
+      const kept = parseNdjson(await (await send({})).text());
+      expect(kept[0]).toMatchObject({ type: 'progress', metadata: { kind: 'mcp_servers' } });
+
+      const cleared = parseNdjson(await (await send({ mcpServers: [] })).text());
+      expect(cleared).toEqual([{ type: 'text', text: 'Done.' }, { type: 'result' }]);
+
+      const invalid = await send({ mcpServers: [{ ...mcpServers[0], transport: 'stdio' }] });
+      expect(invalid.status).toBe(400);
+      expect(await invalid.text()).not.toContain(token);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
