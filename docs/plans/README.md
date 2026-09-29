@@ -57,6 +57,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
+| [PLAN-046](./PLAN-046-session-mcp-servers.md) | Session MCP Servers | Complete — R1–R4 merged; release separate | [SPEC-035](../specs/SPEC-035-session-mcp-servers.md), [ADR-044](../decisions/044-configure-session-mcp-servers-for-provider-clis.md) |
 | [PLAN-045](./PLAN-045-catalog-basis-channel-and-plan.md) | Catalog Basis (Channel and Plan) | Implemented — Runtime and Platform merged; ships with the next Desktop release | [SPEC-031](../specs/SPEC-031-provider-catalog-data-and-local-overrides.md#amendment-2026-09-29-catalog-basis) |
 | [PLAN-042](./PLAN-042-model-selector-custom-controls-route-and-cost-signals.md) | Model Selector Custom Controls, Route Display and Cost Signals | On Hold — not approved; waiting for SPEC-032 approval | [SPEC-032](../specs/SPEC-032-model-selector-custom-controls-route-and-cost-signals.md) |
 | [PLAN-040](./PLAN-040-provider-catalog-data-and-local-overrides.md) | Provider Catalog Data and Local Overrides | Completed — implementation CI passed; release separate | [SPEC-031](../specs/SPEC-031-provider-catalog-data-and-local-overrides.md), [ADR-040](../decisions/040-use-data-driven-provider-catalogs-and-local-overrides.md) |

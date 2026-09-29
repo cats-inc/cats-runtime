@@ -29,6 +29,7 @@ describe('buildProviderContinuitySummary', () => {
       resume: true,
       fork: true,
       permissions: true,
+      sessionMcpServers: false,
       providerManagedSessions: false,
       sessionKey: false,
       providerSessionState: true,
@@ -65,11 +66,71 @@ describe('buildProviderContinuitySummary', () => {
       resume: true,
       fork: false,
       permissions: false,
+      sessionMcpServers: false,
       providerManagedSessions: true,
       sessionKey: false,
       providerSessionState: false,
       remoteCancel: false,
     });
+  });
+
+  it('reports session MCP server support for supporting CLI adapters in a native runtime', () => {
+    const target = (providerName: 'claude' | 'codex', mode: 'native' | 'wsl') => ({
+      providerName,
+      backend: 'cli',
+      instanceId: 'default',
+      defaultTarget: true,
+      cliInstance: {
+        id: 'default',
+        providerName,
+        commandConfig: {
+          path: providerName,
+          runner: 'auto',
+          runtime: mode === 'native' ? { mode: 'native' } : { mode: 'wsl', distro: 'Ubuntu' },
+        },
+      },
+    }) as ProviderTargetDescriptor;
+    const capabilities = {
+      resume: true,
+      fork: true,
+      permissions: true,
+      sessionMcpServers: true,
+    };
+
+    for (const providerName of ['claude', 'codex'] as const) {
+      expect(buildProviderContinuitySummary(target(providerName, 'native'), { capabilities }))
+        .toMatchObject({ source: 'provider_native', sessionMcpServers: true });
+      // Delivery requires a native runtime, so a WSL instance of the same adapter reports false.
+      expect(buildProviderContinuitySummary(target(providerName, 'wsl'), { capabilities }))
+        .toMatchObject({ source: 'provider_native', sessionMcpServers: false });
+    }
+    expect(buildProviderContinuitySummary(target('claude', 'native'), {
+      capabilities: { resume: true, fork: true, permissions: true },
+    }).sessionMcpServers).toBe(false);
+  });
+
+  it('never reports session MCP server support for api, local or agent targets', () => {
+    const capabilities = {
+      resume: true,
+      fork: true,
+      permissions: true,
+      sessionMcpServers: true,
+    };
+    for (const backend of ['api', 'local', 'agent'] as const) {
+      const summary = buildProviderContinuitySummary({
+        providerName: 'claude',
+        backend,
+        instanceId: 'remote',
+        defaultTarget: true,
+        remoteInstance: {
+          id: 'remote',
+          providerName: 'claude',
+          backend,
+          transport: backend === 'agent' ? 'agent_sdk_bridge' : 'anthropic',
+        },
+      } as ProviderTargetDescriptor, { capabilities });
+      expect(summary.sessionMcpServers).toBe(false);
+    }
   });
 
   it('describes provider-managed continuity for agent targets', () => {
@@ -133,6 +194,7 @@ describe('buildProviderContinuitySummary', () => {
       resume: true,
       fork: true,
       permissions: false,
+      sessionMcpServers: false,
       providerManagedSessions: true,
       sessionKey: true,
       providerSessionState: true,

@@ -2980,6 +2980,7 @@ backends:
           resume: true,
           fork: false,
           permissions: false,
+          sessionMcpServers: false,
           providerManagedSessions: true,
           sessionKey: false,
           providerSessionState: false,
@@ -3128,6 +3129,7 @@ backends:
                   resume: true,
                   fork: false,
                   permissions: false,
+                  sessionMcpServers: false,
                   providerManagedSessions: true,
                   sessionKey: false,
                   providerSessionState: false,
@@ -3191,6 +3193,7 @@ backends:
                   resume: true,
                   fork: false,
                   permissions: false,
+                  sessionMcpServers: false,
                   providerManagedSessions: true,
                   sessionKey: false,
                   providerSessionState: false,
@@ -3416,6 +3419,7 @@ backends:
             resume: true,
             fork: false,
             permissions: false,
+            sessionMcpServers: false,
             providerManagedSessions: true,
             sessionKey: false,
             providerSessionState: false,
@@ -3567,6 +3571,7 @@ providers:
                   resume: true,
                   fork: true,
                   permissions: true,
+                  sessionMcpServers: true,
                   providerManagedSessions: true,
                   sessionKey: false,
                   providerSessionState: false,
@@ -3697,6 +3702,7 @@ providers:
                 resume: true,
                 fork: false,
                 permissions: false,
+                sessionMcpServers: false,
                 providerManagedSessions: true,
                 sessionKey: false,
                 providerSessionState: false,
@@ -3718,6 +3724,41 @@ providers:
         ],
         count: 1,
       });
+    });
+  });
+
+  it('GET /sessions and GET /sessions/:id agree on session MCP server support', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const expected = new Map([
+        [runtime.context.registry.create({ providerName: 'claude', cwd: 'C:/repo-claude' }).id, true],
+        [runtime.context.registry.create({ providerName: 'codex', cwd: 'C:/repo-codex' }).id, true],
+        [runtime.context.registry.create({ providerName: 'cursor', cwd: 'C:/repo-cursor' }).id, false],
+      ]);
+      type SessionRead = {
+        id: string;
+        providerTarget: { backend: string; continuity: { sessionMcpServers: boolean } };
+      };
+
+      const listResponse = await runtime.app.request('/sessions');
+      expect(listResponse.status).toBe(200);
+      const { sessions } = await listResponse.json() as { sessions: SessionRead[] };
+      for (const [id, supported] of expected) {
+        const listed = sessions.find((session) => session.id === id);
+        expect(listed?.providerTarget.backend).toBe('cli');
+        expect(listed?.providerTarget.continuity.sessionMcpServers).toBe(supported);
+
+        const detailResponse = await runtime.app.request(`/sessions/${id}`);
+        expect(detailResponse.status).toBe(200);
+        const detail = await detailResponse.json() as SessionRead;
+        expect(detail.providerTarget.continuity.sessionMcpServers).toBe(supported);
+      }
+
+      for (const [provider, supported] of [['claude', true], ['codex', true], ['cursor', false]] as const) {
+        const toolsResponse = await runtime.app.request(`/providers/${provider}/tools?instance=cli/native`);
+        expect(toolsResponse.status).toBe(200);
+        const tools = await toolsResponse.json() as { continuity: { sessionMcpServers: boolean } };
+        expect(tools.continuity.sessionMcpServers).toBe(supported);
+      }
     });
   });
 
@@ -4650,6 +4691,7 @@ providers:
           resume: true,
           fork: true,
           permissions: true,
+          sessionMcpServers: false,
           providerManagedSessions: false,
           sessionKey: false,
           providerSessionState: true,

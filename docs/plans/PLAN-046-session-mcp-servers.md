@@ -1,7 +1,7 @@
 # PLAN-046: Session MCP servers
 
-Status: In progress (2026-09-29). R1 merged in #130 and R2 in #132. R3 is on
-`feat/session-mcp-codex`. R4 remains.
+Status: Complete (2026-09-30). R1 merged in #130, R2 in #132, R3 in #134 and R4
+in #PR_NUMBER. Release remains separate (see R4).
 [SPEC-035](../specs/SPEC-035-session-mcp-servers.md) and
 [ADR-044](../decisions/044-configure-session-mcp-servers-for-provider-clis.md)
 govern this work. The Platform consumer is PLAN-116, which tracks the matching
@@ -64,9 +64,9 @@ R2 findings for consumers:
   A session at exactly `maxSessions` can hit "Max sessions reached" while the
   killed worker still counts as alive. This latent limit is shared with Pi and
   is not fixed here.
-- Session reads map `resume`/`fork`/`permissions` explicitly and do not surface
-  `sessionMcpServers`, so list and detail reads stay consistent. Exposing the
-  capability remains R4.
+- Session list reads use fallback capabilities rather than the adapter's, so R4
+  added `sessionMcpServers` to the Claude and Codex fallback when it exposed the
+  capability. List and detail reads report the same value.
 
 ## R3 — Codex
 
@@ -109,10 +109,20 @@ R3 notes for consumers:
 
 ## R4 — Surfacing and release boundary
 
-- [ ] Expose `sessionMcpServers` in provider tooling/continuity reads.
-- [ ] Record the release boundary: an additive optional field within the current
-  0.x line. The version is chosen at release time under the release SOP. This
-  plan authorizes no bump.
+- [x] Expose `sessionMcpServers` in provider tooling/continuity reads.
+  `ProviderContinuitySummary.sessionMcpServers` appears wherever `continuity`
+  does: `GET /providers/config`, `GET /providers/:provider/tools`,
+  `GET /diagnostics/providers` and session `providerTarget` reads. It is `true`
+  only for a CLI adapter that declares the capability on a `native` instance,
+  the gate that session create, resume and send apply. The session manager and
+  the summary share one predicate, `targetSupportsSessionMcpServers`. Docker/WSL
+  instances and `api`, `local` and `agent` targets report `false`.
+- [x] Record the release boundary: an additive optional field within the current
+  0.x line. The optional `mcpServers` request field and the
+  `continuity.sessionMcpServers` read field are compatible additions: no
+  existing HTTP, configuration or persisted-data contract changes, and no
+  migration is needed. The version is chosen at release time under the release
+  SOP. This plan authorizes no bump.
 
 ## Validation
 

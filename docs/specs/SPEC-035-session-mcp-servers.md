@@ -35,6 +35,15 @@ interface SessionMcpServer {
 | SMCP-08 | For a supporting adapter, a send that changes a live worker's set recycles the worker through resume at the turn boundary. This is PLAN-046 R2. |
 | SMCP-09 | The Runtime `/mcp` facade does not accept the field in v1. ACP client `mcpServers` is unrelated. |
 
+## Provider reads (PLAN-046 R4)
+
+`GET /providers/config`, `GET /providers/:provider/tools`, `GET /diagnostics/providers`
+and session `providerTarget` reads report `continuity.sessionMcpServers` for each
+target. It applies the SMCP-05 gate: `true` only when a CLI adapter declares
+support and the instance runs in `native` mode, otherwise `false`. It tells a host
+whether to send the field; delivery is still read from the SMCP-06 report, which
+also covers peer-routed turns.
+
 ## Adapter mappings (PLAN-046 R2/R3)
 
 - **Claude Code (implemented in R2):** inline `--mcp-config` JSON with

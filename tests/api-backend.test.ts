@@ -59,6 +59,7 @@ function expectRuntimeContinuity() {
     resume: true,
     fork: true,
     permissions: true,
+    sessionMcpServers: false,
     providerManagedSessions: false,
     sessionKey: false,
     providerSessionState: true,

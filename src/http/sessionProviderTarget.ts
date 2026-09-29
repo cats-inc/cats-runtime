@@ -77,6 +77,7 @@ function buildFallbackCapabilities(
         resume: true,
         fork: true,
         permissions: true,
+        sessionMcpServers: true,
       };
     case 'auggie':
     case 'kiro':
