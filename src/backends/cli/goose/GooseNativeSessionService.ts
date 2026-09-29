@@ -348,7 +348,7 @@ export class GooseNativeSessionService {
 
 /**
  * Parse a line from `goose session list` output.
- * Format: "20260316_4 - cats-test - 2026-03-16 21:03:50 UTC - ~/Source/SK2/one-man-digital-company"
+ * Format: "20260316_4 - cats-test - 2026-03-16 21:03:50 UTC - ~/Source/Fixtures/alpha-project"
  */
 function parseSessionListLine(line: string): GooseNativeSessionSummary | null {
   const parts = line.split(/\s+-\s+/);

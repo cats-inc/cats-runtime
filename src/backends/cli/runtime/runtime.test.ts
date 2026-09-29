@@ -18,8 +18,8 @@ describe('runtime adapters', () => {
       mode: 'native',
     });
 
-    expect(runtime.toRuntimePath('/Users/kenne/repo')).toBe('/Users/kenne/repo');
-    expect(runtime.toHostPath('/Users/kenne/repo')).toBe('/Users/kenne/repo');
+    expect(runtime.toRuntimePath('/Users/tester/repo')).toBe('/Users/tester/repo');
+    expect(runtime.toHostPath('/Users/tester/repo')).toBe('/Users/tester/repo');
   });
 
   it('maps Windows host paths into WSL runtime paths and back', () => {
@@ -28,8 +28,8 @@ describe('runtime adapters', () => {
       distro: 'Ubuntu',
     });
 
-    expect(runtime.toRuntimePath('C:\\Users\\kenne\\repo')).toBe('/mnt/c/Users/kenne/repo');
-    expect(runtime.toHostPath('/mnt/c/Users/kenne/repo')).toBe('C:/Users/kenne/repo');
+    expect(runtime.toRuntimePath('C:\\Users\\tester\\repo')).toBe('/mnt/c/Users/tester/repo');
+    expect(runtime.toHostPath('/mnt/c/Users/tester/repo')).toBe('C:/Users/tester/repo');
   });
 
   it('builds a WSL spawn config with runtime cwd translation', () => {
@@ -44,7 +44,7 @@ describe('runtime adapters', () => {
       },
       'copilot',
       ['--help'],
-      'C:\\Users\\kenne\\repo',
+      'C:\\Users\\tester\\repo',
     );
 
     expect(spawnConfig).toEqual({
@@ -79,7 +79,7 @@ describe('runtime adapters', () => {
       shell: false,
       env: {
         CATS_RUNTIME_WSL_EXEC_B64: Buffer.from(JSON.stringify({
-          cwd: '/mnt/c/Users/kenne/repo',
+          cwd: '/mnt/c/Users/tester/repo',
           command: 'cursor-agent',
           args: ['--help'],
         }), 'utf8').toString('base64'),
@@ -104,12 +104,12 @@ describe('runtime adapters', () => {
       },
       'cursor',
       ['-p', 'Review ${summary} and keep `literal` text'],
-      'C:\\Users\\kenne\\repo',
+      'C:\\Users\\tester\\repo',
     );
 
     expect(spawnConfig.env).toEqual({
       CATS_RUNTIME_WSL_EXEC_B64: Buffer.from(JSON.stringify({
-        cwd: '/mnt/c/Users/kenne/repo',
+        cwd: '/mnt/c/Users/tester/repo',
         command: 'cursor-agent',
         args: ['-p', 'Review ${summary} and keep `literal` text'],
       }), 'utf8').toString('base64'),
@@ -124,7 +124,7 @@ describe('runtime adapters', () => {
   it('builds a native direct spawn config without path rewriting', () => {
     const spawnConfig = buildProcessSpawnConfig(
       {
-        path: '/Users/kenne/.local/bin/cursor-agent',
+        path: '/Users/tester/.local/bin/cursor-agent',
         runner: 'direct',
         runtime: {
           mode: 'native',
@@ -132,14 +132,14 @@ describe('runtime adapters', () => {
       },
       'cursor',
       ['--help'],
-      '/Users/kenne/repo',
+      '/Users/tester/repo',
     );
 
     expect(spawnConfig).toEqual({
-      command: '/Users/kenne/.local/bin/cursor-agent',
+      command: '/Users/tester/.local/bin/cursor-agent',
       args: ['--help'],
       shell: false,
-      cwd: '/Users/kenne/repo',
+      cwd: '/Users/tester/repo',
     });
   });
 
@@ -154,7 +154,7 @@ describe('runtime adapters', () => {
       },
       'kiro',
       ['chat', '--no-interactive', 'Review ${summary}\n- **user** (stakeholder)'],
-      '/Users/kenne/repo',
+      '/Users/tester/repo',
     );
 
     if (process.platform === 'win32') {
@@ -180,7 +180,7 @@ describe('runtime adapters', () => {
         'Review ${summary}\n- **user** (stakeholder)',
       ]);
     }
-    expect(spawnConfig.cwd).toBe('/Users/kenne/repo');
+    expect(spawnConfig.cwd).toBe('/Users/tester/repo');
     expect(spawnConfig.shell).toBe(false);
   });
 
@@ -204,7 +204,7 @@ describe('runtime adapters', () => {
         },
         'copilot',
         ['--help'],
-        'C:\\Users\\kenne\\repo',
+        'C:\\Users\\tester\\repo',
       );
 
       expect(spawnConfig.command.toLowerCase()).toContain('cmd.exe');
@@ -255,7 +255,7 @@ describe('runtime adapters', () => {
         },
         'codex',
         ['app-server', '-c', 'model="gpt-5.6-sol"'],
-        'C:\\Users\\kenne\\repo',
+        'C:\\Users\\tester\\repo',
       );
 
       expect(spawnConfig.command).toBe(join(binDir, 'node.exe'));
@@ -306,7 +306,7 @@ describe('runtime adapters', () => {
         },
         'cline',
         ['--json', '--', prompt],
-        'C:\\Users\\kenne\\repo',
+        'C:\\Users\\tester\\repo',
       );
 
       expect(spawnConfig.command).toBe(join(binDir, 'node.exe'));
@@ -343,7 +343,7 @@ describe('runtime adapters', () => {
         },
         'cursor',
         ['-p', '--output-format', 'stream-json', prompt],
-        'C:\\Users\\kenne\\repo',
+        'C:\\Users\\tester\\repo',
       );
 
       expect(spawnConfig.command).toBe(join(versionDir, 'node.exe'));
@@ -383,7 +383,7 @@ describe('runtime adapters', () => {
         },
         'junie',
         ['--output-format', 'json', prompt],
-        'C:\\Users\\kenne\\repo',
+        'C:\\Users\\tester\\repo',
       );
 
       expect(spawnConfig.command).toBe(join(binaryDir, 'junie.exe'));
@@ -391,7 +391,7 @@ describe('runtime adapters', () => {
       expect(spawnConfig.args).toEqual(['--skip-update-check', '--output-format', 'json', prompt]);
       expect(spawnConfig.shell).toBe(false);
       expect(spawnConfig.env).toMatchObject({
-        EJ_RUNNER_PWD: 'C:\\Users\\kenne\\repo',
+        EJ_RUNNER_PWD: 'C:\\Users\\tester\\repo',
         JUNIE_DATA: junieData,
       });
     } finally {
@@ -413,7 +413,7 @@ describe('runtime adapters', () => {
       },
       'kiro',
       ['chat', '--no-interactive', 'Review ${summary}\n- **user** (stakeholder)'],
-      'C:\\Users\\kenne\\repo',
+      'C:\\Users\\tester\\repo',
     );
 
     if (process.platform === 'win32') {
@@ -522,7 +522,7 @@ describe('runtime adapters', () => {
       container: 'cats-cli-dev',
     });
 
-    expect(runtime.toRuntimePath('C:\\Users\\kenne\\repo')).toBe('C:/Users/kenne/repo');
+    expect(runtime.toRuntimePath('C:\\Users\\tester\\repo')).toBe('C:/Users/tester/repo');
     expect(runtime.toHostPath('/home/user/repo')).toBe('/home/user/repo');
   });
 
@@ -602,17 +602,17 @@ describe('runtime adapters', () => {
           },
         },
         'auggie',
-        ['--workspace-root', 'C:\\Users\\kenne\\repo', '--instruction-file', promptFile],
-        'C:\\Users\\kenne\\repo',
+        ['--workspace-root', 'C:\\Users\\tester\\repo', '--instruction-file', promptFile],
+        'C:\\Users\\tester\\repo',
       );
 
       expect(spawnConfig.env).toEqual({
         CATS_RUNTIME_WSL_EXEC_B64: Buffer.from(JSON.stringify({
-          cwd: '/mnt/c/Users/kenne/repo',
+          cwd: '/mnt/c/Users/tester/repo',
           command: 'auggie',
           args: [
             '--workspace-root',
-            '/mnt/c/Users/kenne/repo',
+            '/mnt/c/Users/tester/repo',
             '--instruction-file',
             promptFile.replace(/\\/g, '/').replace(/^([A-Za-z]):/, (_, drive) => `/mnt/${drive.toLowerCase()}`),
           ],
@@ -736,12 +736,12 @@ describe('runtime adapters', () => {
         },
         'pi',
         ['--mode', 'rpc', '--append-system-prompt', promptFile],
-        'C:\\Users\\kenne\\repo',
+        'C:\\Users\\tester\\repo',
       );
 
       expect(spawnConfig.env).toEqual({
         CATS_RUNTIME_WSL_EXEC_B64: Buffer.from(JSON.stringify({
-          cwd: '/mnt/c/Users/kenne/repo',
+          cwd: '/mnt/c/Users/tester/repo',
           command: 'pi',
           args: [
             '--mode',

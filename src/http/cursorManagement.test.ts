@@ -481,7 +481,7 @@ describe('Cursor native session management', () => {
     vi.mocked(cursorNative.listAllSessions).mockResolvedValue([
       {
         providerSessionId: 'cursor-global-1',
-        cwd: '/mnt/c/Users/kenne/Source/SK2/ai-content-storyteller',
+        cwd: '/mnt/c/Users/tester/Source/Fixtures/beta-project',
         summary: 'Global Cursor Session',
         messageCount: 4,
       },
@@ -493,7 +493,7 @@ describe('Cursor native session management', () => {
     const body = await res.json() as { sessions: Array<{ providerSessionId: string; cwd: string }> };
     expect(body.sessions).toHaveLength(1);
     expect(body.sessions[0].providerSessionId).toBe('cursor-global-1');
-    expect(body.sessions[0].cwd).toBe('/mnt/c/Users/kenne/Source/SK2/ai-content-storyteller');
+    expect(body.sessions[0].cwd).toBe('/mnt/c/Users/tester/Source/Fixtures/beta-project');
   });
 
   it('returns 400 when a requested Cursor instance does not exist', async () => {
@@ -508,7 +508,7 @@ describe('Cursor native session management', () => {
     vi.mocked(cursorNative.listAllSessions).mockResolvedValue([
       {
         providerSessionId: 'cursor-global-1',
-        cwd: '/mnt/c/Users/kenne/Source/SK2/ai-content-storyteller',
+        cwd: '/mnt/c/Users/tester/Source/Fixtures/beta-project',
         summary: 'Global Cursor Session',
         messageCount: 4,
         lastActivity: '2026-03-09T00:00:00Z',
@@ -527,7 +527,7 @@ describe('Cursor native session management', () => {
     };
     expect(body.sessions).toHaveLength(1);
     expect(body.sessions[0].providerSessionId).toBe('cursor-global-1');
-    expect(body.sessions[0].cwd).toBe('/mnt/c/Users/kenne/Source/SK2/ai-content-storyteller');
+    expect(body.sessions[0].cwd).toBe('/mnt/c/Users/tester/Source/Fixtures/beta-project');
     expect(body.sessions[0].origin).toBe('discovered');
     expect(body.sessions[0].controlMode).toBe('resume_only');
     expect(registry.list({ provider: 'cursor' })).toHaveLength(1);

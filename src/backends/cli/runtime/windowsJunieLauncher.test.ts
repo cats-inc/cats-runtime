@@ -19,7 +19,7 @@ const JUNIE_SHIM = [
   '',
 ].join('\r\n');
 
-const CWD = 'C:\\Users\\kenne\\repo';
+const CWD = 'C:\\Users\\tester\\repo';
 
 describe('windows junie launcher resolution', () => {
   let root: string;

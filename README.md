@@ -1,12 +1,18 @@
 # cats-runtime
 
-> Unified runtime for subscription CLIs, API backends, and local-model backends.
+> Unified runtime for agent CLIs, API backends, and local-model backends.
 
 Cats / Cats Inc. is a software project name maintained by the individual
 developer [sammykenny2](https://github.com/sammykenny2), not a registered company.
 The software is provided under the [MIT License](LICENSE), including its warranty
 disclaimer and limitation of liability. Back up important files before allowing
 agents to modify them.
+
+Cats drives third-party agent CLIs, model APIs and local models that you install
+and sign in to yourself. Runtime only launches the official CLIs and never reads or
+reuses their credentials, but each provider's terms decide what your plan allows.
+Check the terms that apply to your account before connecting a provider; staying
+within them is your responsibility.
 
 ## Interactive npm entrypoint
 
@@ -327,6 +333,21 @@ See [docs/](./docs/) for detailed documentation:
 - [Architecture](./docs/architecture.md)
 - [API](./docs/api.md)
 - [Contributing](./CONTRIBUTING.md)
+
+## Data and privacy
+
+- Runtime keeps its state in plain files under `~/.cats/runtime` (`data`, `sessions`,
+  `config`); `CATS_RUNTIME_DIR` moves that root. Session transcripts, workspace copies
+  and provider configuration live there unencrypted.
+- Prompts, attachments and workspace files you send to a session go to the selected
+  provider (its CLI or API) under that provider's retention terms. Nothing is sent to
+  the Cats maintainer: there is no telemetry, crash reporting or account.
+- The dashboard and playground pages load `marked`, `DOMPurify` and `highlight.js`
+  from `cdn.jsdelivr.net`; the API itself only calls the providers you configure.
+- The HTTP server binds `127.0.0.1` by default. Setting `CATS_RUNTIME_API_KEY` without
+  `CATS_RUNTIME_HOST` binds every interface, so set both when exposing Runtime.
+- Deleting a session permanently removes its Runtime files and, for providers that keep
+  native transcripts, the provider's own copy. There is no recycle bin; back up first.
 
 ## License
 

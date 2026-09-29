@@ -37,7 +37,7 @@ describe('AuggieSessionScanner', () => {
                   ide_state_node: {
                     workspace_folders: [
                       {
-                        folder_root: 'C:/Users/kenne/Source/SK2/one-man-digital-company',
+                        folder_root: 'C:/Users/tester/Source/Fixtures/alpha-project',
                       },
                     ],
                   },
@@ -56,9 +56,9 @@ describe('AuggieSessionScanner', () => {
     expect(result).toEqual([
       {
         providerSessionId: 'auggie-1',
-        projectPath: 'C:/Users/kenne/Source/SK2/one-man-digital-company',
+        projectPath: 'C:/Users/tester/Source/Fixtures/alpha-project',
         sourcePath: join(sessionsDir, 'session-1.json'),
-        cwd: 'C:/Users/kenne/Source/SK2/one-man-digital-company',
+        cwd: 'C:/Users/tester/Source/Fixtures/alpha-project',
         summary: 'Repo review',
         messageCount: 1,
         lastActivity: '2026-03-10T00:01:00.000Z',

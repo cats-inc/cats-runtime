@@ -1,7 +1,7 @@
 {
   "name": "@cats-inc/cats-runtime",
   "version": "0.3.4",
-  "description": "Unified runtime for subscription CLIs and future API backends.",
+  "description": "Unified runtime for agent CLIs, API backends, and local-model backends.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/cats-inc/cats-runtime.git"
