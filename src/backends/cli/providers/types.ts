@@ -67,6 +67,8 @@ export interface ClaudeStreamEvent {
   type: string;
   subtype?: string;
   session_id?: string;
+  /** Present on `system:init` frames: configured MCP servers and their status. */
+  mcp_servers?: unknown[];
   /** Present on `rate_limit_event` frames. */
   rate_limit_info?: ClaudeRateLimitInfo;
   /** Present on `result` frames. */

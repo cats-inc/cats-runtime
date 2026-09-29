@@ -1,6 +1,7 @@
 # PLAN-046: Session MCP servers
 
-Status: In progress (2026-09-29). R1 is on `feat/session-mcp-servers`.
+Status: In progress (2026-09-29). R1 is in PR #130. R2 is on `feat/session-mcp-claude`,
+stacked on R1.
 [SPEC-035](../specs/SPEC-035-session-mcp-servers.md) and
 [ADR-044](../decisions/044-configure-session-mcp-servers-for-provider-clis.md)
 govern this work. The Platform consumer is PLAN-116, which tracks the matching
@@ -24,14 +25,41 @@ runtime tasks as R1–R4.
 
 ## R2 — Claude Code
 
-- [ ] Verify `${VAR}` expansion in `--mcp-config` headers on the installed CLI
-  (2.1.284). If it does not work, use an owner-only temporary file removed at
-  worker exit.
-- [ ] Add `--mcp-config` and `mcp__<name>` in `--allowedTools`, and enable the
-  capability.
-- [ ] Recycle a live worker at the turn boundary when the set changes (SMCP-08).
-- [ ] Parse `system:init.mcp_servers` into per-server `connection`.
-- [ ] Run an isolated live smoke against a stub loopback MCP server.
+- [x] Verify `${VAR}` expansion in `--mcp-config` headers on the installed CLI
+  (2.1.284). Verified: the stub server received the expanded bearer, never a
+  literal placeholder, and the token was absent from argv. No temporary file is
+  needed.
+- [x] Add `--mcp-config` (inline JSON) and `mcp__<name>` in `--allowedTools`
+  for `default` and `whitelist` modes, and enable the capability.
+- [x] Recycle a live worker through resume at the turn boundary when a send
+  changes the set (SMCP-08). A recycle failure closes the session and returns
+  500.
+- [x] Normalize `system:init.mcp_servers` into `InitStreamEvent.mcpServers`. The
+  pool keeps the latest states per live worker. `connected` maps to `connected`,
+  `failed` and `needs-auth` map to `failed`, and anything else is `unknown`.
+- [x] Isolated live smoke (2026-09-29, Windows, Claude Code 2.1.284, haiku).
+  Setup: Runtime under a temporary `CATS_RUNTIME_DIR` with a stub loopback
+  Streamable HTTP server and permission mode `default`.
+  - Create reported `delivered`.
+  - Turn 1 called `mcp__probe__echo`, and the stub recorded an authenticated
+    `tools/call` with the requested arguments.
+  - Turn 2 reported `connection: connected`.
+  - The token did not appear in create or read bodies, `sessions.json`, other
+    data files or Runtime output. The CLI-created project folders were removed
+    afterwards.
+
+R2 findings for consumers:
+
+- Claude Code defers MCP tools behind `ToolSearch`: the model first called
+  `ToolSearch` with `select:mcp__probe__echo`, then called the tool. Session
+  instructions should name the full tool IDs (for example
+  `mcp__cats__show_in_canvas`) so the model can load them directly.
+- Connection evidence arrives with the provider's `system:init`, which Claude
+  emits during the first turn. The first report therefore shows
+  `connection: unknown`, and later turns show `connected`.
+- The config travels as an inline JSON argument. Native `.exe` launches pass it
+  unchanged. Instances that run through the Windows `cmd` proxy rely on its
+  argument quoting and were not exercised.
 
 ## R3 — Codex
 

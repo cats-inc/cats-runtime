@@ -19,6 +19,7 @@ import type {
   ToolResultStreamEvent,
   ToolUseStreamEvent,
 } from '../../../core/types.js';
+import type { SessionMcpServerLaunch } from '../../../core/sessionMcpServers.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
 import {
   observeNormalized,
@@ -29,7 +30,12 @@ import { compileRuntimeTurnPrompt } from './prompt.js';
 
 export class ClaudeProvider implements Provider {
   name = 'claude';
-  capabilities: ProviderCapabilities = { resume: true, fork: true, permissions: true };
+  capabilities: ProviderCapabilities = {
+    resume: true,
+    fork: true,
+    permissions: true,
+    sessionMcpServers: true,
+  };
 
   /**
    * Latest account rate-limit snapshot observed on this worker. Claude Code emits a
@@ -73,16 +79,29 @@ export class ClaudeProvider implements Provider {
       args.push('--fork-session');
     }
 
+    const mcpServers = opts.mcpServers ?? [];
+    if (mcpServers.length > 0) {
+      args.push('--mcp-config', buildClaudeSessionMcpConfig(mcpServers));
+    }
+    // `-p` denies tools that are not pre-approved, so session MCP servers must be
+    // allowed explicitly unless every permission check is already skipped.
+    const mcpAllowedTools = mcpServers.map((server) => `mcp__${server.name}`);
+
     switch (opts.permissionMode) {
       case 'skip':
         args.push('--dangerously-skip-permissions');
         break;
-      case 'whitelist':
-        if (opts.allowedTools?.length) {
-          args.push('--allowedTools', opts.allowedTools.join(','));
+      case 'whitelist': {
+        const allowedTools = [...(opts.allowedTools ?? []), ...mcpAllowedTools];
+        if (allowedTools.length) {
+          args.push('--allowedTools', allowedTools.join(','));
         }
         break;
-      // 'default' — no extra flags
+      }
+      default:
+        if (mcpAllowedTools.length) {
+          args.push('--allowedTools', mcpAllowedTools.join(','));
+        }
     }
 
     return args;
@@ -154,6 +173,9 @@ export class ClaudeProvider implements Provider {
       }, {
         type: 'init',
         sessionId: event.session_id,
+        ...(Array.isArray(event.mcp_servers)
+          ? { mcpServers: normalizeClaudeMcpServerStatuses(event.mcp_servers) }
+          : {}),
         raw: event,
       } satisfies InitStreamEvent);
     }
@@ -622,4 +644,28 @@ function unixSecondsToIso(value: unknown): string | undefined {
 
 function formatPercent(fraction: number): string {
   return `${Math.round(fraction * 100)}%`;
+}
+
+/**
+ * SPEC-035: Claude Code expands `${VAR}` in MCP config headers from its own
+ * environment, so the bearer stays out of argv and only the variable name is here.
+ */
+export function buildClaudeSessionMcpConfig(servers: readonly SessionMcpServerLaunch[]): string {
+  return JSON.stringify({
+    mcpServers: Object.fromEntries(servers.map((server) => [server.name, {
+      type: 'http',
+      url: server.url,
+      ...(server.bearerTokenEnvVar
+        ? { headers: { Authorization: 'Bearer ${' + server.bearerTokenEnvVar + '}' } }
+        : {}),
+    }])),
+  });
+}
+
+function normalizeClaudeMcpServerStatuses(value: unknown[]): { name: string; status: string }[] {
+  return value.flatMap((entry) => {
+    if (typeof entry !== 'object' || entry === null) return [];
+    const { name, status } = entry as { name?: unknown; status?: unknown };
+    return typeof name === 'string' && typeof status === 'string' ? [{ name, status }] : [];
+  });
 }

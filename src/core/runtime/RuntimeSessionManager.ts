@@ -38,6 +38,7 @@ import { AgentBackendManager } from '../../backends/agent/runtime/AgentBackendMa
 import { extractWakeReason } from './wakeReason.js';
 import {
   SessionMcpServerStore,
+  toSessionMcpConnection,
   toSessionMcpLaunchConfig,
   type SessionMcpDeliveryReport,
 } from '../sessionMcpServers.js';
@@ -266,7 +267,18 @@ export class RuntimeSessionManager {
         supported = false;
       }
     }
-    return this.mcpServers.report(sessionId, supported);
+    const report = this.mcpServers.report(sessionId, supported);
+    const connections = report?.status === 'delivered'
+      ? this.pool.getSessionMcpConnections?.(sessionId)
+      : undefined;
+    if (!report || !connections) return report;
+    return {
+      ...report,
+      servers: report.servers.map((server) => ({
+        ...server,
+        connection: toSessionMcpConnection(connections.get(server.name)),
+      })),
+    };
   }
 
   private supportsSessionMcpServers(
