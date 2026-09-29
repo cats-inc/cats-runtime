@@ -71,7 +71,7 @@ the capability before this workflow is supported. Publication remains a separate
 
 ## Deployment Modes
 
-### Listener exposure (next minor, 0.4.0)
+### Listener exposure (0.4.0)
 
 Runtime now defaults to `127.0.0.1` whether or not `CATS_RUNTIME_API_KEY` is set.
 Previously an API key without `CATS_RUNTIME_HOST` implicitly exposed every interface.
@@ -80,9 +80,8 @@ Existing remote clients relying on that implicit bind must explicitly set
 before upgrading. Keep an API key and appropriate network controls for remote use.
 A successful non-loopback bind emits one startup warning; loopback binds do not.
 Local Desktop/Platform installs using loopback are unchanged. No stored-data format
-changes or data migration are involved. This configuration behavior change requires
-the next Runtime minor, **0.4.0**, rather than a 0.3.x patch; this change does not bump
-or publish a version.
+changes or data migration are involved. This configuration behavior change is why
+Runtime **0.4.0** is a minor rather than a 0.3.x patch.
 
 ### 1. Source checkout
 

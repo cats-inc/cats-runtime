@@ -43,7 +43,7 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
-### Next minor release notes — 0.4.0 (unreleased)
+### Release notes — 0.4.0 (prepared 2026-09-30)
 
 - **Explicit remote listening required.** An API key no longer changes the default
   listener from `127.0.0.1` to every interface. Existing remote deployments that only
@@ -54,6 +54,24 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
   [deployment instructions](deployment.md#listener-exposure-next-minor-040).
 
 ### Published versions
+
+Runtime **0.4.0** is prepared on 2026-09-30 (Taipei) for publication to npm `latest`
+and for bundling in the Desktop **0.7.0** standard-profile preview; the owner authorized
+both together with Platform npm 0.7.0, Usage 0.5.1, Studio 0.2.1 and cats-one 0.4.0.
+It is a **minor** because the listener default changed: an API key no longer implies
+binding every interface (see the 0.4.0 release notes above and
+[deployment](deployment.md#listener-exposure-040)). Everything else since npm 0.3.2 is
+compatible: session MCP servers on create, resume and send, configured for Claude Code
+and Codex; managed Agency skills with durable revocation; served-model reporting for
+Claude, Copilot, Grok, Codex, Pi, Kiro and Junie; bounded native Grok image jobs;
+the Junie stdin/UTF-8/failure fixes; Kiro v1 engine selection; the catalog basis field;
+the 0.3.3 and 0.3.4 Desktop-only fixes; privacy and deletion hardening (access logs
+without query strings, staged deletion with retry fences, atomic registry snapshots
+written `0o600`, bundle third-party notices); dashboard dependencies vendored with
+integrity checks; and the `author` field. Catalog schema 2 and persisted formats are
+unchanged; no data migration is involved. cats-one's `^0.3.1` range excludes this
+version, so the launcher moves to `^0.4.0` in its own release. Publication workflow,
+registry and tarball verification follow.
 
 Runtime **0.3.4** shipped on 2026-09-28 (Taipei) in the
 [Desktop **0.5.10** standard-profile preview](https://github.com/cats-inc/cats-platform/releases/tag/v0.5.10),
