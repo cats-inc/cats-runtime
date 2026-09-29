@@ -55,9 +55,10 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ### Published versions
 
-Runtime **0.4.0** is prepared on 2026-09-30 (Taipei) for publication to npm `latest`
-and for bundling in the Desktop **0.7.0** standard-profile preview; the owner authorized
-both together with Platform npm 0.7.0, Usage 0.5.1, Studio 0.2.1 and cats-one 0.4.0.
+Runtime **0.4.0** was published on 2026-09-30 (Taipei) to npm `latest` from
+`2f167ad5f8d2e787de804bbd1c4bf069b9f9c433`, and is selected for bundling in the Desktop
+**0.7.0** standard-profile preview; the owner authorized both together with Platform npm
+0.7.0, Usage 0.5.1, Studio 0.2.1 and cats-one 0.4.0.
 It is a **minor** because the listener default changed: an API key no longer implies
 binding every interface (see the 0.4.0 release notes above and
 [deployment](deployment.md#listener-exposure-040)). Everything else since npm 0.3.2 is
@@ -70,8 +71,16 @@ without query strings, staged deletion with retry fences, atomic registry snapsh
 written `0o600`, bundle third-party notices); dashboard dependencies vendored with
 integrity checks; and the `author` field. Catalog schema 2 and persisted formats are
 unchanged; no data migration is involved. cats-one's `^0.3.1` range excludes this
-version, so the launcher moves to `^0.4.0` in its own release. Publication workflow,
-registry and tarball verification follow.
+version, so the launcher moves to `^0.4.0` in its own release. The
+[publication workflow](https://github.com/cats-inc/cats-runtime/actions/runs/36608425703)
+passed its release gate, fresh build and trusted publication, and recorded a Sigstore
+provenance statement ([transparency log 3003568317](https://search.sigstore.dev/?logIndex=3003568317)).
+Verified after propagation: npm `latest` = 0.4.0, `gitHead` equals the source commit,
+`author` is the individual maintainer, the downloaded tarball's SHA-1
+`4269b67da29a38ff2ee15e06cbf28e09f78f99d2` matches the registry, and the tarball ships
+`LICENSE`, the new favicon and the pinned vendored dashboard scripts. A fresh private
+prefix installed it and the `cats-runtime --help` entry point ran. The registry
+document lagged the successful publish by a few minutes; no repeat publication was made.
 
 Runtime **0.3.4** shipped on 2026-09-28 (Taipei) in the
 [Desktop **0.5.10** standard-profile preview](https://github.com/cats-inc/cats-platform/releases/tag/v0.5.10),
