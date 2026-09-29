@@ -1,13 +1,17 @@
 import { build } from 'esbuild';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeBundleNotices } from './bundle-license-notices.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-await build({
+const outfile = resolve(root, 'build', 'runtime-bundle', 'index.js');
+const result = await build({
+  absWorkingDir: root,
   entryPoints: [resolve(root, 'build', 'runtime', 'index.js')],
   bundle: true,
-  outfile: resolve(root, 'build', 'runtime-bundle', 'index.js'),
+  outfile,
+  metafile: true,
   platform: 'node',
   target: 'node22',
   format: 'esm',
@@ -19,3 +23,4 @@ await build({
     'playwright-core',
   ],
 });
+await writeBundleNotices({ metafile: result.metafile, root, outfile });

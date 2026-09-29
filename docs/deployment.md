@@ -3,6 +3,25 @@
 > Deployment and startup guidance for `cats-runtime` in standalone and
 > app-managed local modes.
 
+## Distribution licenses
+
+Keep the repository `LICENSE` with redistributed Runtime code, including Desktop
+sidecars. `npm run build:runtime-bundle` also writes `THIRD-PARTY-NOTICES.txt` and
+`THIRD-PARTY-NOTICES.json` beside the bundled entry. It collects original license
+and notice text from the dependency packages in esbuild's actual input graph and
+fails if a bundled dependency has no license text. The JSON binds the entry and
+notice text by SHA-256; regenerate all three files together after a build change.
+External packages retain their own license/notice files when copied into Desktop.
+The reviewed jpeg-js supplement retains its decoder Apache-2.0 and Adobe encoder
+headers in addition to the package-root BSD license. A changed version or source
+hash blocks bundling until reviewed; see `scripts/licenses/README.md`. Review new
+or updated dependencies for additional file-level notices as well.
+
+Desktop license staging requires the Runtime bundle producer from this change;
+an older pinned Runtime commit without these notices cannot pass the new bundle
+gate. This is a private build-artifact requirement, not a public Runtime API or
+stored-data change. It needs a coordinated Desktop build, not a Runtime npm release.
+
 ## Catalog resources and local patches
 
 Builds validate the authored schema-2 catalog and its generated digest. npm packages
