@@ -38,6 +38,12 @@ Local npm package smoke tests are available on each desktop platform:
 | `scripts/linux/sync-agent-skills.sh` | Linux | Invoke the shared reconciler from Bash |
 | `scripts/macos/sync-agent-skills.sh` | macOS | Invoke the shared reconciler from Bash |
 
+## Testing Helpers
+
+| Script | Platform | Purpose |
+|--------|----------|---------|
+| `scripts/testing/session-mcp-stub-server.mjs` | Cross-platform | Loopback Streamable HTTP MCP stub with an `echo` tool for SPEC-035 session MCP smokes. It reads the expected bearer from `CATS_MCP_STUB_TOKEN` and never logs the token. |
+
 The canonical repository-maintenance packages live under `skills/`. The reconciler writes
 them to `.claude/skills/` for Claude Code and `.agents/skills/` for Codex, Antigravity, and Grok.
 It tracks repository-managed skill names in each target, removes stale managed mirrors, preserves
