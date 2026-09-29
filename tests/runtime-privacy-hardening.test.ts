@@ -3,15 +3,45 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../src/core/config.js';
+import { RuntimeWakeupService } from '../src/core/wakeup/RuntimeWakeupService.js';
 import { createRuntimeApp, type AppContext } from '../src/http/app.js';
 import { executeRetainedWorktreeCleanup } from '../src/http/routes/sessions.js';
 import { SessionRegistry } from '../src/backends/cli/pool/SessionRegistry.js';
 import { createRuntimeTestEnvWithAllCliProviders, createRuntimeTestPaths, ensureRuntimeTestDirs } from './support/runtimeTestPaths.js';
 
+const fsFaults = vi.hoisted(() => ({
+  lockedIndexStage: false,
+  wakeupWritePath: undefined as string | undefined,
+}));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  const blocked = (path: unknown) => fsFaults.lockedIndexStage && typeof path === 'string'
+    && path.endsWith('-sessions-index.json.pending-delete');
+  return {
+    ...actual,
+    rmSync: (...args: Parameters<typeof actual.rmSync>) => {
+      if (blocked(args[0])) throw new Error('synthetic staged index lock');
+      return actual.rmSync(...args);
+    },
+    renameSync: (...args: Parameters<typeof actual.renameSync>) => {
+      if (blocked(args[0])) throw new Error('synthetic staged index lock');
+      return actual.renameSync(...args);
+    },
+    writeFileSync: (...args: Parameters<typeof actual.writeFileSync>) => {
+      if (args[0] === fsFaults.wakeupWritePath) {
+        throw new Error('synthetic wakeup persistence failure');
+      }
+      return actual.writeFileSync(...args);
+    },
+  };
+});
+
 describe('Runtime HTTP privacy hardening', () => {
   let root: string;
   beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'cats-http-privacy-')); });
   afterEach(() => {
+    fsFaults.lockedIndexStage = false;
+    fsFaults.wakeupWritePath = undefined;
     vi.restoreAllMocks();
     rmSync(root, { recursive: true, force: true });
   });
@@ -223,6 +253,83 @@ describe('Runtime HTTP privacy hardening', () => {
     spy.mockRestore();
     const retry = await app.request(`/sessions/${session.id}`, { method: 'DELETE' });
     expect(await retry.json()).toMatchObject({ status: 'retained', cleanup: { registryDropped: false } });
+    registry.flush();
+  });
+
+  it('restores real wakeup state after a failed write and persists its removal on DELETE retry', async () => {
+    const { app, registry, config, context } = fixture('', true);
+    const session = registry.create({ id: 'wakeup-failure', providerName: 'codex', cwd: root, workspaceMode: 'shared' });
+    registry.updateStatus(session.id, 'closed');
+    registry.flush();
+    const archive = join(config.sessionBaseDir, 'compactions', session.id);
+    mkdirSync(archive, { recursive: true });
+    writeFileSync(join(archive, 'snapshot.jsonl'), 'synthetic history');
+    const persistPath = join(createRuntimeTestPaths(root).dataDir, 'wakeups.json');
+    const wakeSession = vi.fn(async (sessionId: string) => ({ sessionId, outcome: 'resumed' as const }));
+    const wakeup = new RuntimeWakeupService({ persistPath, wakeSession });
+    context.wakeup = wakeup;
+    const request = wakeup.create({
+      reason: 'Synthetic request for deletion', target: { kind: 'session', sessionId: session.id },
+      scheduleAt: '2030-01-01T00:00:00Z',
+    }).request;
+    const unrelated = wakeup.create({
+      reason: 'Keep unrelated wakeup', target: { kind: 'session', sessionId: 'unrelated' },
+      scheduleAt: '2030-01-01T00:00:00Z',
+    }).request;
+    const before = readFileSync(persistPath, 'utf8');
+    const clearSession = vi.spyOn(wakeup, 'clearSession');
+    fsFaults.wakeupWritePath = persistPath;
+    const drop = vi.spyOn(context.runtime!, 'dropSession');
+    const failed = await app.request(`/sessions/${session.id}`, { method: 'DELETE' });
+    expect(failed.status).toBe(500);
+    expect(await failed.json()).toMatchObject({ error: expect.stringContaining('synthetic wakeup persistence failure') });
+    expect(registry.get(session.id)).toBe(session);
+    expect(drop).not.toHaveBeenCalled();
+    expect(wakeup.get(request.id)).toEqual(request);
+    expect(wakeup.get(unrelated.id)).toEqual(unrelated);
+    expect(readFileSync(persistPath, 'utf8')).toBe(before);
+    expect(context.runtime!.getTrackedState(session.id)?.maintenance.lastLifecycle?.status).not.toBe('completed');
+    fsFaults.wakeupWritePath = undefined;
+    const retry = await app.request(`/sessions/${session.id}`, { method: 'DELETE' });
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toMatchObject({
+      status: 'deleted', cleanup: { wakeupsCleared: true, registryDropped: true },
+    });
+    expect(clearSession).toHaveBeenCalledTimes(2);
+    expect(drop).toHaveBeenCalledExactlyOnceWith(session.id);
+    expect(registry.get(session.id)).toBeUndefined();
+    expect(existsSync(archive)).toBe(false);
+    expect(wakeup.list()).toEqual([unrelated]);
+    expect(JSON.parse(readFileSync(persistPath, 'utf8'))).toEqual([unrelated]);
+    expect(new RuntimeWakeupService({ persistPath, wakeSession }).list()).toEqual([unrelated]);
+    expect(wakeSession).not.toHaveBeenCalled();
+    registry.flush();
+  });
+
+  it('preserves the rewritten provider index when its old staged copy cannot be removed or renamed', async () => {
+    const { app, registry } = fixture('', true);
+    const session = registry.create({ id: 'index-failure', providerName: 'claude', cwd: root, workspaceMode: 'shared' });
+    const providerDir = join(root, 'index-provider');
+    mkdirSync(providerDir);
+    const source = join(providerDir, 'index-native.jsonl');
+    const indexPath = join(providerDir, 'sessions-index.json');
+    writeFileSync(source, 'synthetic provider history');
+    const keep = { cwd: root, summary: 'unrelated retained session' };
+    writeFileSync(indexPath, JSON.stringify({ 'index-native': { cwd: root }, 'keep-native': keep }));
+    registry.setProviderSessionId(session.id, 'index-native');
+    session.providerSourcePath = source;
+    registry.updateStatus(session.id, 'closed');
+    fsFaults.lockedIndexStage = true;
+    const response = await app.request(`/sessions/${session.id}`, { method: 'DELETE' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ status: 'retained', fileDeleted: false });
+    expect(JSON.parse(readFileSync(indexPath, 'utf8'))).toEqual({ 'keep-native': keep });
+    expect(existsSync(source)).toBe(false);
+    const pending = registry.getPendingFileDeletionPaths(session.id);
+    expect(pending).toHaveLength(1);
+    expect(JSON.parse(readFileSync(pending[0], 'utf8'))).toHaveProperty('index-native');
+    expect(registry.get(session.id)).toBeDefined();
+    fsFaults.lockedIndexStage = false;
     registry.flush();
   });
 

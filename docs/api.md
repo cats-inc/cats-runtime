@@ -3638,7 +3638,10 @@ tail, and persists aggregate metadata such as repaired-line count, compacted
 entry count, aggressive-pass count, and the archive path.
 
 `DELETE /sessions/{id}` also clears any persisted wakeups targeting that
-session before the runtime unregisters it. Delete responses now also include
+session before the runtime unregisters it. If wakeup cleanup throws, delete
+returns HTTP 500 and keeps the session registered for an explicit retry; earlier
+file cleanup may already have completed. A failed wakeup write restores the
+removed requests in memory so the retry attempts persistence again. Delete responses now also include
 `action: "delete"` plus `sessionId` so lifecycle consumers can treat delete as
 the same control family even though the session snapshot is gone afterward.
 Delete responses also include:
@@ -3660,19 +3663,25 @@ Final staged-file removal can fail after some files have already been removed.
 In that case delete returns `status: "retained"`, `fileDeleted: false`, and
 `cleanup.registryDropped: false`, with maintenance reason
 `cleanup_removal_failed`. Surviving staged files are restored where possible so
-an explicit delete retry can remove them. The response reason identifies paths
+an explicit delete retry can remove them. If removing an old staged provider
+index fails, the rewritten live index stays intact and the old copy becomes a
+pending path requiring manual resolution. The response reason identifies paths
 needing attention; if restoring a file also fails, it names the remaining
 `.pending-delete` path for manual resolution. Runtime persists those unresolved
 paths in optional, Runtime-owned `pendingFileDeletionPaths` session metadata.
 Later delete attempts, including after restart, return `cleanup_pending_removal`
 and retain the session while any such path exists or cannot be verified absent.
+DELETE checks this fence before closing a worker or cleaning up its worktree.
 These paths are a retry fence, never automatic deletion targets; malformed
 metadata also blocks deletion. After manual resolution, another explicit delete
 attempt rechecks the paths and can finish. Existing session records without this
 optional field need no conversion.
 
 Registry snapshots use a same-directory temporary file and atomic replacement,
-preserving the previous snapshot if writing or replacement fails. Persisting a
+preserving the previous snapshot if writing or replacement fails. Replacement
+snapshots are created with mode `0o600` (owner read/write on POSIX), so successful
+updates also restrict a previously broader registry file mode. This mode argument
+does not configure Windows ACLs. Persisting a
 new unresolved-path fence is a strict write: on failure DELETE returns HTTP 500
 with the residual paths and explains that the fence is only in memory and may
 not survive restart. Resolve that storage failure or recover the reported files

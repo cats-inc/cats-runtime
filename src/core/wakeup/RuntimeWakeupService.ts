@@ -363,19 +363,28 @@ export class RuntimeWakeupService {
   }
 
   clearSession(sessionId: string): ClearSessionWakeupsResult {
-    const removedIds: string[] = [];
+    const removedRequests = new Map<string, RuntimeWakeupRequest>();
     for (const [id, request] of this.requests.entries()) {
       if (request.target.sessionId !== sessionId) {
         continue;
       }
       this.requests.delete(id);
-      removedIds.push(id);
+      removedRequests.set(id, request);
     }
 
-    if (removedIds.length > 0) {
-      this.persist();
+    if (removedRequests.size > 0) {
+      try {
+        this.persist();
+      } catch (error) {
+        // Keep failed cleanup retryable, including when called before session removal.
+        for (const [id, request] of removedRequests) {
+          this.requests.set(id, request);
+        }
+        throw error;
+      }
     }
 
+    const removedIds = Array.from(removedRequests.keys());
     return {
       removedCount: removedIds.length,
       removedIds,

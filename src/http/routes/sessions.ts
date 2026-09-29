@@ -1427,6 +1427,29 @@ async function settleRetainedResetAfterCleanup(
   };
 }
 
+function retainDeleteForPendingPaths(
+  ctx: AppContext,
+  session: SessionInfo,
+  workspaceCleaned: boolean,
+  pendingPaths: string[],
+) {
+  const id = session.id;
+  const maintenance = recordSessionLifecycle(ctx, id, {
+    action: 'delete', boundary: 'permanent_delete', status: 'retained',
+    reasonCodes: ['cleanup_pending_removal'],
+    cleanup: {
+      workerDetached: !getRuntimeSessionManager(ctx).isAttached(id), workspaceCleaned,
+      managedTranscriptDeleted: false, providerDiscoveryCleared: false, registryDropped: false,
+    },
+  });
+  ctx.registry.flush();
+  return {
+    status: 'retained' as const, hadTranscript: true, fileDeleted: false, nativeDeleted: false,
+    reason: `A previous removal left unresolved staged files. Resolve these paths before retrying: ${pendingPaths.join(', ')}`,
+    maintenance, session: serializeSession(ctx, ctx.registry.get(id) ?? session),
+  };
+}
+
 async function finalizeDeleteAfterWorkspaceCleanup(
   ctx: AppContext,
   session: SessionInfo,
@@ -1450,20 +1473,7 @@ async function finalizeDeleteAfterWorkspaceCleanup(
   assertCurrentDeletionSession(ctx, session);
   const pendingPaths = ctx.registry.getPendingFileDeletionPaths(id);
   if (pendingPaths.length > 0) {
-    const maintenance = recordSessionLifecycle(ctx, id, {
-      action: 'delete', boundary: 'permanent_delete', status: 'retained',
-      reasonCodes: ['cleanup_pending_removal'],
-      cleanup: {
-        workerDetached: !runtime.isAttached(id), workspaceCleaned: input.workspaceCleaned,
-        managedTranscriptDeleted: false, providerDiscoveryCleared: false, registryDropped: false,
-      },
-    });
-    ctx.registry.flush();
-    return {
-      status: 'retained', hadTranscript: true, fileDeleted: false, nativeDeleted: false,
-      reason: `A previous removal left unresolved staged files. Resolve these paths before retrying: ${pendingPaths.join(', ')}`,
-      maintenance, session: serializeSession(ctx, ctx.registry.get(id) ?? session),
-    };
+    return retainDeleteForPendingPaths(ctx, session, input.workspaceCleaned, pendingPaths);
   }
   const hasNativeSessionState = tracksNativeSessionState(session);
   const hasProviderDiscoveryState = tracksProviderDiscoveryState(session);
@@ -1639,10 +1649,10 @@ async function finalizeDeleteAfterWorkspaceCleanup(
       session: serializeSession(ctx, ctx.registry.get(id) ?? session),
     };
   }
+  const wakeupResult = ctx.wakeup?.clearSession(id);
   if (!ctx.registry.unregister(id)) {
     throw new SessionDeletionConflict('session_delete_conflict', 'Session registry could not be removed; file cleanup may already be complete. Refresh session state before retrying');
   }
-  const wakeupResult = ctx.wakeup?.clearSession(id);
   const maintenance = recordSessionLifecycle(ctx, id, {
     action: 'delete',
     boundary: 'permanent_delete',
@@ -2426,19 +2436,11 @@ function prepareReplacementFileDeletion(
         rmSync(stagedPath, { force: true });
         result = { fileDeleted: true };
       } catch {
-        // Restore the original index for an explicit retry. If restoration is
-        // also blocked, report the surviving staged copy instead of success.
-        let restored = false;
-        try {
-          rmSync(filePath, { force: true });
-          renameSync(stagedPath, filePath);
-          restored = true;
-        } catch {
-          // The failure result below identifies the remaining copy.
-        }
+        // The rewritten index is already live. Keep it intact even when the old
+        // staged copy is locked; attempting rollback could remove the only live
+        // index and still fail to restore the locked copy.
         result = {
-          fileDeleted: false, failedPaths: [restored ? filePath : stagedPath],
-          ...(!restored ? { pendingPaths: [stagedPath] } : {}),
+          fileDeleted: false, failedPaths: [stagedPath], pendingPaths: [stagedPath],
         };
       }
       return result;
@@ -4118,6 +4120,15 @@ sessionRoutes.delete('/sessions/:id', guardSessionDeletion, async (c) => {
       ),
       409,
     );
+  }
+
+  const pendingPaths = ctx.registry.getPendingFileDeletionPaths(id);
+  if (pendingPaths.length > 0) {
+    const retained = retainDeleteForPendingPaths(ctx, session, false, pendingPaths);
+    return c.json({
+      action: 'delete', sessionId: id, ...retained,
+      workspaceCleaned: false, cleanup: retained.maintenance.cleanup,
+    });
   }
 
   let workspaceCleaned = false;

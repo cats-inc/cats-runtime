@@ -406,7 +406,6 @@ function writeTranscriptArchive(
 ): string {
   const archiveDir = runtimeCompactionDirectory(sessionBaseDir, sessionId);
   mkdirSync(archiveDir, { recursive: true });
-  runtimeCompactionDirectory(sessionBaseDir, sessionId);
   const archivePath = join(
     archiveDir,
     `${compactedAt.replace(/[:.]/g, '-')}.jsonl`,
