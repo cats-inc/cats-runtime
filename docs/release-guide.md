@@ -43,6 +43,18 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+### Next minor release notes — 0.4.0 (unreleased)
+
+- **Explicit remote listening required.** An API key no longer changes the default
+  listener from `127.0.0.1` to every interface. Existing remote deployments that only
+  set `CATS_RUNTIME_API_KEY` must also set `CATS_RUNTIME_HOST=0.0.0.0`, `::`, or their
+  chosen interface address. A non-loopback bind logs a startup warning. Loopback
+  Desktop/Platform clients and persisted data are unchanged. This breaks an implicit
+  configuration contract, so do not ship it as a 0.3.x patch. See the
+  [deployment instructions](deployment.md#listener-exposure-next-minor-040).
+
+### Published versions
+
 Runtime **0.3.4** shipped on 2026-09-28 (Taipei) in the
 [Desktop **0.5.10** standard-profile preview](https://github.com/cats-inc/cats-platform/releases/tag/v0.5.10),
 which bundles `0804e238e1c9b6a29c3357301336400ea4e3ac64` on every OS. It is not

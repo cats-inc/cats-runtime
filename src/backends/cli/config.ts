@@ -422,7 +422,7 @@ export function loadConfig(
   options: LoadConfigOptions = {},
 ): CliRuntimeConfig {
   const apiKey = env.CATS_RUNTIME_API_KEY || '';
-  const host = env.CATS_RUNTIME_HOST || (apiKey ? '' : '127.0.0.1');
+  const host = env.CATS_RUNTIME_HOST || '127.0.0.1';
   const port = parsePositiveInt(
     env.CATS_RUNTIME_PORT || env.PORT || '3110',
     3110,
