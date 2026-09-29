@@ -1578,6 +1578,8 @@ export interface SessionInfo {
   skills?: SessionSkillState;
   hydration?: SessionHydrationState;
   maintenanceState?: RuntimeSessionMaintenanceState;
+  /** Runtime-owned retry fence; paths are never used as automatic deletion targets. */
+  pendingFileDeletionPaths?: string[];
   context?: SessionInvocationContext;
   outputDir?: string;
   artifacts?: SessionArtifact[];

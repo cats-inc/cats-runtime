@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Hono } from 'hono';
-import { logger } from 'hono/logger';
+import { requestLogging } from './requestLogging.js';
 import type { RuntimeConfig } from '../core/config.js';
 import { RuntimeSessionManager } from '../core/runtime/RuntimeSessionManager.js';
 import { RuntimeBrowserService } from '../core/browser/RuntimeBrowserService.js';
@@ -371,7 +371,7 @@ export function createRuntimeApp(ctx: AppContext) {
     ) {
       return await next();
     }
-    return logger()(c, next);
+    return requestLogging()(c, next);
   });
   app.use('*', async (c, next) => {
     // In bootstrap mode, exempt provider setup routes from bearer auth.

@@ -2,6 +2,12 @@
 
 > Unified runtime for subscription CLIs, API backends, and local-model backends.
 
+Cats / Cats Inc. is a software project name maintained by the individual
+developer [sammykenny2](https://github.com/sammykenny2), not a registered company.
+The software is provided under the [MIT License](LICENSE), including its warranty
+disclaimer and limitation of liability. Back up important files before allowing
+agents to modify them.
+
 ## Interactive npm entrypoint
 
 Run `npx @cats-inc/cats-runtime`. Once ready, an interactive terminal opens

@@ -1,8 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { bindManagedNativeIdentity } from '../../../core/skills/managedPlugins.js';
 import { invalidateSkillContentProvenance } from '../../../core/skills/contentPolicy.js';
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import {
+  assertUnlinkedRuntimeSessionPath,
+  isWithinRuntimeSessions,
+  runtimeCompactionDirectory,
+} from '../../../core/runtime/transcriptPaths.js';
+import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import type {
   PermissionMode,
   ProviderModelResolution,
@@ -110,10 +115,16 @@ interface DiscoveredSessionData {
   artifacts?: SessionArtifact[];
 }
 
+export interface FileDeletionResult {
+  fileDeleted: boolean;
+  failedPaths?: string[];
+  pendingPaths?: string[];
+}
+
 export interface PreparedFileDeletion {
   hadFiles: boolean;
   ready: boolean;
-  finalize(): { fileDeleted: boolean };
+  finalize(): FileDeletionResult;
   rollback(): void;
 }
 
@@ -279,23 +290,28 @@ export class SessionRegistry {
     }, 1000);
   }
 
-  private saveToDisk(): void {
-    if (!this.persistPath) return;
+  private saveToDisk(strict = false): void {
+    if (!this.persistPath) {
+      if (strict) throw new Error('Runtime registry persistence is not configured');
+      return;
+    }
     if (!existsSync(dirname(this.persistPath))) {
+      if (strict) throw new Error('Runtime registry directory is unavailable');
       return;
     }
     try {
       const arr = Array.from(this.sessions.values());
-      writeFileSync(this.persistPath, JSON.stringify(arr, null, 2));
+      this.writeSnapshotAtomically(this.persistPath, JSON.stringify(arr, null, 2));
       if (this.providerDiscoveryPersistPath) {
         const entries = Array.from(this.providerDiscoverySourcePaths.entries())
           .sort(([left], [right]) => left.localeCompare(right));
-        writeFileSync(
+        this.writeSnapshotAtomically(
           this.providerDiscoveryPersistPath,
           JSON.stringify(Object.fromEntries(entries), null, 2),
         );
       }
     } catch (err) {
+      if (strict) throw err;
       if (isMissingPersistencePathError(err)) {
         return;
       }
@@ -303,17 +319,46 @@ export class SessionRegistry {
     }
   }
 
+  private writeSnapshotAtomically(target: string, content: string): void {
+    const temporary = `${target}.${randomUUID()}.tmp`;
+    let created = false;
+    let descriptor: number | undefined;
+    try {
+      // Keep the previous registry intact until the complete replacement exists.
+      descriptor = openSync(temporary, 'wx', 0o600);
+      created = true;
+      writeFileSync(descriptor, content, 'utf8');
+      fsyncSync(descriptor);
+      closeSync(descriptor);
+      descriptor = undefined;
+      this.replacePersistenceSnapshot(temporary, target);
+    } finally {
+      try {
+        if (descriptor !== undefined) closeSync(descriptor);
+      } finally {
+        if (created && existsSync(temporary)) rmSync(temporary, { force: true });
+      }
+    }
+  }
+
+  private replacePersistenceSnapshot(temporary: string, target: string): void {
+    renameSync(temporary, target);
+  }
+
   /** Flush pending saves immediately (call on shutdown) */
-  flush(): void {
+  flush(strict = false): void {
     if (this.saveTimer) {
       clearTimeout(this.saveTimer);
       this.saveTimer = null;
     }
-    this.saveToDisk();
+    this.saveToDisk(strict);
   }
 
   create(input: CreateSessionInput): SessionInfo {
     const id = input.id || randomUUID();
+    if (this.getPendingFileDeletionPaths(id).length > 0) {
+      throw new Error('Session has unresolved staged file removals');
+    }
     const now = new Date().toISOString();
 
     const session: SessionInfo = {
@@ -608,7 +653,7 @@ export class SessionRegistry {
    * Try to delete transcript files associated with a session.
    * Does NOT remove the session from the registry.
    */
-  deleteTranscripts(id: string): { fileDeleted: boolean } {
+  deleteTranscripts(id: string): FileDeletionResult {
     const prepared = this.prepareTranscriptDeletion(id);
     if (!prepared.ready) {
       prepared.rollback();
@@ -634,12 +679,13 @@ export class SessionRegistry {
       };
     }
 
-    return this.preparePathDeletion(
-      this.collectTranscriptArtifactPaths(session),
-    );
+    return this.prepareSessionTranscriptDeletion(session, false);
   }
 
-  prepareManagedTranscriptDeletion(id: string): PreparedFileDeletion {
+  prepareManagedTranscriptDeletion(
+    id: string,
+    options: { deferPendingPersistence?: boolean } = {},
+  ): PreparedFileDeletion {
     const session = this.sessions.get(id);
     if (!session) {
       return {
@@ -650,14 +696,99 @@ export class SessionRegistry {
       };
     }
 
-    return this.preparePathDeletion(
-      this.collectManagedTranscriptArtifactPaths(session),
-    );
+    return this.prepareSessionTranscriptDeletion(session, true, !options.deferPendingPersistence);
+  }
+
+  private prepareSessionTranscriptDeletion(
+    session: SessionInfo,
+    managedOnly: boolean,
+    persistPending = true,
+  ): PreparedFileDeletion {
+    const pendingPaths = this.getPendingFileDeletionPaths(session.id);
+    if (pendingPaths.length > 0) {
+      return {
+        hadFiles: true, ready: false,
+        finalize: () => ({ fileDeleted: false, failedPaths: pendingPaths, pendingPaths }),
+        rollback() {},
+      };
+    }
+    let paths: string[];
+    try {
+      if (this.sessionBaseDir && [session.sourcePath, session.providerSourcePath].some(
+        (path) => path !== undefined && relative(this.sessionBaseDir!, path) === '',
+      )) {
+        throw new Error('The Runtime sessions root is not a transcript artifact');
+      }
+      paths = managedOnly ? this.collectManagedTranscriptArtifactPaths(session)
+        : this.collectTranscriptArtifactPaths(session);
+    } catch {
+      return { hadFiles: true, ready: false, finalize: () => ({ fileDeleted: false }), rollback() {} };
+    }
+    const prepared = this.preparePathDeletion(paths, {
+      validatePath: (target) => {
+        if (this.sessionBaseDir && isWithinRuntimeSessions(this.sessionBaseDir, target)) {
+          assertUnlinkedRuntimeSessionPath(this.sessionBaseDir, target);
+        }
+      },
+    });
+    return {
+      ...prepared,
+      finalize: () => {
+        const result = prepared.finalize();
+        // The HTTP coordinator may defer this until all independently prepared
+        // artifacts finalize, then strictly persist the combined pending paths.
+        if (persistPending) this.retainPendingFileDeletions(session.id, result.pendingPaths ?? []);
+        return result;
+      },
+    };
+  }
+
+  /** Retain only a retry fence, never permission to delete persisted paths. */
+  retainPendingFileDeletions(id: string, pendingPaths: string[]): void {
+    const session = this.sessions.get(id);
+    if (!session || pendingPaths.length === 0) return;
+    if (session.pendingFileDeletionPaths !== undefined && !Array.isArray(session.pendingFileDeletionPaths)) return;
+    session.pendingFileDeletionPaths = [...new Set([...(session.pendingFileDeletionPaths ?? []), ...pendingPaths])];
+    try {
+      this.flush(true);
+    } catch (error) {
+      throw new Error(
+        `Failed to persist unresolved file-removal paths; the retry fence is only in memory and may not survive restart. `
+        + `Deletion is incomplete; manually recover these paths: ${session.pendingFileDeletionPaths.join(', ')}. `
+        + `Persistence error: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  getPendingFileDeletionPaths(id: string): string[] {
+    const session = this.sessions.get(id);
+    const saved: unknown = session?.pendingFileDeletionPaths;
+    if (!session || saved === undefined) return [];
+    if (!Array.isArray(saved) || saved.some((path) => typeof path !== 'string'
+      || !isAbsolute(path) || !/^\.cats-runtime-delete-.+\.pending-delete$/u.test(basename(path)))) {
+      return ['[invalid pending file deletion metadata; manual repair required]'];
+    }
+    const remaining = saved.filter((path: string) => {
+      try {
+        if (this.sessionBaseDir && isWithinRuntimeSessions(this.sessionBaseDir, path)) {
+          assertUnlinkedRuntimeSessionPath(this.sessionBaseDir, path);
+        }
+        lstatSync(path); // A dangling link is still an unresolved path.
+        return true;
+      } catch (error) {
+        return (error as NodeJS.ErrnoException).code !== 'ENOENT';
+      }
+    });
+    if (remaining.length !== saved.length) {
+      session.pendingFileDeletionPaths = remaining.length > 0 ? remaining : undefined;
+      this.flush();
+    }
+    return remaining;
   }
 
   preparePathDeletion(
     artifactPaths: Iterable<string>,
-    options: { preserveDirs?: Iterable<string> } = {},
+    options: { preserveDirs?: Iterable<string>; validatePath?: (target: string) => void } = {},
   ): PreparedFileDeletion {
     const preservedDirs = new Set(
       Array.from(options.preserveDirs ?? [], (dir) => resolve(dir)),
@@ -667,12 +798,13 @@ export class SessionRegistry {
 
     try {
       for (const artifactPath of artifactPaths) {
+        options.validatePath?.(artifactPath);
         if (!existsSync(artifactPath)) continue;
         hadFiles = true;
         stagedArtifacts.push(this.stageTranscriptArtifact(artifactPath));
       }
     } catch {
-      this.restoreStagedArtifacts(stagedArtifacts);
+      this.restoreStagedArtifacts(stagedArtifacts, options.validatePath);
       return {
         hadFiles,
         ready: false,
@@ -682,13 +814,14 @@ export class SessionRegistry {
     }
 
     let completed = false;
+    let result: FileDeletionResult = { fileDeleted: false };
 
     return {
       hadFiles,
       ready: true,
       finalize: () => {
         if (completed) {
-          return { fileDeleted: hadFiles };
+          return result;
         }
 
         completed = true;
@@ -697,21 +830,37 @@ export class SessionRegistry {
             .map((artifact) => artifact.cleanupDir)
             .filter((dir) => !preservedDirs.has(resolve(dir))),
         );
+        const failedArtifacts: StagedTranscriptArtifact[] = [];
         for (const artifact of stagedArtifacts) {
           try {
-            rmSync(artifact.stagedPath, { recursive: true, force: true });
+            options.validatePath?.(artifact.stagedPath);
+            this.removeStagedArtifact(artifact.stagedPath);
           } catch {
-            // Best effort only. The staged artifact is already detached from
-            // the tracked session path, so it will not be rediscovered.
+            failedArtifacts.push(artifact);
           }
         }
+        // Finalization may be partially irreversible. Restore survivors for a
+        // later explicit retry, but never describe a partial removal as success.
+        this.restoreStagedArtifacts(failedArtifacts, options.validatePath, true);
+        const pendingPaths = failedArtifacts.map((artifact) => artifact.stagedPath)
+          .filter((path) => {
+            try { options.validatePath?.(path); lstatSync(path); return true; } catch (error) {
+              return (error as NodeJS.ErrnoException).code !== 'ENOENT';
+            }
+          });
+        result = failedArtifacts.length > 0 ? {
+          fileDeleted: false,
+          failedPaths: failedArtifacts.map((artifact) => existsSync(artifact.stagedPath)
+            ? artifact.stagedPath : artifact.originalPath),
+          ...(pendingPaths.length > 0 ? { pendingPaths } : {}),
+        } : { fileDeleted: hadFiles };
         this.cleanupEmptyDirs(cleanupDirs);
-        return { fileDeleted: hadFiles };
+        return result;
       },
       rollback: () => {
         if (completed) return;
         completed = true;
-        this.restoreStagedArtifacts(stagedArtifacts);
+        this.restoreStagedArtifacts(stagedArtifacts, options.validatePath);
       },
     };
   }
@@ -720,6 +869,7 @@ export class SessionRegistry {
   unregister(id: string): boolean {
     const session = this.sessions.get(id);
     if (!session) return false;
+    if (this.getPendingFileDeletionPaths(id).length > 0) return false;
     this.forgetProviderDiscoverySourcePathForSession(session);
     this.sessions.delete(id);
     this.scheduleSave();
@@ -758,6 +908,9 @@ export class SessionRegistry {
       if (retained.has(session.providerSessionId)) {
         continue;
       }
+      if (this.getPendingFileDeletionPaths(id).length > 0) {
+        continue;
+      }
 
       this.forgetProviderDiscoverySourcePathForSession(session);
       this.sessions.delete(id);
@@ -776,7 +929,13 @@ export class SessionRegistry {
     const session = this.sessions.get(id);
     if (!session) return { deleted: false, fileDeleted: false };
 
-    const { fileDeleted } = this.deleteTranscripts(id);
+    const prepared = this.prepareTranscriptDeletion(id);
+    if (!prepared.ready) {
+      prepared.rollback();
+      return { deleted: false, fileDeleted: false };
+    }
+    const { fileDeleted, failedPaths } = prepared.finalize();
+    if (failedPaths?.length) return { deleted: false, fileDeleted: false };
     this.forgetProviderDiscoverySourcePathForSession(session);
     this.sessions.delete(id);
     this.scheduleSave();
@@ -1010,7 +1169,7 @@ export class SessionRegistry {
     // Only attach providerSourcePath if session doesn't already have runtime-managed history
     // (prevents /history from duplicating turns from both sources)
     const hasRuntimeHistory = session.sourcePath && this.sessionBaseDir
-      && session.sourcePath.startsWith(this.sessionBaseDir);
+      && isWithinRuntimeSessions(this.sessionBaseDir, session.sourcePath);
     if (data.sourcePath && (!hasRuntimeHistory || session.providerName === 'pi')) {
       session.providerSourcePath = data.sourcePath;
     }
@@ -1082,6 +1241,9 @@ export class SessionRegistry {
         artifactPaths.add(snapshotDir);
       }
     }
+    if (this.sessionBaseDir) {
+      artifactPaths.add(runtimeCompactionDirectory(this.sessionBaseDir, session.id));
+    }
     return Array.from(artifactPaths);
   }
 
@@ -1089,7 +1251,7 @@ export class SessionRegistry {
     if (!this.sessionBaseDir) return [];
 
     return this.collectTranscriptArtifactPaths(session).filter((artifactPath) =>
-      artifactPath.startsWith(this.sessionBaseDir!),
+      isWithinRuntimeSessions(this.sessionBaseDir!, artifactPath),
     );
   }
 
@@ -1106,10 +1268,25 @@ export class SessionRegistry {
     };
   }
 
-  private restoreStagedArtifacts(stagedArtifacts: StagedTranscriptArtifact[]): void {
+  private removeStagedArtifact(stagedPath: string): void {
+    rmSync(stagedPath, { recursive: true, force: true });
+  }
+
+  private restoreStagedArtifacts(
+    stagedArtifacts: StagedTranscriptArtifact[],
+    validatePath?: (target: string) => void,
+    bestEffort = false,
+  ): void {
     for (const artifact of [...stagedArtifacts].reverse()) {
-      if (!existsSync(artifact.stagedPath) || existsSync(artifact.originalPath)) continue;
-      renameSync(artifact.stagedPath, artifact.originalPath);
+      try {
+        validatePath?.(artifact.stagedPath);
+        validatePath?.(artifact.originalPath);
+        if (!existsSync(artifact.stagedPath) || existsSync(artifact.originalPath)) continue;
+        renameSync(artifact.stagedPath, artifact.originalPath);
+      } catch (error) {
+        if (!bestEffort) throw error;
+        // Finalize exposes a remaining staged path as a failed removal.
+      }
     }
   }
 
@@ -1333,7 +1510,7 @@ export class SessionRegistry {
   ): sourcePath is string {
     return Boolean(
       sourcePath
-      && (!this.sessionBaseDir || !sourcePath.startsWith(this.sessionBaseDir))
+      && (!this.sessionBaseDir || !isWithinRuntimeSessions(this.sessionBaseDir, sourcePath))
     );
   }
 
@@ -1382,6 +1559,14 @@ export class SessionRegistry {
     target.hydration = invalidateSkillContentProvenance(target.hydration);
     if (!target.maintenanceState && incoming.maintenanceState) {
       target.maintenanceState = cloneMaintenanceState(incoming.maintenanceState);
+    }
+    if (incoming.pendingFileDeletionPaths !== undefined) {
+      const normalizePending = (value: unknown): string[] => value === undefined ? []
+        : Array.isArray(value) ? value : ['[invalid pending file deletion metadata]'];
+      target.pendingFileDeletionPaths = [...new Set([
+        ...normalizePending(target.pendingFileDeletionPaths),
+        ...normalizePending(incoming.pendingFileDeletionPaths),
+      ])];
     }
     if (!target.context && incoming.context) target.context = cloneInvocationContext(incoming.context);
     if (!target.outputDir && incoming.outputDir) target.outputDir = incoming.outputDir;

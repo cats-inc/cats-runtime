@@ -3638,7 +3638,10 @@ tail, and persists aggregate metadata such as repaired-line count, compacted
 entry count, aggressive-pass count, and the archive path.
 
 `DELETE /sessions/{id}` also clears any persisted wakeups targeting that
-session before the runtime unregisters it. Delete responses now also include
+session before the runtime unregisters it. If wakeup cleanup throws, delete
+returns HTTP 500 and keeps the session registered for an explicit retry; earlier
+file cleanup may already have completed. A failed wakeup write restores the
+removed requests in memory so the retry attempts persistence again. Delete responses now also include
 `action: "delete"` plus `sessionId` so lifecycle consumers can treat delete as
 the same control family even though the session snapshot is gone afterward.
 Delete responses also include:
@@ -3650,10 +3653,60 @@ Delete responses also include:
 - `maintenance`: the terminal lifecycle marker for the delete attempt, with
   `status: "completed"` or `status: "retained"`
 
+Managed transcript cleanup includes Runtime's own pre-compaction archives under
+`<sessionBaseDir>/compactions/<sessionId>`. It derives that directory from the
+session ID rather than trusting an archive path stored in a transcript. Unsafe
+IDs and linked descendants of the configured sessions root prevent staging;
+cleanup does not follow those links into another directory.
+
+Final staged-file removal can fail after some files have already been removed.
+In that case delete returns `status: "retained"`, `fileDeleted: false`, and
+`cleanup.registryDropped: false`, with maintenance reason
+`cleanup_removal_failed`. Surviving staged files are restored where possible so
+an explicit delete retry can remove them. If removing an old staged provider
+index fails, the rewritten live index stays intact and the old copy becomes a
+pending path requiring manual resolution. The response reason identifies paths
+needing attention; if restoring a file also fails, it names the remaining
+`.pending-delete` path for manual resolution. Runtime persists those unresolved
+paths in optional, Runtime-owned `pendingFileDeletionPaths` session metadata.
+Later delete attempts, including after restart, return `cleanup_pending_removal`
+and retain the session while any such path exists or cannot be verified absent.
+DELETE checks this fence before closing a worker or cleaning up its worktree.
+These paths are a retry fence, never automatic deletion targets; malformed
+metadata also blocks deletion. After manual resolution, another explicit delete
+attempt rechecks the paths and can finish. Existing session records without this
+optional field need no conversion.
+
+Registry snapshots use a same-directory temporary file and atomic replacement,
+preserving the previous snapshot if writing or replacement fails. Replacement
+snapshots are created with mode `0o600` (owner read/write on POSIX), so successful
+updates also restrict a previously broader registry file mode. This mode argument
+does not configure Windows ACLs. Persisting a
+new unresolved-path fence is a strict write: on failure DELETE returns HTTP 500
+with the residual paths and explains that the fence is only in memory and may
+not survive restart. Resolve that storage failure or recover the reported files
+before restarting; a failed persistence attempt does not establish a durable
+deletion guard.
+
+The fence records observed failures; it is not a crash-recovery journal for an
+interruption before that record is persisted or an atomic secure erase. Cleanup
+does not erase external backups, provider-hosted history, or other independently
+retained diagnostic/export data.
+
 `DELETE /sessions/{id}` accepts the same optional `maintenance` body plus:
 
 - `requireAcknowledgedHooks?: boolean`
 - `worktreeCleanupPolicy: "discard" | "merge" | "preserve"`
+
+Deletion and retained-worktree cleanup share a per-session operation lock within
+one Runtime registry. An overlapping request returns HTTP 409 with
+`code: "session_delete_busy"` before staging any files. The lock covers cleanup,
+file finalization and pending-path persistence; it releases on success, retained
+results and errors. Other session IDs are independent. A stale registry entry or
+a refused unregister returns HTTP 409 with `code: "session_delete_conflict"`
+instead of a completed deletion result. Refresh session state before retrying;
+some cleanup may already have completed. This is an in-process coordination
+boundary, not a lock between separate Runtime processes sharing storage.
 
 For worktree-backed sessions, the runtime closes any attached worker first,
 then either detaches the worktree and removes the session or returns

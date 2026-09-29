@@ -1373,6 +1373,34 @@ describe('session worktree routes', () => {
     expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(true);
   });
 
+  it('checks unresolved file-removal paths before discarding a worktree on DELETE retry', async () => {
+    const repoDir = createGitWorkspace(rootDir, 'repo-pending-delete');
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'worktree-pending-delete', sessionBaseDir, cwd: repoDir,
+      workspaceMode: 'shared', workspaceIsolationMode: 'worktree',
+    });
+    const session = registry.create({
+      id: 'worktree-pending-delete', providerName: 'codex', cwd: prepared.cwd,
+      workspaceMode: prepared.workspaceMode, workspaceIsolation: prepared.workspaceIsolation,
+    });
+    registry.updateStatus(session.id, 'closed');
+    writeFileSync(join(prepared.cwd, 'uncommitted.txt'), 'preserve while blocked');
+    const pending = join(sessionBaseDir, '.cats-runtime-delete-fixture.pending-delete');
+    writeFileSync(pending, 'unresolved earlier removal');
+    session.pendingFileDeletionPaths = [pending];
+    const response = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ worktreeCleanupPolicy: 'discard' }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: 'retained', workspaceCleaned: false,
+      maintenance: { reasonCodes: ['cleanup_pending_removal'] },
+    });
+    expect(readFileSync(join(prepared.cwd, 'uncommitted.txt'), 'utf8')).toBe('preserve while blocked');
+    expect(runGit(repoDir, ['worktree', 'list', '--porcelain'])).toContain(prepared.cwd.replace(/\\/g, '/'));
+  });
+
   it('settles retained delete state after cleanup succeeds', async () => {
     const repoDir = createGitWorkspace(rootDir, 'repo-delete-cleanup-retry');
     const prepared = await prepareSessionWorkspace({

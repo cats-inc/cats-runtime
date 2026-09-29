@@ -57,6 +57,13 @@ Before committing, verify:
 
 ### Runtime-Specific Secret Boundaries
 
+- HTTP access logs record the method, path, status and elapsed time. They omit
+  the complete query string, headers and body, including on authentication
+  failure. Do not replace this with a full-URL logger: the existing EventSource
+  authentication contract accepts a `token` query parameter.
+- Prefer an `Authorization: Bearer` header for clients that support it. Query
+  authentication remains compatible, so browsers, reverse proxies and other
+  systems outside Runtime's access logger can still retain credential URLs.
 - Keep `.env.example` as placeholders only; never replace those entries with
   live secrets in git.
 - Treat provider credentials independently:

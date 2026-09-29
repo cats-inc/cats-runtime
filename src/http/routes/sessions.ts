@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { Hono } from 'hono';
+import { createMiddleware } from 'hono/factory';
 import {
   getRuntimeBrowserService,
   getProviderCompatibilityService,
@@ -15,7 +16,7 @@ import {
   type ProviderInstanceConfig,
 } from '../../backends/cli/config.js';
 import type { SessionsIndex } from '../../backends/cli/discovery/types.js';
-import type { PreparedFileDeletion } from '../../backends/cli/pool/SessionRegistry.js';
+import type { FileDeletionResult, PreparedFileDeletion } from '../../backends/cli/pool/SessionRegistry.js';
 import type {
   SessionInfo,
   SessionInvocationContext,
@@ -98,6 +99,7 @@ import {
   summarizeContextTransplant,
 } from '../../core/runtime/sessionBranching.js';
 import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
+import { isWithinRuntimeSessions } from '../../core/runtime/transcriptPaths.js';
 import {
   canRuntimeCompactSessionTranscript,
   compactRuntimeManagedTranscript,
@@ -151,6 +153,48 @@ interface SessionRouteEnv {
 }
 
 export const sessionRoutes = new Hono<SessionRouteEnv>();
+const activeSessionDeletions = new WeakMap<AppContext['registry'], Set<string>>();
+
+class SessionDeletionConflict extends Error {
+  constructor(readonly code: 'session_delete_busy' | 'session_delete_conflict', message: string) {
+    super(message);
+  }
+}
+
+function acquireSessionDeletion(ctx: AppContext, id: string): () => void {
+  let active = activeSessionDeletions.get(ctx.registry);
+  if (!active) {
+    active = new Set();
+    activeSessionDeletions.set(ctx.registry, active);
+  }
+  if (active.has(id)) {
+    throw new SessionDeletionConflict('session_delete_busy', 'Session deletion or retained workspace cleanup is already in progress');
+  }
+  active.add(id);
+  return () => { active.delete(id); };
+}
+
+const guardSessionDeletion = createMiddleware<SessionRouteEnv>(async (c, next) => {
+  let release: () => void;
+  try {
+    release = acquireSessionDeletion(c.get('ctx'), c.req.param('id')!);
+  } catch (error) {
+    if (error instanceof SessionDeletionConflict) return c.json({ error: error.message, code: error.code }, 409);
+    throw error;
+  }
+  try {
+    await next();
+  } finally {
+    release();
+  }
+});
+
+function assertCurrentDeletionSession(ctx: AppContext, session: SessionInfo): void {
+  if (ctx.registry.get(session.id) !== session) {
+    throw new SessionDeletionConflict('session_delete_conflict', 'Session registry changed during deletion; refresh session state before retrying');
+  }
+}
+
 const PLAYGROUND_WORKSPACE_PREFIX = 'playground-room-';
 const PLAYGROUND_WORKSPACE_ROOT = 'playground-workspaces';
 
@@ -1253,39 +1297,45 @@ export async function executeRetainedWorktreeCleanup(
     settledReset?: Awaited<ReturnType<typeof settleRetainedResetAfterCleanup>>;
     settledDelete?: Awaited<ReturnType<typeof settleRetainedDeleteAfterCleanup>>;
   }> {
-  const cleanup = await prepareWorkspaceCleanupState(
-    session,
-    options.worktreeCleanupPolicy,
-    ctx,
-  );
-  let sessionAfterCleanup = persistWorkspaceCleanupState(ctx, session.id, cleanup) ?? session;
-  if (
-    options.rehydratePersistedState !== false
-    && (cleanup.nextCwd !== undefined || cleanup.nextWorkspaceIsolation !== undefined)
-  ) {
-    try {
-      sessionAfterCleanup = await rehydratePersistedSessionState(ctx, sessionAfterCleanup);
-    } catch (error) {
-      throw new RetainedWorktreeCleanupHydrationError(
-        `Retained worktree cleanup changed workspace state but failed to refresh hydration: ${error}`,
-        cleanup,
-      );
+  const release = acquireSessionDeletion(ctx, session.id);
+  try {
+    assertCurrentDeletionSession(ctx, session);
+    const cleanup = await prepareWorkspaceCleanupState(
+      session,
+      options.worktreeCleanupPolicy,
+      ctx,
+    );
+    let sessionAfterCleanup = persistWorkspaceCleanupState(ctx, session.id, cleanup) ?? session;
+    if (
+      options.rehydratePersistedState !== false
+      && (cleanup.nextCwd !== undefined || cleanup.nextWorkspaceIsolation !== undefined)
+    ) {
+      try {
+        sessionAfterCleanup = await rehydratePersistedSessionState(ctx, sessionAfterCleanup);
+      } catch (error) {
+        throw new RetainedWorktreeCleanupHydrationError(
+          `Retained worktree cleanup changed workspace state but failed to refresh hydration: ${error}`,
+          cleanup,
+        );
+      }
     }
+
+    const settledReset = cleanup.status === 'completed'
+      ? await settleRetainedResetAfterCleanup(ctx, sessionAfterCleanup, cleanup)
+      : undefined;
+    const settledDelete = cleanup.status === 'completed'
+      ? await settleRetainedDeleteAfterCleanup(ctx, sessionAfterCleanup, cleanup)
+      : undefined;
+
+    return {
+      cleanup,
+      sessionAfterCleanup,
+      ...(settledReset ? { settledReset } : {}),
+      ...(settledDelete ? { settledDelete } : {}),
+    };
+  } finally {
+    release();
   }
-
-  const settledReset = cleanup.status === 'completed'
-    ? await settleRetainedResetAfterCleanup(ctx, sessionAfterCleanup, cleanup)
-    : undefined;
-  const settledDelete = cleanup.status === 'completed'
-    ? await settleRetainedDeleteAfterCleanup(ctx, sessionAfterCleanup, cleanup)
-    : undefined;
-
-  return {
-    cleanup,
-    sessionAfterCleanup,
-    ...(settledReset ? { settledReset } : {}),
-    ...(settledDelete ? { settledDelete } : {}),
-  };
 }
 
 async function discardPreparedWorkspace(
@@ -1377,6 +1427,29 @@ async function settleRetainedResetAfterCleanup(
   };
 }
 
+function retainDeleteForPendingPaths(
+  ctx: AppContext,
+  session: SessionInfo,
+  workspaceCleaned: boolean,
+  pendingPaths: string[],
+) {
+  const id = session.id;
+  const maintenance = recordSessionLifecycle(ctx, id, {
+    action: 'delete', boundary: 'permanent_delete', status: 'retained',
+    reasonCodes: ['cleanup_pending_removal'],
+    cleanup: {
+      workerDetached: !getRuntimeSessionManager(ctx).isAttached(id), workspaceCleaned,
+      managedTranscriptDeleted: false, providerDiscoveryCleared: false, registryDropped: false,
+    },
+  });
+  ctx.registry.flush();
+  return {
+    status: 'retained' as const, hadTranscript: true, fileDeleted: false, nativeDeleted: false,
+    reason: `A previous removal left unresolved staged files. Resolve these paths before retrying: ${pendingPaths.join(', ')}`,
+    maintenance, session: serializeSession(ctx, ctx.registry.get(id) ?? session),
+  };
+}
+
 async function finalizeDeleteAfterWorkspaceCleanup(
   ctx: AppContext,
   session: SessionInfo,
@@ -1397,14 +1470,22 @@ async function finalizeDeleteAfterWorkspaceCleanup(
   }> {
   const runtime = getRuntimeSessionManager(ctx);
   const id = session.id;
+  assertCurrentDeletionSession(ctx, session);
+  const pendingPaths = ctx.registry.getPendingFileDeletionPaths(id);
+  if (pendingPaths.length > 0) {
+    return retainDeleteForPendingPaths(ctx, session, input.workspaceCleaned, pendingPaths);
+  }
   const hasNativeSessionState = tracksNativeSessionState(session);
   const hasProviderDiscoveryState = tracksProviderDiscoveryState(session);
   const workerDetached = !runtime.isAttached(id);
   const providerDiscoveryHydration = hasProviderDiscoveryState
     ? await hydrateProviderDiscoverySourcePathForDelete(ctx, session)
     : undefined;
+  assertCurrentDeletionSession(ctx, session);
 
-  const preparedManagedTranscripts = ctx.registry.prepareManagedTranscriptDeletion(id);
+  const preparedManagedTranscripts = ctx.registry.prepareManagedTranscriptDeletion(id, {
+    deferPendingPersistence: true,
+  });
   const preparedProviderDiscovery = prepareProviderDiscoveryDeletion(ctx, session);
   const providerDiscoveryDeleteMode = hasProviderDiscoveryState
     ? (preparedProviderDiscovery.hadFiles ? 'full' : 'registry_only')
@@ -1521,15 +1602,57 @@ async function finalizeDeleteAfterWorkspaceCleanup(
   let browserSessionsCleared = 0;
   try {
     browserSessionsCleared = await clearBrowserSessionsForRuntimeSession(ctx, id);
+    assertCurrentDeletionSession(ctx, session);
   } catch (error) {
     preparedManagedTranscripts.rollback();
     preparedProviderDiscovery.rollback();
+    if (error instanceof SessionDeletionConflict) throw error;
     throw new Error(`Failed to clear browser sessions before delete: ${error}`);
   }
 
   const managedDeletion = preparedManagedTranscripts.finalize();
   const providerDeletion = preparedProviderDiscovery.finalize();
+  // A strict persistence error must not strand an unfinalized provider stage.
+  ctx.registry.retainPendingFileDeletions(id, [
+    ...(managedDeletion.pendingPaths ?? []), ...(providerDeletion.pendingPaths ?? []),
+  ]);
+  const failedPaths = [...(managedDeletion.failedPaths ?? []), ...(providerDeletion.failedPaths ?? [])];
+  if (failedPaths.length > 0) {
+    const maintenance = recordSessionLifecycle(ctx, id, {
+      action: 'delete',
+      boundary: 'permanent_delete',
+      status: 'retained',
+      reasonCodes: ['cleanup_removal_failed'],
+      cleanup: buildDeleteCleanupSummary({
+        workerDetached: !runtime.isAttached(id),
+        wakeupsCleared: false,
+        browserSessionsCleared,
+        workspaceCleaned: input.workspaceCleaned,
+        ...(input.worktreeDetached !== undefined ? { worktreeDetached: input.worktreeDetached } : {}),
+        ...(input.resolvedCleanupPolicy ? { worktreeCleanupPolicy: input.resolvedCleanupPolicy } : {}),
+        ...(input.worktreeMergedPaths !== undefined ? { worktreeMergedPaths: input.worktreeMergedPaths } : {}),
+        managedTranscriptDeleted: managedDeletion.fileDeleted,
+        providerDiscoveryCleared: providerDeletion.fileDeleted,
+        ...(providerDiscoveryDeleteMode ? { providerDiscoveryDeleteMode } : {}),
+        ...(providerDiscoveryHydration ? { providerDiscoveryHydration } : {}),
+        registryDropped: false,
+      }),
+    });
+    ctx.registry.flush();
+    return {
+      status: 'retained',
+      hadTranscript,
+      fileDeleted: false,
+      nativeDeleted: hasNativeSessionState ? nativeDeleted === true : false,
+      reason: `Session file removal was incomplete. Some files may already have been removed; session state was kept. Retry after resolving these paths: ${failedPaths.join(', ')}`,
+      maintenance,
+      session: serializeSession(ctx, ctx.registry.get(id) ?? session),
+    };
+  }
   const wakeupResult = ctx.wakeup?.clearSession(id);
+  if (!ctx.registry.unregister(id)) {
+    throw new SessionDeletionConflict('session_delete_conflict', 'Session registry could not be removed; file cleanup may already be complete. Refresh session state before retrying');
+  }
   const maintenance = recordSessionLifecycle(ctx, id, {
     action: 'delete',
     boundary: 'permanent_delete',
@@ -1555,7 +1678,6 @@ async function finalizeDeleteAfterWorkspaceCleanup(
     }),
     clearExecutionState: true,
   });
-  ctx.registry.unregister(id);
   runtime.dropSession(id);
   ctx.registry.flush();
 
@@ -1982,7 +2104,8 @@ function collectProviderDiscoveryArtifactPaths(ctx: AppContext, session: Session
   const artifactPaths = new Set<string>();
   for (const sourcePath of [session.providerSourcePath, session.sourcePath]) {
     if (!sourcePath) continue;
-    if (sourcePath.startsWith(ctx.config.sessionBaseDir)) continue;
+    if (relative(ctx.config.sessionBaseDir, sourcePath) === ''
+      || isWithinRuntimeSessions(ctx.config.sessionBaseDir, sourcePath)) continue;
 
     if (session.providerName === 'cline' || session.providerName === 'grok'
       || session.providerName === 'muse') {
@@ -2241,10 +2364,17 @@ function combinePreparedDeletions(
     ready: preparedDeletions.every((prepared) => prepared.ready),
     finalize: () => {
       let fileDeleted = false;
+      const failedPaths: string[] = [];
+      const pendingPaths: string[] = [];
       for (const prepared of preparedDeletions) {
-        fileDeleted = prepared.finalize().fileDeleted || fileDeleted;
+        const result = prepared.finalize();
+        fileDeleted = result.fileDeleted || fileDeleted;
+        failedPaths.push(...(result.failedPaths ?? []));
+        pendingPaths.push(...(result.pendingPaths ?? []));
       }
-      return { fileDeleted };
+      return failedPaths.length > 0 ? {
+        fileDeleted: false, failedPaths, ...(pendingPaths.length > 0 ? { pendingPaths } : {}),
+      } : { fileDeleted };
     },
     rollback: () => {
       for (const prepared of [...preparedDeletions].reverse()) {
@@ -2291,22 +2421,29 @@ function prepareReplacementFileDeletion(
   }
 
   let completed = false;
+  let result: FileDeletionResult = { fileDeleted: false };
 
   return {
     hadFiles: true,
     ready: true,
     finalize: () => {
       if (completed) {
-        return { fileDeleted: true };
+        return result;
       }
 
       completed = true;
       try {
         rmSync(stagedPath, { force: true });
+        result = { fileDeleted: true };
       } catch {
-        // Best effort only. The replacement file is already live at filePath.
+        // The rewritten index is already live. Keep it intact even when the old
+        // staged copy is locked; attempting rollback could remove the only live
+        // index and still fail to restore the locked copy.
+        result = {
+          fileDeleted: false, failedPaths: [stagedPath], pendingPaths: [stagedPath],
+        };
       }
-      return { fileDeleted: true };
+      return result;
     },
     rollback: () => {
       if (completed) return;
@@ -3605,6 +3742,9 @@ sessionRoutes.post('/sessions/:id/workspace/cleanup', async (c) => {
       worktreeCleanupPolicy,
     });
   } catch (error) {
+    if (error instanceof SessionDeletionConflict) {
+      return c.json({ error: error.message, code: error.code }, 409);
+    }
     if (error instanceof RetainedWorktreeCleanupHydrationError) {
       return c.json({
         error: error.message,
@@ -3931,7 +4071,7 @@ sessionRoutes.post('/sessions/:id/compact/follow-through', async (c) => {
 });
 
 /** DELETE /sessions/:id — permanently remove session and delete .jsonl */
-sessionRoutes.delete('/sessions/:id', async (c) => {
+sessionRoutes.delete('/sessions/:id', guardSessionDeletion, async (c) => {
   const ctx = c.get('ctx');
   const id = c.req.param('id');
   const session = ctx.registry.get(id);
@@ -3980,6 +4120,15 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
       ),
       409,
     );
+  }
+
+  const pendingPaths = ctx.registry.getPendingFileDeletionPaths(id);
+  if (pendingPaths.length > 0) {
+    const retained = retainDeleteForPendingPaths(ctx, session, false, pendingPaths);
+    return c.json({
+      action: 'delete', sessionId: id, ...retained,
+      workspaceCleaned: false, cleanup: retained.maintenance.cleanup,
+    });
   }
 
   let workspaceCleaned = false;
@@ -4060,6 +4209,9 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
       worktreeMergedPaths,
     });
   } catch (error) {
+    if (error instanceof SessionDeletionConflict) {
+      return c.json({ error: error.message, code: error.code }, 409);
+    }
     return c.json({ error: `${error}` }, 500);
   }
 
@@ -4070,7 +4222,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
       status: 'retained',
       hadTranscript: finalizedDelete.hadTranscript,
       fileDeleted: false,
-      nativeDeleted: false,
+      nativeDeleted: finalizedDelete.nativeDeleted,
       workspaceCleaned,
       cleanup: finalizedDelete.maintenance.cleanup,
       reason: finalizedDelete.reason,
