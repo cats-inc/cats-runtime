@@ -217,6 +217,7 @@ export class WorkerPool {
     providerName: string,
     opts: ProviderSpawnOptions,
     providerInstanceId?: string,
+    launchEnv: Readonly<Record<string, string>> = {},
   ): WorkerProcess {
     if (this.activeCount >= this.config.maxSessions) {
       throw new Error(`Max sessions (${this.config.maxSessions}) reached`);
@@ -257,7 +258,11 @@ export class WorkerPool {
       const managed = hasManagedPluginExposure(this.config.sessionBaseDir, sessionId);
       const executionId = randomUUID();
       if (managed && (!['codex', 'claude'].includes(providerName) || commandConfig.runtime.mode !== 'native')) throw new Error('Managed Plugins require native Codex or Claude.');
-      worker = new WorkerProcess(provider, opts, commandConfig, resilience, managed);
+      if (Object.keys(launchEnv).length > 0
+        && (!provider.capabilities.sessionMcpServers || commandConfig.runtime.mode !== 'native')) {
+        throw new Error('Session MCP servers require a supporting adapter in a native CLI runtime.');
+      }
+      worker = new WorkerProcess(provider, opts, commandConfig, resilience, managed, launchEnv);
       worker.on('native-session', nativeId => { this.registry.setProviderSessionId(sessionId, nativeId, !opts.resumeSessionId); });
       if (managed) {
         pluginExecutionId = executionId;

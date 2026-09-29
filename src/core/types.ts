@@ -2,6 +2,7 @@ import type {
   ProviderModelResolution,
   ProviderModelSelection,
 } from './models/providerSelectionResolution.js';
+import type { SessionMcpServerLaunch } from './sessionMcpServers.js';
 
 export type {
   ProviderModelResolution,
@@ -205,7 +206,8 @@ export type RuntimeProgressKind =
   | 'model_state'
   | 'guardrail'
   | 'quota'
-  | 'session';
+  | 'session'
+  | 'mcp_servers';
 export type RuntimeProgressStatus =
   | 'started'
   | 'running'
@@ -1614,6 +1616,8 @@ export interface ProviderCapabilities {
   resume: boolean;
   fork: boolean;
   permissions: boolean;
+  /** Adapter maps SPEC-035 session MCP servers into its launch configuration. */
+  sessionMcpServers?: boolean;
 }
 
 export type PermissionMode = 'skip' | 'whitelist' | 'default';
@@ -1632,6 +1636,8 @@ export interface ProviderSpawnOptions {
   permissionMode?: PermissionMode;
   allowedTools?: string[];
   instructionsFile?: string;
+  /** SPEC-035 servers to configure; secrets arrive only through the child environment. */
+  mcpServers?: SessionMcpServerLaunch[];
 }
 
 export interface ProviderTurnOptions extends ProviderSpawnOptions {

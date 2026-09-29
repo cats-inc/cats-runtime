@@ -74,6 +74,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     commandConfig: ProviderCommandConfig,
     spawnResilience: SpawnResilienceConfig = { retries: 1, timeoutMs: 30_000 },
     private readonly managedPluginExecution = false,
+    /** SPEC-035 secrets for this child only; never logged or placed in argv. */
+    private readonly launchEnv: Readonly<Record<string, string>> = {},
   ) {
     super();
     this.provider = provider;
@@ -127,6 +129,13 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     }
     if (spawnConfig.env) {
       Object.assign(env, spawnConfig.env);
+    }
+    if (Object.keys(this.launchEnv).length > 0) {
+      // Docker/WSL launch payloads can carry the environment into argv.
+      if (this.commandConfig.runtime.mode !== 'native') {
+        throw new Error('Session MCP servers require a native CLI runtime.');
+      }
+      Object.assign(env, this.launchEnv);
     }
     delete env.CATS_PLUGIN_MANAGEMENT_KEY;
     this.stderrLines = [];

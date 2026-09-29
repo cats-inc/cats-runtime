@@ -36,6 +36,11 @@ import type { BackendKind } from '../../backends/cli/config.js';
 import { ApiBackendManager } from '../../backends/api/runtime/ApiBackendManager.js';
 import { AgentBackendManager } from '../../backends/agent/runtime/AgentBackendManager.js';
 import { extractWakeReason } from './wakeReason.js';
+import {
+  SessionMcpServerStore,
+  toSessionMcpLaunchConfig,
+  type SessionMcpDeliveryReport,
+} from '../sessionMcpServers.js';
 import { describeRunTarget, formatRunLogLine, type RuntimeRunLogOutcome } from './runLog.js';
 import { hasReportedModelMismatch, mergeReportedModels } from './reportedModels.js';
 import {
@@ -130,6 +135,9 @@ export class RuntimeSessionManager {
   /** What the log line for a session's current run names; see `runLog.ts`. */
   private readonly runLogTargets = new Map<string, { target: string; startedAtMs: number }>();
 
+  /** SPEC-035 descriptors: in memory only, never on `SessionInfo`. */
+  readonly mcpServers = new SessionMcpServerStore();
+
   constructor(
     private readonly config: RuntimeConfig,
     private readonly pool: WorkerPool,
@@ -207,15 +215,24 @@ export class RuntimeSessionManager {
       const cliInstanceId = !providerInstanceId
         ? undefined
         : target.instanceId;
-      const worker = this.pool.spawn(
-        sessionId,
-        providerName,
-        normalizedOpts,
-        cliInstanceId,
-      ) as WorkerProcess | undefined;
+      const mcpServers = this.mcpServers.get(sessionId);
+      const mcpLaunch = mcpServers.length > 0 && this.supportsSessionMcpServers(target, providerName, cliInstanceId)
+        ? toSessionMcpLaunchConfig(mcpServers)
+        : undefined;
+      const worker = (mcpLaunch
+        ? this.pool.spawn(
+          sessionId,
+          providerName,
+          { ...normalizedOpts, mcpServers: mcpLaunch.servers },
+          cliInstanceId,
+          mcpLaunch.env,
+        )
+        : this.pool.spawn(sessionId, providerName, normalizedOpts, cliInstanceId)) as WorkerProcess | undefined;
+      this.mcpServers.recordLaunch(sessionId, mcpLaunch ? mcpServers : []);
       return worker ? new CliExecutionHandle(worker, () => this.pool.kill(sessionId)) : undefined;
     }
 
+    this.mcpServers.recordLaunch(sessionId, []);
     if (target.backend === 'agent') {
       if (!this.agentBackend) {
         throw new Error(`Agent backend is not initialized for '${providerName}'`);
@@ -224,6 +241,42 @@ export class RuntimeSessionManager {
     }
 
     return this.apiBackend?.spawn(sessionId, target);
+  }
+
+  /** SPEC-035 report for a session, or `undefined` when it has no servers. */
+  mcpServerReport(sessionId: string): SessionMcpDeliveryReport | undefined {
+    if (this.mcpServers.get(sessionId).length === 0) return undefined;
+    const session = this.getSessionBinding?.(sessionId);
+    let supported = false;
+    if (session) {
+      try {
+        const target = resolveProviderTarget(
+          this.config,
+          session.providerName,
+          session.providerBackend && session.providerInstanceId
+            ? `${session.providerBackend}/${session.providerInstanceId}`
+            : session.providerInstanceId,
+        );
+        supported = this.supportsSessionMcpServers(
+          target,
+          session.providerName,
+          session.providerInstanceId ? target.instanceId : undefined,
+        );
+      } catch {
+        supported = false;
+      }
+    }
+    return this.mcpServers.report(sessionId, supported);
+  }
+
+  private supportsSessionMcpServers(
+    target: ReturnType<typeof resolveProviderTarget>,
+    providerName: string,
+    cliInstanceId: string | undefined,
+  ): boolean {
+    return target.backend === 'cli'
+      && target.cliInstance?.commandConfig.runtime.mode === 'native'
+      && this.pool.getCapabilities(providerName, cliInstanceId).sessionMcpServers === true;
   }
 
   beginRun(

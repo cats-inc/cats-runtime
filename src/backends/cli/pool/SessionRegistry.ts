@@ -161,6 +161,7 @@ export class SessionRegistry {
   private persistPath: string | null = null;
   private providerDiscoveryPersistPath: string | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly removalListeners = new Set<(sessionId: string) => void>();
 
   constructor(
     dataDir?: string,
@@ -865,13 +866,24 @@ export class SessionRegistry {
     };
   }
 
+  /** Observe every removal path, e.g. to drop in-memory session secrets. */
+  onRemoved(listener: (sessionId: string) => void): () => void {
+    this.removalListeners.add(listener);
+    return () => { this.removalListeners.delete(listener); };
+  }
+
+  private forgetSession(id: string): void {
+    this.sessions.delete(id);
+    for (const listener of this.removalListeners) listener(id);
+  }
+
   /** Remove a session from the registry (does not touch files). */
   unregister(id: string): boolean {
     const session = this.sessions.get(id);
     if (!session) return false;
     if (this.getPendingFileDeletionPaths(id).length > 0) return false;
     this.forgetProviderDiscoverySourcePathForSession(session);
-    this.sessions.delete(id);
+    this.forgetSession(id);
     this.scheduleSave();
     return true;
   }
@@ -913,7 +925,7 @@ export class SessionRegistry {
       }
 
       this.forgetProviderDiscoverySourcePathForSession(session);
-      this.sessions.delete(id);
+      this.forgetSession(id);
       removed++;
     }
 
@@ -937,7 +949,7 @@ export class SessionRegistry {
     const { fileDeleted, failedPaths } = prepared.finalize();
     if (failedPaths?.length) return { deleted: false, fileDeleted: false };
     this.forgetProviderDiscoverySourcePathForSession(session);
-    this.sessions.delete(id);
+    this.forgetSession(id);
     this.scheduleSave();
     return { deleted: true, fileDeleted };
   }
