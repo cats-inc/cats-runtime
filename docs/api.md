@@ -3197,6 +3197,14 @@ Current normalized progress kinds:
 - `quota`: provider-reported account rate-limit or quota snapshots, with the
   flat record under `metadata.quota`
 - `session`: provider session lifecycle checkpoints
+- `heartbeat`: the `POST /sessions/:id/messages` NDJSON stream writes
+  `{"type":"progress","text":"","metadata":{"kind":"heartbeat","source":"runtime"}}`
+  after 30 seconds without another line, and again every 30 seconds while the
+  turn stays silent. A provider can run a long command or reason for minutes
+  without an event; the heartbeat keeps a client's idle timeout from ending a
+  turn that is still working. Clients should skip it. It is not recorded in
+  session history, observe events or metering. If the client disconnects, the
+  turn still runs to completion and later lines are dropped.
 
 Runtime-owned strategy loops emit additive `progress` events with
 `metadata.kind: "strategy"` and statuses such as `started`, `updated`,

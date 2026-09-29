@@ -46,6 +46,7 @@ import { isPiUnknownSessionError, resolvePiResumeTarget } from '../../backends/c
 import { toRuntimeSkillErrorResponse } from '../runtimeSkillErrors.js';
 import { createRuntimeProgressEvent } from '../../core/progress.js';
 import { parseSessionMcpServers } from '../../core/sessionMcpServers.js';
+import { createNdjsonStreamWriter, type NdjsonStreamWriter } from '../ndjsonStreamWriter.js';
 
 function appendHistory(sourcePath: string, entry: Record<string, unknown>): void {
   mkdirSync(dirname(sourcePath), { recursive: true });
@@ -811,17 +812,21 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
       appendUserTurnHistory(historyState.sourcePath, turnInput);
     }
 
-    const stream = new ReadableStream({
+    let writer: NdjsonStreamWriter | null = null;
+    const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
         let assistantText = '';
         const turnStartedAt = Date.now();
         const contentBlocks = createRuntimeContentBlockProjector();
+        const output = createNdjsonStreamWriter(controller);
+        writer = output;
+        const write = (value: unknown) => output.write(value);
         try {
           for (const leadingEvent of [mcpServersEvent, warningEvent]) {
             if (!leadingEvent) continue;
             runtime.observeEvent(id, leadingEvent);
             for (const outputEvent of toStreamOutputEvents(contentBlocks, leadingEvent)) {
-              controller.enqueue(new TextEncoder().encode(JSON.stringify(outputEvent) + '\n'));
+              write(outputEvent);
             }
           }
           const eventStream = withTurnTerminalEvent(peerRouted
@@ -833,8 +838,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
             const observedEvent = metering.observeEvent(executionSession, event, { turnStartedAt });
             runtime.observeEvent(id, observedEvent);
             for (const outputEvent of toStreamOutputEvents(contentBlocks, observedEvent)) {
-              const line = JSON.stringify(outputEvent) + '\n';
-              controller.enqueue(new TextEncoder().encode(line));
+              write(outputEvent);
             }
 
             applyObservedEventToSession(ctx, id, session, observedEvent, {
@@ -889,16 +893,18 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           runtime.observeEvent(id, errorEvent);
           assistantText = flushAssistantText(historyState.sourcePath, assistantText);
           for (const outputEvent of toStreamOutputEvents(contentBlocks, errorEvent)) {
-            controller.enqueue(
-              new TextEncoder().encode(JSON.stringify(outputEvent) + '\n'),
-            );
+            write(outputEvent);
           }
           restoreReadyIfSessionStillInteractive(ctx.registry, id);
         } finally {
           await closeManagedHandle(peerHandle);
           persistAgentTargetEvidence(ctx, id);
-          controller.close();
+          output.close();
         }
+      },
+      cancel() {
+        // The client left, for example on its idle timeout; the turn still finishes.
+        writer?.cancel();
       },
     });
 
