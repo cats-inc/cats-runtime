@@ -314,6 +314,27 @@ export function createRuntimeApp(ctx: AppContext) {
     }
   });
 
+  // Only these public distribution assets are addressable; never serve arbitrary paths.
+  for (const file of [
+    'marked-15.0.7.min.js', 'marked-15.0.7.LICENSE',
+    'dompurify-3.4.16.min.js', 'dompurify-3.4.16.LICENSE',
+    'highlight-11.11.1.min.js', 'highlight-11.11.1-github-dark.min.css',
+    'highlight-11.11.1.LICENSE',
+  ]) {
+    app.get(`/vendor/${file}`, (c) => {
+      try {
+        return c.body(readFileSync(resolveRuntimePublicAssetPath(`vendor/${file}`)), 200, {
+          'content-type': file.endsWith('.js') ? 'text/javascript; charset=utf-8'
+            : file.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/plain; charset=utf-8',
+          'x-content-type-options': 'nosniff',
+          'cache-control': 'public, max-age=86400',
+        });
+      } catch {
+        return c.notFound();
+      }
+    });
+  }
+
   // Surface pages redirect into /setup while bootstrap remains incomplete.
   app.get('/', (c) => {
     if (ctx.startup?.bootstrapRequired) {

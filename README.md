@@ -342,8 +342,9 @@ See [docs/](./docs/) for detailed documentation:
 - Prompts, attachments and workspace files you send to a session go to the selected
   provider (its CLI or API) under that provider's retention terms. Nothing is sent to
   the Cats maintainer: there is no telemetry, crash reporting or account.
-- The dashboard and playground pages load `marked`, `DOMPurify` and `highlight.js`
-  from `cdn.jsdelivr.net`; the API itself only calls the providers you configure.
+- The dashboard and playground ship pinned, integrity-checked copies of `marked`,
+  `DOMPurify` and `highlight.js`; they do not contact a CDN. The API itself only
+  calls the providers you configure.
 - The HTTP server binds `127.0.0.1` by default, even with `CATS_RUNTIME_API_KEY` set.
   Remote access requires an explicit `CATS_RUNTIME_HOST` (for example `0.0.0.0`)
   and logs a startup warning. Protect remote access with an API key and a trusted network.
