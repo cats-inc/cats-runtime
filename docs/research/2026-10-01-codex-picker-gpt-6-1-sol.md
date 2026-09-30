@@ -108,6 +108,9 @@ Temporary scripts remain private and were intentionally left out of the PR:
 - `npm run catalog:check`: passed, including generated digest and code/data boundary checks.
 - Catalog data/runtime suites: **58 tests passed** in two files, with isolated profiles.
 - Normalizer: **6 tests passed**, using `--test-isolation=none` in the sandbox.
+- Three affected HTTP catalog tests passed (71 unrelated tests skipped), and TypeScript
+  `--noEmit` passed. Their basic/aggregate/advanced model/default expectations now read the
+  shared factory fixture instead of hardcoding the previous Astra/Medium default.
 - Isolated factory/adapter smoke: equal basic/advanced revisions and ordered models; initial
   GPT-6.1-Sol/Low; all eight model switches; all six new-model efforts; restored explicit Ultra;
   actual `model` and `model_reasoning_effort` argv values. No provider process was launched.
@@ -115,11 +118,17 @@ Temporary scripts remain private and were intentionally left out of the PR:
   and Vitest succeeded through the authorized native executor. The first disposable smoke fixture
   lacked a configured provider; adding its isolated native instance made the check pass.
 - Exact old IDs/labels and display consumers were searched in Runtime and Platform. Remaining
-  occurrences describe other authorized provider/backend scopes, frozen migration/UI fixtures or
-  synthetic adapter/UI tests. They are not an independent current Codex CLI menu to rewrite.
+  occurrences include three current-factory HTTP tests, corrected in this PR. Other occurrences
+  describe other authorized provider/backend scopes, frozen migration/UI fixtures or synthetic
+  adapter/UI tests. Those do not establish an independent current Codex CLI menu to rewrite.
 - Independent cross-review passed with no required fixes; it independently checked every model,
   scope isolation, generated data, redaction, decision/gap artifacts and sampled screenshots.
+  The initial review missed the three current-factory HTTP assertions; follow-up review confirmed
+  their corrected fixture-driven expectations. No additional UI capture was needed.
   Required full-suite `release-preflight` CI is recorded with the PR.
+- The first [PR #145 CI run](https://github.com/cats-inc/cats-runtime/actions/runs/36744135636)
+  passed 2711 tests but failed exactly the three stale Astra-default HTTP assertions (five skipped).
+  The follow-up commit corrects those assertions; the required gate reruns for that head.
 
 This validates source catalog data and isolated execution arguments. It is not an installed
 Desktop/Playground acceptance run or a package publication. The factory digest is

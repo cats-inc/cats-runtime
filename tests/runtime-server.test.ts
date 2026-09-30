@@ -4202,7 +4202,7 @@ providers:
         provider: 'codex',
         backend: 'cli',
         instance: 'native',
-        defaultModel: 'gpt-6-astra',
+        defaultModel: factoryModels.find(model => model.default)?.id ?? null,
         source: 'static',
         cache: null,
         models: factoryModels.map(({ id, label, default: isDefault }) => ({ id, label, default: isDefault })),
@@ -4291,6 +4291,8 @@ providers:
 
   it('GET /providers/models returns default-target catalogs for configured providers', async () => {
     await withRuntime({}, {}, async (runtime) => {
+      const factoryModels = readCatalogFactory({ packageRoot: process.cwd(), runtimeRoot: process.cwd() })
+        .document.catalogs.find(scope => scope.provider === 'codex' && scope.backend === 'cli')!.models;
       const response = await runtime.app.request('/providers/models');
       expect(response.status).toBe(200);
 
@@ -4309,7 +4311,7 @@ providers:
         instance: 'native',
         source: 'static',
       });
-      expect(payload.providers.codex.models[0]?.id).toBe('gpt-6-astra');
+      expect(payload.providers.codex.models.map(model => model.id)).toEqual(factoryModels.map(model => model.id));
       expect(payload.providers.claude).toMatchObject({
         provider: 'claude',
         backend: 'cli',
@@ -4330,8 +4332,11 @@ providers:
 
   it('GET /providers/:provider/models/advanced adds a runtime-owned advanced catalog without changing v1', async () => {
     await withRuntime({}, {}, async (runtime) => {
-      const factoryIds = readCatalogFactory({ packageRoot: process.cwd(), runtimeRoot: process.cwd() })
-        .document.catalogs.find(scope => scope.provider === 'codex' && scope.backend === 'cli')!.models.map(model => model.id);
+      const factoryModels = readCatalogFactory({ packageRoot: process.cwd(), runtimeRoot: process.cwd() })
+        .document.catalogs.find(scope => scope.provider === 'codex' && scope.backend === 'cli')!.models;
+      const factoryIds = factoryModels.map(model => model.id);
+      const defaultModel = factoryModels.find(model => model.default)!;
+      const defaultEffort = defaultModel.controls!.find(control => control.key === 'codex.reasoning_effort')!.default;
       const response = await runtime.app.request('/providers/codex/models/advanced');
       expect(response.status).toBe(200);
       const payload = await response.json();
@@ -4339,15 +4344,15 @@ providers:
         provider: 'codex',
         backend: 'cli',
         instance: 'native',
-        defaultModel: 'gpt-6-astra',
+        defaultModel: defaultModel.id,
         source: 'static',
         cache: null,
         presets: [],
         defaultSelection: {
-          entryId: 'gpt-6-astra',
+          entryId: defaultModel.id,
           entryMode: 'explicit',
           controls: {
-            'codex.reasoning_effort': 'medium',
+            'codex.reasoning_effort': defaultEffort,
           },
         },
         support: {
