@@ -117,6 +117,11 @@ records the scrolled Default-plus-ten picker, per-row execution values read thro
 the operator's move from `opus[1m]` to the picker's `opus`, the scrolling and shared-effort fixes
 to the capture helper, and the screenshot and token cost of the native run.
 
+[Claude 2.1.285 picker capture: Sonnet 5.5](./research/2026-09-30-claude-picker-sonnet-5-5.md)
+records the twelve-row picker with Sonnet 5.5, the `sonnet` alias moving to it while the Sonnet 5
+row sets its full id, Ultracode leaving the effort cycles, the new below-window row count, the
+row-status reader and changelog helpers, and the unreproduced Opus 5.5 report.
+
 [Claude 2.1.282 agent-operated capture](./research/2026-09-25-claude-picker-agent-capture.md)
 records the Opus 5.5 label, Opus's Medium default effort, the `opus[1m]` context alias, the
 arrow-only Claude capture helper and the measured screenshot/token cost of the native run.

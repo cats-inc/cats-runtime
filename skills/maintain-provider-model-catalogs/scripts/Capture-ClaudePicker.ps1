@@ -6,8 +6,9 @@
     "Select model" picker in a dedicated Windows Terminal window, moves across every model
     row with Up/Down, and cycles each row's effort line with Right until it returns to the
     starting level. A list longer than the picker's window scrolls: its edge rows carry
-    up/down arrows and a "+N models" line counts the rows out of view, so each row is read
-    while it is highlighted. Effort is one picker-wide selection, so a row that lacks the
+    up/down arrows and a "+N models" line counts the rows out of view (2.1.283 and earlier) or
+    only the rows below the window (2.1.284 and later), so each row is read while it is
+    highlighted. Effort is one picker-wide selection, so a row that lacks the
     starting level (for example xHigh) leaves another level behind; the starting row is cycled
     back at the end. Only arrow keys are sent: Enter saves a default and "s" applies the
     session, so neither is ever used. The picker is left open at its starting row and effort.
@@ -24,7 +25,7 @@
     checked from helper start; hash it separately before launch to cover startup too.
 .PARAMETER ExpectedModelCount
     Number of rows independently observed for this account, compared with the visible rows plus
-    the picker's out-of-view count. It does not prove completeness.
+    the picker's out-of-view count at every row. It does not prove completeness.
 .PARAMETER MaxEffortLevels
     Upper bound on Right presses per row before the cycle is declared incomplete.
 .PARAMETER Screenshots
@@ -101,9 +102,11 @@ function Read-Picker([string]$Text) {
     if ($lines.Count -eq 0) { throw 'No effort line is visible for the highlighted row.' }
     $effort = [regex]::Match($lines[0], $effortPattern)
     $unsupported = [regex]::Match($lines[0], $unsupportedPattern)
+    # Through 2.1.283 the count covered every row out of view; from 2.1.284 it covers only the
+    # rows below the window. Both totals agree when the first row is visible.
     [pscustomobject]@{
         Rows = $rows
-        Total = $rows.Count + $hidden
+        Totals = @(($rows.Count + $hidden), ([int]$lastRow.Groups['index'].Value + $hidden))
         Highlight = [int]$highlight[0].Groups['index'].Value
         EffortBlock = ($lines -join "`n")
         EffortLine = $lines[0]
@@ -161,11 +164,11 @@ function Assert-ConfigUnchanged([string]$When) {
 try {
     $initialText = Save-Picker 'models' $true
     $initial = Read-Picker $initialText
-    if ($initial.Total -ne $ExpectedModelCount) { throw 'Visible plus out-of-view model count differs from expected coverage.' }
-    for ($index=1; $index -le $initial.Total; $index++) {
+    if ($initial.Totals -notcontains $ExpectedModelCount) { throw 'Visible plus out-of-view model count differs from expected coverage.' }
+    for ($index=1; $index -le $ExpectedModelCount; $index++) {
         # Read each row while highlighted: a scrolled list shows only part of the rows at once.
         $state = Move-Picker $index
-        if ($state.Total -ne $initial.Total) { throw 'Model count changed while scrolling.' }
+        if ($state.Totals -notcontains $ExpectedModelCount) { throw 'Model count changed while scrolling.' }
         $row = @($state.Rows | Where-Object { [int]$_.Groups['index'].Value -eq $index })
         if ($row.Count -ne 1) { throw "Model row $index is not uniquely visible." }
         $columns = $row[0].Groups['rest'].Value.Trim() -split '[ \t]{2,}', 2

@@ -1,0 +1,24 @@
+# Source: agent-operated Claude Code /model picker rows plus the local /status panel,
+#   Windows UI Automation visible text
+# Version: 2.1.285
+# Observed: 2026-09-30 21:38-21:58 (local time, UTC+8); row 2 about 21:38, rows 4 and 6 about 21:57
+# Scope: operator subscription account (startup banner: Claude Max); Windows 11 RDP session,
+#   Windows Terminal, interactive mode, launched with --safe-mode --no-chrome
+# Method: for each row, open /model, highlight the row, press s (use this session only), then
+#   open /status, read its Model line and press Escape. No prompt was submitted; settings.json
+#   kept its prelaunch SHA-256 after every row and after exit.
+# Coverage: rows 2, 4 and 6 only, by operator scope. The other rows keep their 2.1.282 values in
+#   docs/research/fixtures/claude-2.1.282/model-row-status.redacted.txt
+# Redaction: /status account, organization, email, session and working-directory lines are
+#   omitted; only the Version and Model lines are kept per row
+# Note: "alias (resolved id)" means the row sets the alias; a bare id means the row sets that id
+
+Picker row -> confirmation line -> /status Model
+   2. Opus 5.5     Set model to Opus 5.5 for this session only with xhigh effort
+                   opus (claude-opus-5-5)
+   4. Sonnet 5.5   Set model to Sonnet 5.5 for this session only
+                   sonnet (claude-sonnet-5-5)
+   6. Sonnet 5     Set model to Sonnet 5 for this session only
+                   claude-sonnet-5
+
+/status Version line on every read: 2.1.285
