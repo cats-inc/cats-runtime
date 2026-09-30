@@ -126,7 +126,9 @@ row-status reader and changelog helpers, and the unreproduced Opus 5.5 report.
 records the Opus 5.5 label, Opus's Medium default effort, the `opus[1m]` context alias, the
 arrow-only Claude capture helper and the measured screenshot/token cost of the native run.
 
-[Codex desktop picker pilot](./research/2026-09-24-codex-picker-pilot.md) records the complete
+[Codex 0.159.2 picker refresh](./research/2026-10-01-codex-picker-gpt-6-1-sol.md) records eight
+models, GPT-6.1-Sol as the model default with Low reasoning, complete native evidence and measured
+capture cost. [Codex desktop picker pilot](./research/2026-09-24-codex-picker-pilot.md) records the complete
 0.156.1 catalog, native menu capture, default-marker masking and reusable skill workflow.
 
 [Junie full catalog](./research/2026-09-26-junie-picker-full-catalog.md) records the complete 15-row

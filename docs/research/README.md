@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-10-01-codex-picker-gpt-6-1-sol](./2026-10-01-codex-picker-gpt-6-1-sol.md) | Codex 0.159.2 complete picker refresh | Eight models, GPT-6.1-Sol/Low default, native per-model reasoning evidence, capture cost and settings limits |
 | [2026-09-29-cats-ask-mcp-probe](./2026-09-29-cats-ask-mcp-probe.md) | Cats Ask MCP and bookmarks probe | Grok Bot receipts matched; Cursor CLI OAuth/discovery passed but data calls returned client-not-enrolled; save order inferred, video analysis and autonomous dispatch unverified |
 | [2026-09-29-cli-provider-branches-outside-adapters](./2026-09-29-cli-provider-branches-outside-adapters.md) | Where CLI provider knowledge leaks out of the adapters | 238 name checks by layer, the native-session, per-provider service and skill-delivery clusters, what to leave alone, a candidate capability shape and when to pick it up; not scheduled |
 | [2026-09-28-kiro-v2-ignores-model](./2026-09-28-kiro-v2-ignores-model.md) | Kiro 2.24 v2 engine ignores `--model` | Truthful session records, the `Method not found` warning, four engine probes and the move to `--agent-engine v1` |

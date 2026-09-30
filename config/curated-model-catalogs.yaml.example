@@ -433,34 +433,72 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Codex
-    cli_version: 0.156.1
-    last_updated: 2026-09-24
+    cli_version: 0.159.2
+    last_updated: 2026-10-01
     notes:
-      - Complete visible model list and every per-model reasoning/advanced menu captured on 2026-09-24
-        from Codex CLI 0.156.1 in Windows Terminal using UI Automation text and window screenshots.
+      - Complete visible model list and every per-model reasoning/advanced menu captured on 2026-10-01
+        Asia/Taipei (2026-09-30 UTC) from Codex CLI 0.159.2 in Windows Terminal using UI Automation
+        text and window screenshots.
         Scope is the local CLI account; entitlement on other accounts is unverified.
-      - "Evidence: docs/research/fixtures/codex-0.156.1/picker.redacted.txt and
-        docs/research/fixtures/codex-0.156.1/machine-catalog.redacted.json"
-      - The seven picker rows agree with the seven visibility=list entries from codex debug models.
+      - "Evidence: docs/research/fixtures/codex-0.159.2/picker.agent-capture.redacted.txt and
+        docs/research/fixtures/codex-0.159.2/machine-catalog.redacted.json;
+        docs/research/2026-10-01-codex-picker-gpt-6-1-sol.md records capture cost and validation."
+      - The eight picker rows agree with the eight visibility=list entries from codex debug models.
         The hidden gpt-reserve and codex-auto-review entries are enumeration evidence, not Cats picker
-        rows. No existing picker row was removed.
+        rows. GPT-6.1-Sol is newly offered first; no existing picker row was removed.
       - Display labels preserve the exact GPT-style casing now observed in the picker. Raw slugs
-        remain execution.model. Astra is explicitly (default); (current) masks that marker when Astra
-        is active, so a per-invocation --model override to GPT-6-Sol exposed the default without
-        changing config.toml.
-      - Each model reasoning set/default was observed independently. Astra, GPT-6-Sol, GPT-5.6-Sol and
-        GPT-5.6-Terra offer Max/Ultra; both Luna models offer Max only; GPT-5.5 ends at Extra high.
-        GPT-5.6-Sol defaults to Low, all others to Medium.
+        remain execution.model. GPT-6.1-Sol is explicitly (default); Astra is only (current) in the
+        per-invocation --model gpt-6-astra capture. This supersedes the earlier Astra model default.
+      - Each model reasoning set/default was observed independently. GPT-6.1-Sol, Astra, GPT-6-Sol,
+        GPT-5.6-Sol and GPT-5.6-Terra offer Max/Ultra; both Luna models offer Max only; GPT-5.5 ends
+        at Extra high. GPT-6.1-Sol and GPT-5.6-Sol default to Low, all others to Medium.
       - The operator previously approved flattening More reasoning into one Cats effort list.
         Navigation, per-model usage warnings and advanced descriptions remain in the picker fixture.
         Max/Ultra display descriptions use the visible picker wording rather than the different
         machine enumeration descriptions.
-      - Raw effort tokens/defaults and all seven 272000 context values were re-observed in codex debug
+      - Raw effort tokens/defaults and all eight 272000 context values were re-observed in codex debug
         models; these are CLI catalog values, not claims about OpenAI API limits. Older capability
         tags and migration source_names remain with their earlier provenance; no capability tags were
         inferred for new models.
     models:
       - default: true
+        id: gpt-6.1-sol
+        label: GPT-6.1-Sol
+        limits:
+          contextWindowTokens: 272000
+        notes:
+          - Latest workhorse model for coding and everyday work.
+        execution:
+          model: gpt-6.1-sol
+        controls:
+          - key: codex.reasoning_effort
+            label: Reasoning effort
+            description: Controls Codex CLI reasoning depth for supported models.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: Low
+                description: Fast responses with lighter reasoning
+              - value: medium
+                label: Medium
+                description: Balances speed and reasoning depth for everyday tasks
+              - value: high
+                label: High
+                description: Greater reasoning depth for complex problems
+              - value: xhigh
+                label: Extra high
+                description: Extra high reasoning depth for complex problems
+              - value: max
+                label: Max
+                description: For difficult problems when quality matters more than speed · higher usage
+              - value: ultra
+                label: Ultra
+                description: For demanding work using multiple agents · highest usage
+            semanticTags:
+              - reasoning_intensity
+            default: low
+      - default: false
         id: gpt-6-astra
         label: GPT-6-Astra
         capabilityTags:
@@ -507,7 +545,7 @@ catalogs:
         limits:
           contextWindowTokens: 272000
         notes:
-          - Workhorse model for coding and everyday work.
+          - Previous generation workhorse model.
         execution:
           model: gpt-6-sol
         controls:
@@ -580,7 +618,7 @@ catalogs:
         limits:
           contextWindowTokens: 272000
         notes:
-          - Older coding model for complex work.
+          - Older generation workhorse model.
         source_names:
           - gpt-5.6-sol
         execution:
