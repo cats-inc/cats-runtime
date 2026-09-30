@@ -104,7 +104,9 @@ powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/scripts/
 
 It sends only arrow keys. Up/Down move rows; Right cycles each row's effort line until it returns
 to its starting level. A scrolled list counts toward `-ExpectedModelCount` through its visible
-rows plus the `… +N models` line, and each row is read while highlighted. Effort is picker-wide,
+rows plus the `… +N models` line, and each row is read while highlighted. That line counts every
+row out of view through 2.1.283, and only the rows below the window from 2.1.284, so the helper
+accepts either total at every row. Effort is picker-wide,
 so the helper cycles the starting row back at the end. Enter (save default) and `s` (session only)
 are never sent, and the picker is left open at its starting row and effort. `KeyScreens` saves the list plus one default-marked
 (or unsupported) screen per row; the other steps are text-only. The JSON result records each
@@ -115,6 +117,36 @@ Exercise traversal, config-change and evidence-directory guards without launchin
 
 ```powershell
 powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Test-ClaudePicker.ps1
+```
+
+The picker does not show what a row sets. After the traversal, close the picker with Escape and
+run [`Read-ClaudePickerRowStatus.ps1`](../scripts/Read-ClaudePickerRowStatus.ps1) from the empty
+prompt of the same window:
+
+```powershell
+powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/scripts/Read-ClaudePickerRowStatus.ps1 `
+  -UiHelperPath $desktopUiHelper -WindowTitle $captureWindowTitle `
+  -Rows '2,4,6' -OutputFile $newResultFile -ConfigPath $claudeSettings
+```
+
+For each row it opens `/model`, highlights the row, presses `s` (this session only), reads the
+`/status` Version and Model lines and closes `/status` with Escape. Enter only runs the typed
+commands; it is never sent inside the picker. Before `s` it waits for the highlight and footer to
+render together, because a guard read during a redraw once missed the highlight. The settings
+file must keep its SHA-256 after every row. The session is left on the last row; exit with
+`/exit`. Exercise it without a desktop or CLI:
+
+```powershell
+powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Test-ClaudePickerRowStatus.ps1
+```
+
+[`claude-picker-observation.mjs`](../scripts/claude-picker-observation.mjs) turns the capture
+helper's JSON, plus the row-status JSON when present, into the observation tree for `gaps`,
+`summary` and `assess`. Rows without a `/status` read keep `rawId: null`:
+
+```text
+node skills/maintain-provider-model-catalogs/scripts/claude-picker-observation.mjs \
+  --capture capture-result.json --row-status row-status.json --artifact <fixture path> > observation.json
 ```
 
 ## Windows Kiro helper
@@ -291,7 +323,9 @@ The [Codex reference](providers/codex.md) records default-marker masking and oth
 details. The owning repo's `docs/research/2026-09-24-codex-picker-pilot.md` records the native run,
 catalog delta, validation and limitations. The [Claude reference](providers/claude.md) and
 `docs/research/2026-09-25-claude-picker-agent-capture.md` do the same for Claude Code;
-`docs/research/2026-09-26-claude-picker-eleven-rows.md` adds the scrolled list and row values.
+`docs/research/2026-09-26-claude-picker-eleven-rows.md` adds the scrolled list and row values;
+`docs/research/2026-09-30-claude-picker-sonnet-5-5.md` adds the below-window count, a moved
+alias and the row-status reader.
 The [Kiro reference](providers/kiro.md) and `docs/research/2026-09-27-kiro-picker-full-catalog.md`
 record a settings panel whose toggles persist, and its config restore. The
 [Auggie reference](providers/auggie.md) and `docs/research/2026-09-27-auggie-picker-full-catalog.md`

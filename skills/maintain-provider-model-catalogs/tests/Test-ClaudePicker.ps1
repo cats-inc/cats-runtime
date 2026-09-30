@@ -53,7 +53,8 @@ function Get-WindowsUiText($Target) {
         $label = if ($m.Current) { "$($m.Label) $check" } else { $m.Label }
         $lines += "$lead$number$label    $($m.Desc)"
     }
-    $hidden = $count - ($last - $script:mockTop + 1)
+    # 2.1.284 and later count only the rows below the window; earlier builds count every hidden row.
+    $hidden = if ($global:mockCountBelowOnly) { $count - $last } else { $count - ($last - $script:mockTop + 1) }
     if ($hidden -gt 0) { $lines += "     $([char]0x2026) +$hidden $(if ($hidden -eq 1) { 'model' } else { 'models' })" }
     $lines += ''
     $m = $script:mockModels[$script:mockRow - 1]
@@ -187,6 +188,28 @@ try {
     if (-not $failed) {throw 'Out-of-view rows were not counted toward expected coverage'}
     Write-Output 'PASS counts out-of-view rows toward expected coverage'
 
+    $global:mockCountBelowOnly = $true
+    $output = Join-Path $scratch 'scrolled-below-count'
+    $null = New-Item -ItemType Directory -Path $output
+    $result = & $subject -UiHelperPath $mock -WindowTitle 'Fixture' -OutputDirectory $output `
+        -ConfigPath 'simulated-config' -ExpectedModelCount 3 -Screenshots None | ConvertFrom-Json
+    if (($result.CapturedModels.Label -join '|') -ne 'Example Default (recommended)|Example Alpha|Example Mini') {
+        throw 'A count of the rows below the window did not yield every row'
+    }
+    $output = Join-Path $scratch 'scrolled-below-mismatch'
+    $null = New-Item -ItemType Directory -Path $output
+    $failed = $false
+    try {
+        $null = & $subject -UiHelperPath $mock -WindowTitle 'Fixture' -OutputDirectory $output `
+            -ConfigPath 'simulated-config' -ExpectedModelCount 4 -Screenshots None
+    } catch {
+        if ($_.Exception.Message -notmatch 'differs from expected coverage') {throw}
+        $failed = $true
+    }
+    if (-not $failed) {throw 'A count of the rows below the window accepted a missing row'}
+    Write-Output 'PASS reads a list whose count covers only the rows below the window'
+    $global:mockCountBelowOnly = $false
+
     $global:mockVisible = $null
     $global:mockStartLevel = 'Max'
     $output = Join-Path $scratch 'shared-effort'
@@ -202,6 +225,7 @@ try {
     Remove-Variable -Name mockStartLevel -Scope Global -ErrorAction SilentlyContinue
     Remove-Variable -Name simulateFinalChange -Scope Global -ErrorAction SilentlyContinue
     Remove-Variable -Name mockVisible -Scope Global -ErrorAction SilentlyContinue
+    Remove-Variable -Name mockCountBelowOnly -Scope Global -ErrorAction SilentlyContinue
     $resolved = [IO.Path]::GetFullPath($scratch)
     if (-not $resolved.StartsWith($scratchRoot + [IO.Path]::DirectorySeparatorChar) -or
         (Split-Path -Leaf $resolved) -notlike 'claude-capture-test-*') {throw 'Unsafe fixture cleanup path'}
