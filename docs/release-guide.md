@@ -2,6 +2,12 @@
 
 ## Release boundaries
 
+Follow the [shared release preparation/completion policy](https://github.com/cats-inc/cats-one/blob/main/docs/release-guide.md#release-preparation-and-completion):
+prepare all release documentation and pins in the original version change.
+Verify publication using existing hosted Release/Actions/registry evidence, then
+report and finish. Do not add tracked publication reports, status-only commits
+or follow-up PRs, or chase unrelated main updates after verification.
+
 Runtime npm is independently released as `@cats-inc/cats-runtime`. Ordinary
 commits, merges and branch pushes do not bump its version or publish it. Accumulate
 changes until the owner selects a Runtime npm release; use existing authorization
