@@ -48,7 +48,8 @@ option controls;
 Goose uses provider-qualified IDs with fixed Thinking Off through its native model suffix;
 Pi uses bare model-id labels with its channel in the scope basis, plus a separate per-model
 thinking control and CLI argument.
-No scheduled refresh cadence or automated refresh job has been specified.
+No scheduled refresh cadence or automated refresh job has been specified. The operator runs the
+read-only [catalog probe](./references/catalog-probe.md) on demand; it validates and never edits.
 
 ## Schema-2 data boundary
 
@@ -78,6 +79,10 @@ Read [catalog surfaces](./references/catalog-surfaces.md) for current fields and
   the operator separately asks for a fix.
 - **Audit**: derive the current provider inventory from code and classify every registered family
   across all catalog surfaces.
+- **Probe report**: when the operator hands over a catalog probe `report.json`, or asks to run or
+  extend the probe, read [catalog probe](./references/catalog-probe.md). The report's `needsAgent`
+  scopes are the request scope; each finding's kind sets the evidence still needed. Commit the
+  snapshot rows an edit relies on as a fixture with the probe's `evidence` command.
 - **Capture/preview**: use for a raw picker paste that is supplied as catalog evidence without an
   edit request. Parse and summarize it, but do not modify repository files, including evidence
   fixtures.

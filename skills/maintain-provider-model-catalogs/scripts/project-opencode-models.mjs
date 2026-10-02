@@ -33,7 +33,7 @@ function objectLength(text, start) {
   throw new Error('The verbose output ends inside a model metadata object.');
 }
 
-export function parseVerboseModels(text) {
+export function parseVerboseModels(text, { keepMetadata = false } = {}) {
   const rows = [];
   let cursor = 0;
   while (cursor < text.length) {
@@ -49,7 +49,10 @@ export function parseVerboseModels(text) {
     }
     const length = objectLength(text, objectStart);
     const metadata = JSON.parse(text.slice(objectStart, objectStart + length));
-    rows.push({ id: line, name: metadata.name ?? null, providerID: metadata.providerID ?? null });
+    const row = { id: line, name: metadata.name ?? null, providerID: metadata.providerID ?? null };
+    // The catalog probe keeps selected public fields from here; the projection above never prints it.
+    if (keepMetadata) Object.defineProperty(row, 'metadata', { value: metadata, enumerable: false });
+    rows.push(row);
     cursor = objectStart + length;
   }
   return rows;

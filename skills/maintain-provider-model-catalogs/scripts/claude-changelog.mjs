@@ -13,6 +13,7 @@ import { parseArgs } from 'node:util';
 
 const BACKSLASH = 0x5c;
 const QUOTE = 0x27;
+const BACKTICK = 0x60;
 const HEADING = /^## (\d+\.\d+\.\d+)$/;
 
 function compareVersions(a, b) {
@@ -32,16 +33,20 @@ function decodeLiteral(raw) {
   });
 }
 
-// Returns every single-quoted literal that starts with a version heading.
+// Returns every single-quoted or template literal that starts with a version heading. Builds up
+// to 2.1.285 embed a single-quoted literal; 2.1.286 and later embed a template literal.
 function findChangelogLiterals(buffer) {
-  const needle = Buffer.from("'## ");
   const literals = [];
-  for (let at = buffer.indexOf(needle); at >= 0; at = buffer.indexOf(needle, at + 1)) {
-    const heading = buffer.subarray(at + 1, at + 40).toString('latin1');
-    if (!/^## \d+\.\d+\.\d+\\n/.test(heading)) continue;
-    let end = at + 1;
-    while (end < buffer.length && !(buffer[end] === QUOTE && buffer[end - 1] !== BACKSLASH)) end += 1;
-    literals.push(decodeLiteral(buffer.subarray(at + 1, end).toString('utf8')));
+  for (const quote of [QUOTE, BACKTICK]) {
+    const needle = Buffer.from([quote, ...Buffer.from('## ')]);
+    for (let at = buffer.indexOf(needle); at >= 0; at = buffer.indexOf(needle, at + 1)) {
+      const heading = buffer.subarray(at + 1, at + 40).toString('latin1');
+      // A template literal can hold real line breaks instead of `\n` escapes.
+      if (!/^## \d+\.\d+\.\d+(?:\\n|\r?\n)/.test(heading)) continue;
+      let end = at + 1;
+      while (end < buffer.length && buffer[end] !== quote) end += buffer[end] === BACKSLASH ? 2 : 1;
+      literals.push(decodeLiteral(buffer.subarray(at + 1, end).toString('utf8')));
+    }
   }
   return literals;
 }

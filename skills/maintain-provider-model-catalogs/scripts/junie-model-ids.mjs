@@ -107,6 +107,17 @@ function runProbe({ jar, java }) {
   }
 }
 
+export function defaultJunieDataDir(env = process.env) {
+  return env.JUNIE_DATA_DIR ?? join(homedir(), '.local', 'share', 'junie');
+}
+
+/** Reads the installed JAR's model enum; `jar` and `java` override the located pair. */
+export function readJunieModelIds({ dataDir = defaultJunieDataDir(), junieHome, jar, java } = {}) {
+  const located = jar && java ? { jar, java } : locateJunieJvm(junieHome ?? resolveJunieHome(dataDir));
+  if (!existsSync(located.jar) || !existsSync(located.java)) throw new Error('The JAR or java path does not exist.');
+  return { ...parseJunieModelIds(runProbe(located)), jar: located.jar };
+}
+
 function main() {
   const { values } = parseArgs({
     options: {
@@ -117,17 +128,15 @@ function main() {
       input: { type: 'string' },
     },
   });
-  let text;
-  if (values.input) {
-    text = readFileSync(values.input, 'utf8');
-  } else {
-    const dataDir = values['data-dir'] ?? process.env.JUNIE_DATA_DIR ?? join(homedir(), '.local', 'share', 'junie');
-    const junieHome = values['junie-home'] ?? resolveJunieHome(dataDir);
-    const located = values.jar && values.java ? { jar: values.jar, java: values.java } : locateJunieJvm(junieHome);
-    if (!existsSync(located.jar) || !existsSync(located.java)) throw new Error('The JAR or java path does not exist.');
-    text = runProbe(located);
-  }
-  process.stdout.write(`${JSON.stringify(parseJunieModelIds(text), null, 2)}\n`);
+  const result = values.input
+    ? parseJunieModelIds(readFileSync(values.input, 'utf8'))
+    : (({ jar, ...ids }) => ids)(readJunieModelIds({
+      dataDir: values['data-dir'] ?? defaultJunieDataDir(),
+      junieHome: values['junie-home'],
+      jar: values.jar,
+      java: values.java,
+    }));
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
