@@ -526,6 +526,45 @@ test('a source that cannot find its CLI is unavailable, not an error', async () 
   assert.deepEqual(result.models, []);
 });
 
+test('a degraded source is tried once more and keeps the better answer', async () => {
+  const flaky = (answers) => {
+    let call = 0;
+    return {
+      provider: 'flaky', backend: 'cli', transport: null, sourceClass: 'machine-readable', command: 'flaky models', coverage: { membership: 'complete' },
+      calls: () => call,
+      async probe() {
+        const answer = answers[call];
+        call += 1;
+        if (answer === 'fail') throw new SourceFailure('error', 'timeout', 'no answer');
+        return answer === 'degraded'
+          ? { models: [{ id: 'a' }], status: 'degraded', reason: 'not-authenticated', message: 'signed out' }
+          : { models: [{ id: 'a' }, { id: 'b' }] };
+      },
+    };
+  };
+
+  const recovered = flaky(['degraded', 'ok']);
+  const ok = await runSource(recovered, { scope: null });
+  assert.equal(recovered.calls(), 2);
+  assert.equal(ok.status, 'ok');
+  assert.equal(ok.models.length, 2);
+  assert.deepEqual(ok.notes, ['The first attempt was degraded (not-authenticated); a second attempt answered normally.']);
+
+  const still = await runSource(flaky(['degraded', 'degraded']), { scope: null });
+  assert.equal(still.status, 'degraded');
+  assert.equal(still.reason, 'not-authenticated');
+  assert.deepEqual(still.notes, ['A second attempt was degraded too (not-authenticated).']);
+
+  const failed = await runSource(flaky(['degraded', 'fail']), { scope: null });
+  assert.equal(failed.status, 'degraded');
+  assert.equal(failed.models.length, 1);
+  assert.deepEqual(failed.notes, ['A second attempt returned error (timeout).']);
+
+  const once = flaky(['ok']);
+  assert.equal((await runSource(once, { scope: null })).notes, undefined);
+  assert.equal(once.calls(), 1);
+});
+
 test('channel-scoped sources refuse a factory scope without a basis channel', async () => {
   const opencode = SOURCES.find((candidate) => candidate.provider === 'opencode');
   const result = await runSource(opencode, { scope: { provider: 'opencode', backend: 'cli' }, find: () => '/bin/opencode' });

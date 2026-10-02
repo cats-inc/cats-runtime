@@ -791,8 +791,24 @@ export const SOURCES = [
   },
 ];
 
-/** Runs one source and always returns a snapshot entry, never throws. */
-export async function runSource(source, { scope, env = process.env, timeoutMs = 60000, home = homedir(), find } = {}) {
+/**
+ * Runs one source and always returns a snapshot entry, never throws. A degraded answer is tried
+ * once more: on 2026-10-03 `grok models` reported "not authenticated" on the call that refreshed an
+ * expired sign-in, and the next call answered for the account.
+ */
+export async function runSource(source, options = {}) {
+  const first = await attemptSource(source, options);
+  if (first.status !== 'degraded') return first;
+  const second = await attemptSource(source, options);
+  const durationMs = first.durationMs + second.durationMs;
+  if (second.status === 'ok') {
+    return { ...second, notes: [...(second.notes ?? []), `The first attempt was degraded (${first.reason}); a second attempt answered normally.`], durationMs };
+  }
+  const outcome = second.status === 'degraded' ? `was degraded too (${second.reason})` : `returned ${second.status} (${second.reason})`;
+  return { ...first, notes: [...(first.notes ?? []), `A second attempt ${outcome}.`], durationMs };
+}
+
+async function attemptSource(source, { scope, env = process.env, timeoutMs = 60000, home = homedir(), find } = {}) {
   const workDir = mkdtempSync(join(tmpdir(), 'cats-catalog-probe-'));
   const ctx = {
     scope,
