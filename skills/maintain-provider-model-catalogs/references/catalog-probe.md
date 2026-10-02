@@ -28,16 +28,24 @@ The npm scripts pass `--open`, which shows `report.html` in the default browser;
 script with `node` opens nothing unless `--open` is given. The JSON files are the record and the
 page is a view of `report.json`. It shows:
 
-- **What to do:** the operator's actions, the agent scopes and a copyable hand-off prompt.
-- **Scopes:** one row per scope with catalog and installed versions; filter by who acts.
-- **Each scope:** every catalog entry beside the CLI's row for it: label, options and the
-  execution IDs the CLI listed (✓) or did not (✗), then new rows and, folded, the other listed
-  models. A value only in the catalog is struck through in red, a value only the CLI lists is
-  green, ★ marks a default and an outlined ★ a different default. Fields a CLI is not
-  authoritative for are dimmed and not compared.
-- **Search:** finds a model by entry ID, label or execution ID across every scope.
+- **Headline and what to do:** how many scopes need an agent or you, the operator's actions,
+  the agent scopes and a copyable hand-off prompt.
+- **Tally:** one row per scope with catalog and installed versions and one mark per catalog
+  entry in catalog order, then, after a gap, the listed models no entry runs. A mark's shape and
+  colour both give its status, and each mark links to its row in the scope's sheet.
+- **Each scope:** a reconciliation sheet with the catalog on the left, what the CLI listed on
+  the right and the result between them. The left heading names the CLI version the catalog was
+  captured with and the right one the installed version that answered. Each row shows the
+  label, options and the execution IDs the CLI listed (✓) or did not (✗), then new rows and,
+  folded, the other listed models. A value only in the catalog is struck through in red, a value
+  only the CLI lists is green, ★ marks a default, an outlined ★ a different default and a wavy
+  underline a different label. Fields a CLI is not authoritative for are dimmed and not
+  compared.
+- **Filter and search:** filter the sheets by who acts; search finds a model by entry ID, label
+  or execution ID across every scope.
 
-Each tag says who acts:
+Each terminal tag says who acts; the page writes `Agent` or `You` beside the scope and nothing
+when it is `ok`:
 
 - `ok`: every comparable entry is confirmed, or only notes remain.
 - `you`: install, sign in or rerun. The line under the table says which.
