@@ -59,6 +59,10 @@ with its process tree on timeout (default 60 s, `--timeout`). None logs in, open
 sends a prompt or writes raw output. Versions come from installed package metadata where it
 exists, otherwise from `--version`.
 
+A degraded answer is tried once more before it is reported. A CLI can refresh an expired
+sign-in on one call and answer for the account only on the next: `grok models` did on 2026-10-03.
+The retry is noted on the scope; only a second degraded answer asks you to sign in.
+
 | Scope | Read | Membership | Compared fields | Guards |
 |---|---|---|---|---|
 | claude | release notes embedded in the newest `~/.local/share/claude/versions` binary | none | picker-related notes since `cli_version` | never launched |
@@ -105,7 +109,7 @@ probed on. A scope without it is a tool error, not a default.
 | `field-drift` | agent | `label`, `efforts` or `effortDefault` differs on a field the source is authoritative for. |
 | `capture-needed` | agent | Claude release notes since `cli_version` mention picker changes. |
 | `source-unavailable` | you or agent | Not installed, not signed in or timed out is yours; a parse, exit or launch failure means the CLI changed and an agent updates the source. |
-| `source-degraded` | you | The source answered without the account catalog. Its model findings become inconclusive notes. |
+| `source-degraded` | you | The source answered without the account catalog twice in a row. Its model findings become inconclusive notes. |
 | `upstream-only`, `hidden-upstream`, `version-changed`, `no-automatic-source` | note | Shortlist or superset extras, hidden rows, a newer CLI, an unverifiable scope. |
 
 `report.json` holds every finding with `subject`, `catalog`/`observed` values and `nextAction`.
