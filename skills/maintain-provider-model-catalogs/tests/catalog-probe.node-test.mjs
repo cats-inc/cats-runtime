@@ -492,9 +492,16 @@ test('the HTML view escapes CLI text and marks differences', () => {
   assert.doesNotMatch(html, /<img src=x/);
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
   assert.match(html, /New &quot;one&quot;/);
-  assert.match(html, /<details class="scope" id="scope-ex-cli" data-filter="agent" open>/);
-  assert.match(html, /class="pill s-drift"/);
-  assert.match(html, /class="pill s-new"/);
+  assert.match(html, /<h1>1 scope needs an agent\.<\/h1>/);
+  assert.match(html, /<details class="scope sheet v-agent" id="scope-ex-cli" data-filter="agent" open>/);
+  // Each tally mark links to its ledger row, keyed by position so sanitized IDs cannot collide.
+  assert.match(html, /<a class="mk m-drift" title="Ex A: Differs\. [^"]+" aria-label="Ex A: Differs" href="#scope-ex-cli-e0"><\/a>/);
+  assert.match(html, /<tr id="scope-ex-cli-e0">/);
+  assert.match(html, /<a class="mk m-new" [^>]*aria-label="New &quot;one&quot;: New" href="#scope-ex-cli-u0"><\/a>/);
+  assert.match(html, /<tr id="scope-ex-cli-u0">/);
+  assert.match(html, /<span class="st st-drift">Differs<\/span>/);
+  assert.match(html, /<th colspan="2" scope="colgroup">In the catalog, captured with ex 1\.0\.0<\/th>/);
+  assert.match(html, /<th colspan="2" scope="colgroup">Listed by ex 1\.0\.0 \(installed\)<\/th>/);
   assert.match(html, /<span class="chip del">high<\/span>/);
   assert.match(html, /<span class="chip add def def-diff" title="default">max<\/span>/);
   assert.match(html, /<details class="ev" open><summary>More from the CLI<\/summary>/);
