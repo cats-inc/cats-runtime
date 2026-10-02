@@ -388,6 +388,24 @@ describe('repository-maintenance skill sync', () => {
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
   });
 
+  it('runs the catalog probe behavior suite', () => {
+    const result = spawnSync(process.execPath, [
+      '--test',
+      join(
+        REPO_ROOT,
+        'skills',
+        'maintain-provider-model-catalogs',
+        'tests',
+        'catalog-probe.node-test.mjs',
+      ),
+    ], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+  });
+
   it('runs the Claude picker observation builder behavior suite', () => {
     const result = spawnSync(process.execPath, [
       '--test',

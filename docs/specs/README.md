@@ -1,5 +1,7 @@
 # Feature Specifications
 
+- [SPEC-036: Operator-run catalog probe](SPEC-036-operator-run-catalog-probe.md) — read-only
+  CLI model enumeration validated against the factory, with agent hand-off and acknowledgements.
 - [SPEC-035: Session MCP servers](SPEC-035-session-mcp-servers.md) — create/resume/send
   descriptors, in-memory secrets, delivery reports and the provider support matrix.
 - [SPEC-034: Managed Plugin skills](SPEC-034-managed-plugin-skills.md) — local

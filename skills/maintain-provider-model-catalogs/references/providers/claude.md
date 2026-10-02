@@ -30,7 +30,9 @@ when those screens already establish the requested values/defaults. Follow
 - `scripts/claude-changelog.mjs --binary <installed version file> --since <catalog cli_version>`
   lists the release notes that the binary embeds. That is static-artifact evidence of what
   changed, such as picker counting, aliases or effort levels. A build embeds notes only up to its
-  previous release.
+  previous release. Builds through 2.1.285 embed them as a single-quoted literal; 2.1.286 and
+  later as a template literal with real line breaks. The helper reads both, and the
+  [catalog probe](../catalog-probe.md) uses it to decide whether a capture is needed.
 
 
 ## Agent-operated capture

@@ -61,6 +61,23 @@ test('keeps sections newer than --since and entries matching --grep', () => with
   ]);
 }));
 
+test('reads a template literal, as builds from 2.1.286 embed it', () => withScratch((root) => {
+  // Real line breaks, as 2.1.287 embeds them, alongside escaped quotes and backticks.
+  const notes = [
+    '## 9.9.5\n\n',
+    `- Added a count such as ${BS}"2 of 5${BS}" and ${BS}\`code${BS}\`\n`,
+    `- Fixed a path ending in ${BS}${BS}\n\n`,
+    `## 9.9.4${NL}${NL}- Older entry${NL}`,
+  ].join('');
+  const path = join(root, 'template.bin');
+  writeFileSync(path, Buffer.from(`function dr(){return\`${notes}\`}var x='unrelated';`));
+  const result = readClaudeChangelog({ binaryPath: path, since: '9.9.4' });
+  assert.equal(result.newestEmbeddedVersion, '9.9.5');
+  assert.deepEqual(result.sections, [
+    { version: '9.9.5', entries: ['Added a count such as "2 of 5" and `code`', `Fixed a path ending in ${BS}`] },
+  ]);
+}));
+
 test('the command line prints JSON and rejects a binary without notes', () => withScratch((root) => {
   const ok = spawnSync(process.execPath, [SCRIPT, '--binary', writeFakeBinary(root), '--since', '9.9.2'], { encoding: 'utf8' });
   assert.equal(ok.status, 0, ok.stderr);
