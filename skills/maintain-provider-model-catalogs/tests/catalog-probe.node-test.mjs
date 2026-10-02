@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { findRepoRoot, loadFactory, selectSources } from '../scripts/catalog-probe.mjs';
@@ -215,8 +215,10 @@ test('versions and Claude release-note signals', () => {
 
 test('npm shims resolve to their node script; other wrappers do not', () => {
   const npmShim = '@ECHO off\r\nSET "_prog=node"\r\nendLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\node_modules\\@ex\\cli\\bin\\ex.js" %*\r\n';
-  const resolved = resolveNpmShimScript(join('C:', 'bin', 'ex.cmd'), () => npmShim);
-  assert.equal(resolved, join('C:', 'bin', 'node_modules', '@ex', 'cli', 'bin', 'ex.js'));
+  // An absolute path on every platform; CI runs on Linux.
+  const shimPath = resolve(tmpdir(), 'npm-prefix', 'ex.cmd');
+  const resolved = resolveNpmShimScript(shimPath, () => npmShim);
+  assert.equal(resolved, join(dirname(shimPath), 'node_modules', '@ex', 'cli', 'bin', 'ex.js'));
   assert.equal(resolveNpmShimScript('ex.cmd', () => '@echo off\r\n"%~dp0ex.exe" %*\r\n'), null);
   assert.equal(resolveNpmShimScript('missing.cmd', () => { throw new Error('ENOENT'); }), null);
   assert.deepEqual(launchSpec('/usr/bin/ex', ['models'], { platform: 'linux' }), { command: '/usr/bin/ex', args: ['models'] });
