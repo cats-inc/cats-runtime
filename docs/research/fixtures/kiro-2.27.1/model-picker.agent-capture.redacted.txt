@@ -1,0 +1,129 @@
+Kiro CLI /model picker, agent-operated capture (redacted)
+=========================================================
+
+Captured: 2026-10-03 08:21-08:23 (UTC+8); window opened 08:16
+Version: kiro-cli 2.27.1 (`kiro-cli --version`), native Windows 11, Windows Terminal
+Launch: `kiro-cli chat` in a dedicated window from an empty private directory, after clearing
+  inherited agent/terminal variables (TERM, CI, NO_COLOR, pager/git-prompt, CLAUDECODE,
+  CLAUDE_CODE_*, KIRO_*, JSC_*, AWS_EXECUTION_ENV). No task or prompt submitted.
+Method: Windows UI Automation visible text, Capture-KiroPicker.ps1 (with the 2.27.1 fallback-row
+  focus fix); the first picker screen was checked against a window screenshot.
+Keys: `/model` + Enter (slash command) and `/quit` + Enter (exit). In the picker: Up, Down, Tab,
+  Right and one Escape. Enter was never sent in the picker.
+Account: no email, organization or account identifier appeared on any captured screen.
+Redaction: terminal padding, banner art and the working-directory header trimmed.
+
+--- `kiro-cli chat --list-models --format json-pretty` (catalog probe, 2.27.1), projected ---
+
+auto                 1.00x  1000000  Models chosen by task for optimal usage and consistent quality
+claude-opus-5.5      2.00x  1000000  Experimental preview of Claude Opus 5.5 model with 1M context window
+claude-sonnet-5.5    1.30x  1000000  Experimental preview of Claude Sonnet 5.5 model with 1M context window
+claude-opus-5        2.20x  1000000  Claude Opus 5 model with 1M context window
+claude-sonnet-5      1.30x  1000000  Claude Sonnet 5 model with 1M context window
+claude-opus-4.8      2.20x  1000000  Claude Opus 4.8 model with 1M context window
+gpt-5.6-sol          4.40x  1000000  Experimental preview of OpenAI GPT 5.6 Sol with 1M context window
+gpt-5.6-terra        2.20x  1000000  Experimental preview of OpenAI GPT 5.6 Terra with 1M context window
+gpt-5.6-luna         0.60x  1000000  Experimental preview of OpenAI GPT 5.6 Luna with 1M context window
+claude-opus-4.7      2.20x  1000000  Claude Opus 4.7 model with 1M context window
+claude-opus-4.6      2.20x  1000000  Claude Opus 4.6 model with 1M context window
+claude-sonnet-4.6    1.30x  1000000  Claude Sonnet 4.6 model with 1M context window
+claude-opus-4.5      2.20x  200000   Claude Opus 4.5 model
+claude-sonnet-4.5    1.30x  200000   Claude Sonnet 4.5 model
+claude-sonnet-4      1.30x  200000   [EOL] Hybrid reasoning and coding for regular use. Model reaches end of life on October 14, 2026.
+claude-haiku-4.5     0.40x  200000   The latest Claude Haiku model
+deepseek-3.2         0.25x  164000   Experimental preview of DeepSeek V3.2
+minimax-m2.5         0.25x  196000   MiniMax M2.5 model
+minimax-m2.1         0.15x  196000   Experimental preview of MiniMax M2.1
+glm-5                0.50x  200000   GLM-5 model
+qwen3-coder-next     0.05x  256000   Experimental preview of Qwen3 Coder Next
+
+Columns: id, credit rate (rate_unit Credit on every row), context_window_tokens, description.
+
+--- /model picker, first screen -----------------------------------------------------------
+
+Select model:   type to search
+
+❯ auto                 1.00x credits    Models chosen by task for optimal usage and consistent quality [active]
+  claude-opus-5.5      2.00x credits    Experimental preview of Claude Opus 5.5 model with 1M context window
+  claude-sonnet-5.5    1.30x credits    Experimental preview of Claude Sonnet 5.5 model with 1M context window
+  claude-opus-5        2.20x credits    Claude Opus 5 model with 1M context window
+  claude-sonnet-5      1.30x credits    Claude Sonnet 5 model with 1M context window
+  claude-opus-4.8      2.20x credits    Claude Opus 4.8 model with 1M context window
+  gpt-5.6-sol          4.40x credits    Experimental preview of OpenAI GPT 5.6 Sol with 1M context window
+  gpt-5.6-terra        2.20x credits    Experimental preview of OpenAI GPT 5.6 Terra with 1M context window
+(+13 more)
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Settings for selected model: auto                                                                 tab to switch panels
+
+  thinking  n/a   Not available for this model.
+  effort    n/a   Not available for this model.
+  fallback  none  Answers for this model when it refuses or is unavailable.
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ esc to close · ↑↓ to navigate · ↵ to select · tab to switch panels
+
+Coverage: 21 rows (8 visible plus "(+13 more)"); Down and Up visited the same rows in the
+same order (OrderCheckedBothDirections: true). Only auto carries [active].
+The picker truncates the claude-sonnet-4 description; the list above has the full text.
+
+--- Model rows, settings panel as first shown -------------------------------------------------
+
+#  id                 credits  thinking  effort   fallback
+01 auto               1.00x    n/a       n/a      none
+02 claude-opus-5.5    2.00x    n/a       xhigh    none
+03 claude-sonnet-5.5  1.30x    n/a       default  none
+04 claude-opus-5      2.20x    default   default  none
+05 claude-sonnet-5    1.30x    default   default  none
+06 claude-opus-4.8    2.20x    default   default  none
+07 gpt-5.6-sol        4.40x    n/a       default  none
+08 gpt-5.6-terra      2.20x    n/a       default  none
+09 gpt-5.6-luna       0.60x    n/a       default  none
+10 claude-opus-4.7    2.20x    default   xhigh    none
+11 claude-opus-4.6    2.20x    default   high     none
+12 claude-sonnet-4.6  1.30x    default   high     none
+13 claude-opus-4.5    2.20x    n/a       n/a      none
+14 claude-sonnet-4.5  1.30x    n/a       n/a      none
+15 claude-sonnet-4    1.30x    n/a       n/a      none
+16 claude-haiku-4.5   0.40x    n/a       n/a      none
+17 deepseek-3.2       0.25x    n/a       n/a      none
+18 minimax-m2.5       0.25x    n/a       n/a      none
+19 minimax-m2.1       0.15x    n/a       n/a      none
+20 glm-5              0.50x    n/a       n/a      none
+21 qwen3-coder-next   0.05x    n/a       n/a      none
+
+Notes as shown: thinking n/a reads "Always on for this model." on claude-opus-5.5 and
+claude-sonnet-5.5 and "Not available for this model." elsewhere; fallback reads "Answers for this
+model when it refuses or is unavailable." on every row. No value carries a default marker.
+
+--- Settings panel (Tab from the list) ---------------------------------------------------------
+
+Kiro 2.27.1 adds the fallback row. Tab lands on it, and while it is highlighted the footer reads
+like the list footer (esc to close · ↑↓ to navigate · ↵ to select · tab to switch panels); on
+effort it reads esc to close · ↑↓ to navigate · ←→ to toggle · ↵ back to models · tab to switch panels.
+
+Effort, Right-key sequence from the arrival value:
+claude-opus-5.5    xhigh > max > low > medium > high > xhigh
+claude-sonnet-5.5  default > low > medium > high > xhigh > max > low
+claude-opus-5      default > low > medium > high > xhigh > max > low
+claude-sonnet-5    default > low > medium > high > xhigh > max > low
+claude-opus-4.8    default > low > medium > high > xhigh > max > low
+gpt-5.6-sol        default > none > low > medium > high > xhigh > max > none
+gpt-5.6-terra      default > none > low > medium > high > xhigh > max > none
+gpt-5.6-luna       default > none > low > medium > high > xhigh > max > none
+claude-opus-4.7    xhigh > max > low > medium > high > xhigh
+claude-opus-4.6    high > max > low > medium > high
+claude-sonnet-4.6  high > max > low > medium > high
+
+Thinking, Right-key sequence:
+claude-opus-5      on > off > on
+claude-sonnet-5    on > off > on
+claude-opus-4.8    on > off > on
+claude-opus-4.7    on > off > on
+claude-opus-4.6    on > off > on
+claude-sonnet-4.6  on > off > on
+
+--- Settings file -------------------------------------------------------------------------------
+
+Every Right press rewrote ~/.kiro/settings/cli.json (75 toggles). Pre-launch SHA-256
+4C87129F3C18E5AC62AC407262DA88E09ACB722E5E4B5B3F45F7D871534E30D7. After Kiro exited (exit 0) the
+file was unchanged since the last toggle and Restore-KiroPickerConfig.ps1 restored the backup;
+the restored hash equals the pre-launch hash.

@@ -93,7 +93,7 @@ describe('factory and executable catalog projections', () => {
 
   it('starts Kiro effort at each row\'s first picker value and sends --effort only where offered', () => {
     const kiro = knowledge(snapshot.document.catalogs.find(s => s.provider === 'kiro' && s.backend === 'cli')!);
-    expect(kiro.catalog.entries).toHaveLength(20);
+    expect(kiro.catalog.entries).toHaveLength(21);
     expect(kiro.catalog.entries[0].id).toBe('auto');
     // auto is [active] in the picker and default_model in --list-models; neither is a catalog default.
     expect(kiro.catalog.entries.some(e => e.default)).toBe(false);
@@ -110,6 +110,7 @@ describe('factory and executable catalog projections', () => {
     };
     const effort = (entryId: string) => resolve(entryId).resolution.controls['kiro.reasoning_effort'];
     expect(effort('claude-opus-5.5')).toBe('low');
+    expect(effort('claude-sonnet-5.5')).toBe('low');
     expect(effort('claude-opus-4.6')).toBe('low');
     expect(effort('gpt-5.6-sol')).toBe('none');
     expect(resolve('claude-opus-4.7', { 'kiro.reasoning_effort': 'xhigh' })
@@ -117,9 +118,12 @@ describe('factory and executable catalog projections', () => {
     expect(() => resolve('claude-opus-4.6', { 'kiro.reasoning_effort': 'xhigh' })).toThrow();
     expect(() => resolve('claude-haiku-4.5', { 'kiro.reasoning_effort': 'low' })).toThrow();
     expect(kiro.catalog.entries.filter(e => e.controls?.length).map(e => e.id)).toEqual([
-      'claude-opus-5.5', 'claude-opus-5', 'claude-sonnet-5', 'claude-opus-4.8', 'gpt-5.6-sol',
+      'claude-opus-5.5', 'claude-sonnet-5.5', 'claude-opus-5', 'claude-sonnet-5', 'claude-opus-4.8', 'gpt-5.6-sol',
       'gpt-5.6-terra', 'gpt-5.6-luna', 'claude-opus-4.7', 'claude-opus-4.6', 'claude-sonnet-4.6',
     ]);
+    const sonnet = spawn('claude-sonnet-5.5', { 'kiro.reasoning_effort': 'max' });
+    expect(sonnet.slice(sonnet.indexOf('--model'), sonnet.indexOf('--model') + 4))
+      .toEqual(['--model', 'claude-sonnet-5.5', '--effort', 'max']);
 
     const auto = spawn('auto');
     expect(auto.slice(auto.indexOf('--model'), auto.indexOf('--model') + 2)).toEqual(['--model', 'auto']);
