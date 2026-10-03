@@ -346,7 +346,7 @@ describe('shared playground selection helpers', () => {
       div: { querySelector: () => controls }, catalog, entryId: '' };
     vm.createContext(context);
     vm.runInContext(html.slice(start, end), context);
-    expect(models).toHaveLength(20);
+    expect(models).toHaveLength(21);
     expect(models.filter(model => model.default).map(model => model.id)).toEqual(['gpt-5.6-terra']);
     const input = { provider: 'copilot', selectableProviders: ['copilot'], providerOrder: ['copilot'],
       advancedCatalogs: { copilot: catalog } };

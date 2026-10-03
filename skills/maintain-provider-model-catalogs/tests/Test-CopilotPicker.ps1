@@ -10,15 +10,16 @@ $capture = Join-Path $PSScriptRoot '../scripts/Capture-CopilotPicker.ps1'
 $null = New-Item -ItemType Directory -Path $scratch -Force
 $mock = Join-Path $scratch 'ui.ps1'
 @'
-# Simulated Copilot 1.0.88 /model picker with the real layout and synthetic model names.
+# Simulated Copilot 1.0.88 /model picker with the real layout and synthetic model names. With
+# $global:mockCategory it adds the 1.0.91 Category column before Context.
 $mP = [string][char]0x276F; $mL = [string][char]0x2190; $mR = [string][char]0x2192; $mCk = [string][char]0x2713
 $mDa = [string][char]0x2014; $mMd = [string][char]0x00B7; $mBar = [string][char]0x2503
 $mRule = ([string][char]0x2500) * 60
 $models = @(
     @{ L = 'Auto'; G = $null; Opts = @('Efficiency', 'Balance', 'Intelligence', 'Fast'); Opt = 1; Tier = $true }
-    @{ L = 'Example Recent'; G = 'Recent models'; Ctx = '328K 628K'; Opts = @('Low', 'Medium', 'High'); Opt = 2; Cost = 'Medium'; In = 200 }
-    @{ L = 'Example Default'; G = 'Recent models'; Default = $true; Opts = @('None', 'Low', 'Medium'); Opt = 2; Cost = 'Low'; In = 20 }
-    @{ L = 'Example Plain'; G = 'Other models'; Cost = 'Low'; In = 100 }
+    @{ L = 'Example Recent'; G = 'Recent models'; Ctx = '328K 628K'; Opts = @('Low', 'Medium', 'High'); Opt = 2; Cost = 'Medium'; In = 200; Cat = 'Versatile' }
+    @{ L = 'Example Default'; G = 'Recent models'; Default = $true; Opts = @('None', 'Low', 'Medium'); Opt = 2; Cost = 'Low'; In = 20; Cat = 'Lightweight' }
+    @{ L = 'Example Plain'; G = 'Other models'; Cost = 'Low'; In = 100; Cat = 'Powerful' }
     @{ L = 'example-locked'; G = 'Unavailable models'; Locked = $true }
 )
 # All simulator state lives in one global table so it cannot collide with capture-script variables.
@@ -43,9 +44,11 @@ function Get-MockRow([int]$Index, [bool]$Focused) {
         if ($m.Opts) { $option = "$mL $option $mR" }
         if ($m.Tier) { return (" $mP {0,-27}{1}" -f $label, $option) }
         $ctx = if ($m.Ctx) { $m.Ctx } else { $mDa }
+        if ($global:mockCategory) { return (" $mP {0,-27}{1,-14}{2,-11}{3}" -f $label, $m.Cat, $ctx, $option) }
         return (" $mP {0,-27}{1,-11}{2}" -f $label, $ctx, $option)
     }
     $ctx = if ($m.Ctx) { ($m.Ctx -split ' ')[0] } else { $mDa }
+    if ($global:mockCategory) { return ('   {0,-27}{1,-14}{2,-11}{3}' -f $label, $m.Cat, $ctx, $option) }
     return ('   {0,-27}{1,-11}{2}' -f $label, $ctx, $option)
 }
 function Get-WindowsUiTarget { param($Title, $ProcessName) [pscustomobject]@{ Title = $Title } }
@@ -95,7 +98,7 @@ function Save-WindowsUiSnapshot { param($Target, $OutputPrefix)
 }
 '@ | Set-Content -LiteralPath $mock -Encoding UTF8
 
-$globals = 'mockClosed', 'mockGroup', 'mockWriteOnKey', 'mockStuckPane', 'mockKeys', 'mockConfigPath', 'mk'
+$globals = 'mockClosed', 'mockGroup', 'mockWriteOnKey', 'mockStuckPane', 'mockKeys', 'mockConfigPath', 'mk', 'mockCategory'
 function Reset-Fixture([string]$Name) {
     foreach ($variable in $globals) { Remove-Variable -Name $variable -Scope Global -ErrorAction SilentlyContinue }
     $dir = Join-Path $scratch $Name
@@ -145,6 +148,17 @@ try {
         throw 'The walk did not return to the first row unchanged, or cycled without -CycleOptions.'
     }
     Write-Output 'PASS Up/Down walk records groups, markers, context figures, options and lagging panes'
+
+    $dir = Reset-Fixture 'category'
+    $global:mockCategory = $true
+    $result = Invoke-Capture $dir
+    $rows = Read-Evidence $dir 'rows.json'
+    $shape = ($rows | ForEach-Object { '{0}|{1}|{2}|{3}' -f $_.Label, $_.Group, ($_.Context -join ' '), $_.Option }) -join ';'
+    if ($shape -ne $expected -or ($result.ContextRows -join ',') -ne 'Example Recent' -or
+        (($rows | ForEach-Object { [string]$_.Category }) -join ',') -ne ',Versatile,Lightweight,Powerful,') {
+        throw "The 1.0.91 Category column was read as Context: $shape"
+    }
+    Write-Output 'PASS the 1.0.91 Category column is recorded apart from the Context figures'
 
     $dir = Reset-Fixture 'cycle'
     $result = Invoke-Capture $dir @{ CycleOptions = $true }

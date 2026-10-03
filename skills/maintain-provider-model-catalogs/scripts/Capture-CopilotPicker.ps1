@@ -107,8 +107,12 @@ function Read-Picker([string]$Text) {
         if ($label.EndsWith(' (default)')) { $default = $true; $label = $label.Substring(0, $label.Length - 10) }
         $optionPart = $parts[-1]; $option = $null
         if ($optionPart -match "^$LEFT (.+) $RIGHT$") { $option = $Matches[1] }
+        # From 1.0.91 a Category word (Versatile, Lightweight, Powerful) precedes the Context column.
+        $rest = @($parts | Select-Object -Skip 1)
+        $category = $null
+        if ($rest.Count -ge 3 -and $rest[0] -match '^[A-Za-z][A-Za-z -]*$') { $category = $rest[0]; $rest = @($rest | Select-Object -Skip 1) }
         $context = @()
-        if ($parts.Count -ge 3 -and $parts[1] -ne $DASH) { $context = @($parts[1] -split ' ') }
+        if ($rest.Count -ge 2 -and $rest[0] -ne $DASH) { $context = @($rest[0] -split ' ') }
         # A group header is one indented phrase; an unfocused row has column gaps after its label.
         $group = $null
         if ($i -gt 0 -and $lines[$i - 1] -match '^ {3}(\S(?:.*\S)?)$') {
@@ -116,7 +120,7 @@ function Read-Picker([string]$Text) {
             if ($heading -notmatch '\s{2,}') { $group = $heading }
         }
         $state.Row = [pscustomobject]@{ Label = $label; Default = $default; Current = $current
-            Context = $context; Option = $option; Group = $group }
+            Category = $category; Context = $context; Option = $option; Group = $group }
         break
     }
     [pscustomobject]$state
@@ -171,7 +175,7 @@ function New-RowRecord([int]$Index, $State, [string]$Group) {
     $pane = $State.Pane; $matched = Test-PaneMatches $State
     [pscustomobject]@{ Index = $Index; Group = $Group; Label = $State.Row.Label
         Default = $State.Row.Default; Current = $State.Row.Current
-        Unavailable = ($matched -and $pane.Unavailable); Context = @($State.Row.Context)
+        Unavailable = ($matched -and $pane.Unavailable); Category = $State.Row.Category; Context = @($State.Row.Context)
         Option = $State.Row.Option; CostTier = $(if ($matched) { $pane.CostTier } else { $null })
         Credits = $(if ($matched) { $pane.Credits } else { $null }); PaneMatched = $matched }
 }
