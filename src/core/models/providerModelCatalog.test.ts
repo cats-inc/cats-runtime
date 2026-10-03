@@ -771,14 +771,16 @@ describe('ProviderModelCatalogService', () => {
         instance: 'default',
         defaultModel: 'Gemini 3.7 Flash',
         source: 'static',
-        // Complete 26.9.22 picker, in picker order. Labels are the literal picker names;
+        // Complete 26.9.22 (build 3419.29) picker, in picker order. Labels are the literal picker names;
         // effort is a per-model control, not part of the label.
         models: [
           { id: 'Gemini 3.7 Flash', label: 'Gemini 3.7 Flash', default: true },
+          { id: 'Junie Lite', label: 'Junie Lite' },
           { id: 'Claude Fable 5.1', label: 'Claude Fable 5.1' },
           { id: 'Claude Opus 5', label: 'Claude Opus 5' },
           { id: 'Claude Opus 5.5', label: 'Claude Opus 5.5' },
           { id: 'Claude Sonnet 5', label: 'Claude Sonnet 5' },
+          { id: 'Claude Sonnet 5.5', label: 'Claude Sonnet 5.5' },
           { id: 'Gemini 3.6 Flash', label: 'Gemini 3.6 Flash' },
           { id: 'Gemini 3.8 Flash', label: 'Gemini 3.8 Flash' },
           { id: 'GPT-5.6-LUNA', label: 'GPT-5.6-LUNA' },
@@ -787,6 +789,7 @@ describe('ProviderModelCatalogService', () => {
           { id: 'GPT-6-ASTRA', label: 'GPT-6-ASTRA' },
           { id: 'GPT-6-LUNA', label: 'GPT-6-LUNA' },
           { id: 'GPT-6-SOL', label: 'GPT-6-SOL' },
+          { id: 'GPT-6.1-SOL', label: 'GPT-6.1-SOL' },
           { id: 'Grok 4.6', label: 'Grok 4.6' },
           { id: 'Grok 4.7', label: 'Grok 4.7' },
         ],
