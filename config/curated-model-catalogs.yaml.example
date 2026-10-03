@@ -4,15 +4,19 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Claude
-    cli_version: 2.1.285
-    last_updated: 2026-09-30
+    cli_version: 2.1.288
+    last_updated: 2026-10-03
     notes:
-      - Model list and every model's effort line re-read 2026-09-30 by an agent-operated capture of
-        the Claude Code 2.1.285 `/model` picker (Windows UI Automation visible text, checked
-        against screenshots). Scope is the operator's subscription account on one machine;
+      - Model list, every model's effort line and every row's value re-read 2026-10-03 by an
+        agent-operated capture of the Claude Code 2.1.288 `/model` picker (Windows UI Automation
+        visible text, checked against screenshots); the list, effort lines and defaults equal the
+        2026-09-30 capture of 2.1.285. Scope is the operator's subscription account on one machine;
         entitlement elsewhere is unverified.
-      - "Evidence: docs/research/fixtures/claude-2.1.285/model-picker-12-rows.agent-capture.redacted.txt
-        and docs/research/fixtures/claude-2.1.285/model-row-status.redacted.txt"
+      - "Evidence: docs/research/fixtures/claude-2.1.288/model-picker.agent-capture.redacted.txt,
+        docs/research/fixtures/claude-2.1.288/model-row-status.redacted.txt,
+        docs/research/fixtures/claude-2.1.285/model-picker-12-rows.agent-capture.redacted.txt,
+        docs/research/fixtures/claude-2.1.285/model-row-status.redacted.txt and
+        docs/research/2026-10-03-claude-picker-2-1-288.md"
       - The twelve source rows are Default (recommended), Opus 5.5, Fable 5.1, Sonnet 5.5, Haiku 4.5,
         Sonnet 5, Opus 5, Fable 5, Opus 4.8, Opus 4.7, Opus 4.6, and Sonnet 4.6. The picker shows eight
         rows at a time and scrolls the rest. Default is a provider-default sentinel, not an executable
@@ -25,9 +29,10 @@ catalogs:
       - "Execution values were observed per row: the agent chose a row for the session only (`s`,
         which left settings.json unchanged) and read the local `/status` Model line without
         submitting a prompt. On 2.1.285, Opus 5.5 sets `opus` (claude-opus-5-5), Sonnet 5.5 `sonnet`
-        (claude-sonnet-5-5), and Sonnet 5 `claude-sonnet-5`. The other rows were not re-read and keep
-        their 2.1.282 values: Fable 5.1 `claude-fable-5-1`, Haiku 4.5 `haiku`
-        (claude-haiku-4-5-20251001), and each of the remaining rows its full model id."
+        (claude-sonnet-5-5), and Sonnet 5 `claude-sonnet-5`. On 2.1.288 (2026-10-03) rows 2-12 were
+        all re-read: Opus 5.5 `opus` (claude-opus-5-5), Fable 5.1 `fable` (claude-fable-5-1),
+        Sonnet 5.5 `sonnet` (claude-sonnet-5-5), Haiku 4.5 `haiku` (claude-haiku-4-5-20251001),
+        and each remaining row its full model id."
       - "The `sonnet` alias moved from claude-sonnet-5 (2.1.282) to claude-sonnet-5-5; the Claude Code
         2.1.284 changelog made Sonnet 5.5 the default Sonnet model. Entry `sonnet` keeps its id and its
         `sonnet` execution, so a saved selection keeps executing what it already did, and its label now
@@ -37,7 +42,10 @@ catalogs:
         claude-opus-5-5[1m] on 2026-09-26, but the operator chose to follow the picker: Opus now
         executes `opus`, and its 1M label and limit are removed. The standard context value was not
         observed, so no limit is recorded. The operator also chose the picker's `claude-fable-5-1`
-        over the `fable` alias; both resolved to claude-fable-5-1. Entry ids are unchanged."
+        over the `fable` alias; both resolved to claude-fable-5-1. Entry ids are unchanged. On
+        2.1.288 the Fable 5.1 row sets `fable` again (Claude Code 2.1.287: picking Fable now saves
+        a value that follows the newest Fable). The entry keeps executing `claude-fable-5-1` until
+        the operator decides; both still resolve to claude-fable-5-1."
       - "Effort is one picker-wide selection. For each adjustable row, the capture pressed Right until
         the line returned to its starting level. Opus 5.5, Fable 5.1, Sonnet 5.5, Sonnet 5, Opus 5,
         Fable 5, Opus 4.8, and Opus 4.7 cycle Low, Medium, High, xHigh, and Max; Opus 4.6 and Sonnet
@@ -47,7 +55,7 @@ catalogs:
         warning is retained per model. Effort tokens reuse the retained `--effort` mapping of the
         earlier rows."
       - "Ultracode is no longer an effort level. Claude Code 2.1.284 made it a separate `/effort`
-        toggle that no longer forces xhigh, and no 2.1.285 picker row offers it. The operator chose on
+        toggle that no longer forces xhigh, and no 2.1.285 or 2.1.288 picker row offers it. The operator chose on
         2026-09-30 to follow the picker and remove it. The 2.1.285 parser still accepts
         `--effort ultracode` as a legacy alias of `xhigh`, so a session bound earlier keeps a valid
         argument."
@@ -120,8 +128,9 @@ catalogs:
           - reasoning
         notes:
           - "Picker description: For your toughest challenges"
-          - Executes `claude-fable-5-1`, the value the picker row sets; the earlier `fable` alias
-            resolved to the same model.
+          - Executes `claude-fable-5-1`, the value the picker row set on 2.1.282; the operator chose it
+            over the `fable` alias. On 2.1.288 the row sets `fable` (claude-fable-5-1); the choice is
+            pending with the operator.
         source_names:
           - Fable
           - Fable 5.1

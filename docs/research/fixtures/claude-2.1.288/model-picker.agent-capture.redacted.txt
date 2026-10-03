@@ -1,0 +1,117 @@
+# Source: agent-operated Claude Code /model picker, Windows UI Automation visible text
+#   (skills/maintain-provider-model-catalogs/scripts/Capture-ClaudePicker.ps1)
+# Version: 2.1.288
+# Observed: 2026-10-03 08:07-08:09 (local time, UTC+8)
+# Scope: operator subscription account (startup banner: Claude Max); Windows 11 native session,
+#   Windows Terminal; launched with --safe-mode from a cleaned environment; account identity not recorded
+# Completeness: the picker shows eight rows at a time and "+N models" counts the rows below the
+#   window. The helper highlighted each of the 12 rows in turn and cycled every adjustable row's
+#   effort line with the Right key until it returned to its starting level. The traversal ran twice
+#   (the first run's JSON summary was not kept); both runs read the same rows and effort lines
+# Starting state: saved model opus (check mark on row 2) and saved effort xhigh. Effort is one
+#   picker-wide selection; "(default)" appears only on the level the picker marks default
+# Settings: ~/.claude/settings.json kept its prelaunch SHA-256 after both traversals
+# Redaction: startup banner (working directory) omitted; no identifiers present; "# " separators
+#   and blank-line normalization are editorial
+
+Version: 2.1.288
+
+# Model list as first opened (rows 1-8 visible)
+
+  Select model
+  Switch between Claude models. Your pick becomes the default for new sessions. For other/previous model names,
+  specify with --model.
+
+    1.  Default (recommended)  Opus 5.5 · Best for everyday, complex tasks
+  ❯ 2.  Opus 5.5 ✔             For complex work and everyday tasks
+    3.  Fable 5.1              For your toughest challenges
+    4.  Sonnet 5.5             Most efficient for simpler tasks
+    5.  Haiku 4.5              Fastest for quick answers
+    6.  Sonnet 5               Efficient for routine tasks
+    7.  Opus 5                 Best for everyday, complex tasks
+  ↓ 8.  Fable 5                Most capable for your hardest and longest-running tasks
+     … +4 models
+
+  ◉ xHigh effort ←/→ to adjust
+
+  Enter to set as default · s to use this session only · Esc to cancel
+
+# Each row while highlighted, then its effort line after each Right press (cycle order)
+
+  ❯ 1.  Default (recommended)  Opus 5.5 · Best for everyday, complex tasks
+      ◉ xHigh effort ←/→ to adjust
+      ◈ Max effort ←/→ to adjust
+      ○ Low effort ←/→ to adjust
+      ◐ Medium effort (default) ←/→ to adjust
+      ● High effort ←/→ to adjust
+
+  ❯ 2.  Opus 5.5 ✔             For complex work and everyday tasks
+      ◉ xHigh effort ←/→ to adjust
+      ◈ Max effort ←/→ to adjust
+      ○ Low effort ←/→ to adjust
+      ◐ Medium effort (default) ←/→ to adjust
+      ● High effort ←/→ to adjust
+
+  ❯ 3.  Fable 5.1              For your toughest challenges
+      ◉ xHigh effort ←/→ to adjust
+      ◈ Max effort ←/→ to adjust
+      ○ Low effort ←/→ to adjust
+      ◐ Medium effort ←/→ to adjust
+      ● High effort (default) ←/→ to adjust
+
+  ❯ 4.  Sonnet 5.5             Most efficient for simpler tasks
+      ◉ xHigh effort ←/→ to adjust
+      ◈ Max effort ←/→ to adjust
+      ○ Low effort ←/→ to adjust
+      ◐ Medium effort (default) ←/→ to adjust
+      ● High effort ←/→ to adjust
+
+  ❯ 5.  Haiku 4.5              Fastest for quick answers
+      ○ Effort not supported for Haiku 4.5
+
+  ❯ 6.  Sonnet 5               Efficient for routine tasks
+      ◉ xHigh effort ←/→ to adjust
+      ◈ Max effort ←/→ to adjust
+      ○ Low effort ←/→ to adjust
+      ◐ Medium effort ←/→ to adjust
+      ● High effort (default) ←/→ to adjust
+
+  ❯ 7.  Opus 5                 Best for everyday, complex tasks
+      ◉ xHigh effort ←/→ to adjust
+      ◈ Max effort ←/→ to adjust
+      ○ Low effort ←/→ to adjust
+      ◐ Medium effort ←/→ to adjust
+      ● High effort (default) ←/→ to adjust
+
+  ❯ 8.  Fable 5                Most capable for your hardest and longest-running tasks
+      ◉ xHigh effort ←/→ to adjust
+      ◈ Max effort ←/→ to adjust
+      ○ Low effort ←/→ to adjust
+      ◐ Medium effort ←/→ to adjust
+      ● High effort (default) ←/→ to adjust
+
+  ❯ 9.  Opus 4.8               Best for everyday, complex tasks
+      ◉ xHigh effort ←/→ to adjust
+      ◈ Max effort ←/→ to adjust
+      ○ Low effort ←/→ to adjust
+      ◐ Medium effort ←/→ to adjust
+      ● High effort (default) ←/→ to adjust
+
+  ❯ 10. Opus 4.7               Best for everyday, complex tasks
+      ◉ xHigh effort (default) ←/→ to adjust
+      ◈ Max effort ←/→ to adjust
+      ○ Low effort ←/→ to adjust
+      ◐ Medium effort ←/→ to adjust
+      ● High effort ←/→ to adjust
+
+  ❯ 11. Opus 4.6               Best for everyday, complex tasks
+      ● High effort (default) ←/→ to adjust
+      ◈ Max effort ←/→ to adjust
+      ○ Low effort ←/→ to adjust
+      ◐ Medium effort ←/→ to adjust
+
+  ❯ 12. Sonnet 4.6             Efficient for routine tasks
+      ● High effort (default) ←/→ to adjust
+      ◈ Max effort ←/→ to adjust
+      ○ Low effort ←/→ to adjust
+      ◐ Medium effort ←/→ to adjust

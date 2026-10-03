@@ -1,0 +1,41 @@
+# Source: agent-operated Claude Code /model picker rows plus the local /status panel,
+#   Windows UI Automation visible text (Read-ClaudePickerRowStatus.ps1)
+# Version: 2.1.288
+# Observed: 2026-10-03 08:10-08:12 (local time, UTC+8)
+# Scope: operator subscription account (startup banner: Claude Max); Windows 11 native session,
+#   Windows Terminal, interactive mode, launched with --safe-mode from a cleaned environment
+# Method: for each row, open /model, highlight the row, press s (use this session only), then
+#   open /status, read its Model line and press Escape. No prompt was submitted; settings.json
+#   kept its prelaunch SHA-256 after every row and after exit.
+# Coverage: rows 2-12 (row 1, Default, is value null). Row 2 ran first. For row 3 the helper
+#   stopped at "/mod" when it saw a momentarily held modifier key; the agent finished typing
+#   /model, closed that picker with Escape ("Kept model as Opus 5.5"), and rows 3-12 ran after.
+# Redaction: /status account, organization, email, session and working-directory lines are
+#   omitted; only the Version and Model lines are kept per row
+# Note: "alias (resolved id)" means the row sets the alias; a bare id means the row sets that id
+
+Picker row -> confirmation line -> /status Model
+   2. Opus 5.5     Set model to Opus 5.5 for this session only
+                  opus (claude-opus-5-5)
+   3. Fable 5.1    Set model to Fable 5.1 for this session only
+                  fable (claude-fable-5-1)
+   4. Sonnet 5.5   Set model to Sonnet 5.5 for this session only
+                  sonnet (claude-sonnet-5-5)
+   5. Haiku 4.5    Set model to Haiku 4.5 for this session only
+                  haiku (claude-haiku-4-5-20251001)
+   6. Sonnet 5     Set model to Sonnet 5 for this session only
+                  claude-sonnet-5
+   7. Opus 5       Set model to Opus 5 for this session only
+                  claude-opus-5
+   8. Fable 5      Set model to Fable 5 for this session only
+                  claude-fable-5
+   9. Opus 4.8     Set model to Opus 4.8 for this session only
+                  claude-opus-4-8
+  10. Opus 4.7     Set model to Opus 4.7 for this session only
+                  claude-opus-4-7
+  11. Opus 4.6     Set model to Opus 4.6 for this session only
+                  claude-opus-4-6
+  12. Sonnet 4.6   Set model to Sonnet 4.6 for this session only
+                  claude-sonnet-4-6
+
+/status Version line on every read: 2.1.288
