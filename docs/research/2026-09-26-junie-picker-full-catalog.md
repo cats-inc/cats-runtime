@@ -211,3 +211,44 @@ The general Windows lesson is in platform's desktop-ui-automation skill (cats-pl
   - That window also covers the handoff assessment and coordinating the two cats-platform PRs
     (#150, #151). The subagent that implemented #150 is not included.
   - This repeats the skill's advice to run each provider refresh in a fresh session.
+
+## Later refresh (2026-10-03): build 3419.29
+
+- **Request:** the 2026-10-03 catalog probe read the auto-updated Junie (release 26.9.22, build
+  3419.29, installed 04:07 local time). Its JAR model enum gained two setting IDs since build 3419.7,
+  `claude-sonnet-5-5` and `gpt-6.1-sol`; as a superset source the probe could not say whether the
+  picker shows them. The operator handed every probe finding to the agent ("這次都交給你").
+- **Defender:** the operator's own `junie` launches failed at 07:18-07:27 with `Cannot run program
+  "powershell": CreateProcess error=5`. `Get-MpThreatDetection` showed `Trojan:Win32/Commando.A!ml`
+  on Junie's `powershell -NoProfile -NonInteractive -EncodedCommand …` credential read, as on
+  2026-09-18 and 2026-09-26. The operator restored the detection; the agent did not change any
+  Defender setting. The agent's launch at 07:51 was not blocked and added no detection.
+- **Capture:** 2026-10-03 07:51-08:01 (UTC+8), Windows native, Windows Terminal, the versioned
+  `junie.exe --skip-update-check` from an empty private directory with cleaned variables; the trust
+  prompt was answered "Keep untrusted". All 18 rows were highlighted in turn and every row's effort
+  was cycled back to its start. `~/.junie/settings.json` changed only at startup (`sessionCount`)
+  and kept its hash through the traversal and after exit. Evidence:
+  [picker capture](./fixtures/junie-26.9.22/model-picker.agent-capture.2026-10-03.redacted.txt) and
+  [probe list](./fixtures/junie-build-3419.29/model-list.probe.redacted.json).
+
+### Catalog delta
+
+- **Junie Lite** (row 2, badge Free, $0.15 / $0.90 per Mtok, `junie-lite`): the Effort cell shows
+  `‹ None ›` and Right does not change it; Junie saves `effortPerModel` `junie-lite: none`. Its
+  `junie.reasoning_effort` control has the single value `none`. Row 2 is not current-model
+  pinning: Junie Lite was the current model, but on 2026-09-26 the current model (Claude Opus 5.5)
+  stayed in its alphabetical place.
+- **Claude Sonnet 5.5** (row 7, `claude-sonnet-5-5`, $2.00 / $10.00): Low, Medium, High, XHigh, Max.
+- **GPT-6.1-SOL** (row 16, `gpt-6.1-sol`, $2.00 / $10.00): Low, Medium, High, XHigh, Max, with no
+  None, like GPT-6-ASTRA.
+- The other 15 rows keep their names, prices, descriptions and effort sets. `cli_version` stays
+  26.9.22, the release the startup banner shows.
+
+### Scripts
+
+| Temporary script | Purpose | Rerunnable? | Kept? |
+| --- | --- | --- | --- |
+| `launch-junie.cmd` | Cleared variables and started the versioned `junie.exe` | Yes, machine-specific | No: the reference documents the launch |
+| `junie-step.ps1` | Guarded type/key/read/snapshot for the capture window | Yes | No: generalized as a private `step.ps1`, a thin wrapper over `WindowsUi.ps1` |
+| `junie-traverse.ps1` | Walked every row with Up/Down and cycled each effort with Right back to its start | Yes, if the picker layout holds | Yes, generalized as `scripts/Capture-JuniePicker.ps1` with `tests/Test-JuniePicker.ps1` and a usage section in the interactive capture reference |
+| `build-fixture.mjs`, `edit-junie-scope.mjs` | Built this fixture and applied this delta | No | No: run-specific |

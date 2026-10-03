@@ -69,13 +69,17 @@ describe('factory and executable catalog projections', () => {
 
   it('starts Junie effort at each model\'s first picker value and emits it as --effort', () => {
     const junie = knowledge(snapshot.document.catalogs.find(s => s.provider === 'junie' && s.backend === 'cli')!);
-    expect(junie.catalog.entries).toHaveLength(15);
+    expect(junie.catalog.entries).toHaveLength(18);
+    expect(junie.catalog.entries.slice(0, 2).map(e => e.id)).toEqual(['Gemini 3.7 Flash', 'Junie Lite']);
     expect(junie.catalog.entries.filter(e => e.default).map(e => e.id)).toEqual(['Gemini 3.7 Flash']);
     // The picker shows no effort default, so none is declared and resolution uses the first value.
     expect(junie.catalog.entries.every(e => !e.controlDefaults)).toBe(true);
     const effort = (entryId: string, controls?: Record<string, string>) => resolveProviderSelection(junie,
       { entryId, entryMode: 'explicit', ...(controls ? { controls } : {}) }).resolution.controls['junie.reasoning_effort'];
     expect(effort('GPT-5.6-SOL')).toBe('none');
+    expect(effort('Junie Lite')).toBe('none');
+    expect(effort('GPT-6.1-SOL')).toBe('low');
+    expect(() => effort('GPT-6.1-SOL', { 'junie.reasoning_effort': 'none' })).toThrow();
     expect(effort('Gemini 3.6 Flash')).toBe('minimal');
     expect(effort('Gemini 3.7 Flash')).toBe('low');
     expect(effort('Claude Opus 5.5', { 'junie.reasoning_effort': 'xhigh' })).toBe('xhigh');
