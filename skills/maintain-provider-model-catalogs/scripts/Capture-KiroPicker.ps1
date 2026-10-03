@@ -203,18 +203,20 @@ function Read-KiroPicker([string]$Text) {
         }
     }
     $footer = @($sections[2] | Where-Object { $_.Trim() } | Select-Object -First 1)
-    $focus = if ($footer.Count -and $footer[0] -match $listFooterPattern) { 'list' }
-        elseif ($footer.Count -and $footer[0] -match $settingsFooterPattern) { 'settings' }
-        else { throw 'The picker footer is not visible or not recognized.' }
+    $listFooter = $footer.Count -and $footer[0] -match $listFooterPattern
+    if (-not $listFooter -and -not ($footer.Count -and $footer[0] -match $settingsFooterPattern)) {
+        throw 'The picker footer is not visible or not recognized.'
+    }
 
+    # Focus follows the highlight. Kiro 2.27.1 shows the list footer (Enter to select) while its
+    # select-type fallback row is highlighted in the settings panel, and Tab can land there.
     $markedRows = @($rows | Where-Object Marked)
     $markedPanel = @($panel | Where-Object Marked)
-    if ($focus -eq 'list' -and ($markedRows.Count -ne 1 -or $markedPanel.Count -ne 0 -or
-        $markedRows[0].Id -cne $header.Groups['id'].Value)) {
+    $focus = if ($markedRows.Count -eq 1 -and $markedPanel.Count -eq 0) { 'list' }
+        elseif ($markedRows.Count -eq 0 -and $markedPanel.Count -eq 1) { 'settings' }
+        else { throw 'Highlight is ambiguous between the model list and the settings panel.' }
+    if ($focus -eq 'list' -and (-not $listFooter -or $markedRows[0].Id -cne $header.Groups['id'].Value)) {
         throw 'List highlight and settings header disagree or are ambiguous.'
-    }
-    if ($focus -eq 'settings' -and ($markedRows.Count -ne 0 -or $markedPanel.Count -ne 1)) {
-        throw 'Settings highlight is ambiguous.'
     }
     [pscustomobject]@{
         Rows = $rows; More = $more; HeaderId = $header.Groups['id'].Value
@@ -260,7 +262,8 @@ function Get-Guard([string]$Id, [string]$Focus, [string]$Axis, [string]$Value) {
     if ($Focus -eq 'list') {
         $guard += '(?=.*^\u276F ' + [regex]::Escape($Id) + ' )(?=.*\u21B5 to select)'
     } else {
-        $guard += '(?=.*\u2190\u2192 to toggle)'
+        # A settings row is highlighted and no model row is; the footer differs by row type.
+        $guard += '(?!.*^\u276f \S+ {2,}\d+(?:\.\d+)?x credits)(?=.*^\u276f [a-z][a-z_-]* {2,}\S+ {2,})'
     }
     if ($Axis) { $guard += '(?=.*^\u276F ' + [regex]::Escape($Axis) + ' +' + [regex]::Escape($Value) + ' )' }
     return $guard

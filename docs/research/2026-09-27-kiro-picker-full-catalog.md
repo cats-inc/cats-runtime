@@ -297,3 +297,50 @@ and the [interactive capture reference](../../skills/maintain-provider-model-cat
 - Windows PowerShell 5.1 reads a BOM-less script as ANSI. Non-ASCII literals such as `❯` or `─`
   then fail to match. Keep capture scripts ASCII and use `\u` regex escapes or `[char]` code
   points.
+
+## Later refresh (2026-10-03): Kiro 2.27.1
+
+- **Request:** the operator-run catalog probe (2026-10-03) reported `new-candidate claude-sonnet-5.5`
+  on `kiro/cli` (2.24.1 → 2.27.1), and the operator handed every probe finding to the agent
+  ("這次都交給你"). Mode: refresh; policy: confirm uncertainty.
+- **Capture:** 2026-10-03 08:16-08:24 (UTC+8), native Windows 11, Windows Terminal, interactive
+  `kiro-cli chat` from an empty private directory with cleaned variables. This was the helpers'
+  first native run. All 21 rows were read while highlighted; Down and Up gave the same order; 75
+  effort/thinking toggles. Evidence:
+  [picker capture](./fixtures/kiro-2.27.1/model-picker.agent-capture.redacted.txt) and
+  [probe list](./fixtures/kiro-2.27.1/model-list.probe.redacted.json).
+- **Settings:** `~/.kiro/settings/cli.json` was backed up before the first toggle. After Kiro exited
+  (exit 0), `Restore-KiroPickerConfig.ps1` restored it; the hash equals the pre-launch hash.
+
+### Catalog delta
+
+- **New row 3, `claude-sonnet-5.5`** (1.30x credits, 1M context): effort `low, medium, high, xhigh,
+  max` (arrived `default`, the unset state), thinking n/a "Always on for this model", like
+  `claude-opus-5.5`. Eleven rows now carry `kiro.reasoning_effort`.
+- **`gpt-5.6-luna`** now shows 0.60x credits (1.10x on 2.24.1); its note is updated.
+- **`claude-sonnet-4`** now reads "[EOL] … Model reaches end of life on October 14, 2026." The row
+  stays while the picker lists it; removing it later needs the operator's confirmation.
+- **New `fallback` settings row** on every model, `none` everywhere. It chooses another model rather
+  than an option of this one and is recorded in the scope notes only.
+- The other 19 rows keep their IDs, order, descriptions, rates and effort rings.
+
+### Helper fix
+
+On 2.27.1, Tab into the settings panel lands on the new `fallback` row, and while that row is
+highlighted the footer is the list footer (`↵ to select`). `Capture-KiroPicker.ps1` used the footer
+to tell which side had focus, so it stopped after the first Tab. It now takes focus from the
+highlight (exactly one model row or one settings row) and its settings-side key guard checks for a
+highlighted settings row instead of the toggle hint. `Test-KiroPicker.ps1` gains a 2.27.1 case:
+Tab lands on `fallback`, the footer reads like the list's, and Right is never sent on it.
+
+### Scripts
+
+| Temporary script | Purpose | Rerunnable? | Kept? |
+| --- | --- | --- | --- |
+| `launch.cmd` | Cleared agent variables and started `kiro-cli chat` in the capture window | Yes, but machine-specific paths | No: the reference documents the variables, and `Start-WindowsUiTerminal` takes any command |
+| `step.ps1` | Generic guarded type/key/read/snapshot for a titled window, used for `/model`, Escape and `/quit` | Yes | No: it is a thin wrapper over `WindowsUi.ps1` functions |
+| `kiro-reset.ps1` | One Tab back to the list and one Up after the first, failed helper run | No | No: one-off recovery |
+| `build-fixture.mjs` | Built the redacted fixture from the helper JSON and the probe snapshot | Partly | No: its prose is specific to this run |
+| `edit-kiro-scope.mjs` | Applied this delta to the kiro scope | No | No: model rows belong in YAML |
+
+Kept: the `Capture-KiroPicker.ps1` focus fix and its `Test-KiroPicker.ps1` case.

@@ -11,7 +11,9 @@ $restore = Join-Path $PSScriptRoot '../scripts/Restore-KiroPickerConfig.ps1'
 $null = New-Item -ItemType Directory -Path $scratch -Force
 $mock = Join-Path $scratch 'ui.ps1'
 @'
-# Simulated Kiro 2.24.1 /model picker with the real layout and synthetic model ids.
+# Simulated Kiro 2.24.1 /model picker with the real layout and synthetic model ids. With
+# $global:mockKiro227 it adds the 2.27.1 fallback settings row, where Tab lands and the footer
+# reads like the list's.
 $script:mockRow = if ($global:mockStartRow) { $global:mockStartRow } else { 0 }
 $script:mockTop = 0
 $script:mockVisible = 4
@@ -49,7 +51,9 @@ function Get-MockAxisDisplay($Model, [string]$Axis) {
     return @($entry.Value, $entry.Note)
 }
 function Get-MockSelectable($Model) {
-    @($Model.Axes.Keys | Where-Object { (Get-MockAxisDisplay $Model $_)[0] -ne 'n/a' })
+    $keys = @($Model.Axes.Keys | Where-Object { (Get-MockAxisDisplay $Model $_)[0] -ne 'n/a' })
+    if ($global:mockKiro227) { $keys += 'fallback' }
+    $keys
 }
 function Set-MockLast { $global:mockLastFocus = $script:mockFocus; $global:mockLastRow = $script:mockRow }
 function Get-WindowsUiTarget { param($Title, $ProcessName) [pscustomobject]@{ Title = $Title } }
@@ -84,8 +88,12 @@ function Get-WindowsUiText($Target) {
         $lead = if ($script:mockFocus -eq 'settings' -and $script:mockAxis -eq $axis) { "$mark " } else { '  ' }
         $lines += $lead + $axis.PadRight(10) + $shown[0].PadRight(9) + $shown[1]
     }
+    if ($global:mockKiro227) {
+        $lead = if ($script:mockFocus -eq 'settings' -and $script:mockAxis -eq 'fallback') { "$mark " } else { '  ' }
+        $lines += $lead + 'fallback'.PadRight(10) + 'none'.PadRight(9) + 'Answers for this model when it refuses or is unavailable.'
+    }
     $lines += $rule
-    if ($script:mockFocus -eq 'list') {
+    if ($script:mockFocus -eq 'list' -or $script:mockAxis -eq 'fallback') {
         $lines += " esc to close $dot $arrows to navigate $dot $enter to select $dot tab to switch panels"
     } else {
         $nav = if (@(Get-MockSelectable $model).Count -gt 1) { "$arrows to navigate $dot " } else { '' }
@@ -139,6 +147,7 @@ function Send-WindowsUiKey { param($Target, $Key, $ExpectedText)
         }
         'Right' {
             if ($script:mockFocus -ne 'settings') { throw 'Right was sent outside the settings panel' }
+            if ($script:mockAxis -eq 'fallback') { throw 'Right was sent on the fallback row' }
             Invoke-MockToggle $model
         }
         default { throw "Capture sent a selecting, closing or unexpected key: $Key" }
@@ -150,7 +159,7 @@ function Invoke-WindowsUiKeyInput { param([uint16]$Code, [bool]$Control)
     $global:mockTabs = [int]$global:mockTabs + 1
     if ($script:mockFocus -eq 'list') {
         $script:mockFocus = 'settings'
-        $script:mockAxis = @(Get-MockSelectable $script:mockModels[$script:mockRow])[0]
+        $script:mockAxis = if ($global:mockKiro227) { 'fallback' } else { @(Get-MockSelectable $script:mockModels[$script:mockRow])[0] }
     } else {
         $script:mockFocus = 'list'
         $script:mockAxis = $null
@@ -171,7 +180,7 @@ function Get-Digest([string]$Path) {
 }
 function Reset-Fixture([string]$Name, [switch]$NoConfig) {
     foreach ($variable in 'mockExternalWriteOnDown', 'mockUpSkip', 'mockStartRow', 'mockWindowClosed', 'mockTabs',
-        'mockLastFocus', 'mockLastRow') {
+        'mockLastFocus', 'mockLastRow', 'mockKiro227') {
         Remove-Variable -Name $variable -Scope Global -ErrorAction SilentlyContinue
     }
     $dir = Join-Path $scratch $Name
@@ -274,6 +283,17 @@ try {
     }
     Write-Output 'PASS empty -Axes reads rows without Tab, toggles or settings writes'
 
+    $dir = Reset-Fixture 'kiro-2.27'
+    $global:mockKiro227 = $true
+    $result = Invoke-Capture $dir
+    if ((Get-Values $result.Rows.Id) -ne $ids -or $result.Toggles -ne 15 -or -not $result.OrderCheckedBothDirections -or
+        (Get-Values @($result.Rows[1].Cycles)[0].Cycle) -ne 'low,medium,high,max' -or
+        (Get-Values @($result.Rows[1].Cycles)[1].Cycle) -ne 'on,off' -or
+        (Get-Values ($result.Rows[0].Arrival | ForEach-Object { $_.Axis + '=' + $_.Value })) -ne 'thinking=n/a,effort=n/a,fallback=none') {
+        throw 'The 2.27.1 fallback row or its list-style footer broke the capture.'
+    }
+    Write-Output 'PASS a Tab that lands on the 2.27.1 fallback row still cycles effort and thinking'
+
     $dir = Reset-Fixture 'concurrent'
     $global:mockExternalWriteOnDown = 3
     Assert-Throws { Invoke-Capture $dir } 'without a toggle by this helper' 'A concurrent settings edit'
@@ -311,7 +331,7 @@ try {
     Write-Output 'PASS rejects wrong counts, a moved start row, direction mismatch and reused evidence'
 } finally {
     foreach ($name in 'mockExternalWriteOnDown', 'mockUpSkip', 'mockStartRow', 'mockWindowClosed', 'mockTabs',
-        'mockLastFocus', 'mockLastRow', 'mockConfigPath') {
+        'mockLastFocus', 'mockLastRow', 'mockConfigPath', 'mockKiro227') {
         Remove-Variable -Name $name -Scope Global -ErrorAction SilentlyContinue
     }
     $resolved = [IO.Path]::GetFullPath($scratch)

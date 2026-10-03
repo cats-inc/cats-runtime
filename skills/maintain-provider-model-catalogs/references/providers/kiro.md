@@ -22,6 +22,10 @@ Do not copy its model values into this reference.
     `Settings for selected model: <id>` on auto and `Settings for model: <id>` elsewhere.
   - Tab switches between the list and the panel. In the panel, Up/Down pick the row and ←→ cycle
     its value. Enter in the list selects the model; never send it.
+  - From 2.27.1 the panel also has a `fallback` row (another model to answer when this one
+    refuses or is unavailable). Tab lands on it, and while it is highlighted the footer reads like
+    the list's (`↵ to select`), so tell the focused side by the highlight, not the footer. Never
+    send Enter or ←→ on it.
 - **Toggles persist immediately, without Enter.** Each ←→ rewrites `~/.kiro/settings/cli.json`
   `chat.modelDefaults.<id>`.
   - Hash and privately back up that file before the first toggle. Cycle every ring back to its

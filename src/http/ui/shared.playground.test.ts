@@ -269,7 +269,7 @@ describe('shared playground selection helpers', () => {
       div: { querySelector: () => controls }, catalog, entryId: '' };
     vm.createContext(context);
     vm.runInContext(html.slice(start, end), context);
-    expect(models).toHaveLength(20);
+    expect(models).toHaveLength(21);
     expect(models.some(model => model.default)).toBe(false);
     // No default is declared, so the UI initializes the first picker row (auto).
     expect(catsUI.normalizePlaygroundAgentSelection({ provider: 'kiro', selectableProviders: ['kiro'],
@@ -287,7 +287,7 @@ describe('shared playground selection helpers', () => {
       }
       firstValues[entry.id] = options[0]?.[0] ?? null;
     }
-    expect(firstValues).toMatchObject({ auto: null, 'claude-opus-5.5': 'low', 'gpt-5.6-sol': 'none',
+    expect(firstValues).toMatchObject({ auto: null, 'claude-opus-5.5': 'low', 'claude-sonnet-5.5': 'low', 'gpt-5.6-sol': 'none',
       'claude-sonnet-4.6': 'low', 'claude-haiku-4.5': null, 'qwen3-coder-next': null });
     expect(catsUI.normalizePlaygroundAgentSelection({
       provider: 'kiro', modelSelection: { entryId: 'claude-opus-5.5', entryMode: 'explicit',
