@@ -44,8 +44,10 @@ catalogs:
         observed, so no limit is recorded. The operator also chose the picker's `claude-fable-5-1`
         over the `fable` alias; both resolved to claude-fable-5-1. Entry ids are unchanged. On
         2.1.288 the Fable 5.1 row sets `fable` again (Claude Code 2.1.287: picking Fable now saves
-        a value that follows the newest Fable). The entry keeps executing `claude-fable-5-1` until
-        the operator decides; both still resolve to claude-fable-5-1."
+        a value that follows the newest Fable). On 2026-10-03 the operator decided to keep
+        `claude-fable-5-1`: the Fable 5.1 label then always matches the model that runs, while the
+        alias would move to a newer Fable before the catalog is refreshed. Both still resolve to
+        claude-fable-5-1."
       - "Effort is one picker-wide selection. For each adjustable row, the capture pressed Right until
         the line returned to its starting level. Opus 5.5, Fable 5.1, Sonnet 5.5, Sonnet 5, Opus 5,
         Fable 5, Opus 4.8, and Opus 4.7 cycle Low, Medium, High, xHigh, and Max; Opus 4.6 and Sonnet
@@ -129,8 +131,8 @@ catalogs:
         notes:
           - "Picker description: For your toughest challenges"
           - Executes `claude-fable-5-1`, the value the picker row set on 2.1.282; the operator chose it
-            over the `fable` alias. On 2.1.288 the row sets `fable` (claude-fable-5-1); the choice is
-            pending with the operator.
+            over the `fable` alias. On 2.1.288 the row sets `fable` (claude-fable-5-1); the operator kept
+            `claude-fable-5-1` on 2026-10-03.
         source_names:
           - Fable
           - Fable 5.1
