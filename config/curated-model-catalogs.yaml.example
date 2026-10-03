@@ -442,7 +442,7 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Codex
-    cli_version: 0.159.2
+    cli_version: 0.160.0
     last_updated: 2026-10-01
     notes:
       - Complete visible model list and every per-model reasoning/advanced menu captured on 2026-10-01
@@ -469,6 +469,7 @@ catalogs:
         models; these are CLI catalog values, not claims about OpenAI API limits. Older capability
         tags and migration source_names remain with their earlier provenance; no capability tags were
         inferred for new models.
+      - "cli_version advanced from 0.159.2 to 0.160.0 on 2026-10-03 at the operator's request, without a new picker capture: `codex debug models` listed exactly this scope's 8 entries, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 0.159.2 evidence. Evidence: docs/research/fixtures/codex-0.160.0/model-list.probe.redacted.json."
     models:
       - default: true
         id: gpt-6.1-sol
@@ -778,7 +779,7 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Antigravity
-    cli_version: 1.2.10
+    cli_version: 1.2.15
     last_updated: 2026-09-25
     notes:
       - Complete operator-supplied /model picker and all per-model effort screens on Antigravity CLI
@@ -792,6 +793,7 @@ catalogs:
         executable choices remain represented.
       - No model or effort is marked default. Cats initializes to the first model and first
         applicable effort without adding a default label; existing explicit choices are preserved.
+      - "cli_version advanced from 1.2.10 to 1.2.15 on 2026-10-03 at the operator's request, without a new picker capture: `agy models` listed exactly this scope's 7 entries, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 1.2.10 evidence. Evidence: docs/research/fixtures/antigravity-1.2.15/model-list.probe.redacted.json."
     models:
       - id: gemini-3.8-flash-low
         label: Gemini 3.8 Flash
@@ -970,7 +972,7 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Grok
-    cli_version: 1.0.41
+    cli_version: 1.0.46
     last_updated: 2026-09-25
     notes:
       - "Complete four-model /model list and per-model effort menus captured 2026-09-25 from Grok
@@ -992,6 +994,7 @@ catalogs:
         initialization policy remains: menus start at the first row without a default flag."
       - "Context 500000 was re-read from the 1.0.41 model cache for every listed model. The capture
         session header showed 500K. The cache had no output limit."
+      - "cli_version advanced from 1.0.41 to 1.0.46 on 2026-10-03 at the operator's request, without a new picker capture: `grok models` listed exactly this scope's 4 entries, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 1.0.41 evidence. Evidence: docs/research/fixtures/grok-1.0.46/model-list.probe.redacted.json."
     models:
       - id: grok-4.7
         label: Grok 4.7
@@ -1122,7 +1125,7 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Muse
-    cli_version: 1.4.0-R4161.1
+    cli_version: 1.4.2-R4684.1
     last_updated: 2026-09-26
     notes:
       - "Model list re-read 2026-09-26 on Muse Code 1.4.0 (muse-bin-1.4.0-R4161.1): MSP `model/list`
@@ -1171,6 +1174,7 @@ catalogs:
       - The earlier exec --help list proves parser vocabulary, not per-model picker
         availability/defaults. Model-list version, freshness, labels, and limits retain their
         2026-09-05 provenance; this correction only re-observes effort menus.
+      - "cli_version advanced from 1.4.0-R4161.1 to 1.4.2-R4684.1 on 2026-10-03 at the operator's request, without a new picker capture: `muse-bin serve --no-session-log, MSP model/list` listed exactly this scope's 4 entries, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 1.4.0-R4161.1 evidence. Evidence: docs/research/fixtures/muse-1.4.2-R4684.1/model-list.probe.redacted.json."
     models:
       - id: muse-spark-1.3
         label: muse-spark-1.3
@@ -1327,7 +1331,7 @@ catalogs:
     backend: cli
     selection_mode: shortlist
     source_cli: Cursor
-    cli_version: 2026.09.15-d2fe57e
+    cli_version: 2026.10.01-e373342
     last_updated: 2026-09-18
     notes:
       - Operator-approved six fixed combos in picker order; complete shortlist, not the full
@@ -1345,6 +1349,7 @@ catalogs:
         different context. No default metadata; UI initializes from the first entry.
       - Refresh re-reads this shortlist without expanding it from discovery or cached models. All
         parameters are fixed in each model expression.
+      - "cli_version advanced from 2026.09.15-d2fe57e to 2026.10.01-e373342 on 2026-10-03 at the operator's request, without a new picker capture: `cursor-agent --list-models` listed the model family of all 6 entries; the exact parameter combinations are not proven, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 2026.09.15-d2fe57e evidence. Evidence: docs/research/fixtures/cursor-2026.10.01-e373342/model-list.probe.redacted.json."
     models:
       - id: grok-4.6[effort=high,fast=true]
         label: Cursor Grok 4.6 — High Fast
@@ -2119,7 +2124,7 @@ catalogs:
     backend: cli
     selection_mode: shortlist
     source_cli: OpenCode
-    cli_version: 1.18.32
+    cli_version: 1.18.34
     last_updated: 2026-09-28
     basis:
       channel:
@@ -2142,6 +2147,7 @@ catalogs:
       - Desktop and Playground initialize to the first row without adding a default marker. Refresh
         retains this shortlist and custom model-string input remains available. See
         docs/research/2026-09-18-opencode-shortlist.md.
+      - "cli_version advanced from 1.18.32 to 1.18.34 on 2026-10-03 at the operator's request, without a new picker capture: `opencode models <channel> --verbose --pure` listed all 5 shortlist entries; other upstream rows are informational, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 1.18.32 evidence. Evidence: docs/research/fixtures/opencode-1.18.34/model-list.probe.redacted.json."
     models:
       - id: opencode-go/deepseek-v4.1-flash
         label: DeepSeek V4.1 Flash
@@ -2195,7 +2201,7 @@ catalogs:
     backend: cli
     selection_mode: shortlist
     source_cli: Kilo
-    cli_version: 7.7.3
+    cli_version: 7.8.3
     last_updated: 2026-09-18
     basis:
       channel:
@@ -2210,6 +2216,7 @@ catalogs:
         without a default label.
       - "Evidence: docs/research/2026-09-18-kilo-shortlist.md and
         docs/research/fixtures/kilo-7.7.3/."
+      - "cli_version advanced from 7.7.3 to 7.8.3 on 2026-10-03 at the operator's request, without a new picker capture: `kilo models <channel> --verbose --pure (gateway list, not the picker)` listed all 6 shortlist entries; other upstream rows are informational, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 7.7.3 evidence. Evidence: docs/research/fixtures/kilo-7.8.3/model-list.probe.redacted.json."
     models:
       - id: kilo/deepseek/deepseek-v4.1-flash
         label: "DeepSeek: DeepSeek V4.1 Flash"
@@ -2275,7 +2282,7 @@ catalogs:
     backend: cli
     selection_mode: shortlist
     source_cli: Goose
-    cli_version: 1.51.0
+    cli_version: 1.53.0
     last_updated: 2026-09-23
     basis:
       channel:
@@ -2290,6 +2297,7 @@ catalogs:
         to Thinking Off. Its Codex backend maps Off to none when supported, otherwise low."
       - "Evidence and version confirmation: docs/research/2026-09-23-goose-shortlist.md and
         docs/research/fixtures/goose-1.51.0/operator.redacted.txt."
+      - "cli_version advanced from 1.51.0 to 1.53.0 on 2026-10-03 at the operator's request, without a new picker capture: `goose --version (GOOSE_PATH_ROOT in a temporary directory)` has no read-only model list, so only the version was read and the 6 entries are unverified at 1.53.0. The notes above describe the 1.51.0 evidence."
     models:
       - id: chatgpt_codex/gpt-5.6-sol
         label: gpt-5.6-sol — Off
@@ -4216,7 +4224,7 @@ catalogs:
     backend: cli
     selection_mode: shortlist
     source_cli: Cline
-    cli_version: 3.0.62
+    cli_version: 3.0.68
     last_updated: 2026-09-18
     basis:
       channel:
@@ -4228,6 +4236,7 @@ catalogs:
         catalog. No provider default is claimed.
       - Qwen3.8 Max is an explicitly approved display projection of cline-pass/qwen3.8-max.
       - Execution uses --provider cline-pass --model <verbatim ID> --thinking medium.
+      - "cli_version advanced from 3.0.62 to 3.0.68 on 2026-10-03 at the operator's request, without a new picker capture: `installed @cline/llms dist/models.js provider block (read, never executed)` listed all 6 shortlist entries; other upstream rows are informational, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 3.0.62 evidence. Evidence: docs/research/fixtures/cline-3.0.68/model-list.probe.redacted.json."
     models:
       - id: cline-pass/glm-5.3
         label: GLM-5.3 — Medium
@@ -4306,7 +4315,7 @@ catalogs:
     transport: acp_stdio
     selection_mode: shortlist
     source_cli: Devin
-    cli_version: 3000.10.31
+    cli_version: 3000.11.3
     last_updated: 2026-09-18
     notes:
       - "Source: docs/research/2026-09-18-devin-shortlist.md and fixtures/devin-3000.10.31/."
@@ -4314,6 +4323,7 @@ catalogs:
         default is claimed.
       - Effort is encoded in model_uid; Adaptive has no specified effort. Applied through agent/acp
         session/set_config_option.
+      - "cli_version advanced from 3000.10.31 to 3000.11.3 on 2026-10-03 at the operator's request, without a new picker capture: `devin models list --format json` listed all 6 shortlist entries; other upstream rows are informational, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 3000.10.31 evidence. Evidence: docs/research/fixtures/devin-3000.11.3/model-list.probe.redacted.json."
     models:
       - id: adaptive
         label: Adaptive

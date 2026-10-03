@@ -1,0 +1,140 @@
+{
+  "kind": "cats-catalog-probe-evidence",
+  "schemaVersion": 1,
+  "provider": "kilo",
+  "backend": "cli",
+  "transport": null,
+  "command": "kilo models <channel> --verbose --pure (gateway list, not the picker)",
+  "sourceClass": "machine-readable",
+  "cliVersion": "7.8.3",
+  "versionSource": "npm package",
+  "observedAt": "2026-10-03T01:33:38.055Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "accountScope": "The CLI's existing sign-in on the probing machine. No identity is recorded.",
+  "status": "ok",
+  "completeness": {
+    "membership": "partial",
+    "meaning": "The command is known to omit picker rows; absence here is not evidence of withdrawal."
+  },
+  "authoritativeFor": {
+    "ids": true,
+    "label": false,
+    "efforts": false,
+    "effortDefault": false
+  },
+  "stillNeedsPicker": "A model (default) marker, picker descriptions, picker order, and every field not listed under authoritativeFor still need picker evidence.",
+  "selection": {
+    "ids": [
+      "kilo/bytedance-seed/seed-2-1-turbo",
+      "kilo/deepseek/deepseek-v4.1-flash",
+      "kilo/google/gemini-3-pro-image",
+      "kilo/minimax/minimax-m3",
+      "kilo/moonshotai/kimi-k3",
+      "kilo/z-ai/glm-5.3-flash"
+    ]
+  },
+  "models": [
+    {
+      "id": "kilo/bytedance-seed/seed-2-1-turbo",
+      "label": "ByteDance Seed: Seed 2.1 Turbo",
+      "evidence": {
+        "status": "active",
+        "releaseDate": "2026-10-03",
+        "contextLimit": 262144,
+        "outputLimit": 235929,
+        "reasoning": true,
+        "variants": [
+          "instant",
+          "thinking"
+        ]
+      }
+    },
+    {
+      "id": "kilo/deepseek/deepseek-v4.1-flash",
+      "label": "DeepSeek: DeepSeek V4.1 Flash",
+      "evidence": {
+        "status": "active",
+        "releaseDate": "2026-10-03",
+        "contextLimit": 1048576,
+        "outputLimit": 943718,
+        "reasoning": true,
+        "variants": [
+          "none",
+          "low",
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "kilo/google/gemini-3-pro-image",
+      "label": "Google: Nano Banana Pro (Gemini 3 Pro Image)",
+      "evidence": {
+        "family": "gemini",
+        "status": "active",
+        "releaseDate": "2026-10-03",
+        "contextLimit": 131072,
+        "outputLimit": 32768,
+        "reasoning": true,
+        "variants": [
+          "thinking"
+        ]
+      }
+    },
+    {
+      "id": "kilo/minimax/minimax-m3",
+      "label": "MiniMax: MiniMax M3",
+      "evidence": {
+        "status": "active",
+        "releaseDate": "2026-10-03",
+        "contextLimit": 1048576,
+        "outputLimit": 512000,
+        "reasoning": true,
+        "variants": [
+          "instant",
+          "thinking"
+        ]
+      }
+    },
+    {
+      "id": "kilo/moonshotai/kimi-k3",
+      "label": "MoonshotAI: Kimi K3",
+      "evidence": {
+        "status": "active",
+        "releaseDate": "2026-10-03",
+        "contextLimit": 1048576,
+        "outputLimit": 943718,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "kilo/z-ai/glm-5.3-flash",
+      "label": "Z.ai: GLM 5.3 Flash",
+      "evidence": {
+        "status": "active",
+        "releaseDate": "2026-10-03",
+        "contextLimit": 1048576,
+        "outputLimit": 943717,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "high",
+          "max"
+        ]
+      }
+    }
+  ],
+  "redaction": {
+    "method": "Projected public model fields only; no raw output, account identifier, price, endpoint or login text. String values passed through the skill redaction helper.",
+    "redactions": [],
+    "reviewBeforeCommit": "Check names, paths and provider-specific identifiers by hand; the helper catches only common shapes."
+  }
+}

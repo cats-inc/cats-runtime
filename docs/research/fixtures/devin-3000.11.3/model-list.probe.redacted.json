@@ -1,0 +1,96 @@
+{
+  "kind": "cats-catalog-probe-evidence",
+  "schemaVersion": 1,
+  "provider": "devin",
+  "backend": "agent",
+  "transport": "acp_stdio",
+  "command": "devin models list --format json",
+  "sourceClass": "machine-readable",
+  "cliVersion": "3000.11.3",
+  "versionSource": "--version",
+  "observedAt": "2026-10-03T01:33:38.055Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "accountScope": "The CLI's existing sign-in on the probing machine. No identity is recorded.",
+  "status": "ok",
+  "completeness": {
+    "membership": "complete",
+    "meaning": "The command lists what the picker offers; an absent row still needs picker confirmation before removal."
+  },
+  "authoritativeFor": {
+    "ids": true,
+    "label": false,
+    "efforts": false,
+    "effortDefault": false
+  },
+  "stillNeedsPicker": "A model (default) marker, picker descriptions, picker order, and every field not listed under authoritativeFor still need picker evidence.",
+  "selection": {
+    "ids": [
+      "adaptive",
+      "claude-fable-5-1-medium",
+      "gpt-6-astra-medium",
+      "gemini-3-8-flash-medium",
+      "grok-4-6-medium",
+      "nemotron-3-ultra-high"
+    ]
+  },
+  "models": [
+    {
+      "id": "adaptive",
+      "label": "Adaptive",
+      "evidence": {
+        "family": "Adaptive",
+        "familyLabel": "Adaptive",
+        "description": "Automatically balances quality and cost"
+      }
+    },
+    {
+      "id": "claude-fable-5-1-medium",
+      "label": "Claude Fable 5.1 Medium",
+      "evidence": {
+        "family": "claude-fable-5-1",
+        "familyLabel": "Claude Fable 5.1"
+      }
+    },
+    {
+      "id": "gpt-6-astra-medium",
+      "label": "GPT-6 Astra Medium Thinking",
+      "evidence": {
+        "family": "gpt-6-astra",
+        "familyLabel": "GPT-6 Astra"
+      }
+    },
+    {
+      "id": "gemini-3-8-flash-medium",
+      "label": "Gemini 3.8 Flash Medium",
+      "evidence": {
+        "family": "gemini-3-8-flash",
+        "familyLabel": "Gemini 3.8 Flash"
+      }
+    },
+    {
+      "id": "grok-4-6-medium",
+      "label": "Grok 4.6 Medium",
+      "evidence": {
+        "family": "grok-4-6",
+        "familyLabel": "Grok 4.6",
+        "isBeta": true
+      }
+    },
+    {
+      "id": "nemotron-3-ultra-high",
+      "label": "Nemotron 3 Ultra High",
+      "evidence": {
+        "family": "nemotron-3-ultra",
+        "familyLabel": "Nemotron 3 Ultra"
+      }
+    }
+  ],
+  "redaction": {
+    "method": "Projected public model fields only; no raw output, account identifier, price, endpoint or login text. String values passed through the skill redaction helper.",
+    "redactions": [],
+    "reviewBeforeCommit": "Check names, paths and provider-specific identifiers by hand; the helper catches only common shapes."
+  }
+}
