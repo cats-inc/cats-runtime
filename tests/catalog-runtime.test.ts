@@ -134,12 +134,13 @@ describe('factory and executable catalog projections', () => {
       .toEqual(['--model', 'gpt-5.6-sol', '--effort', 'none']);
   });
 
-  it('lists the full Auggie picker with Opus 4.8 as default and sends only --model', () => {
+  it('lists the full Auggie picker with Claude Opus 5.5 as default and sends only --model', () => {
     const auggie = knowledge(snapshot.document.catalogs.find(s => s.provider === 'auggie' && s.backend === 'cli')!);
-    expect(auggie.catalog.entries).toHaveLength(34);
-    expect(auggie.catalog.entries.slice(0, 3).map(e => e.id)).toEqual(['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna']);
-    expect(auggie.catalog.entries.filter(e => e.default).map(e => e.id)).toEqual(['claude-opus-4-8']);
-    expect(auggie.catalog.defaultSelection).toEqual(expect.objectContaining({ entryId: 'claude-opus-4-8', entryMode: 'explicit' }));
+    expect(auggie.catalog.entries).toHaveLength(36);
+    expect(auggie.catalog.entries.slice(0, 6).map(e => e.id)).toEqual(['gpt-6-astra', 'gpt-6-1-sol', 'gpt-6-luna',
+      'claude-fable-5-1', 'claude-opus-5-5', 'claude-sonnet-5-5']);
+    expect(auggie.catalog.entries.filter(e => e.default).map(e => e.id)).toEqual(['claude-opus-5-5']);
+    expect(auggie.catalog.defaultSelection).toEqual(expect.objectContaining({ entryId: 'claude-opus-5-5', entryMode: 'explicit' }));
     // Effort is recorded in notes only; no auggie.reasoning_effort binding exists.
     expect(auggie.catalog.entries.every(e => !e.controls?.length && !e.controlDefaults)).toBe(true);
     expect(auggie.catalog.entries.find(e => e.id === 'butler_b')?.label).toBe('Prism (GPT)');
@@ -148,7 +149,7 @@ describe('factory and executable catalog projections', () => {
       return new AuggieProvider({} as never, 10).buildSpawnArgs({ cwd: '/tmp',
         model: selected.execution.model, modelControls: selected.resolution.controls });
     };
-    for (const id of ['butler_b', 'claude-opus-4-8', 'gemini-3-1-pro-preview', 'kimi-k2p7']) {
+    for (const id of ['butler_b', 'claude-opus-4-8', 'gpt-6-1-sol', 'claude-sonnet-5-5', 'gemini-3-1-pro-preview', 'kimi-k2p7']) {
       const args = spawn(id);
       expect(args.slice(args.indexOf('--model'), args.indexOf('--model') + 2)).toEqual(['--model', id]);
       expect(args).not.toContain('--reasoning-effort');

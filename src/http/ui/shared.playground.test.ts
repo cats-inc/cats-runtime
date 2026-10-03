@@ -296,13 +296,13 @@ describe('shared playground selection helpers', () => {
     }).modelSelection.controls).toEqual({ 'kiro.reasoning_effort': 'xhigh' });
   });
 
-  it('initializes Auggie at the picker default Opus 4.8 with no effort menu and keeps custom input', () => {
+  it('initializes Auggie at the picker default Claude Opus 5.5 with no effort menu and keeps custom input', () => {
     const catsUI = createCatsUI();
     const target = { providerName: 'auggie', backend: 'cli' as const,
       instanceId: 'native', defaultTarget: true };
     const models = getStaticProviderModels(target);
     const { catalog } = buildProviderAdvancedKnowledge(target, {
-      provider: 'auggie', backend: 'cli', instance: 'native', defaultModel: 'claude-opus-4-8',
+      provider: 'auggie', backend: 'cli', instance: 'native', defaultModel: 'claude-opus-5-5',
       source: 'static', cache: null, models, warnings: [],
     }, { snapshot: createCatalogSnapshot(readFileSync(new URL('../../../config/curated-model-catalogs.yaml.example', import.meta.url), 'utf8')) });
     const html = readFileSync(new URL('./pages/playground.html', import.meta.url), 'utf8');
@@ -313,12 +313,12 @@ describe('shared playground selection helpers', () => {
       div: { querySelector: () => controls }, catalog, entryId: '' };
     vm.createContext(context);
     vm.runInContext(html.slice(start, end), context);
-    expect(models).toHaveLength(34);
-    expect(models.filter(model => model.default).map(model => model.id)).toEqual(['claude-opus-4-8']);
-    expect(catsUI.getAdvancedCatalogDefaultEntryId(catalog)).toBe('claude-opus-4-8');
+    expect(models).toHaveLength(36);
+    expect(models.filter(model => model.default).map(model => model.id)).toEqual(['claude-opus-5-5']);
+    expect(catsUI.getAdvancedCatalogDefaultEntryId(catalog)).toBe('claude-opus-5-5');
     const input = { provider: 'auggie', selectableProviders: ['auggie'], providerOrder: ['auggie'],
       advancedCatalogs: { auggie: catalog } };
-    expect(catsUI.normalizePlaygroundAgentSelection(input).modelSelection.entryId).toBe('claude-opus-4-8');
+    expect(catsUI.normalizePlaygroundAgentSelection(input).modelSelection.entryId).toBe('claude-opus-5-5');
     for (const entry of catalog.entries) {
       context.entryId = entry.id;
       vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);

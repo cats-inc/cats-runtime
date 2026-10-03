@@ -228,3 +228,42 @@ and the [interactive capture reference](../../skills/maintain-provider-model-cat
   inherited the agent host's `PSModulePath`. With the Windows PowerShell module path it passed
   9/9. The Auggie helper and test hash through .NET and do not depend on it.
 
+
+## Later refresh (2026-10-03)
+
+- **Request:** the operator-run catalog probe (2026-10-03) reported `new-candidate` rows
+  `claude-sonnet-5-5` and `gpt-6-1-sol` on `auggie/cli` (0.36.0, unchanged). The operator handed
+  every probe finding to the agent ("這次都交給你"). Mode: refresh; policy: confirm uncertainty.
+- **Capture:** 2026-10-03 08:33-08:34 (UTC+8), Windows native, Windows Terminal, interactive `auggie`
+  from an empty private directory with `AUGMENT_*`/`AUGGIE_*` and agent variables cleared;
+  indexing skipped with Escape. `Capture-AuggiePicker.ps1` walked all 36 rows with Up and Down
+  only; both directions agreed. No Enter probe was run. `~/.augment/settings.json` kept SHA-256
+  `86319C45…` throughout, the same digest as on 2026-09-27. Evidence:
+  [picker projection](./fixtures/auggie-0.36.0/model-picker.agent-capture.2026-10-03.redacted.txt)
+  and [probe list](./fixtures/auggie-0.36.0/model-list.probe.redacted.json).
+
+### Catalog delta
+
+- **New rows:** GPT-6.1 Sol (`gpt-6-1-sol`, row 2, $$) and Claude Sonnet 5.5 (`claude-sonnet-5-5`,
+  row 6, $$), each matched to exactly one JSON row by `displayName`. Their JSON `effortLevels`
+  (`low…max`) stay in notes.
+- **Order:** GPT-6 Sol moved from row 2 to row 18 (after GPT-5.6 Luna) and Claude Sonnet 5 from row 6
+  to row 22 (after Opus 4.8). The catalog follows the picker.
+- **Default:** the picker's only `(default)` suffix is now on Claude Opus 5.5, and its JSON row is the
+  only one with `isDefault: true`. On 2026-09-27 both were on Opus 4.8 while the same settings file
+  (byte-identical) saved `opus5.5`, so the marker is the account default, not the saved session
+  model. `default: true` moves to `claude-opus-5-5`; Opus 4.8 keeps `Opus 4.8 (default)` as a source
+  name. The envelope `defaultModelId` (`claude-sonnet-5-5-c4-p2-agent`) still names no picker row.
+- **Descriptions:** Claude Sonnet 5 now reads "Previous Sonnet model"; both Prism rows route between
+  the newer models. The earlier text stays in each row's notes.
+- The startup tip said "Claude Fable 5 is now available again"; Claude Fable 5 was already a
+  catalog row and is unchanged.
+
+### Scripts
+
+| Temporary script | Purpose | Rerunnable? | Kept? |
+| --- | --- | --- | --- |
+| `launch.cmd` | Cleared variables and started `auggie` in the capture window | Yes, machine-specific | No: the reference documents the variables |
+| `step.ps1` | Generic guarded type/key/read for `/model`, Escape and `/exit` | Yes | No: a thin wrapper over `WindowsUi.ps1` |
+| `build-fixture.mjs` | Built the redacted projection from the helper rows and the probe snapshot | Partly | No: its header prose is specific to this run |
+| `edit-auggie-scope.mjs` | Reordered the scope to the picker, added rows, moved the default | No | No: model rows belong in YAML |

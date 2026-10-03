@@ -1,0 +1,586 @@
+{
+  "kind": "cats-catalog-probe-evidence",
+  "schemaVersion": 1,
+  "provider": "auggie",
+  "backend": "cli",
+  "transport": null,
+  "command": "auggie model list --json",
+  "sourceClass": "machine-readable",
+  "cliVersion": "0.36.0",
+  "versionSource": "npm package",
+  "observedAt": "2026-10-02T23:31:48.330Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "accountScope": "The CLI's existing sign-in on the probing machine. No identity is recorded.",
+  "status": "ok",
+  "completeness": {
+    "membership": "complete",
+    "meaning": "The command lists what the picker offers; an absent row still needs picker confirmation before removal."
+  },
+  "authoritativeFor": {
+    "ids": true,
+    "label": true,
+    "efforts": false,
+    "effortDefault": false
+  },
+  "stillNeedsPicker": "A model (default) marker, picker descriptions, picker order, and every field not listed under authoritativeFor still need picker evidence.",
+  "selection": "all 36 rows",
+  "sourceEvidence": {
+    "defaultModelId": "claude-sonnet-5-5-c4-p2-agent"
+  },
+  "models": [
+    {
+      "id": "butler_a",
+      "label": "Prism (Claude + GPT)",
+      "evidence": {
+        "shortName": "prism-a",
+        "description": "Routes between Claude Opus 5.5, Claude Sonnet 5.5, and GPT-6 Luna low solver tiers.",
+        "costTier": 3,
+        "badges": [
+          {
+            "label": "New"
+          },
+          {
+            "color": "info",
+            "label": "Auto"
+          }
+        ]
+      }
+    },
+    {
+      "id": "butler_b",
+      "label": "Prism (GPT)",
+      "evidence": {
+        "shortName": "prism-b",
+        "description": "Routes between GPT-6.1 Sol deep, GPT-6 Luna xhigh fast, and GPT-6 Luna low solver tiers",
+        "costTier": 3,
+        "badges": [
+          {
+            "label": "New"
+          },
+          {
+            "color": "info",
+            "label": "Auto"
+          }
+        ]
+      }
+    },
+    {
+      "id": "claude-fable-5",
+      "label": "Claude Fable 5",
+      "evidence": {
+        "shortName": "fable-5",
+        "description": "First Anthropic Mythos-class model — Great for long horizon asynchronous tasks",
+        "costTier": 4,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "claude-fable-5-1",
+      "label": "Claude Fable 5.1",
+      "evidence": {
+        "shortName": "fable-5.1",
+        "description": "Latest Anthropic Mythos-class model — Great for long horizon asynchronous tasks",
+        "costTier": 4,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "claude-haiku-4-5",
+      "label": "Haiku 4.5",
+      "evidence": {
+        "shortName": "haiku4.5",
+        "description": "Fast and efficient responses",
+        "costTier": 1
+      }
+    },
+    {
+      "id": "claude-opus-4-6",
+      "label": "Opus 4.6",
+      "evidence": {
+        "shortName": "opus4.6",
+        "description": "Good for complex, multi-step agentic tasks",
+        "costTier": 3,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "claude-opus-4-6-500k",
+      "label": "Opus 4.6 (500K)",
+      "evidence": {
+        "shortName": "opus4.6-500k",
+        "description": "Anthropic Claude Opus 4.6, 500K context window",
+        "costTier": 3,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "claude-opus-4-7",
+      "label": "Opus 4.7",
+      "evidence": {
+        "shortName": "opus4.7",
+        "description": "Great for complex, multi-step agentic tasks",
+        "costTier": 3,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "claude-opus-4-7-500k",
+      "label": "Opus 4.7 (500K)",
+      "evidence": {
+        "shortName": "opus4.7-500k",
+        "description": "Anthropic Claude Opus 4.7, 500K context window",
+        "costTier": 3,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "claude-opus-4-8",
+      "label": "Opus 4.8",
+      "evidence": {
+        "shortName": "opus4.8",
+        "description": "Great for complex, multi-step agentic tasks",
+        "costTier": 3,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "claude-opus-5",
+      "label": "Claude Opus 5",
+      "evidence": {
+        "shortName": "opus5",
+        "description": "Great for complex tasks",
+        "costTier": 3,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "claude-opus-5-5",
+      "label": "Claude Opus 5.5",
+      "evidence": {
+        "shortName": "opus5.5",
+        "description": "Latest Anthropic model for complex tasks",
+        "costTier": 3,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "jsonIsDefault": true
+      }
+    },
+    {
+      "id": "claude-sonnet-4-6",
+      "label": "Sonnet 4.6",
+      "evidence": {
+        "shortName": "sonnet4.6",
+        "description": "Latest Sonnet model with improved capabilities",
+        "costTier": 2,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "claude-sonnet-4-6-500k",
+      "label": "Sonnet 4.6 (500K)",
+      "evidence": {
+        "shortName": "sonnet4.6-500k",
+        "description": "Anthropic Claude Sonnet 4.6, 500K context window",
+        "costTier": 2,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "claude-sonnet-5-0",
+      "label": "Claude Sonnet 5",
+      "evidence": {
+        "shortName": "sonnet5-high",
+        "description": "Previous Sonnet model",
+        "costTier": 2,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "claude-sonnet-5-0-500k",
+      "label": "Claude Sonnet 5 (500K)",
+      "evidence": {
+        "shortName": "sonnet5-500k",
+        "description": "Latest Sonnet model, 500K context window",
+        "costTier": 2,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "claude-sonnet-5-5",
+      "label": "Claude Sonnet 5.5",
+      "evidence": {
+        "shortName": "sonnet5.5",
+        "description": "Latest Sonnet model",
+        "costTier": 2,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "deepseek-4-1-flash",
+      "label": "DeepSeek V4.1 Flash",
+      "evidence": {
+        "shortName": "deepseek-4.1",
+        "description": "Multimodal DeepSeek model with 1M context",
+        "costTier": 1,
+        "effortLevels": [
+          "low",
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "gemini-3-1-pro-preview",
+      "label": "Gemini 3.1 Pro",
+      "evidence": {
+        "shortName": "gemini-3.1-pro-preview",
+        "description": "Cost-efficient for complex tasks",
+        "costTier": 2,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "dynamic"
+        ]
+      }
+    },
+    {
+      "id": "gemini-3-7-flash",
+      "label": "Gemini 3.7 Flash",
+      "evidence": {
+        "shortName": "gemini-3.7-flash",
+        "description": "Fast and cost-efficient, 1M context",
+        "costTier": 1,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "dynamic"
+        ]
+      }
+    },
+    {
+      "id": "gemini-3-8-flash",
+      "label": "Gemini 3.8 Flash",
+      "evidence": {
+        "shortName": "gemini-3.8-flash",
+        "description": "Fast and cost-efficient, 1M context",
+        "costTier": 1,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "dynamic"
+        ]
+      }
+    },
+    {
+      "id": "glm-5-2",
+      "label": "GLM 5.2",
+      "evidence": {
+        "shortName": "glm-5.2",
+        "description": "Great performance at lower cost",
+        "costTier": 1
+      }
+    },
+    {
+      "id": "glm-5-3",
+      "label": "GLM 5.3 Flash",
+      "evidence": {
+        "shortName": "glm-5.3",
+        "description": "Native vision and strong performance at lower cost, 1M context",
+        "costTier": 1,
+        "effortLevels": [
+          "low",
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "gpt-5-5",
+      "label": "GPT-5.5",
+      "evidence": {
+        "shortName": "gpt5.5",
+        "description": "Best for complex tasks",
+        "costTier": 3,
+        "effortLevels": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ]
+      }
+    },
+    {
+      "id": "gpt-5-6-luna",
+      "label": "GPT-5.6 Luna",
+      "evidence": {
+        "shortName": "gpt5.6-luna",
+        "description": "OpenAI model for small-scale automations",
+        "costTier": 1,
+        "effortLevels": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "gpt-5-6-sol",
+      "label": "GPT-5.6 Sol",
+      "evidence": {
+        "shortName": "gpt5.6-sol",
+        "description": "OpenAI model for complex tasks",
+        "costTier": 3,
+        "effortLevels": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "gpt-5-6-terra",
+      "label": "GPT-5.6 Terra",
+      "evidence": {
+        "shortName": "gpt5.6-terra",
+        "description": "OpenAI model for everyday tasks",
+        "costTier": 2,
+        "effortLevels": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "gpt-6-1-sol",
+      "label": "GPT-6.1 Sol",
+      "evidence": {
+        "shortName": "gpt6.1-sol",
+        "description": "OpenAI model for complex coding and agentic workflows",
+        "costTier": 2,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "gpt-6-astra",
+      "label": "GPT-6 Astra",
+      "evidence": {
+        "shortName": "gpt6-astra",
+        "description": "OpenAI model for complex reasoning and long-horizon agent tasks",
+        "costTier": 4,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "gpt-6-luna",
+      "label": "GPT-6 Luna",
+      "evidence": {
+        "shortName": "gpt6-luna",
+        "description": "OpenAI model for focused, high-volume tasks",
+        "costTier": 1,
+        "effortLevels": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "gpt-6-sol",
+      "label": "GPT-6 Sol",
+      "evidence": {
+        "shortName": "gpt6-sol",
+        "description": "OpenAI model for complex coding and agentic workflows",
+        "costTier": 2,
+        "effortLevels": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "grok-4-5",
+      "label": "Grok 4.5",
+      "evidence": {
+        "shortName": "grok4.5",
+        "description": "xAI Grok 4.5 frontier model for coding and agentic tasks",
+        "costTier": 2,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "grok-4-6",
+      "label": "Grok 4.6",
+      "evidence": {
+        "shortName": "grok4.6",
+        "description": "xAI Grok 4.6 frontier model for coding and agentic tasks",
+        "costTier": 2,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "grok-4-7",
+      "label": "Grok 4.7",
+      "evidence": {
+        "shortName": "grok4.7",
+        "description": "xAI Grok 4.7 frontier model for coding and agentic tasks",
+        "costTier": 2,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "kimi-k2p7",
+      "label": "Kimi K2.7 Code",
+      "evidence": {
+        "shortName": "kimi-k2.7",
+        "description": "Coding-focused model with strong performance at lower cost",
+        "costTier": 1
+      }
+    },
+    {
+      "id": "kimi-k3",
+      "label": "Kimi K3",
+      "evidence": {
+        "shortName": "kimi-k3",
+        "description": "Strong performance at lower cost",
+        "costTier": 2,
+        "effortLevels": [
+          "low",
+          "high",
+          "max"
+        ]
+      }
+    }
+  ],
+  "redaction": {
+    "method": "Projected public model fields only; no raw output, account identifier, price, endpoint or login text. String values passed through the skill redaction helper.",
+    "redactions": [],
+    "reviewBeforeCommit": "Check names, paths and provider-specific identifiers by hand; the helper catches only common shapes."
+  }
+}
