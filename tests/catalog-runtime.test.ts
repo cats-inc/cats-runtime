@@ -214,13 +214,13 @@ describe('factory and executable catalog projections', () => {
 
   it('lists the Copilot Pro picker with Terra as default and first-value effort, context and tier', () => {
     const copilot = knowledge(snapshot.document.catalogs.find(s => s.provider === 'copilot' && s.backend === 'cli')!);
-    expect(copilot.catalog.entries).toHaveLength(20);
+    expect(copilot.catalog.entries).toHaveLength(21);
     expect(copilot.catalog.entries.slice(0, 4).map(e => e.id)).toEqual(['auto', 'grok-4.7', 'gpt-5.6-terra', 'mai-code-1.1-flash']);
     expect(copilot.catalog.entries.filter(e => e.default).map(e => e.id)).toEqual(['gpt-5.6-terra']);
     // Plan-unavailable picker rows (Pro+ only) are omitted.
     expect(copilot.catalog.entries.some(e => /opus|fable|astra|sol|^gpt-5\.5$/.test(e.id))).toBe(false);
     const withContext = copilot.catalog.entries.filter(e => e.controls?.some(c => c.key === 'copilot.context'));
-    expect(withContext).toHaveLength(12);
+    expect(withContext).toHaveLength(13);
     const spawn = (entryId: string, controls?: Record<string, string>) => {
       const selected = resolveProviderSelection(copilot, { entryId, entryMode: 'explicit', ...(controls ? { controls } : {}) });
       const args = new CopilotProvider().buildSpawnArgs({ cwd: '/tmp',
@@ -231,6 +231,8 @@ describe('factory and executable catalog projections', () => {
     expect(spawn('gemini-3.5-flash')).toEqual(['--model', 'gemini-3.5-flash', '--effort', 'minimal', '--context', 'default']);
     expect(spawn('grok-4.7', { 'copilot.reasoning_effort': 'xhigh', 'copilot.context': 'long_context' }))
       .toEqual(['--model', 'grok-4.7', '--effort', 'xhigh', '--context', 'long_context']);
+    expect(spawn('claude-sonnet-5.5', { 'copilot.reasoning_effort': 'max', 'copilot.context': 'long_context' }))
+      .toEqual(['--model', 'claude-sonnet-5.5', '--effort', 'max', '--context', 'long_context']);
     expect(spawn('gpt-5.4-mini')).toEqual(['--model', 'gpt-5.4-mini', '--effort', 'none']);
     expect(spawn('auto')).toEqual(['--model', 'auto', '--auto-tier', 'efficiency']);
     expect(spawn('kimi-k2.7-code')).toEqual(['--model', 'kimi-k2.7-code']);

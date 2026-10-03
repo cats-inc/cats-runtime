@@ -15,6 +15,10 @@ the agent to collect the picker; follow [picker intake](../paste-intake.md) for 
   recently used models, so a later capture can reorder the first rows without an upstream change.
 - Only an explicit `(default)` suffix is a model default. The check mark after a label marks the
   session's current model, not a default.
+- From 1.0.91 a Category column (Versatile, Lightweight, Powerful) sits between the label and
+  Context; `Capture-CopilotPicker.ps1` records it as `Category`. Typing `/model` also lists
+  subcommands (`plan`, `auto`, `--session`…); send Enter only while the bare `/model` is the
+  highlighted suggestion.
 - A row whose Context column shows two figures has a Tab context toggle: the first figure is
   `--context default`, the second `--context long_context`. The highlighted figure is only a color
   change, but an unfocused row shows its selected figure as text. A dash means no context control.

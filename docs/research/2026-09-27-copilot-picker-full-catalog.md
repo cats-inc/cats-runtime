@@ -189,3 +189,46 @@ Kept in this PR:
   state and glyph names distinct.
 - **Enter in the picker has side effects.** The operator's selection rewrote `recentModelIds`,
   which also feeds the Recent group, so the first rows' order depends on account history.
+
+## Later refresh (2026-10-03): Copilot 1.0.91
+
+- **Request:** the operator-run catalog probe (2026-10-03) reported `new-candidate claude-sonnet-5.5`
+  and `absent-from-source kimi-k2.7-code` on `copilot/cli` (1.0.88 → 1.0.91). The operator handed
+  every probe finding to the agent ("這次都交給你"). Mode: refresh; policy: confirm uncertainty.
+- **Capture:** 2026-10-03 08:41-08:58 (UTC+8), Windows native, Windows Terminal, `copilot
+  --no-auto-update --no-custom-instructions --disable-builtin-mcps --no-remote --no-remote-export`
+  from an already trusted folder with `COPILOT_*` and agent variables cleared. No prompt was sent;
+  Enter was never sent in the list. `~/.copilot/config.json` kept its post-startup SHA-256
+  throughout. Evidence: [picker projection](./fixtures/copilot-1.0.91/model-picker.agent-capture.redacted.txt)
+  and [models.list](./fixtures/copilot-1.0.91/model-list.probe.redacted.json).
+
+### What changed in the picker
+
+- **Layout:** a Category column (Versatile, Lightweight, Powerful) now precedes Context. The helper
+  read it as the Context figures on its first run; it now records `Category` separately
+  (`Test-CopilotPicker.ps1` covers the layout), and the walk was rerun. Option cycles from the first
+  run are unaffected and were kept.
+- **New selectable row:** Claude Sonnet 5.5 (`claude-sonnet-5.5`, New models, Versatile, Medium
+  cost 200/1000/20/250, Context 328K / 1.1M, Reasoning Low…Max). It is added after Claude Sonnet 5.
+- **Moved to Unavailable models** ("Your plan doesn't include this model"): gemini-3.6-flash,
+  gemini-3.5-flash and kimi-k2.7-code, all selectable on 2026-09-27. gpt-6.1-sol, gpt-6-sol and
+  claude-opus-5.5 appear there for the first time. 18 rows are selectable now (Auto plus 17).
+- The other 17 selectable rows keep their Context figures, option order and the GPT-5.6 Terra
+  `(default)` marker.
+
+### Decision left to the operator
+
+Removing gemini-3.6-flash, gemini-3.5-flash and kimi-k2.7-code needs the operator's confirmation:
+the picker no longer offers them on this account, but whether the Copilot Pro plan itself dropped
+them, or this account's plan changed, is not established. They stay in the scope with a note.
+
+### Scripts
+
+| Temporary script | Purpose | Rerunnable? | Kept? |
+| --- | --- | --- | --- |
+| `launch.cmd` | Cleared variables and started Copilot with the isolation flags | Yes, machine-specific | No: the reference documents the flags |
+| `step.ps1` | Generic guarded type/key/read for `/model`, Escape and `/exit` | Yes | No: a thin wrapper over `WindowsUi.ps1` |
+| `build-fixture.mjs` | Joined the walk rows, option cycles and models.list into the projection | Partly | No: its notes are specific to this run |
+| `edit-copilot-scope.mjs` | Added the row and notes to the copilot scope | No | No: model rows belong in YAML |
+
+Kept: the `Capture-CopilotPicker.ps1` Category-column fix and its `Test-CopilotPicker.ps1` case.
