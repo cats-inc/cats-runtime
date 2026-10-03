@@ -4244,11 +4244,11 @@ providers:
     });
   });
 
-  // Complete Junie 26.9.22 picker, in picker order; ids and labels are the literal names.
+  // Complete Junie 26.9.22 (build 3419.29) picker, in picker order; ids and labels are the literal names.
   const JUNIE_PICKER_NAMES = [
-    'Gemini 3.7 Flash', 'Claude Fable 5.1', 'Claude Opus 5', 'Claude Opus 5.5', 'Claude Sonnet 5',
-    'Gemini 3.6 Flash', 'Gemini 3.8 Flash', 'GPT-5.6-LUNA', 'GPT-5.6-SOL', 'GPT-5.6-TERRA',
-    'GPT-6-ASTRA', 'GPT-6-LUNA', 'GPT-6-SOL', 'Grok 4.6', 'Grok 4.7',
+    'Gemini 3.7 Flash', 'Junie Lite', 'Claude Fable 5.1', 'Claude Opus 5', 'Claude Opus 5.5', 'Claude Sonnet 5',
+    'Claude Sonnet 5.5', 'Gemini 3.6 Flash', 'Gemini 3.8 Flash', 'GPT-5.6-LUNA', 'GPT-5.6-SOL', 'GPT-5.6-TERRA',
+    'GPT-6-ASTRA', 'GPT-6-LUNA', 'GPT-6-SOL', 'GPT-6.1-SOL', 'Grok 4.6', 'Grok 4.7',
   ];
 
   it('GET /providers/junie/models returns the complete picker list', async () => {

@@ -310,6 +310,39 @@ Exercise the walk, option cycling and guards without a desktop or Copilot:
 powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Test-CopilotPicker.ps1
 ```
 
+## Windows Junie helper
+
+[`Capture-JuniePicker.ps1`](../scripts/Capture-JuniePicker.ps1) owns Junie picker semantics and
+takes the same platform helper path. It does not launch Junie or interpret defaults.
+
+1. **Launch.** Read the [Junie reference](providers/junie.md) first: Defender can block Junie's
+   credential read. Clean the environment (launch hygiene above, plus `JUNIE_*` and
+   `EJ_RUNNER_PWD`) and open the versioned `junie.exe --skip-update-check` in a uniquely titled
+   window from an empty private directory. Answer the trust prompt with "Keep untrusted".
+2. **Open the picker.** Type `/model`, wait for the `/model  Choose the LLM model for Junie`
+   suggestion and send one guarded Enter; wait until the rows replace `Loading models`.
+3. **Capture.** Pass the footer count and the settings file, normally `~/.junie/settings.json`:
+
+```powershell
+powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/scripts/Capture-JuniePicker.ps1 `
+  -UiHelperPath $desktopUiHelper -WindowTitle $captureWindowTitle `
+  -OutputDirectory $newEmptyEvidenceDirectory -ConfigPath $junieSettings -ExpectedModelCount $footerCount
+```
+
+- It goes Up to row 1, reads each highlighted row (name with badges, prices, Effort cell, provider,
+  footer description), presses Right until the Effort cell returns to its start, then Down. A row
+  whose Effort cell does not change is recorded as single-valued. It returns to the starting row.
+- It sends only Up, Down and Right, and reports whether the settings file kept its SHA-256.
+- Afterwards close the picker with Escape and exit the owned Junie with `/quit` (typing `/exit`
+  autocompletes to it).
+
+It packages the traversal that ran natively on 2026-10-03; the packaged script itself has run
+offline only. Exercise it without a desktop or Junie:
+
+```powershell
+powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Test-JuniePicker.ps1
+```
+
 ## Turn evidence into data
 
 Trim only terminal padding/chrome, mark redactions visibly, and retain material picker text under

@@ -1,0 +1,300 @@
+{
+  "kind": "cats-catalog-probe-evidence",
+  "schemaVersion": 1,
+  "provider": "junie",
+  "backend": "cli",
+  "transport": null,
+  "command": "installed Junie JAR model enum (junie-model-ids.mjs)",
+  "sourceClass": "static-artifact",
+  "cliVersion": "3419.29",
+  "versionSource": "Junie build number (the catalog records the release version)",
+  "observedAt": "2026-10-02T23:31:48.330Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "accountScope": "Data in the installed package. Not account-resolved.",
+  "status": "ok",
+  "completeness": {
+    "membership": "superset",
+    "meaning": "Static data that can list more than the picker; it does not prove a row is offered."
+  },
+  "authoritativeFor": {
+    "ids": true,
+    "label": true,
+    "efforts": false,
+    "effortDefault": false
+  },
+  "stillNeedsPicker": "A model (default) marker, picker descriptions, picker order, and every field not listed under authoritativeFor still need picker evidence.",
+  "selection": "all 36 rows",
+  "sourceEvidence": {
+    "aliases": [
+      "gpt",
+      "gpt-codex",
+      "opus",
+      "sonnet",
+      "gemini-pro",
+      "gemini-flash",
+      "grok"
+    ]
+  },
+  "models": [
+    {
+      "id": "gemini-3-flash-preview",
+      "label": "Gemini 3 Flash Preview",
+      "evidence": {
+        "enumName": "GEMINI_3_0_FLASH"
+      }
+    },
+    {
+      "id": "gemini-3.1-flash-lite",
+      "label": "Gemini 3.1 Flash Lite",
+      "evidence": {
+        "enumName": "GEMINI_3_1_FLASH_LITE"
+      }
+    },
+    {
+      "id": "grok-4.5",
+      "label": "Grok 4.5",
+      "evidence": {
+        "enumName": "GROK_4_5"
+      }
+    },
+    {
+      "id": "grok-4.6",
+      "label": "Grok 4.6",
+      "evidence": {
+        "enumName": "GROK_4_6"
+      }
+    },
+    {
+      "id": "grok-4.7",
+      "label": "Grok 4.7",
+      "evidence": {
+        "enumName": "GROK_4_7"
+      }
+    },
+    {
+      "id": "claude-sonnet-5",
+      "label": "Claude Sonnet 5",
+      "evidence": {
+        "enumName": "SONNET_5"
+      }
+    },
+    {
+      "id": "claude-sonnet-5-5",
+      "label": "Claude Sonnet 5.5",
+      "evidence": {
+        "enumName": "SONNET_5_5"
+      }
+    },
+    {
+      "id": "claude-sonnet-4-6",
+      "label": "Claude Sonnet 4.6",
+      "evidence": {
+        "enumName": "SONNET_4_6"
+      }
+    },
+    {
+      "id": "claude-opus-4-6",
+      "label": "Claude Opus 4.6",
+      "evidence": {
+        "enumName": "OPUS_4_6"
+      }
+    },
+    {
+      "id": "claude-opus-4-7",
+      "label": "Claude Opus 4.7",
+      "evidence": {
+        "enumName": "OPUS_4_7"
+      }
+    },
+    {
+      "id": "claude-opus-4-8",
+      "label": "Claude Opus 4.8",
+      "evidence": {
+        "enumName": "OPUS_4_8"
+      }
+    },
+    {
+      "id": "claude-opus-5",
+      "label": "Claude Opus 5",
+      "evidence": {
+        "enumName": "OPUS_5"
+      }
+    },
+    {
+      "id": "claude-opus-5-5",
+      "label": "Claude Opus 5.5",
+      "evidence": {
+        "enumName": "OPUS_5_5"
+      }
+    },
+    {
+      "id": "claude-fable-5",
+      "label": "Claude Fable 5",
+      "evidence": {
+        "enumName": "FABLE_5"
+      }
+    },
+    {
+      "id": "claude-fable-5-1",
+      "label": "Claude Fable 5.1",
+      "evidence": {
+        "enumName": "FABLE_5_1"
+      }
+    },
+    {
+      "id": "gpt-5-2025-08-07",
+      "label": "GPT-5",
+      "evidence": {
+        "enumName": "GPT5"
+      }
+    },
+    {
+      "id": "gpt-5.3-codex",
+      "label": "GPT-5.3-codex",
+      "evidence": {
+        "enumName": "GPT5_3_CODEX"
+      }
+    },
+    {
+      "id": "gpt-5.4",
+      "label": "GPT-5.4",
+      "evidence": {
+        "enumName": "GPT5_4"
+      }
+    },
+    {
+      "id": "gpt-5.5",
+      "label": "GPT-5.5",
+      "evidence": {
+        "enumName": "GPT5_5"
+      }
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "label": "GPT-5.6-SOL",
+      "evidence": {
+        "enumName": "GPT5_6_SOL"
+      }
+    },
+    {
+      "id": "gpt-6-astra",
+      "label": "GPT-6-ASTRA",
+      "evidence": {
+        "enumName": "GPT6_ASTRA"
+      }
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "label": "GPT-5.6-TERRA",
+      "evidence": {
+        "enumName": "GPT5_6_TERRA"
+      }
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "label": "GPT-5.6-LUNA",
+      "evidence": {
+        "enumName": "GPT5_6_LUNA"
+      }
+    },
+    {
+      "id": "gpt-6-sol",
+      "label": "GPT-6-SOL",
+      "evidence": {
+        "enumName": "GPT6_SOL"
+      }
+    },
+    {
+      "id": "gpt-6.1-sol",
+      "label": "GPT-6.1-SOL",
+      "evidence": {
+        "enumName": "GPT6_1_SOL"
+      }
+    },
+    {
+      "id": "gpt-6-luna",
+      "label": "GPT-6-LUNA",
+      "evidence": {
+        "enumName": "GPT6_LUNA"
+      }
+    },
+    {
+      "id": "gpt-5.2-2025-12-11",
+      "label": "GPT-5.2",
+      "evidence": {
+        "enumName": "GPT5_2"
+      }
+    },
+    {
+      "id": "gemini-3.1-pro-preview",
+      "label": "Gemini 3.1 Pro Preview",
+      "evidence": {
+        "enumName": "GEMINI_3_1_PRO"
+      }
+    },
+    {
+      "id": "grok-4.3",
+      "label": "Grok 4.3",
+      "evidence": {
+        "enumName": "GROK_4_3"
+      }
+    },
+    {
+      "id": "gemini-3.6-flash",
+      "label": "Gemini 3.6 Flash",
+      "evidence": {
+        "enumName": "GEMINI_3_6_FLASH"
+      }
+    },
+    {
+      "id": "gemini-3.7-flash",
+      "label": "Gemini 3.7 Flash",
+      "evidence": {
+        "enumName": "GEMINI_3_7_FLASH"
+      }
+    },
+    {
+      "id": "gemini-3.8-flash",
+      "label": "Gemini 3.8 Flash",
+      "evidence": {
+        "enumName": "GEMINI_3_8_FLASH"
+      }
+    },
+    {
+      "id": "gemini-3.5-flash-lite",
+      "label": "Gemini 3.5 Flash Lite",
+      "evidence": {
+        "enumName": "GEMINI_3_5_FLASH_LITE"
+      }
+    },
+    {
+      "id": "junie-mix",
+      "label": "Junie Mix",
+      "evidence": {
+        "enumName": "JETBRAINS_MIX"
+      }
+    },
+    {
+      "id": "junie-lite",
+      "label": "Junie Lite",
+      "evidence": {
+        "enumName": "JETBRAINS_LITE"
+      }
+    },
+    {
+      "id": "deepseek-v4-flash",
+      "label": "Deepseek V4 Flash",
+      "evidence": {
+        "enumName": "DEEPSEEK_V4_FLASH"
+      }
+    }
+  ],
+  "redaction": {
+    "method": "Projected public model fields only; no raw output, account identifier, price, endpoint or login text. String values passed through the skill redaction helper.",
+    "redactions": [],
+    "reviewBeforeCommit": "Check names, paths and provider-specific identifiers by hand; the helper catches only common shapes."
+  }
+}

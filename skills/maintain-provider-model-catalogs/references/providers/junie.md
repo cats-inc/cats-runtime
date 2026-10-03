@@ -8,7 +8,9 @@ out of scope unless the operator asks for them.
 
 ## Bounded evidence
 
-- **Picker:** `/model` opens `Select model`, with a footer counter `i/N`.
+- **Picker:** `/model` opens `Select model`, with a footer counter `i/N`. On Windows,
+  `Capture-JuniePicker.ps1` implements the traversal below; see the Windows Junie helper in
+  [interactive capture](../interactive-capture.md).
   - Up and Down move rows. Right cycles the highlighted row's effort. Escape closes the picker.
   - Never send Enter: it selects the row.
   - The Effort cell shows the row's saved `effortPerModel` value, not a default. Return each row
@@ -32,7 +34,10 @@ out of scope unless the operator asks for them.
   `powershell -NoProfile -NonInteractive -EncodedCommand …` (DPAPI). When an agent launched Junie,
   Defender blocked that child process as `Trojan:Win32/Commando.A!ml`. Junie's log then shows
   `Cannot run program "powershell": CreateProcess error=5` and the CLI exits before its UI.
-  An operator-launched Junie was not blocked. The cause of that difference is not established.
+  An operator-launched Junie was not blocked then. On 2026-10-03, after an auto-update to build
+  3419.29, the operator's own launches were blocked too (three detections). Once the operator
+  restored the detection, an agent launch started normally with no new detection. The cause of
+  either difference is not established.
 - **After the first unexpected exit, check Defender first.** Look at protection history, or
   `Get-MpThreatDetection` for events after the launch time. Every retry adds another detection,
   so do not relaunch to experiment.
