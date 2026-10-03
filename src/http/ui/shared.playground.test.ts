@@ -346,7 +346,7 @@ describe('shared playground selection helpers', () => {
       div: { querySelector: () => controls }, catalog, entryId: '' };
     vm.createContext(context);
     vm.runInContext(html.slice(start, end), context);
-    expect(models).toHaveLength(21);
+    expect(models).toHaveLength(18);
     expect(models.filter(model => model.default).map(model => model.id)).toEqual(['gpt-5.6-terra']);
     const input = { provider: 'copilot', selectableProviders: ['copilot'], providerOrder: ['copilot'],
       advancedCatalogs: { copilot: catalog } };
@@ -364,10 +364,9 @@ describe('shared playground selection helpers', () => {
       auto: [['efficiency', 'Efficiency']],
       'gpt-5.6-terra': [['none', 'None'], ['default', '400K']],
       'claude-sonnet-5': [['low', 'Low'], ['default', '264K']],
-      'gemini-3.6-flash': [['minimal', 'Minimal'], ['default', '264K']],
+      'gemini-3.7-flash': [['low', 'Low'], ['default', '264K']],
       'gpt-5.4-mini': [['none', 'None']],
       'claude-haiku-4.5': [],
-      'kimi-k2.7-code': [],
     });
     expect(catsUI.normalizePlaygroundAgentSelection({ ...input, modelSelection: {
       entryId: 'grok-4.7', entryMode: 'explicit',

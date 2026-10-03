@@ -1416,14 +1416,14 @@ catalogs:
       plan:
         label: Copilot Pro
     notes:
-      - "Complete /model picker for a Copilot Pro account: 20 selectable rows (Auto plus 19 models), captured 2026-09-27 (UTC+8) from GitHub Copilot CLI 1.0.88 on Windows native by operating the picker, plus Claude Sonnet 5.5 from the 2026-10-03 capture of 1.0.91. Rows follow the 2026-09-27 recommended grouping in arrival order; the new row follows Claude Sonnet 5. Evidence: docs/research/fixtures/copilot-1.0.91/model-picker.agent-capture.redacted.txt, docs/research/fixtures/copilot-1.0.91/model-list.probe.redacted.json, docs/research/fixtures/copilot-1.0.88/model-picker.agent-capture.redacted.txt and docs/research/2026-09-27-copilot-picker-full-catalog.md."
-      - "On 2026-10-03 (1.0.91) the same account's picker listed gemini-3.6-flash, gemini-3.5-flash and kimi-k2.7-code under Unavailable models (Your plan doesn't include this model), next to 13 other unavailable rows, including gpt-6.1-sol, gpt-6-sol and claude-opus-5.5. The three rows stay in this scope until the operator decides whether the Copilot Pro plan dropped them."
-      - "The picker also lists 10 Unavailable models whose detail pane says the plan does not include them (gpt-6-astra, gpt-5.6-sol, gpt-5.5, claude-fable-5.1, claude-fable-5, claude-opus-5, claude-opus-4.8, claude-opus-4.8-fast, claude-opus-4.7, claude-sonnet-4.6). They need Copilot Pro+ or higher and are omitted. Pro+ users can still enter those IDs as custom model strings."
+      - "Complete /model picker for a Copilot Pro account: 18 selectable rows (Auto plus 17 models). First captured 2026-09-27 (UTC+8) from GitHub Copilot CLI 1.0.88 on Windows native by operating the picker; the 2026-10-03 capture of 1.0.91 added Claude Sonnet 5.5 and moved gemini-3.6-flash, gemini-3.5-flash and kimi-k2.7-code to Unavailable models. Rows follow the 2026-09-27 recommended grouping in arrival order; Claude Sonnet 5.5 follows Claude Sonnet 5. Evidence: docs/research/fixtures/copilot-1.0.91/model-picker.agent-capture.redacted.txt, docs/research/fixtures/copilot-1.0.91/model-list.probe.redacted.json, docs/research/fixtures/copilot-1.0.88/model-picker.agent-capture.redacted.txt and docs/research/2026-09-27-copilot-picker-full-catalog.md."
+      - "On 2026-10-03 the operator confirmed removing gemini-3.6-flash, gemini-3.5-flash and kimi-k2.7-code, which the 1.0.91 picker listed under Unavailable models (Your plan doesn't include this model). They remain reachable as custom model strings on plans that include them."
+      - "The 1.0.91 picker lists 16 Unavailable models whose detail pane says the plan does not include them (gpt-6.1-sol, gpt-6-sol, gpt-6-astra, gpt-5.6-sol, gpt-5.5, claude-fable-5.1, claude-fable-5, claude-opus-5.5, claude-opus-5, claude-opus-4.8, claude-opus-4.8-fast, claude-opus-4.7, claude-sonnet-4.6, gemini-3.6-flash, gemini-3.5-flash, kimi-k2.7-code). They are omitted; users whose plan includes them can enter those IDs as custom model strings."
       - "The picker groups rows as Recent, Recommended, New and Other. The Recent group follows the account's recently used models, so a later capture can reorder the first rows without an upstream catalog change."
-      - "IDs come from the models.list RPC, except the four Gemini rows, which models.list omits. The operator confirmed gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash and gemini-3.5-flash, and selecting Gemini 3.8 Flash printed Model changed from Auto to gemini-3.8-flash (medium)."
+      - "IDs come from the models.list RPC, except the two Gemini rows, which models.list omits. On 2026-09-27 the operator confirmed gemini-3.8-flash and gemini-3.7-flash, and selecting Gemini 3.8 Flash printed Model changed from Auto to gemini-3.8-flash (medium)."
       - "Only GPT-5.6 Terra carries a (default) marker, so it is the only default row. Auto shows a check mark for the current session selection only."
       - "Reasoning, Context and Tier values follow each row's picker order. No value carries a default marker, so selection starts at the first value and always sends --effort, --context or --auto-tier, overriding the setting Copilot would otherwise use. Picker arrival values (mostly Medium, Auto Balance) were session state, not defaults. This follows the operator's 2026-09-27 instruction, as for Junie and Kiro."
-      - "Context is a Tab toggle on the 13 rows that show two figures: the first figure is --context default and the second --context long_context. Figures are picker text, not token limits. Rows showing a dash have no context control."
+      - "Context is a Tab toggle on the 11 rows that show two figures: the first figure is --context default and the second --context long_context. Figures are picker text, not token limits. Rows showing a dash have no context control."
       - "From 1.0.91 the picker shows a Category column (Versatile, Lightweight or Powerful) before Context. It is recorded in the evidence only."
       - "Detail-pane cost tiers and credits per 1M tokens are recorded per row in notes. Captured on Windows native only: WSL shares this scope, but a WSL installation and account may see different models. BYOK and custom providers are out of scope. Custom model strings remain available."
     models:
@@ -1971,82 +1971,6 @@ catalogs:
               - value: long_context
                 label: "1M"
       - default: false
-        id: gemini-3.6-flash
-        label: Gemini 3.6 Flash
-        notes:
-          - "Picker group: Other models. Detail pane: Low cost; credits per 1M tokens input 75, output 375, cache read 7.5, cache write 0."
-          - "Picker context figures: 264K (default) and 1M (long_context). Long context raises the credits shown in the detail pane."
-          - "Arrival reasoning value was Medium, with no default marker."
-          - "Absent from models.list; ID confirmed by the operator on 2026-09-27."
-        source_names:
-          - gemini-3.6-flash
-          - "Gemini 3.6 Flash"
-        execution:
-          model: gemini-3.6-flash
-        controls:
-          - key: copilot.reasoning_effort
-            label: Reasoning
-            description: Reasoning effort, sent as --effort.
-            kind: enum
-            scope: both
-            values:
-              - value: minimal
-                label: "Minimal"
-              - value: low
-                label: "Low"
-              - value: medium
-                label: "Medium"
-              - value: high
-                label: "High"
-          - key: copilot.context
-            label: Context
-            description: Context window tier, sent as --context.
-            kind: enum
-            scope: both
-            values:
-              - value: default
-                label: "264K"
-              - value: long_context
-                label: "1M"
-      - default: false
-        id: gemini-3.5-flash
-        label: Gemini 3.5 Flash
-        notes:
-          - "Picker group: Other models. Detail pane: Medium cost; credits per 1M tokens input 150, output 900, cache read 15, cache write 0."
-          - "Picker context figures: 264K (default) and 1M (long_context). Long context raises the credits shown in the detail pane."
-          - "Arrival reasoning value was Medium, with no default marker."
-          - "Absent from models.list; ID confirmed by the operator on 2026-09-27."
-        source_names:
-          - gemini-3.5-flash
-          - "Gemini 3.5 Flash"
-        execution:
-          model: gemini-3.5-flash
-        controls:
-          - key: copilot.reasoning_effort
-            label: Reasoning
-            description: Reasoning effort, sent as --effort.
-            kind: enum
-            scope: both
-            values:
-              - value: minimal
-                label: "Minimal"
-              - value: low
-                label: "Low"
-              - value: medium
-                label: "Medium"
-              - value: high
-                label: "High"
-          - key: copilot.context
-            label: Context
-            description: Context window tier, sent as --context.
-            kind: enum
-            scope: both
-            values:
-              - value: default
-                label: "264K"
-              - value: long_context
-                label: "1M"
-      - default: false
         id: grok-4.5
         label: Grok 4.5
         notes:
@@ -2107,19 +2031,7 @@ catalogs:
                 label: "High"
               - value: max
                 label: "Max"
-      - default: false
-        id: kimi-k2.7-code
-        label: Kimi K2.7 Code
-        notes:
-          - "Picker group: Other models. Detail pane: Low cost; credits per 1M tokens input 95, output 400, cache read 19, cache write 0."
-          - "Picker context column shows a dash: no context control."
-          - "Picker Reasoning column shows a dash and the row has no effort arrows: no reasoning control."
-        source_names:
-          - kimi-k2.7-code
-          - "Kimi K2.7 Code"
-        execution:
-          model: kimi-k2.7-code
-        controls: []
+
   - provider: opencode
     backend: cli
     selection_mode: shortlist

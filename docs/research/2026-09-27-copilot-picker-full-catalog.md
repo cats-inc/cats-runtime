@@ -232,3 +232,10 @@ them, or this account's plan changed, is not established. They stay in the scope
 | `edit-copilot-scope.mjs` | Added the row and notes to the copilot scope | No | No: model rows belong in YAML |
 
 Kept: the `Capture-CopilotPicker.ps1` Category-column fix and its `Test-CopilotPicker.ps1` case.
+
+### Operator decision (2026-10-03)
+
+The operator confirmed removing gemini-3.6-flash, gemini-3.5-flash and kimi-k2.7-code, which the 1.0.91
+picker lists under Unavailable models for this account. The scope now holds the 18 selectable rows
+(Auto plus 17 models). The probe acknowledgements for the two Gemini rows are removed with them;
+those for gemini-3.8-flash and gemini-3.7-flash stay, since models.list still omits every Gemini row.
