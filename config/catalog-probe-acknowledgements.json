@@ -18,22 +18,6 @@
       "acknowledgedOn": "2026-10-02"
     },
     {
-      "provider": "copilot",
-      "kind": "absent-from-source",
-      "subject": "gemini-3.6-flash",
-      "reason": "models.list omits every Gemini picker row; the picker offered it and the operator confirmed the ID. Only a picker capture can show its withdrawal",
-      "evidence": "docs/research/2026-09-27-copilot-picker-full-catalog.md",
-      "acknowledgedOn": "2026-10-02"
-    },
-    {
-      "provider": "copilot",
-      "kind": "absent-from-source",
-      "subject": "gemini-3.5-flash",
-      "reason": "models.list omits every Gemini picker row; the picker offered it and the operator confirmed the ID. Only a picker capture can show its withdrawal",
-      "evidence": "docs/research/2026-09-27-copilot-picker-full-catalog.md",
-      "acknowledgedOn": "2026-10-02"
-    },
-    {
       "provider": "pi",
       "kind": "new-candidate",
       "subject": "gpt-5.3-codex-spark",
