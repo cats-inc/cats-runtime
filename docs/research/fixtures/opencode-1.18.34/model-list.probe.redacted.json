@@ -1,0 +1,128 @@
+{
+  "kind": "cats-catalog-probe-evidence",
+  "schemaVersion": 1,
+  "provider": "opencode",
+  "backend": "cli",
+  "transport": null,
+  "command": "opencode models <channel> --verbose --pure",
+  "sourceClass": "machine-readable",
+  "cliVersion": "1.18.34",
+  "versionSource": "npm package",
+  "observedAt": "2026-10-03T01:33:38.055Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "accountScope": "The CLI's existing sign-in on the probing machine. No identity is recorded.",
+  "status": "ok",
+  "completeness": {
+    "membership": "complete",
+    "meaning": "The command lists what the picker offers; an absent row still needs picker confirmation before removal."
+  },
+  "authoritativeFor": {
+    "ids": true,
+    "label": true,
+    "efforts": false,
+    "effortDefault": false
+  },
+  "stillNeedsPicker": "A model (default) marker, picker descriptions, picker order, and every field not listed under authoritativeFor still need picker evidence.",
+  "selection": {
+    "ids": [
+      "opencode-go/deepseek-v4.1-flash",
+      "opencode-go/glm-5.3-flash",
+      "opencode-go/hy4-preview",
+      "opencode-go/minimax-m3",
+      "opencode-go/qwen3.8-flash"
+    ]
+  },
+  "models": [
+    {
+      "id": "opencode-go/deepseek-v4.1-flash",
+      "label": "DeepSeek V4.1 Flash",
+      "evidence": {
+        "family": "deepseek-flash",
+        "status": "active",
+        "releaseDate": "2026-09-10",
+        "contextLimit": 1000000,
+        "outputLimit": 384000,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/glm-5.3-flash",
+      "label": "GLM-5.3-Flash",
+      "evidence": {
+        "family": "glm-flash",
+        "status": "active",
+        "releaseDate": "2026-08-26",
+        "contextLimit": 1000000,
+        "outputLimit": 131072,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/hy4-preview",
+      "label": "Hy4 preview",
+      "evidence": {
+        "family": "Hy",
+        "status": "active",
+        "releaseDate": "2026-08-28",
+        "contextLimit": 1024000,
+        "outputLimit": 64000,
+        "reasoning": true,
+        "variants": [
+          "none",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/minimax-m3",
+      "label": "MiniMax-M3",
+      "evidence": {
+        "family": "minimax-m3",
+        "status": "active",
+        "releaseDate": "2026-05-31",
+        "contextLimit": 1000000,
+        "outputLimit": 131072,
+        "reasoning": true,
+        "variants": [
+          "none",
+          "thinking"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/qwen3.8-flash",
+      "label": "Qwen3.8 Flash",
+      "evidence": {
+        "family": "qwen",
+        "status": "active",
+        "releaseDate": "2026-08-26",
+        "contextLimit": 1000000,
+        "outputLimit": 131072,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "medium",
+          "xhigh"
+        ]
+      }
+    }
+  ],
+  "redaction": {
+    "method": "Projected public model fields only; no raw output, account identifier, price, endpoint or login text. String values passed through the skill redaction helper.",
+    "redactions": [],
+    "reviewBeforeCommit": "Check names, paths and provider-specific identifiers by hand; the helper catches only common shapes."
+  }
+}

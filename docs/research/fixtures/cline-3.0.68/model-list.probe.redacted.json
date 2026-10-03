@@ -1,0 +1,121 @@
+{
+  "kind": "cats-catalog-probe-evidence",
+  "schemaVersion": 1,
+  "provider": "cline",
+  "backend": "cli",
+  "transport": null,
+  "command": "installed @cline/llms dist/models.js provider block (read, never executed)",
+  "sourceClass": "static-artifact",
+  "cliVersion": "3.0.68",
+  "versionSource": "npm package",
+  "observedAt": "2026-10-03T01:33:38.055Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "accountScope": "Data in the installed package. Not account-resolved.",
+  "status": "ok",
+  "completeness": {
+    "membership": "superset",
+    "meaning": "Static data that can list more than the picker; it does not prove a row is offered."
+  },
+  "authoritativeFor": {
+    "ids": true,
+    "label": false,
+    "efforts": false,
+    "effortDefault": false
+  },
+  "stillNeedsPicker": "A model (default) marker, picker descriptions, picker order, and every field not listed under authoritativeFor still need picker evidence.",
+  "selection": {
+    "ids": [
+      "cline-pass/glm-5.3",
+      "cline-pass/deepseek-v4-pro",
+      "cline-pass/qwen3.8-max",
+      "cline-pass/kimi-k3",
+      "cline-pass/minimax-m3",
+      "cline-pass/mimo-v2.5-pro"
+    ]
+  },
+  "models": [
+    {
+      "id": "cline-pass/glm-5.3",
+      "label": "GLM-5.3",
+      "evidence": {
+        "family": "glm",
+        "releaseDate": "2026-08-14",
+        "contextWindow": 1048576,
+        "maxTokens": 131072,
+        "reasoningOptions": [
+          "effort"
+        ]
+      }
+    },
+    {
+      "id": "cline-pass/deepseek-v4-pro",
+      "label": "DeepSeek V4 Pro",
+      "evidence": {
+        "family": "deepseek-thinking",
+        "releaseDate": "2026-04-24",
+        "contextWindow": 1048576,
+        "maxTokens": 384000,
+        "reasoningOptions": [
+          "toggle",
+          "effort"
+        ]
+      }
+    },
+    {
+      "id": "cline-pass/qwen3.8-max",
+      "label": "cline-pass/qwen3.8-max",
+      "evidence": {
+        "contextWindow": 128000,
+        "maxTokens": 8192
+      }
+    },
+    {
+      "id": "cline-pass/kimi-k3",
+      "label": "Kimi K3",
+      "evidence": {
+        "family": "kimi-k3",
+        "releaseDate": "2026-07-16",
+        "contextWindow": 1048576,
+        "maxTokens": 943718,
+        "reasoningOptions": [
+          "toggle",
+          "effort"
+        ]
+      }
+    },
+    {
+      "id": "cline-pass/minimax-m3",
+      "label": "MiniMax-M3",
+      "evidence": {
+        "family": "minimax",
+        "releaseDate": "2026-06-01",
+        "contextWindow": 1048576,
+        "maxTokens": 512000,
+        "reasoningOptions": [
+          "toggle"
+        ]
+      }
+    },
+    {
+      "id": "cline-pass/mimo-v2.5-pro",
+      "label": "MiMo-V2.5-Pro",
+      "evidence": {
+        "family": "mimo",
+        "releaseDate": "2026-04-22",
+        "contextWindow": 1050000,
+        "maxTokens": 131072,
+        "reasoningOptions": [
+          "toggle"
+        ]
+      }
+    }
+  ],
+  "redaction": {
+    "method": "Projected public model fields only; no raw output, account identifier, price, endpoint or login text. String values passed through the skill redaction helper.",
+    "redactions": [],
+    "reviewBeforeCommit": "Check names, paths and provider-specific identifiers by hand; the helper catches only common shapes."
+  }
+}

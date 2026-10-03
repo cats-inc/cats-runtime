@@ -1,0 +1,305 @@
+{
+  "kind": "cats-catalog-probe-evidence",
+  "schemaVersion": 1,
+  "provider": "codex",
+  "backend": "cli",
+  "transport": null,
+  "command": "codex debug models",
+  "sourceClass": "machine-readable",
+  "cliVersion": "0.160.0",
+  "versionSource": "npm package",
+  "observedAt": "2026-10-03T01:33:38.055Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "accountScope": "The CLI's existing sign-in on the probing machine. No identity is recorded.",
+  "status": "ok",
+  "completeness": {
+    "membership": "complete",
+    "meaning": "The command lists what the picker offers; an absent row still needs picker confirmation before removal."
+  },
+  "authoritativeFor": {
+    "ids": true,
+    "label": true,
+    "efforts": "codex.reasoning_effort",
+    "effortDefault": true
+  },
+  "stillNeedsPicker": "A model (default) marker, picker descriptions, picker order, and every field not listed under authoritativeFor still need picker evidence.",
+  "selection": "all 10 rows",
+  "models": [
+    {
+      "id": "gpt-6.1-sol",
+      "label": "GPT-6.1-Sol",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra"
+      ],
+      "effortDefault": "low",
+      "hidden": false,
+      "evidence": {
+        "description": "Latest workhorse model for coding and everyday work.",
+        "visibility": "list",
+        "contextWindow": 272000,
+        "maxContextWindow": 872000,
+        "effortDescriptions": {
+          "low": "Fast responses with lighter reasoning",
+          "medium": "Balances speed and reasoning depth for everyday tasks",
+          "high": "Greater reasoning depth for complex problems",
+          "xhigh": "Extra high reasoning depth for complex problems",
+          "max": "Maximum reasoning depth for the hardest problems",
+          "ultra": "Maximum reasoning with automatic task delegation"
+        }
+      }
+    },
+    {
+      "id": "gpt-6-astra",
+      "label": "GPT-6-Astra",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra"
+      ],
+      "effortDefault": "medium",
+      "hidden": false,
+      "evidence": {
+        "description": "Frontier intelligence for the most demanding work.",
+        "visibility": "list",
+        "contextWindow": 272000,
+        "maxContextWindow": 872000,
+        "effortDescriptions": {
+          "low": "Fast responses with lighter reasoning",
+          "medium": "Balances speed and reasoning depth for everyday tasks",
+          "high": "Greater reasoning depth for complex problems",
+          "xhigh": "Extra high reasoning depth for complex problems",
+          "max": "Maximum reasoning depth for the hardest problems",
+          "ultra": "Maximum reasoning with automatic task delegation"
+        }
+      }
+    },
+    {
+      "id": "gpt-6-sol",
+      "label": "GPT-6-Sol",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra"
+      ],
+      "effortDefault": "medium",
+      "hidden": false,
+      "evidence": {
+        "description": "Previous generation workhorse model.",
+        "visibility": "list",
+        "contextWindow": 272000,
+        "maxContextWindow": 872000,
+        "effortDescriptions": {
+          "low": "Fast responses with lighter reasoning",
+          "medium": "Balances speed and reasoning depth for everyday tasks",
+          "high": "Greater reasoning depth for complex problems",
+          "xhigh": "Extra high reasoning depth for complex problems",
+          "max": "Maximum reasoning depth for the hardest problems",
+          "ultra": "Maximum reasoning with automatic task delegation"
+        }
+      }
+    },
+    {
+      "id": "gpt-6-luna",
+      "label": "GPT-6-Luna",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "medium",
+      "hidden": false,
+      "evidence": {
+        "description": "Fast and affordable model for easier tasks.",
+        "visibility": "list",
+        "contextWindow": 272000,
+        "maxContextWindow": 872000,
+        "effortDescriptions": {
+          "low": "Fast responses with lighter reasoning",
+          "medium": "Balances speed and reasoning depth for everyday tasks",
+          "high": "Greater reasoning depth for complex problems",
+          "xhigh": "Extra high reasoning depth for complex problems",
+          "max": "Maximum reasoning depth for the hardest problems"
+        }
+      }
+    },
+    {
+      "id": "gpt-reserve",
+      "label": "GPT-Reserve",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "medium",
+      "hidden": true,
+      "evidence": {
+        "description": "Fast and affordable agentic coding model.",
+        "visibility": "hide",
+        "contextWindow": 272000,
+        "maxContextWindow": 872000,
+        "effortDescriptions": {
+          "low": "Fast responses with lighter reasoning",
+          "medium": "Balances speed and reasoning depth for everyday tasks",
+          "high": "Greater reasoning depth for complex problems",
+          "xhigh": "Extra high reasoning depth for complex problems",
+          "max": "Maximum reasoning depth for the hardest problems"
+        }
+      }
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "label": "GPT-5.6-Sol",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra"
+      ],
+      "effortDefault": "low",
+      "hidden": false,
+      "evidence": {
+        "description": "Older generation workhorse model.",
+        "visibility": "list",
+        "contextWindow": 272000,
+        "maxContextWindow": 872000,
+        "effortDescriptions": {
+          "low": "Fast responses with lighter reasoning",
+          "medium": "Balances speed and reasoning depth for everyday tasks",
+          "high": "Greater reasoning depth for complex problems",
+          "xhigh": "Extra high reasoning depth for complex problems",
+          "max": "Maximum reasoning depth for the hardest problems",
+          "ultra": "Maximum reasoning with automatic task delegation"
+        }
+      }
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "label": "GPT-5.6-Terra",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra"
+      ],
+      "effortDefault": "medium",
+      "hidden": false,
+      "evidence": {
+        "description": "Older balanced model for straightforward work.",
+        "visibility": "list",
+        "contextWindow": 272000,
+        "maxContextWindow": 872000,
+        "effortDescriptions": {
+          "low": "Fast responses with lighter reasoning",
+          "medium": "Balances speed and reasoning depth for everyday tasks",
+          "high": "Greater reasoning depth for complex problems",
+          "xhigh": "Extra high reasoning depth for complex problems",
+          "max": "Maximum reasoning depth for the hardest problems",
+          "ultra": "Maximum reasoning with automatic task delegation"
+        }
+      }
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "label": "GPT-5.6-Luna",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "medium",
+      "hidden": false,
+      "evidence": {
+        "description": "Older fast and efficient model.",
+        "visibility": "list",
+        "contextWindow": 272000,
+        "maxContextWindow": 872000,
+        "effortDescriptions": {
+          "low": "Fast responses with lighter reasoning",
+          "medium": "Balances speed and reasoning depth for everyday tasks",
+          "high": "Greater reasoning depth for complex problems",
+          "xhigh": "Extra high reasoning depth for complex problems",
+          "max": "Maximum reasoning depth for the hardest problems"
+        }
+      }
+    },
+    {
+      "id": "gpt-5.5",
+      "label": "GPT-5.5",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "effortDefault": "medium",
+      "hidden": false,
+      "evidence": {
+        "description": "Legacy coding model.",
+        "visibility": "list",
+        "contextWindow": 272000,
+        "maxContextWindow": 272000,
+        "effortDescriptions": {
+          "low": "Fast responses with lighter reasoning",
+          "medium": "Balances speed and reasoning depth for everyday tasks",
+          "high": "Greater reasoning depth for complex problems",
+          "xhigh": "Extra high reasoning depth for complex problems"
+        }
+      }
+    },
+    {
+      "id": "codex-auto-review",
+      "label": "Codex Auto Review",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "medium",
+      "hidden": true,
+      "evidence": {
+        "description": "Automatic approval review model for Codex.",
+        "visibility": "hide",
+        "contextWindow": 272000,
+        "maxContextWindow": 872000,
+        "effortDescriptions": {
+          "low": "Fast responses with lighter reasoning",
+          "medium": "Balances speed and reasoning depth for everyday tasks",
+          "high": "Greater reasoning depth for complex problems",
+          "xhigh": "Extra high reasoning depth for complex problems",
+          "max": "Maximum reasoning depth for the hardest problems"
+        }
+      }
+    }
+  ],
+  "redaction": {
+    "method": "Projected public model fields only; no raw output, account identifier, price, endpoint or login text. String values passed through the skill redaction helper.",
+    "redactions": [],
+    "reviewBeforeCommit": "Check names, paths and provider-specific identifiers by hand; the helper catches only common shapes."
+  }
+}

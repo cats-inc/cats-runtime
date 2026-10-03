@@ -1,0 +1,52 @@
+{
+  "kind": "cats-catalog-probe-evidence",
+  "schemaVersion": 1,
+  "provider": "grok",
+  "backend": "cli",
+  "transport": null,
+  "command": "grok models",
+  "sourceClass": "machine-readable",
+  "cliVersion": "1.0.46",
+  "versionSource": "--version",
+  "observedAt": "2026-10-03T01:33:38.055Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "accountScope": "The CLI's existing sign-in on the probing machine. No identity is recorded.",
+  "status": "ok",
+  "completeness": {
+    "membership": "complete",
+    "meaning": "The command lists what the picker offers; an absent row still needs picker confirmation before removal."
+  },
+  "authoritativeFor": {
+    "ids": true,
+    "label": false,
+    "efforts": false,
+    "effortDefault": false
+  },
+  "stillNeedsPicker": "A model (default) marker, picker descriptions, picker order, and every field not listed under authoritativeFor still need picker evidence.",
+  "selection": "all 4 rows",
+  "models": [
+    {
+      "id": "grok-4.7",
+      "evidence": {
+        "listMarkedDefault": true
+      }
+    },
+    {
+      "id": "grok-4.7-build-fast"
+    },
+    {
+      "id": "grok-4.6"
+    },
+    {
+      "id": "grok-4.5"
+    }
+  ],
+  "redaction": {
+    "method": "Projected public model fields only; no raw output, account identifier, price, endpoint or login text. String values passed through the skill redaction helper.",
+    "redactions": [],
+    "reviewBeforeCommit": "Check names, paths and provider-specific identifiers by hand; the helper catches only common shapes."
+  }
+}
