@@ -449,7 +449,7 @@ describe('shared playground selection helpers', () => {
       div: { querySelector: () => controls }, catalog, entryId: '' };
     vm.createContext(context);
     vm.runInContext(html.slice(start, end), context);
-    expect(models).toHaveLength(7);
+    expect(models).toHaveLength(8);
     expect(models.some(model => model.default)).toBe(false);
     const input = { provider: 'pi', selectableProviders: ['pi'], providerOrder: ['pi'],
       advancedCatalogs: { pi: catalog } };
@@ -465,6 +465,7 @@ describe('shared playground selection helpers', () => {
     expect(levels['openai-codex/gpt-5.5']).toEqual(['off', 'minimal', 'low', 'medium', 'high', 'xhigh']);
     expect(levels['openai-codex/gpt-6-astra']).toEqual(['minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
     expect(levels['openai-codex/gpt-6-sol']).toEqual(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
+    expect(levels['openai-codex/gpt-6.1-sol']).toEqual(['minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
     const custom = 'anthropic/claude-opus-5';
     expect(catsUI.normalizePlaygroundAgentSelection({ ...input, model: custom }))
       .toEqual({ provider: 'pi', model: custom, modelSelection: null });

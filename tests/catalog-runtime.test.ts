@@ -157,7 +157,7 @@ describe('factory and executable catalog projections', () => {
     expect(pi.catalog.entries.map(e => e.id)).toEqual([
       'openai-codex/gpt-5.5', 'openai-codex/gpt-5.6-luna', 'openai-codex/gpt-5.6-sol',
       'openai-codex/gpt-5.6-terra', 'openai-codex/gpt-6-astra', 'openai-codex/gpt-6-luna',
-      'openai-codex/gpt-6-sol',
+      'openai-codex/gpt-6-sol', 'openai-codex/gpt-6.1-sol',
     ]);
     // Labels are bare model ids; the openai-codex channel is shown once, as the scope basis.
     expect(pi.catalog.entries.every(e => e.label === e.id.replace(/^openai-codex\//, ''))).toBe(true);
@@ -174,8 +174,10 @@ describe('factory and executable catalog projections', () => {
     ]);
     expect(spawn('openai-codex/gpt-6-sol', { 'pi.thinking': 'max' }).slice(-2)).toEqual(['--thinking', 'max']);
     expect(spawn('openai-codex/gpt-5.5', { 'pi.thinking': 'off' }).slice(-2)).toEqual(['--thinking', 'off']);
-    // Levels follow each model's thinkingLevelMap: gpt-6-astra has no off, gpt-5.5 no max.
+    // Levels follow each model's thinkingLevelMap: gpt-6-astra and gpt-6.1-sol have no off, gpt-5.5 no max.
     expect(() => spawn('openai-codex/gpt-6-astra', { 'pi.thinking': 'off' })).toThrow();
+    expect(() => spawn('openai-codex/gpt-6.1-sol', { 'pi.thinking': 'off' })).toThrow();
+    expect(spawn('openai-codex/gpt-6.1-sol', { 'pi.thinking': 'max' }).slice(-4)).toEqual(['--model', 'gpt-6.1-sol', '--thinking', 'max']);
     expect(() => spawn('openai-codex/gpt-5.5', { 'pi.thinking': 'max' })).toThrow();
   });
 

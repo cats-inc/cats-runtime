@@ -2313,19 +2313,19 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Pi
-    cli_version: 0.87.1
-    last_updated: 2026-09-29
+    cli_version: 1.0.0
+    last_updated: 2026-10-03
     basis:
       channel:
         id: openai-codex
         label: openai-codex
     notes:
-      - "The openai-codex (ChatGPT subscription) channel of Pi 0.87.1: the models in the installed pi-ai registry (identical to the local model store refreshed 2026-09-27) that a ChatGPT account can run. Labels are the bare model ids, since the scope basis shows the openai-codex channel (operator decision 2026-09-29, replacing the <id> [openai-codex] labels); rows keep registry order; the selector only moves the current and a configured default model to the top. Other Pi providers are out of scope and remain available as custom provider/model strings."
-      - "The channel list is Pi's build-time catalog, not account entitlement. Pi also lists gpt-5.3-codex-spark, which is omitted: the same ChatGPT account's Codex CLI 0.156.1 list (2026-09-24) did not include it, and a Cats turn selecting it failed on 2026-09-29 with \"The 'gpt-5.3-codex-spark' model is not supported when using Codex with a ChatGPT account.\" It remains reachable as a custom provider/model string."
-      - "Thinking values per row are Pi's getSupportedThinkingLevels over each model's thinkingLevelMap, in Pi's order, labeled with Pi's tokens and thinking-selector descriptions. gpt-6-astra has no off. Pi sends minimal as the low reasoning effort on every row here."
+      - "The openai-codex (ChatGPT subscription) channel of Pi 1.0.0: the models in the installed pi-ai registry (identical to the local model store refreshed 2026-10-03) that a ChatGPT account can run. Labels are the bare model ids, since the scope basis shows the openai-codex channel (operator decision 2026-09-29, replacing the <id> [openai-codex] labels); rows keep registry order; the selector only moves the current and a configured default model to the top. Other Pi providers are out of scope and remain available as custom provider/model strings."
+      - "The channel list is Pi's build-time catalog, not account entitlement. Pi also lists gpt-5.3-codex-spark, which is omitted: the same ChatGPT account's Codex CLI lists (0.156.1 on 2026-09-24, 0.160.0 on 2026-10-03) did not include it, and a Cats turn selecting it failed on 2026-09-29 with \"The 'gpt-5.3-codex-spark' model is not supported when using Codex with a ChatGPT account.\" It remains reachable as a custom provider/model string. gpt-6.1-sol, new in Pi 1.0.0, is in that Codex 0.160.0 list."
+      - "Thinking values per row are Pi's getSupportedThinkingLevels over each model's thinkingLevelMap, in Pi's order, labeled with Pi's tokens and thinking-selector descriptions. gpt-6-astra and gpt-6.1-sol have no off. Pi sends minimal as the low reasoning effort on every row here."
       - "Pi's thinking selector marks the default thinking level (settings defaultThinkingLevel, or the built-in medium when unset), so medium is the control default. The model selector marks only a user-configured default model, so no row is a default and the UI initializes the first row."
       - "Execution uses --provider openai-codex --model <raw ID> --thinking <level>. Limits are the registry contextWindow and maxTokens."
-      - "Evidence: docs/research/2026-09-27-pi-openai-codex-full-catalog.md and docs/research/fixtures/pi-0.87.1/openai-codex-models.redacted.json."
+      - "Evidence: docs/research/2026-09-27-pi-openai-codex-full-catalog.md, docs/research/fixtures/pi-0.87.1/openai-codex-models.redacted.json and docs/research/fixtures/pi-1.0.0/model-list.probe.redacted.json."
     models:
       - id: openai-codex/gpt-5.5
         label: gpt-5.5
@@ -2602,6 +2602,44 @@ catalogs:
               - value: off
                 label: off
                 description: "No reasoning"
+              - value: minimal
+                label: minimal
+                description: "Very brief reasoning (~1k tokens)"
+              - value: low
+                label: low
+                description: "Light reasoning (~2k tokens)"
+              - value: medium
+                label: medium
+                description: "Moderate reasoning (~8k tokens)"
+              - value: high
+                label: high
+                description: "Deep reasoning (~16k tokens)"
+              - value: xhigh
+                label: xhigh
+                description: "Extra-high reasoning (~32k tokens)"
+              - value: max
+                label: max
+                description: "Maximum reasoning"
+            default: medium
+      - id: openai-codex/gpt-6.1-sol
+        label: gpt-6.1-sol
+        limits:
+          contextWindowTokens: 272000
+          maxOutputTokens: 128000
+        notes:
+          - "Pi name: GPT-6.1 Sol. Input: text, image."
+        source_names:
+          - openai-codex/gpt-6.1-sol
+        execution:
+          model: gpt-6.1-sol
+          provider: openai-codex
+        controls:
+          - key: pi.thinking
+            label: Thinking
+            description: Pi thinking level, sent as --thinking.
+            kind: enum
+            scope: both
+            values:
               - value: minimal
                 label: minimal
                 description: "Very brief reasoning (~1k tokens)"
