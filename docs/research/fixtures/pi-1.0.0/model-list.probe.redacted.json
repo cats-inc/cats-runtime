@@ -1,0 +1,302 @@
+{
+  "kind": "cats-catalog-probe-evidence",
+  "schemaVersion": 1,
+  "provider": "pi",
+  "backend": "cli",
+  "transport": null,
+  "command": "installed pi-ai models.generated.js (extract-pi-models.mjs)",
+  "sourceClass": "static-artifact",
+  "cliVersion": "1.0.0",
+  "versionSource": "npm package",
+  "observedAt": "2026-10-02T23:31:48.330Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "accountScope": "Data in the installed package. Not account-resolved.",
+  "status": "ok",
+  "completeness": {
+    "membership": "complete",
+    "meaning": "The command lists what the picker offers; an absent row still needs picker confirmation before removal."
+  },
+  "authoritativeFor": {
+    "ids": true,
+    "label": false,
+    "efforts": "pi.thinking",
+    "effortDefault": true
+  },
+  "stillNeedsPicker": "A model (default) marker, picker descriptions, picker order, and every field not listed under authoritativeFor still need picker evidence.",
+  "selection": "all 9 rows",
+  "sourceEvidence": {
+    "piAiVersion": "1.0.0",
+    "defaultThinkingLevel": "medium"
+  },
+  "models": [
+    {
+      "id": "gpt-5.3-codex-spark",
+      "efforts": [
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "effortDefault": "medium",
+      "evidence": {
+        "name": "GPT-5.3 Codex Spark",
+        "input": [
+          "text"
+        ],
+        "reasoning": true,
+        "thinkingLevelMap": {
+          "xhigh": "xhigh",
+          "minimal": "low"
+        },
+        "contextWindow": 128000,
+        "maxTokens": 128000
+      }
+    },
+    {
+      "id": "gpt-5.5",
+      "efforts": [
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "effortDefault": "medium",
+      "evidence": {
+        "name": "GPT-5.5",
+        "input": [
+          "text",
+          "image"
+        ],
+        "reasoning": true,
+        "thinkingLevelMap": {
+          "xhigh": "xhigh",
+          "minimal": "low"
+        },
+        "contextWindow": 272000,
+        "maxTokens": 128000
+      }
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "efforts": [
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "medium",
+      "evidence": {
+        "name": "GPT-5.6 Luna",
+        "input": [
+          "text",
+          "image"
+        ],
+        "reasoning": true,
+        "thinkingLevelMap": {
+          "xhigh": "xhigh",
+          "max": "max",
+          "minimal": "low"
+        },
+        "contextWindow": 272000,
+        "maxTokens": 128000
+      }
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "efforts": [
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "medium",
+      "evidence": {
+        "name": "GPT-5.6 Sol",
+        "input": [
+          "text",
+          "image"
+        ],
+        "reasoning": true,
+        "thinkingLevelMap": {
+          "xhigh": "xhigh",
+          "max": "max",
+          "minimal": "low"
+        },
+        "contextWindow": 272000,
+        "maxTokens": 128000
+      }
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "efforts": [
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "medium",
+      "evidence": {
+        "name": "GPT-5.6 Terra",
+        "input": [
+          "text",
+          "image"
+        ],
+        "reasoning": true,
+        "thinkingLevelMap": {
+          "xhigh": "xhigh",
+          "max": "max",
+          "minimal": "low"
+        },
+        "contextWindow": 272000,
+        "maxTokens": 128000
+      }
+    },
+    {
+      "id": "gpt-6-astra",
+      "efforts": [
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "medium",
+      "evidence": {
+        "name": "GPT-6 Astra",
+        "input": [
+          "text",
+          "image"
+        ],
+        "reasoning": true,
+        "thinkingLevelMap": {
+          "off": null,
+          "minimal": "low",
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "contextWindow": 272000,
+        "maxTokens": 128000
+      }
+    },
+    {
+      "id": "gpt-6-luna",
+      "efforts": [
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "medium",
+      "evidence": {
+        "name": "GPT-6 Luna",
+        "input": [
+          "text",
+          "image"
+        ],
+        "reasoning": true,
+        "thinkingLevelMap": {
+          "off": "none",
+          "minimal": "low",
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "contextWindow": 272000,
+        "maxTokens": 128000
+      }
+    },
+    {
+      "id": "gpt-6-sol",
+      "efforts": [
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "medium",
+      "evidence": {
+        "name": "GPT-6 Sol",
+        "input": [
+          "text",
+          "image"
+        ],
+        "reasoning": true,
+        "thinkingLevelMap": {
+          "off": "none",
+          "minimal": "low",
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "contextWindow": 272000,
+        "maxTokens": 128000
+      }
+    },
+    {
+      "id": "gpt-6.1-sol",
+      "efforts": [
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "medium",
+      "evidence": {
+        "name": "GPT-6.1 Sol",
+        "input": [
+          "text",
+          "image"
+        ],
+        "reasoning": true,
+        "thinkingLevelMap": {
+          "off": null,
+          "minimal": "low",
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "contextWindow": 272000,
+        "maxTokens": 128000
+      }
+    }
+  ],
+  "redaction": {
+    "method": "Projected public model fields only; no raw output, account identifier, price, endpoint or login text. String values passed through the skill redaction helper.",
+    "redactions": [],
+    "reviewBeforeCommit": "Check names, paths and provider-specific identifiers by hand; the helper catches only common shapes."
+  }
+}

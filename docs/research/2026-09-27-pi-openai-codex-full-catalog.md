@@ -115,6 +115,22 @@ its refreshed local store (2026-09-27) both still include Spark, so Pi has not c
 stays reachable as a custom `openai-codex/gpt-5.3-codex-spark` string. The first row, and a new
 selection without a saved choice, is now `gpt-5.5`.
 
+## Later change (2026-10-03): Pi 1.0.0
+
+The operator-run catalog probe (2026-10-03, Windows) read the installed Pi 1.0.0 package (pi-ai
+1.0.0) with `extract-pi-models.mjs`. The openai-codex channel now has 9 rows: the earlier 8 in the
+same order, then `gpt-6.1-sol` (GPT-6.1 Sol, text and image, 272,000-token context window, 128,000
+maximum output). Its thinking levels are `minimal, low, medium, high, xhigh, max`, with no `off`, like
+`gpt-6-astra`; `minimal` again maps to the `low` API effort. The built-in default is still
+`medium`, and the thinking-selector descriptions are unchanged. The local model store has the same
+ids in the same order.
+
+The same account's Codex CLI 0.160.0 `codex debug models` lists `gpt-6.1-sol` as a picker row and
+still omits `gpt-5.3-codex-spark`, so the new row is added after `gpt-6-sol` and Spark stays out.
+The other 7 rows' levels and defaults match. Evidence:
+[probe fixture](./fixtures/pi-1.0.0/model-list.probe.redacted.json). Operator authorization: "這次都交給你"
+(2026-10-03), handing over every probe finding.
+
 ## Scripts
 
 | Temporary script | Purpose | Rerunnable? | Kept? |
