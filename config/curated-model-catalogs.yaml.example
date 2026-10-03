@@ -2664,11 +2664,11 @@ catalogs:
     selection_mode: full
     source_cli: Auggie
     cli_version: 0.36.0
-    last_updated: 2026-09-27
+    last_updated: 2026-10-03
     notes:
-      - "Complete 34-row /model picker, captured 2026-09-27 (UTC+8) from Auggie 0.36.0 on Windows native by operating the CLI picker. Rows follow picker order; IDs come from auggie model list --json, whose 34 displayName values equal the picker labels one to one. Evidence: docs/research/fixtures/auggie-0.36.0/model-picker.agent-capture.redacted.txt and docs/research/2026-09-27-auggie-picker-full-catalog.md."
-      - "Pass id literally to --model. IDs are opaque; Prism rows use butler_a and butler_b. Each row was selected once in the picker and reported Using model: <label>."
-      - "Opus 4.8 is the only row the picker marks (default), and its JSON row has isDefault true. The (current) suffix on the session model and the JSON envelope defaultModelId, which names no picker row, are not catalog defaults."
+      - "Complete 36-row /model picker, captured 2026-10-03 (UTC+8) from Auggie 0.36.0 on Windows native by operating the CLI picker (first capture 2026-09-27, 34 rows). Rows follow picker order; IDs come from auggie model list --json, whose 36 displayName values equal the picker labels one to one. Evidence: docs/research/fixtures/auggie-0.36.0/model-picker.agent-capture.2026-10-03.redacted.txt, docs/research/fixtures/auggie-0.36.0/model-list.probe.redacted.json, docs/research/fixtures/auggie-0.36.0/model-picker.agent-capture.redacted.txt and docs/research/2026-09-27-auggie-picker-full-catalog.md."
+      - "Pass id literally to --model. IDs are opaque; Prism rows use butler_a and butler_b. On 2026-09-27 each of the 34 rows was selected once in the picker and reported Using model: <label>; GPT-6.1 Sol and Claude Sonnet 5.5 (2026-10-03) are matched by exact displayName and were not selected."
+      - "Claude Opus 5.5 is the only row the picker marks (default) on 2026-10-03, and its JSON row has isDefault true; on 2026-09-27 both marked Opus 4.8. The settings file was byte-identical at both captures, so the marker is not the saved session model. The (current) suffix on the session model and the JSON envelope defaultModelId, which names no picker row, are not catalog defaults."
       - "Effort is not bound: the picker shows no effort for any row, and selecting a row opens no effort step, so controls stay empty. JSON effortLevels per model and the global --reasoning-effort flag are recorded in model notes and the research note only."
       - Capture covers this Windows native installation and account only. WSL shares this scope but may see different models. BYOK is out of scope. Custom model strings remain available.
     models:
@@ -2684,17 +2684,17 @@ catalogs:
         execution:
           model: gpt-6-astra
         controls: []
-      - id: gpt-6-sol
-        label: GPT-6 Sol
+      - id: gpt-6-1-sol
+        label: GPT-6.1 Sol
         notes:
           - "Picker description: OpenAI model for complex coding and agentic workflows"
           - "Picker cost tier: $$."
-          - "JSON effortLevels: none, low, medium, high, xhigh, max. Not bound as a Cats control."
+          - "JSON effortLevels: low, medium, high, xhigh, max. Not bound as a Cats control."
         source_names:
-          - gpt-6-sol
-          - GPT-6 Sol
+          - gpt-6-1-sol
+          - GPT-6.1 Sol
         execution:
-          model: gpt-6-sol
+          model: gpt-6-1-sol
         controls: []
       - id: gpt-6-luna
         label: GPT-6 Luna
@@ -2722,7 +2722,8 @@ catalogs:
         execution:
           model: claude-fable-5-1
         controls: []
-      - id: claude-opus-5-5
+      - default: true
+        id: claude-opus-5-5
         label: Claude Opus 5.5
         capabilityTags:
           - reasoning
@@ -2733,20 +2734,21 @@ catalogs:
         source_names:
           - claude-opus-5-5
           - Claude Opus 5.5
+          - Claude Opus 5.5 (default)
         execution:
           model: claude-opus-5-5
         controls: []
-      - id: claude-sonnet-5-0
-        label: Claude Sonnet 5
+      - id: claude-sonnet-5-5
+        label: Claude Sonnet 5.5
         notes:
-          - "Picker description: Latest Sonnet model, High effort"
+          - "Picker description: Latest Sonnet model"
           - "Picker cost tier: $$."
           - "JSON effortLevels: low, medium, high, xhigh, max. Not bound as a Cats control."
         source_names:
-          - claude-sonnet-5-0
-          - Claude Sonnet 5
+          - claude-sonnet-5-5
+          - Claude Sonnet 5.5
         execution:
-          model: claude-sonnet-5-0
+          model: claude-sonnet-5-5
         controls: []
       - id: grok-4-7
         label: Grok 4.7
@@ -2811,7 +2813,8 @@ catalogs:
       - id: butler_a
         label: Prism (Claude + GPT)
         notes:
-          - "Picker description: Routes between Claude Opus 5, Claude Sonnet 5, and GPT-5.6 Luna."
+          - "Picker description: Routes between Claude Opus 5.5, Claude Sonnet 5.5, and GPT-6 Luna low solver tiers."
+          - "Earlier picker description (2026-09-27): Routes between Claude Opus 5, Claude Sonnet 5, and GPT-5.6 Luna."
           - "Picker cost tier: $$$; badges: New, Auto."
           - "JSON effortLevels: none listed. Not bound as a Cats control."
         source_names:
@@ -2823,7 +2826,8 @@ catalogs:
       - id: butler_b
         label: Prism (GPT)
         notes:
-          - "Picker description: Routes between GPT-5.6 Sol deep, GPT-5.6 Luna mid-range, and Luna no-thinking solver tiers"
+          - "Picker description: Routes between GPT-6.1 Sol deep, GPT-6 Luna xhigh fast, and GPT-6 Luna low solver tiers"
+          - "Earlier picker description (2026-09-27): Routes between GPT-5.6 Sol deep, GPT-5.6 Luna mid-range, and Luna no-thinking solver tiers"
           - "Picker cost tier: $$$; badges: New, Auto."
           - "JSON effortLevels: none listed. Not bound as a Cats control."
         source_names:
@@ -2880,6 +2884,18 @@ catalogs:
         execution:
           model: gpt-5-6-luna
         controls: []
+      - id: gpt-6-sol
+        label: GPT-6 Sol
+        notes:
+          - "Picker description: OpenAI model for complex coding and agentic workflows"
+          - "Picker cost tier: $$."
+          - "JSON effortLevels: none, low, medium, high, xhigh, max. Not bound as a Cats control."
+        source_names:
+          - gpt-6-sol
+          - GPT-6 Sol
+        execution:
+          model: gpt-6-sol
+        controls: []
       - id: gpt-5-5
         label: GPT-5.5
         notes:
@@ -2904,8 +2920,7 @@ catalogs:
         execution:
           model: claude-opus-5
         controls: []
-      - default: true
-        id: claude-opus-4-8
+      - id: claude-opus-4-8
         label: Opus 4.8
         notes:
           - "Picker description: Great for complex, multi-step agentic tasks"
@@ -2917,6 +2932,19 @@ catalogs:
           - Opus 4.8 (default)
         execution:
           model: claude-opus-4-8
+        controls: []
+      - id: claude-sonnet-5-0
+        label: Claude Sonnet 5
+        notes:
+          - "Picker description: Previous Sonnet model"
+          - "Earlier picker description (2026-09-27): Latest Sonnet model, High effort"
+          - "Picker cost tier: $$."
+          - "JSON effortLevels: low, medium, high, xhigh, max. Not bound as a Cats control."
+        source_names:
+          - claude-sonnet-5-0
+          - Claude Sonnet 5
+        execution:
+          model: claude-sonnet-5-0
         controls: []
       - id: claude-opus-4-7
         label: Opus 4.7
