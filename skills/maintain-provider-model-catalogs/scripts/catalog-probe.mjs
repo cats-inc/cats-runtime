@@ -16,6 +16,7 @@ import { parseArgs } from 'node:util';
 import { exitCodeFor, validateAcknowledgements, validateSnapshot } from './catalog-probe/compare.mjs';
 import { buildEvidence, selectSnapshotSources, writeEvidence } from './catalog-probe/evidence.mjs';
 import { renderHtml } from './catalog-probe/html.mjs';
+import { buildHandoff } from './catalog-probe/handoff.mjs';
 import { handoffPrompt, renderMarkdown, renderTerminal } from './catalog-probe/report.mjs';
 import { runSource, SOURCES } from './catalog-probe/sources.mjs';
 
@@ -130,13 +131,18 @@ function openInBrowser(path) {
   }
 }
 
-function writeReport({ outDir, repo, report, json, open }) {
+function writeReport({ outDir, repo, report, snapshot, snapshotPath, catalogDocument, json, open }) {
   mkdirSync(outDir, { recursive: true });
   const reportPath = join(outDir, 'report.json');
   const htmlPath = join(outDir, 'report.html');
-  writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  const reportJson = `${JSON.stringify(report, null, 2)}\n`;
+  const handoffJson = `${JSON.stringify(buildHandoff({
+    report, snapshot, catalogDocument, repo, snapshotPath, reportPath,
+  }), null, 2)}\n`;
+  writeFileSync(reportPath, reportJson);
+  writeFileSync(join(outDir, 'agent-handoff.json'), handoffJson);
   writeFileSync(join(outDir, 'report.md'), renderMarkdown(report, { reportPath }));
-  const files = Object.fromEntries(['snapshot.json', 'report.json', 'report.md']
+  const files = Object.fromEntries(['snapshot.json', 'report.json', 'report.md', 'agent-handoff.json']
     .filter((name) => existsSync(join(outDir, name)))
     .map((name) => [name, name]));
   const handoff = report.needsAgent.length ? handoffPrompt(report, reportPath) : null;
@@ -145,6 +151,9 @@ function writeReport({ outDir, repo, report, json, open }) {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   } else {
     process.stdout.write(renderTerminal(report, { reportDir: relative(repo, outDir) || outDir, reportPath }));
+    if (report.needsAgent.length) {
+      process.stdout.write(`Agent input: ${Buffer.byteLength(handoffJson)} bytes; full report: ${Buffer.byteLength(reportJson)} bytes.\n`);
+    }
     process.stdout.write(`View: ${pathToFileURL(htmlPath).href}\n`);
   }
   if (open && !json) openInBrowser(htmlPath);
@@ -159,7 +168,7 @@ function usage() {
     '                            [--name model-list.probe] [--fixtures-root <dir>] [--force]',
     '',
     'probe runs each installed CLI\'s read-only model enumeration, writes snapshot.json, report.json,',
-    'report.md and report.html under tmp/catalog-probe/<time>/ (outside Git), and prints a summary.',
+    'report.md, report.html and agent-handoff.json under tmp/catalog-probe/<time>/ (outside Git).',
     '--open shows report.html in the default browser.',
     'validate re-checks a saved snapshot, for example after a catalog or acknowledgement change.',
     'evidence writes a scope\'s rows with their provenance as a committable redacted fixture under',
@@ -230,10 +239,12 @@ async function main(argv) {
   const environment = { catalogSourceDigest: factory.sourceDigest, personalOverride: personalOverride(process.env) };
 
   let snapshot;
+  let snapshotPath;
   let outDir;
   if (command === 'validate') {
     const read = readSnapshot(values.snapshot);
     snapshot = read.snapshot;
+    snapshotPath = read.snapshotPath;
     outDir = values.out ? resolve(values.out) : dirname(read.snapshotPath);
   } else {
     const timeoutMs = values.timeout ? Number(values.timeout) : 60000;
@@ -248,11 +259,12 @@ async function main(argv) {
       onResult: values.json ? undefined : (result) => process.stderr.write(`  ${result.provider}: ${result.status}${result.reason ? ` (${result.reason})` : ''}\n`),
     });
     mkdirSync(outDir, { recursive: true });
-    writeFileSync(join(outDir, 'snapshot.json'), `${JSON.stringify(snapshot, null, 2)}\n`);
+    snapshotPath = join(outDir, 'snapshot.json');
+    writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
   }
 
   const report = validateSnapshot({ snapshot, catalogDocument: factory.document, acknowledgements, environment });
-  writeReport({ outDir, repo, report, json: values.json, open: values.open });
+  writeReport({ outDir, repo, report, snapshot, snapshotPath, catalogDocument: factory.document, json: values.json, open: values.open });
   return exitCodeFor(report);
 }
 

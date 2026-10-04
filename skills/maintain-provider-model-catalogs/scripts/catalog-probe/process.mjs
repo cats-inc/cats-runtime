@@ -14,6 +14,12 @@ const DROP_ENV = new Set([
 const DROP_PREFIXES = ['CLAUDE_CODE_'];
 const MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
 
+/** Includes nested helpers that preserve errno only in their error message. */
+export function isPermissionDenied(error) {
+  return ['EPERM', 'EACCES'].includes(error?.code)
+    || /\b(?:EPERM|EACCES)\b/.test(String(error?.message ?? error));
+}
+
 export function cleanEnv(base = process.env, { dropPrefixes = [], drop = [], set = {} } = {}) {
   const env = {};
   const prefixes = [...DROP_PREFIXES, ...dropPrefixes];

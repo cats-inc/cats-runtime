@@ -1,5 +1,6 @@
 // Renders a validation report for the terminal and as Markdown. Both are views of report.json,
-// which is what an agent reads.
+// A compact agent-handoff.json beside it contains just the actionable evidence.
+import { dirname, join } from 'node:path';
 
 const VERDICT_TEXT = {
   none: 'clean',
@@ -42,7 +43,7 @@ function resultText(scope) {
 
 export function handoffPrompt(report, reportPath) {
   const scopes = report.needsAgent.join(', ');
-  return `Use the maintain-provider-model-catalogs skill to work through the catalog probe report at ${reportPath} (scopes: ${scopes}). Policy: confirm uncertainty.`;
+  return `Use the maintain-provider-model-catalogs skill. Read ${join(dirname(reportPath), 'agent-handoff.json')} first (scopes: ${scopes}); it contains the actionable findings, relevant rows and evidence/validation commands. Reuse the saved snapshot and capture only missing evidence. Full report: ${reportPath}. Policy: confirm uncertainty.`;
 }
 
 export function renderTerminal(report, { reportDir, reportPath } = {}) {

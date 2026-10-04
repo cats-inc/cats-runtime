@@ -1,0 +1,109 @@
+{
+  "kind": "cats-catalog-probe-evidence",
+  "schemaVersion": 1,
+  "provider": "antigravity",
+  "backend": "cli",
+  "transport": null,
+  "command": "agy models",
+  "sourceClass": "machine-readable",
+  "cliVersion": "1.2.16",
+  "versionSource": "--version",
+  "observedAt": "2026-10-04T11:22:56.477Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "accountScope": "The CLI's existing sign-in on the probing machine. No identity is recorded.",
+  "status": "ok",
+  "completeness": {
+    "membership": "complete",
+    "meaning": "The command lists what the picker offers; an absent row still needs picker confirmation before removal."
+  },
+  "authoritativeFor": {
+    "ids": true,
+    "label": false,
+    "efforts": false,
+    "effortDefault": false
+  },
+  "stillNeedsPicker": "A model (default) marker, picker descriptions, picker order, and every field not listed under authoritativeFor still need picker evidence.",
+  "selection": "all 18 rows",
+  "models": [
+    {
+      "id": "gemini-3.8-flash-high",
+      "label": "Gemini 3.8 Flash (High)"
+    },
+    {
+      "id": "gemini-3.8-flash-medium",
+      "label": "Gemini 3.8 Flash (Medium)"
+    },
+    {
+      "id": "gemini-3.8-flash-low",
+      "label": "Gemini 3.8 Flash (Low)"
+    },
+    {
+      "id": "gemini-3.7-flash-high",
+      "label": "Gemini 3.7 Flash (High)"
+    },
+    {
+      "id": "gemini-3.7-flash-medium",
+      "label": "Gemini 3.7 Flash (Medium)"
+    },
+    {
+      "id": "gemini-3.7-flash-low",
+      "label": "Gemini 3.7 Flash (Low)"
+    },
+    {
+      "id": "gemini-3.6-flash-high",
+      "label": "Gemini 3.6 Flash (High)"
+    },
+    {
+      "id": "gemini-3.6-flash-medium",
+      "label": "Gemini 3.6 Flash (Medium)"
+    },
+    {
+      "id": "gemini-3.6-flash-low",
+      "label": "Gemini 3.6 Flash (Low)"
+    },
+    {
+      "id": "gemini-3.1-pro-high",
+      "label": "Gemini 3.1 Pro (High)"
+    },
+    {
+      "id": "gemini-3.1-pro-low",
+      "label": "Gemini 3.1 Pro (Low)"
+    },
+    {
+      "id": "claude-opus-5-5-low",
+      "label": "Claude Opus 5.5 (Low)"
+    },
+    {
+      "id": "claude-opus-5-5-medium",
+      "label": "Claude Opus 5.5 (Medium)"
+    },
+    {
+      "id": "claude-opus-5-5-high",
+      "label": "Claude Opus 5.5 (High)"
+    },
+    {
+      "id": "claude-sonnet-5-5-low",
+      "label": "Claude Sonnet 5.5 (Low)"
+    },
+    {
+      "id": "claude-sonnet-5-5-medium",
+      "label": "Claude Sonnet 5.5 (Medium)"
+    },
+    {
+      "id": "claude-sonnet-5-5-high",
+      "label": "Claude Sonnet 5.5 (High)"
+    },
+    {
+      "id": "gpt-oss-120b-medium",
+      "label": "GPT-OSS 120B (Medium)"
+    }
+  ],
+  "redaction": {
+    "method": "Projected public model fields only; no raw output, account identifier, price, endpoint or login text. String values passed through the skill redaction helper.",
+    "redactions": [],
+    "reviewBeforeCommit": "Check names, paths and provider-specific identifiers by hand; the helper catches only common shapes."
+  }
+}

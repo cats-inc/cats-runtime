@@ -13,7 +13,7 @@ import { readJunieModelIds, defaultJunieDataDir } from '../junie-model-ids.mjs';
 import { listCopilotModels } from '../list-copilot-models.mjs';
 import { redactVisibleText, stripTerminalPresentation } from '../normalize-picker-paste.mjs';
 import { parseVerboseModels } from '../project-opencode-models.mjs';
-import { cleanEnv, findExecutable, launchSpec, npmPackageDir, readPackageVersion, runCommand } from './process.mjs';
+import { cleanEnv, findExecutable, isPermissionDenied, launchSpec, npmPackageDir, readPackageVersion, runCommand } from './process.mjs';
 
 const VERSION_PATTERN = /\b\d+(?:\.\d+)+(?:-[0-9A-Za-z.]+)?\b/;
 const AUTH_PATTERN = /not (?:logged|signed) in|not authenticated|unauthori[sz]ed|please (?:log|sign) ?in|\blogin required|authentication (?:required|failed)|\b401\b/i;
@@ -499,6 +499,7 @@ export const SOURCES = [
         const changelog = readClaudeChangelog({ binaryPath: binary, since });
         return { ...result, signals: [{ kind: 'changelog', since, newestEmbeddedVersion: changelog.newestEmbeddedVersion, sections: claudeChangelogSignals(changelog) }] };
       } catch (error) {
+        if (isPermissionDenied(error)) throw error;
         return { ...result, signals: [{ kind: 'changelog-unreadable', message: sanitize(error.message) }] };
       }
     },
@@ -831,7 +832,9 @@ async function attemptSource(source, { scope, env = process.env, timeoutMs = 600
     const { status, reason, message, ...rest } = await source.probe(ctx);
     return { ...base, status: status ?? 'ok', ...(reason ? { reason } : {}), ...(message ? { message } : {}), ...rest, durationMs: Date.now() - startedAt };
   } catch (error) {
-    const failure = error instanceof SourceFailure ? error : new SourceFailure('error', 'internal', sanitize(error?.message ?? error));
+    const failure = isPermissionDenied(error)
+      ? new SourceFailure('unavailable', 'permission-denied', sanitize(error?.message ?? error))
+      : error instanceof SourceFailure ? error : new SourceFailure('error', 'internal', sanitize(error?.message ?? error));
     return { ...base, status: failure.status, reason: failure.reason, message: failure.message, models: [], durationMs: Date.now() - startedAt };
   } finally {
     removeQuietly(workDir);

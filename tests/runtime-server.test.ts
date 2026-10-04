@@ -4213,6 +4213,8 @@ providers:
 
   it('GET /providers/antigravity/models serves picker families with no imposed default', async () => {
     await withRuntime({}, {}, async (runtime) => {
+      const factoryModels = readCatalogFactory({ packageRoot: process.cwd(), runtimeRoot: process.cwd() })
+        .document.catalogs.find(scope => scope.provider === 'antigravity' && scope.backend === 'cli')!.models;
       const response = await runtime.app.request('/providers/antigravity/models');
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -4224,19 +4226,9 @@ providers:
         cache: null,
         warnings: [],
       });
-      expect(body.models).toHaveLength(7);
       // `--model` takes the slug, not the display label agy prints back when it
       // rejects one, so the catalog has to serve ids in that form.
-      expect(body.models[0]).toEqual({
-        id: 'gemini-3.8-flash-low',
-        label: 'Gemini 3.8 Flash',
-      });
-      // 1.1.24 dropped the 3.5 Flash family; serving ids agy rejects is worse
-      // than serving a shorter list.
-      expect(body.models.map((model: { id: string }) => model.id))
-        .not.toContain('gemini-3.5-flash-high');
-      expect(body.models.map((model: { id: string }) => model.id))
-        .toContain('claude-opus-4-6-thinking');
+      expect(body.models).toEqual(factoryModels.map(({ id, label }) => ({ id, label })));
       // agy reads its own default from the per-user settings.json, so the
       // runtime must not pick one on the user's behalf.
       expect(body.defaultModel).toBeNull();

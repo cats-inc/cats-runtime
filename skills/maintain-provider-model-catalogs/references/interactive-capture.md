@@ -50,6 +50,14 @@ personal overrides or publication beyond the existing request.
    survive to the next day. List and keep the capture's scripts as the skill's
    [keep reusable scripts](../SKILL.md#keep-reusable-scripts) section describes.
 
+## Windows Antigravity helper
+
+For a fully visible `Switch Model` menu, use
+[`Capture-AntigravityPicker.ps1`](../scripts/Capture-AntigravityPicker.ps1) as described in the
+[Antigravity reference](providers/antigravity.md#bounded-windows-picker-capture). Each selected
+row shows all effort labels at once, so guarded Up/Down traversal is sufficient. The helper
+records picker regions only, in UTF-8, without cycling sliders or confirming a selection.
+
 ## Windows Codex helper
 
 The Runtime owns Codex menu semantics in

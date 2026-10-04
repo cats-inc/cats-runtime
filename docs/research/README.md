@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-10-04-catalog-probe-agent-workflow](./2026-10-04-catalog-probe-agent-workflow.md) | Probe-driven Antigravity refresh and compact agent handoff | Eighteen execution IDs across seven families, permission/acknowledgement fixes, 98.66% smaller handoff, capture helper and measured limits |
 | [2026-10-01-codex-picker-gpt-6-1-sol](./2026-10-01-codex-picker-gpt-6-1-sol.md) | Codex 0.159.2 complete picker refresh | Eight models, GPT-6.1-Sol/Low default, native per-model reasoning evidence, capture cost and settings limits |
 | [2026-09-29-cats-ask-mcp-probe](./2026-09-29-cats-ask-mcp-probe.md) | Cats Ask MCP and bookmarks probe | Grok Bot receipts matched; Cursor CLI OAuth/discovery passed but data calls returned client-not-enrolled; save order inferred, video analysis and autonomous dispatch unverified |
 | [2026-09-29-cli-provider-branches-outside-adapters](./2026-09-29-cli-provider-branches-outside-adapters.md) | Where CLI provider knowledge leaks out of the adapters | 238 name checks by layer, the native-session, per-provider service and skill-delivery clusters, what to leave alone, a candidate capability shape and when to pick it up; not scheduled |

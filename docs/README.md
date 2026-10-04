@@ -126,6 +126,10 @@ row-status reader and changelog helpers, and the unreproduced Opus 5.5 report.
 records the Opus 5.5 label, Opus's Medium default effort, the `opus[1m]` context alias, the
 arrow-only Claude capture helper and the measured screenshot/token cost of the native run.
 
+[Probe-driven refresh and agent handoff](./research/2026-10-04-catalog-probe-agent-workflow.md)
+records the Antigravity 1.2.16 update, compact evidence handoff, host-permission classification,
+acknowledgement guards and native capture limits.
+
 [Codex 0.159.2 picker refresh](./research/2026-10-01-codex-picker-gpt-6-1-sol.md) records eight
 models, GPT-6.1-Sol as the model default with Low reasoning, complete native evidence and measured
 capture cost. [Codex desktop picker pilot](./research/2026-09-24-codex-picker-pilot.md) records the complete

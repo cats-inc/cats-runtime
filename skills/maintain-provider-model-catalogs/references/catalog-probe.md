@@ -17,7 +17,7 @@ npm run catalog:probe -- --skip muse,cursor        # CLIs this machine does not 
 npm run catalog:validate -- --snapshot tmp/catalog-probe/<time>/snapshot.json
 ```
 
-`probe` writes `snapshot.json`, `report.json`, `report.md` and `report.html` to
+`probe` writes `snapshot.json`, `report.json`, `report.md`, `report.html` and `agent-handoff.json` to
 `tmp/catalog-probe/<time>/`, which Git ignores, and prints one line per scope plus a `View:`
 link. `validate` re-checks a saved snapshot, for example after a catalog edit or a new
 acknowledgement, and rewrites the three reports beside it. Exit codes: `0` nothing to do (notes
@@ -29,7 +29,7 @@ script with `node` opens nothing unless `--open` is given. The JSON files are th
 page is a view of `report.json`. It shows:
 
 - **Headline and what to do:** how many scopes need an agent or you, the operator's actions,
-  the agent scopes and a copyable hand-off prompt.
+  the agent scopes and a copyable hand-off prompt pointing to the compact `agent-handoff.json`.
 - **Tally:** one row per scope with catalog and installed versions and one mark per catalog
   entry in catalog order, then, after a gap, the listed models no entry runs. A mark's shape and
   colour both give its status, and each mark links to its row in the scope's sheet.
@@ -108,7 +108,7 @@ probed on. A scope without it is a tool error, not a default.
 | `hidden-in-source` | agent | An entry executes a row the source marks hidden. |
 | `field-drift` | agent | `label`, `efforts` or `effortDefault` differs on a field the source is authoritative for. |
 | `capture-needed` | agent | Claude release notes since `cli_version` mention picker changes. |
-| `source-unavailable` | you or agent | Not installed, not signed in or timed out is yours; a parse, exit or launch failure means the CLI changed and an agent updates the source. |
+| `source-unavailable` | you or agent | Not installed, not signed in, timed out or permission denied needs host/operator action. Other parse, exit or launch failures need agent investigation. |
 | `source-degraded` | you | The source answered without the account catalog twice in a row. Its model findings become inconclusive notes. |
 | `upstream-only`, `hidden-upstream`, `version-changed`, `no-automatic-source` | note | Shortlist or superset extras, hidden rows, a newer CLI, an unverifiable scope. |
 
@@ -143,16 +143,22 @@ runs stay clean:
   not expire with the CLI version: every CLI updates often, and a structural source gap stays.
 - An acknowledged `absent-from-source` on a partial source can never show that row's real
   withdrawal. Only a picker capture can.
-- An unused entry for a probed provider is reported as stale. Remove it once the change is
-  understood.
+- An unused entry is reported stale only after its exact provider/backend/transport scope
+  answers successfully. Failed or degraded reads cannot retire an acknowledgement.
 - Only an agent writes entries, after investigating, with a `reason` and an `evidence` path to the
   research note or fixture. The operator does not author this file. A machine-specific state,
   such as a CLI that is not installed or signed in here, belongs in `--skip`, not in this file.
 
 ## Work through a report (agents)
 
-1. Read `report.json`. Scope is the `needsAgent` list unless the operator narrows it. Ordinary
-   refresh rules, hard gates and the interaction policy still apply.
+1. Read the adjacent `agent-handoff.json` first. It contains only `needsAgent` scopes, open
+   findings, affected entries with inherited controls resolved, relevant snapshot rows, source
+   authority and exact evidence/validation command arguments. Operator actions are separate.
+   Ordinary refresh rules and hard gates still apply. The full report remains the operator's
+   comparison view; avoid loading healthy scopes, hidden rows or unrelated upstream lists into
+   agent context. For an older run without this file, run `node
+   skills/maintain-provider-model-catalogs/scripts/catalog-probe.mjs validate --snapshot <file>`
+   once, without `--open`; it generates the handoff without querying any CLI.
 2. The snapshot is evidence of its source class at its CLI version and time. Reuse it; do not
    rerun the enumeration to corroborate. It is private until an edit is authorized; then write
    the rows that support the edit as a fixture with the [evidence command](#evidence-fixtures)
@@ -165,16 +171,27 @@ runs stay clean:
      picker-only. Then add the entry, or acknowledge why it stays out.
    - **Absent or hidden:** check the picker. Removal needs the operator's confirmation. A
      source gap gets an acknowledgement.
-   - **Field drift:** re-read the field from the authoritative surface and update it, or
-     acknowledge with the `observed` value pinned.
+   - **Field drift:** reuse the already captured field when the source is authoritative for it.
+     Acquire only missing display labels or conflicting evidence, then update it or acknowledge
+     with the `observed` value pinned. Do not repeat a picker traversal just to corroborate it.
    - **Capture needed:** run the provider's agent-operated capture.
    - **Source failure (parse, exit, launch):** update the source in `scripts/catalog-probe/` and
      its synthetic test in `tests/catalog-probe.node-test.mjs`.
+     `EPERM`/`EACCES` instead means `permission-denied`, including when a nested helper wraps the
+     error. Use the host approval mechanism or an authorized terminal, then retry only affected
+     providers. Never interpret host restrictions as model removals or parser drift.
 4. Rerun `npm run catalog:validate -- --snapshot <the same snapshot>`. The scopes you worked on
    should be clean or carry only notes.
 5. A clean run does not advance `last_updated`. When an agent edits a scope, a conclusive run with
    `listConfirmed: true` is complete model-list evidence for that scope at the snapshot's
    version; partial, superset, family and none never are.
+
+The handoff is regenerated even when no agent action remains (its `scopes` is then empty), so a
+previous actionable copy cannot survive validation. `validate --out` retains the original
+snapshot's absolute path in the handoff. Commands are argv arrays, not shell-escaped strings;
+quote arguments for the executing shell instead of joining arbitrary paths into shell code.
+Measure context savings by comparing artifact bytes on the same pre-edit snapshot and factory;
+byte reduction is not a measured token count or an inference-latency benchmark.
 
 ## Evidence fixtures
 

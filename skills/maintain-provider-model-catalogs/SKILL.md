@@ -80,7 +80,9 @@ Read [catalog surfaces](./references/catalog-surfaces.md) for current fields and
 - **Audit**: derive the current provider inventory from code and classify every registered family
   across all catalog surfaces.
 - **Probe report**: when the operator hands over a catalog probe `report.json`, or asks to run or
-  extend the probe, read [catalog probe](./references/catalog-probe.md). The report's `needsAgent`
+  extend the probe, read [catalog probe](./references/catalog-probe.md). Start with the adjacent
+  `agent-handoff.json`, which contains only actionable scopes and relevant rows; load the full
+  report/snapshot only for a concrete gap. The report's `needsAgent`
   scopes are the request scope; each finding's kind sets the evidence still needed. Commit the
   snapshot rows an edit relies on as a fixture with the probe's `evidence` command.
 - **Capture/preview**: use for a raw picker paste that is supplied as catalog evidence without an
@@ -192,7 +194,7 @@ outside Git, like raw evidence.
    operator's authorization covers it.
 3. **Make a kept script reusable.** The Codex, Claude, Kiro, Auggie and Copilot capture helpers in
    [interactive capture](./references/interactive-capture.md) are the pattern:
-   - place it under `scripts/`, with parameters in place of this run's window titles, paths,
+  - place it under `scripts/`, with parameters in place of this run's window titles, paths,
      session IDs and resume flags;
    - reuse existing helpers instead of copying them: `normalize-picker-paste.mjs`,
      `measure-agent-usage.mjs` and the platform `WindowsUi.ps1`;
