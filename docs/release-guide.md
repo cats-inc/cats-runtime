@@ -68,7 +68,7 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
   release preparation records the exact merged Runtime commit and retains its
   existing App pins and standard signing profile.
 - **Validation.** Catalog generation and boundary checks, 76 focused catalog/
-  Antigravity tests, one HTTP consumer test, 39 probe tests through their CI
+  Antigravity tests, one HTTP consumer test, 21 Playground tests, 39 probe tests through their CI
   hook, three picker-helper guards and type checking passed. Independent review
   has no remaining findings. The signed-in Cursor follow-up confirms all six
   curated families and leaves no agent or operator actions. Full release

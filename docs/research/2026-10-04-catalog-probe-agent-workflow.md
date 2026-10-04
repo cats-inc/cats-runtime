@@ -109,6 +109,8 @@ and review are outside these subtotals. The target agy session received no infer
 - Catalog generation/check and model-data code boundary guard passed.
 - Focused catalog data/runtime and Antigravity adapter/fixture tests: 76 passed.
 - Antigravity HTTP factory-consumer test: 1 passed (73 unrelated tests excluded).
+- Release preflight exposed a stale Playground expectation that Claude rows have no effort
+  choices. Updated it for the observed three choices; all 21 Playground tests passed locally.
 - Final probe offline suite: 39 passed, also passed through the existing Vitest CI hook.
 - `npm run typecheck` passed. `git diff --check` passed.
 - New Antigravity helper: synthetic normal traversal, changed-settings and truncated-footer
