@@ -4,9 +4,10 @@
 // for are compared.
 
 import { isDeepStrictEqual } from 'node:util';
+import { isPermissionDenied } from './process.mjs';
 
 const AUDIENCE_RANK = { none: 0, info: 1, operator: 2, agent: 3 };
-const OPERATOR_REASONS = new Set(['not-installed', 'not-authenticated', 'timeout', 'non-account-source']);
+const OPERATOR_REASONS = new Set(['not-installed', 'not-authenticated', 'timeout', 'non-account-source', 'permission-denied']);
 const SAMPLE_LIMIT = 12;
 
 export function scopeKey({ provider, backend, transport }) {
@@ -42,6 +43,8 @@ function sourceUnavailableAction(source) {
       return `Make sure the ${source.provider} CLI is signed in and online, then rerun the probe.`;
     case 'timeout':
       return 'Rerun the probe; if it times out again, raise --timeout.';
+    case 'permission-denied':
+      return 'The host denied process or file access. Use the host approval mechanism for this read-only probe, or run it from an authorized terminal; do not change catalog data or weaken OS protections.';
     default:
       return `\`${source.command}\` changed its output or behavior. Ask an agent to update this probe source.`;
   }
@@ -65,6 +68,14 @@ function sample(ids) {
 
 /** Compares one source entry with its factory scope. */
 export function compareScope(source, scope) {
+  const deniedSignal = source.signals?.find((signal) => signal.kind === 'changelog-unreadable'
+    && isPermissionDenied(signal.message));
+  if (deniedSignal) {
+    source = { ...source, status: 'unavailable', reason: 'permission-denied', message: deniedSignal.message };
+  }
+  if (['error', 'unavailable'].includes(source.status) && isPermissionDenied(source.message)) {
+    source = { ...source, reason: 'permission-denied' };
+  }
   const findings = [];
   const add = (finding) => findings.push(finding);
   const provider = source.provider;
@@ -84,6 +95,7 @@ export function compareScope(source, scope) {
       cliVersion: source.cliVersion ?? null,
       versionSource: source.versionSource ?? null,
       sourceClass: source.sourceClass,
+      coverage: source.coverage ?? {},
       command: source.command,
       membership,
       rows: source.models?.filter((row) => !row.hidden).length ?? 0,
@@ -197,7 +209,7 @@ export function compareScope(source, scope) {
     }
     if (primary && !primary.hidden) compareFields(model, primary, scope, coverage, provider, (finding) => add(inconclusive(finding)));
     entry.findings = findings.slice(before).map((_, offset) => before + offset);
-    if (findings.length === before) summary.confirmedEntries.push(model.id);
+    if (conclusive && findings.length === before) summary.confirmedEntries.push(model.id);
   }
 
   const extra = (source.models ?? []).filter((row) => !matched.has(row.id));
@@ -221,7 +233,7 @@ export function compareScope(source, scope) {
           subject: row.id,
           ...(row.label ? { observed: { label: row.label } } : {}),
           message: `\`${source.command}\` lists ${row.id}${row.label ? ` (${row.label})` : ''}, which no catalog entry executes.`,
-          nextAction: `Capture the ${provider} picker row for ${row.label ?? row.id} with its options, then add it or acknowledge why it stays out.`,
+          nextAction: `Reuse the snapshot's authoritative fields for ${row.label ?? row.id}; capture only missing picker labels, option hierarchy, order or defaults. Add the evidenced entry or explain why it stays out.`,
         }));
       }
     } else {
@@ -247,7 +259,7 @@ function compareFields(model, row, scope, coverage, provider, add) {
     add({
       kind: 'field-drift', audience: 'agent', subject: model.id, field: 'label', catalog: model.label, observed: row.label,
       message: `Entry "${model.id}" is labelled "${model.label}"; the source shows "${row.label}".`,
-      nextAction: `Re-read the ${provider} picker label for "${model.id}".`,
+      nextAction: `Reuse the authoritative snapshot label for "${model.id}"; investigate only conflicting picker evidence.`,
     });
   }
   if (!coverage.efforts) return;
@@ -258,7 +270,7 @@ function compareFields(model, row, scope, coverage, provider, add) {
     add({
       kind: 'field-drift', audience: 'agent', subject: model.id, field: 'efforts', catalog: catalogValues, observed: observedValues,
       message: `Entry "${model.id}" offers [${catalogValues.join(', ')}]; the source lists [${observedValues.join(', ')}].`,
-      nextAction: `Re-read the ${provider} effort menu for "${model.label}".`,
+      nextAction: `Reuse the authoritative snapshot effort values for "${model.label}"; capture only missing display labels or conflicting evidence.`,
     });
     return;
   }
@@ -269,7 +281,7 @@ function compareFields(model, row, scope, coverage, provider, add) {
       add({
         kind: 'field-drift', audience: 'agent', subject: model.id, field: 'effortDefault', catalog: catalogDefault, observed: observedDefault,
         message: `Entry "${model.id}" defaults to ${catalogDefault ?? 'nothing'}; the source defaults to ${observedDefault ?? 'nothing'}.`,
-        nextAction: `Check the ${provider} picker's (default) effort marker for "${model.label}".`,
+        nextAction: `Reuse the authoritative snapshot effort default for "${model.label}"; investigate only conflicting evidence.`,
       });
     }
   }
@@ -307,6 +319,7 @@ const ENTRY_STATUS_BY_KIND = [
 
 function entryStatus(summary, entry) {
   if (!summary.comparison.comparable) return 'unverified';
+  if (summary.source.status !== 'ok') return 'inconclusive';
   const related = entry.findings.map((index) => summary.findings[index]);
   if (related.length === 0) return 'confirmed';
   const open = related.filter((finding) => !finding.acknowledged);
@@ -389,9 +402,10 @@ export function validateSnapshot({ snapshot, catalogDocument, acknowledgements =
       .filter((scope) => scope.selection_mode !== 'discovery' && !probed.has(scopeKey(scope)))
       .map((scope) => scopeKey(scope))
     : [];
-  const probedProviders = new Set(scopes.map((scope) => scope.provider));
   const staleAcknowledgements = acknowledgements
-    .filter((ack) => !used.has(ack.index) && probedProviders.has(ack.provider))
+    .filter((ack) => !used.has(ack.index)
+      && scopes.some((scope) => sameScope(ack, scope) && scope.source.status === 'ok'
+        && !scope.findings.some((finding) => finding.kind === 'signal-unreadable')))
     .map(({ index, ...ack }) => ack);
 
   const general = [];

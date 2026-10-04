@@ -20,6 +20,7 @@ import { cleanEnv, launchSpec, resolveNpmShimScript } from '../scripts/catalog-p
 import { buildEvidence, evidenceDirectoryName, selectSnapshotSources, writeEvidence } from '../scripts/catalog-probe/evidence.mjs';
 import { escapeHtml, renderHtml } from '../scripts/catalog-probe/html.mjs';
 import { renderMarkdown, renderTerminal } from '../scripts/catalog-probe/report.mjs';
+import { buildHandoff } from '../scripts/catalog-probe/handoff.mjs';
 import {
   claudeChangelogSignals,
   parseAgyModels,
@@ -359,6 +360,62 @@ test('source failures go to the operator or an agent by reason', () => {
   assert.match(broken.findings[0].nextAction, /update this probe source/);
 });
 
+test('permission failures from native and nested helpers ask for host access, not catalog edits', async () => {
+  for (const error of [Object.assign(new Error('denied'), { code: 'EACCES' }),
+    new SourceFailure('error', 'parse', 'spawnSync java.exe EPERM')]) {
+    const result = await runSource({ ...source(), probe: async () => { throw error; } });
+    assert.equal(result.status, 'unavailable');
+    assert.equal(result.reason, 'permission-denied');
+    const summary = compareScope(result, fullScope());
+    assert.equal(summary.verdict, 'operator');
+    assert.match(summary.findings[0].nextAction, /host approval/);
+  }
+  // Old snapshots can be revalidated without launching their CLIs again.
+  const legacy = compareScope(source({ status: 'error', reason: 'internal', message: 'spawn EPERM' }), fullScope());
+  assert.equal(legacy.verdict, 'operator');
+});
+
+test('failed, degraded and different-transport scopes cannot make an acknowledgement stale', () => {
+  const acknowledgements = validateAcknowledgements({ schemaVersion: 1, acknowledgements: [
+    { provider: 'ex', kind: 'absent-from-source', subject: 'withdrawn', reason: 'source gap', evidence: 'docs/x.md', acknowledgedOn: '2026-10-04' },
+  ] });
+  for (const patch of [{ status: 'error' }, { status: 'unavailable' }, { status: 'degraded' }, { transport: 'other' }]) {
+    const report = validateSnapshot({ snapshot: snapshotOf([source(patch)]), catalogDocument: { catalogs: [fullScope()] }, acknowledgements });
+    assert.equal(report.general.filter((item) => item.kind === 'stale-acknowledgement').length, 0);
+  }
+  const degraded = compareScope(source({ status: 'degraded', reason: 'non-account-source' }), fullScope());
+  assert.equal(degraded.counts.confirmed, 0);
+  assert.ok(degraded.comparison.entries.every((entry) => entry.status === 'inconclusive'));
+});
+
+test('an unreadable Claude changelog cannot retire acknowledgements; permission signals need host action', () => {
+  const acknowledgements = validateAcknowledgements({ schemaVersion: 1, acknowledgements: [
+    { provider: 'ex', kind: 'capture-needed', subject: 'picker', reason: 'already captured', evidence: 'docs/x.md', acknowledgedOn: '2026-10-04' },
+  ] });
+  for (const message of ['EACCES: permission denied, open binary', 'changelog not found']) {
+    const snapshot = snapshotOf([source({ coverage: { membership: 'none' }, signals: [{ kind: 'changelog-unreadable', message }] })]);
+    const report = validateSnapshot({ snapshot, catalogDocument: { catalogs: [fullScope()] }, acknowledgements });
+    assert.deepEqual(report.general, []);
+    assert.deepEqual(report.needsAgent, []);
+    assert.deepEqual(report.needsOperator, message.startsWith('EACCES') ? ['ex/cli'] : []);
+  }
+});
+
+test('the agent handoff carries only actionable scopes, relevant rows, inherited controls and exact snapshot paths', () => {
+  const catalogDocument = { catalogs: [fullScope({ shared_controls: effortControl(['low', 'high']) }), fullScope({ provider: 'healthy' })] };
+  const snapshot = snapshotOf([source({ models: [...source().models, { id: 'new', label: 'New' }] }), source({ provider: 'healthy' })]);
+  const report = validateSnapshot({ snapshot, catalogDocument });
+  const handoff = buildHandoff({ report, snapshot, catalogDocument, repo: '/repo', snapshotPath: '/private/original/snapshot.json', reportPath: '/elsewhere/report.json' });
+  assert.deepEqual(handoff.scopes.map((scope) => scope.key), ['ex/cli']);
+  assert.deepEqual(handoff.scopes[0].rows.map((row) => row.id), ['c-low', 'c-high', 'new']);
+  assert.deepEqual(handoff.scopes[0].entries[0].controls, catalogDocument.catalogs[0].shared_controls);
+  assert.equal(handoff.scopes[0].source.coverage.efforts, EFFORT);
+  assert.ok(handoff.scopes[0].evidenceCommand.includes('/private/original/snapshot.json'));
+  assert.equal(handoff.commands.validate.at(-1), '/private/original/snapshot.json');
+  assert.ok(handoff.scopes[0].findings.every((finding) => finding.audience === 'agent'));
+  assert.ok(!JSON.stringify(handoff).includes('healthy'));
+});
+
 test('a family source checks parameterized entries by family only', () => {
   const scope = fullScope({ selection_mode: 'shortlist', models: [
     { id: 'ex-5[effort=high]', label: 'Ex 5 High', execution: { model: 'ex-5[effort=high]' } },
@@ -472,7 +529,8 @@ test('renderers name the agent scopes and give a hand-off prompt', () => {
   });
   const terminal = renderTerminal(report, { reportDir: 'tmp/x', reportPath: '/abs/report.json' });
   assert.match(terminal, /\[agent\] ex\/cli/);
-  assert.match(terminal, /maintain-provider-model-catalogs skill .* \/abs\/report\.json \(scopes: ex\/cli\)/);
+  assert.match(terminal, /maintain-provider-model-catalogs skill\. Read .*agent-handoff\.json first \(scopes: ex\/cli\)/);
+  assert.match(terminal, /Full report: \/abs\/report\.json/);
   const markdown = renderMarkdown(report, { reportPath: '/abs/report.json' });
   assert.match(markdown, /\| ex\/cli \| 1\.0\.0 \|/);
   assert.match(markdown, /\*\*new-candidate\*\* `d` \[agent\]: .*Ex \| D/);
@@ -681,6 +739,16 @@ test('validate re-checks a saved snapshot and writes both reports', () => withSc
   assert.ok(existsSync(join(root, 'out', 'report.md')));
   assert.match(readFileSync(join(root, 'out', 'report.html'), 'utf8'), /<title>Catalog probe<\/title>/);
   assert.match(run.stdout, /View: file:\/\//);
+  const handoff = JSON.parse(readFileSync(join(root, 'out', 'agent-handoff.json'), 'utf8'));
+  assert.equal(handoff.snapshotPath, snapshotPath);
+  assert.deepEqual(handoff.scopes[0].rows.map((row) => row.id), ['e']);
+  assert.match(run.stdout, /agent-handoff\.json/);
+  assert.match(run.stdout, /Agent input: \d+ bytes; full report: \d+ bytes/);
+  const cleanSnapshot = snapshotOf([source()], ['ex']);
+  writeFileSync(snapshotPath, JSON.stringify(cleanSnapshot));
+  const cleanRun = spawnSync(process.execPath, [SCRIPT, 'validate', '--snapshot', snapshotPath, '--repo', root, '--out', join(root, 'out')], { encoding: 'utf8', env: { ...process.env, CATS_RUNTIME_DIR: join(root, 'runtime') } });
+  assert.equal(cleanRun.status, 0, cleanRun.stderr);
+  assert.deepEqual(JSON.parse(readFileSync(join(root, 'out', 'agent-handoff.json'), 'utf8')).scopes, []);
 
   const notSnapshot = join(root, 'other.json');
   writeFileSync(notSnapshot, '{"kind":"something-else"}');

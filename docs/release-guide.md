@@ -49,6 +49,32 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+### Release notes — 0.4.1 (prepared 2026-10-04)
+
+- **Current provider catalogs.** Antigravity 1.2.16 now offers Claude Opus 5.5
+  and Sonnet 5.5 with low, medium and high effort. The owner approved removing
+  the two withdrawn Claude 4.6 Thinking families. The complete picker and model
+  list confirm seven families and eighteen executable IDs. Intervening catalog
+  updates also cover Junie, Copilot, Auggie, Kiro and Pi.
+- **Less repeated catalog maintenance.** Probe and offline validation write a
+  compact agent handoff containing actionable scopes, retained evidence and
+  exact next commands. Permission failures remain operator actions; degraded
+  sources cannot falsely confirm rows or invalidate acknowledgements. A guarded
+  Antigravity picker helper captures visible controls without running inference.
+- **Compatibility and release scope.** This is a compatible patch within 0.4.x:
+  public APIs, configuration contracts, catalog schema 2 and persisted formats
+  are unchanged, so no data migration is required. The owner selected source
+  bundling in Desktop 0.7.10 standard preview, not npm publication. Desktop's
+  release preparation records the exact merged Runtime commit and retains its
+  existing App pins and standard signing profile.
+- **Validation.** Catalog generation and boundary checks, 76 focused catalog/
+  Antigravity tests, one HTTP consumer test, 21 Playground tests, 39 probe tests through their CI
+  hook, three picker-helper guards and type checking passed. Independent review
+  has no remaining findings. The signed-in Cursor follow-up confirms all six
+  curated families and leaves no agent or operator actions. Full release
+  preflight remains the PR gate; publication verification belongs to the
+  Desktop workflow and its public assets.
+
 ### Release notes — 0.4.0 (prepared 2026-09-30)
 
 - **Explicit remote listening required.** An API key no longer changes the default

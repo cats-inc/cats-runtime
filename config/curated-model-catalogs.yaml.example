@@ -781,8 +781,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Antigravity
-    cli_version: 1.2.15
-    last_updated: 2026-09-25
+    cli_version: 1.2.16
+    last_updated: 2026-10-04
     notes:
       - Complete operator-supplied /model picker and all per-model effort screens on Antigravity CLI
         1.2.3, observed 2026-09-16; account scope is the operator's CLI.
@@ -790,12 +790,13 @@ catalogs:
       - "Raw execution ids re-enumerated on 1.2.10 via live agy models on 2026-09-25:
         docs/research/fixtures/antigravity-1.2.10/models-command.success.redacted.txt.
         All fourteen execution ids and label associations verified identical to 1.1.24/1.2.3."
-      - One row per picker family. The first effort's verified raw id identifies each Gemini row;
-        Runtime resolves model plus effort to the corresponding verified --model id. All fourteen
-        executable choices remain represented.
+      - One row per picker family. The first effort's verified raw id identifies each adjustable row;
+        Runtime resolves model plus effort to the corresponding verified --model id. All eighteen
+        currently listed executable choices are represented.
       - No model or effort is marked default. Cats initializes to the first model and first
         applicable effort without adding a default label; existing explicit choices are preserved.
       - "cli_version advanced from 1.2.10 to 1.2.15 on 2026-10-03 at the operator's request, without a new picker capture: `agy models` listed exactly this scope's 7 entries, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 1.2.10 evidence. Evidence: docs/research/fixtures/antigravity-1.2.15/model-list.probe.redacted.json."
+      - "Complete seven-family picker and per-row effort sliders read on agy 1.2.16, 2026-10-04, using Windows UI Automation. Claude Opus 5.5 and Claude Sonnet 5.5 each show low, medium, high with no default marker. The operator confirmed removal of the two absent Claude 4.6 Thinking rows. Evidence: docs/research/fixtures/antigravity-1.2.16/model-picker.agent-capture.redacted.txt and docs/research/fixtures/antigravity-1.2.16/model-list.probe.redacted.json. Existing unobserved metadata retains its earlier provenance."
     models:
       - id: gemini-3.8-flash-low
         label: Gemini 3.8 Flash
@@ -939,27 +940,62 @@ catalogs:
                 description: Deepest reasoning for complex problems — slower but strongest
             semanticTags:
               - reasoning
-      - id: claude-sonnet-4-6
-        label: Claude Sonnet 4.6 (Thinking)
-        capabilityTags:
-          - tool_use
-        source_names:
-          - claude-sonnet-4-6
-          - Claude Sonnet 4.6 (Thinking)
+      - id: claude-opus-5-5-low
+        label: Claude Opus 5.5
         execution:
-          model: claude-sonnet-4-6
-        controls: []
-      - id: claude-opus-4-6-thinking
-        label: Claude Opus 4.6 (Thinking)
-        capabilityTags:
-          - tool_use
-          - reasoning
-        source_names:
-          - claude-opus-4-6-thinking
-          - Claude Opus 4.6 (Thinking)
+          model: claude-opus-5-5-low
+          variants:
+            - when:
+                antigravity.effort: low
+              model: claude-opus-5-5-low
+            - when:
+                antigravity.effort: medium
+              model: claude-opus-5-5-medium
+            - when:
+                antigravity.effort: high
+              model: claude-opus-5-5-high
+        controls:
+          - key: antigravity.effort
+            label: Effort
+            kind: enum
+            scope: session_default
+            values:
+              - value: low
+                label: low
+              - value: medium
+                label: medium
+              - value: high
+                label: high
+            semanticTags:
+              - reasoning
+      - id: claude-sonnet-5-5-low
+        label: Claude Sonnet 5.5
         execution:
-          model: claude-opus-4-6-thinking
-        controls: []
+          model: claude-sonnet-5-5-low
+          variants:
+            - when:
+                antigravity.effort: low
+              model: claude-sonnet-5-5-low
+            - when:
+                antigravity.effort: medium
+              model: claude-sonnet-5-5-medium
+            - when:
+                antigravity.effort: high
+              model: claude-sonnet-5-5-high
+        controls:
+          - key: antigravity.effort
+            label: Effort
+            kind: enum
+            scope: session_default
+            values:
+              - value: low
+                label: low
+              - value: medium
+                label: medium
+              - value: high
+                label: high
+            semanticTags:
+              - reasoning
       - id: gpt-oss-120b-medium
         label: GPT-OSS 120B (Medium)
         capabilityTags:

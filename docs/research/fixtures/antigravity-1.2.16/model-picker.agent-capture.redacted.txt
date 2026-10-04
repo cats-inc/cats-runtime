@@ -1,0 +1,136 @@
+Antigravity CLI 1.2.16 /model
+Observed 2026-10-04 on native Windows 11; existing Google AI Pro sign-in, identity omitted.
+Source: visible UI Automation text; initial window screenshot matched the menu.
+Encoding limitation: this run's temporary wrapper replaced some slider glyphs with ?. Labels, option words and footer text are intact; do not infer selection/defaults from those glyphs. The reusable helper writes UTF-8.
+Complete seven-family list with the footer visible. Each row read while highlighted.
+Current selection is not a default marker. No model or effort default marker appeared.
+Raw execution IDs are in the companion model-list.probe.redacted.json.
+
+Switch Model
+
+  Search:
+          ────────────────────
+
+> Gemini 3.8 Flash      (current)
+  Gemini 3.7 Flash
+  Gemini 3.6 Flash
+  Gemini 3.1 Pro
+  Claude Opus 5.5
+  Claude Sonnet 5.5
+  GPT-OSS 120B (Medium)
+
+  Effort  ?        ●??????????????●???????????????        ?
+                  low          medium          high
+            Deepest reasoning for complex problems — slower but strongest
+
+Keyboard: ↑/↓ Navigate  ←/→ Effort  enter Select  esc Go Back
+
+Switch Model
+
+  Search:
+          ────────────────────
+
+  Gemini 3.8 Flash      (current)
+> Gemini 3.7 Flash
+  Gemini 3.6 Flash
+  Gemini 3.1 Pro
+  Claude Opus 5.5
+  Claude Sonnet 5.5
+  GPT-OSS 120B (Medium)
+
+  Effort  ?        ●???????????????──────────────○        ?
+                  low          medium          high
+            Balanced speed and reasoning quality for most tasks
+
+Keyboard: ↑/↓ Navigate  ←/→ Effort  enter Select  esc Go Back
+
+Switch Model
+
+  Search:
+          ────────────────────
+
+  Gemini 3.8 Flash      (current)
+  Gemini 3.7 Flash
+> Gemini 3.6 Flash
+  Gemini 3.1 Pro
+  Claude Opus 5.5
+  Claude Sonnet 5.5
+  GPT-OSS 120B (Medium)
+
+  Effort  ?        ●???????????????──────────────○        ?
+                  low          medium          high
+            Balanced speed and reasoning quality for most tasks
+
+Keyboard: ↑/↓ Navigate  ←/→ Effort  enter Select  esc Go Back
+
+Switch Model
+
+  Search:
+          ────────────────────
+
+  Gemini 3.8 Flash      (current)
+  Gemini 3.7 Flash
+  Gemini 3.6 Flash
+> Gemini 3.1 Pro
+  Claude Opus 5.5
+  Claude Sonnet 5.5
+  GPT-OSS 120B (Medium)
+
+  Effort  ?            ?──────────────────────○            ?
+                      low                   high
+            Faster responses, lighter reasoning — great for simpler tasks
+
+Keyboard: ↑/↓ Navigate  ←/→ Effort  enter Select  esc Go Back
+
+Switch Model
+
+  Search:
+          ────────────────────
+
+  Gemini 3.8 Flash      (current)
+  Gemini 3.7 Flash
+  Gemini 3.6 Flash
+  Gemini 3.1 Pro
+> Claude Opus 5.5
+  Claude Sonnet 5.5
+  GPT-OSS 120B (Medium)
+
+  Effort  ?        ●???????????????──────────────○        ?
+                  low          medium          high
+            Balanced speed and reasoning quality for most tasks
+
+Keyboard: ↑/↓ Navigate  ←/→ Effort  enter Select  esc Go Back
+
+Switch Model
+
+  Search:
+          ────────────────────
+
+  Gemini 3.8 Flash      (current)
+  Gemini 3.7 Flash
+  Gemini 3.6 Flash
+  Gemini 3.1 Pro
+  Claude Opus 5.5
+> Claude Sonnet 5.5
+  GPT-OSS 120B (Medium)
+
+  Effort  ?        ●???????????????──────────────○        ?
+                  low          medium          high
+            Balanced speed and reasoning quality for most tasks
+
+Keyboard: ↑/↓ Navigate  ←/→ Effort  enter Select  esc Go Back
+
+Switch Model
+
+  Search:
+          ────────────────────
+
+  Gemini 3.8 Flash      (current)
+  Gemini 3.7 Flash
+  Gemini 3.6 Flash
+  Gemini 3.1 Pro
+  Claude Opus 5.5
+  Claude Sonnet 5.5
+> GPT-OSS 120B (Medium)
+
+Keyboard: ↑/↓ Navigate  enter Select  esc Go Back

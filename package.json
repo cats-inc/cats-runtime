@@ -1,6 +1,6 @@
 {
   "name": "@cats-inc/cats-runtime",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Unified runtime for agent CLIs, API backends, and local-model backends.",
   "author": "sammykenny2 <sammykenny2@gmail.com>",
   "repository": {

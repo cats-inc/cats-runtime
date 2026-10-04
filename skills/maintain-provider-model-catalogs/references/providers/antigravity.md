@@ -1,6 +1,6 @@
 # Antigravity (agy) Catalog Refresh
 
-Last updated: 2026-09-25
+Last updated: 2026-10-04
 
 Use this path for agy model-picker and per-model effort evidence. Current model names, option sets,
 and counts belong in catalog data and evidence, not this guide. The retained procedures come from
@@ -47,5 +47,26 @@ service. `catalogs: []` inherits factory; `models: []` empties a full/shortlist 
    - Calling `Start-WindowsUiTerminal` will fail to detect window appearance and will hang waiting for the window.
    - Agents executing inside this CLI sandbox MUST NOT attempt to operate the interactive picker via `desktop-ui-automation` without a host-level executor outside that desktop boundary.
 2. **Machine-readable enumeration (`agy models`)**:
-   - `agy models` runs without launching a graphical terminal, consumes zero image/turn tokens, and outputs the complete 14-item machine-readable mapping (`<id>\t<label>`) for the installed CLI.
+   - `agy models` runs without launching a graphical terminal and outputs the current executable mapping (`<id>\t<label>`) for the installed CLI. Derive its size from the result; do not retain a fixed count in this procedure.
    - Prefer `agy models` for verifying execution IDs and model availability. Pair with operator-supplied `/model` pastes when verifying interactive UI layout and slider labels.
+
+## Bounded Windows picker capture
+
+The 1.2.16 picker exposes every effort label on a single slider while its model row is
+highlighted. Read the visible slider; cycling each level adds no evidence when all labels are
+already visible. Use [Capture-AntigravityPicker.ps1](../../scripts/Capture-AntigravityPicker.ps1)
+with the platform helper, unique window title, empty output directory, actual settings path and
+complete ordered `-ModelLabels` observed on the first screen. Start on its first row with empty
+search. It checks every expected row, footer, focus and settings digest, records UTF-8 picker
+regions using Up/Down only, then returns to the first row. It neither selects a model nor toggles
+effort. Stop on a truncated/new layout; the passed labels do not establish completeness by themselves.
+
+Use Windows PowerShell 5.1 and pass labels as an array from a wrapper script. Capture and inspect
+one initial screenshot to verify text correspondence; the helper itself saves text only and
+omits the account banner. Normalize the text with `normalize-picker-paste.mjs` before retention.
+Hash settings before CLI startup as well as before traversal: a new workspace trust choice can
+write CLI settings before the picker opens. Record that separately, and never claim startup
+preservation from a traversal-only digest or restore over a concurrent writer.
+
+Offline guard test: `powershell.exe -NoProfile -File
+skills/maintain-provider-model-catalogs/tests/Test-AntigravityPicker.ps1`.

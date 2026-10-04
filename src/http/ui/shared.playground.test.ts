@@ -492,8 +492,9 @@ describe('shared playground selection helpers', () => {
       vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
       expect(controls.innerHTML).not.toMatch(/default/i);
       const values = [...controls.innerHTML.matchAll(/<option value="([^"]+)"/g)].map((match) => match[1]);
-      if (entry.id.includes('flash')) expect(values).toEqual(['low', 'medium', 'high']);
-      else if (entry.id.includes('pro')) expect(values).toEqual(['low', 'high']);
+      if (entry.id.includes('flash') || entry.id.startsWith('claude-')) {
+        expect(values).toEqual(['low', 'medium', 'high']);
+      } else if (entry.id.includes('pro')) expect(values).toEqual(['low', 'high']);
       else expect(values).toEqual([]);
       if (values.length) expect(controls.innerHTML).toContain('<option value="low" selected>low</option>');
     }

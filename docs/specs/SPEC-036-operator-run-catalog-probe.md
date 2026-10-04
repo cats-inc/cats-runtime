@@ -41,6 +41,8 @@ agent.
 | CP-09 | `npm run catalog:validate -- --snapshot <file>` re-validates a saved snapshot without running any CLI, so an agent can confirm its catalog edits or acknowledgements. |
 | CP-10 | Parsers, comparison, acknowledgements, rendering and the command line are covered by an offline Node suite with synthetic input, run in CI through `tests/agent-skill-sync.test.ts`. |
 | CP-11 | `npm run catalog:evidence -- --snapshot <file> --scope <provider> [--ids …]` writes `docs/research/fixtures/<cli>-<version>/model-list.probe.redacted.json`: the selected rows with command, source class, version, time, platform, account scope, completeness, authoritative fields and what still needs the picker. String values pass the skill's redaction helper; an existing file is not replaced without `--force`; a scope without a read-only list gets no fixture. |
+| CP-12 | Probe and validation also write `agent-handoff.json`: only actionable scopes/findings, affected entries, relevant source rows, authority, and exact snapshot/evidence/validation arguments. Handoffs reuse saved evidence and request only missing/conflicting picker fields. No catalog writes or inference calls are automated. |
+| CP-13 | Process/file permission denial is host/operator action, even through nested helpers or saved snapshots. Only a successful read of the exact scope can make acknowledgements stale. Degraded rows cannot be counted as confirmed. |
 
 ## Non-goals
 
