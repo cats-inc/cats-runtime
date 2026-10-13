@@ -32,6 +32,16 @@ export const CATALOG_BINDINGS: Readonly<Record<string, Binding>> = Object.freeze
   'ollama.keep_alive': { backend: 'local', transport: 'ollama', type: 'string' },
 });
 
+// Goose 1.54.0 parses these model suffixes into ThinkingEffort (Off, Low, Medium, High, Max);
+// it has no -max or -off suffix, so Max travels as -xhigh.
+export const GOOSE_THINKING_SUFFIXES: Readonly<Record<string, string>> = Object.freeze({
+  off: '-none',
+  low: '-low',
+  medium: '-medium',
+  high: '-high',
+  max: '-xhigh',
+});
+
 export function assertCatalogBinding(scope: CatalogScope, key: string, value?: CatalogValue): void {
   const binding = CATALOG_BINDINGS[key];
   if (!binding || binding.backend !== scope.backend
@@ -44,8 +54,9 @@ export function assertCatalogBinding(scope: CatalogScope, key: string, value?: C
     || (typeof value === 'string' && (!value.trim() || /[\u0000-\u001f]/.test(value))))) {
     throw new Error(`Binding '${key}' requires a ${binding.type} value`);
   }
-  // Goose currently has one verified effort serializer: the native '-none' suffix.
-  if (key === 'goose.thinking_effort' && value !== undefined && value !== 'off') {
-    throw new Error(`Binding '${key}' currently supports only 'off'`);
+  // Goose's verified serializer is its native model suffix, one per thinking effort.
+  if (key === 'goose.thinking_effort' && value !== undefined
+    && (typeof value !== 'string' || !(value in GOOSE_THINKING_SUFFIXES))) {
+    throw new Error(`Binding '${key}' supports only ${Object.keys(GOOSE_THINKING_SUFFIXES).join(', ')}`);
   }
 }

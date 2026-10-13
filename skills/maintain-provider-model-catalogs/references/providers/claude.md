@@ -26,7 +26,8 @@ when those screens already establish the requested values/defaults. Follow
   resolved to claude-sonnet-5-5, and the Sonnet 5 row set the full id `claude-sonnet-5`. Re-read
   the value of every alias row on each refresh. Keep the entry id and its execution, so saved
   selections keep executing what they did, and relabel the entry to the row that sets the alias.
-  Add the older model as a new entry under its full id.
+  Add the older model as a new entry under its full id. On 2.1.296 `haiku` moved the same way to
+  claude-haiku-5-5, and the Haiku 4.5 row set `claude-haiku-4-5-20251001`.
 - `scripts/claude-changelog.mjs --binary <installed version file> --since <catalog cli_version>`
   lists the release notes that the binary embeds. That is static-artifact evidence of what
   changed, such as picker counting, aliases or effort levels. A build embeds notes only up to its
@@ -59,7 +60,9 @@ Use this only when the operator asks the agent to collect the picker. Follow
 - A saved model shows a check mark. Effort is one picker-wide selection that starts at the saved
   effort; a row lacking that level shows another one (for example High instead of xHigh), and a
   Right press there changes the selection for every row. Only an explicit `(default)` suffix,
-  reached by cycling with Right, is default evidence. The check mark and the starting level are not.
+  reached with the arrow keys, is default evidence. The check mark and the starting level are not.
+  Through 2.1.292 Right wraps from the highest level to the lowest; from 2.1.293 the line stops at
+  both ends, so walk Right to the highest level and Left to the lowest (the helper does both).
 - The picker does not display row values. After the arrow-only traversal, choose each row with `s`
   in the dedicated window and read `/status`, with `Read-ClaudePickerRowStatus.ps1` on Windows:
   `alias (id)` means the row sets the alias, and a bare id means it sets that id. Confirm the

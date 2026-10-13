@@ -4,8 +4,11 @@
 .DESCRIPTION
     Uses the desktop-ui-automation Windows helper. Starts at an inspected Claude Code
     "Select model" picker in a dedicated Windows Terminal window, moves across every model
-    row with Up/Down, and cycles each row's effort line with Right until it returns to the
-    starting level. A list longer than the picker's window scrolls: its edge rows carry
+    row with Up/Down, and presses Right on each row's effort line until it returns to the
+    starting level (through 2.1.292, where effort wraps) or stops changing; from 2.1.293 effort
+    stops at either end, so the walk then presses Left until it stops at the lowest level.
+    Each row reports Shape (cycle or linear) and Order (the linear order, lowest first, or the
+    Right cycle from its starting level). A list longer than the picker's window scrolls: its edge rows carry
     up/down arrows and a "+N models" line counts the rows out of view (2.1.283 and earlier) or
     only the rows below the window (2.1.284 and later), so each row is read while it is
     highlighted. Effort is one picker-wide selection, so a row that lacks the
@@ -161,6 +164,23 @@ function Assert-ConfigUnchanged([string]$When) {
     }
 }
 
+function Get-RowGuard([int]$Index) {
+    '(?m)^[ \t]*' + [char]0x276F + '\s' + $Index + '\.\s'
+}
+
+function Restore-Effort($State, [string]$Block, [int]$Row) {
+    # Wrapping builds reach the block by Right alone; non-wrapping builds need one direction.
+    foreach ($key in @('Left', 'Right')) {
+        for ($press=1; $press -le $MaxEffortLevels -and $State.Adjustable -and $State.EffortBlock -cne $Block; $press++) {
+            Send-WindowsUiKey $target -Key $key -ExpectedText (Get-RowGuard $Row)
+            $changed = Wait-PickerChange $State.EffortBlock $Row
+            if ($null -eq $changed -or $changed.Highlight -ne $Row) { break }
+            $State = $changed
+        }
+    }
+    return $State
+}
+
 try {
     $initialText = Save-Picker 'models' $true
     $initial = Read-Picker $initialText
@@ -184,21 +204,57 @@ try {
             $defaultSaved = $true
         }
         $cycleComplete = -not $state.Adjustable
+        $shape = if ($state.Adjustable) { $null } else { 'none' }
+        $order = @()
         if ($state.Adjustable) {
+            # Through 2.1.292 Right wraps past the highest level back to the lowest. From 2.1.293
+            # it stops at the highest level, so the walk then goes Left to the lowest level.
             $startBlock = $state.EffortBlock
+            $seen = @{}
+            $seen[$state.EffortBlock] = $state.Level
+            $rightWalk = @($state.Level)
+            $edge = $false
+            $step = 1
             for ($press=1; $press -le $MaxEffortLevels; $press++) {
-                Send-WindowsUiKey $target -Key Right -ExpectedText ('(?m)^[ \t]*\u276F\s' + $index + '\.\s')
+                Send-WindowsUiKey $target -Key Right -ExpectedText (Get-RowGuard $index)
                 $changed = Wait-PickerChange $state.EffortBlock $index
-                if ($null -eq $changed) { break }
+                if ($null -eq $changed) { $edge = $true; break }
                 if ($changed.Highlight -ne $index) { throw 'Effort adjustment moved the model highlight.' }
                 $state = $changed
-                if ($state.EffortBlock -ceq $startBlock) { $cycleComplete = $true; break }
-                $null = Save-Picker ($prefix + '-effort-' + ($press + 1).ToString('D2'))
+                if ($state.EffortBlock -ceq $startBlock) { $cycleComplete = $true; $shape = 'cycle'; break }
+                $step++
+                $null = Save-Picker ($prefix + '-effort-' + $step.ToString('D2'))
                 $levels += [pscustomobject]@{ Line=$state.EffortLine; Level=$state.Level; Default=$state.IsDefault; Detail=$state.EffortDetail }
+                $seen[$state.EffortBlock] = $state.Level
+                $rightWalk += $state.Level
                 if ($state.IsDefault -and -not $defaultSaved) {
                     $null = Save-Picker ($prefix + '-effort-key') $true
                     $defaultSaved = $true
                 }
+            }
+            if ($shape -eq 'cycle') {
+                $order = $rightWalk
+            } elseif ($edge) {
+                $leftWalk = @($state.Level)
+                for ($press=1; $press -le $MaxEffortLevels; $press++) {
+                    Send-WindowsUiKey $target -Key Left -ExpectedText (Get-RowGuard $index)
+                    $changed = Wait-PickerChange $state.EffortBlock $index
+                    if ($null -eq $changed) { $cycleComplete = $true; $shape = 'linear'; break }
+                    if ($changed.Highlight -ne $index) { throw 'Effort adjustment moved the model highlight.' }
+                    $state = $changed
+                    $leftWalk += $state.Level
+                    if (-not $seen.ContainsKey($state.EffortBlock)) {
+                        $step++
+                        $null = Save-Picker ($prefix + '-effort-' + $step.ToString('D2'))
+                        $levels += [pscustomobject]@{ Line=$state.EffortLine; Level=$state.Level; Default=$state.IsDefault; Detail=$state.EffortDetail }
+                        $seen[$state.EffortBlock] = $state.Level
+                        if ($state.IsDefault -and -not $defaultSaved) {
+                            $null = Save-Picker ($prefix + '-effort-key') $true
+                            $defaultSaved = $true
+                        }
+                    }
+                }
+                if ($shape -eq 'linear') { [array]::Reverse($leftWalk); $order = $leftWalk }
             }
         }
         if (-not $defaultSaved) { $null = Save-Picker ($prefix + '-effort-key') $true }
@@ -208,23 +264,20 @@ try {
             Description=$(if ($columns.Count -gt 1) { $columns[1].Trim() } else { '' })
             Unsupported=$levels[0].Line -match $unsupportedPattern
             CycleComplete=$cycleComplete
+            Shape=$shape
+            Order=$order
             EffortCycle=$levels
         }
     }
     $final = Move-Picker $initial.Highlight
-    for ($press=1; $press -le $MaxEffortLevels -and $final.Adjustable -and $final.EffortBlock -cne $initial.EffortBlock; $press++) {
-        Send-WindowsUiKey $target -Key Right -ExpectedText ('(?m)^[ \t]*\u276F\s' + $initial.Highlight + '\.\s')
-        $changed = Wait-PickerChange $final.EffortBlock $initial.Highlight
-        if ($null -eq $changed -or $changed.Highlight -ne $initial.Highlight) { break }
-        $final = $changed
-    }
+    $final = Restore-Effort $final $initial.EffortBlock $initial.Highlight
     if ($final.EffortBlock -cne $initial.EffortBlock) { throw 'Starting effort was not restored on the starting row.' }
     $null = Save-Picker 'models-returned'
     Assert-ConfigUnchanged 'before final verification'
     [pscustomobject]@{
         CapturedModels=$captured; TextCaptures=$captureCount; Screenshots=$imageCount; ConfigUnchanged=$true
         Scope='visible Windows Terminal picker; aliases and account completeness require independent evidence'
-        Completeness='Effort order is the Right-key cycle from each row''s starting level; reconcile with screenshots'
+        Completeness='Effort Order is linear (lowest first) or the Right-key cycle from each row''s starting level; reconcile with screenshots'
     } | ConvertTo-Json -Depth 6
 } catch {
     try { $null = Save-Picker 'stopped-state' $true } catch { }

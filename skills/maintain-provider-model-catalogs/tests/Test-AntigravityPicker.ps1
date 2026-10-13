@@ -14,13 +14,17 @@ function Assert-WindowsUiFocus($Target) { }
 function Get-FileHash { param($LiteralPath, $Algorithm); @{Hash=$(if ($global:changed -and $script:row -eq 1) {'changed'} else {'baseline'})} }
 function Get-WindowsUiText($Target) {
     $lines = @('private@example.invalid', 'Switch Model', '', '  Search:', '  -----', '')
-    for ($i = 0; $i -lt 3; $i++) {
-        $label = @('Example Alpha','Example Beta','Example Fixed')[ $i ]
+    for ($i = 0; $i -lt 4; $i++) {
+        $label = @('Example Alpha','Example Beta','Example Fixed','Example Locked')[ $i ]
         $lead = if ($script:row -eq $i) {'> '} else {'  '}
         $lines += $lead + $label
     }
     if ($script:row -lt 2) { $lines += @('', '  Effort  slider', '    low   medium   high') }
-    if (-not $global:truncated) { $lines += 'Keyboard: Navigate enter Select esc Go Back' }
+    # A row the plan does not include shows a reason line and drops enter Select (agy 1.3.4).
+    if ($script:row -eq 3) {
+        if (-not $global:noReason) { $lines += '  Unavailable - Example Locked needs another plan.' }
+        $lines += 'Keyboard: Navigate esc Go Back'
+    } elseif (-not $global:truncated) { $lines += 'Keyboard: Navigate enter Select esc Go Back' }
     $lines -join "`n"
 }
 function Send-WindowsUiKey { param($Target, $Key, $ExpectedText)
@@ -34,23 +38,25 @@ function Wait-WindowsUiText { param($Target, $ExpectedText)
 }
 '@ | Set-Content -LiteralPath $mock -Encoding UTF8
 try {
-    foreach ($case in @('normal', 'changed', 'truncated')) {
+    foreach ($case in @('normal', 'changed', 'truncated', 'noreason')) {
         $global:changed = $case -eq 'changed'
         $global:truncated = $case -eq 'truncated'
+        $global:noReason = $case -eq 'noreason'
         $output = Join-Path $scratch $case
         $null = New-Item -ItemType Directory -Path $output
         $failed = $false
         try {
             $result = & (Join-Path $PSScriptRoot '../scripts/Capture-AntigravityPicker.ps1') `
                 -UiHelperPath $mock -WindowTitle Fixture -OutputDirectory $output -ConfigPath unused `
-                -ModelLabels @('Example Alpha','Example Beta','Example Fixed') | ConvertFrom-Json
+                -ModelLabels @('Example Alpha','Example Beta','Example Fixed','Example Locked') | ConvertFrom-Json
         } catch {
             if ($case -eq 'normal') { throw }
             $failed = $true
         }
         if (($case -ne 'normal') -ne $failed) { throw "Unexpected outcome: $case" }
         if ($case -eq 'normal') {
-            if ($result.TextCaptures -ne 3 -or -not $result.ConfigUnchanged) { throw 'Incomplete capture' }
+            if ($result.TextCaptures -ne 4 -or -not $result.ConfigUnchanged) { throw 'Incomplete capture' }
+            if ((@($result.Unavailable) -join '|') -ne 'Example Locked') { throw 'Plan-unavailable row not reported' }
             if ((Get-Content (Join-Path $output 'row-01.txt') -Raw) -match 'private@') { throw 'Account banner retained' }
             if ((Get-Content (Join-Path $output 'row-03.txt') -Raw) -match 'Effort') { throw 'Invented effort for fixed row' }
         }

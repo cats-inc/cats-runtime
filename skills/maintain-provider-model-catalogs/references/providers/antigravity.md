@@ -61,6 +61,11 @@ search. It checks every expected row, footer, focus and settings digest, records
 regions using Up/Down only, then returns to the first row. It neither selects a model nor toggles
 effort. Stop on a truncated/new layout; the passed labels do not establish completeness by themselves.
 
+From 1.3.4 the picker can list a row the account's plan does not include, such as
+`Gemini 4 Argon (Medium)` with `Unavailable · ... Ultra plan subscribers` and no `enter Select`.
+`agy models` omits such a row, so it has no executable ID; record it from the picker, report it,
+and leave it out of the catalog unless the operator supplies an ID for a plan that includes it.
+
 Use Windows PowerShell 5.1 and pass labels as an array from a wrapper script. Capture and inspect
 one initial screenshot to verify text correspondence; the helper itself saves text only and
 omits the account banner. Normalize the text with `normalize-picker-paste.mjs` before retention.

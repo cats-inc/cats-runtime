@@ -9,6 +9,7 @@ import { createCatalogSnapshot, readCatalogFactory } from '../src/catalogs/resol
 import { convertLegacyCatalog, type LegacyMigrationScope } from '../src/catalogs/conversion.js';
 import { applyCatalogPatch, previewCatalogPatch } from '../src/catalogs/patch.js';
 import type { CatalogScope } from '../src/catalogs/types.js';
+import { assertCatalogBinding } from '../src/catalogs/bindings.js';
 import type { ProviderTargetDescriptor } from '../src/core/providerCatalog.js';
 import { PiProvider } from '../src/backends/cli/providers/pi.js';
 import { GooseProvider } from '../src/backends/cli/providers/goose.js';
@@ -62,7 +63,7 @@ describe('factory and executable catalog projections', () => {
     expect(high('grok-4.6')).toMatchObject({ description: expect.stringContaining('Higher implementation') });
     expect(high('grok-4.5')).toMatchObject({ description: expect.stringContaining('Highest implementation') });
     const muse = knowledge(snapshot.document.catalogs.find(s => s.provider === 'muse')!);
-    expect(muse.catalog.entries.map(e => e.controls?.[0].values?.length)).toEqual([6, 6, 5, 5]);
+    expect(muse.catalog.entries.map(e => e.controls?.[0].values?.length)).toEqual([6, 6, 5]);
     expect(muse.catalog.entries.every(e => !e.default && !e.controlDefaults)).toBe(true);
     expect(muse.catalog.controls.flatMap(c => c.values ?? []).every(v => typeof v !== 'object' || !v.label.includes('(default)'))).toBe(true);
   });
@@ -144,9 +145,9 @@ describe('factory and executable catalog projections', () => {
 
   it('lists the full Auggie picker with Claude Opus 5.5 as default and sends only --model', () => {
     const auggie = knowledge(snapshot.document.catalogs.find(s => s.provider === 'auggie' && s.backend === 'cli')!);
-    expect(auggie.catalog.entries).toHaveLength(36);
-    expect(auggie.catalog.entries.slice(0, 6).map(e => e.id)).toEqual(['gpt-6-astra', 'gpt-6-1-sol', 'gpt-6-luna',
-      'claude-fable-5-1', 'claude-opus-5-5', 'claude-sonnet-5-5']);
+    expect(auggie.catalog.entries).toHaveLength(37);
+    expect(auggie.catalog.entries.slice(0, 7).map(e => e.id)).toEqual(['gpt-6-astra', 'gpt-6-1-sol', 'gpt-6-luna',
+      'claude-fable-5-1', 'claude-opus-5-5', 'claude-haiku-5-5', 'claude-sonnet-5-5']);
     expect(auggie.catalog.entries.filter(e => e.default).map(e => e.id)).toEqual(['claude-opus-5-5']);
     expect(auggie.catalog.defaultSelection).toEqual(expect.objectContaining({ entryId: 'claude-opus-5-5', entryMode: 'explicit' }));
     // Effort is recorded in notes only; no auggie.reasoning_effort binding exists.
@@ -222,13 +223,13 @@ describe('factory and executable catalog projections', () => {
 
   it('lists the Copilot Pro picker with Terra as default and first-value effort, context and tier', () => {
     const copilot = knowledge(snapshot.document.catalogs.find(s => s.provider === 'copilot' && s.backend === 'cli')!);
-    expect(copilot.catalog.entries).toHaveLength(18);
+    expect(copilot.catalog.entries).toHaveLength(19);
     expect(copilot.catalog.entries.slice(0, 4).map(e => e.id)).toEqual(['auto', 'grok-4.7', 'gpt-5.6-terra', 'mai-code-1.1-flash']);
     expect(copilot.catalog.entries.filter(e => e.default).map(e => e.id)).toEqual(['gpt-5.6-terra']);
     // Plan-unavailable picker rows (Pro+ only) are omitted.
     expect(copilot.catalog.entries.some(e => /opus|fable|astra|sol|^gpt-5\.5$/.test(e.id))).toBe(false);
     const withContext = copilot.catalog.entries.filter(e => e.controls?.some(c => c.key === 'copilot.context'));
-    expect(withContext).toHaveLength(11);
+    expect(withContext).toHaveLength(12);
     const spawn = (entryId: string, controls?: Record<string, string>) => {
       const selected = resolveProviderSelection(copilot, { entryId, entryMode: 'explicit', ...(controls ? { controls } : {}) });
       const args = new CopilotProvider().buildSpawnArgs({ cwd: '/tmp',
@@ -244,9 +245,35 @@ describe('factory and executable catalog projections', () => {
     expect(spawn('gpt-5.4-mini')).toEqual(['--model', 'gpt-5.4-mini', '--effort', 'none']);
     expect(spawn('auto')).toEqual(['--model', 'auto', '--auto-tier', 'efficiency']);
     expect(spawn('claude-haiku-4.5')).toEqual(['--model', 'claude-haiku-4.5']);
+    expect(spawn('claude-haiku-5.5', { 'copilot.reasoning_effort': 'max', 'copilot.context': 'long_context' }))
+      .toEqual(['--model', 'claude-haiku-5.5', '--effort', 'max', '--context', 'long_context']);
     // Rows the plan no longer includes (2026-10-03) are gone from the catalog.
     expect(copilot.catalog.entries.some(e => ['gemini-3.6-flash', 'gemini-3.5-flash', 'kimi-k2.7-code'].includes(e.id))).toBe(false);
     expect(() => spawn('gpt-5.4-mini', { 'copilot.context': 'long_context' })).toThrow();
+  });
+
+  it('lists the full Goose chatgpt_codex channel with Off first and sends each effort as its model suffix', () => {
+    const goose = knowledge(snapshot.document.catalogs.find(s => s.provider === 'goose' && s.backend === 'cli')!);
+    expect(goose.catalog.entries.map(e => e.id)).toEqual(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6',
+      'gpt-5.5', 'gpt-5.4'].map(id => `chatgpt_codex/${id}`));
+    expect(goose.catalog.entries.map(e => e.label)).toEqual(goose.catalog.entries.map(e => e.id.slice('chatgpt_codex/'.length)));
+    expect(goose.catalog.entries.every(e => !e.default && !e.controlDefaults)).toBe(true);
+    const spawn = (entryId: string, effort?: string) => {
+      const selected = resolveProviderSelection(goose, { entryId, entryMode: 'explicit',
+        ...(effort ? { controls: { 'goose.thinking_effort': effort } } : {}) });
+      const args = new GooseProvider().buildSpawnArgs({ cwd: '/tmp', model: selected.execution.model,
+        modelProvider: selected.execution.provider, modelControls: selected.resolution.controls });
+      return args.slice(args.indexOf('--provider'), args.indexOf('--model') + 2);
+    };
+    expect(spawn('chatgpt_codex/gpt-5.6-sol')).toEqual(['--provider', 'chatgpt_codex', '--model', 'gpt-5.6-sol-none']);
+    expect(spawn('chatgpt_codex/gpt-5.5', 'low')).toEqual(['--provider', 'chatgpt_codex', '--model', 'gpt-5.5-low']);
+    expect(spawn('chatgpt_codex/gpt-5.6', 'medium')).toEqual(['--provider', 'chatgpt_codex', '--model', 'gpt-5.6-medium']);
+    expect(spawn('chatgpt_codex/gpt-5.6-terra', 'high')).toEqual(['--provider', 'chatgpt_codex', '--model', 'gpt-5.6-terra-high']);
+    // Goose parses no -max suffix; Max is -xhigh.
+    expect(spawn('chatgpt_codex/gpt-5.4', 'max')).toEqual(['--provider', 'chatgpt_codex', '--model', 'gpt-5.4-xhigh']);
+    expect(() => spawn('chatgpt_codex/gpt-5.6-luna', 'xhigh')).toThrow();
+    const scope = snapshot.document.catalogs.find(s => s.provider === 'goose' && s.backend === 'cli')!;
+    expect(() => assertCatalogBinding(scope, 'goose.thinking_effort', 'ultra')).toThrow(/supports only off, low, medium, high, max/);
   });
 
   it('emits copilot.context and copilot.auto_tier for an unknown model id from data alone', () => {

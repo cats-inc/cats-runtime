@@ -689,7 +689,7 @@ describe('ProviderModelCatalogService', () => {
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
-  it('keeps the curated Goose shortlist independent of the active provider config', async () => {
+  it('keeps the curated Goose channel list independent of the active provider config', async () => {
     const { env, cleanup } = createGooseConfigRoot([
       'GOOSE_PROVIDER: anthropic',
       'GOOSE_MODEL: claude-sonnet-4-5',
@@ -710,12 +710,12 @@ describe('ProviderModelCatalogService', () => {
         source: 'static',
         cache: null,
         models: [
-          { id: 'chatgpt_codex/gpt-5.6-sol', label: 'gpt-5.6-sol — Off' },
-          { id: 'chatgpt_codex/gpt-5.6-terra', label: 'gpt-5.6-terra — Off' },
-          { id: 'chatgpt_codex/gpt-5.6-luna', label: 'gpt-5.6-luna — Off' },
-          { id: 'chatgpt_codex/gpt-5.6', label: 'gpt-5.6 — Off' },
-          { id: 'chatgpt_codex/gpt-5.5', label: 'gpt-5.5 — Off' },
-          { id: 'chatgpt_codex/gpt-5.4', label: 'gpt-5.4 — Off' },
+          { id: 'chatgpt_codex/gpt-5.6-sol', label: 'gpt-5.6-sol' },
+          { id: 'chatgpt_codex/gpt-5.6-terra', label: 'gpt-5.6-terra' },
+          { id: 'chatgpt_codex/gpt-5.6-luna', label: 'gpt-5.6-luna' },
+          { id: 'chatgpt_codex/gpt-5.6', label: 'gpt-5.6' },
+          { id: 'chatgpt_codex/gpt-5.5', label: 'gpt-5.5' },
+          { id: 'chatgpt_codex/gpt-5.4', label: 'gpt-5.4' },
         ],
         warnings: [],
       });

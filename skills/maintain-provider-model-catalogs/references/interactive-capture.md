@@ -56,7 +56,10 @@ For a fully visible `Switch Model` menu, use
 [`Capture-AntigravityPicker.ps1`](../scripts/Capture-AntigravityPicker.ps1) as described in the
 [Antigravity reference](providers/antigravity.md#bounded-windows-picker-capture). Each selected
 row shows all effort labels at once, so guarded Up/Down traversal is sufficient. The helper
-records picker regions only, in UTF-8, without cycling sliders or confirming a selection.
+records picker regions only, in UTF-8, without cycling sliders or confirming a selection. A row the
+plan does not include (agy 1.3.4: `Unavailable · ... Ultra plan subscribers`) has no `enter Select`
+in its footer; the helper accepts that footer only with the Unavailable line and lists the row
+under `Unavailable` in its result.
 
 ## Windows Codex helper
 
@@ -110,16 +113,20 @@ powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/scripts/
   -ExpectedModelCount $independentlyObservedCount
 ```
 
-It sends only arrow keys. Up/Down move rows; Right cycles each row's effort line until it returns
-to its starting level. A scrolled list counts toward `-ExpectedModelCount` through its visible
+It sends only arrow keys. Up/Down move rows; Right steps each row's effort line until it returns
+to its starting level (through 2.1.292, where effort wraps) or stops changing. From 2.1.293 effort
+stops at both ends, so the helper then steps Left until the lowest level and reports that row as
+`Shape: linear` with `Order` lowest first; a wrapping line is `Shape: cycle` with `Order` from its
+starting level. A scrolled list counts toward `-ExpectedModelCount` through its visible
 rows plus the `… +N models` line, and each row is read while highlighted. That line counts every
 row out of view through 2.1.283, and only the rows below the window from 2.1.284, so the helper
 accepts either total at every row. Effort is picker-wide,
-so the helper cycles the starting row back at the end. Enter (save default) and `s` (session only)
+so the helper returns the starting row to its starting level at the end (Left, then Right if
+needed). Enter (save default) and `s` (session only)
 are never sent, and the picker is left open at its starting row and effort. `KeyScreens` saves the list plus one default-marked
 (or unsupported) screen per row; the other steps are text-only. The JSON result records each
-row's label, current marker, description and effort cycle with explicit `(default)` markers.
-Order is the Right-key cycle from the starting level; derive linear order from the wrap point.
+row's label, current marker, description, effort steps with explicit `(default)` markers, `Shape`
+and `Order`.
 
 Exercise traversal, config-change and evidence-directory guards without launching a CLI:
 

@@ -1,9 +1,9 @@
 # Goose
 
-Use supplied provider/model picker evidence first. Goose is a multi-provider CLI:
-keep its selected provider context attached to every model, and preserve lowercase
-raw model labels. A complete selected Cats shortlist does not describe all upstream
-providers or all their effort menus.
+Goose is a multi-provider CLI. Cats maintains the full model list of one channel,
+`chatgpt_codex` (ChatGPT subscription OAuth), recorded as the scope's `basis.channel`.
+Keep that provider attached to every model and preserve Goose's lowercase raw model
+labels. Other Goose providers stay custom `provider/model` input.
 
 ## Bounded evidence
 
@@ -15,15 +15,31 @@ providers or all their effort menus.
 - Provider-qualified Cats IDs use the existing `provider/model` parser. Verify the
   provider token separately from its display label; ChatGPT Codex's token is
   `chatgpt_codex`, not the OpenAI API provider `openai`.
+- Goose has no read-only model-list command, and `goose configure` writes its config.
+  The `chatgpt_codex` list is compiled in: read `CHATGPT_CODEX_KNOWN_MODELS` in
+  `crates/goose/src/providers/chatgpt_codex.rs` at the installed version's tag, then find
+  the same names in the installed binary (they sit together beside the provider's
+  sign-in page text). Record the binary's SHA-256, and compare it with the release asset
+  when one exists. `fetch_supported_models` returning that list shows there is no live,
+  account-specific fetch; recheck this on each version.
+- The configure flow lists those models (filtered by Goose's model registry and sorted
+  newest first, ties in list order) and then one global `Select thinking effort:` menu:
+  Off, Low, Medium, High, Max, starting on Off. Neither marks a default; the provider's
+  fallback model for an unset model is not a picker marker.
 - For an execution mapping absent from help, inspect versioned upstream source at
   the installed version. `goose-providers` reexports model/thinking types from
   `goose-provider-types`; follow that reexport instead of repeatedly guessing paths.
-  This source proves transport semantics, not account-visible menus or defaults.
-
+  This source proves transport semantics, not account entitlement.
 
 ## Schema-2 execution data
 
-Use qualified Cats `id`, bare wire `execution.model`, `execution.provider: chatgpt_codex`, and `execution.fixed_controls.goose.thinking_effort: off`. The generic serializer uses Goose’s native `-none` suffix; its backend may map none to the lowest supported effort. No model-keyed lookup remains; unknown custom strings get no inferred Off.
+Use qualified Cats `id`, the raw model name as `label` and bare wire `execution.model`,
+`execution.provider: chatgpt_codex`, and a per-row `goose.thinking_effort` enum with Goose's
+menu values `off`, `low`, `medium`, `high`, `max` and no default. The adapter sends the value
+as Goose's native model suffix: `-none`, `-low`, `-medium`, `-high`, `-xhigh` (Goose 1.54.0
+parses no `-max` suffix and maps `-xhigh` to Max). The binding rejects any other value.
+Goose's backend then sends the model's own effort token; on models without `none`, Off is
+sent as `low`. Unknown custom strings get no inferred effort.
 
 Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
 Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.

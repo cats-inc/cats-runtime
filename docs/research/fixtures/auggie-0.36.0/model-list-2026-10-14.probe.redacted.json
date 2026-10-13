@@ -1,0 +1,60 @@
+{
+  "kind": "cats-catalog-probe-evidence",
+  "schemaVersion": 1,
+  "provider": "auggie",
+  "backend": "cli",
+  "transport": null,
+  "command": "auggie model list --json",
+  "sourceClass": "machine-readable",
+  "cliVersion": "0.36.0",
+  "versionSource": "npm package",
+  "observedAt": "2026-10-13T17:29:03.545Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "accountScope": "The CLI's existing sign-in on the probing machine. No identity is recorded.",
+  "status": "ok",
+  "completeness": {
+    "membership": "complete",
+    "meaning": "The command lists what the picker offers; an absent row still needs picker confirmation before removal."
+  },
+  "authoritativeFor": {
+    "ids": true,
+    "label": true,
+    "efforts": false,
+    "effortDefault": false
+  },
+  "stillNeedsPicker": "A model (default) marker, picker descriptions, picker order, and every field not listed under authoritativeFor still need picker evidence.",
+  "selection": {
+    "ids": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "sourceEvidence": {
+    "defaultModelId": "claude-sonnet-5-5-c4-p2-agent"
+  },
+  "models": [
+    {
+      "id": "claude-haiku-5-5",
+      "label": "Claude Haiku 5.5",
+      "evidence": {
+        "shortName": "haiku5.5",
+        "description": "Claude Haiku 5.5, 100K context window",
+        "costTier": 1,
+        "effortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    }
+  ],
+  "redaction": {
+    "method": "Projected public model fields only; no raw output, account identifier, price, endpoint or login text. String values passed through the skill redaction helper.",
+    "redactions": [],
+    "reviewBeforeCommit": "Check names, paths and provider-specific identifiers by hand; the helper catches only common shapes."
+  }
+}

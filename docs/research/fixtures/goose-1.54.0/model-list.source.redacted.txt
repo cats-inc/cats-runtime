@@ -1,0 +1,55 @@
+# Goose 1.54.0 chatgpt_codex model list and thinking-effort menu (source and binary reading)
+# Observed: 2026-10-14 (UTC+8) on Windows 11 native. No Goose session, `goose configure`, login or
+#   inference ran. The only command was `goose --version` with GOOSE_PATH_ROOT set to an empty
+#   temporary directory; it printed "1.54.0" and wrote one log inside that directory.
+# Installed binary: goose.exe, 249,551,872 bytes,
+#   SHA-256 f031e1592470dbc2df17408626174bc5c48c84f65d987a50ed935d2557e0a17d. It is byte-identical
+#   to goose.exe in the official v1.54.0 release asset goose-x86_64-pc-windows-msvc.zip (release
+#   published 2026-10-08; tag commit cd643d2126fffab4c6a6186905211ba868d6a657).
+# Source: https://github.com/aaif-goose/goose/blob/v1.54.0/<path>#L<lines>
+# Account scope: none. The list is compiled into Goose, not fetched for an account.
+
+## crates/goose/src/providers/chatgpt_codex.rs
+#L48-L49   provider id chatgpt_codex; CHATGPT_CODEX_DEFAULT_MODEL = "gpt-5.5" (fallback for an unset model)
+#L57-L82   CHATGPT_CODEX_KNOWN_MODELS, in order:
+  gpt-5.6-sol    reasoning_levels: none, low, medium, high, xhigh
+  gpt-5.6-terra  reasoning_levels: none, low, medium, high, xhigh
+  gpt-5.6-luna   reasoning_levels: none, low, medium, high, xhigh
+  gpt-5.6        reasoning_levels: none, low, medium, high, xhigh
+  gpt-5.5        reasoning_levels: low, medium, high, xhigh
+  gpt-5.4        reasoning_levels: low, medium, high, xhigh
+#L86-L98   unknown models fall back to medium, high
+#L1062-L1064  fetch_supported_models returns the list above; there is no live model fetch
+#L237-L264, #L304-L309  request effort: Off -> none on the gpt-5.6 models and low on gpt-5.5/gpt-5.4;
+           Low -> low, Medium -> medium, High -> high, Max -> xhigh; unset -> CHATGPT_CODEX_REASONING_EFFORT
+crates/goose/src/config/base.rs#L1260  CHATGPT_CODEX_REASONING_EFFORT defaults to "medium"
+
+## Picker surfaces
+crates/goose-cli/src/commands/configure.rs#L955-L981 with crates/goose-provider-types/src/base.rs#L576-L640:
+  model step lists the six models (filtered by the model registry, newest release first; the four
+  gpt-5.6 rows share a release date and keep list order). Six rows show as a flat "Select a model:"
+  list plus "Enter a model not listed..."; nothing is preselected or marked default.
+crates/goose-cli/src/commands/configure.rs#L987-L1001 (one global menu, not per model):
+  Select thinking effort:
+    off     Off - No extended thinking
+    low     Low - Better latency, lighter reasoning
+    medium  Medium - Moderate thinking
+    high    High - Deep reasoning
+    max     Max - No constraints on thinking depth
+  initial value: off (first item; no default marker)
+crates/goose-cli/src/session/mod.rs#L1823-L1843  in-session /model completion uses the same list
+
+## Model suffix grammar
+crates/goose-provider-types/src/thinking.rs#L305-L339  ThinkingEffort: Off, Low, Medium, High, Max
+crates/goose-provider-types/src/model.rs#L350-L380  last "-" segment, case-sensitive:
+  -none -> Off, -low -> Low, -medium -> Medium, -high -> High, -xhigh -> Max (no -max, no -off)
+  applies to gpt-5/gpt-6/o-series names (formats/openai.rs#L1852-L1858); all six match
+New sessions apply the suffix before the global default (goose-cli/src/session/builder.rs#L425-L436,
+crates/goose/src/model_config.rs#L123-L143); a resumed session rebuilds its settings when --model
+differs from the stored name, which has the suffix stripped (builder.rs#L409-L424).
+
+## Installed binary corroboration
+Next to the chatgpt_codex sign-in page text, goose.exe holds "gpt-5.6-sol" followed by
+"gpt-5.6-terragpt-5.6-lunagpt-5.6gpt-5.5gpt-5.4": the six names in list order and no others.
+The provider description, the effort menu labels, the suffix pattern and "Enter a model not listed..."
+each appear once.

@@ -81,10 +81,15 @@ function Send-WindowsUiKey { param($Target, $Key, $ExpectedText)
     switch ($Key) {
         Down { $script:mockRow++ }
         Up { $script:mockRow-- }
+        # Through 2.1.292 effort wraps at both ends; $global:mockLinear stops at them (2.1.293+).
         Right { if ($m.Levels.Count -gt 0) {
-            $script:mockLevel = $m.Levels[([array]::IndexOf($m.Levels, (Get-MockLevel $m)) + 1) % $m.Levels.Count] } }
+            $at = [array]::IndexOf($m.Levels, (Get-MockLevel $m))
+            $to = if ($global:mockLinear) { [Math]::Min($at + 1, $m.Levels.Count - 1) } else { ($at + 1) % $m.Levels.Count }
+            $script:mockLevel = $m.Levels[$to] } }
         Left { if ($m.Levels.Count -gt 0) {
-            $script:mockLevel = $m.Levels[([array]::IndexOf($m.Levels, (Get-MockLevel $m)) + $m.Levels.Count - 1) % $m.Levels.Count] } }
+            $at = [array]::IndexOf($m.Levels, (Get-MockLevel $m))
+            $to = if ($global:mockLinear) { [Math]::Max($at - 1, 0) } else { ($at + $m.Levels.Count - 1) % $m.Levels.Count }
+            $script:mockLevel = $m.Levels[$to] } }
         default { throw "Capture sent a saving or unexpected key: $Key" }
     }
 }
@@ -221,7 +226,37 @@ try {
         throw 'A row without the starting level was not cycled from its shown level'
     }
     Write-Output 'PASS restores a picker-wide starting effort that another row lacked'
+
+    # 2.1.293 and later stop effort at both ends instead of wrapping.
+    $global:mockLinear = $true
+    $global:mockStartLevel = 'xHigh'
+    $output = Join-Path $scratch 'linear-effort'
+    $null = New-Item -ItemType Directory -Path $output
+    $result = & $subject -UiHelperPath $mock -WindowTitle 'Fixture' -OutputDirectory $output `
+        -ConfigPath 'simulated-config' -ExpectedModelCount 3 -Screenshots None | ConvertFrom-Json
+    $first = $result.CapturedModels[0]
+    $second = $result.CapturedModels[1]
+    if ($first.Shape -ne 'linear' -or ($first.Order -join ',') -ne 'Low,Medium,High' -or -not $first.CycleComplete -or
+        (@($first.EffortCycle | Where-Object Default).Level -join ',') -ne 'Medium' -or
+        $second.Shape -ne 'linear' -or ($second.Order -join ',') -ne 'Low,Medium,High,Max' -or
+        (@($second.EffortCycle | Where-Object Default).Level -join ',') -ne 'High' -or
+        $result.CapturedModels[2].Shape -ne 'none') {
+        throw 'A non-wrapping effort line was not walked to both ends'
+    }
+    Write-Output 'PASS walks non-wrapping effort to both ends and restores the starting level'
+    $global:mockLinear = $false
+
+    $global:mockStartLevel = $null
+    $output = Join-Path $scratch 'cycle-shape'
+    $null = New-Item -ItemType Directory -Path $output
+    $result = & $subject -UiHelperPath $mock -WindowTitle 'Fixture' -OutputDirectory $output `
+        -ConfigPath 'simulated-config' -ExpectedModelCount 3 -Screenshots None | ConvertFrom-Json
+    if ($result.CapturedModels[0].Shape -ne 'cycle' -or ($result.CapturedModels[0].Order -join ',') -ne 'High,Low,Medium') {
+        throw 'A wrapping effort line was not reported as a cycle'
+    }
+    Write-Output 'PASS reports a wrapping effort line as a cycle from its starting level'
 } finally {
+    Remove-Variable -Name mockLinear -Scope Global -ErrorAction SilentlyContinue
     Remove-Variable -Name mockStartLevel -Scope Global -ErrorAction SilentlyContinue
     Remove-Variable -Name simulateFinalChange -Scope Global -ErrorAction SilentlyContinue
     Remove-Variable -Name mockVisible -Scope Global -ErrorAction SilentlyContinue

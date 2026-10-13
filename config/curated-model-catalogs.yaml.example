@@ -4,8 +4,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Claude
-    cli_version: 2.1.288
-    last_updated: 2026-10-03
+    cli_version: 2.1.296
+    last_updated: 2026-10-14
     notes:
       - Model list, every model's effort line and every row's value re-read 2026-10-03 by an
         agent-operated capture of the Claude Code 2.1.288 `/model` picker (Windows UI Automation
@@ -74,6 +74,7 @@ catalogs:
         list later is not removal evidence, and an added row needs its own capture. See
         docs/research/2026-09-26-claude-picker-eleven-rows.md and
         docs/research/2026-09-30-claude-picker-sonnet-5-5.md.
+      - "Refreshed 2026-10-14 from Claude Code 2.1.296 by an agent-operated /model capture (Claude Max sign-in, --safe-mode). The picker has 13 rows: Default plus 12 models. Haiku 5.5 is new (Low to Max, (default) Medium) and sets the `haiku` alias, which now resolves to claude-haiku-5-5; the Haiku 4.5 row sets claude-haiku-4-5-20251001 and supports no effort, so it moved to its own entry. Every other row kept its label, description, effort levels and (default) level. From 2.1.293 the effort line stops at both ends instead of wrapping; the capture walked each row to both ends. Max effort remains a level on every row that offered it. Evidence: docs/research/fixtures/claude-2.1.296/model-picker.agent-capture.redacted.txt."
     models:
       - default: true
         id: opus
@@ -208,6 +209,47 @@ catalogs:
             default: medium
       - default: false
         id: haiku
+        label: Haiku 5.5
+        capabilityTags:
+          - tool_use
+          - latency_optimized
+        notes:
+          - "Picker description: Fastest for quick answers"
+          - "`haiku` resolves to claude-haiku-5-5 on 2.1.296, as the Haiku 5.5 picker row sets it (/status: haiku (claude-haiku-5-5)). It resolved to claude-haiku-4-5-20251001 through 2.1.288, when this entry was labelled Haiku 4.5; that model now has its own entry. The 200000 context limit described Haiku 4.5 and moved with it."
+        source_names:
+          - Haiku
+          - Haiku 4.5
+          - Haiku 5.5
+        execution:
+          model: haiku
+        controls:
+          - key: claude.reasoning_effort
+            label: Reasoning effort
+            description: Controls Claude Code effort for supported models.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: Low
+                description: Quick, straightforward implementation with minimal overhead
+              - value: medium
+                label: Medium
+                description: Balanced approach with standard implementation and testing
+              - value: high
+                label: High
+                description: Comprehensive implementation with extensive testing and documentation
+              - value: xhigh
+                label: xHigh
+                description: Deeper reasoning than high, just below maximum (on supported models)
+              - value: max
+                label: Max
+                description: May use excessive tokens resulting in long response times or overthinking. Use
+                  sparingly for the hardest tasks.
+            semanticTags:
+              - reasoning_intensity
+            default: medium
+      - default: false
+        id: claude-haiku-4-5-20251001
         label: Haiku 4.5
         capabilityTags:
           - tool_use
@@ -216,12 +258,11 @@ catalogs:
           contextWindowTokens: 200000
         notes:
           - "Picker description: Fastest for quick answers"
-          - "`haiku` resolves to claude-haiku-4-5-20251001."
+          - "Executes `claude-haiku-4-5-20251001`, the value the picker row sets on 2.1.296. Before 2026-10-14 Cats reached this model through the `haiku` entry. The picker shows Effort not supported for this row."
         source_names:
-          - Haiku
           - Haiku 4.5
         execution:
-          model: haiku
+          model: claude-haiku-4-5-20251001
         controls: []
       - default: false
         id: claude-sonnet-5
@@ -444,8 +485,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Codex
-    cli_version: 0.160.0
-    last_updated: 2026-10-01
+    cli_version: 0.162.1
+    last_updated: 2026-10-14
     notes:
       - Complete visible model list and every per-model reasoning/advanced menu captured on 2026-10-01
         Asia/Taipei (2026-09-30 UTC) from Codex CLI 0.159.2 in Windows Terminal using UI Automation
@@ -472,8 +513,9 @@ catalogs:
         tags and migration source_names remain with their earlier provenance; no capability tags were
         inferred for new models.
       - "cli_version advanced from 0.159.2 to 0.160.0 on 2026-10-03 at the operator's request, without a new picker capture: `codex debug models` listed exactly this scope's 8 entries, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 0.159.2 evidence. Evidence: docs/research/fixtures/codex-0.160.0/model-list.probe.redacted.json."
+      - "Refreshed 2026-10-14 from Codex CLI 0.162.1. `codex debug models` now marks gpt-5.5 visibility=hide ('Legacy coding model.'), and the agent-operated picker capture shows seven rows without GPT-5.5; the operator confirmed removing it, and it stays reachable as the custom model string gpt-5.5. The 0.162.1 picker shows no (default) marker on any row, so GPT-6.1-Sol is no longer the model default (operator-confirmed). Every remaining reasoning and More reasoning menu, label and description matched the 0.159.2 capture. Evidence: docs/research/fixtures/codex-0.162.1/picker.agent-capture.redacted.txt and docs/research/fixtures/codex-0.162.1/model-list.probe.redacted.json."
     models:
-      - default: true
+      - default: false
         id: gpt-6.1-sol
         label: GPT-6.1-Sol
         limits:
@@ -742,47 +784,12 @@ catalogs:
             semanticTags:
               - reasoning_intensity
             default: medium
-      - default: false
-        id: gpt-5.5
-        label: GPT-5.5
-        capabilityTags:
-          - tool_use
-        limits:
-          contextWindowTokens: 272000
-        notes:
-          - Legacy coding model.
-        source_names:
-          - gpt-5.5
-        execution:
-          model: gpt-5.5
-        controls:
-          - key: codex.reasoning_effort
-            label: Reasoning effort
-            description: Controls Codex CLI reasoning depth for supported models.
-            kind: enum
-            scope: both
-            values:
-              - value: low
-                label: Low
-                description: Fast responses with lighter reasoning
-              - value: medium
-                label: Medium
-                description: Balances speed and reasoning depth for everyday tasks
-              - value: high
-                label: High
-                description: Greater reasoning depth for complex problems
-              - value: xhigh
-                label: Extra high
-                description: Extra high reasoning depth for complex problems
-            semanticTags:
-              - reasoning_intensity
-            default: medium
   - provider: antigravity
     backend: cli
     selection_mode: full
     source_cli: Antigravity
-    cli_version: 1.2.16
-    last_updated: 2026-10-04
+    cli_version: 1.3.4
+    last_updated: 2026-10-14
     notes:
       - Complete operator-supplied /model picker and all per-model effort screens on Antigravity CLI
         1.2.3, observed 2026-09-16; account scope is the operator's CLI.
@@ -797,6 +804,7 @@ catalogs:
         applicable effort without adding a default label; existing explicit choices are preserved.
       - "cli_version advanced from 1.2.10 to 1.2.15 on 2026-10-03 at the operator's request, without a new picker capture: `agy models` listed exactly this scope's 7 entries, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 1.2.10 evidence. Evidence: docs/research/fixtures/antigravity-1.2.15/model-list.probe.redacted.json."
       - "Complete seven-family picker and per-row effort sliders read on agy 1.2.16, 2026-10-04, using Windows UI Automation. Claude Opus 5.5 and Claude Sonnet 5.5 each show low, medium, high with no default marker. The operator confirmed removal of the two absent Claude 4.6 Thinking rows. Evidence: docs/research/fixtures/antigravity-1.2.16/model-picker.agent-capture.redacted.txt and docs/research/fixtures/antigravity-1.2.16/model-list.probe.redacted.json. Existing unobserved metadata retains its earlier provenance."
+      - "Refreshed 2026-10-14 from agy 1.3.4 (Google AI Pro sign-in). The picker shows five rows: Gemini 3.8 Flash, Claude Opus 5.5 and Claude Sonnet 5.5 with low/medium/high sliders, GPT-OSS 120B (Medium) with no slider, and Gemini 4 Argon (Medium), which reads Unavailable (Ultra plan subscribers only) and has no `agy models` id, so it is not added. Gemini 3.7 Flash, Gemini 3.6 Flash and Gemini 3.1 Pro are gone from both the picker and `agy models`; the operator confirmed removing them. No model or effort default marker appeared. Evidence: docs/research/fixtures/antigravity-1.3.4/model-picker.agent-capture.redacted.txt and docs/research/fixtures/antigravity-1.3.4/model-list.probe.redacted.json."
     models:
       - id: gemini-3.8-flash-low
         label: Gemini 3.8 Flash
@@ -830,111 +838,6 @@ catalogs:
               - value: medium
                 label: medium
                 description: Balanced speed and reasoning quality for most tasks
-              - value: high
-                label: high
-                description: Deepest reasoning for complex problems — slower but strongest
-            semanticTags:
-              - reasoning
-      - id: gemini-3.7-flash-low
-        label: Gemini 3.7 Flash
-        capabilityTags:
-          - tool_use
-          - latency_optimized
-        source_names:
-          - gemini-3.7-flash-low
-          - Gemini 3.7 Flash
-        execution:
-          model: gemini-3.7-flash-low
-          variants:
-            - when:
-                antigravity.effort: low
-              model: gemini-3.7-flash-low
-            - when:
-                antigravity.effort: medium
-              model: gemini-3.7-flash-medium
-            - when:
-                antigravity.effort: high
-              model: gemini-3.7-flash-high
-        controls:
-          - key: antigravity.effort
-            label: Effort
-            kind: enum
-            scope: both
-            values:
-              - value: low
-                label: low
-                description: Faster responses, lighter reasoning — great for simpler tasks
-              - value: medium
-                label: medium
-                description: Balanced speed and reasoning quality for most tasks
-              - value: high
-                label: high
-                description: Deepest reasoning for complex problems — slower but strongest
-            semanticTags:
-              - reasoning
-      - id: gemini-3.6-flash-low
-        label: Gemini 3.6 Flash
-        capabilityTags:
-          - tool_use
-          - latency_optimized
-        source_names:
-          - gemini-3.6-flash-low
-          - Gemini 3.6 Flash
-        execution:
-          model: gemini-3.6-flash-low
-          variants:
-            - when:
-                antigravity.effort: low
-              model: gemini-3.6-flash-low
-            - when:
-                antigravity.effort: medium
-              model: gemini-3.6-flash-medium
-            - when:
-                antigravity.effort: high
-              model: gemini-3.6-flash-high
-        controls:
-          - key: antigravity.effort
-            label: Effort
-            kind: enum
-            scope: both
-            values:
-              - value: low
-                label: low
-                description: Faster responses, lighter reasoning — great for simpler tasks
-              - value: medium
-                label: medium
-                description: Balanced speed and reasoning quality for most tasks
-              - value: high
-                label: high
-                description: Deepest reasoning for complex problems — slower but strongest
-            semanticTags:
-              - reasoning
-      - id: gemini-3.1-pro-low
-        label: Gemini 3.1 Pro
-        capabilityTags:
-          - tool_use
-          - reasoning
-        source_names:
-          - gemini-3.1-pro-low
-          - Gemini 3.1 Pro
-        execution:
-          model: gemini-3.1-pro-low
-          variants:
-            - when:
-                antigravity.effort: low
-              model: gemini-3.1-pro-low
-            - when:
-                antigravity.effort: high
-              model: gemini-3.1-pro-high
-        controls:
-          - key: antigravity.effort
-            label: Effort
-            kind: enum
-            scope: both
-            values:
-              - value: low
-                label: low
-                description: Faster responses, lighter reasoning — great for simpler tasks
               - value: high
                 label: high
                 description: Deepest reasoning for complex problems — slower but strongest
@@ -1010,7 +913,7 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Grok
-    cli_version: 1.0.46
+    cli_version: 1.0.52
     last_updated: 2026-09-25
     notes:
       - "Complete four-model /model list and per-model effort menus captured 2026-09-25 from Grok
@@ -1033,6 +936,7 @@ catalogs:
       - "Context 500000 was re-read from the 1.0.41 model cache for every listed model. The capture
         session header showed 500K. The cache had no output limit."
       - "cli_version advanced from 1.0.41 to 1.0.46 on 2026-10-03 at the operator's request, without a new picker capture: `grok models` listed exactly this scope's 4 entries, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 1.0.41 evidence. Evidence: docs/research/fixtures/grok-1.0.46/model-list.probe.redacted.json."
+      - "cli_version advanced from 1.0.46 to 1.0.52 on 2026-10-14 at the operator's request, without a new picker capture: `grok models` listed exactly this scope's 4 entries, with no other finding. That source compares model IDs only; labels and effort menus were not re-read, and the notes above describe the earlier evidence. Evidence: docs/research/fixtures/grok-1.0.52/model-list.probe.redacted.json."
     models:
       - id: grok-4.7
         label: Grok 4.7
@@ -1163,8 +1067,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Muse
-    cli_version: 1.4.2-R4684.1
-    last_updated: 2026-09-26
+    cli_version: 1.4.7-R6101.1
+    last_updated: 2026-10-14
     notes:
       - "Model list re-read 2026-09-26 on Muse Code 1.4.0 (muse-bin-1.4.0-R4161.1): MSP `model/list`
         over `muse serve --no-session-log` (providerId `meta`, profileId `tbh`, source
@@ -1213,7 +1117,46 @@ catalogs:
         availability/defaults. Model-list version, freshness, labels, and limits retain their
         2026-09-05 provenance; this correction only re-observes effort menus.
       - "cli_version advanced from 1.4.0-R4161.1 to 1.4.2-R4684.1 on 2026-10-03 at the operator's request, without a new picker capture: `muse-bin serve --no-session-log, MSP model/list` listed exactly this scope's 4 entries, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 1.4.0-R4161.1 evidence. Evidence: docs/research/fixtures/muse-1.4.2-R4684.1/model-list.probe.redacted.json."
+      - "Refreshed 2026-10-14 from Muse Code 1.4.7 (muse-bin-1.4.7-R6101.1). MSP `model/list` and the /model picker both list three rows in this order: muse-wonder-1.0 (new; released 2026-10-12), muse-spark-1.3 and muse-spark-1.2. The two -contributor rows are gone from both; the settings file now carries a contributor_mode_enabled switch instead. The operator confirmed removing them; they remain reachable as custom model strings where Muse still accepts them. The /effort picker with muse-wonder-1.0 active lists minimal, low, medium, high, xhigh, max with no default marker (the highlighted xhigh is the session value); MSP variants agree. `model/list` now marks muse-wonder-1.0 isDefault, which is not projected as a curated default. Evidence: docs/research/fixtures/muse-1.4.7-R6101.1/model-picker.agent-capture.redacted.txt and docs/research/fixtures/muse-1.4.7-R6101.1/model-list.probe.redacted.json."
     models:
+      - id: muse-wonder-1.0
+        label: muse-wonder-1.0
+        limits:
+          contextWindowTokens: 1007997
+          maxOutputTokens: 128000
+        notes:
+          - releaseDate 2026-10-12; the catalog carries no description for this row. Marked isDefault by `model/list`; deliberately not marked default here. Effort values (minimal through max) were read from the 1.4.7 /effort picker; their descriptions reuse this scope's wording for the same tokens.
+        source_names:
+          - muse-wonder-1.0
+        execution:
+          model: muse-wonder-1.0
+        controls:
+          - key: muse.reasoning_effort
+            label: Reasoning effort
+            description: Controls Meta Muse CLI reasoning effort.
+            kind: enum
+            scope: both
+            values:
+              - value: minimal
+                label: minimal
+                description: Minimal reasoning budget.
+              - value: low
+                label: low
+                description: Quick responses with lighter reasoning.
+              - value: medium
+                label: medium
+                description: Balances speed and reasoning depth.
+              - value: high
+                label: high
+                description: Greater reasoning depth for complex problems.
+              - value: xhigh
+                label: xhigh
+                description: Extra high reasoning depth.
+              - value: max
+                label: max
+                description: Maximum reasoning depth.
+            semanticTags:
+              - reasoning_intensity
       - id: muse-spark-1.3
         label: muse-spark-1.3
         limits:
@@ -1252,47 +1195,6 @@ catalogs:
                 description: Maximum reasoning depth.
             semanticTags:
               - reasoning_intensity
-      - id: muse-spark-1.3-contributor
-        label: muse-spark-1.3 (contributor)
-        limits:
-          contextWindowTokens: 1007997
-          maxOutputTokens: 128000
-        notes:
-          - "Catalog description: Your content, including inter-session messages, may be used for
-            product improvement."
-          - Marked isDefault by `model/list`; deliberately not marked default here.
-        source_names:
-          - muse-spark-1.3-contributor
-          - muse-spark-1.3 (contributor)
-        execution:
-          model: muse-spark-1.3-contributor
-        controls:
-          - key: muse.reasoning_effort
-            label: Reasoning effort
-            description: Controls Meta Muse CLI reasoning effort.
-            kind: enum
-            scope: both
-            values:
-              - value: minimal
-                label: minimal
-                description: Minimal reasoning budget.
-              - value: low
-                label: low
-                description: Quick responses with lighter reasoning.
-              - value: medium
-                label: medium
-                description: Balances speed and reasoning depth.
-              - value: high
-                label: high
-                description: Greater reasoning depth for complex problems.
-              - value: xhigh
-                label: xhigh
-                description: Extra high reasoning depth.
-              - value: max
-                label: max
-                description: Maximum reasoning depth.
-            semanticTags:
-              - reasoning_intensity
       - id: muse-spark-1.2
         label: muse-spark-1.2
         limits:
@@ -1304,43 +1206,6 @@ catalogs:
           - muse-spark-1.2
         execution:
           model: muse-spark-1.2
-        controls:
-          - key: muse.reasoning_effort
-            label: Reasoning effort
-            description: Controls Meta Muse CLI reasoning effort.
-            kind: enum
-            scope: both
-            values:
-              - value: minimal
-                label: minimal
-                description: Minimal reasoning budget.
-              - value: low
-                label: low
-                description: Quick responses with lighter reasoning.
-              - value: medium
-                label: medium
-                description: Balances speed and reasoning depth.
-              - value: high
-                label: high
-                description: Greater reasoning depth for complex problems.
-              - value: xhigh
-                label: xhigh
-                description: Extra high reasoning depth.
-            semanticTags:
-              - reasoning_intensity
-      - id: muse-spark-1.2-contributor
-        label: muse-spark-1.2 (contributor)
-        limits:
-          contextWindowTokens: 1007997
-          maxOutputTokens: 128000
-        notes:
-          - "Catalog description: Your content, including inter-session messages, may be used for
-            product improvement."
-        source_names:
-          - muse-spark-1.2-contributor
-          - muse-spark-1.2 (contributor)
-        execution:
-          model: muse-spark-1.2-contributor
         controls:
           - key: muse.reasoning_effort
             label: Reasoning effort
@@ -1448,8 +1313,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Copilot
-    cli_version: 1.0.91
-    last_updated: 2026-10-03
+    cli_version: 1.0.96
+    last_updated: 2026-10-14
     basis:
       plan:
         label: Copilot Pro
@@ -1464,6 +1329,7 @@ catalogs:
       - "Context is a Tab toggle on the 11 rows that show two figures: the first figure is --context default and the second --context long_context. Figures are picker text, not token limits. Rows showing a dash have no context control."
       - "From 1.0.91 the picker shows a Category column (Versatile, Lightweight or Powerful) before Context. It is recorded in the evidence only."
       - "Detail-pane cost tiers and credits per 1M tokens are recorded per row in notes. Captured on Windows native only: WSL shares this scope, but a WSL installation and account may see different models. BYOK and custom providers are out of scope. Custom model strings remain available."
+      - "Refreshed 2026-10-14 from Copilot CLI 1.0.96 (agent-operated picker capture with option cycles). The picker now has 19 selectable rows: Claude Haiku 5.5 (claude-haiku-5.5 from models.list; Low to Max reasoning, 100K/936K context) is new under Other models and sits before Claude Haiku 4.5 here, as in the picker. Every other row kept its label, reasoning order, arrival value and default marker. The Context figures changed on every row that has them and now equal the models.list contextMax/longContextMax values (for example GPT-5.6 Terra 272K/922K, was 400K/1.1M); labels and notes follow the new figures. Groups moved (GPT-6 Luna and Claude Sonnet 5.5 are Recommended; Claude Sonnet 5, Gemini 3.8 Flash and Grok 4.6 are Other), and the catalog keeps its 2026-09-27 order. The Unavailable group lists 12 models (claude-opus-4.7 is no longer shown). Evidence: docs/research/fixtures/copilot-1.0.96/model-picker.agent-capture.redacted.txt and docs/research/fixtures/copilot-1.0.96/model-list.probe.redacted.json."
     models:
       - id: auto
         label: Auto
@@ -1498,7 +1364,7 @@ catalogs:
         label: Grok 4.7
         notes:
           - "Picker group: Recent models. Detail pane: Medium cost; credits per 1M tokens input 200, output 600, cache read 50, cache write 0."
-          - "Picker context figures: 328K (default) and 628K (long_context). Long context raises the credits shown in the detail pane."
+          - "Picker context figures: 200K (default) and 500K (long_context). Long context raises the credits shown in the detail pane."
           - "Arrival reasoning value was High, with no default marker."
         source_names:
           - grok-4.7
@@ -1527,16 +1393,16 @@ catalogs:
             scope: both
             values:
               - value: default
-                label: "328K"
+                label: "200K"
               - value: long_context
-                label: "628K"
+                label: "500K"
       - default: true
         id: gpt-5.6-terra
         label: GPT-5.6 Terra
         notes:
           - "Picker group: Recent models. Detail pane: Medium cost; credits per 1M tokens input 200, output 1200, cache read 20, cache write 250."
           - "Picker row reads GPT-5.6 Terra (default); the marker is excluded from the label."
-          - "Picker context figures: 400K (default) and 1.1M (long_context). Long context raises the credits shown in the detail pane."
+          - "Picker context figures: 272K (default) and 922K (long_context). Long context raises the credits shown in the detail pane."
           - "Arrival reasoning value was Medium, with no default marker."
         source_names:
           - gpt-5.6-terra
@@ -1570,9 +1436,9 @@ catalogs:
             scope: both
             values:
               - value: default
-                label: "400K"
+                label: "272K"
               - value: long_context
-                label: "1.1M"
+                label: "922K"
       - default: false
         id: mai-code-1.1-flash
         label: MAI-Code-1.1-Flash
@@ -1605,8 +1471,8 @@ catalogs:
         id: claude-sonnet-5
         label: Claude Sonnet 5
         notes:
-          - "Picker group: Recommended models. Detail pane: Medium cost; credits per 1M tokens input 200, output 1000, cache read 20, cache write 250."
-          - "Picker context figures: 264K (default) and 1M (long_context). Long context shows the same credits for this row; only the highlighted figure changes."
+          - "Picker group: Other models. Detail pane: Medium cost; credits per 1M tokens input 200, output 1000, cache read 20, cache write 250."
+          - "Picker context figures: 200K (default) and 936K (long_context). Long context shows the same credits for this row; only the highlighted figure changes."
           - "Arrival reasoning value was Medium, with no default marker."
         source_names:
           - claude-sonnet-5
@@ -1638,15 +1504,15 @@ catalogs:
             scope: both
             values:
               - value: default
-                label: "264K"
+                label: "200K"
               - value: long_context
-                label: "1M"
+                label: "936K"
       - default: false
         id: claude-sonnet-5.5
         label: Claude Sonnet 5.5
         notes:
-          - "Picker group: New models (2026-10-03, 1.0.91). Detail pane: Medium cost; credits per 1M tokens input 200, output 1000, cache read 20, cache write 250."
-          - "Picker context figures: 328K (default) and 1.1M (long_context). models.list reports contextMax 200000 and longContextMax 936000."
+          - "Picker group: Recommended models. Detail pane: Medium cost; credits per 1M tokens input 200, output 1000, cache read 10, cache write 250."
+          - "Picker context figures: 200K (default) and 936K (long_context). models.list reports contextMax 200000 and longContextMax 936000."
           - "Arrival reasoning value was Medium, with no default marker. models.list supportedReasoningEfforts matches the picker order."
         source_names:
           - claude-sonnet-5.5
@@ -1677,17 +1543,17 @@ catalogs:
             scope: both
             values:
               - value: default
-                label: "328K"
+                label: "200K"
               - value: long_context
-                label: "1.1M"
+                label: "936K"
       - default: false
         id: gemini-3.8-flash
         label: Gemini 3.8 Flash
         capabilityTags:
           - latency_optimized
         notes:
-          - "Picker group: New models. Detail pane: Low cost; credits per 1M tokens input 75, output 375, cache read 7.5, cache write 0."
-          - "Picker context figures: 266K (default) and 1.0M (long_context). Long context raises the credits shown in the detail pane."
+          - "Picker group: Other models. Detail pane: Low cost; credits per 1M tokens input 75, output 375, cache read 7.5, cache write 0."
+          - "Picker context figures: 200K (default) and 983K (long_context). Long context raises the credits shown in the detail pane."
           - "Arrival reasoning value was Medium, with no default marker."
           - "Absent from models.list; ID confirmed by the operator on 2026-09-27."
         source_names:
@@ -1716,15 +1582,15 @@ catalogs:
             scope: both
             values:
               - value: default
-                label: "266K"
+                label: "200K"
               - value: long_context
-                label: "1.0M"
+                label: "983K"
       - default: false
         id: gpt-6-luna
         label: GPT-6 Luna
         notes:
-          - "Picker group: New models. Detail pane: Low cost; credits per 1M tokens input 10, output 50, cache read 1, cache write 12.5."
-          - "Picker context figures: 400K (default) and 1M (long_context). Long context raises the credits shown in the detail pane."
+          - "Picker group: Recommended models. Detail pane: Low cost; credits per 1M tokens input 10, output 50, cache read 1, cache write 12.5."
+          - "Picker context figures: 272K (default) and 872K (long_context). Long context raises the credits shown in the detail pane."
           - "Arrival reasoning value was Medium, with no default marker."
         source_names:
           - gpt-6-luna
@@ -1757,15 +1623,15 @@ catalogs:
             scope: both
             values:
               - value: default
-                label: "400K"
+                label: "272K"
               - value: long_context
-                label: "1M"
+                label: "872K"
       - default: false
         id: grok-4.6
         label: Grok 4.6
         notes:
-          - "Picker group: New models. Detail pane: Medium cost; credits per 1M tokens input 200, output 600, cache read 50, cache write 0."
-          - "Picker context figures: 328K (default) and 628K (long_context). Long context raises the credits shown in the detail pane."
+          - "Picker group: Other models. Detail pane: Medium cost; credits per 1M tokens input 200, output 600, cache read 50, cache write 0."
+          - "Picker context figures: 200K (default) and 500K (long_context). Long context raises the credits shown in the detail pane."
           - "Arrival reasoning value was Medium, with no default marker."
         source_names:
           - grok-4.6
@@ -1795,15 +1661,15 @@ catalogs:
             scope: both
             values:
               - value: default
-                label: "328K"
+                label: "200K"
               - value: long_context
-                label: "628K"
+                label: "500K"
       - default: false
         id: gpt-5.6-luna
         label: GPT-5.6 Luna
         notes:
           - "Picker group: Other models. Detail pane: Low cost; credits per 1M tokens input 20, output 120, cache read 2, cache write 25."
-          - "Picker context figures: 328K (default) and 1.1M (long_context). Long context raises the credits shown in the detail pane."
+          - "Picker context figures: 200K (default) and 922K (long_context). Long context raises the credits shown in the detail pane."
           - "Arrival reasoning value was Medium, with no default marker."
         source_names:
           - gpt-5.6-luna
@@ -1836,15 +1702,15 @@ catalogs:
             scope: both
             values:
               - value: default
-                label: "328K"
+                label: "200K"
               - value: long_context
-                label: "1.1M"
+                label: "922K"
       - default: false
         id: gpt-5.4
         label: GPT-5.4
         notes:
           - "Picker group: Other models. Detail pane: Medium cost; credits per 1M tokens input 250, output 1500, cache read 25, cache write 0."
-          - "Picker context figures: 400K (default) and 1.1M (long_context). Long context raises the credits shown in the detail pane."
+          - "Picker context figures: 272K (default) and 922K (long_context). Long context raises the credits shown in the detail pane."
           - "Arrival reasoning value was Medium, with no default marker."
         source_names:
           - gpt-5.4
@@ -1875,9 +1741,9 @@ catalogs:
             scope: both
             values:
               - value: default
-                label: "400K"
+                label: "272K"
               - value: long_context
-                label: "1.1M"
+                label: "922K"
       - default: false
         id: gpt-5.4-mini
         label: GPT-5.4 mini
@@ -1960,6 +1826,45 @@ catalogs:
               - value: high
                 label: "High"
       - default: false
+        id: claude-haiku-5.5
+        label: Claude Haiku 5.5
+        notes:
+          - "Picker group: Other models (2026-10-14, 1.0.96). Detail pane: Low cost; credits per 1M tokens input 10, output 50, cache read 1, cache write 12.5."
+          - "Picker context figures: 100K (default) and 936K (long_context). models.list reports contextMax 100000 and longContextMax 936000."
+          - "Arrival reasoning value was Medium, with no default marker. models.list supportedReasoningEfforts matches the picker order."
+        source_names:
+          - claude-haiku-5.5
+          - "Claude Haiku 5.5"
+        execution:
+          model: claude-haiku-5.5
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            description: Reasoning effort, sent as --effort.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: "Low"
+              - value: medium
+                label: "Medium"
+              - value: high
+                label: "High"
+              - value: xhigh
+                label: "Extra High"
+              - value: max
+                label: "Max"
+          - key: copilot.context
+            label: Context
+            description: Context window tier, sent as --context.
+            kind: enum
+            scope: both
+            values:
+              - value: default
+                label: "100K"
+              - value: long_context
+                label: "936K"
+      - default: false
         id: claude-haiku-4.5
         label: Claude Haiku 4.5
         notes:
@@ -1977,7 +1882,7 @@ catalogs:
         label: Gemini 3.7 Flash
         notes:
           - "Picker group: Other models. Detail pane: Low cost; credits per 1M tokens input 75, output 375, cache read 7.5, cache write 0."
-          - "Picker context figures: 264K (default) and 1M (long_context). Long context raises the credits shown in the detail pane."
+          - "Picker context figures: 200K (default) and 936K (long_context). Long context raises the credits shown in the detail pane."
           - "Arrival reasoning value was Medium, with no default marker."
           - "Absent from models.list; ID confirmed by the operator on 2026-09-27."
         source_names:
@@ -2005,15 +1910,15 @@ catalogs:
             scope: both
             values:
               - value: default
-                label: "264K"
+                label: "200K"
               - value: long_context
-                label: "1M"
+                label: "936K"
       - default: false
         id: grok-4.5
         label: Grok 4.5
         notes:
           - "Picker group: Other models. Detail pane: Medium cost; credits per 1M tokens input 200, output 600, cache read 50, cache write 0."
-          - "Picker context figures: 328K (default) and 628K (long_context). Long context raises the credits shown in the detail pane."
+          - "Picker context figures: 200K (default) and 500K (long_context). Long context raises the credits shown in the detail pane."
           - "Arrival reasoning value was Medium, with no default marker."
         source_names:
           - grok-4.5
@@ -2040,9 +1945,9 @@ catalogs:
             scope: both
             values:
               - value: default
-                label: "328K"
+                label: "200K"
               - value: long_context
-                label: "628K"
+                label: "500K"
       - default: false
         id: kimi-k3
         label: Kimi K3
@@ -2230,98 +2135,218 @@ catalogs:
         controls: []
   - provider: goose
     backend: cli
-    selection_mode: shortlist
+    selection_mode: full
     source_cli: Goose
-    cli_version: 1.53.0
-    last_updated: 2026-09-23
+    cli_version: 1.54.0
+    last_updated: 2026-10-14
     basis:
       channel:
         id: chatgpt_codex
         label: chatgpt_codex
     notes:
-      - Complete operator-selected six-model shortlist for ChatGPT Codex (OAuth), all fixed Thinking
-        Off. Other Goose providers remain accessible through custom provider/model input.
-      - Preserve raw picker names and order; append the fixed Off choice to display labels. No model
-        or effort default was supplied; initialize the first row without a default marker.
-      - "Execution uses --provider chatgpt_codex --model <model>-none: Goose normalizes the suffix
-        to Thinking Off. Its Codex backend maps Off to none when supported, otherwise low."
-      - "Evidence and version confirmation: docs/research/2026-09-23-goose-shortlist.md and
-        docs/research/fixtures/goose-1.51.0/operator.redacted.txt."
-      - "cli_version advanced from 1.51.0 to 1.53.0 on 2026-10-03 at the operator's request, without a new picker capture: `goose --version (GOOSE_PATH_ROOT in a temporary directory)` has no read-only model list, so only the version was read and the 6 entries are unverified at 1.53.0. The notes above describe the 1.51.0 evidence."
+      - "Complete chatgpt_codex (ChatGPT subscription OAuth) model list of Goose 1.54.0: the six models of its built-in CHATGPT_CODEX_KNOWN_MODELS list, which goose configure and the in-session /model completion offer for this provider in this order. The provider has no live model fetch. Read from the v1.54.0 source tag and found in the installed goose.exe, which is byte-identical to the official release asset; no CLI session, configure run or login was used. Labels are the raw IDs Goose shows."
+      - "The operator moved this scope from the 2026-09-23 six-row shortlist (every row fixed to Thinking Off) to the full-catalog group on 2026-10-14. The membership did not change; the rows gain Goose's thinking-effort menu."
+      - "Thinking effort follows Goose's own menu (Select thinking effort: Off, Low, Medium, High, Max; one global menu in goose configure). Cats sends it per row as Goose's native model suffix: off -none, low -low, medium -medium, high -high, max -xhigh, because Goose parses no -max suffix. The chatgpt_codex backend then sends none, low, medium, high or xhigh for the four gpt-5.6 models; gpt-5.5 and gpt-5.4 do not accept none, so Off there is sent as low, the same request as Low (operator decision 2026-10-14 to keep Goose's menu on every row)."
+      - "No model or effort default is marked. Goose's fallback model gpt-5.5 is a placeholder for an unset model, and goose configure starting on Off is its first item, not a default marker. Cats initializes to the first row and Off, which keeps the earlier shortlist's behavior."
+      - "Evidence: docs/research/fixtures/goose-1.54.0/model-list.source.redacted.txt and docs/research/2026-10-14-catalog-refresh.md. Earlier shortlist evidence: docs/research/2026-09-23-goose-shortlist.md."
     models:
       - id: chatgpt_codex/gpt-5.6-sol
-        label: gpt-5.6-sol — Off
+        label: gpt-5.6-sol
         source_names:
           - chatgpt_codex/gpt-5.6-sol
           - gpt-5.6-sol — Off
         execution:
           model: gpt-5.6-sol
           provider: chatgpt_codex
-          fixed_controls:
-            goose.thinking_effort: off
-        controls: []
+        controls:
+          - key: goose.thinking_effort
+            label: Thinking effort
+            description: Goose thinking effort, sent as the native model suffix.
+            kind: enum
+            scope: both
+            values:
+              - value: "off"
+                label: Off
+                description: No extended thinking
+              - value: low
+                label: Low
+                description: Better latency, lighter reasoning
+              - value: medium
+                label: Medium
+                description: Moderate thinking
+              - value: high
+                label: High
+                description: Deep reasoning
+              - value: max
+                label: Max
+                description: No constraints on thinking depth
+            semanticTags:
+              - reasoning_intensity
       - id: chatgpt_codex/gpt-5.6-terra
-        label: gpt-5.6-terra — Off
+        label: gpt-5.6-terra
         source_names:
           - chatgpt_codex/gpt-5.6-terra
           - gpt-5.6-terra — Off
         execution:
           model: gpt-5.6-terra
           provider: chatgpt_codex
-          fixed_controls:
-            goose.thinking_effort: off
-        controls: []
+        controls:
+          - key: goose.thinking_effort
+            label: Thinking effort
+            description: Goose thinking effort, sent as the native model suffix.
+            kind: enum
+            scope: both
+            values:
+              - value: "off"
+                label: Off
+                description: No extended thinking
+              - value: low
+                label: Low
+                description: Better latency, lighter reasoning
+              - value: medium
+                label: Medium
+                description: Moderate thinking
+              - value: high
+                label: High
+                description: Deep reasoning
+              - value: max
+                label: Max
+                description: No constraints on thinking depth
+            semanticTags:
+              - reasoning_intensity
       - id: chatgpt_codex/gpt-5.6-luna
-        label: gpt-5.6-luna — Off
+        label: gpt-5.6-luna
         source_names:
           - chatgpt_codex/gpt-5.6-luna
           - gpt-5.6-luna — Off
         execution:
           model: gpt-5.6-luna
           provider: chatgpt_codex
-          fixed_controls:
-            goose.thinking_effort: off
-        controls: []
+        controls:
+          - key: goose.thinking_effort
+            label: Thinking effort
+            description: Goose thinking effort, sent as the native model suffix.
+            kind: enum
+            scope: both
+            values:
+              - value: "off"
+                label: Off
+                description: No extended thinking
+              - value: low
+                label: Low
+                description: Better latency, lighter reasoning
+              - value: medium
+                label: Medium
+                description: Moderate thinking
+              - value: high
+                label: High
+                description: Deep reasoning
+              - value: max
+                label: Max
+                description: No constraints on thinking depth
+            semanticTags:
+              - reasoning_intensity
       - id: chatgpt_codex/gpt-5.6
-        label: gpt-5.6 — Off
+        label: gpt-5.6
         source_names:
           - chatgpt_codex/gpt-5.6
           - gpt-5.6 — Off
         execution:
           model: gpt-5.6
           provider: chatgpt_codex
-          fixed_controls:
-            goose.thinking_effort: off
-        controls: []
+        controls:
+          - key: goose.thinking_effort
+            label: Thinking effort
+            description: Goose thinking effort, sent as the native model suffix.
+            kind: enum
+            scope: both
+            values:
+              - value: "off"
+                label: Off
+                description: No extended thinking
+              - value: low
+                label: Low
+                description: Better latency, lighter reasoning
+              - value: medium
+                label: Medium
+                description: Moderate thinking
+              - value: high
+                label: High
+                description: Deep reasoning
+              - value: max
+                label: Max
+                description: No constraints on thinking depth
+            semanticTags:
+              - reasoning_intensity
       - id: chatgpt_codex/gpt-5.5
-        label: gpt-5.5 — Off
+        label: gpt-5.5
         source_names:
           - chatgpt_codex/gpt-5.5
           - gpt-5.5 — Off
         execution:
           model: gpt-5.5
           provider: chatgpt_codex
-          fixed_controls:
-            goose.thinking_effort: off
-        controls: []
+        controls:
+          - key: goose.thinking_effort
+            label: Thinking effort
+            description: Goose thinking effort, sent as the native model suffix.
+            kind: enum
+            scope: both
+            values:
+              - value: "off"
+                label: Off
+                description: No extended thinking
+              - value: low
+                label: Low
+                description: Better latency, lighter reasoning
+              - value: medium
+                label: Medium
+                description: Moderate thinking
+              - value: high
+                label: High
+                description: Deep reasoning
+              - value: max
+                label: Max
+                description: No constraints on thinking depth
+            semanticTags:
+              - reasoning_intensity
       - id: chatgpt_codex/gpt-5.4
-        label: gpt-5.4 — Off
-        capabilityTags:
-          - reasoning
+        label: gpt-5.4
         source_names:
           - chatgpt_codex/gpt-5.4
           - gpt-5.4 — Off
         execution:
           model: gpt-5.4
           provider: chatgpt_codex
-          fixed_controls:
-            goose.thinking_effort: off
-        controls: []
+        controls:
+          - key: goose.thinking_effort
+            label: Thinking effort
+            description: Goose thinking effort, sent as the native model suffix.
+            kind: enum
+            scope: both
+            values:
+              - value: "off"
+                label: Off
+                description: No extended thinking
+              - value: low
+                label: Low
+                description: Better latency, lighter reasoning
+              - value: medium
+                label: Medium
+                description: Moderate thinking
+              - value: high
+                label: High
+                description: Deep reasoning
+              - value: max
+                label: Max
+                description: No constraints on thinking depth
+            semanticTags:
+              - reasoning_intensity
   - provider: pi
     backend: cli
     selection_mode: full
     source_cli: Pi
-    cli_version: 1.0.0
+    cli_version: 1.2.0
     last_updated: 2026-10-03
     basis:
       channel:
@@ -2334,6 +2359,7 @@ catalogs:
       - "Pi's thinking selector marks the default thinking level (settings defaultThinkingLevel, or the built-in medium when unset), so medium is the control default. The model selector marks only a user-configured default model, so no row is a default and the UI initializes the first row."
       - "Execution uses --provider openai-codex --model <raw ID> --thinking <level>. Limits are the registry contextWindow and maxTokens."
       - "Evidence: docs/research/2026-09-27-pi-openai-codex-full-catalog.md, docs/research/fixtures/pi-0.87.1/openai-codex-models.redacted.json and docs/research/fixtures/pi-1.0.0/model-list.probe.redacted.json."
+      - "cli_version advanced from 1.0.0 to 1.2.0 on 2026-10-14 at the operator's request: the probe read the installed 1.2.0 package and found exactly this scope's 8 entries with the same per-model thinking levels and medium default. gpt-5.3-codex-spark is still listed and stays omitted, as acknowledged. Evidence: docs/research/fixtures/pi-1.2.0/model-list.probe.redacted.json."
     models:
       - id: openai-codex/gpt-5.5
         label: gpt-5.5
@@ -2672,13 +2698,14 @@ catalogs:
     selection_mode: full
     source_cli: Auggie
     cli_version: 0.36.0
-    last_updated: 2026-10-03
+    last_updated: 2026-10-14
     notes:
       - "Complete 36-row /model picker, captured 2026-10-03 (UTC+8) from Auggie 0.36.0 on Windows native by operating the CLI picker (first capture 2026-09-27, 34 rows). Rows follow picker order; IDs come from auggie model list --json, whose 36 displayName values equal the picker labels one to one. Evidence: docs/research/fixtures/auggie-0.36.0/model-picker.agent-capture.2026-10-03.redacted.txt, docs/research/fixtures/auggie-0.36.0/model-list.probe.redacted.json, docs/research/fixtures/auggie-0.36.0/model-picker.agent-capture.redacted.txt and docs/research/2026-09-27-auggie-picker-full-catalog.md."
       - "Pass id literally to --model. IDs are opaque; Prism rows use butler_a and butler_b. On 2026-09-27 each of the 34 rows was selected once in the picker and reported Using model: <label>; GPT-6.1 Sol and Claude Sonnet 5.5 (2026-10-03) are matched by exact displayName and were not selected."
       - "Claude Opus 5.5 is the only row the picker marks (default) on 2026-10-03, and its JSON row has isDefault true; on 2026-09-27 both marked Opus 4.8. The settings file was byte-identical at both captures, so the marker is not the saved session model. The (current) suffix on the session model and the JSON envelope defaultModelId, which names no picker row, are not catalog defaults."
       - "Effort is not bound: the picker shows no effort for any row, and selecting a row opens no effort step, so controls stay empty. JSON effortLevels per model and the global --reasoning-effort flag are recorded in model notes and the research note only."
       - Capture covers this Windows native installation and account only. WSL shares this scope but may see different models. BYOK is out of scope. Custom model strings remain available.
+      - "Refreshed 2026-10-14 on the same Auggie 0.36.0: auggie model list --json and the /model picker now have 37 rows. The only change is Claude Haiku 5.5 (claude-haiku-5-5, exact displayName match), shown sixth between Claude Opus 5.5 and Claude Sonnet 5.5; every other row kept its label, order, cost tier and description, and Claude Opus 5.5 is still the only (default) row. Evidence: docs/research/fixtures/auggie-0.36.0/model-picker.agent-capture.2026-10-14.redacted.txt and docs/research/fixtures/auggie-0.36.0/model-list-2026-10-14.probe.redacted.json."
     models:
       - id: gpt-6-astra
         label: GPT-6 Astra
@@ -2745,6 +2772,18 @@ catalogs:
           - Claude Opus 5.5 (default)
         execution:
           model: claude-opus-5-5
+        controls: []
+      - id: claude-haiku-5-5
+        label: Claude Haiku 5.5
+        notes:
+          - "Picker description: Claude Haiku 5.5, 100K context window"
+          - "Picker cost tier: $."
+          - "JSON effortLevels: low, medium, high, xhigh, max. Not bound as a Cats control."
+        source_names:
+          - claude-haiku-5-5
+          - Claude Haiku 5.5
+        execution:
+          model: claude-haiku-5-5
         controls: []
       - id: claude-sonnet-5-5
         label: Claude Sonnet 5.5
@@ -3665,7 +3704,7 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Kiro
-    cli_version: 2.30.0
+    cli_version: 2.31.0
     last_updated: 2026-10-13
     notes:
       - "Complete 21-row model list with per-model effort levels and defaults, read 2026-10-13 from
@@ -3713,6 +3752,7 @@ catalogs:
         the config reply text, unchanged from the picker. Read on Windows native only: WSL shares
         this scope, but a WSL installation and account may see different models. Custom model
         strings remain available."
+      - "cli_version advanced from 2.30.0 to 2.31.0 on 2026-10-14 at the operator's request, without a new picker capture: kiro-cli chat --list-models and the V3 ACP probe listed exactly this scope's 21 entries in the same order, with the same effort levels and defaults. Labels are raw IDs, so no display field needed the picker. Evidence: docs/research/fixtures/kiro-2.31.0/model-list.probe.redacted.json."
     models:
       - id: auto
         label: auto

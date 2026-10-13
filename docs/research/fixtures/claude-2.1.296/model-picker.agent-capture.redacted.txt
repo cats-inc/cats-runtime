@@ -1,0 +1,49 @@
+# Source: agent-operated Claude Code 2.1.296 /model picker, Windows UI Automation visible text
+#   (Capture-ClaudePicker.ps1 with the non-wrapping effort walk, then Read-ClaudePickerRowStatus.ps1)
+# Observed: 2026-10-14 02:05-02:10 (local time, UTC+8), Windows 11 native, Windows Terminal
+# Launch: claude --safe-mode from an already trusted folder, after clearing CLAUDECODE, CLAUDE_PID
+#   and CLAUDE_CODE_* variables. Plan shown by the banner: Claude Max; no identity is kept.
+# Keys: /model + Enter, then arrow keys only in the picker (Enter and s never sent there). From
+#   2.1.293 effort stops at both ends, so each row was walked Right to its highest level and Left to
+#   its lowest. Rows 5 and 6 were then chosen with s (this session only) to read /status.
+# Settings: ~/.claude/settings.json kept its prelaunch SHA-256 through the capture, /status reads and exit.
+
+## Model list
+  Select model
+  Switch between Claude models. Your pick becomes the default for new sessions. For other/previous model names,
+  specify with --model.
+
+    1.  Default (recommended)  Opus 5.5 · Best for everyday, complex tasks
+  ❯ 2.  Opus 5.5 ✔             For complex work and everyday tasks
+    3.  Fable 5.1              For your toughest challenges
+    4.  Sonnet 5.5             Most efficient for simpler tasks
+    5.  Haiku 5.5              Fastest for quick answers
+    6.  Haiku 4.5              Fastest for quick answers
+    7.  Sonnet 5               Efficient for routine tasks
+  ↓ 8.  Opus 5                 Best for everyday, complex tasks
+     … +5 models
+
+  ◉ xHigh effort ←/→ to adjust
+
+  Enter to set as default · s to use this session only · Esc to cancel
+
+## Rows (row | label | description | effort order, lowest first | (default) level)
+1 | Default (recommended) | Opus 5.5 · Best for everyday, complex tasks | Low > Medium > High > xHigh > Max | Medium
+2 | Opus 5.5 (check mark: saved model) | For complex work and everyday tasks | Low > Medium > High > xHigh > Max | Medium
+3 | Fable 5.1 | For your toughest challenges | Low > Medium > High > xHigh > Max | High
+4 | Sonnet 5.5 | Most efficient for simpler tasks | Low > Medium > High > xHigh > Max | Medium
+5 | Haiku 5.5 | Fastest for quick answers | Low > Medium > High > xHigh > Max | Medium
+6 | Haiku 4.5 | Fastest for quick answers | Effort not supported | -
+7 | Sonnet 5 | Efficient for routine tasks | Low > Medium > High > xHigh > Max | High
+8 | Opus 5 | Best for everyday, complex tasks | Low > Medium > High > xHigh > Max | High
+9 | Fable 5 | Most capable for your hardest and longest-running tasks | Low > Medium > High > xHigh > Max | High
+10 | Opus 4.8 | Best for everyday, complex tasks | Low > Medium > High > xHigh > Max | High
+11 | Opus 4.7 | Best for everyday, complex tasks | Low > Medium > High > xHigh > Max | xHigh
+12 | Opus 4.6 | Best for everyday, complex tasks | Low > Medium > High > Max | High
+13 | Sonnet 4.6 | Efficient for routine tasks | Low > Medium > High > Max | High
+
+Max effort detail line: May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+## /status after choosing a row for this session only
+row 5 Haiku 5.5: "Set model to Haiku 5.5 for this session only"; Version 2.1.296; Model haiku (claude-haiku-5-5)
+row 6 Haiku 4.5: "Set model to Haiku 4.5 for this session only"; Version 2.1.296; Model claude-haiku-4-5-20251001
