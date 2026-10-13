@@ -2,6 +2,12 @@
 
 > Unified runtime for agent CLIs, API backends, and local-model backends.
 
+**Development status (2026-10-14):** This is a personal, experimental project
+that is still under development and validation. Some features have automated
+tests but have not yet been verified in everyday use. See the
+[project status](https://github.com/cats-inc#status) for the current scope and
+limitations.
+
 Cats / Cats Inc. is a software project name maintained by the individual
 developer [sammykenny2](https://github.com/sammykenny2), not a registered company.
 The software is provided under the [MIT License](LICENSE), including its warranty
