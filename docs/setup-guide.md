@@ -939,7 +939,7 @@ Path semantics matter:
   path that the `cats-runtime` host process can read directly.
   Antigravity is the one whose files are not JSON: each conversation is a SQLite
   database at `~/.gemini/antigravity-cli/conversations/<conversation_id>.db`, so
-  its scanner shells out to python the same way the Kiro and Cursor services do.
+  its scanner shells out to python the same way the Cursor service does.
   Discovery is therefore skipped rather than failed when python is unavailable.
 - On Windows, if one of those file-backed providers is configured as
   `runtime: wsl`, Linux-style paths such as `~/.codex/sessions` or
@@ -954,16 +954,24 @@ Path semantics matter:
 - Pi can additionally define `instructions_file` on an instance. When present,
   `cats-runtime` passes that file through Pi's `--append-system-prompt` flag and
   rewrites/materializes the file path for WSL or Docker runtimes when needed.
-- Cursor `chats_dir` and Kiro `db_path` are different: they are consumed by
+- Cursor `chats_dir` and Kiro `sessions_dir` are different: they are consumed by
   runtime-aware native services inside the selected runtime, so `~/.cursor/chats`
-  and `~/.local/share/kiro-cli/data.sqlite3` remain valid for WSL-backed
-  Cursor/Kiro instances.
-- Cats runs Kiro with `--agent-engine v1`, because Kiro 2.24's default v2
-  engine ignores `--model` without a terminal. The v1 engine keeps sessions in
-  `db_path`. Sessions from the v2 engine, such as interactive `kiro-cli chat`,
-  live in `~/.kiro/sessions/cli`: one `<id>.json` with the session's cwd and
-  one `<id>.jsonl` transcript each. The Kiro service reads both places, in the
-  same runtime, and needs no setting.
+  and `~/.kiro/sessions` remain valid for WSL-backed Cursor/Kiro instances.
+- Cats runs Kiro's V3 engine headless: `kiro-cli chat --no-interactive
+  --agent-engine v3 --output-format stream-json`, with the prompt on stdin and
+  `--resume-id` for a later turn. V3 applies `--model` and `--effort`, streams
+  its ACP session updates as JSON Lines and resumes any session from any
+  directory. Sessions, their transcripts, recorded models and message counts
+  are read from the V3 store under `sessions_dir` (`~/.kiro/sessions`,
+  override with `KIRO_SESSIONS_DIR`), because `kiro-cli chat --list-sessions`
+  only covers its current directory and `--all-cwds` spans the V1/V2 stores
+  alone. Deletion goes through `kiro-cli chat --delete-session`, which also
+  maintains Kiro's session index. V1 and V2 sessions are neither listed nor
+  resumable.
+  Headless Kiro cannot ask for tool approval: a `default` permission mode lets
+  Kiro deny any tool that would need it, `skip` passes `--trust-all-tools` and
+  `whitelist` passes `--trust-tools=<ids>` with Kiro's internal tool ids such
+  as `fs_write`.
 
 The embedded dashboard reads `GET /providers/config` and uses it to populate the
 provider-instance selector in the create-session modal. Providers configured in

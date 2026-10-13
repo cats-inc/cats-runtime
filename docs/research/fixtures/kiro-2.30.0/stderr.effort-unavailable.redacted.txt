@@ -1,0 +1,1 @@
+[warn] failed to set effort 'low': model 'claude-sonnet-4.5' offers no effort levels

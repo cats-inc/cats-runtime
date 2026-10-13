@@ -20,8 +20,8 @@ export type SessionStatus =
 
 export type SessionOrigin = 'runtime' | 'discovered';
 export type SessionActivity = 'interactive' | 'tearing_down' | 'inactive';
-export type SessionOwnership = 'persistent_process' | 'logical_session' | 'workspace_latest';
-export type SessionResumeStrategy = 'none' | 'provider_session' | 'latest_in_workspace';
+export type SessionOwnership = 'persistent_process' | 'logical_session';
+export type SessionResumeStrategy = 'none' | 'provider_session';
 export type SessionControlMode = 'full' | 'resume_only' | 'observe_only';
 export type ProviderBackend = 'cli' | 'api' | 'local' | 'agent';
 export type SessionReusePolicy = 'create_new' | 'prefer_existing' | 'require_existing';

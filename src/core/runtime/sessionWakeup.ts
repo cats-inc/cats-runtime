@@ -1,7 +1,6 @@
 import type { RuntimeConfig } from '../config.js';
 import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
 import type { RuntimeSessionManager } from './RuntimeSessionManager.js';
-import type { KiroNativeSessionService } from '../../backends/cli/kiro/KiroNativeSessionService.js';
 import { toSessionView } from '../../backends/cli/pool/sessionView.js';
 import { normalizeProviderCatalogModelId } from '../models/providerModelCatalog.js';
 import { resolveProviderTarget } from '../providerCatalog.js';
@@ -19,7 +18,6 @@ export interface EnsureSessionAwakeOptions {
   registry: SessionRegistry;
   runtime: RuntimeSessionManager;
   sessionId: string;
-  getKiroNative?: (instanceId?: string) => KiroNativeSessionService;
 }
 
 function normalizeStoredSessionModel(
@@ -105,28 +103,6 @@ export async function ensureSessionAwake(
       providerSessionId: updated.providerSessionId,
       outcome: 'resumed',
     };
-  }
-
-  if (session.providerName === 'kiro') {
-    if (!session.providerSessionId) {
-      throw new Error('No provider session ID to resume.');
-    }
-
-    if (options.getKiroNative) {
-      const canResume = await options.getKiroNative(session.providerInstanceId).canResumeSession(
-        session.cwd,
-        session.providerSessionId,
-      );
-      if (!canResume) {
-        throw new Error(
-          'Kiro can only resume the latest session in a workspace. '
-          + 'This discovered session is no longer the newest one in its directory.',
-        );
-      }
-    }
-
-    // Kiro still resumes through the generic CLI provider-session path below after
-    // enforcing its "latest session in workspace" constraint here.
   }
 
   if (session.providerName === 'pi') {

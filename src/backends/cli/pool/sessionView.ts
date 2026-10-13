@@ -112,11 +112,10 @@ export function sessionOwnership(
     case 'claude':
     case 'codex':
       return 'persistent_process';
-    case 'kiro':
-      return 'workspace_latest';
     case 'auggie':
     case 'copilot':
     case 'cursor':
+    case 'kiro':
     default:
       return 'logical_session';
   }
@@ -131,13 +130,12 @@ export function sessionResumeStrategy(
   }
 
   switch (providerName) {
-    case 'kiro':
-      return 'latest_in_workspace';
     case 'auggie':
     case 'claude':
     case 'codex':
     case 'copilot':
     case 'cursor':
+    case 'kiro':
     default:
       return 'provider_session';
   }

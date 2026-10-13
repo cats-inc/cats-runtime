@@ -217,20 +217,21 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
   },
   kiro: {
     normalizedStream: {
-      text: { mode: 'line', stepwise: true },
-      toolUse: 'none',
-      toolResult: 'none',
-      progress: 'none',
-      reasoning: 'none',
+      text: { mode: 'chunk', stepwise: true },
+      toolUse: 'native',
+      toolResult: 'native',
+      progress: 'derived',
+      reasoning: 'native',
     },
     transcript: {
       contentBlocks: 'none',
     },
     presentation: {
-      recommended: 'final_message',
+      recommended: 'content_blocks',
     },
     notes: [
-      'Only shallow line-oriented text streaming is currently available.',
+      'The V3 engine streams ACP session updates as JSON Lines: text chunks, thought chunks and tool calls mid-turn.',
+      'The run ends with a runFinished record carrying the stop reason, credits and the model Kiro served.',
     ],
   },
   grok: {

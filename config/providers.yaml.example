@@ -258,10 +258,9 @@ backends:
             environment: native
             command: kiro-cli
             runner: auto
-            # db_path defaults:
-            #   Windows: ~/AppData/Local/kiro-cli/data.sqlite3
-            #   macOS:   ~/Library/Application Support/kiro-cli/data.sqlite3
-            #   Linux:   ~/.local/share/kiro-cli/data.sqlite3
+            # sessions_dir is Kiro's V3 session store inside this runtime and
+            # defaults to ~/.kiro/sessions. Sessions and transcripts are read
+            # from it; deletion goes through kiro-cli.
 
       grok:
         instances:

@@ -87,7 +87,7 @@ describe('managed Plugin pilot', () => {
     config.providerInstances.codex!.native.commandConfig.path = 'cmd.exe';
     config.providerInstances.codex!.native.commandConfig.runner = 'direct';
     const registry = new SessionRegistry(undefined, root);
-    const pool = new WorkerPool(config, registry, {} as never, {} as never, {} as never, {} as never, {} as never, { getCachedAssessment: () => undefined } as never);
+    const pool = new WorkerPool(config, registry, {} as never, {} as never, {} as never, {} as never, { getCachedAssessment: () => undefined } as never);
     registerManagedPlugin(root, descriptor); resolveSkill(root);
     expect(() => pool.spawn('session-a', 'codex', { cwd: temporary }, 'native')).toThrow(/direct native/);
     expect(observeManagedPlugin(root).pendingRuns).toHaveLength(0);

@@ -148,7 +148,7 @@ export interface ProviderInstanceConfig {
   codexSessionsDir?: string;
   copilotSessionsDir?: string;
   cursorChatsDir?: string;
-  kiroDbPath?: string;
+  kiroSessionsDir?: string;
   kiloServerHost?: string;
   kiloServerPort?: number;
   kiloServerStartupTimeoutMs?: number;
@@ -205,7 +205,7 @@ export interface CliRuntimeConfig {
   copilotSessionsDir: string;
   cursorChatsDir: string;
   cursorRuntime: ProviderRuntimeConfig;
-  kiroDbPath: string;
+  kiroSessionsDir: string;
   kiroRuntime: ProviderRuntimeConfig;
   piSessionsDir: string;
   clineSessionsDir: string;
@@ -242,7 +242,7 @@ interface LegacyRuntimeShape {
   copilotSessionsDir: string;
   cursorChatsDir: string;
   cursorRuntime: ProviderRuntimeConfig;
-  kiroDbPath: string;
+  kiroSessionsDir: string;
   kiroRuntime: ProviderRuntimeConfig;
   kiloServerHost: string;
   kiloServerPort: number;
@@ -311,23 +311,9 @@ export function defaultAuggieMaxTurns(): number {
   return 50;
 }
 
-export function defaultKiroDbPath(
-  platform: NodeJS.Platform = process.platform,
-  runtimeMode: RuntimeMode = defaultKiroRuntimeMode(platform),
-): string {
-  if (runtimeMode === 'wsl' || runtimeMode === 'docker') {
-    return '~/.local/share/kiro-cli/data.sqlite3';
-  }
-
-  if (platform === 'darwin') {
-    return '~/Library/Application Support/kiro-cli/data.sqlite3';
-  }
-
-  if (platform === 'win32') {
-    return '~/AppData/Local/kiro-cli/data.sqlite3';
-  }
-
-  return '~/.local/share/kiro-cli/data.sqlite3';
+/** Kiro's V3 session store, the same relative location on every platform and runtime. */
+export function defaultKiroSessionsDir(): string {
+  return '~/.kiro/sessions';
 }
 
 export function defaultPiSessionsDir(): string {
@@ -496,7 +482,7 @@ export function loadConfig(
     copilotSessionsDir: configured.copilotSessionsDir,
     cursorChatsDir: configured.cursorChatsDir,
     cursorRuntime: configured.cursorRuntime,
-    kiroDbPath: configured.kiroDbPath,
+    kiroSessionsDir: configured.kiroSessionsDir,
     kiroRuntime: configured.kiroRuntime,
     piSessionsDir: configured.piSessionsDir,
     clineSessionsDir: configured.clineSessionsDir,
@@ -585,7 +571,7 @@ export function listProviderInstances(
     | 'codexSessionsDir'
     | 'copilotSessionsDir'
     | 'cursorChatsDir'
-    | 'kiroDbPath'
+    | 'kiroSessionsDir'
     | 'kiloServerHost'
     | 'kiloServerPort'
     | 'kiloServerStartupTimeoutMs'
@@ -629,7 +615,7 @@ export function resolveProviderInstance(
     | 'codexSessionsDir'
     | 'copilotSessionsDir'
     | 'cursorChatsDir'
-    | 'kiroDbPath'
+    | 'kiroSessionsDir'
     | 'kiloServerHost'
     | 'kiloServerPort'
     | 'kiloServerStartupTimeoutMs'
@@ -717,7 +703,7 @@ function buildLegacyRuntimeShape(
 
   const auggieSessionsDir = env.AUGGIE_SESSIONS_DIR || defaultAuggieSessionsDir();
   const cursorChatsDir = env.CURSOR_CHATS_DIR || defaultCursorChatsDir();
-  const kiroDbPath = env.KIRO_DB_PATH || defaultKiroDbPath(process.platform, kiroRuntime.mode);
+  const kiroSessionsDir = env.KIRO_SESSIONS_DIR || defaultKiroSessionsDir();
   const kiloServerHost = env.KILO_SERVER_HOST || defaultKiloServerHost();
   const kiloServerPort = parsePositiveInt(
     env.KILO_SERVER_PORT,
@@ -826,7 +812,7 @@ function buildLegacyRuntimeShape(
         id: 'native',
         providerName: 'kiro',
         commandConfig: providerCommands.kiro,
-        kiroDbPath,
+        kiroSessionsDir,
       },
     },
     kilo: {
@@ -883,7 +869,7 @@ function buildLegacyRuntimeShape(
     copilotSessionsDir: env.COPILOT_SESSIONS_DIR || `${home}/.copilot/session-state`,
     cursorChatsDir,
     cursorRuntime: providerCommands.cursor.runtime,
-    kiroDbPath,
+    kiroSessionsDir,
     kiroRuntime,
     kiloServerHost,
     kiloServerPort,
@@ -1036,7 +1022,7 @@ function buildLegacyProviderInstance(
     | 'codexSessionsDir'
     | 'copilotSessionsDir'
     | 'cursorChatsDir'
-    | 'kiroDbPath'
+    | 'kiroSessionsDir'
     | 'kiloServerHost'
     | 'kiloServerPort'
     | 'kiloServerStartupTimeoutMs'
@@ -1059,7 +1045,7 @@ function buildLegacyProviderInstance(
     codexSessionsDir: provider === 'codex' ? config.codexSessionsDir : undefined,
     copilotSessionsDir: provider === 'copilot' ? config.copilotSessionsDir : undefined,
     cursorChatsDir: provider === 'cursor' ? config.cursorChatsDir : undefined,
-    kiroDbPath: provider === 'kiro' ? config.kiroDbPath : undefined,
+    kiroSessionsDir: provider === 'kiro' ? config.kiroSessionsDir : undefined,
     kiloServerHost: provider === 'kilo' ? config.kiloServerHost : undefined,
     kiloServerPort: provider === 'kilo' ? config.kiloServerPort : undefined,
     kiloServerStartupTimeoutMs: provider === 'kilo'
@@ -1102,7 +1088,7 @@ function applyFileBasedProviderConfig(
   let copilotSessionsDir = legacy.copilotSessionsDir;
   let cursorChatsDir = legacy.cursorChatsDir;
   let cursorRuntime = legacy.cursorRuntime;
-  let kiroDbPath = legacy.kiroDbPath;
+  let kiroSessionsDir = legacy.kiroSessionsDir;
   let kiroRuntime = legacy.kiroRuntime;
   let kiloServerHost = legacy.kiloServerHost;
   let kiloServerPort = legacy.kiloServerPort;
@@ -1281,10 +1267,10 @@ function applyFileBasedProviderConfig(
               || fallback.cursorChatsDir
               || cursorChatsDir
             : undefined,
-          kiroDbPath: provider === 'kiro'
-            ? readString(instanceDoc.db_path)
-              || fallback.kiroDbPath
-              || kiroDbPath
+          kiroSessionsDir: provider === 'kiro'
+            ? readString(instanceDoc.sessions_dir)
+              || fallback.kiroSessionsDir
+              || kiroSessionsDir
             : undefined,
           kiloServerHost: provider === 'kilo'
             ? readString(asOptionalObject(instanceDoc.server)?.host)
@@ -1397,7 +1383,7 @@ function applyFileBasedProviderConfig(
         copilotSessionsDir = nextInstances[defaultInstance].copilotSessionsDir || copilotSessionsDir;
       }
       if (provider === 'kiro') {
-        kiroDbPath = nextInstances[defaultInstance].kiroDbPath || kiroDbPath;
+        kiroSessionsDir = nextInstances[defaultInstance].kiroSessionsDir || kiroSessionsDir;
         kiroRuntime = nextInstances[defaultInstance].commandConfig.runtime;
       }
       if (provider === 'kilo') {
@@ -1494,7 +1480,7 @@ function applyFileBasedProviderConfig(
       copilotSessionsDir = instance.copilotSessionsDir || copilotSessionsDir;
     }
     if (provider === 'kiro') {
-      kiroDbPath = instance.kiroDbPath || kiroDbPath;
+      kiroSessionsDir = instance.kiroSessionsDir || kiroSessionsDir;
       kiroRuntime = instance.commandConfig.runtime;
     }
     if (provider === 'kilo') {
@@ -1539,7 +1525,7 @@ function applyFileBasedProviderConfig(
     copilotSessionsDir,
     cursorChatsDir,
     cursorRuntime,
-    kiroDbPath,
+    kiroSessionsDir,
     kiroRuntime,
     kiloServerHost,
     kiloServerPort,

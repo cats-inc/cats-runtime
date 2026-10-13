@@ -381,7 +381,7 @@ describe('ProviderCompatibilityService', () => {
         if (args[0] === '--version') {
           return {
             exitCode: 0,
-            stdout: 'kiro-cli 1.29.3\n',
+            stdout: 'kiro-cli-chat 2.30.0\n',
             stderr: '',
             timedOut: false,
             durationMs: 5,
@@ -390,7 +390,7 @@ describe('ProviderCompatibilityService', () => {
 
         return {
           exitCode: 0,
-          stdout: 'Usage: kiro-cli chat --no-interactive --resume --wrap --agent-engine\n',
+          stdout: 'Usage: kiro-cli chat --no-interactive --resume-id --agent-engine --output-format\n',
           stderr: '',
           timedOut: false,
           durationMs: 5,

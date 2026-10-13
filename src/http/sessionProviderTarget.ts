@@ -87,13 +87,19 @@ function buildFallbackCapabilities(
         sessionMcpServers: true,
       };
     case 'auggie':
-    case 'kiro':
     case 'kilo':
     case 'opencode':
       return {
         resume: true,
         fork: false,
         permissions: true,
+      };
+    case 'kiro':
+      // Headless Kiro denies any tool call that would need approval.
+      return {
+        resume: true,
+        fork: false,
+        permissions: false,
       };
     default:
       return {

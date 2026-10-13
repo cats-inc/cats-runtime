@@ -57,12 +57,12 @@ const JUNIE_SPAWN_ARGS = [
   '--skip-update-check',
 ];
 
-// Kiro 2.24's default v2 engine ignores --model without a terminal; see KiroProvider.
+// Kiro's V3 engine run headless, with ACP session updates as JSON Lines; see KiroProvider.
 const KIRO_CHAT_ARGS = [
   'chat',
   '--no-interactive',
-  '--wrap', 'never',
-  '--agent-engine', 'v1',
+  '--agent-engine', 'v3',
+  '--output-format', 'stream-json',
 ];
 
 const PI_RPC_ARGS = [
@@ -346,29 +346,29 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
     'kiro',
     'Kiro CLI',
     {
-      id: 'kiro-cli-chat-v1',
-      label: 'Kiro CLI non-interactive chat',
+      id: 'kiro-cli-chat-v3',
+      label: 'Kiro CLI V3 headless chat',
       provider: 'kiro',
-      protocolFamily: 'wrapped-text',
-      parserId: 'kiro-chat',
+      protocolFamily: 'stream-json',
+      parserId: 'kiro-stream-json',
       spawnBaseArgs: [...KIRO_CHAT_ARGS],
-      minVersionMajor: 1,
+      minVersionMajor: 2,
       allowUnknownVersion: true,
-      helpTokens: ['chat', '--no-interactive', '--resume', '--agent-engine'],
+      helpTokens: ['chat', '--no-interactive', '--agent-engine', '--output-format', '--resume-id'],
       liveProbeArgs: buildLiveHelpArgs(KIRO_CHAT_ARGS),
-      liveProbeTokens: ['--no-interactive', '--wrap'],
+      liveProbeTokens: ['--output-format', '--agent-engine'],
     },
     {
       id: 'kiro-cli-chat-best-fit',
-      label: 'Kiro CLI non-interactive chat best-fit',
+      label: 'Kiro CLI headless chat best-fit',
       provider: 'kiro',
-      protocolFamily: 'wrapped-text',
-      parserId: 'kiro-chat',
+      protocolFamily: 'stream-json',
+      parserId: 'kiro-stream-json',
       spawnBaseArgs: [...KIRO_CHAT_ARGS],
       allowUnknownVersion: true,
-      helpTokens: ['chat', '--no-interactive'],
+      helpTokens: ['chat', '--no-interactive', '--output-format'],
       liveProbeArgs: buildLiveHelpArgs(KIRO_CHAT_ARGS),
-      liveProbeTokens: ['--no-interactive'],
+      liveProbeTokens: ['--output-format'],
     },
     {
       helpArgs: ['chat', '--help'],

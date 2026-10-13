@@ -5,7 +5,6 @@ import {
   type CliRuntimeConfig,
 } from '../config.js';
 import { AuggieSessionService } from '../auggie/AuggieSessionService.js';
-import { KiroNativeSessionService } from '../kiro/KiroNativeSessionService.js';
 import { KiloNativeSessionService } from '../kilo/KiloNativeSessionService.js';
 import { GooseNativeSessionService } from '../goose/GooseNativeSessionService.js';
 import { OpencodeNativeSessionService } from '../opencode/OpencodeNativeSessionService.js';
@@ -40,7 +39,6 @@ import type { SessionRegistry } from './SessionRegistry.js';
 interface ProviderServiceResolvers {
   getAuggieSessions?: (instanceId?: string) => AuggieSessionService;
   getGooseNative?: (instanceId?: string) => GooseNativeSessionService;
-  getKiroNative?: (instanceId?: string) => KiroNativeSessionService;
   getKiloNative?: (instanceId?: string) => KiloNativeSessionService;
   getOpencodeNative?: (instanceId?: string) => OpencodeNativeSessionService;
 }
@@ -54,7 +52,6 @@ export class WorkerPool {
   private config: CliRuntimeConfig;
   private registry: SessionRegistry;
   private gooseNative: GooseNativeSessionService;
-  private kiroNative: KiroNativeSessionService;
   private kiloNative: KiloNativeSessionService;
   private auggieSessions: AuggieSessionService;
   private opencodeNative: OpencodeNativeSessionService;
@@ -65,7 +62,6 @@ export class WorkerPool {
     config: CliRuntimeConfig,
     registry: SessionRegistry,
     gooseNative: GooseNativeSessionService,
-    kiroNative: KiroNativeSessionService,
     kiloNative: KiloNativeSessionService,
     auggieSessions: AuggieSessionService,
     opencodeNative: OpencodeNativeSessionService,
@@ -75,7 +71,6 @@ export class WorkerPool {
     this.config = config;
     this.registry = registry;
     this.gooseNative = gooseNative;
-    this.kiroNative = kiroNative;
     this.kiloNative = kiloNative;
     this.auggieSessions = auggieSessions;
     this.opencodeNative = opencodeNative;
@@ -164,9 +159,7 @@ export class WorkerPool {
         return { provider: new CursorProvider(), commandConfig: instance.commandConfig };
       case 'kiro':
         return {
-          provider: new KiroProvider(
-            this.resolvers.getKiroNative?.(instance.id) || this.kiroNative,
-          ),
+          provider: new KiroProvider(),
           commandConfig: instance.commandConfig,
         };
       case 'kilo':

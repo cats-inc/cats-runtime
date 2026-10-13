@@ -1,0 +1,1 @@
+[denied] tool permission approval is not supported in non-interactive mode. Use --trust-all-tools to auto-approve.

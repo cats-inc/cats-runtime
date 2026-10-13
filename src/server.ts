@@ -831,9 +831,8 @@ export function createRuntimeServer(
     listProviderInstances(config, 'kiro').map((instance) => [
       instance.id,
       new KiroNativeSessionService({
-        command: instance.commandConfig.path,
-        dbPath: instance.kiroDbPath || config.kiroDbPath,
-        runtime: createRuntimeAdapter(instance.commandConfig.runtime),
+        commandConfig: instance.commandConfig,
+        sessionsDir: instance.kiroSessionsDir || config.kiroSessionsDir,
       }),
     ]),
   );
@@ -906,9 +905,8 @@ export function createRuntimeServer(
     'kiro',
     kiroNativeByInstance,
     () => new KiroNativeSessionService({
-      command: config.kiroPath,
-      dbPath: config.kiroDbPath,
-      runtime: createRuntimeAdapter(config.kiroRuntime),
+      commandConfig: config.providerCommands.kiro,
+      sessionsDir: config.kiroSessionsDir,
     }),
   );
   const gooseNative = getDefaultService(
@@ -951,7 +949,6 @@ export function createRuntimeServer(
     config,
     registry,
     gooseNative,
-    kiroNative,
     kiloNative,
     auggieSessions,
     opencodeNative,
@@ -959,7 +956,6 @@ export function createRuntimeServer(
     {
       getAuggieSessions: resolveAuggieSessions,
       getGooseNative: resolveGooseNative,
-      getKiroNative: resolveKiroNative,
       getKiloNative: resolveKiloNative,
       getOpencodeNative: resolveOpencodeNative,
     },
@@ -976,7 +972,6 @@ export function createRuntimeServer(
         registry,
         runtime,
         sessionId,
-        getKiroNative: resolveKiroNative,
       }),
   });
   const providerModelCatalog = new ProviderModelCatalogService(config, {
@@ -1181,8 +1176,7 @@ export function createRuntimeServer(
       runtime: createRuntimeAdapter(instance.commandConfig.runtime),
     }));
     reconcileServices('kiro', kiroNativeByInstance, (instance) => new KiroNativeSessionService({
-      command: instance.commandConfig.path, dbPath: instance.kiroDbPath || config.kiroDbPath,
-      runtime: createRuntimeAdapter(instance.commandConfig.runtime),
+      commandConfig: instance.commandConfig, sessionsDir: instance.kiroSessionsDir || config.kiroSessionsDir,
     }));
     reconcileServices('goose', gooseNativeByInstance, (instance) => new GooseNativeSessionService({
       command: instance.commandConfig.path,

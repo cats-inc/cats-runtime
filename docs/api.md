@@ -2548,7 +2548,7 @@ set it from `result` or `progress` events (`reportedModels` on the event):
 - Grok: the `end` event's `modelUsage` models; the `-build` suffix is ignored.
 - Codex: the target of a `model/rerouted` notice, which never matches.
 - Pi: the reply's `responseModel`, else its `model`.
-- Kiro: the model its session record gives the turn.
+- Kiro: the model its V3 run's `config_option_update` reports for the session.
 - Junie: every model the task called, without a comparison.
 
 Other providers only echo the requested model, or report none. Each run's
@@ -4691,6 +4691,13 @@ For manual WSL-backed discovery, `POST /cursor/sessions/discover` and
 When `startIfNeeded` is `false`, the runtime will skip waking a stopped WSL
 distro and return any sessions it can inspect without starting WSL. The default
 remains `true`.
+
+`GET /kiro/sessions` and `POST /kiro/sessions/discover` enumerate Kiro's V3
+session store (`sessions_dir`, default `~/.kiro/sessions`) inside the
+instance's runtime and report V3 sessions only, with each session's title as
+`summary`, its recorded `model` and the number of user prompts as
+`messageCount`. Deleting a runtime session removes the Kiro session through
+`kiro-cli chat --delete-session`.
 
 ### Agent Session Discovery
 

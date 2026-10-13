@@ -317,7 +317,7 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
       const messages = await getKiroNative(
         ctx,
         session.providerInstanceId,
-      ).loadHistory(session.cwd, session.providerSessionId);
+      ).loadHistory(session.providerSessionId);
       return c.json(buildHistoryResponse(ctx, session, messages, {
         ownership: 'provider',
         source: 'service',

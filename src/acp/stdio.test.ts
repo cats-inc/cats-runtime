@@ -75,7 +75,7 @@ function makeConfig(rootDir: string): CliRuntimeConfig {
     copilotSessionsDir: '',
     cursorChatsDir: '',
     cursorRuntime: { mode: 'native' },
-    kiroDbPath: '',
+    kiroSessionsDir: '',
     kiroRuntime: { mode: 'native' },
     providerCommands: {
       auggie: { path: 'auggie', runner: 'auto', runtime: { mode: 'native' } },

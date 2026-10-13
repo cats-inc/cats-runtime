@@ -277,7 +277,7 @@ describe('ensureSessionAwake', () => {
     );
   });
 
-  it('validates Kiro latest-session semantics before falling through to generic CLI resume', async () => {
+  it('resumes a discovered Kiro session by id through the generic CLI path', async () => {
     const registry = new SessionRegistry();
     const discovered = registry.upsertDiscovered('kiro-123', {
       providerName: 'kiro',
@@ -287,16 +287,12 @@ describe('ensureSessionAwake', () => {
     });
     expect(discovered).not.toBeNull();
     const runtime = makeRuntime();
-    const getKiroNative = vi.fn(() => ({
-      canResumeSession: vi.fn(async () => true),
-    }));
 
     const result = await ensureSessionAwake({
       config: makeConfig() as never,
       registry,
       runtime: runtime as never,
       sessionId: discovered!.id,
-      getKiroNative: getKiroNative as never,
     });
 
     expect(result).toEqual({
@@ -304,7 +300,6 @@ describe('ensureSessionAwake', () => {
       providerSessionId: 'kiro-123',
       outcome: 'resumed',
     });
-    expect(getKiroNative).toHaveBeenCalledWith('default');
     expect(runtime.spawn).toHaveBeenCalledWith(
       discovered!.id,
       'kiro',

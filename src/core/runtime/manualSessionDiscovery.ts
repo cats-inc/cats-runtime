@@ -155,7 +155,7 @@ type ManualSessionDiscoveryConfig = Pick<
   | 'codexSessionsDir'
   | 'copilotSessionsDir'
   | 'cursorChatsDir'
-  | 'kiroDbPath'
+  | 'kiroSessionsDir'
   | 'kiloServerHost'
   | 'kiloServerPort'
   | 'kiloServerStartupTimeoutMs'

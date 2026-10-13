@@ -42,7 +42,7 @@ describe('wakeup HTTP contract', () => {
       copilotSessionsDir: join(rootDir, '.copilot', 'session-state'),
       cursorChatsDir: join(rootDir, '.cursor', 'chats'),
       cursorRuntime: { mode: 'native' },
-      kiroDbPath: join(rootDir, '.kiro', 'data.sqlite3'),
+      kiroSessionsDir: join(rootDir, '.kiro', 'sessions'),
       kiroRuntime: { mode: 'native' },
       nativeDiscoveryIntervalMs: 0,
       externalSessionLiveWindowMs: 0,
