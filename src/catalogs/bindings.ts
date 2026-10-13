@@ -56,7 +56,7 @@ export function assertCatalogBinding(scope: CatalogScope, key: string, value?: C
   }
   // Goose's verified serializer is its native model suffix, one per thinking effort.
   if (key === 'goose.thinking_effort' && value !== undefined
-    && (typeof value !== 'string' || !(value in GOOSE_THINKING_SUFFIXES))) {
+    && (typeof value !== 'string' || !Object.hasOwn(GOOSE_THINKING_SUFFIXES, value))) {
     throw new Error(`Binding '${key}' supports only ${Object.keys(GOOSE_THINKING_SUFFIXES).join(', ')}`);
   }
 }

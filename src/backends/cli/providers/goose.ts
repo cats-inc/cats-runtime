@@ -56,7 +56,8 @@ export class GooseProvider implements Provider {
       const effort = opts.modelControls?.['goose.thinking_effort'];
       // Goose turns its native effort suffix into ThinkingEffort before request
       // construction, overriding saved/global effort without changing user config.
-      const suffix = typeof effort === 'string' ? GOOSE_THINKING_SUFFIXES[effort] : undefined;
+      const suffix = typeof effort === 'string' && Object.hasOwn(GOOSE_THINKING_SUFFIXES, effort)
+        ? GOOSE_THINKING_SUFFIXES[effort] : undefined;
       args.push('--model', suffix ? `${modelId}${suffix}` : modelId);
     }
 
