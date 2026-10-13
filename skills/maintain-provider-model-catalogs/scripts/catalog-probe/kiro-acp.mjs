@@ -92,6 +92,7 @@ export async function readKiroModelOptions({
   env = process.env,
   cwd,
   timeoutMs = 60000,
+  modelOptionWaitMs = MODEL_OPTION_WAIT_MS,
 } = {}) {
   const workDir = cwd ?? mkdtempSync(join(tmpdir(), 'cats-kiro-acp-probe-'));
   const child = spawn(command, args, { cwd: workDir, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
@@ -179,7 +180,7 @@ export async function readKiroModelOptions({
     if (!modelOption) {
       await new Promise((resolve) => {
         modelOptionWaiter = resolve;
-        setTimeout(resolve, MODEL_OPTION_WAIT_MS);
+        setTimeout(resolve, modelOptionWaitMs);
       });
     }
     let sessionDeleted = false;

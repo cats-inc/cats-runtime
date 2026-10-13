@@ -691,7 +691,7 @@ async function kiroAcpReaderChecks(root) {
 
   const failure = async (mode, timeoutMs = 10000) => {
     try {
-      await readKiroModelOptions({ command: process.execPath, args: [FAKE_KIRO_ACP, mode], cwd: root, timeoutMs });
+      await readKiroModelOptions({ command: process.execPath, args: [FAKE_KIRO_ACP, mode], cwd: root, timeoutMs, modelOptionWaitMs: 100 });
     } catch (error) {
       assert.ok(error instanceof KiroAcpError, String(error));
       return [error.status, error.reason];
