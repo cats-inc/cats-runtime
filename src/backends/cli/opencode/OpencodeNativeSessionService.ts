@@ -290,6 +290,7 @@ export class OpencodeNativeSessionService {
     sessionId: string;
     content: string;
     model?: string;
+    variant?: string;
     signal?: AbortSignal;
   }): Promise<OpencodePromptResult> {
     const model = parseOpencodeModel(input.model);
@@ -299,6 +300,7 @@ export class OpencodeNativeSessionService {
         method: 'POST',
         body: JSON.stringify(stripUndefined({
           model,
+          variant: input.variant,
           parts: [
             {
               type: 'text',

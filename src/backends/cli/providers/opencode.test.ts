@@ -93,3 +93,30 @@ describe('OpencodeProvider', () => {
     );
   });
 });
+
+describe('OpencodeProvider variant', () => {
+  async function promptVariant(controls?: Record<string, string>) {
+    const native = {
+      prompt: vi.fn(async () => ({ sessionId: 'oc-1', messageId: 'msg-1', text: 'ok', toolUses: [] })),
+      abortSession: vi.fn(),
+      listPendingPermissions: vi.fn().mockResolvedValue([]),
+      replyPermission: vi.fn(),
+      listPendingQuestions: vi.fn().mockResolvedValue([]),
+      rejectQuestion: vi.fn(),
+    } as unknown as OpencodeNativeSessionService;
+    const provider = new OpencodeProvider(native);
+    for await (const _event of provider.streamTurn({ message: 'Hi' }, {
+      cwd: '/tmp/repo',
+      resumeSessionId: 'oc-1',
+      model: 'opencode-go/glm-5.3',
+      ...(controls ? { modelControls: controls } : {}),
+    })) { /* drain */ }
+    return (native.prompt as unknown as { mock: { calls: Array<[{ variant?: string }]> } }).mock.calls[0][0].variant;
+  }
+
+  it('sends the selected variant and leaves Default or no selection unset', async () => {
+    await expect(promptVariant({ 'opencode.variant': 'high' })).resolves.toBe('high');
+    await expect(promptVariant({ 'opencode.variant': 'default' })).resolves.toBeUndefined();
+    await expect(promptVariant()).resolves.toBeUndefined();
+  });
+});

@@ -24,6 +24,44 @@
       "reason": "Pi still lists Spark, but ChatGPT accounts reject it; the operator left it out",
       "evidence": "docs/research/2026-09-27-pi-openai-codex-full-catalog.md",
       "acknowledgedOn": "2026-10-02"
+    },
+    {
+      "provider": "devin",
+      "backend": "agent",
+      "transport": "acp_stdio",
+      "kind": "new-candidate",
+      "evidence": "docs/research/2026-10-14-shortlists-to-full.md",
+      "acknowledgedOn": "2026-10-14",
+      "subjectPattern": "^fusion-",
+      "reason": "Fusion main-and-sidekick combinations; the operator excluded the fusion family from the full catalog"
+    },
+    {
+      "provider": "devin",
+      "backend": "agent",
+      "transport": "acp_stdio",
+      "kind": "new-candidate",
+      "evidence": "docs/research/2026-10-14-shortlists-to-full.md",
+      "acknowledgedOn": "2026-10-14",
+      "subjectPattern": "^MODEL_",
+      "reason": "Legacy MODEL_* UIDs; the operator excluded them from the full catalog"
+    },
+    {
+      "provider": "cursor",
+      "kind": "absent-from-source",
+      "subjectPattern": "^(default|claude-(sonnet|opus)-4-6|claude-(opus|haiku|sonnet)-4-5|claude-sonnet-4|glm-5p3|glm-5p3-flash)[[]",
+      "reason": "cursor-agent --list-models prints legacy slugs: Auto as auto, the Claude 4.x families as claude-4.6-sonnet and the like, and it omits Claude Haiku 4.5 and both GLM 5.3 families. The parameterized picker reply captured with capture-cursor-parameterized-models.mjs lists all of them; rerun that capture to check these rows",
+      "evidence": "docs/research/2026-10-14-shortlists-to-full.md",
+      "acknowledgedOn": "2026-10-14"
+    },
+    {
+      "provider": "kilo",
+      "kind": "field-drift",
+      "subject": "kilo/google/gemini-4-argon",
+      "field": "label",
+      "observed": "Google: Gemini 4 Argon (50% off)",
+      "reason": "A temporary price promotion in the listed and picker name; the label keeps the name without it",
+      "evidence": "docs/research/2026-10-14-shortlists-to-full.md",
+      "acknowledgedOn": "2026-10-14"
     }
   ]
 }

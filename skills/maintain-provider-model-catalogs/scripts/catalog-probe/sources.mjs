@@ -217,7 +217,8 @@ export function parseVerboseChannel(output, channel) {
     .filter((row) => !channel || row.id.startsWith(`${channel}/`))
     .map((row) => {
       const metadata = row.metadata ?? {};
-      return withEvidence({ id: row.id, label: row.name }, {
+      // Kilo 7.8.8 lists one name with a trailing space; the picker and the catalog trim it.
+      return withEvidence({ id: row.id, label: typeof row.name === 'string' ? row.name.trim() : row.name }, {
         family: str(metadata.family),
         status: str(metadata.status),
         releaseDate: str(metadata.release_date),
@@ -634,9 +635,9 @@ export const SOURCES = [
   {
     ...SCOPE('kilo'),
     sourceClass: 'machine-readable',
-    command: 'kilo models <channel> --verbose --pure (gateway list, not the picker)',
-    // The gateway list is broader than the picker and lacks its routing rows (kilo.md).
-    coverage: { membership: 'partial' },
+    command: 'kilo models <channel> --verbose --pure',
+    // Since 2026-10-14 the Kilo scope is this gateway list by the operator's choice (kilo.md).
+    coverage: { membership: 'complete', label: true },
     async probe(ctx) {
       const channel = scopeChannel(ctx);
       const executable = locate(ctx, 'kilo');

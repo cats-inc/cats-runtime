@@ -4752,8 +4752,9 @@ When it is supported, each entry is imported into the session registry with
 `lastActivity`. Discovery never issues `session/new`, so enumerating sessions
 does not create one. Verified against Devin 3000.5.20.
 
-Devin 3000.10.31 model selection uses the six fixed combinations in the
-[Devin shortlist](./research/2026-09-18-devin-shortlist.md), plus custom raw model strings.
+Devin 3000.11.3 model selection offers every family except fusion and the legacy `MODEL_*` UIDs,
+with Reasoning Effort and Speed controls that choose the exact variant UID
+([full catalog](./research/2026-10-14-shortlists-to-full.md)), plus custom raw model strings.
 On its executable ACP stdio target, a selected model is applied with
 `session/set_config_option` (`configId: "model"`) after new/load and permission-mode
 pinning, before prompting. Effort is encoded in the model UID. A rejected model

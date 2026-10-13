@@ -5578,6 +5578,9 @@ providers:
         // The mocked command must not depend on a personal OpenCode installation.
         env: { OPENCODE_PATH: process.platform === 'win32' ? 'opencode.cmd' : 'opencode' },
       }, {}, async (runtime) => {
+        const factoryModels = readCatalogFactory({ packageRoot: process.cwd(), runtimeRoot: process.cwd() })
+          .document.catalogs.find(scope => scope.provider === 'opencode' && scope.backend === 'cli')?.models ?? [];
+        expect(factoryModels.length).toBeGreaterThan(6);
         const first = await runtime.app.request('/providers/opencode/models');
         expect(first.status).toBe(200);
         expect(await first.json()).toMatchObject({
@@ -5587,13 +5590,7 @@ providers:
           defaultModel: null,
           source: 'static',
           cache: null,
-          models: [
-            { id: 'opencode-go/deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash' },
-            { id: 'opencode-go/hy4-preview', label: 'Hy4 preview' },
-            { id: 'opencode-go/glm-5.3-flash', label: 'GLM-5.3-Flash' },
-            { id: 'opencode-go/qwen3.8-flash', label: 'Qwen3.8 Flash' },
-            { id: 'opencode-go/minimax-m3', label: 'MiniMax-M3' },
-          ],
+          models: factoryModels.map(({ id, label }) => ({ id, label })),
           warnings: [],
         });
 

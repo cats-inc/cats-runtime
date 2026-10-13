@@ -12,8 +12,9 @@ import { buildProviderAdvancedKnowledge } from '../../core/models/providerAdvanc
 import { createCatalogSnapshot } from '../../catalogs/resolver.js';
 import { getStaticProviderModels } from '../../core/models/providerModelCatalog.js';
 
-describe.each(['cursor', 'opencode', 'kilo', 'devin', 'cline'])('%s shortlists in Playground', (provider) => {
-  it('uses the approved fallbacks and preserves custom strings on reload', () => {
+// These five were operator shortlists until 2026-10-14 and now carry their full catalogs.
+describe.each(['cursor', 'opencode', 'kilo', 'devin', 'cline'])('%s full catalogs in Playground', (provider) => {
+  it('offers every factory row without default markers and preserves custom strings on reload', () => {
     const html = readFileSync(fileURLToPath(new URL('./pages/playground.html', import.meta.url)), 'utf8');
     expect(html).toContain('const PROVIDER_MODELS = {}');
     const models = getStaticProviderModels({ providerName: provider,
@@ -25,10 +26,11 @@ describe.each(['cursor', 'opencode', 'kilo', 'devin', 'cline'])('%s shortlists i
     const fallback = models.map(({ id, label, default: isDefault }) => ({
       value: id, label: `${label}${isDefault ? ' (default)' : ''}`,
     }));
-    // A shortlist holds at most six operator-selected rows; OpenCode has five.
-    expect(fallback.length).toBeGreaterThan(0);
-    expect(fallback.length).toBeLessThanOrEqual(6);
-    expect(fallback.filter(entry => /default/i.test(entry.label))).toHaveLength(0);
+    const factory = createCatalogSnapshot(readFileSync(new URL('../../../config/curated-model-catalogs.yaml.example', import.meta.url), 'utf8'))
+      .document.catalogs.find(scope => scope.provider === provider && scope.selection_mode === 'full');
+    expect(fallback.length).toBeGreaterThan(6);
+    expect(fallback.map(entry => entry.value)).toEqual(factory?.models.map(model => model.id));
+    expect(fallback.filter(entry => / \(default\)$/.test(entry.label))).toHaveLength(0);
     const catalog = {
       provider, backend: 'cli', instance: 'native', defaultModel: null,
       source: 'static', cache: null, entries: models, controls: [], presets: [],

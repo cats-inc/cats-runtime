@@ -254,8 +254,18 @@ export function validateCatalogDocument(value: unknown): CatalogDocument {
   return structuredClone({ schema_version: 2, catalogs });
 }
 
+// One load reads the same packaged factory several times, and YAML parsing dominates for a
+// catalog this size, so recent sources keep their validated document. Callers get a copy.
+const PARSED_CACHE_LIMIT = 4;
+const parsedDocuments = new Map<string, CatalogDocument>();
+
 export function parseCatalogDocument(source: string): CatalogDocument {
+  const cached = parsedDocuments.get(source);
+  if (cached) return structuredClone(cached);
   const doc = parseDocument(source, { uniqueKeys: true });
   if (doc.errors.length) throw new Error(`Invalid catalog YAML: ${doc.errors[0].message}`);
-  return validateCatalogDocument(doc.toJS({ maxAliasCount: 100 }));
+  const document = validateCatalogDocument(doc.toJS({ maxAliasCount: 100 }));
+  if (parsedDocuments.size >= PARSED_CACHE_LIMIT) parsedDocuments.delete(parsedDocuments.keys().next().value!);
+  parsedDocuments.set(source, structuredClone(document));
+  return document;
 }

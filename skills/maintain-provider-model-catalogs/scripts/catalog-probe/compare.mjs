@@ -360,19 +360,32 @@ export function validateAcknowledgements(document) {
     throw new Error('The acknowledgements file needs schemaVersion 1 and an acknowledgements array.');
   }
   return document.acknowledgements.map((ack, index) => {
-    for (const field of ['provider', 'kind', 'subject', 'reason', 'evidence', 'acknowledgedOn']) {
+    for (const field of ['provider', 'kind', 'reason', 'evidence', 'acknowledgedOn']) {
       if (typeof ack[field] !== 'string' || !ack[field].trim()) {
         throw new Error(`Acknowledgement ${index + 1} needs a non-empty "${field}".`);
       }
     }
-    return { backend: 'cli', transport: null, ...ack, index };
+    // A subjectPattern covers a whole class the operator left out, such as one model family.
+    const subjects = ['subject', 'subjectPattern'].filter((field) => ack[field] !== undefined);
+    if (subjects.length !== 1 || typeof ack[subjects[0]] !== 'string' || !ack[subjects[0]].trim()) {
+      throw new Error(`Acknowledgement ${index + 1} needs exactly one non-empty "subject" or "subjectPattern".`);
+    }
+    let subjectRegExp;
+    if (ack.subjectPattern !== undefined) {
+      try {
+        subjectRegExp = new RegExp(ack.subjectPattern);
+      } catch (error) {
+        throw new Error(`Acknowledgement ${index + 1} has an invalid "subjectPattern": ${error.message}`);
+      }
+    }
+    return { backend: 'cli', transport: null, ...ack, index, ...(subjectRegExp ? { subjectRegExp } : {}) };
   });
 }
 
 function ackMatches(ack, scopeSummary, finding) {
   return sameScope(ack, scopeSummary)
     && ack.kind === finding.kind
-    && ack.subject === finding.subject
+    && (ack.subjectRegExp ? ack.subjectRegExp.test(finding.subject) : ack.subject === finding.subject)
     && (ack.field === undefined || ack.field === finding.field)
     && (ack.observed === undefined || isDeepStrictEqual(ack.observed, finding.observed));
 }
@@ -406,14 +419,14 @@ export function validateSnapshot({ snapshot, catalogDocument, acknowledgements =
     .filter((ack) => !used.has(ack.index)
       && scopes.some((scope) => sameScope(ack, scope) && scope.source.status === 'ok'
         && !scope.findings.some((finding) => finding.kind === 'signal-unreadable')))
-    .map(({ index, ...ack }) => ack);
+    .map(({ index, subjectRegExp, ...ack }) => ack);
 
   const general = [];
   if (environment.personalOverride) {
     general.push({ kind: 'personal-override', audience: 'info', subject: environment.personalOverride, message: `A personal catalog override exists at ${environment.personalOverride}; this machine's menus can differ from the factory checked here.` });
   }
   for (const ack of staleAcknowledgements) {
-    general.push({ kind: 'stale-acknowledgement', audience: 'info', subject: `${ack.provider}:${ack.kind}:${ack.subject}`, message: `No current finding matches this acknowledgement (${ack.reason}). Remove it once the change is understood.` });
+    general.push({ kind: 'stale-acknowledgement', audience: 'info', subject: `${ack.provider}:${ack.kind}:${ack.subject ?? ack.subjectPattern}`, message: `No current finding matches this acknowledgement (${ack.reason}). Remove it once the change is understood.` });
   }
 
   const verdict = maxAudience([...scopes.map((scope) => ({ audience: scope.verdict })), ...general]);

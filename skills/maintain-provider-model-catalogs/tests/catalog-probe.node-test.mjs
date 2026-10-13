@@ -524,6 +524,28 @@ test('acknowledgements match the exact finding and are reported stale otherwise'
   assert.throws(() => validateAcknowledgements({ schemaVersion: 1, acknowledgements: [{ provider: 'ex', kind: 'x', subject: 'y' }] }), /needs a non-empty "reason"/);
 });
 
+test('a subjectPattern acknowledges a whole class of findings and can go stale', () => {
+  const acks = validateAcknowledgements({
+    schemaVersion: 1,
+    acknowledgements: [
+      { provider: 'ex', kind: 'new-candidate', subjectPattern: '^fusion-', reason: 'operator excluded fusion', evidence: 'docs/x.md', acknowledgedOn: '2026-10-14' },
+      { provider: 'ex', kind: 'new-candidate', subjectPattern: '^MODEL_', reason: 'operator excluded legacy ids', evidence: 'docs/x.md', acknowledgedOn: '2026-10-14' },
+    ],
+  });
+  const report = validateSnapshot({
+    snapshot: snapshotOf([source({ models: [...source().models, { id: 'fusion-a-b' }, { id: 'fusion-a-c' }, { id: 'e' }] })], ['ex']),
+    catalogDocument: { catalogs: [fullScope()] },
+    acknowledgements: acks,
+  });
+  const [scope] = report.scopes;
+  assert.deepEqual(scope.findings.filter((finding) => finding.kind === 'new-candidate').map((finding) => `${finding.subject}:${finding.audience}`),
+    ['fusion-a-b:none', 'fusion-a-c:none', 'e:agent']);
+  assert.equal(scope.counts.acknowledged, 2);
+  assert.deepEqual(report.general.map((finding) => finding.subject), ['ex:new-candidate:^MODEL_']);
+  assert.throws(() => validateAcknowledgements({ schemaVersion: 1, acknowledgements: [{ provider: 'ex', kind: 'x', subject: 'y', subjectPattern: 'z', reason: 'r', evidence: 'e', acknowledgedOn: 'd' }] }), /exactly one/);
+  assert.throws(() => validateAcknowledgements({ schemaVersion: 1, acknowledgements: [{ provider: 'ex', kind: 'x', subjectPattern: '(', reason: 'r', evidence: 'e', acknowledgedOn: 'd' }] }), /invalid "subjectPattern"/);
+});
+
 test('a full run lists curated scopes that have no source', () => {
   const report = validateSnapshot({
     snapshot: snapshotOf([source()]),

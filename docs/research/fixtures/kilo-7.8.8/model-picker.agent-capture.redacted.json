@@ -1,0 +1,1757 @@
+{
+  "kind": "model-picker.agent-capture",
+  "cli": {
+    "name": "Kilo CLI",
+    "version": "7.8.8",
+    "platform": "Windows 11, Windows Terminal (maximized)"
+  },
+  "capturedAt": "2026-10-14",
+  "method": "skills/maintain-provider-model-catalogs/scripts/Capture-KiloPicker.ps1: /models dialog walked with Up and Down only; every row read from the list and confirmed by the detail panel; the model state file kept its SHA-256.",
+  "accountScope": "Kilo Gateway signed in; no identity recorded. Recent reflects this machine's recent selections.",
+  "sections": [
+    {
+      "Section": "Recent",
+      "Rows": 7
+    },
+    {
+      "Section": "Recommended",
+      "Rows": 9
+    },
+    {
+      "Section": "Kilo Gateway",
+      "Rows": 318
+    }
+  ],
+  "findings": [
+    "Recommended rows are not repeated in the Kilo Gateway section (0 of 9).",
+    "Recent rows stay in their provider section: the 4 Recent rows that are not Recommended also appear under Kilo Gateway; the 3 that are Recommended appear only there.",
+    "Recommended (9) plus Kilo Gateway (318) are the 327 rows of `kilo models kilo --verbose --pure`. Two names differ: the picker shows \"Google: Gemini 4 Argon (50% off)\" for kilo/google/gemini-4-argon, and the listed name of kilo/google/gemma-4-26b-a4b-it ends with a space.",
+    "The Select variant dialog (/variants, current model MiniMax: MiniMax M3) lists Default (current), instant, thinking.",
+    "26 rows carry the May train badge."
+  ],
+  "variantDialog": {
+    "model": "MiniMax: MiniMax M3",
+    "options": [
+      "Default",
+      "instant",
+      "thinking"
+    ],
+    "current": "Default"
+  },
+  "rows": [
+    {
+      "index": 8,
+      "section": "Recommended",
+      "label": "Auto Efficient"
+    },
+    {
+      "index": 9,
+      "section": "Recommended",
+      "label": "Auto Free",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 10,
+      "section": "Recommended",
+      "label": "StepFun: Step 5 Preview (free)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 11,
+      "section": "Recommended",
+      "label": "Stealth: Glyph Cluster (free)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 12,
+      "section": "Recommended",
+      "label": "Anthropic: Claude Opus 5.5"
+    },
+    {
+      "index": 13,
+      "section": "Recommended",
+      "label": "OpenAI: GPT-6.1 Sol"
+    },
+    {
+      "index": 14,
+      "section": "Recommended",
+      "label": "DeepSeek: DeepSeek V4.1 Flash"
+    },
+    {
+      "index": 15,
+      "section": "Recommended",
+      "label": "MoonshotAI: Kimi K3"
+    },
+    {
+      "index": 16,
+      "section": "Recommended",
+      "label": "Z.ai: GLM 5.3 Flash"
+    },
+    {
+      "index": 17,
+      "section": "Kilo Gateway",
+      "label": "Cohere: North Mini Code (free)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 18,
+      "section": "Kilo Gateway",
+      "label": "Dots Studio: Dots3-Note Preview (free)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 19,
+      "section": "Kilo Gateway",
+      "label": "LiquidAI: LFM2.5-2.6B (free)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 20,
+      "section": "Kilo Gateway",
+      "label": "LiquidAI: LFM2.5-24B-A2B",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 21,
+      "section": "Kilo Gateway",
+      "label": "Meta: Muse Spark 1.2 Contributor",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 22,
+      "section": "Kilo Gateway",
+      "label": "Meta: Muse Spark 1.3 Contributor",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 23,
+      "section": "Kilo Gateway",
+      "label": "NVIDIA: Nemotron 3 Nano Omni (free)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 24,
+      "section": "Kilo Gateway",
+      "label": "NVIDIA: Nemotron 3 Super (free)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 25,
+      "section": "Kilo Gateway",
+      "label": "NVIDIA: Nemotron 3 Ultra (free)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 26,
+      "section": "Kilo Gateway",
+      "label": "NVIDIA: Nemotron 3.5 Lightning (free)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 27,
+      "section": "Kilo Gateway",
+      "label": "OpenRouter Free Models Router",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 28,
+      "section": "Kilo Gateway",
+      "label": "Poolside: Laguna S 2.1 (free)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 29,
+      "section": "Kilo Gateway",
+      "label": "Poolside: Laguna S 2.1 (retires Oct 31)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 30,
+      "section": "Kilo Gateway",
+      "label": "Poolside: Laguna XS 2.1 (free)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 31,
+      "section": "Kilo Gateway",
+      "label": "Poolside: Laguna XS 2.1 (retires Oct 31)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 32,
+      "section": "Kilo Gateway",
+      "label": "Sakana: Sakana Namazu",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 33,
+      "section": "Kilo Gateway",
+      "label": "Stealth: Claude Opus 4.6 (20% off)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 34,
+      "section": "Kilo Gateway",
+      "label": "Stealth: Claude Opus 4.7 (20% off)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 35,
+      "section": "Kilo Gateway",
+      "label": "Stealth: Claude Opus 4.8 (20% off)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 36,
+      "section": "Kilo Gateway",
+      "label": "Stealth: Claude Sonnet 4.6 (20% off)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 37,
+      "section": "Kilo Gateway",
+      "label": "Stealth: Qwen3.6 Plus (50% off)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 38,
+      "section": "Kilo Gateway",
+      "label": "Thinking Machines: Inkling Small (free)",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 39,
+      "section": "Kilo Gateway",
+      "label": "inclusionAI: Ling 3.1 Flash",
+      "badges": [
+        "May train"
+      ]
+    },
+    {
+      "index": 40,
+      "section": "Kilo Gateway",
+      "label": "AionLabs: Aion 3.5"
+    },
+    {
+      "index": 41,
+      "section": "Kilo Gateway",
+      "label": "AionLabs: Aion 3.5 Mini"
+    },
+    {
+      "index": 42,
+      "section": "Kilo Gateway",
+      "label": "AionLabs: Aion-2.0"
+    },
+    {
+      "index": 43,
+      "section": "Kilo Gateway",
+      "label": "AionLabs: Aion-3.0"
+    },
+    {
+      "index": 44,
+      "section": "Kilo Gateway",
+      "label": "AionLabs: Aion-3.0-Mini"
+    },
+    {
+      "index": 45,
+      "section": "Kilo Gateway",
+      "label": "Amazon: Nova 2 Lite"
+    },
+    {
+      "index": 46,
+      "section": "Kilo Gateway",
+      "label": "Amazon: Nova Lite 1.0"
+    },
+    {
+      "index": 47,
+      "section": "Kilo Gateway",
+      "label": "Amazon: Nova Micro 1.0"
+    },
+    {
+      "index": 48,
+      "section": "Kilo Gateway",
+      "label": "Amazon: Nova Premier 1.0"
+    },
+    {
+      "index": 49,
+      "section": "Kilo Gateway",
+      "label": "Amazon: Nova Pro 1.0"
+    },
+    {
+      "index": 50,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Fable 5 ($$$$)"
+    },
+    {
+      "index": 51,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Fable 5.1 ($$$$)"
+    },
+    {
+      "index": 52,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Fable Latest ($$$$)"
+    },
+    {
+      "index": 53,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Haiku 4.5"
+    },
+    {
+      "index": 54,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Haiku 5.5"
+    },
+    {
+      "index": 55,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Haiku Latest"
+    },
+    {
+      "index": 56,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Opus 4.1 ($$$$)"
+    },
+    {
+      "index": 57,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Opus 4.5"
+    },
+    {
+      "index": 58,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Opus 4.6"
+    },
+    {
+      "index": 59,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Opus 4.7"
+    },
+    {
+      "index": 60,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Opus 4.8"
+    },
+    {
+      "index": 61,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Opus 5"
+    },
+    {
+      "index": 62,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Opus Latest"
+    },
+    {
+      "index": 63,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Sonnet 4"
+    },
+    {
+      "index": 64,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Sonnet 4.5"
+    },
+    {
+      "index": 65,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Sonnet 4.6"
+    },
+    {
+      "index": 66,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Sonnet 5"
+    },
+    {
+      "index": 67,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Sonnet 5.5"
+    },
+    {
+      "index": 68,
+      "section": "Kilo Gateway",
+      "label": "Anthropic: Claude Sonnet Latest"
+    },
+    {
+      "index": 69,
+      "section": "Kilo Gateway",
+      "label": "Arcee AI: Trinity Large Thinking"
+    },
+    {
+      "index": 70,
+      "section": "Kilo Gateway",
+      "label": "Auto Balanced"
+    },
+    {
+      "index": 71,
+      "section": "Kilo Gateway",
+      "label": "Auto Frontier"
+    },
+    {
+      "index": 72,
+      "section": "Kilo Gateway",
+      "label": "Auto Small"
+    },
+    {
+      "index": 73,
+      "section": "Kilo Gateway",
+      "label": "ByteDance Seed: Seed 1.6 (retires Nov 11)"
+    },
+    {
+      "index": 74,
+      "section": "Kilo Gateway",
+      "label": "ByteDance Seed: Seed 1.6 Flash (retires Nov 11)"
+    },
+    {
+      "index": 75,
+      "section": "Kilo Gateway",
+      "label": "ByteDance Seed: Seed 2.1 Turbo"
+    },
+    {
+      "index": 76,
+      "section": "Kilo Gateway",
+      "label": "ByteDance Seed: Seed-2.0-Code (retires Nov 11)"
+    },
+    {
+      "index": 77,
+      "section": "Kilo Gateway",
+      "label": "ByteDance Seed: Seed-2.0-Lite"
+    },
+    {
+      "index": 78,
+      "section": "Kilo Gateway",
+      "label": "ByteDance Seed: Seed-2.0-Mini"
+    },
+    {
+      "index": 79,
+      "section": "Kilo Gateway",
+      "label": "Cohere: Command A+"
+    },
+    {
+      "index": 80,
+      "section": "Kilo Gateway",
+      "label": "Cohere: Command R (08-2024)"
+    },
+    {
+      "index": 81,
+      "section": "Kilo Gateway",
+      "label": "Cohere: Command R+ (08-2024)"
+    },
+    {
+      "index": 82,
+      "section": "Kilo Gateway",
+      "label": "DeepSeek: DeepSeek Flash Latest"
+    },
+    {
+      "index": 83,
+      "section": "Kilo Gateway",
+      "label": "DeepSeek: DeepSeek Pro Latest"
+    },
+    {
+      "index": 84,
+      "section": "Kilo Gateway",
+      "label": "DeepSeek: DeepSeek V3"
+    },
+    {
+      "index": 85,
+      "section": "Kilo Gateway",
+      "label": "DeepSeek: DeepSeek V3 0324"
+    },
+    {
+      "index": 86,
+      "section": "Kilo Gateway",
+      "label": "DeepSeek: DeepSeek V3.1"
+    },
+    {
+      "index": 87,
+      "section": "Kilo Gateway",
+      "label": "DeepSeek: DeepSeek V3.1 Terminus"
+    },
+    {
+      "index": 88,
+      "section": "Kilo Gateway",
+      "label": "DeepSeek: DeepSeek V3.2"
+    },
+    {
+      "index": 89,
+      "section": "Kilo Gateway",
+      "label": "DeepSeek: DeepSeek V3.2 Exp"
+    },
+    {
+      "index": 90,
+      "section": "Kilo Gateway",
+      "label": "DeepSeek: DeepSeek V4 Flash 0423"
+    },
+    {
+      "index": 91,
+      "section": "Kilo Gateway",
+      "label": "DeepSeek: DeepSeek V4 Flash 0731"
+    },
+    {
+      "index": 92,
+      "section": "Kilo Gateway",
+      "label": "DeepSeek: DeepSeek V4 Flash Latest"
+    },
+    {
+      "index": 93,
+      "section": "Kilo Gateway",
+      "label": "DeepSeek: DeepSeek V4 Flash Vision Exp"
+    },
+    {
+      "index": 94,
+      "section": "Kilo Gateway",
+      "label": "DeepSeek: DeepSeek V4 Pro 0423"
+    },
+    {
+      "index": 95,
+      "section": "Kilo Gateway",
+      "label": "DeepSeek: DeepSeek V4 Pro 0813"
+    },
+    {
+      "index": 96,
+      "section": "Kilo Gateway",
+      "label": "DeepSeek: R1"
+    },
+    {
+      "index": 97,
+      "section": "Kilo Gateway",
+      "label": "DeepSeek: R1 0528"
+    },
+    {
+      "index": 98,
+      "section": "Kilo Gateway",
+      "label": "Fireworks: Ember-1"
+    },
+    {
+      "index": 99,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini 2.5 Flash (retires Oct 20)"
+    },
+    {
+      "index": 100,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini 2.5 Flash Lite (retires Oct 20)"
+    },
+    {
+      "index": 101,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini 2.5 Pro (retires Oct 20)"
+    },
+    {
+      "index": 102,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini 2.5 Pro Preview 06-05"
+    },
+    {
+      "index": 103,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini 3 Flash Preview"
+    },
+    {
+      "index": 104,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini 3.1 Flash Lite"
+    },
+    {
+      "index": 105,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini 3.1 Flash Lite Preview"
+    },
+    {
+      "index": 106,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini 3.1 Pro Preview"
+    },
+    {
+      "index": 107,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini 3.1 Pro Preview Custom Tools"
+    },
+    {
+      "index": 108,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini 3.5 Flash"
+    },
+    {
+      "index": 109,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini 3.5 Flash Lite"
+    },
+    {
+      "index": 110,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini 3.6 Flash"
+    },
+    {
+      "index": 111,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini 3.7 Flash"
+    },
+    {
+      "index": 112,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini 3.8 Flash (50% off)"
+    },
+    {
+      "index": 113,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini 4 Argon (50% off)"
+    },
+    {
+      "index": 114,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini Flash Latest"
+    },
+    {
+      "index": 115,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemini Pro Latest"
+    },
+    {
+      "index": 116,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemma 3 12B"
+    },
+    {
+      "index": 117,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemma 3 27B"
+    },
+    {
+      "index": 118,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemma 4 26B A4B"
+    },
+    {
+      "index": 119,
+      "section": "Kilo Gateway",
+      "label": "Google: Gemma 4 31B"
+    },
+    {
+      "index": 120,
+      "section": "Kilo Gateway",
+      "label": "Google: Nano Banana 2.1"
+    },
+    {
+      "index": 121,
+      "section": "Kilo Gateway",
+      "label": "Google: Nano Banana Pro (Gemini 3 Pro Image)"
+    },
+    {
+      "index": 122,
+      "section": "Kilo Gateway",
+      "label": "IBM: Granite 4.2 8B"
+    },
+    {
+      "index": 123,
+      "section": "Kilo Gateway",
+      "label": "Inception: Mercury 2"
+    },
+    {
+      "index": 124,
+      "section": "Kilo Gateway",
+      "label": "Inception: Mercury 2.5"
+    },
+    {
+      "index": 125,
+      "section": "Kilo Gateway",
+      "label": "Meituan: LongCat 2.0"
+    },
+    {
+      "index": 126,
+      "section": "Kilo Gateway",
+      "label": "Meta: Llama 3.1 70B Instruct"
+    },
+    {
+      "index": 127,
+      "section": "Kilo Gateway",
+      "label": "Meta: Llama 3.1 8B Instruct"
+    },
+    {
+      "index": 128,
+      "section": "Kilo Gateway",
+      "label": "Meta: Llama 3.3 70B Instruct"
+    },
+    {
+      "index": 129,
+      "section": "Kilo Gateway",
+      "label": "Meta: Llama 4 Maverick"
+    },
+    {
+      "index": 130,
+      "section": "Kilo Gateway",
+      "label": "Meta: Llama 4 Scout"
+    },
+    {
+      "index": 131,
+      "section": "Kilo Gateway",
+      "label": "Meta: Muse Glimmer 30B"
+    },
+    {
+      "index": 132,
+      "section": "Kilo Gateway",
+      "label": "Meta: Muse Spark 1.1"
+    },
+    {
+      "index": 133,
+      "section": "Kilo Gateway",
+      "label": "Meta: Muse Spark 1.2"
+    },
+    {
+      "index": 134,
+      "section": "Kilo Gateway",
+      "label": "Meta: Muse Spark 1.3"
+    },
+    {
+      "index": 135,
+      "section": "Kilo Gateway",
+      "label": "Meta: Muse Wonder"
+    },
+    {
+      "index": 136,
+      "section": "Kilo Gateway",
+      "label": "MiniMax: MiniMax M1"
+    },
+    {
+      "index": 137,
+      "section": "Kilo Gateway",
+      "label": "MiniMax: MiniMax M2"
+    },
+    {
+      "index": 138,
+      "section": "Kilo Gateway",
+      "label": "MiniMax: MiniMax M2.1"
+    },
+    {
+      "index": 139,
+      "section": "Kilo Gateway",
+      "label": "MiniMax: MiniMax M2.5"
+    },
+    {
+      "index": 140,
+      "section": "Kilo Gateway",
+      "label": "MiniMax: MiniMax M2.7"
+    },
+    {
+      "index": 141,
+      "section": "Kilo Gateway",
+      "label": "MiniMax: MiniMax M3"
+    },
+    {
+      "index": 142,
+      "section": "Kilo Gateway",
+      "label": "Mistral Large"
+    },
+    {
+      "index": 143,
+      "section": "Kilo Gateway",
+      "label": "Mistral Large 2407"
+    },
+    {
+      "index": 144,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Codestral 2508"
+    },
+    {
+      "index": 145,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Devstral 2 2512"
+    },
+    {
+      "index": 146,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Ministral 3 14B 2512"
+    },
+    {
+      "index": 147,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Ministral 3 3B 2512"
+    },
+    {
+      "index": 148,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Ministral 3 8B 2512"
+    },
+    {
+      "index": 149,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Mistral Large 3 2512"
+    },
+    {
+      "index": 150,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Mistral Large 4 (50% off)"
+    },
+    {
+      "index": 151,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Mistral Medium 3"
+    },
+    {
+      "index": 152,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Mistral Medium 3.1"
+    },
+    {
+      "index": 153,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Mistral Medium 3.5"
+    },
+    {
+      "index": 154,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Mistral Nemo"
+    },
+    {
+      "index": 155,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Mistral Small 3.1 24B"
+    },
+    {
+      "index": 156,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Mistral Small 3.2 24B"
+    },
+    {
+      "index": 157,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Mistral Small 4"
+    },
+    {
+      "index": 158,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Mixtral 8x22B Instruct"
+    },
+    {
+      "index": 159,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Saba"
+    },
+    {
+      "index": 160,
+      "section": "Kilo Gateway",
+      "label": "Mistral: Voxtral Small 24B 2507"
+    },
+    {
+      "index": 161,
+      "section": "Kilo Gateway",
+      "label": "MoonshotAI: Kimi K2 0711"
+    },
+    {
+      "index": 162,
+      "section": "Kilo Gateway",
+      "label": "MoonshotAI: Kimi K2 0905"
+    },
+    {
+      "index": 163,
+      "section": "Kilo Gateway",
+      "label": "MoonshotAI: Kimi K2 Thinking"
+    },
+    {
+      "index": 164,
+      "section": "Kilo Gateway",
+      "label": "MoonshotAI: Kimi K2.5"
+    },
+    {
+      "index": 165,
+      "section": "Kilo Gateway",
+      "label": "MoonshotAI: Kimi K2.6"
+    },
+    {
+      "index": 166,
+      "section": "Kilo Gateway",
+      "label": "MoonshotAI: Kimi K2.7 Code"
+    },
+    {
+      "index": 167,
+      "section": "Kilo Gateway",
+      "label": "MoonshotAI: Kimi Latest"
+    },
+    {
+      "index": 168,
+      "section": "Kilo Gateway",
+      "label": "NVIDIA: Nemotron 3 Nano 30B A3B"
+    },
+    {
+      "index": 169,
+      "section": "Kilo Gateway",
+      "label": "NVIDIA: Nemotron 3 Super"
+    },
+    {
+      "index": 170,
+      "section": "Kilo Gateway",
+      "label": "NVIDIA: Nemotron 3 Ultra"
+    },
+    {
+      "index": 171,
+      "section": "Kilo Gateway",
+      "label": "NVIDIA: Nemotron 3.5 Lightning"
+    },
+    {
+      "index": 172,
+      "section": "Kilo Gateway",
+      "label": "NVIDIA: Switchyard"
+    },
+    {
+      "index": 173,
+      "section": "Kilo Gateway",
+      "label": "Nex AGI: Nex-N2.5-Pro"
+    },
+    {
+      "index": 174,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT Astra Latest ($$$$)"
+    },
+    {
+      "index": 175,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT Audio"
+    },
+    {
+      "index": 176,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT Audio Mini"
+    },
+    {
+      "index": 177,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT Chat Latest"
+    },
+    {
+      "index": 178,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT Luna Latest"
+    },
+    {
+      "index": 179,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT Mini Latest"
+    },
+    {
+      "index": 180,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT Sol Latest"
+    },
+    {
+      "index": 181,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT Terra Latest"
+    },
+    {
+      "index": 182,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-3.5 Turbo"
+    },
+    {
+      "index": 183,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-3.5 Turbo (older v0613)"
+    },
+    {
+      "index": 184,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-3.5 Turbo 16k"
+    },
+    {
+      "index": 185,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-4 ($$$$)"
+    },
+    {
+      "index": 186,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-4 Turbo ($$$$)"
+    },
+    {
+      "index": 187,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-4.1"
+    },
+    {
+      "index": 188,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-4.1 Mini"
+    },
+    {
+      "index": 189,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-4.1 Nano"
+    },
+    {
+      "index": 190,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-4o"
+    },
+    {
+      "index": 191,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-4o (2024-05-13)"
+    },
+    {
+      "index": 192,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-4o (2024-08-06)"
+    },
+    {
+      "index": 193,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-4o (2024-11-20)"
+    },
+    {
+      "index": 194,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-4o-mini"
+    },
+    {
+      "index": 195,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-4o-mini (2024-07-18)"
+    },
+    {
+      "index": 196,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5"
+    },
+    {
+      "index": 197,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5 Mini"
+    },
+    {
+      "index": 198,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5 Nano"
+    },
+    {
+      "index": 199,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5 Pro ($$$$)"
+    },
+    {
+      "index": 200,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.1"
+    },
+    {
+      "index": 201,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.1-Codex"
+    },
+    {
+      "index": 202,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.1-Codex-Max"
+    },
+    {
+      "index": 203,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.1-Codex-Mini"
+    },
+    {
+      "index": 204,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.2"
+    },
+    {
+      "index": 205,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.2 Chat"
+    },
+    {
+      "index": 206,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.2 Pro ($$$$)"
+    },
+    {
+      "index": 207,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.2-Codex"
+    },
+    {
+      "index": 208,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.3-Codex"
+    },
+    {
+      "index": 209,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.4"
+    },
+    {
+      "index": 210,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.4 Mini"
+    },
+    {
+      "index": 211,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.4 Nano"
+    },
+    {
+      "index": 212,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.4 Pro ($$$$)"
+    },
+    {
+      "index": 213,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.5"
+    },
+    {
+      "index": 214,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.5 Pro ($$$$)"
+    },
+    {
+      "index": 215,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.6 Luna"
+    },
+    {
+      "index": 216,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.6 Luna Pro"
+    },
+    {
+      "index": 217,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.6 Sol"
+    },
+    {
+      "index": 218,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.6 Sol Pro"
+    },
+    {
+      "index": 219,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.6 Terra"
+    },
+    {
+      "index": 220,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-5.6 Terra Pro"
+    },
+    {
+      "index": 221,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-6 Astra ($$$$)"
+    },
+    {
+      "index": 222,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-6 Astra Pro ($$$$)"
+    },
+    {
+      "index": 223,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-6 Luna"
+    },
+    {
+      "index": 224,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-6 Luna Pro"
+    },
+    {
+      "index": 225,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-6 Sol"
+    },
+    {
+      "index": 226,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-6 Sol Pro"
+    },
+    {
+      "index": 227,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: GPT-6.1 Sol Pro"
+    },
+    {
+      "index": 228,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: gpt-oss-120b"
+    },
+    {
+      "index": 229,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: gpt-oss-20b"
+    },
+    {
+      "index": 230,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: gpt-oss-safeguard-20b"
+    },
+    {
+      "index": 231,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: o1 ($$$$)"
+    },
+    {
+      "index": 232,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: o3"
+    },
+    {
+      "index": 233,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: o3 Mini"
+    },
+    {
+      "index": 234,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: o3 Mini High"
+    },
+    {
+      "index": 235,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: o3 Pro ($$$$)"
+    },
+    {
+      "index": 236,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: o4 Mini"
+    },
+    {
+      "index": 237,
+      "section": "Kilo Gateway",
+      "label": "OpenAI: o4 Mini High"
+    },
+    {
+      "index": 238,
+      "section": "Kilo Gateway",
+      "label": "OpenRouter Auto Router"
+    },
+    {
+      "index": 239,
+      "section": "Kilo Gateway",
+      "label": "OpenRouter Auto Router (Beta)"
+    },
+    {
+      "index": 240,
+      "section": "Kilo Gateway",
+      "label": "OpenRouter Body Builder (beta)"
+    },
+    {
+      "index": 241,
+      "section": "Kilo Gateway",
+      "label": "OpenRouter Pareto Code Router"
+    },
+    {
+      "index": 242,
+      "section": "Kilo Gateway",
+      "label": "OpenRouter: Fusion"
+    },
+    {
+      "index": 243,
+      "section": "Kilo Gateway",
+      "label": "Pareto"
+    },
+    {
+      "index": 244,
+      "section": "Kilo Gateway",
+      "label": "Pareto 26.10 Preview"
+    },
+    {
+      "index": 245,
+      "section": "Kilo Gateway",
+      "label": "Perceptron: Perceptron Mk1.5"
+    },
+    {
+      "index": 246,
+      "section": "Kilo Gateway",
+      "label": "PrismML: Ternary Bonsai 2 27B"
+    },
+    {
+      "index": 247,
+      "section": "Kilo Gateway",
+      "label": "Qwen2.5 72B Instruct"
+    },
+    {
+      "index": 248,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen-Plus"
+    },
+    {
+      "index": 249,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen2.5 7B Instruct"
+    },
+    {
+      "index": 250,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3 14B"
+    },
+    {
+      "index": 251,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3 235B A22B Instruct 2507"
+    },
+    {
+      "index": 252,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3 235B A22B Thinking 2507"
+    },
+    {
+      "index": 253,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3 30B A3B"
+    },
+    {
+      "index": 254,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3 30B A3B Instruct 2507"
+    },
+    {
+      "index": 255,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3 32B"
+    },
+    {
+      "index": 256,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3 Coder 30B A3B Instruct"
+    },
+    {
+      "index": 257,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3 Coder 480B A35B"
+    },
+    {
+      "index": 258,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3 Coder Flash"
+    },
+    {
+      "index": 259,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3 Coder Next"
+    },
+    {
+      "index": 260,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3 Next 80B A3B Instruct"
+    },
+    {
+      "index": 261,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3 Next 80B A3B Thinking"
+    },
+    {
+      "index": 262,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3 VL 235B A22B Instruct"
+    },
+    {
+      "index": 263,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3 VL 30B A3B Instruct"
+    },
+    {
+      "index": 264,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3 VL 30B A3B Thinking"
+    },
+    {
+      "index": 265,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3 VL 8B Instruct"
+    },
+    {
+      "index": 266,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.5 397B A17B"
+    },
+    {
+      "index": 267,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.5 Plus 2026-02-15"
+    },
+    {
+      "index": 268,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.5 Plus 2026-04-20"
+    },
+    {
+      "index": 269,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.5-122B-A10B"
+    },
+    {
+      "index": 270,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.5-27B"
+    },
+    {
+      "index": 271,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.5-35B-A3B"
+    },
+    {
+      "index": 272,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.5-9B (retires Oct 21)"
+    },
+    {
+      "index": 273,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.5-Flash"
+    },
+    {
+      "index": 274,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.6 27B"
+    },
+    {
+      "index": 275,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.6 35B A3B"
+    },
+    {
+      "index": 276,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.6 Flash"
+    },
+    {
+      "index": 277,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.6 Plus"
+    },
+    {
+      "index": 278,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.7 Flash"
+    },
+    {
+      "index": 279,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.7 Max"
+    },
+    {
+      "index": 280,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.7 Plus"
+    },
+    {
+      "index": 281,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.8 2.4T A95B"
+    },
+    {
+      "index": 282,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.8 27B"
+    },
+    {
+      "index": 283,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.8 Flash"
+    },
+    {
+      "index": 284,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.8 Max (0902)"
+    },
+    {
+      "index": 285,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.8 Max Prime"
+    },
+    {
+      "index": 286,
+      "section": "Kilo Gateway",
+      "label": "Qwen: Qwen3.8 Omni Flash"
+    },
+    {
+      "index": 287,
+      "section": "Kilo Gateway",
+      "label": "Reka Edge"
+    },
+    {
+      "index": 288,
+      "section": "Kilo Gateway",
+      "label": "Relace: Relace Search"
+    },
+    {
+      "index": 289,
+      "section": "Kilo Gateway",
+      "label": "Sakana: Fugu Max"
+    },
+    {
+      "index": 290,
+      "section": "Kilo Gateway",
+      "label": "Sakana: Fugu Ultra"
+    },
+    {
+      "index": 291,
+      "section": "Kilo Gateway",
+      "label": "Sakana: Fugu Ultra v2"
+    },
+    {
+      "index": 292,
+      "section": "Kilo Gateway",
+      "label": "SpaceXAI: Grok 4.20"
+    },
+    {
+      "index": 293,
+      "section": "Kilo Gateway",
+      "label": "SpaceXAI: Grok 4.3"
+    },
+    {
+      "index": 294,
+      "section": "Kilo Gateway",
+      "label": "SpaceXAI: Grok 4.5"
+    },
+    {
+      "index": 295,
+      "section": "Kilo Gateway",
+      "label": "SpaceXAI: Grok 4.6"
+    },
+    {
+      "index": 296,
+      "section": "Kilo Gateway",
+      "label": "SpaceXAI: Grok 4.7"
+    },
+    {
+      "index": 297,
+      "section": "Kilo Gateway",
+      "label": "SpaceXAI: Grok Build 0.1"
+    },
+    {
+      "index": 298,
+      "section": "Kilo Gateway",
+      "label": "StepFun: Step 3.5 Flash"
+    },
+    {
+      "index": 299,
+      "section": "Kilo Gateway",
+      "label": "StepFun: Step 3.7 Flash"
+    },
+    {
+      "index": 300,
+      "section": "Kilo Gateway",
+      "label": "StepFun: Step 5 Preview"
+    },
+    {
+      "index": 301,
+      "section": "Kilo Gateway",
+      "label": "Tencent: Hy3"
+    },
+    {
+      "index": 302,
+      "section": "Kilo Gateway",
+      "label": "Tencent: Hy3 preview"
+    },
+    {
+      "index": 303,
+      "section": "Kilo Gateway",
+      "label": "Tencent: Hy4 preview"
+    },
+    {
+      "index": 304,
+      "section": "Kilo Gateway",
+      "label": "Thinking Machines: Inkling"
+    },
+    {
+      "index": 305,
+      "section": "Kilo Gateway",
+      "label": "Thinking Machines: Inkling Small"
+    },
+    {
+      "index": 306,
+      "section": "Kilo Gateway",
+      "label": "TypeSafe: Jev Router"
+    },
+    {
+      "index": 307,
+      "section": "Kilo Gateway",
+      "label": "Upstage: Solar Mini 4"
+    },
+    {
+      "index": 308,
+      "section": "Kilo Gateway",
+      "label": "Upstage: Solar Pro 3"
+    },
+    {
+      "index": 309,
+      "section": "Kilo Gateway",
+      "label": "Upstage: Solar Pro 4"
+    },
+    {
+      "index": 310,
+      "section": "Kilo Gateway",
+      "label": "Xiaomi: MiMo-V2.5 (retires Oct 21)"
+    },
+    {
+      "index": 311,
+      "section": "Kilo Gateway",
+      "label": "Xiaomi: MiMo-V2.5-Pro (retires Oct 21)"
+    },
+    {
+      "index": 312,
+      "section": "Kilo Gateway",
+      "label": "Xiaomi: MiMo-V2.6-Flash"
+    },
+    {
+      "index": 313,
+      "section": "Kilo Gateway",
+      "label": "Xiaomi: MiMo-V2.6-Pro"
+    },
+    {
+      "index": 314,
+      "section": "Kilo Gateway",
+      "label": "Xiaomi: MiMo-V2.6-Pro-UltraSpeed"
+    },
+    {
+      "index": 315,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM 4.5"
+    },
+    {
+      "index": 316,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM 4.5 Air"
+    },
+    {
+      "index": 317,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM 4.5V"
+    },
+    {
+      "index": 318,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM 4.6"
+    },
+    {
+      "index": 319,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM 4.6V"
+    },
+    {
+      "index": 320,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM 4.7"
+    },
+    {
+      "index": 321,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM 4.7 Flash"
+    },
+    {
+      "index": 322,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM 5"
+    },
+    {
+      "index": 323,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM 5 Turbo"
+    },
+    {
+      "index": 324,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM 5.1"
+    },
+    {
+      "index": 325,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM 5.2"
+    },
+    {
+      "index": 326,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM 5.3"
+    },
+    {
+      "index": 327,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM 5.3 FlashX"
+    },
+    {
+      "index": 328,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM 5.3 Prime"
+    },
+    {
+      "index": 329,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM 5V Turbo"
+    },
+    {
+      "index": 330,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM Flash Latest"
+    },
+    {
+      "index": 331,
+      "section": "Kilo Gateway",
+      "label": "Z.ai: GLM Latest"
+    },
+    {
+      "index": 332,
+      "section": "Kilo Gateway",
+      "label": "inclusionAI: Ling 3.0 Flash"
+    },
+    {
+      "index": 333,
+      "section": "Kilo Gateway",
+      "label": "inclusionAI: Ling 3.0 Flash VL"
+    },
+    {
+      "index": 334,
+      "section": "Kilo Gateway",
+      "label": "xAI: Grok Latest"
+    }
+  ],
+  "omitted": "The 7 Recent rows are this machine's selection history and are omitted; their section count and the exclusivity finding remain. Indexes are the picker positions."
+}

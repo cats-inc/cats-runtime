@@ -1,36 +1,47 @@
 # Devin Catalog Refresh
 
-Use the operator's selected combinations and retained mappings first. Current model values and
-the observed transport behavior belong in the
-[Devin evidence note](../../../../docs/research/2026-09-18-devin-shortlist.md).
-The shortlist and ACP execution path are already implemented; an ordinary model refresh should
-reuse them instead of repeating the original adapter investigation.
+The scope is every Devin family except the fusion family and the legacy `MODEL_*` UIDs, as recorded
+in `docs/research/2026-10-14-shortlists-to-full.md`; the earlier shortlist and the ACP transport
+investigation are in the [Devin evidence note](../../../../docs/research/2026-09-18-devin-shortlist.md).
 
-## Resolve only missing executable mappings
+## Read the list
 
-- Distinguish a model family from its executable variant `model_uid`. Fixed effort is encoded in
-  the observed variant UID; a family slug alone loses that choice. Do not construct a UID by
-  concatenating a model name and effort without evidence of the mapping.
-- The verified read-only enumeration is `devin models list --format json`. When fresh mapping
-  evidence is needed, parse the output in-process and retain only the selected families' public
-  IDs, labels and relevant variants before returning it to the agent. The full enumeration is
-  verbose enough to truncate tool output. Inspect output shape before assuming a JSON schema.
-- Enumeration resolves IDs; it does not expand the approved shortlist or override the operator's
-  visible names, efforts or default claims. Unselected variants remain mapping evidence. An
-  enumeration label containing Thinking does not authorize another UI control or suffix.
-- `devin help acp` was verified to exit after showing help. Do not assume `devin acp --help` is
-  harmless: older builds can enter the ACP server. Reuse retained help evidence where sufficient;
-  bound any necessary invocation without creating a session or sending a prompt.
+- The verified read-only enumeration is `devin models list --format json` (the probe's Devin
+  source). Parse the output in-process; it is verbose enough to truncate tool output. Its fields
+  are family (`family_uid`, `family_label`, `slug`, `aliases`) and variant (`model_uid`, `label`,
+  costs, token limits, `is_new`, `is_beta`); it has no default, hidden or order field.
+- `devin help acp` exits after showing help. Do not run `devin acp --help`: older builds enter the
+  ACP server. A family slug passed as `--model` resolves to a variant Devin chooses, so always use
+  exact UIDs.
+- The interactive picker needs a trusted directory; in an untrusted one it asks first, and the
+  answer is the operator's.
 
+## Families as controls
+
+A variant UID is the family base plus an effort (`none`, `minimal`, `low`, `medium`, `high`,
+`xhigh`, `max`) and modifiers. In 3000.11.3 every family was the full product of its efforts and its
+speed form, so one entry per family has:
+
+- `devin.effort` (Reasoning Effort) with the list's labels (No Thinking, XHigh and so on), in the
+  list's order, the first value starting a selection without a default claim;
+- `devin.speed` (Speed: Standard, Fast) where the family has `fast` (Claude) or `priority` (GPT)
+  variants; both read Fast in the list;
+- separate entries for the `1m` and `thinking` forms, named as the list names them.
+
+Some bare UIDs carry an effort only in their label (`glm-5-2` is High); read it from the label.
+`scripts/catalog-scope-entries.mjs --snapshot <probe snapshot> --provider devin --exclude-family fusion --exclude-id '^MODEL_' --write <yaml>`
+builds the entries and fails on any family that is not a full product. The probe acknowledges the
+excluded rows with `subjectPattern` entries.
 
 ## Schema-2 execution data
 
-Use provider `devin`, backend `agent`, transport `acp_stdio`. The empty CLI scope is intentional. Store the observed executable variant UID in `execution.model`; ACP sets it after session/new or session/load and permission pinning, before prompt. No separate effort control is implied.
+Use provider `devin`, backend `agent`, transport `acp_stdio`. The empty CLI scope is intentional.
+Store the exact UIDs in `execution.model` and `execution.variants`; the `devin.*` controls only
+choose one. ACP sets it after session/new or session/load and permission pinning, before prompt.
 
 Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
 Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.
-There are no independent Runtime, Playground or Desktop model tables to update. Existing generic
-bindings require no repeated implementation authorization; a new unsupported binding is a separate
-code change. Validate labels, ordered values, defaults, custom input, and actual emitted bindings.
-Discovery tests must explicitly use a `selection_mode: discovery` scope before constructing the
-service. `catalogs: []` inherits factory; `models: []` empties a full/shortlist scope.
+There are no independent Runtime, Playground or Desktop model tables to update. Validate labels,
+ordered values, defaults, custom input, and actual emitted bindings. Discovery tests must
+explicitly use a `selection_mode: discovery` scope before constructing the service.
+`catalogs: []` inherits factory; `models: []` empties a full scope.

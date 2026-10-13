@@ -1,3 +1,6 @@
+> Superseded on 2026-10-14 by the [full kilo gateway list](./2026-10-14-shortlists-to-full.md#kilo-cli-788-kilo-327-rows).
+> Every gateway model now offers its Variant menu, in the picker's Recommended-then-gateway order.
+
 # Kilo Code 7.7.3 shortlist
 
 Last updated: 2026-09-18.

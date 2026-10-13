@@ -73,7 +73,7 @@ The retry is noted on the scope; only a second degraded answer asks you to sign 
 | cursor | `cursor-agent --list-models` | family | family slug only | none needed so far |
 | copilot | `list-copilot-models.mjs` (`models.list`) | partial | label, efforts | `--headless --stdio --no-auto-update`, no `COPILOT_*` |
 | opencode | `opencode models <basis channel> --verbose --pure` | complete | label | `OPENCODE_DISABLE_AUTOUPDATE=true` |
-| kilo | `kilo models <basis channel> --verbose --pure` (gateway, not picker) | partial | IDs | `--pure` |
+| kilo | `kilo models <basis channel> --verbose --pure` (the gateway list, which is the scope) | complete | label | `--pure` |
 | goose | `goose --version` | none | version only | `GOOSE_PATH_ROOT` in a temporary directory |
 | pi | `extract-pi-models.mjs` on the installed package | complete | thinking levels, default | never `pi --list-models` |
 | auggie | `auggie model list --json` | complete | label; `registryAvailable: false` is degraded | no `AUGMENT_*`/`AUGGIE_*` |
@@ -87,7 +87,7 @@ Membership values:
 - **complete:** the source lists what the picker offers. An extra row is a new candidate in a
   full scope; a missing entry is absent.
 - **partial:** the source is known to differ from the picker and can omit its rows: Copilot omits
-  every Gemini row, and Kilo's gateway list lacks the picker's routing rows.
+  every Gemini row.
 - **superset:** static data that can list more than the picker. Extra rows are notes only.
 - **family:** only model families, not the parameterized variant. Cursor's legacy slug
   `gpt-5.6-sol-high-fast` proves the `gpt-5.6-sol` family is listed, not that the catalog's
@@ -141,6 +141,10 @@ runs stay clean:
 - An entry matches one finding by scope, `kind` and `subject`, plus `field` and `observed` when
   given. Pin `observed` for a drift so a later different value reopens it. Acknowledgements do
   not expire with the CLI version: every CLI updates often, and a structural source gap stays.
+- Use `subjectPattern`, a regular expression, instead of `subject` for a whole class the operator
+  left out or a source cannot show, such as Devin's `^fusion-` and `^MODEL_` rows or the Cursor
+  families its legacy slugs name differently. Keep the pattern as narrow as the decision, and
+  avoid backslashes (`[[]` matches `[`): shells and some agent tools rewrite them.
 - An acknowledged `absent-from-source` on a partial source can never show that row's real
   withdrawal. Only a picker capture can.
 - An unused entry is reported stale only after its exact provider/backend/transport scope
