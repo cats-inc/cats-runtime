@@ -252,7 +252,7 @@ describe('shared playground selection helpers', () => {
     }
   });
 
-  it('renders Kiro per-model effort in picker order, starting at the first value, and none for auto', () => {
+  it('renders Kiro per-model effort in picker order, starting at each row\'s V3 default, and none for auto', () => {
     const catsUI = createCatsUI();
     const target = { providerName: 'kiro', backend: 'cli' as const,
       instanceId: 'native', defaultTarget: true };
@@ -274,21 +274,21 @@ describe('shared playground selection helpers', () => {
     // No default is declared, so the UI initializes the first picker row (auto).
     expect(catsUI.normalizePlaygroundAgentSelection({ provider: 'kiro', selectableProviders: ['kiro'],
       providerOrder: ['kiro'], advancedCatalogs: { kiro: catalog } }).modelSelection.entryId).toBe('auto');
-    const firstValues: Record<string, string | null> = {};
+    const selectedValues: Record<string, string | null> = {};
+    const orders: Record<string, string[]> = {};
     for (const entry of catalog.entries) {
       context.entryId = entry.id;
       vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
-      expect(controls.innerHTML).not.toMatch(/default/i);
-      const options = [...controls.innerHTML.matchAll(/<option value="([^"]+)"[^>]*>([^<]+)<\/option>/g)]
+      const options = [...controls.innerHTML.matchAll(/<option value="([^"]+)"([^>]*)>/g)]
         .map((match) => [match[1], match[2]]);
-      if (options.length) {
-        const [value, label] = options[0];
-        expect(controls.innerHTML).toContain(`<option value="${value}" selected>${label}</option>`);
-      }
-      firstValues[entry.id] = options[0]?.[0] ?? null;
+      orders[entry.id] = options.map(([value]) => value);
+      selectedValues[entry.id] = options.find(([, attributes]) => / selected/.test(attributes))?.[0] ?? null;
     }
-    expect(firstValues).toMatchObject({ auto: null, 'claude-opus-5.5': 'low', 'claude-sonnet-5.5': 'low', 'gpt-5.6-sol': 'none',
-      'claude-sonnet-4.6': 'low', 'claude-haiku-4.5': null, 'qwen3-coder-next': null });
+    // Each effort row starts at the defaultEffortLevel Kiro 2.30.0 reports; rows without effort render no menu.
+    expect(selectedValues).toMatchObject({ auto: null, 'claude-opus-5.5': 'medium', 'claude-sonnet-5.5': 'high',
+      'gpt-5.6-sol': 'high', 'claude-opus-4.7': 'xhigh', 'claude-sonnet-4.6': 'high', 'claude-haiku-4.5': null, 'qwen3-coder-next': null });
+    expect(orders['gpt-5.6-sol']).toEqual(['none', 'low', 'medium', 'high', 'xhigh', 'max']);
+    expect(orders['claude-sonnet-4.6']).toEqual(['low', 'medium', 'high', 'max']);
     expect(catsUI.normalizePlaygroundAgentSelection({
       provider: 'kiro', modelSelection: { entryId: 'claude-opus-5.5', entryMode: 'explicit',
         controls: { 'kiro.reasoning_effort': 'xhigh' } },

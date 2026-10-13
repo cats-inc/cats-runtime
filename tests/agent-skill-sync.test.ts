@@ -388,7 +388,9 @@ describe('repository-maintenance skill sync', () => {
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
   });
 
-  it('runs the catalog probe behavior suite', () => {
+  // The Kiro ACP reader test spawns a fake ACP server four times, so the suite
+  // runs past vitest's default budget on a slow CI host.
+  it('runs the catalog probe behavior suite', { timeout: 30_000 }, () => {
     const result = spawnSync(process.execPath, [
       '--test',
       join(

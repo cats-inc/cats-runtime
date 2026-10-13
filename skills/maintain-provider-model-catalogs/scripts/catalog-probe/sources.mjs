@@ -13,6 +13,7 @@ import { readJunieModelIds, defaultJunieDataDir } from '../junie-model-ids.mjs';
 import { listCopilotModels } from '../list-copilot-models.mjs';
 import { redactVisibleText, stripTerminalPresentation } from '../normalize-picker-paste.mjs';
 import { parseVerboseModels } from '../project-opencode-models.mjs';
+import { KIRO_ACP_ARGS, KiroAcpError, readKiroModelOptions } from './kiro-acp.mjs';
 import { cleanEnv, findExecutable, isPermissionDenied, launchSpec, npmPackageDir, readPackageVersion, runCommand } from './process.mjs';
 
 const VERSION_PATTERN = /\b\d+(?:\.\d+)+(?:-[0-9A-Za-z.]+)?\b/;
@@ -745,14 +746,41 @@ export const SOURCES = [
   {
     ...SCOPE('kiro'),
     sourceClass: 'machine-readable',
-    command: 'kiro-cli chat --list-models --format json-pretty',
-    coverage: { membership: 'complete' },
+    command: 'kiro-cli chat --list-models --format json-pretty; kiro-cli acp --agent-engine v3 (initialize, session/new, session/delete)',
+    coverage: { membership: 'complete', efforts: 'kiro.reasoning_effort', effortDefault: true },
     async probe(ctx) {
       const extra = ctx.env().LOCALAPPDATA ? [join(ctx.env().LOCALAPPDATA, 'Kiro-Cli')] : [];
       const executable = locate(ctx, 'kiro-cli', extra);
       const env = ctx.env({ dropPrefixes: ['KIRO_', 'JSC_'], drop: ['AWS_EXECUTION_ENV'] });
       const result = await runOrFail(ctx, executable, ['chat', '--list-models', '--format', 'json-pretty'], { what: '`kiro-cli chat --list-models`', env });
-      return { cliVersion: await versionFromFlag(ctx, executable, ['--version'], env), versionSource: '--version', models: parseKiroListModels(result.stdout) };
+      const listed = parseKiroListModels(result.stdout);
+      // Effort levels and defaults exist only in the V3 engine's session config; the reader
+      // creates one empty session in the probe's private directory and deletes it again.
+      const spec = launchSpec(executable, KIRO_ACP_ARGS);
+      let options;
+      try {
+        options = await readKiroModelOptions({ command: spec.command, args: spec.args, env, cwd: ctx.workDir, timeoutMs: ctx.timeoutMs });
+      } catch (error) {
+        if (error instanceof KiroAcpError) throw new SourceFailure(error.status, error.reason, error.message);
+        throw error;
+      }
+      const byId = new Map(options.rows.map((row) => [row.id, row]));
+      const models = listed.map((row) => {
+        const option = byId.get(row.id);
+        if (!option) return row;
+        return withEvidence(
+          { id: row.id, label: row.label, efforts: option.efforts, effortDefault: option.effortDefault },
+          { ...row.evidence, ...option.evidence },
+        );
+      });
+      for (const row of options.rows) if (!byId.has(row.id) || !listed.some((entry) => entry.id === row.id)) models.push(row);
+      return {
+        cliVersion: await versionFromFlag(ctx, executable, ['--version'], env),
+        versionSource: '--version',
+        models,
+        sourceEvidence: { acpProbeSessionDeleted: options.sessionDeleted },
+        ...(options.sessionDeleted ? {} : { notes: [`The ACP probe session ${options.sessionId ?? ''} could not be deleted; remove it with kiro-cli chat --delete-session.`] }),
+      };
     },
   },
   {

@@ -1,67 +1,52 @@
 # Kiro catalog refresh
 
 Kiro is a full-catalog provider. Current choices and evidence belong in the
-[Kiro picker capture](../../../../docs/research/2026-09-27-kiro-picker-full-catalog.md). The
-earlier [shortlist note](../../../../docs/research/2026-09-18-kiro-shortlist.md) is superseded.
-Do not copy its model values into this reference.
+[V3 catalog refresh](../../../../docs/research/2026-10-13-kiro-v3-catalog-refresh.md); the
+[2.24.1 picker capture](../../../../docs/research/2026-09-27-kiro-picker-full-catalog.md) records
+the settings-panel rings the V3 data agreed with, and the earlier
+[shortlist note](../../../../docs/research/2026-09-18-kiro-shortlist.md) is superseded. Do not copy
+their model values into this reference.
 
 ## Bounded evidence
 
 - **Enumeration:** `kiro-cli chat --list-models --format json-pretty` gives raw `model_id`,
   description, `context_window_tokens`, credit rate and `default_model`. It needs no chat or
-  inference. Use it to check picker IDs and order. It is not effort evidence, and its
-  `default_model` (plain output: `* = default`) is not a catalog default.
-- **Picker:** in interactive `kiro-cli chat`, type `/model`, wait for the echo, then press Enter to
-  run the slash command. On Windows, `Capture-KiroPicker.ps1` and `Restore-KiroPickerConfig.ps1`
-  implement the traversal and settings restore below; see the Windows Kiro helper in
-  [interactive capture](../interactive-capture.md). The list shows raw IDs, credit rate and
-  description. Rows scroll 8 at a time with a `(+N more)` counter; read every row while
-  highlighted.
-  - `[active]` marks the current selection only.
-  - Below the list, a per-model panel shows `thinking` and `effort`. Its header is
-    `Settings for selected model: <id>` on auto and `Settings for model: <id>` elsewhere.
-  - Tab switches between the list and the panel. In the panel, Up/Down pick the row and ←→ cycle
-    its value. Enter in the list selects the model; never send it.
-  - From 2.27.1 the panel also has a `fallback` row (another model to answer when this one
-    refuses or is unavailable). Tab lands on it, and while it is highlighted the footer reads like
-    the list's (`↵ to select`), so tell the focused side by the highlight, not the footer. Never
-    send Enter or ←→ on it.
-- **Toggles persist immediately, without Enter.** Each ←→ rewrites `~/.kiro/settings/cli.json`
-  `chat.modelDefaults.<id>`.
-  - Hash and privately back up that file before the first toggle. Cycle every ring back to its
-    starting value.
-  - After the owned Kiro exits, confirm that no other writer changed the file since the last
-    toggle, then restore the backup byte for byte and compare hashes.
-  - If the file changed concurrently, stop and ask instead of overwriting.
-- **Reading the ring:**
-  - An unset row shows `default`, which leaves the ring on the first Right and never returns. It
-    is the unset state, not a value or a default marker.
-  - Derive linear order from the wrap point: `max` wraps to the lowest value.
-  - Values differ per model; never copy one row's ring to another.
-  - A value shown without a saved setting (for example `xhigh` or `high`) carries no default
-    marker; do not declare it.
-- **Thinking:** some Claude rows also toggle thinking on/off, and off makes effort n/a.
-  `kiro-cli chat --help` has no thinking argument, so record it in notes only unless the CLI later
-  gains one.
+  inference. Use it to check IDs and order. It is not effort evidence, and its `default_model`
+  (plain output: `* = default`) is not a catalog default.
+- **Effort levels, defaults and thinking:** the V3 engine lists every model with
+  `effortLevels`, `defaultEffortLevel`, `thinkingToggleable` and `defaultThinkingEnabled` in the
+  ACP `config_option_update` it sends while creating a session. The
+  [catalog probe](../catalog-probe.md) reads it through `kiro-cli acp --agent-engine v3
+  --auth-method cli`: `initialize`, `session/new` in the probe's private directory, then
+  `session/delete`. No prompt is sent and no credits are spent; the session exists only for that
+  exchange. The session-free `_kiro/config/template` reply omits the model option on 2.30.0, which
+  is why a session is needed. Headless `--output-format stream-json` runs carry the same update,
+  so a real turn's capture (for example in `docs/research/fixtures/kiro-2.30.0/`) is equal
+  evidence.
+- **Display names:** the V3 option carries a display name per row (`Claude Opus 5.5`). Labels stay
+  the raw IDs until the V3 picker is captured; keep the names in evidence only.
+- **No picker capture is needed.** The interactive `/model` picker and its settings panel were the
+  evidence path for 2.24.1 and 2.27.1; the V3 data lists the same rows and rings. The capture
+  and settings-restore helpers were removed with the move to V3.
 - **Help is global text.** `--effort <EFFORT>` lists example values, not per-model availability.
   `--list-models` accepts any `--effort` string, so it cannot validate tokens. A real turn would
   consume credits and needs separate authorization.
-- **Windows capture:** clear inherited `KIRO_*`, `AWS_EXECUTION_ENV` and `JSC_*` variables when
-  an agent running inside Kiro launches the capture instance. Kiro 2.24.1 then started normally in
-  Windows Terminal; no Defender detection occurred.
+- **Windows:** clear inherited `KIRO_*`, `AWS_EXECUTION_ENV` and `JSC_*` variables when an agent
+  running inside Kiro launches the probe; the probe does this itself.
 
 ## Schema-2 execution data
 
-- `id`, `label` and `execution.model` are the verbatim picker IDs, including the `auto` routing
-  row, in picker order. Add a separate label only if the picker shows a display name.
-- Give each effort-bearing row its own `kiro.reasoning_effort` enum `controls`, with only its
-  observed values. Rows showing effort n/a use `controls: []`. Add `default` only when the picker
-  marks one.
-- With no default, Desktop, Playground and runtime resolution start at the first value. The
-  adapter sends it as `--effort`, which overrides Kiro's saved `chat.modelDefaults`. Do not add a
-  fabricated "default" option to preserve Kiro's setting.
-- Without a model default, the advanced projection's `defaultSelection` is the generic first row
-  with no controls. That is initialization, not a default claim.
+- `id`, `label` and `execution.model` are the verbatim model IDs, including the `auto` routing
+  row, in list order.
+- Give each row with `hasEffort` its own `kiro.reasoning_effort` enum `controls`, with exactly its
+  `effortLevels` in order, and its `defaultEffortLevel` as the control's `default`. Rows without
+  effort use `controls: []`. The defaults were adopted on 2026-10-13; Kiro states them per model,
+  so they are evidence, not an inferred setting.
+- Selection starts at the default and always sends `--effort`, which overrides Kiro's saved
+  `chat.modelDefaults`. Do not add a fabricated "default" option to preserve Kiro's setting.
+- `auto` has no effort and no model default; the advanced projection's `defaultSelection` is the
+  first row with no controls. That is initialization, not a default claim.
+- Thinking toggles are notes only: `kiro-cli chat` has no thinking argument.
 - Context limits may come from `--list-models` `context_window_tokens`.
 - Native and WSL share this scope. That does not establish equal account entitlement: evidence
   from one platform does not prove the other's model or effort list.
@@ -69,9 +54,7 @@ Do not copy its model values into this reference.
 - To check that a row actually runs, read the model Kiro reports for the turn, not the flags sent.
   Cats runs Kiro's V3 engine headless (`--agent-engine v3 --output-format stream-json`), which
   applies `--model` and `--effort` and reports both back in its `config_option_update` and
-  `session.json`; the runtime's `reportedModels` carries that value. The same update lists every
-  model with its `effortLevels` and `defaultEffortLevel`, which is per-model effort evidence
-  without a picker capture. See
+  `session.json`; the runtime's `reportedModels` carries that value. See
   [the V3 contract](../../../../docs/research/2026-10-13-kiro-v3-headless-contract.md) and, for
   the V2 defect that is now history,
   [the engine probe](../../../../docs/research/2026-09-28-kiro-v2-ignores-model.md).
