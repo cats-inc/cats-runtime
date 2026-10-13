@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-10-13-kiro-v3-picker-capture](./2026-10-13-kiro-v3-picker-capture.md) | Kiro 2.30.0 V3 picker, agent-operated capture | Raw IDs as labels confirmed, panel cells as current values rather than defaults, changed thinking text and the removed fallback row, session cleanup, and the read-only Up/Down capture helper |
 | [2026-10-13-kiro-v3-catalog-refresh](./2026-10-13-kiro-v3-catalog-refresh.md) | Kiro 2.30.0 catalog from the V3 engine's config | 21 rows and eleven effort rings confirmed against the 2.27.1 picker, per-model effort defaults adopted, the probe's zero-credit ACP source (session/new, session/delete), display names kept as evidence, and the retired picker capture helpers |
 | [2026-10-13-kiro-v3-headless-contract](./2026-10-13-kiro-v3-headless-contract.md) | Kiro 2.30.0 V3 headless engine | stream-json frames and ACP session updates, resume by id from any directory, the V3 session store, headless permission denial, `--list-sessions`/`--delete-session`, stdin prompts, effort recording and the eight redacted captures |
 | [2026-10-04-catalog-probe-agent-workflow](./2026-10-04-catalog-probe-agent-workflow.md) | Probe-driven Antigravity refresh and compact agent handoff | Eighteen execution IDs across seven families, permission/acknowledgement fixes, 98.66% smaller handoff, capture helper and measured limits |

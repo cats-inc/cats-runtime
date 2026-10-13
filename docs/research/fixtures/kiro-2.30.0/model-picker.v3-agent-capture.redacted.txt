@@ -1,0 +1,120 @@
+Kiro CLI V3 /model picker, agent-operated capture (redacted)
+=============================================================
+
+Captured: 2026-10-13 23:23-23:33 (UTC+8)
+Version: kiro-cli-chat 2.30.0 (`kiro-cli --version`), native Windows 11, Windows Terminal
+Launch: `kiro-cli chat --agent-engine v3` in a dedicated window titled
+  `Cats Kiro V3 picker 20261013`, from an empty private directory, after clearing inherited
+  agent/terminal environment variables (names only recorded in the private log). The banner
+  read "Welcome to Kiro CLI V3!". No task or prompt submitted.
+Method: Windows UI Automation visible text (desktop-ui-automation WindowsUi.ps1); the opened
+  picker screen was checked against one window screenshot.
+Keys: `/model` + Enter (slash command) and `/quit` + Enter (exit). In the picker: Down x20,
+  Up x20 and one Escape. Enter, Tab, Left and Right were never sent in the picker.
+Settings: ~/.kiro/settings/cli.json kept its SHA-256 before every arrow key in the walk and
+  after the exit.
+Account: no email, organization or account identifier appeared on any captured screen.
+  The workspace path appears as `~\...\cwd` (it contained the user name).
+Redaction: terminal padding and banner art trimmed; no other content removed.
+
+--- /model picker, first screen ----------------------------------------------------------
+
+Default · auto · ◔ 1%
+~\...\cwd
+› /model
+Select model:   type to search
+❯ auto                 1.00x credits    [active] Models chosen by task for optimal usage and consistent quality
+  claude-opus-5.5      2.00x credits    Experimental preview of Claude Opus 5.5 model with 1M context window
+  claude-sonnet-5.5    1.30x credits    Experimental preview of Claude Sonnet 5.5 model with 1M context window
+  claude-opus-5        2.20x credits    Claude Opus 5 model with 1M context window
+  claude-sonnet-5      1.30x credits    Claude Sonnet 5 model with 1M context window
+  claude-opus-4.8      2.20x credits    Claude Opus 4.8 model with 1M context window
+  gpt-5.6-sol          4.40x credits    Experimental preview of OpenAI GPT 5.6 Sol with 1M context window
+  gpt-5.6-terra        2.20x credits    Experimental preview of OpenAI GPT 5.6 Terra with 1M context window
+(+13 more)
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Settings for selected model: auto                                                                 tab to switch panels
+  thinking  n/a  Not available for this model.
+  effort    n/a  Not available for this model.
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ esc to close · ↑↓ to navigate · ↵ to select · tab to switch panels
+
+--- a row with a thinking toggle (row 4) -------------------------------------------------
+
+› /model
+Select model:   type to search
+  auto                 1.00x credits    [active] Models chosen by task for optimal usage and consistent quality
+  claude-opus-5.5      2.00x credits    Experimental preview of Claude Opus 5.5 model with 1M context window
+  claude-sonnet-5.5    1.30x credits    Experimental preview of Claude Sonnet 5.5 model with 1M context window
+❯ claude-opus-5        2.20x credits    Claude Opus 5 model with 1M context window
+  claude-sonnet-5      1.30x credits    Claude Sonnet 5 model with 1M context window
+  claude-opus-4.8      2.20x credits    Claude Opus 4.8 model with 1M context window
+  gpt-5.6-sol          4.40x credits    Experimental preview of OpenAI GPT 5.6 Sol with 1M context window
+  gpt-5.6-terra        2.20x credits    Experimental preview of OpenAI GPT 5.6 Terra with 1M context window
+(+13 more)
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Settings for model: claude-opus-5                                                                 tab to switch panels
+  thinking  on    Shows reasoning before answering. Can improve quality, but impacts time and credits.
+  effort    high  Sets deliberation level. Higher levels help with complex tasks, but impacts time and credits.
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ esc to close · ↑↓ to navigate · ↵ to select · tab to switch panels
+
+--- last row (row 21) --------------------------------------------------------------------
+
+› /model
+Select model:   type to search
+  claude-sonnet-4.5    1.30x credits    Claude Sonnet 4.5 model
+  claude-sonnet-4      1.30x credits    [EOL] Hybrid reasoning and coding for regular use. Model reaches end of lif...
+  claude-haiku-4.5     0.40x credits    The latest Claude Haiku model
+  deepseek-3.2         0.25x credits    Experimental preview of DeepSeek V3.2
+  minimax-m2.5         0.25x credits    MiniMax M2.5 model
+  minimax-m2.1         0.15x credits    Experimental preview of MiniMax M2.1
+  glm-5                0.50x credits    GLM-5 model
+❯ qwen3-coder-next     0.05x credits    Experimental preview of Qwen3 Coder Next
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Settings for model: qwen3-coder-next                                                              tab to switch panels
+  thinking  n/a  Not available for this model.
+  effort    n/a  Not available for this model.
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ esc to close · ↑↓ to navigate · ↵ to select · tab to switch panels
+
+--- every row's settings panel (Down rows 1-21; Up rows 20-1 read the same) ------------
+
+ 1  auto               1.00x credits  thinking n/a  effort n/a
+ 2  claude-opus-5.5    2.00x credits  thinking n/a  effort xhigh
+ 3  claude-sonnet-5.5  1.30x credits  thinking n/a  effort high
+ 4  claude-opus-5      2.20x credits  thinking on   effort high
+ 5  claude-sonnet-5    1.30x credits  thinking on   effort high
+ 6  claude-opus-4.8    2.20x credits  thinking on   effort high
+ 7  gpt-5.6-sol        4.40x credits  thinking n/a  effort high
+ 8  gpt-5.6-terra      2.20x credits  thinking n/a  effort high
+ 9  gpt-5.6-luna       0.60x credits  thinking n/a  effort high
+10  claude-opus-4.7    2.20x credits  thinking on   effort xhigh
+11  claude-opus-4.6    2.20x credits  thinking on   effort high
+12  claude-sonnet-4.6  1.30x credits  thinking on   effort high
+13  claude-opus-4.5    2.20x credits  thinking n/a  effort n/a
+14  claude-sonnet-4.5  1.30x credits  thinking n/a  effort n/a
+15  claude-sonnet-4    1.30x credits  thinking n/a  effort n/a
+16  claude-haiku-4.5   0.40x credits  thinking n/a  effort n/a
+17  deepseek-3.2       0.25x credits  thinking n/a  effort n/a
+18  minimax-m2.5       0.25x credits  thinking n/a  effort n/a
+19  minimax-m2.1       0.15x credits  thinking n/a  effort n/a
+20  glm-5              0.50x credits  thinking n/a  effort n/a
+21  qwen3-coder-next   0.05x credits  thinking n/a  effort n/a
+
+Coverage: 21 rows (8 visible plus "(+13 more)", counting down to none). Down and Up visited
+the same rows in the same order, which equals `kiro-cli chat --list-models` and the ACP
+config reply in model-list.probe.redacted.json. Each row's ID, credit rate and description
+equal that reply; claude-sonnet-4's [EOL] description is truncated on screen.
+
+Labels: every row shows its raw model ID. The ACP display names (Claude Opus 5.5 and so on)
+do not appear in the picker.
+
+The panel shows each row's current value, not a default. claude-opus-5.5 shows effort xhigh
+because ~/.kiro/settings/cli.json holds chat.modelDefaults claude-opus-5.5 effort xhigh; the
+ACP defaultEffortLevel is medium. Every other effort cell equals defaultEffortLevel. Effort
+rings were not cycled (no Left/Right), so effort levels and their order come from the ACP reply.
+
+The panel has only thinking and effort rows; the 2.27.1 panel's fallback row is gone. Rows
+whose thinking is not toggleable, including claude-opus-5.5 and claude-sonnet-5.5, show
+"n/a  Not available for this model."; 2.27.1 showed "Always on for this model." for those two.
