@@ -2903,7 +2903,7 @@ backends:
     });
   });
 
-  it('GET /providers/kiro/models/advanced returns per-model effort without defaults', async () => {
+  it('GET /providers/kiro/models/advanced returns per-model effort with the V3 defaults', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/kiro/models/advanced');
       expect(response.status).toBe(200);
@@ -2916,17 +2916,21 @@ backends:
         support: { tier: 'full', advancedMetadataStatus: 'verified_manifest' },
         warnings: [],
       });
-      const values = (id: string) => (payload.entries.find((entry: { id: string }) => entry.id === id)
-        .controls ?? []).flatMap((control: { values: Array<{ value: string }> }) =>
+      const entry = (id: string) => payload.entries.find((candidate: { id: string }) => candidate.id === id);
+      const values = (id: string) => (entry(id).controls ?? []).flatMap((control: { values: Array<{ value: string }> }) =>
         control.values.map(value => value.value));
       expect(values('auto')).toEqual([]);
       expect(values('claude-haiku-4.5')).toEqual([]);
       expect(values('claude-opus-5.5')).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
       expect(values('gpt-5.6-luna')).toEqual(['none', 'low', 'medium', 'high', 'xhigh', 'max']);
       expect(values('claude-sonnet-4.6')).toEqual(['low', 'medium', 'high', 'max']);
-      expect(payload.entries.some((entry: { default?: boolean }) => entry.default)).toBe(false);
+      expect(payload.entries.some((candidate: { default?: boolean }) => candidate.default)).toBe(false);
       expect(payload.defaultSelection.controls).toBeUndefined();
-      expect(JSON.stringify(payload.entries)).not.toMatch(/\(default\)|controlDefaults/);
+      // Effort defaults are the defaultEffortLevel values Kiro 2.30.0 reports per model.
+      expect(entry('claude-opus-5.5').controlDefaults).toEqual({ 'kiro.reasoning_effort': 'medium' });
+      expect(entry('claude-opus-4.7').controlDefaults).toEqual({ 'kiro.reasoning_effort': 'xhigh' });
+      expect(entry('gpt-5.6-luna').controlDefaults).toEqual({ 'kiro.reasoning_effort': 'high' });
+      expect(entry('claude-haiku-4.5').controlDefaults).toBeUndefined();
     });
   });
 

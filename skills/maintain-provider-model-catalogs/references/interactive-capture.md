@@ -157,82 +157,13 @@ node skills/maintain-provider-model-catalogs/scripts/claude-picker-observation.m
   --capture capture-result.json --row-status row-status.json --artifact <fixture path> > observation.json
 ```
 
-## Windows Kiro helper
+## Kiro
 
-[`Capture-KiroPicker.ps1`](../scripts/Capture-KiroPicker.ps1) owns Kiro CLI picker semantics and
-takes the same platform helper path. It does not launch Kiro, type `/model` or interpret defaults.
-
-1. **Launch.** Clean the environment first (see launch hygiene above). When the agent itself runs
-   inside Kiro, that means `KIRO_*`, `AWS_EXECUTION_ENV` and `JSC_*`. Then open interactive
-   `kiro-cli chat` in a uniquely titled window with `Start-WindowsUiTerminal`, from an empty
-   private working directory.
-2. **Open the picker.** Type `/model` with `Send-WindowsUiText`, wait for the echo, and send one
-   guarded Enter to run the slash command. The picker opens with the list focused.
-3. **Check the start.** The first row must be highlighted and the search empty. Run
-   `kiro-cli chat --list-models` for `-ExpectedModelCount`.
-4. **Capture.** Pass the settings file the picker writes, normally `~/.kiro/settings/cli.json`:
-
-```powershell
-powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/scripts/Capture-KiroPicker.ps1 `
-  -UiHelperPath $desktopUiHelper -WindowTitle $captureWindowTitle `
-  -OutputDirectory $newEmptyEvidenceDirectory -ConfigPath $kiroSettings `
-  -ExpectedModelCount $listModelsCount
-```
-
-**What the helper does:**
-
-- Reads every row while it is highlighted: raw ID, credit rate, description, `[active]` and the
-  arrival value of each settings row. `-ExpectedModelCount` is checked against the visible rows
-  plus the `(+N more)` line.
-- For each `-Axes` row (default `effort,thinking`) that is not `n/a`:
-  - Tab enters the settings panel.
-  - Right cycles the value until one repeats, recording every step together with the other
-    rows' values, so `thinking` off → `effort` n/a is visible.
-  - Tab returns to the list.
-- Walks back up with Up and checks that both directions give the same order, then leaves the
-  picker open at its first row.
-- Sends only Up, Down, Right and Tab. Enter would select a model and Escape would close the
-  picker, so neither is ever sent. `Send-WindowsUiKey` has no Tab, so Tab reuses the platform
-  helper's own guards before its key primitive.
-- Screenshots: `KeyScreens` saves the first list screen and each cycled row's settings panel;
-  every step is kept as text. The JSON result records each ring as the Right-key sequence from
-  its start value. `default` is the unset state, so derive linear order from the wrap point.
-
-**Settings file.** Kiro saves every toggle immediately. The helper:
-
-1. copies the settings file into the evidence directory before the first key;
-2. records its SHA-256 in `config-state.json`;
-3. before every key, requires the file to match the last digest it observed, and stops on any
-   other change;
-4. never restores while Kiro runs.
-
-`-Axes ''` reads only the list and arrival values, with no toggles and no settings write.
-
-**After the capture:**
-
-1. Press Escape at the picker footer.
-2. Exit the owned Kiro with `/quit`.
-3. Once its window has closed, restore the file:
-
-```powershell
-powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/scripts/Restore-KiroPickerConfig.ps1 `
-  -UiHelperPath $desktopUiHelper -StatePath (Join-Path $newEmptyEvidenceDirectory 'config-state.json')
-```
-
-The restore refuses in two cases: while the capture window still exists, and when the file changed
-after the last recorded toggle (another program, or Kiro on exit). In the second case compare the
-file with the backup by hand. Otherwise it writes the backup through a same-directory temporary
-file, or removes a file that did not exist at baseline, and checks the baseline digest. A repeated
-run leaves an already restored file alone.
-
-When the capture agent runs inside Kiro CLI, measure its session with the shared
-[agent usage](#agent-usage) helper.
-
-Exercise traversal, config guards and restore without a desktop or Kiro:
-
-```powershell
-powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Test-KiroPicker.ps1
-```
+Kiro needs no picker capture: its V3 engine lists every model with effort levels, defaults and
+thinking flags, and the [catalog probe](catalog-probe.md) reads them through `kiro-cli acp`
+without sending a prompt. See the [Kiro reference](providers/kiro.md). The 2.24.1 and 2.27.1
+picker captures and their Windows helpers are history
+(`docs/research/2026-09-27-kiro-picker-full-catalog.md`).
 
 ## Windows Auggie helper
 
@@ -367,8 +298,8 @@ catalog delta, validation and limitations. The [Claude reference](providers/clau
 `docs/research/2026-09-26-claude-picker-eleven-rows.md` adds the scrolled list and row values;
 `docs/research/2026-09-30-claude-picker-sonnet-5-5.md` adds the below-window count, a moved
 alias and the row-status reader.
-The [Kiro reference](providers/kiro.md) and `docs/research/2026-09-27-kiro-picker-full-catalog.md`
-record a settings panel whose toggles persist, and its config restore. The
+The [Kiro reference](providers/kiro.md) records the V3 engine's machine-readable effort data,
+and `docs/research/2026-09-27-kiro-picker-full-catalog.md` the earlier settings-panel capture. The
 [Auggie reference](providers/auggie.md) and `docs/research/2026-09-27-auggie-picker-full-catalog.md`
 record a picker without effort and the authorized Enter probe. The
 [Copilot reference](providers/copilot.md) and `docs/research/2026-09-27-copilot-picker-full-catalog.md`
@@ -401,10 +332,11 @@ node skills/maintain-provider-model-catalogs/scripts/measure-agent-usage.mjs <ho
 - **Junie:** `~/.junie/sessions/<session>/events.jsonl`, with Junie's USD cost per call. Measure
   before ending the session. The 2026-09-26 capture's file was gone the next day, and its
   `summary.json` covered only $0.29 of the $9.68 that `events.jsonl` had recorded.
-- **Kiro CLI:** `~/.kiro/sessions/cli/<session-id>.json`, or `KIRO_SESSION_ID` from inside Kiro.
-  Kiro 2.24.1 records one credit entry per request and leaves the token fields at 0. The result
-  also lists each turn's requests, duration and context use; the turn in progress has no metadata
-  until it ends.
+- **Kiro CLI:** the V3 session directory `~/.kiro/sessions/<workspace hash>/<session-id>/` (or
+  its `messages.jsonl`), or `KIRO_SESSION_ID` from inside Kiro. Kiro 2.30.0 records one
+  `usage_summary` per turn in credits with its request ids and elapsed time, and no token counts,
+  so credits are reported per turn and phases count calls only; the turn in progress has no
+  summary until it ends.
 - **GitHub Copilot:** `~/.copilot/session-state/<session-id>/events.jsonl`, or that folder. Tokens
   and premium requests arrive per model in `session.shutdown`, once per exit (a resumed session
   has several segments, which the reader sums). Copilot 1.0.88 writes no `outputTokens` on its

@@ -1,5 +1,10 @@
 # Kiro 2.24.1 full catalog from an agent-operated picker capture
 
+> Evidence path superseded on 2026-10-13 by the
+> [V3 catalog refresh](./2026-10-13-kiro-v3-catalog-refresh.md): the V3 engine reports the same
+> rows and effort rings machine-readably, with per-model defaults, and the capture helpers
+> described here were removed. The rings recorded below remain valid evidence.
+
 Date: 2026-09-27 (UTC+8). Mode: refresh. Interaction policy: confirm uncertainty.
 Scope: the `kiro` / `cli` catalog scope, changed from a six-row shortlist to
 `selection_mode: full`, plus a new `kiro.reasoning_effort` binding that the Kiro adapter sends as

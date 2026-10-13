@@ -95,16 +95,19 @@ describe('factory and executable catalog projections', () => {
     expect(args.slice(args.indexOf('--effort'), args.indexOf('--effort') + 2)).toEqual(['--effort', 'none']);
   });
 
-  it('starts Kiro effort at each row\'s first picker value and sends --effort only where offered', () => {
+  it('starts Kiro effort at each row\'s own V3 default and sends --effort only where offered', () => {
     const kiro = knowledge(snapshot.document.catalogs.find(s => s.provider === 'kiro' && s.backend === 'cli')!);
     expect(kiro.catalog.entries).toHaveLength(21);
     expect(kiro.catalog.entries[0].id).toBe('auto');
-    // auto is [active] in the picker and default_model in --list-models; neither is a catalog default.
+    // auto is the session's current model in the V3 config and default_model in --list-models;
+    // neither is a catalog default.
     expect(kiro.catalog.entries.some(e => e.default)).toBe(false);
     // First-row initialization only: no default flag and no effort controls on auto.
     expect(kiro.catalog.defaultSelection).toEqual(expect.objectContaining({ entryId: 'auto', entryMode: 'explicit' }));
     expect(kiro.catalog.defaultSelection?.controls).toBeUndefined();
-    expect(kiro.catalog.entries.every(e => !e.controlDefaults)).toBe(true);
+    // Every effort row carries the defaultEffortLevel Kiro 2.30.0 reports for it.
+    expect(kiro.catalog.entries.filter(e => e.controls?.length).every(e => e.controlDefaults?.['kiro.reasoning_effort'])).toBe(true);
+    expect(kiro.catalog.entries.filter(e => !e.controls?.length).every(e => !e.controlDefaults)).toBe(true);
     const resolve = (entryId: string, controls?: Record<string, string>) => resolveProviderSelection(kiro,
       { entryId, entryMode: 'explicit', ...(controls ? { controls } : {}) });
     const spawn = (entryId: string, controls?: Record<string, string>) => {
@@ -113,10 +116,11 @@ describe('factory and executable catalog projections', () => {
         model: selected.execution.model, modelControls: selected.resolution.controls });
     };
     const effort = (entryId: string) => resolve(entryId).resolution.controls['kiro.reasoning_effort'];
-    expect(effort('claude-opus-5.5')).toBe('low');
-    expect(effort('claude-sonnet-5.5')).toBe('low');
-    expect(effort('claude-opus-4.6')).toBe('low');
-    expect(effort('gpt-5.6-sol')).toBe('none');
+    expect(effort('claude-opus-5.5')).toBe('medium');
+    expect(effort('claude-sonnet-5.5')).toBe('high');
+    expect(effort('claude-opus-4.7')).toBe('xhigh');
+    expect(effort('claude-opus-4.6')).toBe('high');
+    expect(effort('gpt-5.6-sol')).toBe('high');
     expect(resolve('claude-opus-4.7', { 'kiro.reasoning_effort': 'xhigh' })
       .resolution.controls['kiro.reasoning_effort']).toBe('xhigh');
     expect(() => resolve('claude-opus-4.6', { 'kiro.reasoning_effort': 'xhigh' })).toThrow();
@@ -135,7 +139,7 @@ describe('factory and executable catalog projections', () => {
     expect(spawn('claude-haiku-4.5')).not.toContain('--effort');
     const sol = spawn('gpt-5.6-sol');
     expect(sol.slice(sol.indexOf('--model'), sol.indexOf('--model') + 4))
-      .toEqual(['--model', 'gpt-5.6-sol', '--effort', 'none']);
+      .toEqual(['--model', 'gpt-5.6-sol', '--effort', 'high']);
   });
 
   it('lists the full Auggie picker with Claude Opus 5.5 as default and sends only --model', () => {

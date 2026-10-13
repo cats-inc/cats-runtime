@@ -13,7 +13,7 @@ import { parseArgs } from 'node:util';
 export const HOSTS = ['auggie', 'claude', 'codex', 'copilot', 'junie', 'kiro'];
 const TOKEN_FIELDS = ['uncachedInput', 'cacheWrite', 'cacheRead', 'output', 'reasoningOutput'];
 const MARKER_SUPPORT = {
-  at: ['auggie', 'claude', 'codex', 'copilot', 'junie'],
+  at: ['auggie', 'claude', 'codex', 'copilot', 'junie', 'kiro'],
   text: ['auggie', 'claude', 'codex', 'copilot', 'kiro'],
   turn: ['auggie', 'copilot', 'junie', 'kiro'],
 };
@@ -42,9 +42,10 @@ const HOST_NOTES = {
     'Usage comes from LlmResponseMetadataEvent entries; costUsd is as Junie reported it.',
   ],
   kiro: [
-    'Kiro 2.24.1 records one metering_usage credit entry per request and leaves token fields at 0.',
-    "A call's credits are known only when its turn's metering entries pair with its assistant messages.",
-    'The turn in progress has no metadata until it ends.',
+    "Kiro's V3 store records one usage_summary per turn, in credits, with its request ids and elapsed time; no token counts.",
+    'Credits are per turn, so calls carry none and phases report calls only; read credits from turns.',
+    'Records are the assistant messages and tool calls of each turn; the model is the session modelId.',
+    'The turn in progress has no usage_summary until it ends.',
   ],
 };
 
@@ -329,65 +330,75 @@ function readJunie(path, counters) {
   return { sources: [basename(eventsPath)], records };
 }
 
-function readKiro(path, counters) {
-  const base = path.replace(/\.jsonl?$/, '');
-  const session = JSON.parse(readFileSync(`${base}.json`, 'utf8'));
-  const metadata = session.session_state?.conversation_metadata?.user_turn_metadatas ?? [];
-  const turnMessages = [];
-  for (const { value } of readJsonLines(`${base}.jsonl`, counters)) {
-    if (value.kind === 'Prompt') {
-      turnMessages.push([]);
-    } else if (value.kind === 'AssistantMessage') {
-      if (turnMessages.length === 0) {
-        throw new Error('The transcript has an assistant message before any prompt.');
-      }
-      turnMessages.at(-1).push(collectText(value.data?.content));
-    }
+// A Kiro V3 session directory (`~/.kiro/sessions/<workspace hash>/<session id>/`), or one of
+// its two files.
+function resolveKiroSessionDir(path) {
+  if (existsSync(path) && statSync(path).isDirectory()) {
+    return path;
   }
+  return dirname(path);
+}
+
+function readKiro(path, counters) {
+  const dir = resolveKiroSessionDir(path);
+  const session = JSON.parse(readFileSync(join(dir, 'session.json'), 'utf8'));
+  const model = typeof session.modelId === 'string' ? session.modelId : null;
   const records = [];
   const turns = [];
-  for (let index = 0; index < Math.max(turnMessages.length, metadata.length); index += 1) {
-    const meta = metadata[index];
-    const messages = turnMessages[index] ?? [];
-    const metering = (meta?.metering_usage ?? []).filter(Boolean);
-    for (const entry of metering) {
-      if (entry.unit !== 'credit') {
-        throw new Error(`Unexpected metering unit '${entry.unit}'.`);
-      }
+  let current = null;
+  const requireTurn = (what) => {
+    if (!current) {
+      throw new Error(`The transcript has ${what} before any prompt.`);
     }
-    const paired = Boolean(meta) && metering.length === messages.length;
-    messages.forEach((text, position) => records.push({
-      time: null,
-      turn: index + 1,
-      model: meta?.model ?? null,
-      credits: paired ? Number(metering[position].value) : null,
-      text,
-    }));
-    if (!meta) {
-      turns.push({ turn: index + 1, recorded: false, assistantMessages: messages.length });
+    return current;
+  };
+  for (const { value } of readJsonLines(join(dir, 'messages.jsonl'), counters)) {
+    const payload = value?.payload;
+    if (!payload || typeof payload !== 'object') {
       continue;
     }
-    const tokens = {
-      input: meta.input_token_count ?? 0,
-      output: meta.output_token_count ?? 0,
-      cacheRead: meta.cache_read_input_token_count ?? 0,
-      cacheWrite: meta.cache_write_input_token_count ?? 0,
-    };
-    turns.push({
-      turn: index + 1,
-      recorded: true,
-      model: meta.model ?? null,
-      requests: meta.total_request_count ?? null,
-      assistantMessages: messages.length,
-      meteringEntries: metering.length,
-      credits: round(metering.reduce((sum, entry) => sum + Number(entry.value), 0)),
-      durationSeconds: meta.turn_duration?.secs ?? null,
-      contextUsagePercent: meta.context_usage_percentage ?? null,
-      tokensRecorded: Object.values(tokens).some((amount) => amount !== 0),
-      tokens,
-    });
+    const time = toTime(value.timestamp);
+    switch (payload.type) {
+      case 'user':
+        current = { turn: turns.length + 1, recorded: false, assistantMessages: 0, toolCalls: 0 };
+        turns.push(current);
+        break;
+      case 'assistant':
+        requireTurn('an assistant message').assistantMessages += 1;
+        records.push({ time, turn: current.turn, model, credits: null, text: collectText(payload.content) });
+        break;
+      case 'tool_call':
+        requireTurn('a tool call').toolCalls += 1;
+        records.push({ time, turn: current.turn, model, credits: null, text: collectText({ toolName: payload.toolName, args: payload.args }) });
+        break;
+      case 'usage_summary': {
+        const turn = requireTurn('a usage summary');
+        const summaries = Array.isArray(payload.promptTurnSummaries) ? payload.promptTurnSummaries : [];
+        for (const summary of summaries) {
+          if (summary?.unit !== 'credit') {
+            throw new Error(`Unexpected usage unit '${summary?.unit}'.`);
+          }
+        }
+        Object.assign(turn, {
+          recorded: true,
+          model,
+          requests: Array.isArray(payload.requestIds) ? payload.requestIds.length : null,
+          credits: round(summaries.reduce((sum, summary) => sum + Number(summary.usage ?? 0), 0)),
+          durationSeconds: typeof payload.elapsedTime === 'number' ? round(payload.elapsedTime / 1000) : null,
+          tokensRecorded: false,
+        });
+        break;
+      }
+      case 'session_metadata':
+        if (current && payload.key === 'contextUsage' && typeof payload.value?.usagePercentage === 'number') {
+          current.contextUsagePercent = payload.value.usagePercentage;
+        }
+        break;
+      default:
+        break;
+    }
   }
-  return { sources: [`${basename(base)}.json`, `${basename(base)}.jsonl`], records, turns };
+  return { sources: ['session.json', 'messages.jsonl'], records, turns };
 }
 
 const READERS = {
@@ -539,15 +550,28 @@ export function measureAgentUsage({ host, path, phaseStarts = [], phaseNames = [
   return result;
 }
 
-function defaultKiroPath() {
+// The V3 store groups sessions by a workspace hash, so the directory is found by id.
+function defaultKiroPath(sessionsRoot = join(homedir(), '.kiro', 'sessions')) {
   const sessionId = process.env.KIRO_SESSION_ID;
   if (!sessionId) {
     return null;
   }
-  if (!/^[A-Za-z0-9-]+$/.test(sessionId)) {
+  if (!/^[A-Za-z0-9_-]+$/.test(sessionId)) {
     throw new Error('KIRO_SESSION_ID contains unexpected characters.');
   }
-  return join(homedir(), '.kiro', 'sessions', 'cli', `${sessionId}.json`);
+  let groups = [];
+  try {
+    groups = readdirSync(sessionsRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory() && entry.name !== 'cli');
+  } catch {
+    groups = [];
+  }
+  for (const group of groups) {
+    const candidate = join(sessionsRoot, group.name, sessionId);
+    if (existsSync(join(candidate, 'session.json'))) {
+      return candidate;
+    }
+  }
+  throw new Error(`No Kiro V3 session ${sessionId} under ${sessionsRoot}.`);
 }
 
 function cliUsage() {
@@ -561,10 +585,10 @@ function cliUsage() {
     '  codex   ~/.codex/sessions/<yyyy>/<mm>/<dd>/rollout-*.jsonl',
     '  copilot ~/.copilot/session-state/<session-id>/events.jsonl, or the session folder',
     '  junie   ~/.junie/sessions/<session>/events.jsonl, or the session folder',
-    '  kiro    ~/.kiro/sessions/cli/<session-id>.json; defaults to KIRO_SESSION_ID',
+    '  kiro    ~/.kiro/sessions/<workspace hash>/<session-id>/ (or its messages.jsonl); defaults to KIRO_SESSION_ID',
     '',
     'Phase starts, in order; the call that matches starts the next phase:',
-    '  at:<ISO time with zone>  auggie, claude, codex, copilot, junie',
+    '  at:<ISO time with zone>  auggie, claude, codex, copilot, junie, kiro',
     "  text:<literal>           auggie, claude, codex, copilot, kiro (the agent's own messages and tool calls only)",
     '  turn:<n>                 auggie, copilot, junie, kiro',
   ].join('\n');

@@ -78,7 +78,7 @@ The retry is noted on the scope; only a second degraded answer asks you to sign 
 | pi | `extract-pi-models.mjs` on the installed package | complete | thinking levels, default | never `pi --list-models` |
 | auggie | `auggie model list --json` | complete | label; `registryAvailable: false` is degraded | no `AUGMENT_*`/`AUGGIE_*` |
 | junie | `junie-model-ids.mjs` on the installed JAR | superset | label | never starts Junie; build number, not release version |
-| kiro | `kiro-cli chat --list-models --format json-pretty` | complete | IDs | no `KIRO_*`, `JSC_*`, `AWS_EXECUTION_ENV` |
+| kiro | `kiro-cli chat --list-models --format json-pretty`, then `kiro-cli acp --agent-engine v3` (`initialize`, `session/new`, `session/delete`) | complete | IDs, efforts, effort default | no `KIRO_*`, `JSC_*`, `AWS_EXECUTION_ENV`; the one source that creates a session: an empty V3 session in the probe's private directory, deleted in the same exchange, with no prompt and no credits |
 | cline | the `@cline/llms` `dist/models.js` provider block, read as text | superset | IDs | never executes Cline, whose informational flags once started npm updates |
 | devin (agent/acp_stdio) | `devin models list --format json` | complete | variant UIDs | never `devin acp --help` |
 
@@ -221,7 +221,8 @@ support a note or a limit, but they are the source's own claim, not picker evide
 - **codex:** description, visibility, context window and maximum, effort descriptions.
 - **copilot:** context and long-context maximum, discount.
 - **kiro:** description, context window, credit rate and unit, the list's own default marker
-  (not a catalog default).
+  (not a catalog default), the V3 display name, effort schema path, thinking flags and the
+  session's current model (not a catalog default); `acpProbeSessionDeleted` as source evidence.
 - **auggie:** short name, description, cost tier, badges, `effortLevels`, the JSON `isDefault` as
   `jsonIsDefault` (only the picker `(default)` suffix is default evidence); the
   envelope's `defaultModelId` as source evidence.

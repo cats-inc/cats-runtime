@@ -3665,39 +3665,44 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Kiro
-    cli_version: 2.27.1
-    last_updated: 2026-10-03
+    cli_version: 2.30.0
+    last_updated: 2026-10-13
     notes:
-      - "Complete 21-row /model picker and per-model effort rings, captured 2026-10-03 from
-        kiro-cli 2.27.1 on native Windows 11 by operating the interactive picker (first capture
-        2026-09-27, 20 rows, kiro-cli-chat 2.24.1). Picker order and raw IDs equal kiro-cli chat
-        --list-models. Evidence: docs/research/fixtures/kiro-2.27.1/model-picker.agent-capture.redacted.txt,
-        docs/research/fixtures/kiro-2.27.1/model-list.probe.redacted.json,
-        docs/research/fixtures/kiro-2.24.1/model-picker.agent-capture.redacted.txt and
+      - "Complete 21-row model list with per-model effort levels and defaults, read 2026-10-13 from
+        kiro-cli 2.30.0 on native Windows 11 through the V3 engine's ACP config_option_update
+        (sent while creating a session; no prompt), which lists the same rows, order and effort
+        rings as the 2.27.1 interactive picker capture of 2026-10-03 (first capture 2026-09-27,
+        20 rows, kiro-cli-chat 2.24.1). Order and raw IDs equal kiro-cli chat --list-models.
+        Evidence: docs/research/fixtures/kiro-2.30.0/model-list.probe.redacted.json,
+        docs/research/2026-10-13-kiro-v3-catalog-refresh.md and, for the picker rings,
+        docs/research/fixtures/kiro-2.27.1/model-picker.agent-capture.redacted.txt and
         docs/research/2026-09-27-kiro-picker-full-catalog.md."
-      - "The picker shows only raw IDs. id, label and execution.model are those verbatim
-        strings, passed to --model. auto is a Kiro routing option kept as row 1 in picker order."
-      - "No model default is declared. The picker marks auto [active], meaning only the current
-        selection. --list-models reports default_model auto (plain output: * = default); that is
-        recorded here as reference only and is not a catalog default."
-      - "Effort tokens and labels are the settings-panel values in linear Right-key order. Only
-        the eleven rows whose panel shows effort carry kiro.reasoning_effort; rows showing effort
-        n/a have controls: []. The low/medium/high/xhigh/max list in kiro-cli chat --help is
-        global text, not per-model evidence."
-      - "No effort default is declared. Unset rows displayed default, an unset state outside the
-        ring; claude-opus-4.7 displayed xhigh and claude-opus-4.6/claude-sonnet-4.6 high, with no
-        default marker. Selections start at each row's first value (Claude low, GPT none) and
-        always send --effort, overriding chat.modelDefaults in ~/.kiro/settings/cli.json.
-        Accepted by the operator on 2026-09-27."
-      - "Claude rows with effort, except claude-opus-5.5 and claude-sonnet-5.5 (thinking Always
-        on), also show thinking on/off; off makes effort n/a. kiro-cli has no thinking argument,
-        so the adapter cannot pass it and the axis is not represented."
+      - "id, label and execution.model are the raw model IDs, passed to --model. The V3 config
+        reply also carries a display name per row (for example Claude Opus 5.5); labels stay the
+        raw IDs until the V3 picker is captured. auto is a Kiro routing option kept as row 1."
+      - "No model default is declared. The V3 config reports auto as the current model, meaning
+        only the session's selection. --list-models reports default_model auto (plain output:
+        * = default); that is recorded here as reference only and is not a catalog default."
+      - "Effort tokens are each row's effortLevels in the V3 config reply, which match the
+        settings-panel ring of the 2.27.1 capture. Only the eleven rows with hasEffort carry
+        kiro.reasoning_effort; rows without effort have controls: []. The low/medium/high/xhigh/max
+        list in kiro-cli chat --help is global text, not per-model evidence."
+      - "Effort defaults are each row's defaultEffortLevel in the V3 config reply, adopted on
+        2026-10-13 under the operator's instruction to follow best practice: claude-opus-5.5
+        medium, claude-opus-4.7 xhigh, every other effort row high. Selection starts at that
+        default and always sends --effort, which overrides chat.modelDefaults in
+        ~/.kiro/settings/cli.json. The 2.27.1 picker had shown no default marker."
+      - "The V3 config reply marks claude-opus-5, claude-sonnet-5, claude-opus-4.8, claude-opus-4.7,
+        claude-opus-4.6 and claude-sonnet-4.6 thinkingToggleable with thinking on by default;
+        claude-opus-5.5 and claude-sonnet-5.5 keep thinking always on. kiro-cli has no thinking
+        argument, so the adapter cannot pass it and the axis is not represented."
       - "Kiro 2.27.1 adds a fallback row to every model's settings panel (none on every row:
         Answers for this model when it refuses or is unavailable). It selects another model
         rather than an option of this one, and it is not represented."
       - "Context limits are --list-models context_window_tokens. Descriptions and credit rates are
-        the picker text. Captured on Windows native only: WSL shares this scope, but a WSL
-        installation and account may see different models. Custom model strings remain available."
+        the config reply text, unchanged from the picker. Read on Windows native only: WSL shares
+        this scope, but a WSL installation and account may see different models. Custom model
+        strings remain available."
     models:
       - id: auto
         label: auto
@@ -3744,6 +3749,7 @@ catalogs:
                 label: max
             semanticTags:
               - reasoning_intensity
+            default: medium
       - id: claude-sonnet-5.5
         label: claude-sonnet-5.5
         limits:
@@ -3776,6 +3782,7 @@ catalogs:
                 label: max
             semanticTags:
               - reasoning_intensity
+            default: high
       - id: claude-opus-5
         label: claude-opus-5
         capabilityTags:
@@ -3809,6 +3816,7 @@ catalogs:
                 label: max
             semanticTags:
               - reasoning_intensity
+            default: high
       - id: claude-sonnet-5
         label: claude-sonnet-5
         limits:
@@ -3840,6 +3848,7 @@ catalogs:
                 label: max
             semanticTags:
               - reasoning_intensity
+            default: high
       - id: claude-opus-4.8
         label: claude-opus-4.8
         limits:
@@ -3871,6 +3880,7 @@ catalogs:
                 label: max
             semanticTags:
               - reasoning_intensity
+            default: high
       - id: gpt-5.6-sol
         label: gpt-5.6-sol
         limits:
@@ -3904,6 +3914,7 @@ catalogs:
                 label: max
             semanticTags:
               - reasoning_intensity
+            default: high
       - id: gpt-5.6-terra
         label: gpt-5.6-terra
         limits:
@@ -3937,6 +3948,7 @@ catalogs:
                 label: max
             semanticTags:
               - reasoning_intensity
+            default: high
       - id: gpt-5.6-luna
         label: gpt-5.6-luna
         limits:
@@ -3970,6 +3982,7 @@ catalogs:
                 label: max
             semanticTags:
               - reasoning_intensity
+            default: high
       - id: claude-opus-4.7
         label: claude-opus-4.7
         limits:
@@ -4001,6 +4014,7 @@ catalogs:
                 label: max
             semanticTags:
               - reasoning_intensity
+            default: xhigh
       - id: claude-opus-4.6
         label: claude-opus-4.6
         limits:
@@ -4030,6 +4044,7 @@ catalogs:
                 label: max
             semanticTags:
               - reasoning_intensity
+            default: high
       - id: claude-sonnet-4.6
         label: claude-sonnet-4.6
         limits:
@@ -4059,6 +4074,7 @@ catalogs:
                 label: max
             semanticTags:
               - reasoning_intensity
+            default: high
       - id: claude-opus-4.5
         label: claude-opus-4.5
         limits:

@@ -237,66 +237,77 @@ test('copilot sums shutdown segments, keeps message records and flags an open ta
   assert.throws(() => measureAgentUsage({ host: 'copilot', path: join(root, 'missing') }), /does not exist/);
 }));
 
+// A Kiro 2.30.0 V3 session directory: session.json plus the messages.jsonl transcript.
 function writeKiroSession(root, sessionId) {
-  const metering = (values) => values.map((value) => ({ value, unit: 'credit', unitPlural: 'credits' }));
-  const turn = (requests, secs, context, meteringValues, inputTokens = 0) => ({
-    total_request_count: requests, turn_duration: { secs, nanos: 5 }, model: 'example-model',
-    input_token_count: inputTokens, output_token_count: 0, cache_read_input_token_count: 0,
-    cache_write_input_token_count: 0, context_usage_percentage: context, metering_usage: metering(meteringValues),
-  });
-  writeFileSync(join(root, `${sessionId}.json`), JSON.stringify({
-    session_id: sessionId,
-    session_state: { conversation_metadata: { user_turn_metadatas: [
-      turn(4, 60, 12.5, [0.5, 0.25, 1, 2]),
-      turn(3, 30, 20, [1, 1], 10),
-    ] } },
+  const dir = join(root, '0a72772e56783f0f', sessionId);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'session.json'), JSON.stringify({
+    schemaVersion: '1.0.0', id: sessionId, title: 'Capture', workspacePaths: [root], modelId: 'example-model',
   }));
-  const line = (kind, text) => ({ version: 'v1', kind, data: { content: [{ kind: 'text', data: text }] } });
-  writeLines(join(root, `${sessionId}.jsonl`), [
-    line('Prompt', `${SECRET} first request`),
-    line('AssistantMessage', 'reading the skill'),
-    line('ToolResults', `${SECRET} MARK-CAPTURE in a tool result`),
-    line('AssistantMessage', 'run MARK-CAPTURE now'),
-    line('AssistantMessage', 'still capturing'),
-    line('AssistantMessage', 'MARK-WRAP and report'),
-    line('Prompt', `${SECRET} second request`),
-    line('AssistantMessage', 'one'),
-    line('AssistantMessage', 'two'),
-    line('AssistantMessage', 'three'),
-    line('Prompt', `${SECRET} third request, still running`),
-    line('AssistantMessage', 'working'),
+  let tick = 0;
+  const at = () => `2026-01-01T00:${String(tick += 1).padStart(2, '0')}:00Z`;
+  const entry = (payload) => ({ id: `e${tick}`, timestamp: at(), payload });
+  const user = (text) => entry({ type: 'user', content: text, documents: [], images: [] });
+  const say = (text, executionId) => entry({ type: 'assistant', content: text, operationType: 'Say', executionId });
+  const tool = (args, executionId) => entry({ type: 'tool_call', toolCallId: 't1', toolName: 'execute_bash', args, status: 'approved', executionId });
+  const usage = (credits, requests, elapsedTime, executionId) => entry({
+    type: 'usage_summary', promptTurnSummaries: credits.map((usage) => ({ unit: 'credit', unitPlural: 'credits', usage })),
+    elapsedTime, status: 'success', executionId, requestIds: Array.from({ length: requests }, (_, index) => `r${index}`),
+  });
+  writeLines(join(dir, 'messages.jsonl'), [
+    entry({ type: 'agent_note', content: `${SECRET} context` }),
+    user(`${SECRET} first request`),
+    entry({ type: 'turn_start', executionId: 'x1' }),
+    say('reading the skill', 'x1'),
+    entry({ type: 'tool_result', toolCallId: 't0', content: `${SECRET} MARK-CAPTURE in a tool result`, success: true }),
+    tool({ command: 'run MARK-CAPTURE now' }, 'x1'),
+    say('still capturing', 'x1'),
+    say('MARK-WRAP and report', 'x1'),
+    entry({ type: 'session_metadata', key: 'contextUsage', value: { usagePercentage: 12.5 }, executionId: 'x1' }),
+    usage([0.5, 0.25, 1, 2], 4, 60000, 'x1'),
+    entry({ type: 'turn_end', stopReason: 'end_turn', executionId: 'x1' }),
+    entry({ type: 'session_start', agentType: 'vibe', content: `${SECRET} system prompt` }),
+    user(`${SECRET} second request`),
+    say('one', 'x2'),
+    say('two', 'x2'),
+    say('three', 'x2'),
+    usage([2], 3, 30000, 'x2'),
+    user(`${SECRET} third request, still running`),
+    say('working', 'x3'),
   ]);
-  return join(root, `${sessionId}.json`);
+  return dir;
 }
 
-test('kiro reports turn credits, pairs call credits and splits phases', () => withScratch((root) => {
-  const path = writeKiroSession(root, '00000000-1111-2222-3333-444444444444');
+test('kiro reports turn credits from the V3 store and splits phases by call', () => withScratch((root) => {
+  const dir = writeKiroSession(root, 'sess_00000000-1111-2222-3333-444444444444');
   const result = measureAgentUsage({
     host: 'kiro',
-    path,
+    path: dir,
     phaseStarts: ['text:MARK-CAPTURE', 'text:MARK-WRAP', 'turn:2', 'turn:3'],
     phaseNames: ['Prep', 'Capture', 'Wrap', 'Second', 'Running'],
   });
-  assert.deepEqual(result.turns.map((turn) => [turn.turn, turn.recorded, turn.requests, turn.credits, turn.tokensRecorded]),
-    [[1, true, 4, 3.75, false], [2, true, 3, 2, true], [3, false, undefined, undefined, undefined]]);
+  assert.deepEqual(result.turns.map((turn) => [turn.turn, turn.recorded, turn.requests, turn.credits, turn.assistantMessages, turn.toolCalls]),
+    [[1, true, 4, 3.75, 3, 1], [2, true, 3, 2, 3, 0], [3, false, undefined, undefined, 1, 0]]);
   assert.equal(result.turns[0].durationSeconds, 60);
   assert.equal(result.turns[0].contextUsagePercent, 12.5);
+  assert.equal(result.turns[0].model, 'example-model');
   assert.deepEqual(result.recordedTurnTotals, { turns: 2, requests: 7, credits: 5.75 });
+  // Credits are per turn, so every call is without credits and phases count calls only.
   assert.deepEqual(result.phases.map((phase) => [phase.phase, phase.firstCall, phase.calls, phase.credits, phase.callsWithoutCredits]), [
-    ['Prep', 1, 1, 0.5, undefined],
-    ['Capture', 2, 2, 1.25, undefined],
-    ['Wrap', 4, 1, 2, undefined],
+    ['Prep', 1, 1, 0, 1],
+    ['Capture', 2, 2, 0, 2],
+    ['Wrap', 4, 1, 0, 1],
     ['Second', 5, 3, 0, 3],
     ['Running', 8, 1, 0, 1],
   ]);
   assert.doesNotMatch(JSON.stringify(result), /SECRET|reading the skill|MARK/);
-  assert.throws(() => measureAgentUsage({ host: 'kiro', path, phaseStarts: ['text:NOT-PRESENT'] }), /was not found/);
-  assert.throws(() => measureAgentUsage({ host: 'kiro', path, phaseStarts: ['at:2026-01-01T00:00:00Z'] }),
-    /does not support at: phase starts/);
+  assert.equal(measureAgentUsage({ host: 'kiro', path: join(dir, 'messages.jsonl') }).turns.length, 3);
+  assert.equal(measureAgentUsage({ host: 'kiro', path: dir, phaseStarts: ['at:2026-01-01T00:13:00Z'] }).phases[1].firstCall, 5);
+  assert.throws(() => measureAgentUsage({ host: 'kiro', path: dir, phaseStarts: ['text:NOT-PRESENT'] }), /was not found/);
 }));
 
 test('rejects malformed phase starts and unpaired names', () => withScratch((root) => {
-  const path = writeKiroSession(root, 'session');
+  const path = writeKiroSession(root, 'sess_session');
   assert.throws(() => measureAgentUsage({ host: 'kiro', path, phaseStarts: ['text:MARK-CAPTURE'], phaseNames: ['only'] }),
     /one more --phase-name/);
   assert.throws(() => measureAgentUsage({ host: 'kiro', path, phaseStarts: ['MARK-CAPTURE'] }), /must be at:/);
@@ -307,7 +318,7 @@ test('rejects malformed phase starts and unpaired names', () => withScratch((roo
 }));
 
 test('the command line prints JSON and rejects a path-like KIRO_SESSION_ID', () => withScratch((root) => {
-  const path = writeKiroSession(root, 'session');
+  const path = writeKiroSession(root, 'sess_session');
   const ok = spawnSync(process.execPath, [SCRIPT, 'kiro', path, '--phase-start', 'turn:2'], { encoding: 'utf8' });
   assert.equal(ok.status, 0, ok.stderr);
   assert.equal(JSON.parse(ok.stdout).phases.length, 2);

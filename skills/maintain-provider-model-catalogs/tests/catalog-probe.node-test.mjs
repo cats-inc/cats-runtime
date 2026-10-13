@@ -38,8 +38,10 @@ import {
   SOURCES,
   SourceFailure,
 } from '../scripts/catalog-probe/sources.mjs';
+import { KiroAcpError, parseKiroModelOptions, readKiroModelOptions } from '../scripts/catalog-probe/kiro-acp.mjs';
 
 const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), '../scripts/catalog-probe.mjs');
+const FAKE_KIRO_ACP = join(dirname(fileURLToPath(import.meta.url)), 'support', 'fake-kiro-acp.mjs');
 
 function parseFailure(run) {
   assert.throws(run, (error) => error instanceof SourceFailure && error.status === 'error' && error.reason === 'parse');
@@ -109,6 +111,21 @@ test('kiro, auggie and devin JSON projections', () => {
     { id: 'ex-1', label: 'ex-1' },
   ]);
   parseFailure(() => parseKiroListModels(JSON.stringify({ models: [{ model_name: 'x' }] })));
+
+  assert.deepEqual(parseKiroModelOptions({
+    id: 'model', currentValue: 'auto',
+    options: [
+      { value: 'auto', name: 'Auto', description: 'Chosen by task', _meta: { kiro: { rateMultiplier: 1, rateUnit: 'Credit', hasEffort: false, thinkingToggleable: false } } },
+      { value: 'ex-think', name: 'Example Think', _meta: { kiro: { rateMultiplier: 2, rateUnit: 'Credit', hasEffort: true, effortSchemaPath: 'output_config', effortLevels: ['low', 'high'], defaultEffortLevel: 'high', thinkingToggleable: true, defaultThinkingEnabled: true } } },
+      { value: 'ex-unknown' },
+    ],
+  }), [
+    { id: 'auto', label: 'auto', efforts: [], effortDefault: null, evidence: { displayName: 'Auto', description: 'Chosen by task', rateMultiplier: 1, rateUnit: 'Credit', thinkingToggleable: false, currentModel: true } },
+    { id: 'ex-think', label: 'ex-think', efforts: ['low', 'high'], effortDefault: 'high', evidence: { displayName: 'Example Think', rateMultiplier: 2, rateUnit: 'Credit', effortSchemaPath: 'output_config', thinkingToggleable: true, defaultThinkingEnabled: true } },
+    { id: 'ex-unknown', label: 'ex-unknown', efforts: null, effortDefault: null },
+  ]);
+  assert.throws(() => parseKiroModelOptions({ id: 'model', options: [{ name: 'no value' }] }),
+    (error) => error instanceof KiroAcpError && error.reason === 'parse');
 
   assert.deepEqual(parseAuggieModelList(JSON.stringify({
     registryAvailable: false,
@@ -650,6 +667,40 @@ function writeRepo(root, { stale = false } = {}) {
     document: { schema_version: 2, catalogs: [fullScope()] },
   }));
   return root;
+}
+
+test('the kiro ACP reader keeps the model option, deletes its session and classifies failures', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'catalog-probe-kiro-acp-'));
+  try {
+    await kiroAcpReaderChecks(root);
+  } finally {
+    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  }
+});
+
+async function kiroAcpReaderChecks(root) {
+  const log = join(root, 'requests.log');
+  const result = await readKiroModelOptions({
+    command: process.execPath, args: [FAKE_KIRO_ACP, 'ok'], env: { ...process.env, FAKE_KIRO_ACP_LOG: log }, cwd: root, timeoutMs: 10000,
+  });
+  assert.equal(result.sessionId, 'sess_fake');
+  assert.equal(result.sessionDeleted, true);
+  assert.deepEqual(result.rows.map((row) => [row.id, row.efforts, row.effortDefault]),
+    [['auto', [], null], ['ex-think', ['low', 'medium', 'high'], 'medium'], ['ex-plain', [], null]]);
+  assert.deepEqual(readFileSync(log, 'utf8').trim().split('\n'), ['initialize', 'session/new', 'session/delete']);
+
+  const failure = async (mode, timeoutMs = 10000) => {
+    try {
+      await readKiroModelOptions({ command: process.execPath, args: [FAKE_KIRO_ACP, mode], cwd: root, timeoutMs });
+    } catch (error) {
+      assert.ok(error instanceof KiroAcpError, String(error));
+      return [error.status, error.reason];
+    }
+    throw new Error(`mode ${mode} did not fail`);
+  };
+  assert.deepEqual(await failure('auth'), ['unavailable', 'not-signed-in']);
+  assert.deepEqual(await failure('silent', 500), ['unavailable', 'timeout']);
+  assert.deepEqual(await failure('no-model'), ['error', 'parse']);
 }
 
 test('the repository root is found from below and a stale generated catalog is refused', () => withScratch((root) => {
