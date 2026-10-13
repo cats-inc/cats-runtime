@@ -46,7 +46,7 @@ call provider account APIs. Kiro remains gated on a verified authenticated resul
 See the [live evidence and limits](./docs/research/2026-09-11-additional-cli-quota-queries.md).
 This implementation does not publish or update an installed Desktop.
 
-`cats-runtime` is the stable execution boundary for upper-layer products such as
+`cats-runtime` is the shared execution boundary for upper-layer products such as
 `cats-platform` and `crew-chat-poc`. It now embeds the CLI runtime directly instead
 of proxying to a second local sidecar service.
 
