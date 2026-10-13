@@ -3673,13 +3673,17 @@ catalogs:
         (sent while creating a session; no prompt), which lists the same rows, order and effort
         rings as the 2.27.1 interactive picker capture of 2026-10-03 (first capture 2026-09-27,
         20 rows, kiro-cli-chat 2.24.1). Order and raw IDs equal kiro-cli chat --list-models.
+        The 2.30.0 V3 picker, walked the same day without cycling effort, shows the same 21
+        rows, order, IDs, credit rates and descriptions.
         Evidence: docs/research/fixtures/kiro-2.30.0/model-list.probe.redacted.json,
-        docs/research/2026-10-13-kiro-v3-catalog-refresh.md and, for the picker rings,
+        docs/research/fixtures/kiro-2.30.0/model-picker.v3-agent-capture.redacted.txt,
+        docs/research/2026-10-13-kiro-v3-catalog-refresh.md,
+        docs/research/2026-10-13-kiro-v3-picker-capture.md and, for the picker rings,
         docs/research/fixtures/kiro-2.27.1/model-picker.agent-capture.redacted.txt and
         docs/research/2026-09-27-kiro-picker-full-catalog.md."
-      - "id, label and execution.model are the raw model IDs, passed to --model. The V3 config
-        reply also carries a display name per row (for example Claude Opus 5.5); labels stay the
-        raw IDs until the V3 picker is captured. auto is a Kiro routing option kept as row 1."
+      - "id, label and execution.model are the raw model IDs, passed to --model. The 2.30.0 V3
+        picker shows these raw IDs; the display names in the V3 config reply (for example Claude
+        Opus 5.5) do not appear in it. auto is a Kiro routing option kept as row 1."
       - "No model default is declared. The V3 config reports auto as the current model, meaning
         only the session's selection. --list-models reports default_model auto (plain output:
         * = default); that is recorded here as reference only and is not a catalog default."
@@ -3691,14 +3695,20 @@ catalogs:
         2026-10-13 under the operator's instruction to follow best practice: claude-opus-5.5
         medium, claude-opus-4.7 xhigh, every other effort row high. Selection starts at that
         default and always sends --effort, which overrides chat.modelDefaults in
-        ~/.kiro/settings/cli.json. The 2.27.1 picker had shown no default marker."
+        ~/.kiro/settings/cli.json. The 2.27.1 picker had shown no default marker. The 2.30.0 V3
+        picker panel shows each row's current effort, not a marked default: it equals these
+        defaults except where chat.modelDefaults saves another level."
       - "The V3 config reply marks claude-opus-5, claude-sonnet-5, claude-opus-4.8, claude-opus-4.7,
-        claude-opus-4.6 and claude-sonnet-4.6 thinkingToggleable with thinking on by default;
-        claude-opus-5.5 and claude-sonnet-5.5 keep thinking always on. kiro-cli has no thinking
-        argument, so the adapter cannot pass it and the axis is not represented."
-      - "Kiro 2.27.1 adds a fallback row to every model's settings panel (none on every row:
+        claude-opus-4.6 and claude-sonnet-4.6 thinkingToggleable with thinking on by default,
+        and the V3 picker panel shows thinking on for them. claude-opus-5.5 and claude-sonnet-5.5
+        are not toggleable: the 2.27.1 picker showed their thinking as Always on for this model,
+        and the 2.30.0 V3 picker shows n/a, Not available for this model, the same text as rows
+        without thinking. kiro-cli has no thinking argument, so the adapter cannot pass it and
+        the axis is not represented."
+      - "Kiro 2.27.1 added a fallback row to every model's settings panel (none on every row:
         Answers for this model when it refuses or is unavailable). It selects another model
-        rather than an option of this one, and it is not represented."
+        rather than an option of this one, and it is not represented. The 2.30.0 V3 panel has
+        no fallback row."
       - "Context limits are --list-models context_window_tokens. Descriptions and credit rates are
         the config reply text, unchanged from the picker. Read on Windows native only: WSL shares
         this scope, but a WSL installation and account may see different models. Custom model
@@ -3724,7 +3734,7 @@ catalogs:
         notes:
           - "Picker description: Experimental preview of Claude Opus 5.5 model with 1M context window"
           - "Picker rate: 2.00x credits."
-          - "Picker thinking: n/a, Always on for this model."
+          - "Picker thinking: n/a, Not available for this model (2.30.0 V3 panel); 2.27.1 showed n/a, Always on for this model."
         source_names:
           - claude-opus-5.5
         execution:
@@ -3757,7 +3767,7 @@ catalogs:
         notes:
           - "Picker description: Experimental preview of Claude Sonnet 5.5 model with 1M context window"
           - "Picker rate: 1.30x credits."
-          - "Picker thinking: n/a, Always on for this model."
+          - "Picker thinking: n/a, Not available for this model (2.30.0 V3 panel); 2.27.1 showed n/a, Always on for this model."
         source_names:
           - claude-sonnet-5.5
         execution:

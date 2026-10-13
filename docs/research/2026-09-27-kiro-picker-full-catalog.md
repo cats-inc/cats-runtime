@@ -3,7 +3,9 @@
 > Evidence path superseded on 2026-10-13 by the
 > [V3 catalog refresh](./2026-10-13-kiro-v3-catalog-refresh.md): the V3 engine reports the same
 > rows and effort rings machine-readably, with per-model defaults, and the capture helpers
-> described here were removed. The rings recorded below remain valid evidence.
+> described here were removed. The rings recorded below remain valid evidence. A read-only
+> V3 `Capture-KiroPicker.ps1` that never cycles the ring replaced them the same day
+> ([V3 picker capture](./2026-10-13-kiro-v3-picker-capture.md)).
 
 Date: 2026-09-27 (UTC+8). Mode: refresh. Interaction policy: confirm uncertainty.
 Scope: the `kiro` / `cli` catalog scope, changed from a six-row shortlist to

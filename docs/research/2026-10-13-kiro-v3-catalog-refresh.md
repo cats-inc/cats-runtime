@@ -21,6 +21,8 @@ Decisions taken under the operator's "best practice" instruction:
   first value; it now starts at Kiro's default. The adapter still sends `--effort` on every turn.
 - **Keep raw IDs as labels.** The V3 config carries a display name per row
   (`Claude Opus 5.5`); it is kept in evidence, not in `label`, until the V3 picker is captured.
+  The [V3 picker capture](./2026-10-13-kiro-v3-picker-capture.md) later that day showed the
+  raw IDs, so the labels stay.
 - **Keep thinking as notes.** `thinkingToggleable` and `defaultThinkingEnabled` are recorded
   in the scope notes; `kiro-cli chat` has no thinking argument.
 
@@ -69,7 +71,9 @@ Committed evidence:
   (`session.json` and `messages.jsonl`); credits are per turn from `usage_summary`, with no token
   counts.
 - Removed: `Capture-KiroPicker.ps1`, `Restore-KiroPickerConfig.ps1` and `Test-KiroPicker.ps1`,
-  with the Windows Kiro helper section of `interactive-capture.md`.
+  with the Windows Kiro helper section of `interactive-capture.md`. A read-only V3 walk of the
+  same name came back later that day for display text only
+  ([V3 picker capture](./2026-10-13-kiro-v3-picker-capture.md#skill-changes)).
 
 ## Probe run
 
@@ -87,7 +91,7 @@ true`. The Kiro session store held only the operator's own session before and af
 
 ## Open
 
-- Capturing the V3 terminal picker would show whether Kiro now displays the display names; if
-  so, labels could follow them under the usual label policy.
+- Closed the same day: the [V3 picker capture](./2026-10-13-kiro-v3-picker-capture.md) shows
+  the raw IDs, not the display names, so the labels stay.
 - A real turn's `config_option_update` is equal evidence to the ACP one; a future refresh that
   already has a headless capture can cite it instead of running the probe.

@@ -192,7 +192,7 @@ outside Git, like raw evidence.
    at review. In review, audit and capture/preview modes, which make no repository change, list
    and recommend only. If that change has already merged, open a follow-up only when the
    operator's authorization covers it.
-3. **Make a kept script reusable.** The Codex, Claude, Auggie and Copilot capture helpers in
+3. **Make a kept script reusable.** The Codex, Claude, Kiro, Auggie and Copilot capture helpers in
    [interactive capture](./references/interactive-capture.md) are the pattern:
   - place it under `scripts/`, with parameters in place of this run's window titles, paths,
      session IDs and resume flags;
@@ -264,7 +264,8 @@ authorizes that external mutation.
   and operator-launched capture when Windows Defender blocks agent-launched startup.
 - [Kiro](./references/providers/kiro.md): raw model IDs, per-model effort levels and defaults
   from the V3 engine's ACP config (read by the probe without a prompt), thinking flags as notes,
-  auto without a default claim, and display names kept in evidence only.
+  auto without a default claim, display names kept in evidence only, and the read-only V3
+  picker walk for display text, whose panel shows current values rather than defaults.
 - [Kilo](./references/providers/kilo.md): distinguish gateway mappings from the picker and
   execution variants from display-only thinking flags.
 - [Muse](./references/providers/muse.md): MSP model-id enumeration versus per-model picker efforts;

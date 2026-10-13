@@ -1,7 +1,9 @@
 # Kiro catalog refresh
 
 Kiro is a full-catalog provider. Current choices and evidence belong in the
-[V3 catalog refresh](../../../../docs/research/2026-10-13-kiro-v3-catalog-refresh.md); the
+[V3 catalog refresh](../../../../docs/research/2026-10-13-kiro-v3-catalog-refresh.md), the
+[V3 picker capture](../../../../docs/research/2026-10-13-kiro-v3-picker-capture.md) records what
+the picker displays, the
 [2.24.1 picker capture](../../../../docs/research/2026-09-27-kiro-picker-full-catalog.md) records
 the settings-panel rings the V3 data agreed with, and the earlier
 [shortlist note](../../../../docs/research/2026-09-18-kiro-shortlist.md) is superseded. Do not copy
@@ -23,11 +25,18 @@ their model values into this reference.
   is why a session is needed. Headless `--output-format stream-json` runs carry the same update,
   so a real turn's capture (for example in `docs/research/fixtures/kiro-2.30.0/`) is equal
   evidence.
-- **Display names:** the V3 option carries a display name per row (`Claude Opus 5.5`). Labels stay
-  the raw IDs until the V3 picker is captured; keep the names in evidence only.
-- **No picker capture is needed.** The interactive `/model` picker and its settings panel were the
-  evidence path for 2.24.1 and 2.27.1; the V3 data lists the same rows and rings. The capture
-  and settings-restore helpers were removed with the move to V3.
+- **Display names:** the V3 option carries a display name per row (`Claude Opus 5.5`), but the
+  2.30.0 V3 picker shows the raw IDs. Labels follow the picker, so keep the names in evidence
+  only.
+- **Picker walk for display text only.** The probe owns membership, efforts and defaults; the
+  interactive `/model` picker is needed only to check what it displays: labels, descriptions,
+  credit rates and the settings panel's cells. Walk it with the read-only Up/Down helper in
+  [interactive capture](../interactive-capture.md#windows-kiro-helper); never cycle Left/Right,
+  which persists the value (2.24.1 rewrote `cli.json` on every key).
+- **The panel shows current values.** Each row's thinking and effort cells are the values a
+  selection would use now, and `chat.modelDefaults` in `~/.kiro/settings/cli.json` overrides
+  them. On 2026-10-13 claude-opus-5.5 showed `xhigh` from that setting while its
+  `defaultEffortLevel` is `medium`. Never take a catalog `default:` from a panel cell.
 - **Help is global text.** `--effort <EFFORT>` lists example values, not per-model availability.
   `--list-models` accepts any `--effort` string, so it cannot validate tokens. A real turn would
   consume credits and needs separate authorization.

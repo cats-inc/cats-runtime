@@ -157,12 +157,54 @@ node skills/maintain-provider-model-catalogs/scripts/claude-picker-observation.m
   --capture capture-result.json --row-status row-status.json --artifact <fixture path> > observation.json
 ```
 
-## Kiro
+## Windows Kiro helper
 
-Kiro needs no picker capture: its V3 engine lists every model with effort levels, defaults and
-thinking flags, and the [catalog probe](catalog-probe.md) reads them through `kiro-cli acp`
-without sending a prompt. See the [Kiro reference](providers/kiro.md). The 2.24.1 and 2.27.1
-picker captures and their Windows helpers are history
+Kiro's V3 engine lists every model with effort levels, defaults and thinking flags, and the
+[catalog probe](catalog-probe.md) reads them through `kiro-cli acp` without sending a prompt.
+Capture the picker only for what it displays: labels, descriptions, credit rates and the
+settings panel's cells. See the [Kiro reference](providers/kiro.md).
+[`Capture-KiroPicker.ps1`](../scripts/Capture-KiroPicker.ps1) owns Kiro V3 picker semantics and
+takes the same platform helper path. It does not launch Kiro or interpret defaults.
+
+1. **Launch.** Clean the environment first (launch hygiene above, plus `KIRO_*`,
+   `AWS_EXECUTION_ENV` and `JSC_*`). Open `kiro-cli chat --agent-engine v3` in a uniquely
+   titled window with `Start-WindowsUiTerminal`, from an empty private working directory. The
+   banner reads `Welcome to Kiro CLI V3!`.
+2. **Open the picker.** Type `/model`, wait for `/model    List or switch models` and send one
+   guarded Enter; that Enter runs the command and selects nothing. Run
+   `kiro-cli chat --list-models` for `-ExpectedModelCount`.
+3. **Capture.** Pass the settings file, normally `~/.kiro/settings/cli.json`:
+
+```powershell
+powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/scripts/Capture-KiroPicker.ps1 `
+  -UiHelperPath $desktopUiHelper -WindowTitle $captureWindowTitle `
+  -OutputDirectory $newEmptyEvidenceDirectory -ConfigPath $kiroSettings `
+  -ExpectedModelCount $listModelsCount
+```
+
+- The walk goes Up to the first row, Down to the last and Up again, reading each highlighted
+  row's label, credit rate, description, `[active]` tag and the panel's thinking and effort
+  cells, and checks that both directions agree. The list shows `(+N more)` below but nothing
+  for rows scrolled out above, so the position comes from `-ExpectedModelCount`. Each read
+  waits until the panel names the highlighted row. It leaves the picker at its starting row.
+- It sends only Up and Down. Left and Right change the panel value and Kiro persists it, so the
+  ring is never cycled; effort levels come from the probe. Before every key the settings file
+  must match its pre-capture SHA-256.
+- The panel cells are current values: `chat.modelDefaults` in `cli.json` overrides them.
+  Never take a catalog `default:` from them.
+- Afterwards close the picker with Escape and exit the owned Kiro with `/quit`. Startup
+  creates an empty session for the working directory; delete it with
+  `kiro-cli chat --delete-session <id>`, then remove the prompt history Kiro left for it in
+  `~/.kiro/sessions/cli/<id>.history`.
+
+Exercise the walk and guards without a desktop or Kiro:
+
+```powershell
+powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Test-KiroPicker.ps1
+```
+
+`docs/research/2026-10-13-kiro-v3-picker-capture.md` records the 2.30.0 run. The 2.24.1 and
+2.27.1 settings-panel captures, which cycled the ring, are history
 (`docs/research/2026-09-27-kiro-picker-full-catalog.md`).
 
 ## Windows Auggie helper
@@ -299,7 +341,8 @@ catalog delta, validation and limitations. The [Claude reference](providers/clau
 `docs/research/2026-09-30-claude-picker-sonnet-5-5.md` adds the below-window count, a moved
 alias and the row-status reader.
 The [Kiro reference](providers/kiro.md) records the V3 engine's machine-readable effort data,
-and `docs/research/2026-09-27-kiro-picker-full-catalog.md` the earlier settings-panel capture. The
+`docs/research/2026-10-13-kiro-v3-picker-capture.md` the V3 picker's display text and
+`docs/research/2026-09-27-kiro-picker-full-catalog.md` the earlier settings-panel capture. The
 [Auggie reference](providers/auggie.md) and `docs/research/2026-09-27-auggie-picker-full-catalog.md`
 record a picker without effort and the authorized Enter probe. The
 [Copilot reference](providers/copilot.md) and `docs/research/2026-09-27-copilot-picker-full-catalog.md`
