@@ -265,9 +265,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
           stderrLines: [...this.stderrLines],
         });
         this.maybeFailFastOnLaunchRefusal(refusal);
-        if (shouldLogProviderStderr(this.provider.name)) {
-          console.error(`[${this.provider.name}:stderr] ${text}`);
-        }
+        console.error(`[${this.provider.name}:stderr] ${text}`);
       }
     });
 
@@ -714,13 +712,6 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       this.emit('event', event);
     }
   }
-}
-
-function shouldLogProviderStderr(providerName: string): boolean {
-  if (process.env.CATS_RUNTIME_LOG_STDERR === '1') {
-    return true;
-  }
-  return providerName !== 'kiro';
 }
 
 function formatLaunchSummary(

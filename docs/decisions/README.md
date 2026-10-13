@@ -1,5 +1,8 @@
 # Architecture Decision Records (ADR)
 
+- [ADR-045: Kiro V3 headless engine](045-drive-kiro-through-the-v3-headless-engine.md) — accepted,
+  2026-10-13; Kiro runs on the V3 engine's stream-json headless mode, sessions go through
+  `kiro-cli`, and the V1/V2 paths are removed.
 - [ADR-044: Session MCP servers](044-configure-session-mcp-servers-for-provider-clis.md) — proposed,
   2026-09-29; host-supplied MCP servers configured into native provider CLIs.
 - [ADR-043: Managed Plugin skills](043-admit-managed-plugin-skills.md) — accepted

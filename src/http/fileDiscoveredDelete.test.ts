@@ -59,7 +59,7 @@ describe('file-discovered session deletion', () => {
       mode: 'wsl',
       distro: 'Ubuntu',
     },
-    kiroDbPath: '~/AppData/Local/kiro-cli/data.sqlite3',
+    kiroSessionsDir: '~/.kiro/sessions',
     kiroRuntime: {
       mode: 'native',
     },

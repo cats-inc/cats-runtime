@@ -1,0 +1,29 @@
+[
+  {
+    "cwd": "<other-scratch>",
+    "sessions": [
+      {
+        "sessionId": "b0474226-7f18-47bd-8e04-3f4f9f183dbb",
+        "source": "v2",
+        "title": "(no title)",
+        "updatedAt": "2026-10-03T00:23:20.004Z",
+        "messageCount": 0,
+        "status": "in_progress"
+      }
+    ],
+    "complete": true
+  },
+  {
+    "cwd": "<workspace>",
+    "sessions": [
+      {
+        "sessionId": "a83f2973-5f8e-4f00-83be-c881d0bf78d0",
+        "source": "v2",
+        "title": "(no title)",
+        "updatedAt": "2026-10-02T23:16:01.245Z",
+        "messageCount": 0
+      }
+    ],
+    "complete": true
+  }
+]

@@ -109,7 +109,7 @@ describe('factory and executable catalog projections', () => {
       { entryId, entryMode: 'explicit', ...(controls ? { controls } : {}) });
     const spawn = (entryId: string, controls?: Record<string, string>) => {
       const selected = resolve(entryId, controls);
-      return new KiroProvider({} as never).buildSpawnArgs({ cwd: '/tmp',
+      return new KiroProvider().buildSpawnArgs({ cwd: '/tmp',
         model: selected.execution.model, modelControls: selected.resolution.controls });
     };
     const effort = (entryId: string) => resolve(entryId).resolution.controls['kiro.reasoning_effort'];
@@ -271,7 +271,7 @@ describe('factory and executable catalog projections', () => {
         values: [{ value: 'fixture-effort', label: 'fixture-effort' }] }],
     }] });
     const selected = resolveProviderSelection(kiro, { entryId: 'fixture-unlisted-model', entryMode: 'explicit' });
-    const args = new KiroProvider({} as never).buildSpawnArgs({ cwd: '/tmp',
+    const args = new KiroProvider().buildSpawnArgs({ cwd: '/tmp',
       model: selected.execution.model, modelControls: selected.resolution.controls });
     expect(args.slice(args.indexOf('--model'), args.indexOf('--model') + 4))
       .toEqual(['--model', 'fixture-unlisted-model', '--effort', 'fixture-effort']);

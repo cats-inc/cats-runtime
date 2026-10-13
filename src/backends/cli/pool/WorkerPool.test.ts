@@ -12,7 +12,7 @@ describe('WorkerPool', () => {
     instance.commandConfig.singleton = 'test:grok-image';
     config.maxSessions = 2;
     const registry = new SessionRegistry(undefined, undefined, config.providerDefaultInstances, config.providerDefaultTargets);
-    const pool = new WorkerPool(config, registry, {} as never, {} as never, {} as never,
+    const pool = new WorkerPool(config, registry, {} as never, {} as never,
       {} as never, {} as never, { getCachedAssessment: () => undefined } as never);
     let cancelled = 0;
     const release = pool.reserveExternalExecution('image-1', 'grok', instance.id, () => { cancelled++; });
@@ -42,7 +42,6 @@ describe('WorkerPool', () => {
     const pool = new WorkerPool(
       config,
       registry,
-      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -82,7 +81,6 @@ describe('WorkerPool', () => {
     const pool = new WorkerPool(
       config,
       registry,
-      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -129,7 +127,6 @@ describe('WorkerPool', () => {
     const pool = new WorkerPool(
       config,
       registry,
-      {} as never,
       {} as never,
       {} as never,
       {} as never,

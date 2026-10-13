@@ -66,11 +66,12 @@ describe('sessionView helpers', () => {
     expect(sessionOwnership('claude')).toBe('persistent_process');
     expect(sessionOwnership('auggie')).toBe('logical_session');
     expect(sessionOwnership('cursor')).toBe('logical_session');
-    expect(sessionOwnership('kiro')).toBe('workspace_latest');
+    // Kiro V3 resumes any session by id, so it is an ordinary logical session.
+    expect(sessionOwnership('kiro')).toBe('logical_session');
     expect(sessionResumeStrategy('codex')).toBe('provider_session');
     expect(sessionResumeStrategy('auggie')).toBe('provider_session');
     expect(sessionResumeStrategy('cursor')).toBe('provider_session');
-    expect(sessionResumeStrategy('kiro')).toBe('latest_in_workspace');
+    expect(sessionResumeStrategy('kiro')).toBe('provider_session');
   });
 
   it('exposes resume_only control mode for closed resumable sessions', () => {

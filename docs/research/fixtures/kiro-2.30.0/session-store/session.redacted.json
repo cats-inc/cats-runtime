@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "1.0.0",
+  "dataModelVersion": 1,
+  "id": "sess_0624b1e8-e58c-4c91-8c66-235ed36e6536",
+  "title": "Read And Summarize Notes File",
+  "agentMode": "vibe",
+  "workspacePaths": [
+    "<scratch>\\fixture"
+  ],
+  "rootPaths": [
+    "<scratch>\\fixture"
+  ],
+  "createdAt": "2026-10-13T13:22:15.339Z",
+  "lastModifiedAt": "2026-10-13T13:22:35.099Z",
+  "modelId": "claude-haiku-4.5",
+  "autopilot": true,
+  "contextSnapshotModelDisplay": {
+    "modelId": "claude-haiku-4.5",
+    "display": "Claude Haiku 4.5"
+  },
+  "semanticReviewEnabled": true,
+  "disableAutoCompaction": false,
+  "ftaEnabled": false,
+  "workflowsEnabled": false,
+  "specPlanEnabled": false,
+  "specWorkflow": "quick",
+  "specSkipClarificationEnabled": true,
+  "memoryConfig": {
+    "mode": "disabled",
+    "reflection": false
+  },
+  "memoryConfigSource": "explicit",
+  "status": "idle",
+  "_meta": {
+    "kiro": {
+      "settings": {
+        "memory": {
+          "mode": "disabled",
+          "reflection": false
+        },
+        "workflows": {
+          "enabled": false
+        },
+        "goal": {
+          "enabled": false
+        }
+      }
+    }
+  }
+}

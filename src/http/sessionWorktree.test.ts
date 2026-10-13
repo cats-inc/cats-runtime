@@ -110,7 +110,7 @@ describe('session worktree routes', () => {
       mode: 'wsl',
       distro: 'Ubuntu',
     },
-    kiroDbPath: '~/AppData/Local/kiro-cli/data.sqlite3',
+    kiroSessionsDir: '~/.kiro/sessions',
     kiroRuntime: {
       mode: 'native',
     },

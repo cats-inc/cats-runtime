@@ -46,7 +46,7 @@ function makeConfig(sessionBaseDir: string, dataDir: string): CliRuntimeConfig {
     cursorRuntime: {
       mode: 'native',
     },
-    kiroDbPath: '',
+    kiroSessionsDir: '',
     kiroRuntime: {
       mode: 'native',
     },

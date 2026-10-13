@@ -2051,7 +2051,7 @@ async function deleteNativeSessionState(
 
     if (session.providerName === 'kiro') {
       const kiroNative = getKiroNative(ctx, session.providerInstanceId);
-      await kiroNative.deleteSession(session.cwd, session.providerSessionId);
+      await kiroNative.deleteSession(session.providerSessionId);
       const remaining = await kiroNative.listSessions(
         session.cwd,
         { startIfNeeded: false },
@@ -4377,73 +4377,6 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
 
     let hydratedSession = preparedSession;
     try {
-      const providerTarget = resolveSessionProviderTarget(ctx.config, preparedSession);
-      const hydrated = await hydrateSessionForTarget(ctx, {
-        trigger: 'resume',
-        sessionId: preparedSession.id,
-        providerTarget,
-        cwd: preparedSession.cwd,
-        workspaceMode: preparedSession.workspaceMode,
-        workspaceIsolationMode: resolveSessionWorkspaceIsolationMode(preparedSession),
-        existingSkills: preparedSession.skills,
-        existingHydration: preparedSession.hydration,
-        workspaceSourceCwd: getSessionWorkspaceSourceCwd(preparedSession),
-      });
-      ctx.registry.updateSessionMetadata(id, {
-        skills: hydrated.skills,
-        hydration: hydrated.hydration,
-      });
-      hydratedSession = ctx.registry.get(id) ?? preparedSession;
-      hydratedSession = await refreshSessionModelStateForTarget(ctx, providerTarget, hydratedSession);
-      await primeCliCompatibility(
-        ctx,
-        resolveCliProviderTarget(ctx, hydratedSession.providerName, hydratedSession.providerInstanceId),
-      );
-      runtime.spawn(
-        id,
-        hydratedSession.providerName,
-        buildSpawnOptions({
-          cwd: hydratedSession.cwd,
-          workspaceMode: hydratedSession.workspaceMode,
-          model: hydratedSession.model,
-          modelResolution: hydratedSession.modelResolution,
-          resumeSessionId: hydratedSession.providerSessionId,
-          instructionsFile: hydratedSession.skills?.delivery.instructions?.filePath,
-          permissionMode: hydratedSession.permissionMode,
-          allowedTools: hydratedSession.allowedTools,
-        }),
-        hydratedSession.providerInstanceId,
-        'cli',
-      );
-      ctx.registry.updateStatus(id, 'ready');
-    } catch (err) {
-      return c.json({ error: `Failed to resume: ${err}` }, 500);
-    }
-
-    return c.json({
-      ...serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession),
-      ...sessionMcpReport(runtime, id),
-    });
-  }
-
-  if (session.providerName === 'kiro') {
-    if (!preparedSession.providerSessionId) {
-      return c.json({ error: 'No provider session ID to resume' }, 400);
-    }
-
-    let hydratedSession = preparedSession;
-    try {
-      const canResume = await getKiroNative(
-        ctx,
-        preparedSession.providerInstanceId,
-      ).canResumeSession(preparedSession.cwd, preparedSession.providerSessionId);
-      if (!canResume) {
-        return c.json({
-          error: 'Kiro can only resume the latest session in a workspace. '
-          + 'This discovered session is no longer the newest one in its directory.',
-        }, 409);
-      }
-
       const providerTarget = resolveSessionProviderTarget(ctx.config, preparedSession);
       const hydrated = await hydrateSessionForTarget(ctx, {
         trigger: 'resume',

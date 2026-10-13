@@ -42,7 +42,7 @@ describe('Kiro native session management', () => {
       mode: 'wsl',
       distro: 'Ubuntu',
     },
-    kiroDbPath: '~/AppData/Local/kiro-cli/data.sqlite3',
+    kiroSessionsDir: '~/.kiro/sessions',
     kiroRuntime: {
       mode: 'native',
     },
@@ -79,7 +79,7 @@ describe('Kiro native session management', () => {
     registry = new SessionRegistry();
     attachedWorkers = new Map();
     pool = {
-      getCapabilities: vi.fn(() => ({ resume: true, fork: false, permissions: true })),
+      getCapabilities: vi.fn(() => ({ resume: true, fork: false, permissions: false })),
       get: vi.fn((id: string) => attachedWorkers.get(id)),
       spawn: vi.fn((sessionId: string) => {
         const worker = { alive: true };
@@ -105,9 +105,6 @@ describe('Kiro native session management', () => {
       listAllSessions: vi.fn(),
       loadHistory: vi.fn(),
       deleteSession: vi.fn(),
-      canResumeSession: vi.fn(),
-      getLatestSession: vi.fn(),
-      getLatestSessionId: vi.fn(),
     } as unknown as KiroNativeSessionService;
     auggieSessions = {
       listSessions: vi.fn(),
@@ -165,7 +162,7 @@ describe('Kiro native session management', () => {
     expect(body.status).toBe('initializing');
     expect(body.origin).toBe('runtime');
     expect(body.controlMode).toBe('full');
-    expect(body.ownership).toBe('workspace_latest');
+    expect(body.ownership).toBe('logical_session');
     expect(vi.mocked(pool.spawn)).toHaveBeenCalledWith(
       expect.any(String),
       'kiro',
@@ -178,7 +175,7 @@ describe('Kiro native session management', () => {
   });
 
   it('loads Kiro history through the generic history route', async () => {
-    const session = registry.upsertDiscovered('kiro-123', {
+    const session = registry.upsertDiscovered('sess_123', {
       providerName: 'kiro',
       cwd: 'C:/repo',
       summary: 'Existing Kiro Session',
@@ -197,10 +194,11 @@ describe('Kiro native session management', () => {
       { role: 'user', text: 'hello' },
       { role: 'assistant', text: 'world' },
     ]);
+    expect(vi.mocked(kiroNative.loadHistory)).toHaveBeenCalledWith('sess_123');
   });
 
-  it('deletes the native Kiro session before removing it from the registry', async () => {
-    const session = registry.upsertDiscovered('kiro-123', {
+  it('deletes the native Kiro session by id before removing it from the registry', async () => {
+    const session = registry.upsertDiscovered('sess_123', {
       providerName: 'kiro',
       cwd: 'C:/repo',
       summary: 'Existing Kiro Session',
@@ -216,11 +214,12 @@ describe('Kiro native session management', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
     expect(body.nativeDeleted).toBe(true);
+    expect(vi.mocked(kiroNative.deleteSession)).toHaveBeenCalledWith('sess_123');
     expect(registry.get(session!.id)).toBeUndefined();
   });
 
   it('deletes Kiro sessions that are already gone even when native delete returns false', async () => {
-    const session = registry.upsertDiscovered('kiro-gone', {
+    const session = registry.upsertDiscovered('sess_gone', {
       providerName: 'kiro',
       cwd: 'C:/repo',
       summary: 'Existing Kiro Session',
@@ -243,7 +242,7 @@ describe('Kiro native session management', () => {
   it('discovers existing Kiro sessions for a workspace', async () => {
     vi.mocked(kiroNative.listSessions).mockResolvedValue([
       {
-        providerSessionId: 'kiro-abc',
+        providerSessionId: 'sess_abc',
         cwd: 'C:/repo',
         summary: 'Existing Kiro Session',
         messageCount: 3,
@@ -263,10 +262,10 @@ describe('Kiro native session management', () => {
       sessions: Array<{ providerSessionId: string; origin: string; controlMode: string; resumeStrategy: string }>;
     };
     expect(body.sessions).toHaveLength(1);
-    expect(body.sessions[0].providerSessionId).toBe('kiro-abc');
+    expect(body.sessions[0].providerSessionId).toBe('sess_abc');
     expect(body.sessions[0].origin).toBe('discovered');
     expect(body.sessions[0].controlMode).toBe('resume_only');
-    expect(body.sessions[0].resumeStrategy).toBe('latest_in_workspace');
+    expect(body.sessions[0].resumeStrategy).toBe('provider_session');
     expect(registry.list({ provider: 'kiro' })).toHaveLength(1);
   });
 
@@ -318,16 +317,23 @@ describe('Kiro native session management', () => {
     expect(body.error).toContain("Unknown kiro instance 'missing'");
   });
 
-  it('resumes a discovered Kiro session when it is still the latest in the workspace', async () => {
-    const session = registry.upsertDiscovered('kiro-123', {
+  it('resumes any discovered Kiro session by id, newest in its workspace or not', async () => {
+    registry.upsertDiscovered('sess_new', {
       providerName: 'kiro',
       cwd: 'C:/repo',
-      summary: 'Existing Kiro Session',
+      summary: 'Newer Kiro Session',
       messageCount: 1,
+      lastActivity: '2026-10-13T13:00:00Z',
     });
-    vi.mocked(kiroNative.canResumeSession).mockResolvedValue(true);
+    const older = registry.upsertDiscovered('sess_old', {
+      providerName: 'kiro',
+      cwd: 'C:/repo',
+      summary: 'Older Kiro Session',
+      messageCount: 1,
+      lastActivity: '2026-10-13T12:00:00Z',
+    });
 
-    const res = await app.request(`/sessions/${session!.id}/resume`, {
+    const res = await app.request(`/sessions/${older!.id}/resume`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
@@ -336,36 +342,17 @@ describe('Kiro native session management', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
     expect(body.controlMode).toBe('full');
-    expect(body.ownership).toBe('workspace_latest');
+    expect(body.ownership).toBe('logical_session');
     expect(vi.mocked(pool.spawn)).toHaveBeenCalledWith(
-      session!.id,
+      older!.id,
       'kiro',
       expect.objectContaining({
         cwd: 'C:/repo',
-        resumeSessionId: 'kiro-123',
+        resumeSessionId: 'sess_old',
       }),
       undefined,
     );
-    expect(registry.get(session!.id)?.status).toBe('ready');
-  });
-
-  it('rejects resuming a stale discovered Kiro session', async () => {
-    const session = registry.upsertDiscovered('kiro-old', {
-      providerName: 'kiro',
-      cwd: 'C:/repo',
-      summary: 'Older Kiro Session',
-      messageCount: 1,
-    });
-    vi.mocked(kiroNative.canResumeSession).mockResolvedValue(false);
-
-    const res = await app.request(`/sessions/${session!.id}/resume`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    });
-
-    expect(res.status).toBe(409);
-    const body = await res.json() as { error: string };
-    expect(body.error).toContain('latest session');
+    // The generic CLI resume path reports ready once the worker's first event arrives.
+    expect(registry.get(older!.id)?.status).toBe('initializing');
   });
 });

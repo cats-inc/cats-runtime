@@ -6,7 +6,7 @@ export function withSelectedCliProviders<T>(input: T): T {
   const config = input as T & CliRuntimeConfig;
   const providerInstances = { ...config.providerInstances };
   const paths = ['auggieSessionsDir', 'claudeProjectsDir', 'codexSessionsDir',
-    'copilotSessionsDir', 'cursorChatsDir', 'kiroDbPath', 'kiloServerHost',
+    'copilotSessionsDir', 'cursorChatsDir', 'kiroSessionsDir', 'kiloServerHost',
     'kiloServerPort', 'kiloServerStartupTimeoutMs', 'opencodeServerHost',
     'opencodeServerPort', 'opencodeServerStartupTimeoutMs', 'piSessionsDir',
     'clineSessionsDir', 'grokSessionsDir', 'antigravitySessionsDir'] as const;

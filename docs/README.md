@@ -140,6 +140,11 @@ Junie 26.9.22 picker, per-model effort controls without effort defaults, the Mic
 launch incident and phase token cost. It supersedes the
 [Junie shortlist](./research/2026-09-23-junie-shortlist.md).
 
+[Kiro V3 headless contract](./research/2026-10-13-kiro-v3-headless-contract.md) records the
+2.30.0 probes behind [ADR-045](./decisions/045-drive-kiro-through-the-v3-headless-engine.md):
+the stream-json event shapes, resume by id from any directory, the V3 session store, the
+headless permission denial and the CLI listing and deletion the runtime now uses.
+
 [Kiro full catalog](./research/2026-09-27-kiro-picker-full-catalog.md) records the complete 20-row
 Kiro 2.24.1 picker, per-model effort on ten rows through the new `kiro.reasoning_effort` binding,
 auto without a default claim, the config-restoring capture, session cost and the reusable Kiro
