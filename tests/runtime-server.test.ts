@@ -523,9 +523,9 @@ describe('runtime server', () => {
       expect(html).toContain('confirmApplyTwelveAgentPreset()');
       expect(html).toContain("if(!window.confirm('Replace the current agents with the 12-agent preset?')) return;");
       expect(html).toContain('id="starter-agents-btn"');
-      expect(html).toContain('Restore default 2-agent preset');
+      expect(html).toContain('Restore default 4-agent preset');
       expect(html).toContain('confirmRestoreStarterAgents()');
-      expect(html).toContain("if(!window.confirm('Replace the current agents with the default 2-agent preset?')) return;");
+      expect(html).toContain("if(!window.confirm('Replace the current agents with the default 4-agent preset?')) return;");
       expect(html).toContain('id="add-agent-btn"');
       expect(html).toContain(
         '<header class="runtime-page-header" style="padding-top:0.75rem;padding-bottom:0.75rem;">',
@@ -547,11 +547,13 @@ describe('runtime server', () => {
       expect(html).toContain("return `${name}-CLI`;");
       expect(html).toContain('const TWELVE_AGENT_PRESET = [');
       expect(html).toContain('const STARTER_AGENT_PRESET = [');
-      expect(html).toContain("{ name:'Agent-1', provider:'claude', model:'', tags:['orchestrator'] },");
-      expect(html).toContain("{ name:'Agent-2', provider:'codex', model:'', tags:['coder'] },");
-      expect(html).toContain("{ name:'Agent-1', provider:'antigravity', model:getDefaultModel('antigravity'), tags:['orchestrator'] },");
+      expect(html).toContain("{ name:'Agent-1', provider:'codex', model:'', tags:['orchestrator'] },");
+      expect(html).toContain("{ name:'Agent-2', provider:'claude', model:'', tags:['pm'] },");
+      expect(html).toContain("{ name:'Agent-3', provider:'antigravity', model:'', tags:['coder'] },");
+      expect(html).toContain("{ name:'Agent-4', provider:'grok', model:'', tags:['reviewer'] },");
+      expect(html).toContain("{ name:'Agent-1', provider:'muse', model:getDefaultModel('muse'), tags:['orchestrator'] },");
       expect(html).toContain("{ name:'Agent-2', provider:'cursor', model:getDefaultModel('cursor'), tags:['pm'] },");
-      expect(html).toContain("{ name:'Agent-12', provider:'openclaw', model:getDefaultModel('openclaw'), tags:['marketer'] },");
+      expect(html).toContain("{ name:'Agent-12', provider:'goose', model:getDefaultModel('goose'), tags:['marketer'] },");
       expect(html).toContain('id="agents-loading-state"');
       expect(html).toContain('function ensureStarterAgents(){');
       expect(html).toContain('applyStarterAgentPreset({ allowBeforeProviderReady:true });');

@@ -865,6 +865,14 @@ const setupDiagnosticsCache = new Map();
 const setupDiagnosticsInFlight = new Map();
 const SETUP_CATALOG_REFRESH_DEFAULT_LABEL = 'Refresh Model Catalog';
 const SETUP_AVAILABILITY_REFRESH_DEFAULT_LABEL = 'Reprobe Availability';
+const SETUP_PROVIDER_ORDER = ['codex','claude','antigravity','grok','muse','cursor','copilot','opencode','kilo','cline','auggie','pi','kiro','junie','devin','goose','ollama','openclaw'];
+
+function compareSetupProviders(left, right) {
+  const leftIndex = SETUP_PROVIDER_ORDER.indexOf(left);
+  const rightIndex = SETUP_PROVIDER_ORDER.indexOf(right);
+  return (leftIndex < 0 ? SETUP_PROVIDER_ORDER.length : leftIndex)
+    - (rightIndex < 0 ? SETUP_PROVIDER_ORDER.length : rightIndex);
+}
 
 function escapeHtml(s) {
   return String(s == null ? '' : s)
@@ -1496,7 +1504,9 @@ function currentSetupCapabilitySelection() {
 }
 
 function configuredTargetEntries() {
-  return Object.entries(configuredTargetCatalog?.providers || {}).flatMap(([providerName, provider]) => (
+  return Object.entries(configuredTargetCatalog?.providers || {})
+    .sort(([left], [right]) => compareSetupProviders(left, right))
+    .flatMap(([providerName, provider]) => (
     (provider?.instances || []).map((instance) => ({
       providerName,
       provider,
@@ -2033,7 +2043,7 @@ function syncSetupCapabilitySelectors() {
 
   const providers = Object.keys(configuredTargetCatalog.providers).filter(
     (providerName) => (configuredTargetCatalog.providers[providerName]?.instances?.length || 0) > 0,
-  );
+  ).sort(compareSetupProviders);
 
   if (providers.length === 0) {
     providerSelect.innerHTML = '<option value="">No runtime targets</option>';
@@ -2585,7 +2595,9 @@ function renderUniverse(universe) {
     }
   }
   const observations = providerObservationMap();
-  document.getElementById('providerListItems').innerHTML = Array.from(entries.entries()).map(([key, entry]) => {
+  document.getElementById('providerListItems').innerHTML = Array.from(entries.entries())
+    .sort(([, left], [, right]) => compareSetupProviders(left.provider, right.provider))
+    .map(([key, entry]) => {
     const observed = observations.get(key);
     const status = describeProviderObservation(entry, observed);
     const historical = observed?.configurationStatus === 'not_selected';

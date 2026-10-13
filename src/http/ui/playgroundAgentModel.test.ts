@@ -4,6 +4,35 @@ import { describe, expect, it } from 'vitest';
 
 const html = readFileSync(new URL('./pages/playground.html', import.meta.url), 'utf8');
 
+describe('Playground agent presets', () => {
+  const start = html.indexOf('const STARTER_AGENT_PRESET = [');
+  const end = html.indexOf('let agentCounter=', start);
+  const presets = JSON.parse(vm.runInNewContext(`${html.slice(start, end)}
+    JSON.stringify({ starter: STARTER_AGENT_PRESET, twelve: TWELVE_AGENT_PRESET })`, {
+    getDefaultModel: (provider: string) => `${provider}-default`,
+  })) as { starter: Array<{ name: string; provider: string; tags: string[] }>;
+    twelve: Array<{ name: string; provider: string; model: string; tags: string[] }> };
+
+  it('starts with Codex CEO, Claude PM, Antigravity Coder and Grok Reviewer', () => {
+    expect(presets.starter.map(({ name, provider, tags }) => ({ name, provider, tags }))).toEqual([
+      { name: 'Agent-1', provider: 'codex', tags: ['orchestrator'] },
+      { name: 'Agent-2', provider: 'claude', tags: ['pm'] },
+      { name: 'Agent-3', provider: 'antigravity', tags: ['coder'] },
+      { name: 'Agent-4', provider: 'grok', tags: ['reviewer'] },
+    ]);
+  });
+
+  it('assigns the remaining twelve providers in order to the existing twelve roles', () => {
+    const providers = ['muse', 'cursor', 'copilot', 'opencode', 'kilo', 'cline',
+      'auggie', 'pi', 'kiro', 'junie', 'devin', 'goose'];
+    const roles = ['orchestrator', 'pm', 'researcher', 'designer', 'architect', 'coder',
+      'tester', 'reviewer', 'security', 'qa', 'tech_writer', 'marketer'];
+    expect(presets.twelve).toEqual(providers.map((provider, index) => ({
+      name: `Agent-${index + 1}`, provider, model: `${provider}-default`, tags: [roles[index]],
+    })));
+  });
+});
+
 type CustomSelectionInput = {
   requestedIsUnlisted: boolean;
   preserveCurrent: boolean;

@@ -190,7 +190,7 @@
                     <rect x="14" y="14" width="6" height="6" rx="1.5" />
                   </svg>
                 </button>
-                <button id="starter-agents-btn" onclick="confirmRestoreStarterAgents()" class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0 opacity-40 cursor-not-allowed" title="Restore default 2-agent preset" aria-label="Restore default 2-agent preset" disabled aria-disabled="true">
+                <button id="starter-agents-btn" onclick="confirmRestoreStarterAgents()" class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0 opacity-40 cursor-not-allowed" title="Restore default 4-agent preset" aria-label="Restore default 4-agent preset" disabled aria-disabled="true">
                   <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M3 12a9 9 0 1 0 3-6.7" />
                     <path d="M3 4v4h4" />
@@ -407,7 +407,7 @@ const AVAILABLE_TAGS = ['orchestrator','pm','researcher','designer','architect',
 const ROLE_LABELS = { orchestrator:'CEO',pm:'PM',researcher:'Researcher',designer:'Designer',architect:'Architect',coder:'Coder',tester:'Tester',reviewer:'Reviewer',security:'Security',qa:'QA',tech_writer:'Tech Writer',marketer:'Marketer' };
 const PROVIDER_MODELS = {};
 const PROVIDER_ADVANCED_CATALOGS = {};
-const PROVIDERS = ['claude','codex','antigravity','cursor','copilot','opencode','kilo','goose','pi','auggie','junie','kiro','grok','cline','devin','muse','ollama','openclaw'];
+const PROVIDERS = ['codex','claude','antigravity','grok','muse','cursor','copilot','opencode','kilo','cline','auggie','pi','kiro','junie','devin','goose','ollama','openclaw'];
 const PROVIDER_AVAILABILITY = {};
 let SELECTABLE_PROVIDERS = [...PROVIDERS];
 let providerOptionsReady = false;
@@ -429,7 +429,7 @@ function getProviderAvailabilityLabel(provider){
 function listSelectableProviders() {
   const selectable=[...SELECTABLE_PROVIDERS];
   return window.CatsUI?.listSelectablePlaygroundProviders
-    ? window.CatsUI.listSelectablePlaygroundProviders(selectable,PROVIDERS,PROVIDER_AVAILABILITY)
+    ? window.CatsUI.listSelectablePlaygroundProviders(selectable,PROVIDERS)
     : selectable;
 }
 function normalizeSelectableProvider(provider) {
@@ -1264,22 +1264,24 @@ function updateAgentStatus(agent, status) {
 // ============================================================
 const MAX_AGENT_COUNT = 12;
 const STARTER_AGENT_PRESET = [
-  { name:'Agent-1', provider:'claude', model:'', tags:['orchestrator'] },
-  { name:'Agent-2', provider:'codex', model:'', tags:['coder'] },
+  { name:'Agent-1', provider:'codex', model:'', tags:['orchestrator'] },
+  { name:'Agent-2', provider:'claude', model:'', tags:['pm'] },
+  { name:'Agent-3', provider:'antigravity', model:'', tags:['coder'] },
+  { name:'Agent-4', provider:'grok', model:'', tags:['reviewer'] },
 ];
 const TWELVE_AGENT_PRESET = [
-  { name:'Agent-1', provider:'antigravity', model:getDefaultModel('antigravity'), tags:['orchestrator'] },
+  { name:'Agent-1', provider:'muse', model:getDefaultModel('muse'), tags:['orchestrator'] },
   { name:'Agent-2', provider:'cursor', model:getDefaultModel('cursor'), tags:['pm'] },
   { name:'Agent-3', provider:'copilot', model:getDefaultModel('copilot'), tags:['researcher'] },
   { name:'Agent-4', provider:'opencode', model:getDefaultModel('opencode'), tags:['designer'] },
   { name:'Agent-5', provider:'kilo', model:getDefaultModel('kilo'), tags:['architect'] },
-  { name:'Agent-6', provider:'goose', model:getDefaultModel('goose'), tags:['coder'] },
-  { name:'Agent-7', provider:'pi', model:getDefaultModel('pi'), tags:['tester'] },
-  { name:'Agent-8', provider:'auggie', model:getDefaultModel('auggie'), tags:['reviewer'] },
-  { name:'Agent-9', provider:'junie', model:getDefaultModel('junie'), tags:['security'] },
-  { name:'Agent-10', provider:'kiro', model:getDefaultModel('kiro'), tags:['qa'] },
-  { name:'Agent-11', provider:'ollama', model:getDefaultModel('ollama'), tags:['tech_writer'] },
-  { name:'Agent-12', provider:'openclaw', model:getDefaultModel('openclaw'), tags:['marketer'] },
+  { name:'Agent-6', provider:'cline', model:getDefaultModel('cline'), tags:['coder'] },
+  { name:'Agent-7', provider:'auggie', model:getDefaultModel('auggie'), tags:['tester'] },
+  { name:'Agent-8', provider:'pi', model:getDefaultModel('pi'), tags:['reviewer'] },
+  { name:'Agent-9', provider:'kiro', model:getDefaultModel('kiro'), tags:['security'] },
+  { name:'Agent-10', provider:'junie', model:getDefaultModel('junie'), tags:['qa'] },
+  { name:'Agent-11', provider:'devin', model:getDefaultModel('devin'), tags:['tech_writer'] },
+  { name:'Agent-12', provider:'goose', model:getDefaultModel('goose'), tags:['marketer'] },
 ];
 let agentCounter=0, nextAgentNumber=1;
 function syncNextAgentNumber(name){const m=/^Agent-(\d+)$/i.exec((name||'').trim());if(!m)return;const v=parseInt(m[1],10);if(Number.isFinite(v)&&v>=nextAgentNumber)nextAgentNumber=v+1;}
@@ -1803,7 +1805,7 @@ function applyStarterAgentPreset(options={}){
   starterAgentsInitialized=true;
 }
 function confirmRestoreStarterAgents(){
-  if(!window.confirm('Replace the current agents with the default 2-agent preset?')) return;
+  if(!window.confirm('Replace the current agents with the default 4-agent preset?')) return;
   applyStarterAgentPreset();
 }
 function confirmApplyTwelveAgentPreset(){
