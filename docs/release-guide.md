@@ -49,6 +49,45 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+### Release notes — 0.5.0 (prepared 2026-10-14)
+
+- **Kiro runs on its V3 headless engine (minor boundary).** Each turn runs
+  `kiro-cli chat --no-interactive --agent-engine v3 --output-format stream-json`
+  and resumes by session id from any directory, with tool, reasoning, model,
+  effort and credit events ([ADR-045](decisions/045-drive-kiro-through-the-v3-headless-engine.md)).
+  Sessions are read from Kiro's V3 store: `sessions_dir` in `providers.yaml` and
+  `KIRO_SESSIONS_DIR` replace `db_path` and `KIRO_DB_PATH`. The old keys are
+  ignored, not migrated, because they named a file Runtime no longer reads;
+  Kiro sessions kept only in the older SQLite store are no longer listed. Kiro
+  CLI 2.30.0 is the first verified release; older releases fail with Kiro's own
+  error. Headless Kiro denies tool calls that need approval, so `default` mode
+  means deny rather than ask. Replacing user configuration keys is why this is
+  0.5.0 rather than a 0.4.x patch.
+- **Every CLI has a full model catalog.** Cursor, OpenCode (`opencode-go`), Kilo
+  (its gateway list), Cline (`cline-pass`) and Devin moved from six-model
+  shortlists to complete lists, with per-model Variant, thinking-level, effort,
+  speed or parameter controls where the CLI offers them. The eleven existing
+  full catalogs were refreshed to this machine's CLI versions, Goose moved to
+  its full `chatgpt_codex` channel with its thinking-effort menu, and Kiro's
+  per-model effort defaults come from its V3 engine. New bindings keep
+  `CATALOG_BINDING_VERSION` at 1; catalog schema 2 is unchanged. Repeated
+  catalog loads in one process now reuse the parsed factory.
+- **Setup and Playground.** Providers appear in one display order everywhere,
+  and the Playground presets start with four agents (Codex, Claude,
+  Antigravity, Grok) or twelve in that order.
+- **Compatibility and release scope.** Apart from the Kiro configuration keys,
+  public APIs, configuration contracts, catalog schema 2 and persisted formats
+  are unchanged; no data migration is required. Runtime 0.4.1 was never
+  published to npm but was bundled by Desktop 0.7.10 to 0.7.14 from
+  `f64f347d2820a08fc24b4e82448c69542fc88771`, so this source takes a new version.
+  The owner selected npm `latest` and the Desktop 0.8.0 standard preview, which
+  bundles the merged commit of this preparation, together with Platform npm 0.8.0
+  and cats-one 0.5.0, whose Runtime range moves to `^0.5.0`.
+- **Validation.** The merged changes passed their pull-request release
+  preflight; this preparation changes only version fields and these notes. The
+  publication workflow runs `npm run release:check` before trusted publication.
+  Publication results: the npm registry entry and the `npm-publish.yml` run.
+
 ### Release notes — 0.4.1 (prepared 2026-10-04)
 
 - **Current provider catalogs.** Antigravity 1.2.16 now offers Claude Opus 5.5
@@ -284,4 +323,4 @@ authorization before applying it; release notes alone do not complete migration.
 - Apps are independently versioned artifacts owned by cats-apps. A Runtime change
   does not bump App versions or change Desktop's selected App artifacts.
 
-*Last updated: 2026-09-28*
+*Last updated: 2026-10-14*
