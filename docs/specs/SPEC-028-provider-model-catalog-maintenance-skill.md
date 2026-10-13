@@ -48,8 +48,8 @@ The repository owner approved two maintenance groups for Cats Desktop and Runtim
 
 | Group | CLI providers | Maintained and selectable catalog |
 |---|---|---|
-| Full catalog | Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie CLI, Kiro CLI, Auggie CLI, GitHub Copilot CLI, Pi (`openai-codex` channel) | Complete evidenced CLI model lists and all applicable effort/options, plus custom model-string input |
-| Shortlist | Cursor Agent CLI, Goose CLI, Devin CLI, OpenCode, Kilo Code CLI, Cline | At most six explicitly selected models per CLI, plus a custom-input action |
+| Full catalog | Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie CLI, Kiro CLI, Auggie CLI, GitHub Copilot CLI, Pi (`openai-codex` channel), Goose CLI (`chatgpt_codex` channel) | Complete evidenced CLI model lists and all applicable effort/options, plus custom model-string input |
+| Shortlist | Cursor Agent CLI, Devin CLI, OpenCode, Kilo Code CLI, Cline | At most six explicitly selected models per CLI, plus a custom-input action |
 
 **2026-09-26 amendment:** the owner moved Junie CLI from the shortlist group to the
 full-catalog group. It now carries the complete JetBrains AI picker list and each model's
@@ -93,6 +93,14 @@ backend rejects, was removed on 2026-09-29. Each row's thinking levels are Pi's 
 Pi's thinking selector marks. Other Pi providers remain custom input and out of scope, as recorded
 in [the Pi channel note](../research/2026-09-27-pi-openai-codex-full-catalog.md). Full expansion
 of the remaining shortlists is deferred. Membership of the other groups is unchanged.
+
+**2026-10-14 Goose amendment:** the owner moved Goose CLI from the shortlist group to the
+full-catalog group for its `chatgpt_codex` (ChatGPT subscription OAuth) channel only. The catalog
+carries every model Goose offers for that channel; in 1.54.0 that is the six models of its built-in
+list, the same six the 2026-09-23 shortlist held. Each row now offers Goose's own thinking-effort
+menu (Off, Low, Medium, High, Max) with no default, sent as Goose's native model suffix, as
+recorded in [the 2026-10-14 refresh note](../research/2026-10-14-catalog-refresh.md). Other Goose
+providers remain custom input and out of scope. Membership of the other groups is unchanged.
 
 **2026-09-29 basis amendment:** a scope records its routing channel or account plan as
 `basis` only with evidence, as defined in the

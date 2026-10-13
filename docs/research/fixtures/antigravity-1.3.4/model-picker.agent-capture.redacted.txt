@@ -1,0 +1,93 @@
+# Source: agent-operated Antigravity CLI (agy) 1.3.4 /model picker, Windows UI Automation visible text
+#   (Capture-AntigravityPicker.ps1 rows 1-4; row 5 read separately after the helper stopped on it)
+# Observed: 2026-10-14 01:58 (local time, UTC+8), Windows 11 native, Windows Terminal
+# Account: existing Google AI Pro sign-in; the banner line with the account is omitted.
+# Keys: /model + Enter, Up/Down only; Escape and /exit at the end. No model or effort was selected.
+# Settings: ~/.gemini/antigravity-cli/settings.json kept its prelaunch SHA-256 through exit.
+# Reading: five rows. Gemini 3.7 Flash, Gemini 3.6 Flash and Gemini 3.1 Pro are gone. Gemini 4 Argon
+#   (Medium) is new but Unavailable to this plan, and `agy models` does not list it. No default marker.
+#   The filled slider dot is the session effort, not a default.
+
+## Row 1 highlighted
+Switch Model
+
+  Search:
+          ────────────────────
+
+> Gemini 3.8 Flash        (current)
+  Claude Opus 5.5
+  Claude Sonnet 5.5
+  GPT-OSS 120B (Medium)
+  Gemini 4 Argon (Medium)
+
+  Effort  ◂        ●━━━━━━━━━━━━━━●━━━━━━━━━━━━━━◉        ▸
+                  low          medium          high
+            Deepest reasoning for complex problems — slower but strongest
+
+Keyboard: ↑/↓ Navigate  ←/→ Effort  enter Select  esc Go Back
+
+## Row 2 highlighted
+Switch Model
+
+  Search:
+          ────────────────────
+
+  Gemini 3.8 Flash        (current)
+> Claude Opus 5.5
+  Claude Sonnet 5.5
+  GPT-OSS 120B (Medium)
+  Gemini 4 Argon (Medium)
+
+  Effort  ◂        ●━━━━━━━━━━━━━━◉──────────────○        ▸
+                  low          medium          high
+            Balanced speed and reasoning quality for most tasks
+
+Keyboard: ↑/↓ Navigate  ←/→ Effort  enter Select  esc Go Back
+
+## Row 3 highlighted
+Switch Model
+
+  Search:
+          ────────────────────
+
+  Gemini 3.8 Flash        (current)
+  Claude Opus 5.5
+> Claude Sonnet 5.5
+  GPT-OSS 120B (Medium)
+  Gemini 4 Argon (Medium)
+
+  Effort  ◂        ●━━━━━━━━━━━━━━◉──────────────○        ▸
+                  low          medium          high
+            Balanced speed and reasoning quality for most tasks
+
+Keyboard: ↑/↓ Navigate  ←/→ Effort  enter Select  esc Go Back
+
+## Row 4 highlighted
+Switch Model
+
+  Search:
+          ────────────────────
+
+  Gemini 3.8 Flash        (current)
+  Claude Opus 5.5
+  Claude Sonnet 5.5
+> GPT-OSS 120B (Medium)
+  Gemini 4 Argon (Medium)
+
+Keyboard: ↑/↓ Navigate  enter Select  esc Go Back
+
+## Row 5 highlighted
+Switch Model
+
+  Search:
+          ────────────────────
+
+  Gemini 3.8 Flash        (current)
+  Claude Opus 5.5
+  Claude Sonnet 5.5
+  GPT-OSS 120B (Medium)
+> Gemini 4 Argon (Medium)
+
+  Unavailable · Gemini 4 Argon is currently available to Ultra plan subscribers.
+
+Keyboard: ↑/↓ Navigate  esc Go Back

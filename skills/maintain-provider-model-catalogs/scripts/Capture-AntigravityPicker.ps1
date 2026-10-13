@@ -55,8 +55,11 @@ function Read-Region([int]$Index) {
     $start = $text.LastIndexOf('Switch Model')
     if ($start -lt 0) { throw 'The model picker is not visible.' }
     $region = $text.Substring($start)
-    $footer = [regex]::Match($region, '(?m)^Keyboard:.*enter Select.*esc Go Back[^\r\n]*')
-    if (-not $footer.Success -or $region -notmatch (Highlight $Index)) {
+    # A row the plan does not include (1.3.4: "Unavailable - ... Ultra plan subscribers") drops
+    # "enter Select" from the footer; accept that footer only with its Unavailable line.
+    $footer = [regex]::Match($region, '(?m)^Keyboard:.*esc Go Back[^\r\n]*')
+    if (-not $footer.Success -or $region -notmatch (Highlight $Index) -or
+        ($footer.Value -notmatch 'enter Select' -and $region -notmatch '(?m)^\s*Unavailable\b')) {
         throw 'The expected row or complete picker footer is missing.'
     }
     $last = -1
@@ -73,11 +76,13 @@ function Move-Row([string]$Key, [int]$From, [int]$To) {
     Send-WindowsUiKey $target -Key $Key -ExpectedText (Highlight $From)
     $null = Wait-WindowsUiText $target -ExpectedText (Highlight $To)
 }
+$unavailable = @()
 for ($i = 0; $i -lt $ModelLabels.Count; $i++) {
     if ($i -gt 0) { Move-Row Down ($i - 1) $i }
     $region = Read-Region $i
+    if ($region -match '(?m)^\s*Unavailable\b') { $unavailable += $ModelLabels[$i] }
     $region | Set-Content -LiteralPath (Join-Path $OutputDirectory ('row-{0:D2}.txt' -f ($i + 1))) -Encoding UTF8
 }
 for ($i = $ModelLabels.Count - 1; $i -gt 0; $i--) { Move-Row Up $i ($i - 1) }
 Assert-Config
-@{ Models = $ModelLabels; ConfigUnchanged = $true; TextCaptures = $ModelLabels.Count } | ConvertTo-Json
+@{ Models = $ModelLabels; Unavailable = $unavailable; ConfigUnchanged = $true; TextCaptures = $ModelLabels.Count } | ConvertTo-Json

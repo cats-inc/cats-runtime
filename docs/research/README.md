@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-10-14-catalog-refresh](./2026-10-14-catalog-refresh.md) | Eleven full-catalog CLIs at this machine's versions | Probe plus six text-only picker captures; Haiku 5.5 rows (Claude alias move, Copilot, Auggie), Codex GPT-5.5 and default removal, three agy Gemini rows and two Muse contributor rows removed, muse-wonder-1.0, Copilot Context figures, Goose moved to its full chatgpt_codex channel with suffix-sent thinking effort, and the Claude and agy helper fixes |
 | [2026-10-13-kiro-v3-picker-capture](./2026-10-13-kiro-v3-picker-capture.md) | Kiro 2.30.0 V3 picker, agent-operated capture | Raw IDs as labels confirmed, panel cells as current values rather than defaults, changed thinking text and the removed fallback row, session cleanup, and the read-only Up/Down capture helper |
 | [2026-10-13-kiro-v3-catalog-refresh](./2026-10-13-kiro-v3-catalog-refresh.md) | Kiro 2.30.0 catalog from the V3 engine's config | 21 rows and eleven effort rings confirmed against the 2.27.1 picker, per-model effort defaults adopted, the probe's zero-credit ACP source (session/new, session/delete), display names kept as evidence, and the retired picker capture helpers |
 | [2026-10-13-kiro-v3-headless-contract](./2026-10-13-kiro-v3-headless-contract.md) | Kiro 2.30.0 V3 headless engine | stream-json frames and ACP session updates, resume by id from any directory, the V3 session store, headless permission denial, `--list-sessions`/`--delete-session`, stdin prompts, effort recording and the eight redacted captures |

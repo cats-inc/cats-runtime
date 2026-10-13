@@ -18,17 +18,16 @@ The operator-approved policy is recorded in the 2026-09-17 amendment to
 `docs/specs/SPEC-028-provider-model-catalog-maintenance-skill.md` in cats-runtime:
 
 - **Full catalogs:** Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie, Kiro, Auggie, GitHub
-  Copilot, and Pi (its `openai-codex` channel only). Maintain the
+  Copilot, Pi (its `openai-codex` channel only) and Goose (its `chatgpt_codex` channel only). Maintain the
   complete evidenced CLI model lists and applicable effort/options; offer all of them in Desktop and
   Playground, plus custom model-string input. The six-model limit does not apply to this group.
-- **Shortlists:** Cursor Agent, Goose, Devin, OpenCode, Kilo Code, and Cline. Maintain at most six explicitly selected model entries per CLI, plus
+- **Shortlists:** Cursor Agent, Devin, OpenCode, Kilo Code, and Cline. Maintain at most six explicitly selected model entries per CLI, plus
   custom input. Effort remains attached to its model; the custom-input action is not a model slot.
 - Approved shortlists are recorded in `docs/research/2026-09-17-cursor-fixed-presets.md`,
   `docs/research/2026-09-18-opencode-shortlist.md`,
   `docs/research/2026-09-18-kilo-shortlist.md`,
-  `docs/research/2026-09-18-devin-shortlist.md`,
-  `docs/research/2026-09-18-cline-shortlist.md`, and
-  `docs/research/2026-09-23-goose-shortlist.md`.
+  `docs/research/2026-09-18-devin-shortlist.md`, and
+  `docs/research/2026-09-18-cline-shortlist.md`.
   Shortlist membership and order remain operator decisions. Do not truncate current
   catalogs or select the first six discovered models from this policy alone. These are product
   policy groups, not a substitute for deriving the registered inventory during an audit.
@@ -45,7 +44,8 @@ per-model effort control; Junie uses literal picker names as entry IDs, executed
 setting IDs, plus a separate per-model effort control;
 Auggie uses CLI-observed IDs and exact picker labels; its picker shows no effort, so it has no
 option controls;
-Goose uses provider-qualified IDs with fixed Thinking Off through its native model suffix;
+Goose uses provider-qualified IDs with raw-ID labels plus a per-model thinking-effort control sent
+as its native model suffix;
 Pi uses bare model-id labels with its channel in the scope basis, plus a separate per-model
 thinking control and CLI argument.
 No scheduled refresh cadence or automated refresh job has been specified. The operator runs the
@@ -255,8 +255,8 @@ authorizes that external mutation.
   shortlists, refresh/custom-input preservation, and isolated discovery fixtures.
 - [Devin](./references/providers/devin.md): family versus executable variant UIDs, bounded JSON
   mapping evidence, ACP new/resume model application, and response-consumer validation.
-- [Goose](./references/providers/goose.md): provider-qualified model IDs, isolated informational
-  probes, fixed Thinking Off transport and native-config/shortlist separation.
+- [Goose](./references/providers/goose.md): the `chatgpt_codex` channel list compiled into Goose,
+  isolated informational probes, thinking-effort suffix transport and native-config separation.
 - [Grok](./references/providers/grok.md): screenshot/transcription evidence, retained effort-token
   mappings, and first-item selection that reaches the execution arguments.
 - [Junie](./references/providers/junie.md): literal picker names executed as JAR setting IDs, the

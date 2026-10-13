@@ -1,0 +1,31 @@
+# Source: agent-operated Muse Code 1.4.7 (muse-bin-1.4.7-R6101.1) /model and /effort pickers,
+#   Windows UI Automation visible text
+# Observed: 2026-10-14 02:12-02:14 (local time, UTC+8), Windows 11 native, Windows Terminal
+# Launch: muse --no-session-log --model muse-wonder-1.0 from an already trusted folder, after clearing
+#   agent variables. No prompt was submitted. The working folder is shown as <cwd>.
+# Keys: /model + Enter, Escape; /effort + Enter, Escape; /exit. Nothing was confirmed.
+# Settings: ~/.config/muse/settings.json kept its prelaunch SHA-256 through exit.
+# Reading: three model rows, no contributor rows, no default marker. The highlighted row is the
+#   session model. muse-wonder-1.0 offers minimal..max; "current" is the session effort, not a default.
+
+## /model
+  Choose model
+
+⟩ muse-wonder-1.0
+  muse-spark-1.3
+  muse-spark-1.2
+
+  ↑↓ move · enter confirm · esc go back
+
+## /effort with muse-wonder-1.0 active
+  Effort  |  Select Meta reasoning effort
+  filter
+
+  minimal
+  low
+  medium
+  high
+⟩ xhigh                 current
+  max
+
+  ↑↓ move · type to filter · enter confirm · esc go back

@@ -12,7 +12,7 @@ import { buildProviderAdvancedKnowledge } from '../../core/models/providerAdvanc
 import { createCatalogSnapshot } from '../../catalogs/resolver.js';
 import { getStaticProviderModels } from '../../core/models/providerModelCatalog.js';
 
-describe.each(['cursor', 'opencode', 'kilo', 'devin', 'cline', 'goose'])('%s shortlists in Playground', (provider) => {
+describe.each(['cursor', 'opencode', 'kilo', 'devin', 'cline'])('%s shortlists in Playground', (provider) => {
   it('uses the approved fallbacks and preserves custom strings on reload', () => {
     const html = readFileSync(fileURLToPath(new URL('./pages/playground.html', import.meta.url)), 'utf8');
     expect(html).toContain('const PROVIDER_MODELS = {}');
@@ -134,7 +134,7 @@ describe('shared playground selection helpers', () => {
         vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
         expect(controls.innerHTML).not.toMatch(/default/i);
         const expected = ['minimal', 'low', 'medium', 'high', 'xhigh',
-          ...(entry.id.includes('1.3') ? ['max'] : [])];
+          ...(entry.id === 'muse-spark-1.2' ? [] : ['max'])];
         const options = [...controls.innerHTML.matchAll(/<option value="([^"]+)"[^>]*>([^<]+)<\/option>/g)]
           .map(match => [match[1], match[2]]);
         expect(options).toEqual(expected.map(value => [value, value]));
@@ -313,7 +313,7 @@ describe('shared playground selection helpers', () => {
       div: { querySelector: () => controls }, catalog, entryId: '' };
     vm.createContext(context);
     vm.runInContext(html.slice(start, end), context);
-    expect(models).toHaveLength(36);
+    expect(models).toHaveLength(37);
     expect(models.filter(model => model.default).map(model => model.id)).toEqual(['claude-opus-5-5']);
     expect(catsUI.getAdvancedCatalogDefaultEntryId(catalog)).toBe('claude-opus-5-5');
     const input = { provider: 'auggie', selectableProviders: ['auggie'], providerOrder: ['auggie'],
@@ -346,7 +346,7 @@ describe('shared playground selection helpers', () => {
       div: { querySelector: () => controls }, catalog, entryId: '' };
     vm.createContext(context);
     vm.runInContext(html.slice(start, end), context);
-    expect(models).toHaveLength(18);
+    expect(models).toHaveLength(19);
     expect(models.filter(model => model.default).map(model => model.id)).toEqual(['gpt-5.6-terra']);
     const input = { provider: 'copilot', selectableProviders: ['copilot'], providerOrder: ['copilot'],
       advancedCatalogs: { copilot: catalog } };
@@ -362,9 +362,10 @@ describe('shared playground selection helpers', () => {
     }
     expect(rendered).toMatchObject({
       auto: [['efficiency', 'Efficiency']],
-      'gpt-5.6-terra': [['none', 'None'], ['default', '400K']],
-      'claude-sonnet-5': [['low', 'Low'], ['default', '264K']],
-      'gemini-3.7-flash': [['low', 'Low'], ['default', '264K']],
+      'gpt-5.6-terra': [['none', 'None'], ['default', '272K']],
+      'claude-sonnet-5': [['low', 'Low'], ['default', '200K']],
+      'claude-haiku-5.5': [['low', 'Low'], ['default', '100K']],
+      'gemini-3.7-flash': [['low', 'Low'], ['default', '200K']],
       'gpt-5.4-mini': [['none', 'None']],
       'claude-haiku-4.5': [],
     });
@@ -468,6 +469,41 @@ describe('shared playground selection helpers', () => {
     const custom = 'anthropic/claude-opus-5';
     expect(catsUI.normalizePlaygroundAgentSelection({ ...input, model: custom }))
       .toEqual({ provider: 'pi', model: custom, modelSelection: null });
+  });
+
+  it('initializes Goose at the first chatgpt_codex row with Off thinking and keeps provider/model input', () => {
+    const catsUI = createCatsUI();
+    const target = { providerName: 'goose', backend: 'cli' as const,
+      instanceId: 'native', defaultTarget: true };
+    const models = getStaticProviderModels(target);
+    const { catalog } = buildProviderAdvancedKnowledge(target, {
+      provider: 'goose', backend: 'cli', instance: 'native', defaultModel: null,
+      source: 'static', cache: null, models, warnings: [],
+    }, { snapshot: createCatalogSnapshot(readFileSync(new URL('../../../config/curated-model-catalogs.yaml.example', import.meta.url), 'utf8')) });
+    const html = readFileSync(new URL('./pages/playground.html', import.meta.url), 'utf8');
+    const start = html.indexOf('function renderAgentModelControls(');
+    const end = html.indexOf('function applyAgentModelControlValues(', start);
+    const controls = { innerHTML: '' };
+    const context = { window: { CatsUI: catsUI }, escapeHtml: String,
+      div: { querySelector: () => controls }, catalog, entryId: '' };
+    vm.createContext(context);
+    vm.runInContext(html.slice(start, end), context);
+    expect(models).toHaveLength(6);
+    expect(models.some(model => model.default)).toBe(false);
+    const input = { provider: 'goose', selectableProviders: ['goose'], providerOrder: ['goose'],
+      advancedCatalogs: { goose: catalog } };
+    expect(catsUI.normalizePlaygroundAgentSelection(input).modelSelection.entryId).toBe('chatgpt_codex/gpt-5.6-sol');
+    for (const entry of catalog.entries) {
+      context.entryId = entry.id;
+      vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
+      const options = [...controls.innerHTML.matchAll(/<option value="([^"]+)"\s*(selected)?>([^<]+)<\/option>/g)];
+      expect(options.map(match => [match[1], match[3]])).toEqual([['off', 'Off'], ['low', 'Low'],
+        ['medium', 'Medium'], ['high', 'High'], ['max', 'Max']]);
+      expect(options.filter(match => match[2]).map(match => match[1])).toEqual(['off']);
+    }
+    const custom = 'anthropic/claude-sonnet-4';
+    expect(catsUI.normalizePlaygroundAgentSelection({ ...input, model: custom }))
+      .toEqual({ provider: 'goose', model: custom, modelSelection: null });
   });
 
   it('renders the Antigravity first effort without default labels and preserves saved effort', () => {

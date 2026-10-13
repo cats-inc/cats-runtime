@@ -3480,12 +3480,12 @@ backends:
         source: 'static',
         cache: null,
         models: [
-          { id: 'chatgpt_codex/gpt-5.6-sol', label: 'gpt-5.6-sol — Off' },
-          { id: 'chatgpt_codex/gpt-5.6-terra', label: 'gpt-5.6-terra — Off' },
-          { id: 'chatgpt_codex/gpt-5.6-luna', label: 'gpt-5.6-luna — Off' },
-          { id: 'chatgpt_codex/gpt-5.6', label: 'gpt-5.6 — Off' },
-          { id: 'chatgpt_codex/gpt-5.5', label: 'gpt-5.5 — Off' },
-          { id: 'chatgpt_codex/gpt-5.4', label: 'gpt-5.4 — Off' },
+          { id: 'chatgpt_codex/gpt-5.6-sol', label: 'gpt-5.6-sol' },
+          { id: 'chatgpt_codex/gpt-5.6-terra', label: 'gpt-5.6-terra' },
+          { id: 'chatgpt_codex/gpt-5.6-luna', label: 'gpt-5.6-luna' },
+          { id: 'chatgpt_codex/gpt-5.6', label: 'gpt-5.6' },
+          { id: 'chatgpt_codex/gpt-5.5', label: 'gpt-5.5' },
+          { id: 'chatgpt_codex/gpt-5.4', label: 'gpt-5.4' },
         ],
         warnings: [],
       });
@@ -4333,8 +4333,10 @@ providers:
       const factoryModels = readCatalogFactory({ packageRoot: process.cwd(), runtimeRoot: process.cwd() })
         .document.catalogs.find(scope => scope.provider === 'codex' && scope.backend === 'cli')!.models;
       const factoryIds = factoryModels.map(model => model.id);
-      const defaultModel = factoryModels.find(model => model.default)!;
-      const defaultEffort = defaultModel.controls!.find(control => control.key === 'codex.reasoning_effort')!.default;
+      // Codex 0.162.1 marks no model default, so selection starts at the first row.
+      const defaultModel = factoryModels.find(model => model.default) ?? null;
+      const startModel = defaultModel ?? factoryModels[0];
+      const defaultEffort = startModel.controls!.find(control => control.key === 'codex.reasoning_effort')!.default;
       const response = await runtime.app.request('/providers/codex/models/advanced');
       expect(response.status).toBe(200);
       const payload = await response.json();
@@ -4342,12 +4344,12 @@ providers:
         provider: 'codex',
         backend: 'cli',
         instance: 'native',
-        defaultModel: defaultModel.id,
+        defaultModel: defaultModel?.id ?? null,
         source: 'static',
         cache: null,
         presets: [],
         defaultSelection: {
-          entryId: defaultModel.id,
+          entryId: startModel.id,
           entryMode: 'explicit',
           controls: {
             'codex.reasoning_effort': defaultEffort,

@@ -1,3 +1,6 @@
+> Superseded on 2026-10-14 by the [full chatgpt_codex channel](./2026-10-14-catalog-refresh.md#goose).
+> Goose now offers its own thinking-effort menu on every row of that channel.
+
 # Goose 1.51.0 ChatGPT Codex shortlist
 
 Date: 2026-09-23. Mode: refresh. Interaction policy: confirm uncertainty.
