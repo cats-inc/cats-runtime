@@ -163,6 +163,27 @@ describe('model catalog upgrade recovery', () => {
 });
 
 describe('provider setup interactions', () => {
+  it('orders selection rows, configured targets and provider choices consistently', () => {
+    const providers = ['codex', 'claude', 'antigravity', 'grok', 'muse', 'cursor',
+      'copilot', 'opencode', 'kilo', 'cline', 'auggie', 'pi', 'kiro', 'junie', 'devin', 'goose',
+      'ollama', 'openclaw'];
+    const shuffled = providers.slice().reverse().map((provider) => ({
+      provider, backend: 'cli', instance: 'native', familyLabel: provider, binaryName: provider,
+    }));
+    const ui = page({ ...state([]), universe: shuffled }, async () => Response.json({}));
+    const rowProviders = [...ui.element('providerListItems').innerHTML.matchAll(/aria-label="Use ([^ ]+) \(/g)]
+      .map((match) => match[1]);
+    expect(rowProviders).toEqual(providers);
+    ui.context.catalog = { providers: Object.fromEntries(shuffled.map(({ provider }) => [provider, {
+      instances: [{ id: 'native', backend: 'cli' }],
+    }])) };
+    expect(ui.evaluate('configuredTargetCatalog = catalog; configuredTargetEntries().map(entry => entry.providerName)'))
+      .toEqual(providers);
+    ui.evaluate('syncConfiguredTargetSelection = () => {}; syncSetupCapabilitySelectors()');
+    expect([...ui.element('setupCapabilityProvider').innerHTML.matchAll(/<option value="([^"]+)"/g)]
+      .map((match) => match[1])).toEqual(providers);
+  });
+
   const devin = { provider: 'devin', backend: 'agent', instance: 'acp' };
 
   function devinState(commandStatus = 'ready') {

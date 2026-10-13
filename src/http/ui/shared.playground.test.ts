@@ -547,12 +547,25 @@ describe('shared playground selection helpers', () => {
       .toBe('gpt-6-astra (default)');
   });
 
-  it('orders runtime-usable providers ahead of unavailable targets', () => {
+  it('keeps the Playground provider menu order without an availability priority', () => {
+    const catsUI = createCatsUI();
+    const html = readFileSync(fileURLToPath(new URL('./pages/playground.html', import.meta.url)), 'utf8');
+    const start = html.indexOf('function listSelectableProviders()');
+    const end = html.indexOf('\nfunction ', start + 1);
+    const listSelectableProviders = vm.runInNewContext(`(${html.slice(start, end)})`, {
+      window: { CatsUI: catsUI }, SELECTABLE_PROVIDERS: ['claude', 'antigravity', 'codex'],
+      PROVIDERS: ['codex', 'claude', 'antigravity'],
+      PROVIDER_AVAILABILITY: { codex: 'unavailable', claude: 'ok', antigravity: 'degraded' },
+    });
+    expect(listSelectableProviders()).toEqual(['codex', 'claude', 'antigravity']);
+  });
+
+  it('retains availability priority for other runtime UI consumers', () => {
     const catsUI = createCatsUI();
 
     expect(catsUI.listSelectablePlaygroundProviders(
-      ['claude', 'codex', 'antigravity'],
-      ['claude', 'codex', 'antigravity'],
+      ['claude', 'antigravity', 'codex'],
+      ['codex', 'claude', 'antigravity'],
       {
         claude: 'ok',
         codex: 'unavailable',
@@ -568,7 +581,7 @@ describe('shared playground selection helpers', () => {
       provider: 'codex',
       model: 'gpt-5.4',
       selectableProviders: ['claude', 'codex'],
-      providerOrder: ['claude', 'codex'],
+      providerOrder: ['codex', 'claude'],
       providerAvailability: {
         claude: 'ok',
         codex: 'unavailable',

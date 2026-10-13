@@ -231,6 +231,24 @@ Cats may use and save that selection before scanning. Missing installations or
 credentials do not prevent selection; an explicit empty selection allows idle
 use. The runtime activates the saved config in the same process.
 
+Setup provider rows, configured target lists, and Playground provider menus use
+this display order: Codex, Claude, Antigravity, Grok, Muse, Cursor, Copilot,
+OpenCode, Kilo, Cline, Auggie, Pi, Kiro, Junie, Devin, Goose. Ollama and OpenClaw
+follow these providers. Availability does not reorder the menus; preset routing
+still falls back to a usable configured target when necessary.
+
+Playground starts with a four-agent preset: Codex (CEO), Claude (PM),
+Antigravity (Coder), and Grok (Reviewer). The restore button restores those four
+agents. The twelve-agent preset assigns Muse through Goose in the order above
+to CEO, PM, Researcher, Designer, Architect, Coder, Tester, Reviewer, Security,
+QA, Tech Writer, and Marketer respectively. Both presets use Runtime model
+metadata rather than hardcoded models.
+
+Validated on 2026-10-13: 61 focused setup, shared UI, and Playground preset and
+selection tests passed. `npm run build:ui` and `npm run build:runtime` passed;
+all generated HTML pages match their sources. Independent review confirmed
+that dashboard and preset availability fallback behavior remains intact.
+
 ## Installation (Source)
 
 ```powershell
@@ -1298,4 +1316,4 @@ status, registry counts, and discovery adapters.
 
 ---
 
-*Last updated: 2026-03-29*
+*Last updated: 2026-10-13*
