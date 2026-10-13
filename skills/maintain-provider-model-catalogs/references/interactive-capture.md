@@ -331,6 +331,17 @@ offline only. Exercise it without a desktop or Junie:
 powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Test-JuniePicker.ps1
 ```
 
+## Windows Kilo helper
+
+[`Capture-KiloPicker.ps1`](../scripts/Capture-KiloPicker.ps1) walks Kilo's `/models` dialog, whose
+highlighted row is named only in its detail panel, and records each row's section, label and
+badges. Launch, run and section semantics are in the [Kilo reference](providers/kilo.md). It sends
+only Up and Down and requires the model state file to keep its hash. Offline test:
+
+```powershell
+powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Test-KiloPicker.ps1
+```
+
 ## Turn evidence into data
 
 Trim only terminal padding/chrome, mark redactions visibly, and retain material picker text under

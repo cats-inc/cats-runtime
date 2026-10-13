@@ -1,3 +1,6 @@
+> Superseded on 2026-10-14 by the [full Cursor catalog](./2026-10-14-shortlists-to-full.md#cursor-20261001-e373342-47-entries-over-44-families).
+> Every picker family now offers its parameters as controls over the exact variant strings.
+
 # Cursor 2026.09.15 fixed model presets
 
 ## Scope and decisions

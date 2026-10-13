@@ -93,3 +93,30 @@ describe('KiloProvider', () => {
     );
   });
 });
+
+describe('KiloProvider variant', () => {
+  async function promptVariant(controls?: Record<string, string>) {
+    const native = {
+      prompt: vi.fn(async () => ({ sessionId: 'kilo-1', messageId: 'msg-1', text: 'ok', toolUses: [] })),
+      abortSession: vi.fn(),
+      listPendingPermissions: vi.fn().mockResolvedValue([]),
+      replyPermission: vi.fn(),
+      listPendingQuestions: vi.fn().mockResolvedValue([]),
+      rejectQuestion: vi.fn(),
+    } as unknown as KiloNativeSessionService;
+    const provider = new KiloProvider(native);
+    for await (const _event of provider.streamTurn({ message: 'Hi' }, {
+      cwd: '/tmp/repo',
+      resumeSessionId: 'kilo-1',
+      model: 'kilo/minimax/minimax-m3',
+      ...(controls ? { modelControls: controls } : {}),
+    })) { /* drain */ }
+    return (native.prompt as unknown as { mock: { calls: Array<[{ variant?: string }]> } }).mock.calls[0][0].variant;
+  }
+
+  it('sends the selected variant and leaves Default or no selection unset', async () => {
+    await expect(promptVariant({ 'kilo.variant': 'thinking' })).resolves.toBe('thinking');
+    await expect(promptVariant({ 'kilo.variant': 'default' })).resolves.toBeUndefined();
+    await expect(promptVariant()).resolves.toBeUndefined();
+  });
+});

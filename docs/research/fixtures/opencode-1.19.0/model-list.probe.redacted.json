@@ -1,0 +1,559 @@
+{
+  "kind": "cats-catalog-probe-evidence",
+  "schemaVersion": 1,
+  "provider": "opencode",
+  "backend": "cli",
+  "transport": null,
+  "command": "opencode models <channel> --verbose --pure",
+  "sourceClass": "machine-readable",
+  "cliVersion": "1.19.0",
+  "versionSource": "npm package",
+  "observedAt": "2026-10-13T19:57:40.637Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "accountScope": "The CLI's existing sign-in on the probing machine. No identity is recorded.",
+  "status": "ok",
+  "completeness": {
+    "membership": "complete",
+    "meaning": "The command lists what the picker offers; an absent row still needs picker confirmation before removal."
+  },
+  "authoritativeFor": {
+    "ids": true,
+    "label": true,
+    "efforts": false,
+    "effortDefault": false
+  },
+  "stillNeedsPicker": "A model (default) marker, picker descriptions, picker order, and every field not listed under authoritativeFor still need picker evidence.",
+  "selection": "all 32 rows",
+  "models": [
+    {
+      "id": "opencode-go/cat-jam-free",
+      "label": "Cat Jam Free",
+      "evidence": {
+        "status": "active",
+        "releaseDate": "2026-10-12",
+        "contextLimit": 262144,
+        "outputLimit": 131072,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/claude-haiku-5-5",
+      "label": "Claude Haiku 5.5",
+      "evidence": {
+        "family": "claude-haiku",
+        "status": "active",
+        "releaseDate": "2026-10-07",
+        "contextLimit": 1000000,
+        "outputLimit": 128000,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/deepseek-v4-flash",
+      "label": "DeepSeek V4 Flash",
+      "evidence": {
+        "family": "deepseek-flash",
+        "status": "active",
+        "releaseDate": "2026-07-31",
+        "contextLimit": 1000000,
+        "outputLimit": 384000,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/deepseek-v4-flash-vision-exp",
+      "label": "DeepSeek V4 Flash Vision Exp",
+      "evidence": {
+        "family": "deepseek-flash",
+        "status": "active",
+        "releaseDate": "2026-08-21",
+        "contextLimit": 1000000,
+        "outputLimit": 384000,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/deepseek-v4-pro",
+      "label": "DeepSeek V4 Pro (New)",
+      "evidence": {
+        "family": "deepseek-thinking",
+        "status": "active",
+        "releaseDate": "2026-04-24",
+        "contextLimit": 1000000,
+        "outputLimit": 384000,
+        "reasoning": true,
+        "variants": [
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/deepseek-v4.1-flash",
+      "label": "DeepSeek V4.1 Flash",
+      "evidence": {
+        "family": "deepseek-flash",
+        "status": "active",
+        "releaseDate": "2026-09-10",
+        "contextLimit": 1000000,
+        "outputLimit": 384000,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/glm-5.2",
+      "label": "GLM-5.2",
+      "evidence": {
+        "family": "glm",
+        "status": "active",
+        "releaseDate": "2026-06-13",
+        "contextLimit": 1000000,
+        "outputLimit": 131072,
+        "reasoning": true,
+        "variants": [
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/glm-5.3",
+      "label": "GLM-5.3",
+      "evidence": {
+        "family": "glm",
+        "status": "active",
+        "releaseDate": "2026-08-14",
+        "contextLimit": 1000000,
+        "outputLimit": 131072,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/glm-5.3-flash",
+      "label": "GLM-5.3-Flash",
+      "evidence": {
+        "family": "glm-flash",
+        "status": "active",
+        "releaseDate": "2026-08-26",
+        "contextLimit": 1000000,
+        "outputLimit": 131072,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/gpt-5.6-luna",
+      "label": "GPT-5.6 Luna",
+      "evidence": {
+        "family": "gpt-luna",
+        "status": "active",
+        "releaseDate": "2026-07-09",
+        "contextLimit": 1050000,
+        "outputLimit": 128000,
+        "reasoning": true,
+        "variants": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/gpt-6-luna",
+      "label": "GPT-6 Luna",
+      "evidence": {
+        "family": "gpt-luna",
+        "status": "active",
+        "releaseDate": "2026-09-22",
+        "contextLimit": 1050000,
+        "outputLimit": 128000,
+        "reasoning": true,
+        "variants": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/grok-4.6",
+      "label": "Grok 4.6",
+      "evidence": {
+        "family": "grok",
+        "status": "active",
+        "releaseDate": "2026-08-12",
+        "contextLimit": 500000,
+        "outputLimit": 500000,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/grok-4.7",
+      "label": "Grok 4.7",
+      "evidence": {
+        "family": "grok",
+        "status": "active",
+        "releaseDate": "2026-09-21",
+        "contextLimit": 500000,
+        "outputLimit": 500000,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/hy3",
+      "label": "Hy3",
+      "evidence": {
+        "family": "Hy",
+        "status": "active",
+        "releaseDate": "2026-07-06",
+        "contextLimit": 256000,
+        "outputLimit": 128000,
+        "reasoning": true,
+        "variants": [
+          "none",
+          "low",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/hy4-preview",
+      "label": "Hy4 preview",
+      "evidence": {
+        "family": "Hy",
+        "status": "active",
+        "releaseDate": "2026-08-28",
+        "contextLimit": 1024000,
+        "outputLimit": 64000,
+        "reasoning": true,
+        "variants": [
+          "none",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/kimi-k2.7-code",
+      "label": "Kimi K2.7 Code",
+      "evidence": {
+        "family": "kimi-k2",
+        "status": "active",
+        "releaseDate": "2026-06-12",
+        "contextLimit": 262144,
+        "outputLimit": 262144,
+        "reasoning": true
+      }
+    },
+    {
+      "id": "opencode-go/kimi-k3",
+      "label": "Kimi K3",
+      "evidence": {
+        "family": "kimi-k3",
+        "status": "active",
+        "releaseDate": "2026-07-16",
+        "contextLimit": 1048576,
+        "outputLimit": 131072,
+        "reasoning": true,
+        "variants": [
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/longcat-2.0",
+      "label": "LongCat-2.0",
+      "evidence": {
+        "family": "longcat",
+        "status": "active",
+        "releaseDate": "2026-06-30",
+        "contextLimit": 1000000,
+        "outputLimit": 131072,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "medium",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/longcat-2.5-preview-free",
+      "label": "LongCat 2.5 Preview Free",
+      "evidence": {
+        "family": "longcat",
+        "status": "active",
+        "releaseDate": "2026-09-25",
+        "contextLimit": 1000000,
+        "outputLimit": 131072,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "medium",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/mimo-v2.5",
+      "label": "MiMo V2.5",
+      "evidence": {
+        "family": "mimo-v2.5",
+        "status": "active",
+        "releaseDate": "2026-04-22",
+        "contextLimit": 1000000,
+        "outputLimit": 128000,
+        "reasoning": true
+      }
+    },
+    {
+      "id": "opencode-go/mimo-v2.5-pro",
+      "label": "MiMo V2.5 Pro",
+      "evidence": {
+        "family": "mimo-v2.5-pro",
+        "status": "active",
+        "releaseDate": "2026-04-22",
+        "contextLimit": 1048576,
+        "outputLimit": 128000,
+        "reasoning": true
+      }
+    },
+    {
+      "id": "opencode-go/mimo-v2.6-flash",
+      "label": "MiMo-V2.6-Flash",
+      "evidence": {
+        "family": "mimo",
+        "status": "active",
+        "releaseDate": "2026-09-22",
+        "contextLimit": 1048576,
+        "outputLimit": 131072,
+        "reasoning": true
+      }
+    },
+    {
+      "id": "opencode-go/mimo-v2.6-pro",
+      "label": "MiMo-V2.6-Pro",
+      "evidence": {
+        "family": "mimo",
+        "status": "active",
+        "releaseDate": "2026-09-22",
+        "contextLimit": 1048576,
+        "outputLimit": 131072,
+        "reasoning": true
+      }
+    },
+    {
+      "id": "opencode-go/minimax-m2.7",
+      "label": "MiniMax-M2.7",
+      "evidence": {
+        "family": "minimax-m2.7",
+        "status": "active",
+        "releaseDate": "2026-03-18",
+        "contextLimit": 204800,
+        "outputLimit": 131072,
+        "reasoning": true
+      }
+    },
+    {
+      "id": "opencode-go/minimax-m3",
+      "label": "MiniMax-M3",
+      "evidence": {
+        "family": "minimax-m3",
+        "status": "active",
+        "releaseDate": "2026-05-31",
+        "contextLimit": 1000000,
+        "outputLimit": 131072,
+        "reasoning": true,
+        "variants": [
+          "none",
+          "thinking"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/muse-spark-1.2-contributor",
+      "label": "Muse Spark 1.2 Contributor",
+      "evidence": {
+        "family": "muse",
+        "status": "active",
+        "releaseDate": "2026-08-05",
+        "contextLimit": 1048576,
+        "outputLimit": 131072,
+        "reasoning": true,
+        "variants": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/muse-spark-1.3-contributor",
+      "label": "Muse Spark 1.3 Contributor",
+      "evidence": {
+        "family": "muse",
+        "status": "active",
+        "releaseDate": "2026-09-02",
+        "contextLimit": 1048576,
+        "outputLimit": 131072,
+        "reasoning": true,
+        "variants": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/qwen3.7-plus",
+      "label": "Qwen3.7 Plus",
+      "evidence": {
+        "family": "qwen3.7-plus",
+        "status": "active",
+        "releaseDate": "2026-06-02",
+        "contextLimit": 1000000,
+        "outputLimit": 65536,
+        "reasoning": true,
+        "variants": [
+          "high",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/qwen3.8-flash",
+      "label": "Qwen3.8 Flash",
+      "evidence": {
+        "family": "qwen",
+        "status": "active",
+        "releaseDate": "2026-08-26",
+        "contextLimit": 1000000,
+        "outputLimit": 131072,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "medium",
+          "xhigh"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/qwen3.8-max",
+      "label": "Qwen3.8 Max",
+      "evidence": {
+        "family": "qwen3.8-max",
+        "status": "active",
+        "releaseDate": "2026-08-03",
+        "contextLimit": 1000000,
+        "outputLimit": 131072,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "medium",
+          "xhigh"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/space-bunny",
+      "label": "Space Bunny",
+      "evidence": {
+        "status": "active",
+        "releaseDate": "2026-09-23",
+        "contextLimit": 1048576,
+        "outputLimit": 524288,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    },
+    {
+      "id": "opencode-go/step-5-preview-free",
+      "label": "Step 5 Preview Free",
+      "evidence": {
+        "status": "active",
+        "releaseDate": "2026-09-16",
+        "contextLimit": 1000000,
+        "outputLimit": 65536,
+        "reasoning": true,
+        "variants": [
+          "low",
+          "medium",
+          "high"
+        ]
+      }
+    }
+  ],
+  "redaction": {
+    "method": "Projected public model fields only; no raw output, account identifier, price, endpoint or login text. String values passed through the skill redaction helper.",
+    "redactions": [],
+    "reviewBeforeCommit": "Check names, paths and provider-specific identifiers by hand; the helper catches only common shapes."
+  }
+}

@@ -1,37 +1,46 @@
 # Cline / ClinePass Catalog Refresh
 
-Reuse the implemented shortlist and execution path. Current selected models, versions and
-operator decisions belong in the
-[Cline evidence note](../../../../docs/research/2026-09-18-cline-shortlist.md), not this guide.
+The scope is the full `cline-pass` channel, as recorded in
+`docs/research/2026-10-14-shortlists-to-full.md`; the earlier shortlist is history in the
+[Cline evidence note](../../../../docs/research/2026-09-18-cline-shortlist.md).
 
-## Resolve missing mappings without expanding the menu
+## Membership
 
-- Use the supplied picker and retained mappings first. The observed CLI has no model-list
-  command; do not guess a subcommand that could become a prompt. Check installed package/help
-  evidence only when a missing mapping or changed invocation requires it.
-- For static mapping evidence, locate the installed `cline` package and its bundled
-  `@cline/llms` dependency. Record both versions. The observed `dist/models.js` contains a
-  provider-keyed catalog; extract only the selected `cline-pass` block's IDs and names using
-  bounded text or an AST parser. The repository's TypeScript parser can inspect object literals
-  without executing the bundle. This static source may be a superset of account availability.
+- The observed CLI has no model-list command; do not guess a subcommand that could become a
+  prompt, and never execute Cline to inspect it (informational flags once started npm updates).
+- The probe reads the bundled `@cline/llms` `dist/models.js` `cline-pass` block as text. The
+  operator accepted that build-time list as the channel list. The picker fetches the same list from
+  Cline's recommended-models service, so the live picker can differ; record both versions.
+- The block also appends `cline-free/*` models. The picker lists them under `Free` with "Try with
+  limited usage, separate from ClinePass quota."; they are outside the channel and stay out.
 - Minified files can put megabytes on one line. Find filenames with `rg -l`, then return bounded
-  excerpts or selected fields; `rg -n` with a small match count does not bound output size.
-  Do not dump the package tree, full catalog, user provider settings or session histories.
-- Static model IDs/capability enums do not override the operator's effort choices. In particular,
-  a generic or another provider's `reasoningOptions` list does not redefine ClinePass's picker.
-- A raw-ID-looking display name may be the upstream label itself. Preserve it until an explicit
-  display projection is authorized. Retain the original in evidence and keep the execution ID
-  unchanged; one approved friendly name is not permission to prettify other rows.
+  excerpts or selected fields. The repository's TypeScript parser can read the object literal
+  without executing the bundle. Do not dump the package tree, user provider settings or sessions.
+- A raw-ID-looking name may be the upstream label itself. Keep it unless an explicit display
+  projection is authorized (Qwen3.8 Max is one); keep the execution ID unchanged.
 
+## Thinking level
+
+The picker ignores `reasoningOptions`: every reasoning model gets the same dialog, Off, Low, Medium,
+High, Extra High, preselecting Medium. Each row carries that `cline.reasoning_effort` control with
+default `medium`. Execution passes `--provider cline-pass --model <id> --thinking <level>`; Cline
+then moves the level to the nearest effort the model advertises, so do not copy `reasoningOptions`
+into the control.
+
+## Build the scope
+
+`scripts/catalog-scope-entries.mjs --snapshot <probe snapshot> --provider cline --label <id>=<approved name> --write <yaml>`
+keeps the subscribed `cline-pass/` rows in source order with the thinking control.
 
 ## Schema-2 execution data
 
-Set `execution.provider: cline-pass`, preserve the full observed `execution.model`, and put approved thinking in `execution.fixed_controls.cline.reasoning_effort`. The adapter sends separate `--provider`, `--model`, `--thinking` arguments.
+Set `execution.provider: cline-pass`, preserve the full observed `execution.model`, and put the
+thinking level in the `cline.reasoning_effort` control. The adapter sends separate `--provider`,
+`--model` and `--thinking` arguments.
 
 Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
 Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.
-There are no independent Runtime, Playground or Desktop model tables to update. Existing generic
-bindings require no repeated implementation authorization; a new unsupported binding is a separate
-code change. Validate labels, ordered values, defaults, custom input, and actual emitted bindings.
-Discovery tests must explicitly use a `selection_mode: discovery` scope before constructing the
-service. `catalogs: []` inherits factory; `models: []` empties a full/shortlist scope.
+There are no independent Runtime, Playground or Desktop model tables to update. Validate labels,
+ordered values, defaults, custom input, and actual emitted bindings. Discovery tests must
+explicitly use a `selection_mode: discovery` scope before constructing the service.
+`catalogs: []` inherits factory; `models: []` empties a full scope.

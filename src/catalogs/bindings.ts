@@ -22,6 +22,16 @@ export const CATALOG_BINDINGS: Readonly<Record<string, Binding>> = Object.freeze
   'copilot.context': { provider: 'copilot', backend: 'cli', type: 'string' },
   'copilot.auto_tier': { provider: 'copilot', backend: 'cli', type: 'string' },
   'kilo.variant': { provider: 'kilo', backend: 'cli', type: 'string' },
+  'opencode.variant': { provider: 'opencode', backend: 'cli', type: 'string' },
+  // Devin and Cursor encode these choices in the executable model id, chosen through variants.
+  'devin.effort': { provider: 'devin', backend: 'agent', transport: 'acp_stdio', type: 'string', modelVariant: true },
+  'devin.speed': { provider: 'devin', backend: 'agent', transport: 'acp_stdio', type: 'string', modelVariant: true },
+  'cursor.context': { provider: 'cursor', backend: 'cli', type: 'string', modelVariant: true },
+  'cursor.effort': { provider: 'cursor', backend: 'cli', type: 'string', modelVariant: true },
+  'cursor.reasoning': { provider: 'cursor', backend: 'cli', type: 'string', modelVariant: true },
+  'cursor.reasoning_effort': { provider: 'cursor', backend: 'cli', type: 'string', modelVariant: true },
+  'cursor.thinking': { provider: 'cursor', backend: 'cli', type: 'string', modelVariant: true },
+  'cursor.fast': { provider: 'cursor', backend: 'cli', type: 'string', modelVariant: true },
   'cline.reasoning_effort': { provider: 'cline', backend: 'cli', type: 'string' },
   'junie.reasoning_effort': { provider: 'junie', backend: 'cli', type: 'string' },
   'kiro.reasoning_effort': { provider: 'kiro', backend: 'cli', type: 'string' },
@@ -41,6 +51,14 @@ export const GOOSE_THINKING_SUFFIXES: Readonly<Record<string, string>> = Object.
   high: '-high',
   max: '-xhigh',
 });
+
+// OpenCode's and Kilo's variant pickers offer Default, which leaves the prompt variant unset.
+export const NATIVE_DEFAULT_VARIANT = 'default';
+
+/** The native prompt's variant for a selected value: none for Default or no selection. */
+export function nativePromptVariant(value: unknown): string | undefined {
+  return typeof value === 'string' && value !== NATIVE_DEFAULT_VARIANT ? value : undefined;
+}
 
 export function assertCatalogBinding(scope: CatalogScope, key: string, value?: CatalogValue): void {
   const binding = CATALOG_BINDINGS[key];

@@ -15,6 +15,7 @@ import type {
 import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
 import { observeNormalized } from '../../../core/compatibility/providerEvolution.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
+import { nativePromptVariant } from '../../../catalogs/bindings.js';
 
 const REQUEST_POLL_INTERVAL_MS = 250;
 
@@ -68,8 +69,7 @@ export class KiloProvider implements Provider {
         sessionId,
         content: compileRuntimeTurnPrompt(turn.message, turn),
         model: opts.model,
-        variant: typeof opts.modelControls?.['kilo.variant'] === 'string'
-          ? opts.modelControls['kilo.variant'] : undefined,
+        variant: nativePromptVariant(opts.modelControls?.['kilo.variant']),
         signal: opts.signal,
       });
 

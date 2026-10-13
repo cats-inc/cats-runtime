@@ -212,12 +212,14 @@ describe('OpencodeNativeSessionService', () => {
       if (url.pathname === '/session/oc-1/message' && init?.method === 'POST') {
         const body = JSON.parse(String(init.body)) as {
           model?: { providerID: string; modelID: string };
+          variant?: string;
           parts: Array<{ type: string; text?: string }>;
         };
         expect(body.model).toEqual({
           providerID: 'anthropic',
           modelID: 'claude-sonnet-4.5',
         });
+        expect(body.variant).toBe('high');
         expect(body.parts).toEqual([{ type: 'text', text: 'Ship it' }]);
 
         return jsonResponse({
@@ -253,6 +255,7 @@ describe('OpencodeNativeSessionService', () => {
       sessionId: 'oc-1',
       content: 'Ship it',
       model: 'anthropic/claude-sonnet-4.5',
+      variant: 'high',
     })).resolves.toEqual({
       sessionId: 'oc-1',
       messageId: 'assistant-1',

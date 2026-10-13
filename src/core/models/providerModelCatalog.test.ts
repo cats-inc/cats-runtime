@@ -800,7 +800,7 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
-  it('serves the bundled Cursor shortlist without promising upstream expansion', async () => {
+  it('serves the bundled full Cursor catalog on reads and refreshes instead of discovery', async () => {
     const runtime = createRuntimeRoot();
 
     try {
@@ -857,6 +857,12 @@ describe('ProviderModelCatalogService', () => {
           unknown: cursorStaticModelCount,
         },
       });
+
+      // A full curated scope keeps precedence over live discovery, as a shortlist did.
+      const refreshed = await service.getCatalog('cursor', undefined, { forceRefresh: true });
+      expect(refreshed).toMatchObject({ source: 'static', cache: null });
+      expect(refreshed?.models.map(model => model.id)).toEqual(cursorCatalog.models.map(model => model.id));
+      expect(cursorStaticModelCount).toBeGreaterThan(6);
     } finally {
       runtime.cleanup();
     }

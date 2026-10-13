@@ -17,29 +17,29 @@ provider-specific model options or expanding the operator's scope.
 The operator-approved policy is recorded in the 2026-09-17 amendment to
 `docs/specs/SPEC-028-provider-model-catalog-maintenance-skill.md` in cats-runtime:
 
-- **Full catalogs:** Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie, Kiro, Auggie, GitHub
-  Copilot, Pi (its `openai-codex` channel only) and Goose (its `chatgpt_codex` channel only). Maintain the
-  complete evidenced CLI model lists and applicable effort/options; offer all of them in Desktop and
-  Playground, plus custom model-string input. The six-model limit does not apply to this group.
-- **Shortlists:** Cursor Agent, Devin, OpenCode, Kilo Code, and Cline. Maintain at most six explicitly selected model entries per CLI, plus
-  custom input. Effort remains attached to its model; the custom-input action is not a model slot.
-- Approved shortlists are recorded in `docs/research/2026-09-17-cursor-fixed-presets.md`,
-  `docs/research/2026-09-18-opencode-shortlist.md`,
-  `docs/research/2026-09-18-kilo-shortlist.md`,
-  `docs/research/2026-09-18-devin-shortlist.md`, and
-  `docs/research/2026-09-18-cline-shortlist.md`.
-  Shortlist membership and order remain operator decisions. Do not truncate current
-  catalogs or select the first six discovered models from this policy alone. These are product
-  policy groups, not a substitute for deriving the registered inventory during an audit.
-- Custom input remains available for both groups, including API-key-backed use on supported
-  execution paths. Preserve backend-specific identifiers; this policy does not establish new
-  adapter/API support or unknown model capabilities.
+- **Full catalogs:** all sixteen CLIs: Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie, Kiro,
+  Auggie, GitHub Copilot, Pi (its `openai-codex` channel only), Goose (its `chatgpt_codex` channel
+  only), Cursor Agent, Devin (without the fusion family and legacy `MODEL_*` UIDs), OpenCode (its
+  `opencode-go` channel only), Kilo Code (its `kilo` gateway list) and Cline (its `cline-pass`
+  channel only). Maintain the complete evidenced CLI model lists and applicable effort/options;
+  offer all of them in Desktop and Playground, plus custom model-string input.
+- **Shortlists:** none since 2026-10-14. A shortlist holds at most six operator-selected entries
+  plus custom input, and its membership and order are operator decisions. Never truncate a full
+  catalog to one, or pick the first six discovered models, without that decision. The earlier
+  shortlists are history in the 2026-09-17/18 notes and `docs/research/2026-09-23-goose-shortlist.md`.
+  These are product policy groups, not a substitute for deriving the registered inventory during
+  an audit.
+- Custom input remains available, including API-key-backed use on supported execution paths.
+  Preserve backend-specific identifiers; this policy does not establish new adapter/API support or
+  unknown model capabilities.
 
-Cursor uses fixed parameterized model strings; Copilot uses picker labels with `models.list` or
-operator-confirmed IDs plus separate per-row reasoning, context and Auto tier controls; OpenCode uses provider-qualified model IDs without evidenced option controls; Kilo
-resolves approved fixed variants separately from the raw model ID; Devin uses executable variant
-UIDs containing the fixed effort on its agent/ACP target; ClinePass uses explicit CLI provider
-selection plus a separate fixed thinking argument; Kiro uses verbatim picker IDs plus a separate
+Cursor uses one entry per picker family whose parameters are controls over the exact
+parameterized variant strings, with the picker's preselected variant as defaults; Copilot uses picker labels with `models.list` or
+operator-confirmed IDs plus separate per-row reasoning, context and Auto tier controls; OpenCode
+and Kilo use provider-qualified model IDs plus a per-model Variant control (Default first) sent as
+the native prompt's variant; Devin uses one entry per family with effort and speed controls over
+the executable variant UIDs on its agent/ACP target; ClinePass uses explicit CLI provider
+selection plus a per-model thinking-level control; Kiro uses verbatim picker IDs plus a separate
 per-model effort control; Junie uses literal picker names as entry IDs, executed as the JAR's
 setting IDs, plus a separate per-model effort control;
 Auggie uses CLI-observed IDs and exact picker labels; its picker shows no effort, so it has no
@@ -244,17 +244,19 @@ authorizes that external mutation.
 - [Claude](./references/providers/claude.md): supplied picker fast path, arrow-only agent capture,
   alias/label projection, per-model effort and existing Runtime/Desktop support; compiled
   extraction is a possible superset.
-- [Cline](./references/providers/cline.md): bounded installed ClinePass mappings, explicit provider
-  routing, fixed thinking arguments and consistent structured/plain-string execution.
+- [Cline](./references/providers/cline.md): the installed static `cline-pass` block as the channel
+  list, the quota-separate Free models left out, explicit provider routing and the picker's
+  thinking levels.
 - [Codex](./references/providers/codex.md): supplied picker evidence, existing per-model defaults,
   exact display labels, data bindings and focused validation.
 - [Copilot](./references/providers/copilot.md): the `/model` picker as the full list for the
   account's plan, `models.list` IDs with confirmation for omitted rows, per-row Reasoning, Context
   and Auto Tier controls, plan-unavailable rows, and the reusable capture helper.
-- [Cursor](./references/providers/cursor.md): exact parameterized variant strings, fixed-combination
-  shortlists, refresh/custom-input preservation, and isolated discovery fixtures.
-- [Devin](./references/providers/devin.md): family versus executable variant UIDs, bounded JSON
-  mapping evidence, ACP new/resume model application, and response-consumer validation.
+- [Cursor](./references/providers/cursor.md): the parameterized-model capture script, families as
+  controls over exact variant strings, picker-preselected defaults, splitting families that do not
+  list every combination, and the legacy `--list-models` limits.
+- [Devin](./references/providers/devin.md): families with effort and speed controls over exact
+  variant UIDs, the excluded fusion and legacy rows, bounded JSON reading and ACP model application.
 - [Goose](./references/providers/goose.md): the `chatgpt_codex` channel list compiled into Goose,
   isolated informational probes, thinking-effort suffix transport and native-config separation.
 - [Grok](./references/providers/grok.md): screenshot/transcription evidence, retained effort-token
@@ -266,12 +268,12 @@ authorizes that external mutation.
   from the V3 engine's ACP config (read by the probe without a prompt), thinking flags as notes,
   auto without a default claim, display names kept in evidence only, and the read-only V3
   picker walk for display text, whose panel shows current values rather than defaults.
-- [Kilo](./references/providers/kilo.md): distinguish gateway mappings from the picker and
-  execution variants from display-only thinking flags.
+- [Kilo](./references/providers/kilo.md): the gateway list as the operator-chosen scope, the picker
+  walk helper for order and coverage, Recommended versus Recent sections, and the Variant control.
 - [Muse](./references/providers/muse.md): MSP model-id enumeration versus per-model picker efforts;
   global help is not a menu, and MSP `isDefault` must not be copied into curated YAML.
-- [OpenCode](./references/providers/opencode.md): verbose ID/name enumeration, same-name provider
-  disambiguation, and entry-only shortlist wiring.
+- [OpenCode](./references/providers/opencode.md): the `opencode-go` channel from the verbose
+  listing, the picker's order and Recent behavior, and the Variant control.
 
 - [Pi](./references/providers/pi.md): the full `openai-codex` channel read from the installed
   package, the channel as scope basis with bare labels, per-model thinking levels with the

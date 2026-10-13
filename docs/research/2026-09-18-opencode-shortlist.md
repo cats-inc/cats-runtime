@@ -1,3 +1,6 @@
+> Superseded on 2026-10-14 by the [full opencode-go channel](./2026-10-14-shortlists-to-full.md#opencode-1190-opencode-go-32-rows).
+> Every listed model now offers its Variant menu.
+
 # OpenCode 1.18.31 shortlist
 
 ## Amendment 2026-09-28: Union Alpha Free removed (OpenCode 1.18.32)

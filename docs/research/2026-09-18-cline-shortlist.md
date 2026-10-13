@@ -1,3 +1,6 @@
+> Superseded on 2026-10-14 by the [full cline-pass channel](./2026-10-14-shortlists-to-full.md#cline-3071-cline-pass-14-rows).
+> Every subscribed model now offers the picker's thinking levels.
+
 # Cline 3.0.62 ClinePass shortlist
 
 Date: 2026-09-18. Mode: refresh; interaction policy: confirm uncertainty.

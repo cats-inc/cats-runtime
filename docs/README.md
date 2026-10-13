@@ -155,6 +155,13 @@ auto without a default claim, the config-restoring capture, session cost and the
 capture, restore and usage helpers. It supersedes the
 [Kiro shortlist](./research/2026-09-18-kiro-shortlist.md).
 
+[Shortlists to full catalogs](./research/2026-10-14-shortlists-to-full.md) records the move of
+Cursor, OpenCode, Kilo, Cline and Devin to full catalogs: the opencode-go and kilo gateway rows
+with Default-first Variant controls, Cline's cline-pass channel with the picker's thinking levels,
+Devin families with effort and speed controls, Cursor families from the parameterized reply, the
+Kilo picker and Cursor capture helpers, pattern acknowledgements and the factory parse cache. It
+supersedes the five shortlists below.
+
 [ClinePass shortlist](./research/2026-09-18-cline-shortlist.md) records six fixed Medium
 combinations, explicit provider routing, custom input and the fix for single-token
 or flag-like prompts rejected by Cline's argument parser.
@@ -183,9 +190,8 @@ Pi 0.87.1 `openai-codex` models a ChatGPT account can run, read from the install
 combinations, parameterized execution, refresh-stable shortlist, and custom input.
 
 [Approved model-menu maintenance policy](./specs/SPEC-028-provider-model-catalog-maintenance-skill.md#approved-maintenance-and-menu-policy-2026-09-17)
-records complete catalogs for Codex/Claude/agy/Grok/Muse, up to six models for the named other
-CLIs, and custom model input for both groups. Cursor, OpenCode, Kilo, Devin and Cline shortlists are implemented; the remaining
-individual shortlists and rollout are pending.
+records the full-catalog and shortlist groups and custom model input for both. Since 2026-10-14
+all sixteen CLIs carry full catalogs and no shortlist remains.
 
 [Grok Build 1.0.34 picker](./research/2026-09-17-grok-model-picker-refresh.md)
 records exact effort labels and first-item initialization in Desktop and Playground

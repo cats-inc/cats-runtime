@@ -48,8 +48,8 @@ The repository owner approved two maintenance groups for Cats Desktop and Runtim
 
 | Group | CLI providers | Maintained and selectable catalog |
 |---|---|---|
-| Full catalog | Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie CLI, Kiro CLI, Auggie CLI, GitHub Copilot CLI, Pi (`openai-codex` channel), Goose CLI (`chatgpt_codex` channel) | Complete evidenced CLI model lists and all applicable effort/options, plus custom model-string input |
-| Shortlist | Cursor Agent CLI, Devin CLI, OpenCode, Kilo Code CLI, Cline | At most six explicitly selected models per CLI, plus a custom-input action |
+| Full catalog | Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie CLI, Kiro CLI, Auggie CLI, GitHub Copilot CLI, Pi (`openai-codex` channel), Goose CLI (`chatgpt_codex` channel), Cursor Agent CLI, Devin CLI, OpenCode (`opencode-go` channel), Kilo Code CLI (`kilo` gateway list), Cline (`cline-pass` channel) | Complete evidenced CLI model lists and all applicable effort/options, plus custom model-string input |
+| Shortlist | None since 2026-10-14 | At most six explicitly selected models per CLI, plus a custom-input action |
 
 **2026-09-26 amendment:** the owner moved Junie CLI from the shortlist group to the
 full-catalog group. It now carries the complete JetBrains AI picker list and each model's
@@ -101,6 +101,18 @@ list, the same six the 2026-09-23 shortlist held. Each row now offers Goose's ow
 menu (Off, Low, Medium, High, Max) with no default, sent as Goose's native model suffix, as
 recorded in [the 2026-10-14 refresh note](../research/2026-10-14-catalog-refresh.md). Other Goose
 providers remain custom input and out of scope. Membership of the other groups is unchanged.
+
+**2026-10-14 shortlist retirement amendment:** the owner moved the last five shortlists to the
+full-catalog group, as recorded in [the 2026-10-14 note](../research/2026-10-14-shortlists-to-full.md):
+Cursor Agent CLI (every picker family, its parameters as controls over the exact variant strings,
+defaults from the variant the picker preselects); Devin CLI (every family except the fusion family
+and the legacy `MODEL_*` UIDs, with effort and speed controls over the exact UIDs); OpenCode for its
+`opencode-go` channel and Cline for its `cline-pass` channel (each model with its picker's
+variant or thinking menu; Cline's quota-separate `cline-free` models stay out); and Kilo Code CLI,
+whose scope the owner set to the `kilo` gateway list (`kilo models kilo`) instead of the picker,
+an explicit change of the scope basis the Kilo reference otherwise forbids, in the picker's
+Recommended-then-gateway order. Other providers of these hosts remain custom input. The shortlist
+group keeps its rules for a future choice but has no members.
 
 **2026-09-29 basis amendment:** a scope records its routing channel or account plan as
 `basis` only with evidence, as defined in the

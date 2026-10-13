@@ -1,3 +1,6 @@
+> Superseded on 2026-10-14 by the [full Devin catalog](./2026-10-14-shortlists-to-full.md#devin-3000113-54-entries-over-47-families).
+> Every family except fusion and the legacy MODEL_* UIDs now offers effort and speed controls.
+
 # Devin 3000.10.31 fixed shortlist and ACP execution
 
 ## Scope and evidence

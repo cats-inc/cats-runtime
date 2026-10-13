@@ -408,6 +408,43 @@ describe('repository-maintenance skill sync', () => {
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
   });
 
+  // Two preload cases run a fake bundle in child processes, so allow a slow CI host.
+  it('runs the Cursor parameterized model capture behavior suite', { timeout: 30_000 }, () => {
+    const result = spawnSync(process.execPath, [
+      '--test',
+      join(
+        REPO_ROOT,
+        'skills',
+        'maintain-provider-model-catalogs',
+        'tests',
+        'capture-cursor-parameterized-models.node-test.mjs',
+      ),
+    ], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+  });
+
+  it('runs the catalog scope entry generator behavior suite', () => {
+    const result = spawnSync(process.execPath, [
+      '--test',
+      join(
+        REPO_ROOT,
+        'skills',
+        'maintain-provider-model-catalogs',
+        'tests',
+        'catalog-scope-entries.node-test.mjs',
+      ),
+    ], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+  });
+
   it('runs the Claude picker observation builder behavior suite', () => {
     const result = spawnSync(process.execPath, [
       '--test',
