@@ -1,0 +1,13 @@
+┌──────────────────────────────────────────────────────┐
+│  Session usage                                       │
+│    Input      0                                      │
+│    Cached     0                                      │
+│    Output     0                                      │
+│    Total      0                                      │
+│    Turns         0                                   │
+│    Subagents  none                                   │
+│  Subscription · REDACTED                             │
+│    Current        0% used · Resets at 7:27 AM        │
+│    Weekly         0% used · Resets Oct 19 at 8:00 AM │
+│    as of 2:33 AM                                     │
+└──────────────────────────────────────────────────────┘

@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Explicit native Codex/Copilot/Claude/Antigravity/Kiro refresh implemented; history deferred |
+| Status | Seven CLI query seams implemented; six numeric providers verified, Grok currently unavailable; history deferred |
 | Owner | cats-runtime |
 | Implementation | Authenticated bounded snapshot and separate passive quota observations |
 | Consumer | Usage via cats-platform |
@@ -14,7 +14,7 @@
 ### Explicit CLI refresh (Codex 2026-09-10; additional providers 2026-09-11)
 
 - `POST /usage/refresh` accepts only `{provider, instance:string}`, where provider
-  is `codex`, `copilot`, `claude`, `antigravity`, or `kiro`, for a configured CLI target.
+  is `codex`, `copilot`, `claude`, `antigravity`, `kiro`, `grok`, or `muse`, for a configured CLI target.
   It works during bootstrap, behind runtime authentication.
 - For Codex, run the configured CLI's `app-server` over stdio: await `initialize`, send
   `initialized`, then `account/rateLimits/read`. Never start a thread/model turn,
@@ -60,6 +60,17 @@ limits stay unknown; bonus/add-on credits and overage billing remain unmapped. S
 [Kiro evidence](../research/2026-10-14-kiro-v3-account-quota.md).
 See the [dated probe and limitations](../research/2026-09-11-additional-cli-quota-queries.md).
 
+Grok/Muse follow-up (2026-10-15): Grok `agent stdio` initializes ACP and calls
+`_x.ai/billing` without a session. Its current authenticated response lacks both
+percentage and legacy included-allowance quantities, so it is unavailable.
+Prepaid/on-demand balances are excluded. Muse fresh MSP `usage/read` is empty;
+native Windows TUI through existing Git winpty supplies Current/Weekly percentage
+windows via the fixed `/usage` built-in, with Session Turns 0. It uses an unlogged
+empty workspace, disabled writes/shell, bounded output/time and owned-tree cleanup.
+Missing helper, custom argv and unverified OS/transports return unsupported.
+Optional bounded `resetLabel` preserves Muse's local-clock text; reset instant,
+timezone and window duration remain unknown. See [evidence and validation](../research/2026-10-15-grok-muse-account-quota.md).
+
 SDK 1.2 adds `quota.refreshSupported` plus nullable native `used`, `limit`,
 `remaining`, `unit` (`percent`/`requests`/`credits`) and `unlimited` per window.
 Unlimited is not 100% or a negative limit. No reset date is invented: an elapsed
@@ -96,7 +107,8 @@ durable history without moving budget policy or app presentation into runtime.
 - A quota-only signal without token/cost values is not sufficient for the current
   usage-record gate; the new account path must handle it independently.
 
-Only the four verified native CLI paths above are collected on demand. No universal
+Only the seven verified query seams above are collected on demand; six have live
+numeric success evidence and Grok currently returns unavailable. No universal
 remaining/reset API or durable metering history is claimed.
 
 ## Goals

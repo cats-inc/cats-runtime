@@ -23,17 +23,21 @@ export interface UsageQuotaWindow {
   resetsAt: string | null;
   /** Calendar date only; no reset instant or timezone was reported. */
   resetsOn?: string | null;
+  /** Native human label without enough date/timezone information for an instant. */
+  resetLabel?: string | null;
   windowMinutes: number | null;
 }
 
-export function supportsQuotaRefresh(provider: unknown): provider is 'codex' | 'copilot' | 'claude' | 'antigravity' | 'kiro' {
-  return provider === 'codex' || provider === 'copilot' || provider === 'claude' || provider === 'antigravity' || provider === 'kiro';
+export function supportsQuotaRefresh(provider: unknown): provider is 'codex' | 'copilot' | 'claude' | 'antigravity' | 'kiro' | 'grok' | 'muse' {
+  return provider === 'codex' || provider === 'copilot' || provider === 'claude' || provider === 'antigravity' || provider === 'kiro'
+    || provider === 'grok' || provider === 'muse';
 }
 
 export function isAccountQuotaSource(value: unknown): value is string {
   return value === 'claude.rate_limit_event' || value === 'claude.get_usage'
     || value === 'codex.account/rateLimits/updated' || value === 'codex.account/rateLimits/read'
-    || value === 'copilot.account.getQuota' || value === 'antigravity.usage' || value === 'kiro.account.getUsage';
+    || value === 'copilot.account.getQuota' || value === 'antigravity.usage' || value === 'kiro.account.getUsage'
+    || value === 'grok.billing' || value === 'muse.tui.usage';
 }
 
 function finite(value: unknown): number | null {
@@ -81,6 +85,9 @@ export function normalizeUsageQuota(observation: UsageQuotaObservation | undefin
         remainingPercent: unlimited || usedPercent === null ? null : Math.max(0, 100 - usedPercent),
         resetsAt: timestamp(quota[`${id}.resetsAt`]),
         ...(calendarDate(quota[`${id}.resetsOn`]) ? { resetsOn: calendarDate(quota[`${id}.resetsOn`]) } : {}),
+        ...(source === 'muse.tui.usage' && typeof quota[`${id}.resetLabel`] === 'string'
+          && String(quota[`${id}.resetLabel`]).length <= 80 && !/[\u0000-\u001f\u007f]/u.test(String(quota[`${id}.resetLabel`]))
+          ? { resetLabel: String(quota[`${id}.resetLabel`]) } : {}),
         windowMinutes: finite(quota[`${id}.windowDurationMins`]),
       });
     }
@@ -100,7 +107,9 @@ export function normalizeUsageQuota(observation: UsageQuotaObservation | undefin
     observedAt,
     accountId: null,
     accountLinkage: 'unverified' as const,
-    scope: source === 'codex.account/rateLimits/read' || source === 'copilot.account.getQuota' || source === 'claude.get_usage' || source === 'antigravity.usage' || source === 'kiro.account.getUsage' ? 'provider_account_query' as const : 'provider_reported_during_runtime_execution' as const,
+    scope: source === 'codex.account/rateLimits/read' || source === 'copilot.account.getQuota' || source === 'claude.get_usage'
+      || source === 'antigravity.usage' || source === 'kiro.account.getUsage' || source === 'grok.billing' || source === 'muse.tui.usage'
+      ? 'provider_account_query' as const : 'provider_reported_during_runtime_execution' as const,
     limitId: typeof quota?.limitId === 'string' && /^[a-zA-Z0-9_-]{1,64}$/u.test(quota.limitId) ? quota.limitId : null,
     automaticRefresh: false as const,
     windows,

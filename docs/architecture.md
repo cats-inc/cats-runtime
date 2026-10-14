@@ -58,9 +58,13 @@ unrelated subscription allowance.
 Usage in `cats-apps` consumes sanitized snapshots through the
 `cats-platform` App host, not provider credentials or runtime-internal classes.
 The stable `/usage/snapshot` API and separate `/usage/refresh` POST for native
-Codex/Copilot/Claude/Antigravity/Kiro CLI account reads are implemented. Cats never
+Codex/Copilot/Claude/Antigravity/Kiro/Grok/Muse CLI account reads are implemented. Cats never
 extracts CLI credentials or calls provider APIs directly; each quota-only CLI
-process owns authentication. Kiro credit/date mapping is live-verified; scheduled polling,
+process owns authentication. Kiro credit/date and Muse Windows zero-turn TUI
+mapping are live-verified; Grok billing currently lacks numeric allowance and
+remains unavailable. Muse uses an existing winpty helper and bounded built-in
+input, with no model fallback; native reset text is optional without an invented
+instant. See [Grok/Muse evidence](research/2026-10-15-grok-muse-account-quota.md). Scheduled polling,
 verified account linkage and durable history described in
 [ADR-038](./decisions/038-separate-execution-usage-from-provider-account-quota.md),
 [SPEC-029](./specs/SPEC-029-provider-account-quota-and-usage-snapshots.md), and

@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Native Codex/Copilot/Claude/Antigravity/Kiro explicit refresh implemented; history deferred |
+| Status | Seven CLI query seams implemented; six numeric providers verified, Grok currently unavailable; history deferred |
 | Owner | cats-runtime |
 | Related spec | SPEC-029 |
 | Related decision | ADR-038 |
@@ -107,6 +107,21 @@ are provenance, not allowlists. Independent review found and fixed execution-cou
 and status-only cache replacement, plus custom-argv launch risks. New collectors
 reject custom arguments; last numeric observations retain their original timestamp.
 
+### Phase 2c: Grok and Muse (2026-10-15, source implementation)
+
+- [x] Verify Grok ACP billing with CLI-owned login; preserve missing included allowance as unavailable.
+- [x] Verify Muse fresh Windows TUI `/usage` with Turns 0 after fresh MSP usage/read returned empty.
+- [x] Add fixed built-in input, existing winpty discovery, bounded time/output and owned-tree cleanup.
+- [x] Preserve optional native resetLabel without inventing timestamp, timezone or duration.
+- [x] Connect Runtime route/snapshot, Platform gates/SDK projection and capability-gated Usage UI.
+- [x] Pass authenticated production CLI → HTTP → compiled host client with zero execution records/sessions, passive reads and cooldown.
+- [x] Pass production-host built-App browser checks against fixtures and independent source review.
+- [ ] Eventual authorized release: next compatible SDK minor, new immutable Usage patch and selected Desktop Runtime/App pins.
+
+The [evidence record](../research/2026-10-15-grok-muse-account-quota.md) separates
+Grok's working query seam from missing numeric data and Muse's Windows/helper
+limit. No version bump, publication, persistent format change or installed update.
+
 ### Phase 3: U2 Account Quota Service
 
 - [x] Retain quota-only progress per target independently from token-bearing results;
@@ -172,6 +187,7 @@ Live collector verification is a separately scoped activity with recorded eviden
 
 | Date | Update |
 |------|--------|
+| 2026-10-15 | Grok/Muse CLI-only reads and additive resetLabel implemented. Windows Runtime 28 focused tests and TypeScript check/build passed; host/client/renderer tests and production-host private Usage archive checks passed. Live Grok unavailable and Muse Current/Weekly 0% used, one CLI read each, zero execution records/sessions, passive GETs and cooldown. Independent review fixed the Windows kill/EOF race; descendant cleanup regression passed. No new release or installed update. |
 | 2026-10-14 | Kiro 2.31.0 V3 quota-only ACP read verified on native Windows; source/HTTP/host/Usage connected with decimal credits and additive calendar-only resetsOn. Runtime 66 focused tests and TypeScript check/build, six Usage tests and live compiled collector → authenticated HTTP → host client passed (one query, zero sessions/execution records, passive reads and cooldown). Independent review found no P1/P2 issues. See [evidence](../research/2026-10-14-kiro-v3-account-quota.md); no release or installed update. |
 | 2026-09-11 | PR-only delivery authorized. Full Windows npm test passed (2,037 passed, 10 skipped, 0 failed); isolated the API-only peer fixture from real CLI diagnostics and settled aborted requests after an existing timeout surfaced. Independent delta review passed. No product-route/timeout change, tag, publication or installed update. |
 | 2026-09-11 | Native Copilot/Claude/Antigravity queries, SDK 1.2 and Usage 0.2.0 implemented and independently reviewed. Focused tests and built-App browser checks passed; Kiro authentication/success mapping remains open. No release or installed update. |
