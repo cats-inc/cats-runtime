@@ -382,21 +382,10 @@ describe('runtime server', () => {
       expect(html).toContain('session?.lastInputPreview');
       expect(html).toContain('window.__CATS_RUNTIME_API_BASE__');
       expect(html).toContain('window.__CATS_RUNTIME_PROXY_MODE__');
-      expect(html.indexOf('<option value="claude">claude</option>'))
-        .toBeLessThan(html.indexOf('<option value="codex">codex</option>'));
-      expect(html.indexOf('<option value="codex">codex</option>'))
-        .toBeLessThan(html.indexOf('<option value="antigravity">antigravity</option>'));
-      expect(html.indexOf('<option value="antigravity">antigravity</option>'))
-        .toBeLessThan(html.indexOf('<option value="cursor">cursor</option>'));
-      expect(html.indexOf('<option value="cursor">cursor</option>'))
-        .toBeLessThan(html.indexOf('<option value="copilot">copilot</option>'));
-      expect(html.indexOf('<option value="copilot">copilot</option>'))
-        .toBeLessThan(html.indexOf('<option value="opencode">opencode</option>'));
+      expect(html).toContain('<option value="">Loading providers...</option>');
       expect(html).toContain(
-        "const PROVIDER_ORDER = ['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'opencode', 'kilo', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'grok', 'cline', 'devin', 'muse', 'ollama', 'openclaw'];",
+        "const PROVIDER_ORDER = ['codex', 'claude', 'antigravity', 'grok', 'muse', 'cursor', 'copilot', 'opencode', 'kilo', 'cline', 'auggie', 'pi', 'kiro', 'junie', 'devin', 'goose', 'ollama', 'openclaw'];",
       );
-      expect(html.indexOf('<option value="kiro">kiro</option>'))
-        .toBeLessThan(html.indexOf('<option value="grok">grok</option>'));
       expect(html).toContain('--grok: #e5e7eb;');
       expect(html).toContain('.provider-badge[data-p="grok"]');
       expect(html).toContain('--openclaw: #f87171;');

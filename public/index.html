@@ -1109,19 +1109,7 @@
         <div class="runtime-field">
           <label class="runtime-field-label">Provider</label>
           <select id="inputProvider" class="runtime-select" onchange="onProviderChange()">
-            <option value="claude">claude</option>
-            <option value="codex">codex</option>
-            <option value="antigravity">antigravity</option>
-            <option value="cursor">cursor</option>
-            <option value="copilot">copilot</option>
-            <option value="opencode">opencode</option>
-            <option value="kilo">kilo</option>
-            <option value="auggie">auggie</option>
-            <option value="kiro">kiro</option>
-            <option value="grok">grok</option>
-            <option value="cline">cline</option>
-            <option value="devin">devin</option>
-            <option value="muse">muse</option>
+            <option value="">Loading providers...</option>
           </select>
         </div>
         <div class="runtime-field" id="instanceGroup">
@@ -1244,7 +1232,7 @@ if (PLATFORM_RUNTIME_PROXY && !INJECTED_RUNTIME_API_BASE) {
 const API_BASE = INJECTED_RUNTIME_API_BASE
   ? INJECTED_RUNTIME_API_BASE.replace(/\/+$/, '')
   : window.location.origin;
-const PROVIDER_ORDER = ['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'opencode', 'kilo', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'grok', 'cline', 'devin', 'muse', 'ollama', 'openclaw'];
+const PROVIDER_ORDER = ['codex', 'claude', 'antigravity', 'grok', 'muse', 'cursor', 'copilot', 'opencode', 'kilo', 'cline', 'auggie', 'pi', 'kiro', 'junie', 'devin', 'goose', 'ollama', 'openclaw'];
 const CLI_RUNTIME_ORDER = ['native', 'wsl', 'docker'];
 let currentSessionId = null;
 let isStreaming = false;
@@ -2472,7 +2460,7 @@ function syncProviderSelect() {
     return;
   }
 
-  const current = providerSelect.value || 'claude';
+  const current = providerSelect.value;
   const providers = configuredProviderNames();
 
   if (providers.length === 0) {

@@ -164,6 +164,11 @@ public, but the user must enter a bearer token in the playground UI before it
 can call protected routes such as `GET /providers/{provider}/models` or session
 mutation endpoints.
 
+Fresh Playground Add Agent cards use the first selectable provider in canonical
+order (Codex first, subject to availability). The Dashboard's blank new-session
+picker likewise uses the first configured provider. Explicit selections and
+starter-team provider roles are preserved.
+
 `POST /mcp` exposes the runtime-owned MCP facade over HTTP JSON-RPC and is the
 authoritative MCP execution owner because it runs inside the primary
 `cats-runtime` process. `node build/runtime/bin/mcp.js` exposes the same tool plane over
