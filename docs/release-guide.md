@@ -49,6 +49,24 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+### Release notes — 0.5.1 (2026-10-14)
+
+- Add native Kiro V3 account quota reads through CLI-owned ACP authentication,
+  without a session or model turn. Preserve fractional credits, unknown limits
+  and calendar-only reset dates; bonus/add-on billing remains unmapped.
+- This is a compatible patch within 0.5.x: configuration and persisted formats
+  stay compatible, so no data migration is required. Snapshot schemaVersion 1
+  gains optional `resetsOn` rather than an invented reset instant.
+- The owner selected source bundling in Desktop 0.8.1 standard preview. No Runtime
+  npm publication or cats-one release is selected. Desktop preparation pins the
+  immutable merge commit of this bump across every OS and the source archive.
+- The Kiro implementation passed 66 focused tests, native Windows live validation
+  and its full PR release-preflight. This preparation changes version fields and
+  notes; its existing PR gate and Desktop packaging workflow enforce validation.
+  Publication results: Desktop
+  [`v0.8.1`](https://github.com/cats-inc/cats-platform/releases/tag/v0.8.1) and its
+  workflow run. Native macOS/Linux quota login remains unverified locally.
+
 ### Release notes — 0.5.0 (prepared 2026-10-14)
 
 - **Kiro runs on its V3 headless engine (minor boundary).** Each turn runs
