@@ -107,6 +107,26 @@ describe('Usage snapshot', () => {
     });
   });
 
+  it('exposes Grok/Muse query capability and preserves Muse native reset labels without inventing instants', () => {
+    const service = new RuntimeMeteringService({ now: () => now });
+    service.observeQuota({ provider: 'muse', instance: 'default', backend: 'cli', observedAt: now.toISOString(), quota: {
+      source: 'muse.tui.usage', 'current.usedPercent': 0, 'current.resetLabel': 'at 7:27 AM',
+      'weekly.usedPercent': 20, 'weekly.resetLabel': 'Oct 19 at 8:00 AM', password: 'PRIVATE',
+    } });
+    const snapshot = service.buildUsageSnapshot([], [
+      { provider: 'grok', instance: 'default', backend: 'cli' }, { provider: 'muse', instance: 'default', backend: 'cli' },
+    ]);
+    const grok = snapshot.targets.find(target => target.provider === 'grok')!;
+    expect(grok.quota).toMatchObject({ status: 'unavailable', refreshSupported: true, windows: [] });
+    const muse = snapshot.targets.find(target => target.provider === 'muse')!;
+    expect(muse.quota).toMatchObject({ status: 'available', refreshSupported: true, scope: 'provider_account_query', windows: [
+      { id: 'current', usedPercent: 0, remainingPercent: 100, resetLabel: 'at 7:27 AM', resetsAt: null, windowMinutes: null },
+      { id: 'weekly', usedPercent: 20, remainingPercent: 80, resetLabel: 'Oct 19 at 8:00 AM', resetsAt: null },
+    ] });
+    expect(snapshot.totals.observations).toBe(0);
+    expect(JSON.stringify(snapshot)).not.toContain('PRIVATE');
+  });
+
   it('does not sum quota across targets with unverified account identity', () => {
     const service = new RuntimeMeteringService({ now: () => now });
     for (const instance of ['one', 'two']) service.observeEvent(session('codex', instance), {

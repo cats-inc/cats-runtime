@@ -311,6 +311,10 @@ When working on this project:
 
 ## Current Documentation Gaps
 
+[Grok/Muse CLI quota evidence](research/2026-10-15-grok-muse-account-quota.md)
+records seven implemented query seams, six numeric providers verified, Grok's
+currently missing allowance fields and Muse's native Windows/winpty boundary.
+
 The [Codex explicit quota-read evidence](research/2026-09-11-codex-cli-explicit-quota-read.md)
 records the native CLI-only collector and isolated built-App verification. Installed
 delivery, other native OS acceptance and remote transports are separate gates.

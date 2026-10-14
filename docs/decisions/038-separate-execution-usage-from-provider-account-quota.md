@@ -6,7 +6,12 @@ Accepted — ownership and data distinction approved on 2026-09-10.
 The memory-only read contract and passive Claude/Codex window projection are now
 implemented under PLAN-038. Explicit native Codex, Copilot, Claude Code and
 Antigravity and Kiro V3 CLI reads are implemented. Kiro authenticated credit/date
-evidence was verified 2026-10-14; scheduled polling, verified accounts and persistence remain planned.
+evidence was verified 2026-10-14. Grok billing and Windows Muse zero-turn TUI reads
+were verified 2026-10-15; Grok currently lacks numeric allowance. Muse uses the
+existing terminal helper because fresh MSP usage/read is empty; only a full
+Turns 0 subscription card establishes quota, and native reset text does not
+establish a reset instant. See [evidence](../research/2026-10-15-grok-muse-account-quota.md).
+Scheduled polling, verified accounts and persistence remain planned.
 
 ## Context
 

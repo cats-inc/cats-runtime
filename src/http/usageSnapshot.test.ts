@@ -38,7 +38,7 @@ it('explicit refresh authenticates, validates the configured target, works in bo
   const collect = vi.fn(async () => ({ status: 'updated' as const, quota: {
     source: 'codex.account/rateLimits/read', 'primary.usedPercent': 10,
   } }));
-  const ctx = { config: { apiKey: 'fixture', providerInstances: { codex: { primary: {} }, copilot: { primary: {} }, claude: { primary: {} }, antigravity: { primary: {} }, kiro: { primary: {} } } },
+  const ctx = { config: { apiKey: 'fixture', providerInstances: { codex: { primary: {} }, copilot: { primary: {} }, claude: { primary: {} }, antigravity: { primary: {} }, kiro: { primary: {} }, grok: { primary: {} }, muse: { primary: {} } } },
     startup: { bootstrapRequired: true }, registry: { list: () => [] }, metering,
     quotaRefresh: new QuotaRefreshService({ collect, observe: (q) => metering.observeQuota(q) }),
   } as unknown as AppContext;
@@ -75,4 +75,9 @@ it('explicit refresh authenticates, validates the configured target, works in bo
   expect((await request({ provider: 'kiro', instance: 'primary' })).status).toBe(200);
   expect(collect).toHaveBeenLastCalledWith({ provider: 'kiro', instance: 'primary', backend: 'cli' }, expect.any(AbortSignal));
   expect(collect).toHaveBeenCalledTimes(5);
+  for (const provider of ['grok', 'muse']) {
+    expect((await request({ provider, instance: 'primary' })).status).toBe(200);
+    expect(collect).toHaveBeenLastCalledWith({ provider, instance: 'primary', backend: 'cli' }, expect.any(AbortSignal));
+  }
+  expect(collect).toHaveBeenCalledTimes(7);
 });
