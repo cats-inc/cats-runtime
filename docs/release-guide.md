@@ -49,6 +49,30 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+### Release notes — 0.5.2 (2026-10-15)
+
+- Fresh Dashboard session and Playground Add Agent pickers use the first
+  configured/selectable provider in canonical order, Codex first, instead of
+  preselecting Claude. Explicit current/saved selections and starter team roles
+  remain intact; Playground retains its availability ordering.
+- Include the Grok/Muse CLI-only quota collectors: Grok billing is connected but
+  the current authenticated response lacks subscription allowance numbers and
+  stays unavailable. Muse native Windows plus existing Git winpty supplies
+  Current/Weekly percentages from an unlogged Turns 0 TUI. Optional resetLabel
+  preserves native text without an invented reset instant or window duration.
+- Compatible 0.5.x patch; configuration and persisted formats are unchanged,
+  with no data migration. Existing sessions and HTTP/ACP execution defaults are
+  preserved. Quota reads do not create model turns or execution history.
+- Source bundling is selected for Desktop 0.8.2 standard-profile preview. Its
+  preparation must pin this bump's immutable merge commit across OS builds and
+  the complete source archive. No Runtime npm or cats-one release is selected.
+- The default-picker regression tests and existing provider/Playground tests
+  passed (32 focused cases). Grok/Muse live CLI → HTTP → host and quota tests
+  passed in their implementation slice. Required PR release-preflight and
+  Desktop packaged-source/App/startup gates enforce the release checks.
+  Expected Desktop tag: `v0.8.2`. Use its Actions run and Release assets to verify
+  completion after dispatch. Muse macOS/Linux/WSL/Docker quota queries remain unsupported.
+
 ### Release notes — 0.5.1 (2026-10-14)
 
 - Add native Kiro V3 account quota reads through CLI-owned ACP authentication,
