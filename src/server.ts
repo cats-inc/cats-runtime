@@ -85,6 +85,7 @@ import { readCopilotQuota } from './backends/cli/usage/copilotQuota.js';
 import { readClaudeQuota } from './backends/cli/usage/claudeQuota.js';
 import { readAntigravityQuota } from './backends/cli/usage/antigravityQuota.js';
 import { readCodexQuota } from './backends/cli/usage/codexQuota.js';
+import { readKiroQuota } from './backends/cli/usage/kiroQuota.js';
 import { primeProviderAvailabilityDiagnosticsCache, invalidateProviderAvailabilityDiagnosticsCache } from './http/routes/diagnostics.js';
 import { probeSetupNonCliTarget } from './core/bootstrap/setupConnections.js';
 import { executeRetainedWorktreeCleanup } from './http/routes/sessions.js';
@@ -1128,6 +1129,7 @@ export function createRuntimeServer(
       if (target.provider === 'copilot') return readCopilotQuota(resolveProviderInstance(config, 'copilot', target.instance).commandConfig, signal);
       if (target.provider === 'claude') return readClaudeQuota(resolveProviderInstance(config, 'claude', target.instance).commandConfig, signal);
       if (target.provider === 'antigravity') return readAntigravityQuota(resolveProviderInstance(config, 'antigravity', target.instance).commandConfig, signal);
+      if (target.provider === 'kiro') return readKiroQuota(resolveProviderInstance(config, 'kiro', target.instance).commandConfig, signal);
       return { status: 'unsupported' };
     },
     observe: (observation) => context.metering!.observeQuota(observation),

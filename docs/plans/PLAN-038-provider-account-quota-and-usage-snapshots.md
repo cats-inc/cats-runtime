@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Native Codex/Copilot/Claude/Antigravity explicit refresh implemented; Kiro auth/success verification and history deferred |
+| Status | Native Codex/Copilot/Claude/Antigravity/Kiro explicit refresh implemented; history deferred |
 | Owner | cats-runtime |
 | Related spec | SPEC-029 |
 | Related decision | ADR-038 |
@@ -92,7 +92,7 @@ start a model turn, or use execution-token statistics as account allowance.
 - [x] Claude: verify a non-model invocation of its built-in usage command before
       enabling automation; do not send `/usage` as a model prompt.
 - [x] Kiro: inspect CLI/ACP and probe no-session account read; record auth failure.
-- [ ] Kiro: obtain an authenticated success fixture and verify unit/window mapping before enabling.
+- [x] Kiro: authenticated V3 success fixture and credit/date mapping verified 2026-10-14; collector enabled.
 - [x] Antigravity: verify standalone built-in `/usage` in `agy`, not Gemini CLI documentation.
 - [x] Extend the permission-checked host/SDK/Usage path for verified collectors,
       with provider+instance isolation, tests, and independent review.
@@ -172,6 +172,7 @@ Live collector verification is a separately scoped activity with recorded eviden
 
 | Date | Update |
 |------|--------|
+| 2026-10-14 | Kiro 2.31.0 V3 quota-only ACP read verified on native Windows; source/HTTP/host/Usage connected with decimal credits and additive calendar-only resetsOn. Runtime 66 focused tests and TypeScript check/build, six Usage tests and live compiled collector → authenticated HTTP → host client passed (one query, zero sessions/execution records, passive reads and cooldown). Independent review found no P1/P2 issues. See [evidence](../research/2026-10-14-kiro-v3-account-quota.md); no release or installed update. |
 | 2026-09-11 | PR-only delivery authorized. Full Windows npm test passed (2,037 passed, 10 skipped, 0 failed); isolated the API-only peer fixture from real CLI diagnostics and settled aborted requests after an existing timeout surfaced. Independent delta review passed. No product-route/timeout change, tag, publication or installed update. |
 | 2026-09-11 | Native Copilot/Claude/Antigravity queries, SDK 1.2 and Usage 0.2.0 implemented and independently reviewed. Focused tests and built-App browser checks passed; Kiro authentication/success mapping remains open. No release or installed update. |
 | 2026-09-10 | Baseline and ownership recorded; all new runtime implementation remains planned. |

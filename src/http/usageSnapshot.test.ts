@@ -38,7 +38,7 @@ it('explicit refresh authenticates, validates the configured target, works in bo
   const collect = vi.fn(async () => ({ status: 'updated' as const, quota: {
     source: 'codex.account/rateLimits/read', 'primary.usedPercent': 10,
   } }));
-  const ctx = { config: { apiKey: 'fixture', providerInstances: { codex: { primary: {} }, copilot: { primary: {} }, claude: { primary: {} }, antigravity: { primary: {} } } },
+  const ctx = { config: { apiKey: 'fixture', providerInstances: { codex: { primary: {} }, copilot: { primary: {} }, claude: { primary: {} }, antigravity: { primary: {} }, kiro: { primary: {} } } },
     startup: { bootstrapRequired: true }, registry: { list: () => [] }, metering,
     quotaRefresh: new QuotaRefreshService({ collect, observe: (q) => metering.observeQuota(q) }),
   } as unknown as AppContext;
@@ -51,7 +51,7 @@ it('explicit refresh authenticates, validates the configured target, works in bo
   });
   const target = { provider: 'codex', instance: 'primary' };
   expect((await request(target, false)).status).toBe(401);
-  for (const input of [null, [], { ...target, instance: '__proto__' }, { ...target, provider: 'kiro' }, { ...target, command: 'unsafe' }]) {
+  for (const input of [null, [], { ...target, instance: '__proto__' }, { ...target, provider: 'cursor' }, { ...target, command: 'unsafe' }]) {
     expect((await request(input)).status).toBe(400);
   }
   expect((await request({ ...target, instance: 'x'.repeat(2000) })).status).toBe(413);
@@ -72,4 +72,7 @@ it('explicit refresh authenticates, validates the configured target, works in bo
   expect((await request({ provider: 'antigravity', instance: 'primary' })).status).toBe(200);
   expect(collect).toHaveBeenLastCalledWith({ provider: 'antigravity', instance: 'primary', backend: 'cli' }, expect.any(AbortSignal));
   expect(collect).toHaveBeenCalledTimes(4);
+  expect((await request({ provider: 'kiro', instance: 'primary' })).status).toBe(200);
+  expect(collect).toHaveBeenLastCalledWith({ provider: 'kiro', instance: 'primary', backend: 'cli' }, expect.any(AbortSignal));
+  expect(collect).toHaveBeenCalledTimes(5);
 });

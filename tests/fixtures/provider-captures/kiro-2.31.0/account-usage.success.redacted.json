@@ -1,0 +1,17 @@
+{
+  "success": true,
+  "data": {
+    "billingCycleReset": "2099-11-01",
+    "usageBreakdowns": [
+      {
+        "resourceType": "CREDIT",
+        "used": 0.37,
+        "limit": 1000,
+        "percentage": 0,
+        "hasLimit": true
+      }
+    ],
+    "bonusCredits": [],
+    "addOnCredits": []
+  }
+}

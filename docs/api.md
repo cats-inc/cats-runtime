@@ -41,7 +41,7 @@ is not implemented. See
 ## Explicit CLI quota refresh
 
 `POST /usage/refresh` accepts `{ "provider": "codex", "instance": "<configured instance>" }`.
-The allowed providers are `codex`, `copilot`, `claude` and `antigravity`.
+The allowed providers are `codex`, `copilot`, `claude`, `antigravity` and `kiro`.
 It requires normal Runtime authentication, works during bootstrap, and rejects
 unknown targets, extra fields and bodies above 1 KiB before spawning anything.
 Each native CLI receives a quota-only invocation:
@@ -52,12 +52,15 @@ Each native CLI receives a quota-only invocation:
 | Copilot | Headless stdio `connect` (or `ping` fallback), then `account.getQuota` |
 | Claude Code | Stream control `initialize`, then `get_usage` with `skip_behaviors:true` |
 | Antigravity | Standalone built-in `--print /usage --output-format text` |
+| Kiro V3 | `acp --agent-engine v3 --auth-method cli`: `initialize`, then `_kiro/account/getUsage` |
 
 Cats never reads CLI credentials or issues provider API queries; the CLI owns
 authentication. No model prompt or session-creation request is sent. The new
-Copilot/Claude/Antigravity collectors reject custom argv before spawning.
-WSL/Docker are unsupported. Kiro is not enabled without an authenticated success
-fixture and verified unit/window mapping.
+Copilot/Claude/Antigravity/Kiro collectors reject custom argv before spawning.
+WSL/Docker are unsupported. Kiro credits preserve decimal used/limit/remaining.
+Its calendar-only reset is optional `windows[].resetsOn` (`YYYY-MM-DD`); no reset
+instant or timezone is invented, and `resetsAt` remains null. Bonus/add-on and
+overage billing fields are not mapped. See [Kiro evidence](research/2026-10-14-kiro-v3-account-quota.md).
 
 The response is `{status,nextRefreshAt,snapshot}` with `Cache-Control: no-store`.
 Status is `updated`, `cooldown`, `busy`, `auth_required`, `unsupported`,
