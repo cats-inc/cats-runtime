@@ -9,10 +9,16 @@ const extractFunction = (html: string, name: string) => {
   const start = html.indexOf(`function ${name}(`);
   return html.slice(start, html.indexOf('\nfunction ', start + 1));
 };
+const extractProviderOrder = (html: string, name: string): string[] =>
+  vm.runInNewContext(new RegExp(`const ${name} = (\\[[^;]+\\]);`, 'u').exec(html)![1]!);
 
 describe('fresh provider picker defaults', () => {
   it('adds a fresh Agent with the first usable ordered provider and keeps explicit selections', () => {
-    const window: Record<string, any> = { addEventListener() {} };
+    const window: { addEventListener(): void; CatsUI?: {
+      normalizePlaygroundAgentSelection(input: Record<string, unknown>): { provider: string };
+    } } = { addEventListener() {} };
+    const providerOrder = extractProviderOrder(playground, 'PROVIDERS');
+    expect(providerOrder[0]).toBe('codex');
     vm.runInNewContext(SHARED_UI_SCRIPT, { window, document: { readyState: 'loading', addEventListener() {} } });
     let selection: { provider: string } | undefined;
     let availability: Record<string, string> = {};
@@ -21,8 +27,8 @@ describe('fresh provider picker defaults', () => {
       providerOptionsReady: true, providerOptionsLoading: false,
       getAgentCount: () => 0, MAX_AGENT_COUNT: 16,
       normalizeAgentSelectionState: (provider: string) => {
-        selection = window.CatsUI.normalizePlaygroundAgentSelection({ provider,
-          selectableProviders: ['claude', 'codex'], providerOrder: ['codex', 'claude'],
+        selection = window.CatsUI!.normalizePlaygroundAgentSelection({ provider,
+          selectableProviders: ['claude', 'codex'], providerOrder,
           providerAvailability: availability });
         throw stopBeforeRender;
       },
@@ -41,15 +47,25 @@ describe('fresh provider picker defaults', () => {
     const options = [...markup.matchAll(/<option value="([^"]*)"([^>]*)>/gu)];
     expect(options.length).toBeGreaterThan(0);
     const initialValue = (options.find(option => /\bselected\b/u.test(option[2]!)) ?? options[0])![1]!;
+    const providerOrder = extractProviderOrder(dashboard, 'PROVIDER_ORDER');
+    expect(providerOrder).toEqual(extractProviderOrder(playground, 'PROVIDERS'));
     for (const [saved, providers, expected] of [
       [initialValue, ['codex', 'claude'], 'codex'],
       ['', ['codex', 'claude'], 'codex'], ['claude', ['codex', 'claude'], 'claude'],
       ['', ['claude'], 'claude'], ['', [], ''],
     ] as Array<[string, string[], string]>) {
       const select = { value: saved, innerHTML: '', disabled: false };
+      const providerCatalog = { providers: Object.fromEntries(
+        providers.map(provider => [provider, { instances: [{ id: 'default' }] }]),
+      ) };
+      const configuredProviderNames = vm.runInNewContext(
+        `(${extractFunction(dashboard, 'configuredProviderNames')})`, {
+          providerCatalog, PROVIDER_ORDER: providerOrder, PROVIDER_AVAILABILITY: {}, window: {},
+        },
+      );
       const sync = vm.runInNewContext(`(${extractFunction(dashboard, 'syncProviderSelect')})`, {
-        document: { getElementById: () => select }, providerCatalog: { providers: {} },
-        configuredProviderNames: () => providers, escapeHtml: (value: string) => value,
+        document: { getElementById: () => select }, providerCatalog,
+        configuredProviderNames, escapeHtml: (value: string) => value,
         formatProviderSelectLabel: (value: string) => value, setCreateModalEnabled() {},
       });
       sync();

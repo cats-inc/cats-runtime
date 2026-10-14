@@ -1706,7 +1706,7 @@ function syncOrchestratorLocks(){
   });
 }
 
-function addAgent(name='',provider='claude',model='',tags=[],modelSelection=null,options={}) {
+function addAgent(name='',provider='',model='',tags=[],modelSelection=null,options={}) {
   if((providerOptionsLoading||!providerOptionsReady)&&!options.allowBeforeProviderReady){
     updateAgentButtons();
     return null;

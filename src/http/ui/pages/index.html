@@ -1232,7 +1232,7 @@ if (PLATFORM_RUNTIME_PROXY && !INJECTED_RUNTIME_API_BASE) {
 const API_BASE = INJECTED_RUNTIME_API_BASE
   ? INJECTED_RUNTIME_API_BASE.replace(/\/+$/, '')
   : window.location.origin;
-const PROVIDER_ORDER = ['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'opencode', 'kilo', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'grok', 'cline', 'devin', 'muse', 'ollama', 'openclaw'];
+const PROVIDER_ORDER = ['codex', 'claude', 'antigravity', 'grok', 'muse', 'cursor', 'copilot', 'opencode', 'kilo', 'cline', 'auggie', 'pi', 'kiro', 'junie', 'devin', 'goose', 'ollama', 'openclaw'];
 const CLI_RUNTIME_ORDER = ['native', 'wsl', 'docker'];
 let currentSessionId = null;
 let isStreaming = false;
