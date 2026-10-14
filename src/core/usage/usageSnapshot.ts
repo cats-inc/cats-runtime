@@ -21,21 +21,28 @@ export interface UsageQuotaWindow {
   usedPercent: number | null;
   remainingPercent: number | null;
   resetsAt: string | null;
+  /** Calendar date only; no reset instant or timezone was reported. */
+  resetsOn?: string | null;
   windowMinutes: number | null;
 }
 
-export function supportsQuotaRefresh(provider: unknown): provider is 'codex' | 'copilot' | 'claude' | 'antigravity' {
-  return provider === 'codex' || provider === 'copilot' || provider === 'claude' || provider === 'antigravity';
+export function supportsQuotaRefresh(provider: unknown): provider is 'codex' | 'copilot' | 'claude' | 'antigravity' | 'kiro' {
+  return provider === 'codex' || provider === 'copilot' || provider === 'claude' || provider === 'antigravity' || provider === 'kiro';
 }
 
 export function isAccountQuotaSource(value: unknown): value is string {
   return value === 'claude.rate_limit_event' || value === 'claude.get_usage'
     || value === 'codex.account/rateLimits/updated' || value === 'codex.account/rateLimits/read'
-    || value === 'copilot.account.getQuota' || value === 'antigravity.usage';
+    || value === 'copilot.account.getQuota' || value === 'antigravity.usage' || value === 'kiro.account.getUsage';
 }
 
 function finite(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function calendarDate(value: unknown): string | null {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(value) && Number.isFinite(Date.parse(value))
+    && new Date(value).toISOString().slice(0, 10) === value ? value : null;
 }
 
 function timestamp(value: unknown): string | null {
@@ -73,6 +80,7 @@ export function normalizeUsageQuota(observation: UsageQuotaObservation | undefin
         usedPercent: unlimited ? null : usedPercent,
         remainingPercent: unlimited || usedPercent === null ? null : Math.max(0, 100 - usedPercent),
         resetsAt: timestamp(quota[`${id}.resetsAt`]),
+        ...(calendarDate(quota[`${id}.resetsOn`]) ? { resetsOn: calendarDate(quota[`${id}.resetsOn`]) } : {}),
         windowMinutes: finite(quota[`${id}.windowDurationMins`]),
       });
     }
@@ -92,7 +100,7 @@ export function normalizeUsageQuota(observation: UsageQuotaObservation | undefin
     observedAt,
     accountId: null,
     accountLinkage: 'unverified' as const,
-    scope: source === 'codex.account/rateLimits/read' || source === 'copilot.account.getQuota' || source === 'claude.get_usage' || source === 'antigravity.usage' ? 'provider_account_query' as const : 'provider_reported_during_runtime_execution' as const,
+    scope: source === 'codex.account/rateLimits/read' || source === 'copilot.account.getQuota' || source === 'claude.get_usage' || source === 'antigravity.usage' || source === 'kiro.account.getUsage' ? 'provider_account_query' as const : 'provider_reported_during_runtime_execution' as const,
     limitId: typeof quota?.limitId === 'string' && /^[a-zA-Z0-9_-]{1,64}$/u.test(quota.limitId) ? quota.limitId : null,
     automaticRefresh: false as const,
     windows,

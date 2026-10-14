@@ -58,9 +58,9 @@ unrelated subscription allowance.
 Usage in `cats-apps` consumes sanitized snapshots through the
 `cats-platform` App host, not provider credentials or runtime-internal classes.
 The stable `/usage/snapshot` API and separate `/usage/refresh` POST for native
-Codex/Copilot/Claude/Antigravity CLI account reads are implemented. Cats never
+Codex/Copilot/Claude/Antigravity/Kiro CLI account reads are implemented. Cats never
 extracts CLI credentials or calls provider APIs directly; each quota-only CLI
-process owns authentication. Kiro success verification, scheduled polling,
+process owns authentication. Kiro credit/date mapping is live-verified; scheduled polling,
 verified account linkage and durable history described in
 [ADR-038](./decisions/038-separate-execution-usage-from-provider-account-quota.md),
 [SPEC-029](./specs/SPEC-029-provider-account-quota-and-usage-snapshots.md), and

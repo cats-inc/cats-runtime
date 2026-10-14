@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Explicit native Codex/Copilot/Claude/Antigravity refresh implemented; Kiro verification and history deferred |
+| Status | Explicit native Codex/Copilot/Claude/Antigravity/Kiro refresh implemented; history deferred |
 | Owner | cats-runtime |
 | Implementation | Authenticated bounded snapshot and separate passive quota observations |
 | Consumer | Usage via cats-platform |
@@ -14,7 +14,7 @@
 ### Explicit CLI refresh (Codex 2026-09-10; additional providers 2026-09-11)
 
 - `POST /usage/refresh` accepts only `{provider, instance:string}`, where provider
-  is `codex`, `copilot`, `claude`, or `antigravity`, for a configured CLI target.
+  is `codex`, `copilot`, `claude`, `antigravity`, or `kiro`, for a configured CLI target.
   It works during bootstrap, behind runtime authentication.
 - For Codex, run the configured CLI's `app-server` over stdio: await `initialize`, send
   `initialized`, then `account/rateLimits/read`. Never start a thread/model turn,
@@ -47,12 +47,17 @@ Additional collectors use CLI-owned authentication exclusively:
 | Claude Code | Safe-mode stream-json controls: `initialize`, then `get_usage` with `skip_behaviors:true` | Utilization is 0–100, unlike passive fractions; fixed reported five-hour/seven-day windows |
 | Antigravity (`agy`) | Standalone `--print /usage --output-format text` built-in report | Separate model-pool weekly/five-hour windows; not Gemini CLI |
 
-These three collectors reject nonempty custom `command.args` before spawning:
+These additional collectors reject nonempty custom `command.args` before spawning:
 prompt/resume/stream or slash-disabling flags are not a verified quota-only launch.
 They share bounded pipes, 512-KiB aggregate stdout/stderr, timeout, cancellation,
 hidden Windows launch and owned process-tree cleanup. No raw stderr leaves Runtime.
-Kiro's no-session `_kiro/account/getUsage` probe returned an auth-related failure;
-success payload/window semantics remain unverified, so no Kiro collector is enabled.
+Kiro V3 is now verified on native Windows (2026-10-14): `acp --agent-engine v3
+--auth-method cli`, `initialize`, then `_kiro/account/getUsage` without a session.
+Its CREDIT bucket preserves decimal used/limit/remaining; percentage is calculated
+from the same native quantities. Optional `resetsOn` preserves a valid calendar
+reset date without inventing a timezone or instant; `resetsAt` stays null. Unknown
+limits stay unknown; bonus/add-on credits and overage billing remain unmapped. See
+[Kiro evidence](../research/2026-10-14-kiro-v3-account-quota.md).
 See the [dated probe and limitations](../research/2026-09-11-additional-cli-quota-queries.md).
 
 SDK 1.2 adds `quota.refreshSupported` plus nullable native `used`, `limit`,

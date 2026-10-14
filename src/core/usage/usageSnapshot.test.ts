@@ -13,6 +13,26 @@ function session(provider = 'codex', instance = 'main'): SessionInfo {
 }
 
 describe('Usage snapshot', () => {
+
+  it('keeps Kiro fractional credits and date-only reset separate from execution observations', () => {
+    const service = new RuntimeMeteringService({ now: () => now });
+    service.observeQuota({ provider: 'kiro', instance: 'main', backend: 'cli', observedAt: now.toISOString(), quota: {
+      source: 'kiro.account.getUsage', 'credits.unit': 'credits', 'credits.used': 0.37,
+      'credits.limit': 1000, 'credits.remaining': 999.63, 'credits.usedPercent': 0.037,
+      'credits.resetsOn': '2099-11-01', accountId: 'PRIVATE',
+    } });
+    const snapshot = service.buildUsageSnapshot([]);
+    expect(snapshot.sessions).toEqual([]);
+    expect(snapshot.totals.observations).toBe(0);
+    expect(snapshot.targets[0]!.quota).toMatchObject({ status: 'available', refreshSupported: true,
+      source: 'kiro.account.getUsage', scope: 'provider_account_query', windows: [{ id: 'credits',
+        unit: 'credits', used: 0.37, limit: 1000, remaining: 999.63, remainingPercent: 99.963,
+        resetsOn: '2099-11-01', resetsAt: null, windowMinutes: null,
+      }],
+    });
+    expect(JSON.stringify(snapshot)).not.toContain('PRIVATE');
+  });
+
   it('keeps unknown usage distinct from observed zero and costs separated by currency', () => {
     const service = new RuntimeMeteringService({ now: () => now });
     expect(service.buildUsageSnapshot([session()]).totals.totalTokens).toBeNull();
