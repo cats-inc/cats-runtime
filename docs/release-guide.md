@@ -49,6 +49,34 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+### Release notes — 0.5.3 (2026-10-20)
+
+- Refresh five factory model catalogs (#172). Antigravity 1.4.2 adds Gemini 4
+  Argon with a low/medium/high effort control as its first entry, in picker
+  order, so a fresh agy selection starts at Gemini 4 Argon low; Argon execution
+  was not exercised. Codex 0.163.0 raises gpt-6.1-sol's context limit from 272000
+  to 500000. Grok 1.0.62 starts sessions at a 256000 window, so its four limits
+  move from 500000 to 256000; its 500K window can be chosen only in the Grok TUI,
+  and Cats has no window control (#173). Claude 2.1.303 and Muse 1.4.10 keep
+  their rows, efforts and defaults.
+- Saved selections and existing sessions keep their resolved models. Profiles
+  without a catalog override adopt the new factory; an operator override keeps
+  its own scopes. Catalog schema 2 and `CATALOG_BINDING_VERSION` 1 are
+  unchanged, so this is a compatible 0.5.x patch with no data migration.
+- The repository-only catalog skill gains a read-only CLI sign-in checker,
+  `npm run catalog:logins` (#171). It is not in the npm package or Desktop.
+- Source bundling is selected for Desktop 0.8.3 standard-profile preview. Its
+  preparation pins this bump's immutable merge commit across OS builds and the
+  complete source archive. No Runtime npm or cats-one release is selected.
+- The catalog refresh passed catalog generation/check, probe validation of all
+  five scopes, the catalog data/runtime, model, Playground, runtime-server and
+  skill-sync suites, the skill script tests, typecheck and its PR
+  release-preflight. This preparation changes version fields and notes; its PR
+  release-preflight and the Desktop packaging workflow enforce the release
+  checks. Publication results: Desktop
+  [`v0.8.3`](https://github.com/cats-inc/cats-platform/releases/tag/v0.8.3) and its
+  workflow run.
+
 ### Release notes — 0.5.2 (2026-10-15)
 
 - Fresh Dashboard session and Playground Add Agent pickers use the first
