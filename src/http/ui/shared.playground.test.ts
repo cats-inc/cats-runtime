@@ -524,13 +524,13 @@ describe('shared playground selection helpers', () => {
       div: { querySelector: () => controls }, catalog, entryId: '' };
     vm.createContext(context);
     vm.runInContext(html.slice(start, end), context);
-    expect(catsUI.getAdvancedCatalogDefaultEntryId(catalog)).toBe('gemini-3.8-flash-low');
+    expect(catsUI.getAdvancedCatalogDefaultEntryId(catalog)).toBe('gemini-4-argon-low');
     for (const entry of catalog.entries) {
       context.entryId = entry.id;
       vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
       expect(controls.innerHTML).not.toMatch(/default/i);
       const values = [...controls.innerHTML.matchAll(/<option value="([^"]+)"/g)].map((match) => match[1]);
-      if (entry.id.includes('flash') || entry.id.startsWith('claude-')) {
+      if (entry.id.includes('flash') || entry.id.includes('argon') || entry.id.startsWith('claude-')) {
         expect(values).toEqual(['low', 'medium', 'high']);
       } else if (entry.id.includes('pro')) expect(values).toEqual(['low', 'high']);
       else expect(values).toEqual([]);

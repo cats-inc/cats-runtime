@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // Reads the release notes that an installed Claude Code binary embeds for its recent versions.
-// The notes are one single-quoted JavaScript string literal that starts with "## <version>".
+// The notes are one JavaScript string or template literal that starts with "## <version>".
 // This is static-artifact evidence: it says what a version changed, not what an account's
 // picker offers. It never launches Claude Code and reads no settings or credentials.
 
@@ -13,6 +13,7 @@ import { parseArgs } from 'node:util';
 
 const BACKSLASH = 0x5c;
 const QUOTE = 0x27;
+const DOUBLE_QUOTE = 0x22;
 const BACKTICK = 0x60;
 const HEADING = /^## (\d+\.\d+\.\d+)$/;
 
@@ -33,11 +34,12 @@ function decodeLiteral(raw) {
   });
 }
 
-// Returns every single-quoted or template literal that starts with a version heading. Builds up
-// to 2.1.285 embed a single-quoted literal; 2.1.286 and later embed a template literal.
+// Returns every string or template literal that starts with a version heading. Builds up to
+// 2.1.285 embed a single-quoted literal, 2.1.286 to at least 2.1.296 a template literal, and
+// 2.1.300 and later a double-quoted literal.
 function findChangelogLiterals(buffer) {
   const literals = [];
-  for (const quote of [QUOTE, BACKTICK]) {
+  for (const quote of [QUOTE, DOUBLE_QUOTE, BACKTICK]) {
     const needle = Buffer.from([quote, ...Buffer.from('## ')]);
     for (let at = buffer.indexOf(needle); at >= 0; at = buffer.indexOf(needle, at + 1)) {
       const heading = buffer.subarray(at + 1, at + 40).toString('latin1');

@@ -1,0 +1,31 @@
+# Source: Grok Build 1.0.62 (1474f9cbdd91), Windows 11 native, Windows Terminal
+# Observed: 2026-10-20 00:38 (local time, UTC+8); the session was closed with /exit at 00:55
+# Method: one agent-launched session from an already trusted folder, after clearing CLAUDECODE,
+#   CLAUDE_PID and CLAUDE_CODE_* variables; /session-info typed and run (no prompt, no model or
+#   window selection). Windows UI Automation visible text. Plus a read of the CLI's own model
+#   cache (~/.grok/models_cache.json, grok_version 1.0.62, fetched 2026-10-19T16:20Z), projected
+#   to the fields below; identity, session ID and account fields are omitted.
+# Config: ~/.grok/config.toml [models] holds default = grok-4.7 and
+#   default_reasoning_effort = xhigh, and no context window.
+
+## Status line and /session-info (Session info tab)
+  ~/Source\cats-inc                                  1.8K / 256K
+  Shell version: 1.0.62
+  Session ID: <redacted-session-id>
+  Model: Grok 4.7
+  API Backend: Responses
+  Turn: 0
+  Context: 1816 / 256000 tokens (1%)
+
+## Model cache, per model (context_window | context_windows | reasoning_effort | efforts with default flag)
+grok-4.7            | 256000 | [256000, 500000] | high | xhigh, high (default), medium, low
+grok-4.7-build-fast | 256000 | [256000, 500000] | high | xhigh, high (default), medium, low
+grok-4.6            | 256000 | [256000, 500000] | high | xhigh, high (default), medium, low
+grok-4.5            | 256000 | [256000, 500000] | high | high (default), medium, low
+Names, descriptions, effort labels and effort descriptions equal the catalog entries.
+
+## Bundled user guide, docs/user-guide/04-slash-commands.md (1.0.62)
+/model: "When the model offers more than one context window, you can add a window size next.
+  ... The picker asks in the same order: model, then window, then effort."
+/context-window <size>: "Set the context window for the current model. The command is listed only
+  when the model supports more than one size. ... The choice lasts for the session."

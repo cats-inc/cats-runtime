@@ -1,0 +1,89 @@
+{
+  "kind": "cats-catalog-probe-evidence",
+  "schemaVersion": 1,
+  "provider": "antigravity",
+  "backend": "cli",
+  "transport": null,
+  "command": "agy models",
+  "sourceClass": "machine-readable",
+  "cliVersion": "1.4.2",
+  "versionSource": "--version",
+  "observedAt": "2026-10-19T16:20:32.447Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "accountScope": "The CLI's existing sign-in on the probing machine. No identity is recorded.",
+  "status": "ok",
+  "completeness": {
+    "membership": "complete",
+    "meaning": "The command lists what the picker offers; an absent row still needs picker confirmation before removal."
+  },
+  "authoritativeFor": {
+    "ids": true,
+    "label": false,
+    "efforts": false,
+    "effortDefault": false
+  },
+  "stillNeedsPicker": "A model (default) marker, picker descriptions, picker order, and every field not listed under authoritativeFor still need picker evidence.",
+  "selection": "all 13 rows",
+  "models": [
+    {
+      "id": "gemini-4-argon-medium",
+      "label": "Gemini 4 Argon (Medium)"
+    },
+    {
+      "id": "gemini-4-argon-high",
+      "label": "Gemini 4 Argon (High)"
+    },
+    {
+      "id": "gemini-4-argon-low",
+      "label": "Gemini 4 Argon (Low)"
+    },
+    {
+      "id": "gemini-3.8-flash-high",
+      "label": "Gemini 3.8 Flash (High)"
+    },
+    {
+      "id": "gemini-3.8-flash-medium",
+      "label": "Gemini 3.8 Flash (Medium)"
+    },
+    {
+      "id": "gemini-3.8-flash-low",
+      "label": "Gemini 3.8 Flash (Low)"
+    },
+    {
+      "id": "claude-opus-5-5-low",
+      "label": "Claude Opus 5.5 (Low)"
+    },
+    {
+      "id": "claude-opus-5-5-medium",
+      "label": "Claude Opus 5.5 (Medium)"
+    },
+    {
+      "id": "claude-opus-5-5-high",
+      "label": "Claude Opus 5.5 (High)"
+    },
+    {
+      "id": "claude-sonnet-5-5-low",
+      "label": "Claude Sonnet 5.5 (Low)"
+    },
+    {
+      "id": "claude-sonnet-5-5-medium",
+      "label": "Claude Sonnet 5.5 (Medium)"
+    },
+    {
+      "id": "claude-sonnet-5-5-high",
+      "label": "Claude Sonnet 5.5 (High)"
+    },
+    {
+      "id": "gpt-oss-120b-medium",
+      "label": "GPT-OSS 120B (Medium)"
+    }
+  ],
+  "redaction": {
+    "method": "Projected public model fields only; no raw output, account identifier, price, endpoint or login text. String values passed through the skill redaction helper.",
+    "redactions": [],
+    "reviewBeforeCommit": "Check names, paths and provider-specific identifiers by hand; the helper catches only common shapes."
+  }
+}
