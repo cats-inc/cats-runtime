@@ -51,6 +51,51 @@ when it is `ok`:
 - `you`: install, sign in or rerun. The line under the table says which.
 - `agent`: hand `report.json` to an agent with the printed prompt.
 
+## Check sign-ins
+
+`cli-login-status.mjs` answers only whether each CLI can be used now. It finishes in about 20
+seconds and writes nothing, so run it before a probe or a capture to sort out `you` sign-in
+actions first:
+
+```text
+npm run catalog:logins                             # all sixteen
+npm run catalog:logins -- --providers grok,muse    # only these
+npm run catalog:logins -- --skip cursor            # CLIs this machine does not use
+node skills/maintain-provider-model-catalogs/scripts/cli-login-status.mjs --json   # JSON only
+```
+
+`npm run` prints its own banner first, so pipe JSON from the `node` form or add `--silent`.
+
+It prints one line per CLI with one of five states: `ready, verified online` (an account-scoped
+read reached the server), `ready, local credentials` (a status command or credential file shows a
+sign-in, but no server was asked, so a revoked sign-in shows up only on first use), `signed out or
+expired`, `not installed` and `unknown` (with the first output line). Exit codes: `0` no sign-in
+needed, `2` at least one CLI is signed out or expired, `1` the tool failed. Every check runs at
+once from one empty temporary directory, with the probe's cleaned environment and `--timeout`
+(default 60 s), and no check logs in, sends a prompt, opens a session or shows a credential.
+
+| CLI | Check | Reaches the server |
+|---|---|---|
+| antigravity | `agy models` lists rows | yes |
+| grok | `grok models` says "You are logged in", retried once like the probe | yes |
+| muse | MSP `model/list` on the versioned binary answers from `providerCatalog` | yes |
+| auggie | `auggie model list --json` reports `registryAvailable: true` | yes |
+| copilot | headless `models.list` through `list-copilot-models.mjs` | yes |
+| codex, kiro, cursor, devin | `codex login status`, `kiro-cli whoami`, `cursor-agent status`, `devin auth status` | no |
+| claude | `claude auth status` JSON `loggedIn` | no |
+| opencode, kilo | `auth list` names the scope's channel credential (OpenCode Go, Kilo Gateway) | no |
+| pi, goose, cline | a refresh token in the `openai-codex`, `chatgpt_codex` or `cline-pass` credential file; never launched | no |
+| junie | DPAPI credential files are present (Windows only); never launched because of the Defender block in [Junie](./providers/junie.md) | no |
+
+Access-token expiry times in credential files are not read, because the CLIs renew them with the
+stored refresh token: on 2026-10-19 Grok's had passed six days earlier, and the first
+`grok models` call said "not authenticated" while the next one was signed in. Verified on native
+Windows 11 on 2026-10-19 with all sixteen signed in; the signed-out branches are covered only by
+synthetic tests in `tests/cli-login-status.node-test.mjs`, so an unfamiliar signed-out message is
+reported as `unknown` with its first line, never as ready. OpenCode and Kilo are matched by the
+channel's display name in `auth list`; if an update renames it, the check reports `signed out`
+with the name it looked for, so compare that line before signing in again.
+
 ## Sources
 
 Every source runs from an empty temporary directory with stdin closed, without terminal or

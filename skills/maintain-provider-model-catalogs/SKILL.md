@@ -85,6 +85,9 @@ Read [catalog surfaces](./references/catalog-surfaces.md) for current fields and
   report/snapshot only for a concrete gap. The report's `needsAgent`
   scopes are the request scope; each finding's kind sets the evidence still needed. Commit the
   snapshot rows an edit relies on as a fixture with the probe's `evidence` command.
+- **Sign-in check**: when the operator asks only which CLIs are signed in or usable, run the
+  read-only `npm run catalog:logins` described in [catalog probe](./references/catalog-probe.md#check-sign-ins)
+  and report its states; it changes no catalog data.
 - **Capture/preview**: use for a raw picker paste that is supplied as catalog evidence without an
   edit request. Parse and summarize it, but do not modify repository files, including evidence
   fixtures.

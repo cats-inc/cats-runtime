@@ -62,7 +62,8 @@
     "catalog:check": "node --import tsx scripts/generate-provider-catalog.mjs --check && node scripts/check-provider-catalog-boundaries.mjs",
     "catalog:probe": "node skills/maintain-provider-model-catalogs/scripts/catalog-probe.mjs probe --open",
     "catalog:validate": "node skills/maintain-provider-model-catalogs/scripts/catalog-probe.mjs validate --open",
-    "catalog:evidence": "node skills/maintain-provider-model-catalogs/scripts/catalog-probe.mjs evidence"
+    "catalog:evidence": "node skills/maintain-provider-model-catalogs/scripts/catalog-probe.mjs evidence",
+    "catalog:logins": "node skills/maintain-provider-model-catalogs/scripts/cli-login-status.mjs"
   },
   "keywords": [
     "cats",
