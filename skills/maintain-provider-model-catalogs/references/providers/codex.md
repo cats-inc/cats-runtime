@@ -26,6 +26,9 @@ as permanent CLI contracts:
   hidden entries are not extra picker rows. Project only needed fields; discard instructions and
   unrelated session/account fields before storing evidence. Do not manufacture absent fields as
   null and then interpret those nulls as upstream observations.
+- The [catalog probe](../catalog-probe.md) compares labels, efforts and effort defaults, not
+  context. Compare each evidence row's `contextWindow` with the catalog limit on every refresh:
+  0.163.0 raised gpt-6.1-sol from 272000 to 500000 while the probe reported the scope clean.
 - `More reasoning…` is navigation, not an effort token. Inspect it per model. A retiring-model
   notice used `enter/esc confirm` and `ctrl+c quit`; Escape is only safe where the observed footer
   says back/cancel. Stop on an unexpected notice rather than continuing a menu key sequence.

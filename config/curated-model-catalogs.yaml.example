@@ -4,8 +4,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Claude
-    cli_version: 2.1.296
-    last_updated: 2026-10-14
+    cli_version: 2.1.303
+    last_updated: 2026-10-20
     notes:
       - Model list, every model's effort line and every row's value re-read 2026-10-03 by an
         agent-operated capture of the Claude Code 2.1.288 `/model` picker (Windows UI Automation
@@ -75,6 +75,7 @@ catalogs:
         docs/research/2026-09-26-claude-picker-eleven-rows.md and
         docs/research/2026-09-30-claude-picker-sonnet-5-5.md.
       - "Refreshed 2026-10-14 from Claude Code 2.1.296 by an agent-operated /model capture (Claude Max sign-in, --safe-mode). The picker has 13 rows: Default plus 12 models. Haiku 5.5 is new (Low to Max, (default) Medium) and sets the `haiku` alias, which now resolves to claude-haiku-5-5; the Haiku 4.5 row sets claude-haiku-4-5-20251001 and supports no effort, so it moved to its own entry. Every other row kept its label, description, effort levels and (default) level. From 2.1.293 the effort line stops at both ends instead of wrapping; the capture walked each row to both ends. Max effort remains a level on every row that offered it. Evidence: docs/research/fixtures/claude-2.1.296/model-picker.agent-capture.redacted.txt."
+      - "Re-read 2026-10-20 from Claude Code 2.1.303 by an agent-operated /model capture (Claude Max sign-in, --safe-mode), because the 2.1.299 release notes mention /model and effort. The 13 rows, their labels, descriptions, effort levels and (default) levels equal the 2.1.296 capture. /status after choosing each of rows 2-13 for the session only: Opus 5.5 sets `opus` (claude-opus-5-5), Fable 5.1 `fable` (claude-fable-5-1), Sonnet 5.5 `sonnet` (claude-sonnet-5-5), Haiku 5.5 `haiku` (claude-haiku-5-5), and every other row its full model id; every entry's execution still resolves to the model its label names. Evidence: docs/research/fixtures/claude-2.1.303/model-picker.agent-capture.redacted.txt."
     models:
       - default: true
         id: opus
@@ -485,8 +486,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Codex
-    cli_version: 0.162.1
-    last_updated: 2026-10-14
+    cli_version: 0.163.0
+    last_updated: 2026-10-20
     notes:
       - Complete visible model list and every per-model reasoning/advanced menu captured on 2026-10-01
         Asia/Taipei (2026-09-30 UTC) from Codex CLI 0.159.2 in Windows Terminal using UI Automation
@@ -514,12 +515,13 @@ catalogs:
         inferred for new models.
       - "cli_version advanced from 0.159.2 to 0.160.0 on 2026-10-03 at the operator's request, without a new picker capture: `codex debug models` listed exactly this scope's 8 entries, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 0.159.2 evidence. Evidence: docs/research/fixtures/codex-0.160.0/model-list.probe.redacted.json."
       - "Refreshed 2026-10-14 from Codex CLI 0.162.1. `codex debug models` now marks gpt-5.5 visibility=hide ('Legacy coding model.'), and the agent-operated picker capture shows seven rows without GPT-5.5; the operator confirmed removing it, and it stays reachable as the custom model string gpt-5.5. The 0.162.1 picker shows no (default) marker on any row, so GPT-6.1-Sol is no longer the model default (operator-confirmed). Every remaining reasoning and More reasoning menu, label and description matched the 0.159.2 capture. Evidence: docs/research/fixtures/codex-0.162.1/picker.agent-capture.redacted.txt and docs/research/fixtures/codex-0.162.1/model-list.probe.redacted.json."
+      - "cli_version advanced from 0.162.1 to 0.163.0 on 2026-10-20 without a new picker capture: `codex debug models` listed exactly this scope's 7 picker rows (plus the hidden gpt-reserve and codex-auto-review) with the same labels, effort levels and effort defaults. The same source now gives gpt-6.1-sol a 500000 context window (272000 on 0.162.1), so its limit follows; every other row still says 272000. last_updated advances because this scope's data changed on that complete listing. Picker-only fields (model (default) marker, descriptions, order) were not re-read and keep the 0.162.1 evidence. Evidence: docs/research/fixtures/codex-0.163.0/model-list.probe.redacted.json."
     models:
       - default: false
         id: gpt-6.1-sol
         label: GPT-6.1-Sol
         limits:
-          contextWindowTokens: 272000
+          contextWindowTokens: 500000
         notes:
           - Latest workhorse model for coding and everyday work.
         execution:
@@ -788,8 +790,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Antigravity
-    cli_version: 1.3.4
-    last_updated: 2026-10-14
+    cli_version: 1.4.2
+    last_updated: 2026-10-20
     notes:
       - Complete operator-supplied /model picker and all per-model effort screens on Antigravity CLI
         1.2.3, observed 2026-09-16; account scope is the operator's CLI.
@@ -805,7 +807,36 @@ catalogs:
       - "cli_version advanced from 1.2.10 to 1.2.15 on 2026-10-03 at the operator's request, without a new picker capture: `agy models` listed exactly this scope's 7 entries, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 1.2.10 evidence. Evidence: docs/research/fixtures/antigravity-1.2.15/model-list.probe.redacted.json."
       - "Complete seven-family picker and per-row effort sliders read on agy 1.2.16, 2026-10-04, using Windows UI Automation. Claude Opus 5.5 and Claude Sonnet 5.5 each show low, medium, high with no default marker. The operator confirmed removal of the two absent Claude 4.6 Thinking rows. Evidence: docs/research/fixtures/antigravity-1.2.16/model-picker.agent-capture.redacted.txt and docs/research/fixtures/antigravity-1.2.16/model-list.probe.redacted.json. Existing unobserved metadata retains its earlier provenance."
       - "Refreshed 2026-10-14 from agy 1.3.4 (Google AI Pro sign-in). The picker shows five rows: Gemini 3.8 Flash, Claude Opus 5.5 and Claude Sonnet 5.5 with low/medium/high sliders, GPT-OSS 120B (Medium) with no slider, and Gemini 4 Argon (Medium), which reads Unavailable (Ultra plan subscribers only) and has no `agy models` id, so it is not added. Gemini 3.7 Flash, Gemini 3.6 Flash and Gemini 3.1 Pro are gone from both the picker and `agy models`; the operator confirmed removing them. No model or effort default marker appeared. Evidence: docs/research/fixtures/antigravity-1.3.4/model-picker.agent-capture.redacted.txt and docs/research/fixtures/antigravity-1.3.4/model-list.probe.redacted.json."
+      - "Refreshed 2026-10-20 from agy 1.4.2 (the same Google AI Pro sign-in). `agy models` now lists gemini-4-argon-low, gemini-4-argon-medium and gemini-4-argon-high, and the picker's first row is Gemini 4 Argon, without the earlier (Medium) suffix and without the Unavailable line: it shows a low/medium/high slider and `enter Select`. It is added first, in picker order, as one family whose effort resolves to those three ids; the operator chose picker order, so Cats now initializes agy to Gemini 4 Argon low. The other four rows, their sliders and `agy models` ids are unchanged. No model or effort default marker appeared. Listed and selectable is not an execution check; no prompt was sent. Evidence: docs/research/fixtures/antigravity-1.4.2/model-picker.agent-capture.redacted.txt and docs/research/fixtures/antigravity-1.4.2/model-list.probe.redacted.json."
     models:
+      - id: gemini-4-argon-low
+        label: Gemini 4 Argon
+        execution:
+          model: gemini-4-argon-low
+          variants:
+            - when:
+                antigravity.effort: low
+              model: gemini-4-argon-low
+            - when:
+                antigravity.effort: medium
+              model: gemini-4-argon-medium
+            - when:
+                antigravity.effort: high
+              model: gemini-4-argon-high
+        controls:
+          - key: antigravity.effort
+            label: Effort
+            kind: enum
+            scope: session_default
+            values:
+              - value: low
+                label: low
+              - value: medium
+                label: medium
+              - value: high
+                label: high
+            semanticTags:
+              - reasoning
       - id: gemini-3.8-flash-low
         label: Gemini 3.8 Flash
         capabilityTags:
@@ -913,8 +944,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Grok
-    cli_version: 1.0.52
-    last_updated: 2026-09-25
+    cli_version: 1.0.62
+    last_updated: 2026-10-20
     notes:
       - "Complete four-model /model list and per-model effort menus captured 2026-09-25 from Grok
         Build 1.0.41 by operating the CLI menus. UI Automation text was checked against window
@@ -937,11 +968,12 @@ catalogs:
         session header showed 500K. The cache had no output limit."
       - "cli_version advanced from 1.0.41 to 1.0.46 on 2026-10-03 at the operator's request, without a new picker capture: `grok models` listed exactly this scope's 4 entries, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 1.0.41 evidence. Evidence: docs/research/fixtures/grok-1.0.46/model-list.probe.redacted.json."
       - "cli_version advanced from 1.0.46 to 1.0.52 on 2026-10-14 at the operator's request, without a new picker capture: `grok models` listed exactly this scope's 4 entries, with no other finding. That source compares model IDs only; labels and effort menus were not re-read, and the notes above describe the earlier evidence. Evidence: docs/research/fixtures/grok-1.0.52/model-list.probe.redacted.json."
+      - "Refreshed 2026-10-20 from Grok Build 1.0.62 without a /model traversal. `grok models` listed exactly this scope's 4 entries. The 1.0.62 model cache gives every row the same names, descriptions, effort tokens, labels and effort descriptions as above, but its context_window is now 256000, with context_windows [256000, 500000]; the bundled /model help says the picker asks for a window between model and effort when a model offers more than one. A fresh 1.0.62 session on grok-4.7 showed `Context: 1816 / 256000 tokens` in /session-info, with no window saved in config.toml. Cats sends only --model and --reasoning-effort, so every limit is now 256000 (operator decision); the 500K window is not selectable from Cats yet, and a context-window control needs its own binding. The other three rows' 256000 comes from the cache only. last_updated advances because this scope's data changed and `grok models` listed the complete scope. Evidence: docs/research/fixtures/grok-1.0.62/model-list.probe.redacted.json and docs/research/fixtures/grok-1.0.62/context-window.agent-capture.redacted.txt."
     models:
       - id: grok-4.7
         label: Grok 4.7
         limits:
-          contextWindowTokens: 500000
+          contextWindowTokens: 256000
         notes:
           - "Picker description: SpaceXAI's latest frontier model"
         source_names:
@@ -973,7 +1005,7 @@ catalogs:
       - id: grok-4.7-build-fast
         label: Grok 4.7 Fast
         limits:
-          contextWindowTokens: 500000
+          contextWindowTokens: 256000
         notes:
           - "Picker description: Fast variant. 2x the price."
         source_names:
@@ -1005,7 +1037,7 @@ catalogs:
       - id: grok-4.6
         label: Grok 4.6
         limits:
-          contextWindowTokens: 500000
+          contextWindowTokens: 256000
         notes:
           - The 1.0.41 picker row shows the label alone.
         source_names:
@@ -1037,7 +1069,7 @@ catalogs:
       - id: grok-4.5
         label: Grok 4.5
         limits:
-          contextWindowTokens: 500000
+          contextWindowTokens: 256000
         notes:
           - The 1.0.41 picker row shows the label alone.
         source_names:
@@ -1067,7 +1099,7 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Muse
-    cli_version: 1.4.7-R6101.1
+    cli_version: 1.4.10-R6427.1
     last_updated: 2026-10-14
     notes:
       - "Model list re-read 2026-09-26 on Muse Code 1.4.0 (muse-bin-1.4.0-R4161.1): MSP `model/list`
@@ -1118,6 +1150,7 @@ catalogs:
         2026-09-05 provenance; this correction only re-observes effort menus.
       - "cli_version advanced from 1.4.0-R4161.1 to 1.4.2-R4684.1 on 2026-10-03 at the operator's request, without a new picker capture: `muse-bin serve --no-session-log, MSP model/list` listed exactly this scope's 4 entries, with no other finding. Fields that source does not compare were not re-read, and the notes above describe the 1.4.0-R4161.1 evidence. Evidence: docs/research/fixtures/muse-1.4.2-R4684.1/model-list.probe.redacted.json."
       - "Refreshed 2026-10-14 from Muse Code 1.4.7 (muse-bin-1.4.7-R6101.1). MSP `model/list` and the /model picker both list three rows in this order: muse-wonder-1.0 (new; released 2026-10-12), muse-spark-1.3 and muse-spark-1.2. The two -contributor rows are gone from both; the settings file now carries a contributor_mode_enabled switch instead. The operator confirmed removing them; they remain reachable as custom model strings where Muse still accepts them. The /effort picker with muse-wonder-1.0 active lists minimal, low, medium, high, xhigh, max with no default marker (the highlighted xhigh is the session value); MSP variants agree. `model/list` now marks muse-wonder-1.0 isDefault, which is not projected as a curated default. Evidence: docs/research/fixtures/muse-1.4.7-R6101.1/model-picker.agent-capture.redacted.txt and docs/research/fixtures/muse-1.4.7-R6101.1/model-list.probe.redacted.json."
+      - "cli_version advanced from 1.4.7-R6101.1 to 1.4.10-R6427.1 on 2026-10-20 without a new picker capture: MSP `model/list` listed exactly this scope's 3 entries, in the same order, with the same effort variants, release dates and context/output limits. The picker's absence of an effort default was not re-read. Evidence: docs/research/fixtures/muse-1.4.10-R6427.1/model-list.probe.redacted.json."
     models:
       - id: muse-wonder-1.0
         label: muse-wonder-1.0

@@ -1,6 +1,6 @@
 # Antigravity (agy) Catalog Refresh
 
-Last updated: 2026-10-04
+Last updated: 2026-10-20
 
 Use this path for agy model-picker and per-model effort evidence. Current model names, option sets,
 and counts belong in catalog data and evidence, not this guide. The retained procedures come from
@@ -65,6 +65,9 @@ From 1.3.4 the picker can list a row the account's plan does not include, such a
 `Gemini 4 Argon (Medium)` with `Unavailable · ... Ultra plan subscribers` and no `enter Select`.
 `agy models` omits such a row, so it has no executable ID; record it from the picker, report it,
 and leave it out of the catalog unless the operator supplies an ID for a plan that includes it.
+Re-read such a row on every refresh: on 1.4.2 the same plan showed `Gemini 4 Argon` as a normal
+first row with a slider and `enter Select`, and `agy models` listed its three effort IDs. The
+picker opens on the `(current)` row, so press Up to the first row before starting the helper.
 
 Use Windows PowerShell 5.1 and pass labels as an array from a wrapper script. Capture and inspect
 one initial screenshot to verify text correspondence; the helper itself saves text only and

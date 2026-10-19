@@ -78,6 +78,22 @@ test('reads a template literal, as builds from 2.1.286 embed it', () => withScra
   ]);
 }));
 
+test('reads a double-quoted literal, as builds from 2.1.300 embed it', () => withScratch((root) => {
+  const notes = [
+    `## 9.9.7${NL}${NL}`,
+    `- Added a ${BS}"quoted${BS}" name and 'single' quotes${NL}${NL}`,
+    `## 9.9.6${NL}${NL}- Older entry${NL}`,
+  ].join('');
+  const path = join(root, 'double.bin');
+  writeFileSync(path, Buffer.from(`function E8r(){return"${notes}"}var y="## not a heading";`));
+  const result = readClaudeChangelog({ binaryPath: path, since: '9.9.6' });
+  assert.equal(result.newestEmbeddedVersion, '9.9.7');
+  assert.equal(result.oldestEmbeddedVersion, '9.9.6');
+  assert.deepEqual(result.sections, [
+    { version: '9.9.7', entries: [`Added a "quoted" name and 'single' quotes`] },
+  ]);
+}));
+
 test('the command line prints JSON and rejects a binary without notes', () => withScratch((root) => {
   const ok = spawnSync(process.execPath, [SCRIPT, '--binary', writeFakeBinary(root), '--since', '9.9.2'], { encoding: 'utf8' });
   assert.equal(ok.status, 0, ok.stderr);

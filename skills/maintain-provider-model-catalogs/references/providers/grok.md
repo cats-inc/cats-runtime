@@ -15,6 +15,13 @@ is `docs/research/2026-09-17-grok-model-picker-refresh.md` in cats-runtime.
   A new unmapped value remains an evidence gap.
 - The CLI takes model and effort separately (`--model` and `--reasoning-effort`). Do not derive
   model IDs from display text or expand per-model menus to the wider flag vocabulary in help.
+- The CLI's own model cache, `~/.grok/models_cache.json`, carries each model's name, description,
+  `reasoning_efforts` (value, label, description) and context windows. Read it before a picker
+  traversal; it settled the 1.0.62 refresh without one. From 1.0.62 a model can offer several
+  windows (`context_windows`), the picker asks for a window between model and effort, and
+  `context_window` is the one a session gets without a choice. `/session-info` in a fresh session
+  shows it as `Context: <used> / <window> tokens` without a prompt. A catalog limit follows what
+  `--model` alone gets; another window needs its own control and binding.
 - When the operator explicitly requests first-item initialization without default claims, remove
   superseded Cats defaults within that authorization. If older manifest evidence declared a
   default, record this as a Cats display/selection policy; absence of a marker in a newer screenshot
