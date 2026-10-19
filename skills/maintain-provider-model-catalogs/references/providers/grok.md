@@ -22,6 +22,13 @@ is `docs/research/2026-09-17-grok-model-picker-refresh.md` in cats-runtime.
   `context_window` is the one a session gets without a choice. `/session-info` in a fresh session
   shows it as `Context: <used> / <window> tokens` without a prompt. A catalog limit follows what
   `--model` alone gets; another window needs its own control and binding.
+- Only the TUI can choose a window on 1.0.62, so Cats has no window control. Checked without a
+  prompt: `grok --help` has no window flag; `-m "grok-4.7 500k"` is refused as `unknown model id`
+  and the session falls back to the default window; ACP `session/new` offers only the `model` and
+  `reasoning_effort` config options, lists `contextWindows` read-only in each model's `_meta`, and
+  does not advertise `context-window` among its slash commands. On a new version, recheck those
+  three places before adding a `grok.context_window` control. A control with no transport would
+  offer a choice Cats cannot send.
 - When the operator explicitly requests first-item initialization without default claims, remove
   superseded Cats defaults within that authorization. If older manifest evidence declared a
   default, record this as a Cats display/selection policy; absence of a marker in a newer screenshot
