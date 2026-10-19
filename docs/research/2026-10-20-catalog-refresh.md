@@ -29,7 +29,13 @@ One grouped question, after the captures:
 - Grok's default context window is now 256000, with 500000 selectable in the picker. Answer:
   change the limits to 256000; a context-window control is separate code work.
 - Run one quota-using headless prompt on gemini-4-argon-low to prove execution. Answer: no.
-- Version handling and Git. Answer: advance every scope, then commit, open a PR, merge and clean up.
+- Version handling and Git. The recommended option read "Codex/Muse/Grok advance cli_version (not
+  last_updated); Claude/agy advance cli_version and last_updated", then commit, PR, merge and
+  clean up. Answer: that option. Codex and Grok then received data edits (gpt-6.1-sol context and
+  the Grok limits), and a scope whose data an agent edits on a complete, `listConfirmed` source run
+  may advance `last_updated` (catalog probe, step 5). Both therefore advance to 2026-10-20; Muse,
+  with no data edit, keeps 2026-10-14. The Codex context change was found after the question and
+  applied as same-source drift.
 
 ## Results by CLI
 
