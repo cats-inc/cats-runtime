@@ -161,8 +161,8 @@ profile allowing opaque shell or unsupported tools must be `partial` even if
 some file operations are visible. Adapters default to unsupported/unavailable
 until validated. Do not claim complete filesystem tracing for native providers.
 
-Select the first native adapter slice from real fixture inventory in PLAN-047.
-Claude/Codex are candidate consumers, not a promised all-provider support matrix.
+The first native slice is selected from real fixture inventory in PLAN-047:
+native Claude direct Read/Write/Edit. This is not an all-provider support matrix.
 
 S3 observes admitted Runtime-owned tools on the API/local host execution path.
 File reads/writes, patches, copies, renames and deletes report their validated
@@ -171,6 +171,18 @@ without per-entry outcome evidence finish as unknown. Listings/search roots do
 not infer activity in child repos from returned names. Shell observations prove
 only the process's initial cwd. Coverage stays partial; native CLI/ACP modes
 remain unsupported in S3, and unmapped peers have no host mapping or host probe.
+
+S4 adds fixture-backed native Claude complete direct calls (`caller.type: direct`,
+no parent tool ID), host-absolute `file_path` admission and correlated user-frame
+tool results. Missing/foreign/relative paths and nested callers cannot inherit
+startup cwd. Tool-result prose and shell commands do not supply evidence.
+Unverified/nested results cannot close direct operations. Native admission is
+bounded to five seconds per target, 32 queued facts and 1024 correlations per
+execution; the existing four-unresolved-probe manager cap also applies. Late
+probes and old execution leases cannot mutate a replacement or cancelled run.
+Coverage is partial `native_tools_partial`. Windows Claude Code 2.1.304 native
+capture/live evidence and explicit unsupported modes are recorded in the
+[native evidence note](../research/2026-10-20-native-workspace-activity.md).
 
 ### WA-04: Repository and checkout identity
 

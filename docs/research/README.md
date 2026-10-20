@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-10-20-native-workspace-activity](./2026-10-20-native-workspace-activity.md) | Native Claude 2.1.304 workspace activity | Two isolated conversations sharing a parent cwd, captured Read/Write/Edit/failure evidence, live Runtime projection and explicit coverage/deadline limits |
 | [2026-10-20-grok-context-window-transport](./2026-10-20-grok-context-window-transport.md) | Grok 1.0.62 context-window selection outside the TUI | No CLI flag, `-m` refuses a window, ACP offers only model and effort options and no `/context-window`; Cats keeps 256000 and adds no control |
 | [2026-10-20-catalog-refresh](./2026-10-20-catalog-refresh.md) | Codex, Claude, Antigravity, Grok and Muse at this machine's versions | Gemini 4 Argon now listed and selectable in agy on the Pro plan and added first; Claude 2.1.303 picker unchanged after the changelog helper learned the double-quoted literal; Grok default context 256K with a 500K picker window; Codex gpt-6.1-sol context 500000 |
 | [2026-10-15-grok-muse-account-quota](./2026-10-15-grok-muse-account-quota.md) | Grok billing and Muse Windows TUI allowance | Grok numeric fields absent; Muse fresh zero-turn Current/Weekly percentages through existing winpty; CLI-only live HTTP/host verification and truthful reset labels |

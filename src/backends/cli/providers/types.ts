@@ -90,6 +90,8 @@ export interface ClaudeStreamEvent {
       name?: string;
       id?: string;
       input?: Record<string, unknown>;
+      /** Present on direct native Claude tool calls in the captured protocol. */
+      caller?: { type?: string };
       thinking?: string;
       tool_use_id?: string;
       content?: unknown;

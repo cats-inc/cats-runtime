@@ -7,6 +7,7 @@ import { WorkspaceActivityStore, type WorkspaceActivityAttachment,
   type WorkspaceActivityExecution } from '../workspace/workspaceActivity.js';
 import type { RuntimeWorkspaceActivitySnapshot, WorkspaceIdentityContext } from '../workspace/activityTypes.js';
 import { resolveWorkspaceIdentity } from '../workspace/workspaceIdentity.js';
+import { ProviderWorkspaceObserver } from '../workspace/providerWorkspaceObservation.js';
 import type { LocalToolWorkspaceObserverFactory } from '../tools/workspaceObservation.js';
 import { assertRetainedSkillContent, getRuntimeSkillContentPolicy } from '../skills/contentPolicy.js';
 import type {
@@ -140,6 +141,7 @@ export class RuntimeSessionManager {
   private readonly workspaceExecutions = new Map<string, WorkspaceActivityExecution>();
   private readonly workspaceContexts = new Map<string, WorkspaceIdentityContext>();
   private readonly workspaceModes = new Map<string, string>();
+  private readonly providerWorkspaceObservers = new Map<string, ProviderWorkspaceObserver>();
   private pendingWorkspaceProbes = 0;
   private readonly workspaceActivity = new WorkspaceActivityStore({ onChange: snapshot => {
     this.recordObservedStreamEvent(snapshot.sessionId,
@@ -174,14 +176,7 @@ export class RuntimeSessionManager {
     if (!lease || !identityContext || resolve(context.cwd) !== resolve(identityContext.cwd)) return undefined;
     return {
       start: async (target, signal) => {
-        if (this.pendingWorkspaceProbes >= 4) {
-          this.workspaceActivity.degrade(lease, 'observer_error');
-          return undefined;
-        }
-        this.pendingWorkspaceProbes++;
-        let result;
-        try { result = await resolveWorkspaceIdentity(identityContext, target.path); }
-        finally { this.pendingWorkspaceProbes--; }
+        const result = await this.probeWorkspaceIdentity(identityContext, target.path);
         if (signal.aborted) return undefined;
         if (result.reason) this.workspaceActivity.degrade(lease, 'identity_unavailable');
         if (!result.workspace) return undefined;
@@ -194,34 +189,59 @@ export class RuntimeSessionManager {
     };
   };
 
+  private async probeWorkspaceIdentity(context: WorkspaceIdentityContext, path: string) {
+    if (this.pendingWorkspaceProbes >= 4) return { workspace: null, reason: 'path_unavailable' as const };
+    this.pendingWorkspaceProbes++;
+    try { return await resolveWorkspaceIdentity(context, path); }
+    finally { this.pendingWorkspaceProbes--; }
+  }
+
   private beginWorkspaceExecution(session: SessionInfo, executionId: string,
+    target: ReturnType<typeof resolveProviderTarget>,
     requestedMode?: 'local_tools' | 'unsupported' | 'unmapped'): void {
-    const mode = requestedMode ?? (session.providerBackend === 'api' || session.providerBackend === 'local'
-      ? 'local_tools' : 'unsupported');
+    this.endWorkspaceExecution(session.id, 'unknown');
+    const mode = requestedMode ?? (target.backend === 'api' || target.backend === 'local' ? 'local_tools'
+      : target.backend === 'cli' && target.cliInstance?.commandConfig.runtime.mode !== 'native' ? 'unmapped'
+        : target.backend === 'cli' && target.providerName === 'claude' ? 'provider_structured' : 'unsupported');
     let attachment = this.workspaceAttachments.get(session.id);
     const existing = this.workspaceActivity.get(session.id);
     if (!attachment || existing?.runtimeCwd !== session.cwd || this.workspaceModes.get(session.id) !== mode) {
       attachment = this.workspaceActivity.attach(session.id,
         { startupCwd: session.cwd, runtimeCwd: session.cwd },
-        { status: mode === 'local_tools' ? 'partial' : 'unsupported',
-          reason: mode === 'local_tools' ? 'runtime_tools_partial' : mode === 'unmapped'
+        { status: mode === 'local_tools' || mode === 'provider_structured' ? 'partial' : 'unsupported',
+          reason: mode === 'local_tools' ? 'runtime_tools_partial' : mode === 'provider_structured'
+            ? 'native_tools_partial' : mode === 'unmapped'
             ? 'execution_location_unmapped' : 'provider_unverified' });
-      if (!attachment) return;
+      if (!attachment) {
+        this.workspaceActivity.delete(session.id);
+        this.workspaceAttachments.delete(session.id);
+        this.workspaceContexts.delete(session.id);
+        this.workspaceModes.delete(session.id);
+        return;
+      }
       this.workspaceAttachments.set(session.id, attachment);
       this.workspaceModes.set(session.id, mode);
     }
     const worktree = session.origin === 'runtime' && session.workspace.kind === 'worktree'
       ? session.workspace.worktree : undefined;
-    // Runtime-owned tools execute on the host. Native/guest providers do not inherit this mapping.
-    if (mode === 'local_tools') this.workspaceContexts.set(session.id, { cwd: session.cwd, local: true,
+    // Host tools and explicitly native selected CLI targets have a verified host mapping.
+    if (mode === 'local_tools' || mode === 'provider_structured') this.workspaceContexts.set(session.id, { cwd: session.cwd, local: true,
       executionLocationId: `native:${hostname()}`,
       ...(worktree ? { managedWorktree: { path: worktree.worktreePath, sourceRepoRoot: worktree.sourceRepoRoot } } : {}) });
     else this.workspaceContexts.delete(session.id);
     const execution = this.workspaceActivity.beginExecution(attachment, executionId);
-    if (execution) this.workspaceExecutions.set(session.id, execution);
+    if (execution) {
+      this.workspaceExecutions.set(session.id, execution);
+      const context = this.workspaceContexts.get(session.id);
+      if (mode === 'provider_structured' && context) this.providerWorkspaceObservers.set(session.id,
+        new ProviderWorkspaceObserver(this.workspaceActivity, execution,
+          path => this.probeWorkspaceIdentity(context, path)));
+    }
   }
 
   private endWorkspaceExecution(sessionId: string, outcome: 'cancelled' | 'unknown', detach = false): void {
+    this.providerWorkspaceObservers.get(sessionId)?.dispose();
+    this.providerWorkspaceObservers.delete(sessionId);
     const execution = this.workspaceExecutions.get(sessionId);
     if (execution) this.workspaceActivity.endExecution(execution, outcome);
     this.workspaceExecutions.delete(sessionId);
@@ -234,6 +254,15 @@ export class RuntimeSessionManager {
 
   getWorkspaceActivity(sessionId: string): RuntimeWorkspaceActivitySnapshot | undefined {
     return this.workspaceActivity.get(sessionId);
+  }
+
+  async observeProviderWorkspaceEvent(sessionId: string, event: StreamEvent,
+    execution: WorkspaceActivityExecution | undefined): Promise<void> {
+    // The caller must carry the server-owned execution lease across every await.
+    if (!execution || this.workspaceExecutions.get(sessionId)?.executionToken !== execution.executionToken
+      || execution.sessionId !== sessionId) return;
+    try { await this.providerWorkspaceObservers.get(sessionId)?.observe(event); }
+    catch { this.workspaceActivity.degrade(execution, 'observer_error'); }
   }
 
   isCurrentRun(sessionId: string, runId: string): boolean {
@@ -419,7 +448,7 @@ export class RuntimeSessionManager {
       policy: getRuntimeSkillContentPolicy(), hydration: session.hydration, skills: session.skills,
       cwd: session.cwd, sessionBaseDir: this.config.sessionBaseDir, sessionId: session.id,
     });
-    resolveProviderTarget(this.config, session.providerName,
+    const workspaceTarget = resolveProviderTarget(this.config, session.providerName,
       session.providerBackend && session.providerInstanceId
         ? `${session.providerBackend}/${session.providerInstanceId}` : session.providerInstanceId);
     const tracked = this.ensureTrackedState(session.id);
@@ -438,7 +467,7 @@ export class RuntimeSessionManager {
     tracked.state = 'running';
     tracked.wake = wake;
     tracked.currentRun = run;
-    this.beginWorkspaceExecution(session, run.id, options.workspaceObservation);
+    this.beginWorkspaceExecution(session, run.id, workspaceTarget, options.workspaceObservation);
 
     const target = describeRunTarget(session);
     this.runLogTargets.set(session.id, { target, startedAtMs: Date.now() });

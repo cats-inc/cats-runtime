@@ -844,6 +844,8 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
             for await (const event of eventStream) {
               if (!runtime.isCurrentRun(id, startedRun.id)) break;
               if (event.type === 'workspace_activity') continue;
+              await runtime.observeProviderWorkspaceEvent(id, event, workspaceExecution);
+              if (!runtime.isCurrentRun(id, startedRun.id)) break;
               const observedEvent = metering.observeEvent(executionSession, event, { turnStartedAt });
               runtime.observeEvent(id, observedEvent, workspaceExecution);
               if (!runtime.isLatestRun(id, startedRun.id)) break;
@@ -973,6 +975,8 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
       for await (const event of eventStream) {
         if (!runtime.isCurrentRun(id, startedRun.id)) break;
         if (event.type === 'workspace_activity') continue;
+        await runtime.observeProviderWorkspaceEvent(id, event, workspaceExecution);
+        if (!runtime.isCurrentRun(id, startedRun.id)) break;
         const observedEvent = metering.observeEvent(executionSession, event, { turnStartedAt });
         runtime.observeEvent(id, observedEvent, workspaceExecution);
         if (!runtime.isLatestRun(id, startedRun.id)) break;

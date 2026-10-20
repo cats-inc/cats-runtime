@@ -1722,6 +1722,8 @@ export interface ToolUseStreamEvent extends StreamEventBase {
   toolName?: string;
   toolId?: string;
   toolArgs?: Record<string, unknown>;
+  /** Adapter-verified structured target; never decoded from command strings. */
+  workspaceOperation?: { path: string; kind: 'read' | 'write' };
 }
 
 export interface ToolResultStreamEvent extends StreamEventBase {
@@ -1730,6 +1732,8 @@ export interface ToolResultStreamEvent extends StreamEventBase {
   toolName?: string;
   toolId?: string;
   isError?: boolean;
+  /** Only adapters with verified result semantics supply an observation outcome. */
+  workspaceOutcome?: 'succeeded' | 'failed' | 'unknown';
 }
 
 export interface ResultStreamEvent extends StreamEventBase, StreamEventStatePatch {

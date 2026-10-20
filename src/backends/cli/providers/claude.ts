@@ -182,13 +182,29 @@ export class ClaudeProvider implements Provider {
 
     // assistant message — accumulate text content
     if (event.type === 'assistant' && event.message?.content) {
-      const contentEvents = extractClaudeAssistantEvents(event.message.content);
+      const contentEvents = extractClaudeAssistantEvents(event.message.content, !event.parent_tool_use_id);
       if (contentEvents.length > 0) {
         return observeNormalized(this.evolutionObserver, {
           rawEventType: 'assistant',
           rawSample: event,
         }, contentEvents.length === 1 ? contentEvents[0]! : contentEvents);
       }
+    }
+
+    // Native tools return in user frames. Correlate IDs, never parse result prose.
+    if (event.type === 'user' && Array.isArray(event.message?.content)) {
+      const results = event.message.content.flatMap(block => {
+        if (typeof block !== 'object' || block === null || block.type !== 'tool_result') return [];
+        return createClaudeToolResultEvents({ toolId: block.tool_use_id,
+          text: stringifyClaudeContent(block.content), isError: block.is_error === true,
+          sourceEvent: 'user',
+          ...(!event.parent_tool_use_id ? { workspaceOutcome: block.is_error === true ? 'failed' as const
+            : (typeof block.content === 'string' || Array.isArray(block.content))
+              && (block.is_error === undefined || block.is_error === false) ? 'succeeded' as const : 'unknown' as const } : {}),
+        });
+      });
+      if (results.length) return observeNormalized(this.evolutionObserver,
+        { rawEventType: 'user', rawSample: event }, results.length === 1 ? results[0]! : results);
     }
 
     if (event.type === 'assistant' && event.tool_use) {
@@ -283,6 +299,7 @@ export class ClaudeProvider implements Provider {
 
 function extractClaudeAssistantEvents(
   content: NonNullable<ClaudeStreamEvent['message']>['content'],
+  direct = false,
 ): StreamEvent[] {
   const events: StreamEvent[] = [];
   const textParts: string[] = [];
@@ -299,6 +316,7 @@ function extractClaudeAssistantEvents(
         id: block.id,
         input: block.input,
         sourceEvent: 'assistant',
+        workspaceTarget: direct && block.type === 'tool_use' && block.caller?.type === 'direct',
       }));
       continue;
     }
@@ -343,6 +361,7 @@ function createClaudeToolUseEvents(tool: {
   id?: string;
   input?: Record<string, unknown>;
   sourceEvent: string;
+  workspaceTarget?: boolean;
 }): Array<ProgressStreamEvent | ToolUseStreamEvent> {
   const toolName = tool.name ?? 'unknown';
   return [
@@ -363,6 +382,11 @@ function createClaudeToolUseEvents(tool: {
       toolName,
       toolId: tool.id,
       toolArgs: tool.input,
+      ...(tool.workspaceTarget && ['Read', 'Write', 'Edit'].includes(toolName)
+        && typeof tool.input?.file_path === 'string' && tool.input.file_path.length > 0
+        && tool.input.file_path.length <= 4096 && !/[\x00-\x1f\x7f]/u.test(tool.input.file_path)
+        ? { workspaceOperation: { path: tool.input.file_path,
+          kind: toolName === 'Read' ? 'read' as const : 'write' as const } } : {}),
     } satisfies ToolUseStreamEvent,
   ];
 }
@@ -373,6 +397,7 @@ function createClaudeToolResultEvents(tool: {
   text?: string;
   isError?: boolean;
   sourceEvent: string;
+  workspaceOutcome?: ToolResultStreamEvent['workspaceOutcome'];
 }): Array<ProgressStreamEvent | ToolResultStreamEvent> {
   if (!tool.toolName && !tool.toolId && !tool.text) {
     return [];
@@ -400,6 +425,7 @@ function createClaudeToolResultEvents(tool: {
       ...(tool.toolId ? { toolId: tool.toolId } : {}),
       ...(tool.text ? { text: tool.text } : {}),
       ...(tool.isError === true ? { isError: true } : {}),
+      ...(tool.workspaceOutcome ? { workspaceOutcome: tool.workspaceOutcome } : {}),
     } satisfies ToolResultStreamEvent,
   ];
 }

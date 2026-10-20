@@ -1,5 +1,7 @@
 import { withSelectedCliProviders } from '../../tests/support/selectedCliFixture.js';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { ClaudeProvider } from '../backends/cli/providers/claude.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -124,6 +126,51 @@ function makeApp(
 }
 
 describe('message route transcript persistence', () => {
+  it('forwards native capture observations over NDJSON and SSE with inspection parity', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-native-route-'));
+    const sessionBaseDir = join(root, 'sessions');
+    const checkout = join(sessionBaseDir, 'repo', 'nested', 'child');
+    mkdirSync(checkout, { recursive: true });
+    writeFileSync(join(checkout, 'input.txt'), 'fixture\n');
+    const initialized = spawnSync('git', ['init', '-b', 'main'],
+      { cwd: checkout, encoding: 'utf8', windowsHide: true, timeout: 15000 });
+    expect(initialized.status).toBe(0);
+    try {
+      const source = readFileSync(new URL('../../tests/fixtures/provider-captures/claude-2.1.304/workspace-read-write.redacted.ndjson', import.meta.url), 'utf8')
+        .trim().split(/\r?\n/).slice(0, 2).map(line => JSON.parse(line));
+      source[0].message.content[0].input.file_path = join(checkout, 'input.txt');
+      for (const accept of ['application/x-ndjson', 'text/event-stream']) {
+        const provider = new ClaudeProvider();
+        const { app, session } = makeApp(sessionBaseDir, async function* () {
+          for (const frame of source) {
+            const parsed = provider.parseStreamLine(JSON.stringify(frame));
+            for (const event of parsed ? Array.isArray(parsed) ? parsed : [parsed] : []) yield event;
+          }
+          yield { type: 'result' };
+        });
+        const response = await app.request(`/sessions/${session.id}/messages`, {
+          method: 'POST', headers: { 'content-type': 'application/json', accept },
+          body: JSON.stringify({ message: 'replay captured native read' }),
+        });
+        expect(response.status).toBe(200);
+        const text = await response.text();
+        const frames = accept === 'application/x-ndjson' ? parseAllNdjson(text)
+          : text.split(/\r?\n/u).filter(line => line.startsWith('data:'))
+            .map(line => JSON.parse(line.slice(5).trim()));
+        const snapshots = frames.filter(event => event.type === 'workspace_activity');
+        expect(snapshots.length).toBeGreaterThan(0);
+        expect(snapshots.every(event => isWorkspaceActivitySnapshot(event.workspaceActivity))).toBe(true);
+        const snapshot = snapshots.at(-1)!.workspaceActivity;
+        expect(snapshot.workspaces[0]).toMatchObject({ kind: 'original', branch: 'main',
+          runningOperations: [], recentOperations: [{ kind: 'read', state: 'succeeded', evidence: 'provider_structured' }] });
+        const inspection = await (await app.request(`/sessions/${session.id}/observe`)).json();
+        expect(inspection.session.inspection.workspaceActivity).toEqual(snapshot);
+        expect(frames.findLastIndex(event => event.type === 'workspace_activity'))
+          .toBeLessThan(frames.findIndex(event => event.type === 'result'));
+      }
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }, 30000);
+
   it('persists the latest user input preview into session metadata and session list payloads', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
     const sessionBaseDir = join(root, 'sessions');
