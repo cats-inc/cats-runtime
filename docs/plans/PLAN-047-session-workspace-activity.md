@@ -31,18 +31,19 @@ version changes and publication remain separately authorized.
 | S2 | Runtime bounded reducer, ordering, snapshot validation and inactive reattachment | Complete; 11 focused tests and typecheck passed |
 | S3 | Runtime local-tool observation, session lifecycle, transport and memory-only restart checks | Complete; scoped suites/typecheck and independent review passed |
 | S4 | Native provider structured evidence, coverage and fixture/native checks | Complete; native Claude Windows live evidence, captured replay, scoped tests/typecheck and independent review |
-| S5 | Platform participant attribution, work-area API and live projection | Pending |
-| S6 | Code right panel, avatar entry, localization and renderer regressions | Pending |
-| S7 | Cross-repository native acceptance, recovery/privacy and documentation reconciliation | Pending |
+| S5 | Platform participant attribution, work-area API and live projection | Complete; Platform `d553b85b`, focused tests/typechecks and independent review |
+| S6 | Code right panel, avatar entry, localization and renderer regressions | Complete; Platform `8a075834`, seven renderer tests, 49 existing consumer tests and candidate builds |
+| S7 | Cross-repository native acceptance, recovery/privacy and documentation reconciliation | Identity hardening and two-session HTTP projection passed; final Electron work-area visual acceptance incomplete |
 
 S1 uses bounded metadata reads without Git subprocesses/configuration or a root
 scan. It reuses existing path policy and trusted managed-worktree source authority.
 Generic shell strings, bubbles and multiple selected Codespaces remain excluded.
 Unknown identity is retained at an authority or traversal boundary. Managed
 source attachments that are themselves linked worktrees currently remain
-unavailable pending a later identity/lifecycle fixture slice supplying verified provenance. Windows
-case-sensitive directory behavior, submodules and path reuse need later fixtures;
-the current checks do not claim those modes are validated.
+unavailable without verified provenance; the explicit fixture confirms that this
+does not broaden metadata authority. Submodule and reused `.git` identity
+fixtures pass. The case-sensitive-filesystem fixture is capability-gated and
+skipped on this Windows filesystem; that mode and other OSes remain unvalidated.
 
 S2 keeps last-known facts in memory only. No existing session record is rewritten
 and no disk format is introduced. Process restart has no restored activity;
@@ -102,7 +103,7 @@ Platform PLAN-120. Do not claim raw shell target inference as verified evidence.
 - [x] Add a serialized bounded reducer for start/completion/cancel, multiple
   targets, deduplication, limits and freshness.
 - [x] Keep session binding context separate from observed operation association.
-- [ ] Cover branch/path replacement and identity cache invalidation without
+- [x] Cover branch/path replacement and identity cache invalidation without
   filesystem-wide watchers or recursive repository scans.
 
 **Deliverable:** Isolated pure/model and real-temp-Git tests for identity and
@@ -136,16 +137,16 @@ provenance and documented coverage boundaries.
   reattachment and revalidate identity before new observed-operation facts.
 - [x] Verify existing session records are unchanged by observation and no active
   observations survive process restart. No new persisted schema or migration.
-- [ ] Exercise real HTTP/stream consumer fixtures with Platform's parser contract.
+- [x] Exercise real HTTP/stream consumer fixtures with Platform's parser contract.
 
 **Deliverable:** Authenticated recoverable session observations with bounded
 retention and no false running state after a lifecycle boundary.
 
 ### Phase 5: Cross-repository acceptance and documentation
 
-- [ ] Use synthetic temp repositories under a non-Git `cats-inc` parent; include
+- [x] Use synthetic temp repositories under a non-Git `cats-inc` parent; include
   a fourth-level repo, multiple linked worktrees and a plain directory.
-- [ ] Verify two sessions retain the same cwd while reading/writing distinct
+- [x] Verify two sessions retain the same cwd while reading/writing distinct
   child repos; exercise one session across several checkouts.
 - [x] Run a bounded native provider acceptance on one named OS/profile with real
   structured evidence and unchanged execution grants.
@@ -221,6 +222,7 @@ the new contract. A docs-only task does not rerun these baseline suites.
 
 | Date | Update |
 | --- | --- |
+| 2026-10-20 | Final identity hardening includes admitted filesystem generation in repository/checkout IDs. The identity suite passed 18 cases with one capability skip for case-sensitive paths; Windows submodule setup uses a scoped 30-second fixture deadline. Independent review found no blocker. An isolated two-participant fixture passed real Runtime HTTP consumer projection checks: common cwd, fourth-level repo, two worktrees, multiple repos, shared checkout identity and coordinator's own session. Runtime/server/Desktop/Vite builds and candidate startup passed. Final Electron work-area visual acceptance did not complete: the isolated renderer harness exited before producing UI evidence. The owner requested commit and auto-merge PR delivery; this limitation is retained rather than claimed passed. No profile-format change, version bump or publication. |
 | 2026-10-20 | Created ADR-046 / SPEC-037 / PLAN-047 for Platform ADR-134 / SPEC-127 / PLAN-120. Planning only; implementation and native acceptance not started. Multi-root settings, bubble changes and worktree ownership changes are excluded. |
 | 2026-10-20 | Documentation validation passed: 34 references across the six new Platform/Runtime documents resolve against the local worktrees; numbering, index entries, LF/final newlines and code fences checked. Both repositories passed `git diff --check`. No application tests, builds or live acceptance were run for this docs-only task. |
 | 2026-10-20 | Owner authorized sliced implementation and incremental commits. Platform PR #289 was verified merged at `8bb3fd2f` with changes/validate/nodejs CI successful; both main checkouts pulled cleanly. Runtime worktree `plan047-workspace-activity` starts at `b2d888aa`; S1 and independent contract review are in progress. |

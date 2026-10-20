@@ -200,6 +200,13 @@ under each filesystem's case rules; do not lowercase all paths globally. Missing
 paths can be resolved against the nearest admitted existing parent, with existing
 alias/containment protections intact.
 
+The implemented local identities hash the canonical path, execution location
+and admitted directory generation (`dev`, `ino`, `birthtimeNs`). Repository
+identity uses the common Git directory; checkout identity also includes its
+checkout/Git directory generation. Replacing `.git` at a reused path changes
+identity while changing the branch does not. These are observed filesystem
+identities, not permanent IDs across moves, restores or every network filesystem.
+
 `sourceRoot` and a human-readable source repository label are optional verified
 facts. Do not derive them by trimming `.git` strings or treating a worktree's
 arbitrary basename as its source repository. A bare/unresolvable repository or

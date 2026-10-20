@@ -21,6 +21,12 @@ function identityId(kind: string, location: string, path: string): string {
   return `${kind}-${createHash('sha256').update(`${location}\0${path}`).digest('hex').slice(0, 24)}`;
 }
 
+async function directoryGeneration(path: string): Promise<string> {
+  const info = await stat(path, { bigint: true });
+  if (!info.isDirectory()) throw new Error('Expected directory identity');
+  return `${info.dev}:${info.ino}:${info.birthtimeNs}`;
+}
+
 async function metadataPath(roots: string[], candidate: string): Promise<string> {
   for (const root of roots) {
     if (!isInside(root, candidate)) continue;
@@ -76,9 +82,9 @@ function headIdentity(head: string): { branch: string | null; detachedCommit: st
   throw new Error('Unsupported Git HEAD');
 }
 
-function plainIdentity(context: WorkspaceIdentityContext, directory: string): RuntimeWorkspaceIdentity {
+function plainIdentity(context: WorkspaceIdentityContext, directory: string, generation: string): RuntimeWorkspaceIdentity {
   return {
-    checkoutId: identityId('checkout', context.executionLocationId, directory),
+    checkoutId: identityId('checkout', context.executionLocationId, `${directory}\0${generation}`),
     executionLocationId: context.executionLocationId,
     path: directory,
     repository: null,
@@ -101,17 +107,19 @@ export async function resolveWorkspaceIdentity(
   let root: string;
   let target: string;
   let directory: string;
+  let generation: string;
   try {
     if (!inputPath || inputPath.length > 4096 || inputPath.includes('\0')) throw new Error('Invalid path');
     const safe = await resolveSafeWorkspacePath(context.cwd, inputPath);
     root = await realpath(context.cwd);
     target = resolve(root, relative(resolve(context.cwd), safe.fullPath));
     directory = await nearestDirectory(target, root);
+    generation = await directoryGeneration(directory);
   } catch {
     return { workspace: null, reason: 'path_unavailable' };
   }
 
-  const fallback = plainIdentity(context, directory);
+  const fallback = plainIdentity(context, directory, generation);
   const unknown = { ...fallback, kind: 'unknown' as const,
     verification: 'unavailable' as const, management: 'unknown' as const };
   // A target inside Git's control directory is not ordinary checkout activity.
@@ -186,10 +194,14 @@ export async function resolveWorkspaceIdentity(
               && await realpath(sourceMarker) === commonDir) sourceRoot = await realpath(candidate);
           }
         }
-        const repoId = identityId('repo', context.executionLocationId, commonDir);
+        const commonGeneration = await directoryGeneration(commonDir);
+        const gitGeneration = await directoryGeneration(gitDir);
+        const checkoutGeneration = await directoryGeneration(checkout);
+        const repoId = identityId('repo', context.executionLocationId, `${commonDir}\0${commonGeneration}`);
         return { workspace: {
           ...fallback,
-          checkoutId: identityId('checkout', context.executionLocationId, checkout),
+          checkoutId: identityId('checkout', context.executionLocationId,
+            `${checkout}\0${checkoutGeneration}\0${gitGeneration}`),
           path: checkout,
           repository: { id: repoId, label: sourceRoot ? basename(sourceRoot) : `Repository ${repoId.slice(-8)}`,
             ...(sourceRoot ? { sourceRoot } : {}) },

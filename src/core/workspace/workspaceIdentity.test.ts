@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdir, mkdtemp, realpath, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rename, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -76,9 +76,52 @@ describe('workspace identity from admitted operation targets', () => {
   });
 
   it('rechecks branch metadata rather than retaining a stale branch label', async () => {
+    const before = await resolveWorkspaceIdentity(context, branchWorktree);
     git(branchWorktree, 'branch', '-m', 'topic/renamed');
     const result = await resolveWorkspaceIdentity(context, join(branchWorktree, 'src', 'example.ts'));
     expect(result.workspace?.branch).toBe('topic/renamed');
+    expect(result.workspace?.checkoutId).toBe(before.workspace?.checkoutId);
+  });
+
+  it('does not reuse repository/checkout identity after Git metadata is replaced at the same path', async () => {
+    const reused = join(root, 'reused'); await mkdir(reused);
+    git(reused, 'init', '--initial-branch=main');
+    const before = await resolveWorkspaceIdentity(context, reused);
+    await rename(join(reused, '.git'), join(root, 'retired-git-metadata'));
+    git(reused, 'init', '--initial-branch=replacement');
+    const after = await resolveWorkspaceIdentity(context, reused);
+    expect(after.workspace?.path).toBe(before.workspace?.path);
+    expect(after.workspace?.repository?.id).not.toBe(before.workspace?.repository?.id);
+    expect(after.workspace?.checkoutId).not.toBe(before.workspace?.checkoutId);
+    expect(after.workspace?.branch).toBe('replacement');
+  });
+
+  it('keeps submodule Git-file identities separate from the parent and independent clone', async () => {
+    git(repo, '-c', 'protocol.file.allow=always', 'submodule', 'add', clone, 'submodule');
+    const child = await resolveWorkspaceIdentity(context, join(repo, 'submodule', 'src', 'example.ts'));
+    const parent = await resolveWorkspaceIdentity(context, repo);
+    const independent = await resolveWorkspaceIdentity(context, clone);
+    expect(child.workspace).toMatchObject({ kind: 'original', management: 'unmanaged', verification: 'verified' });
+    expect(child.workspace?.repository?.id).not.toBe(parent.workspace?.repository?.id);
+    expect(child.workspace?.repository?.id).not.toBe(independent.workspace?.repository?.id);
+  }, 30_000); // Local submodule creation invokes several Git processes, especially costly on Windows.
+
+  it('distinguishes repositories whose names differ only by case on a capable filesystem', async test => {
+    const upper = join(root, 'CaseRepo'); const lower = join(root, 'caserepo');
+    await mkdir(upper, { recursive: true }); await mkdir(lower, { recursive: true });
+    const [first, second] = await Promise.all([stat(upper, { bigint: true }), stat(lower, { bigint: true })]);
+    if (first.dev === second.dev && first.ino === second.ino) { test.skip(); return; }
+    git(upper, 'init', '--initial-branch=main'); git(lower, 'init', '--initial-branch=main');
+    const a = await resolveWorkspaceIdentity(context, upper); const b = await resolveWorkspaceIdentity(context, lower);
+    expect(a.workspace?.checkoutId).not.toBe(b.workspace?.checkoutId);
+    expect(a.workspace?.repository?.id).not.toBe(b.workspace?.repository?.id);
+  });
+
+  it('does not broaden metadata authority when a managed source is itself a linked worktree', async () => {
+    const result = await resolveWorkspaceIdentity({ ...context, cwd: externalWorktree,
+      managedWorktree: { path: externalWorktree, sourceRepoRoot: worktree } }, '.');
+    expect(result).toMatchObject({ workspace: { kind: 'unknown', management: 'unknown', repository: null },
+      reason: 'git_metadata_unavailable' });
   });
 
   it('qualifies identities by verified execution location', async () => {
