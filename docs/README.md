@@ -1,11 +1,12 @@
 # Documentation Index
 
-[Session workspace activity](specs/SPEC-037-session-workspace-activity.md) proposes
+[Session workspace activity](specs/SPEC-037-session-workspace-activity.md) defines
 bounded, evidence-backed repo/worktree observations for the Platform Code
 participant panel. [ADR-046](decisions/046-expose-evidence-backed-session-workspace-activity.md)
 and [PLAN-047](plans/PLAN-047-session-workspace-activity.md) define coverage,
-identity, lifecycle and consumer validation. This is planning only; execution
-roots, permissions and worktree management are unchanged. Implementation has not started.
+identity, lifecycle and consumer validation. Sliced implementation has started
+with admitted Git identity and public activity types. Observer, transport,
+provider and Code integration acceptance remain pending.
 
 [Cats Ask MCP probe](research/2026-09-29-cats-ask-mcp-probe.md) records the isolated
 question/answer experiment, matched Grok Bot synthetic and authenticated bookmark

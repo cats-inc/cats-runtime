@@ -1,8 +1,8 @@
 # Feature Specifications
 
 - [SPEC-037: Session workspace activity](SPEC-037-session-workspace-activity.md)
-  — draft, 2026-10-20; typed session snapshots, verified Git identity and
-  honest tool/provider coverage. Implementation not started.
+  — approved, 2026-10-20; typed session snapshots, verified Git identity and
+  honest tool/provider coverage. Sliced implementation in progress.
 
 - [SPEC-036: Operator-run catalog probe](SPEC-036-operator-run-catalog-probe.md) — read-only
   CLI model enumeration validated against the factory, with agent hand-off and acknowledgements.
@@ -59,7 +59,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 | Spec | Title | Status | Related Plan |
 |------|-------|--------|--------------|
-| [SPEC-037](SPEC-037-session-workspace-activity.md) | Session Workspace Activity | Draft; planning only | [PLAN-047](../plans/PLAN-047-session-workspace-activity.md) |
+| [SPEC-037](SPEC-037-session-workspace-activity.md) | Session Workspace Activity | Approved; implementation in progress | [PLAN-047](../plans/PLAN-047-session-workspace-activity.md) |
 | [SPEC-032](./SPEC-032-model-selector-custom-controls-route-and-cost-signals.md) | Model Selector Custom Controls, Route Display and Cost Signals | Draft — pending approval (not approved) | [PLAN-042](../plans/PLAN-042-model-selector-custom-controls-route-and-cost-signals.md) (on hold) |
 | [SPEC-031](./SPEC-031-provider-catalog-data-and-local-overrides.md) | Provider Catalog Data and Local Overrides | Implemented — Runtime and Platform CI passed; 2026-09-29 basis amendment implemented in Runtime and Platform | [PLAN-040](../plans/PLAN-040-provider-catalog-data-and-local-overrides.md), [ADR-040](../decisions/040-use-data-driven-provider-catalogs-and-local-overrides.md), [PLAN-045](../plans/PLAN-045-catalog-basis-channel-and-plan.md) |
 | [SPEC-030](./SPEC-030-provider-selection-before-bootstrap-probes.md) | Provider Selection Before Bootstrap Probes | Approved; Runtime UX accepted; integrated acceptance in progress | [PLAN-039](../plans/PLAN-039-provider-selection-bootstrap-rollout.md), [ADR-039](../decisions/039-use-selected-provider-config-as-the-resource-boundary.md) |

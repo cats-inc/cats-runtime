@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| **Status** | Draft; planning only, implementation not started |
+| **Status** | Approved; sliced implementation in progress, acceptance pending |
 | **Owner** | Runtime execution/workspace workstream |
 | **Reviewer** | Owner and Runtime/Platform integration owners; pending |
 | **Decision** | [ADR-046](../decisions/046-expose-evidence-backed-session-workspace-activity.md) |
@@ -55,7 +55,8 @@ existing Runtime session streaming paths. Both carry the same bounded full
 snapshot, avoiding a second product-specific delta protocol. Preserve the field
 through supported NDJSON/SSE and normalized output adapters.
 
-The conceptual shape below is a proposed contract, not a current exported type:
+The types below are exported by the S1 slice. Session inspection and streaming
+integration follow in S3; a type export alone does not enable observation:
 
 ```ts
 interface RuntimeWorkspaceActivitySnapshot {
@@ -175,7 +176,9 @@ alias/containment protections intact.
 `sourceRoot` and a human-readable source repository label are optional verified
 facts. Do not derive them by trimming `.git` strings or treating a worktree's
 arbitrary basename as its source repository. A bare/unresolvable repository or
-unavailable Git executable yields explicit unknown identity instead of a fake root.
+unsupported metadata layout yields explicit unknown identity instead of a fake
+root. The initial resolver reads bounded metadata files directly and needs no
+Git executable; it does not load Git configuration, hooks or external helpers.
 
 Cache identity by execution location and verified checkout, with bounded lifetime
 and invalidation after relevant observed Git actions, filesystem replacement,

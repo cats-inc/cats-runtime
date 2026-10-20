@@ -5,6 +5,15 @@ import type {
 import type { SessionMcpServerLaunch } from './sessionMcpServers.js';
 
 export type {
+  RuntimeObservedWorkspace,
+  RuntimeWorkspaceActivitySnapshot,
+  RuntimeWorkspaceIdentity,
+  RuntimeWorkspaceOperation,
+  WorkspaceActivityCoverage,
+  WorkspaceActivityCoverageStatus,
+} from './workspace/activityTypes.js';
+
+export type {
   ProviderModelResolution,
   ProviderModelSelection,
 } from './models/providerSelectionResolution.js';

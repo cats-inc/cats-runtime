@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| **Status** | Draft; planning delivered, implementation not started |
+| **Status** | In Progress; owner-authorized sliced implementation, acceptance pending |
 | **Owner** | Runtime execution/workspace workstream |
 | **Reviewer** | Owner and Runtime/Platform integration owners; pending |
 | **Spec** | [SPEC-037](../specs/SPEC-037-session-workspace-activity.md) |
@@ -18,8 +18,31 @@ repos/worktrees beneath it. Runtime owns evidence, identity and observation
 lifecycle. Platform maps sessions to Code participants and renders work areas.
 This plan adds no multi-root settings, bubble fields or worktree lifecycle actions.
 
-The current task prepares documents only. All implementation phases remain open;
-no provider, transport, storage or native UI acceptance is claimed here.
+The owner authorized implementation and incremental commits after Platform
+PR #289 passed CI and merged. Both main checkouts were pulled before worktrees
+were created. Each slice receives scoped validation and a separate commit;
+version changes and publication remain separately authorized.
+
+## Delivery Slices
+
+| Slice | Repository and deliverable | State |
+| --- | --- | --- |
+| S1 | Runtime activity types and admitted repo/worktree identity | Complete; 15 focused tests and typecheck passed |
+| S2 | Runtime bounded reducer, ordering, snapshot validation and inactive restore | Pending |
+| S3 | Runtime local-tool observation, session lifecycle, transport and checkpoint integration | Pending |
+| S4 | Native provider structured evidence, coverage and fixture/native checks | Pending |
+| S5 | Platform participant attribution, work-area API and live projection | Pending |
+| S6 | Code right panel, avatar entry, localization and renderer regressions | Pending |
+| S7 | Cross-repository native acceptance, recovery/privacy and documentation reconciliation | Pending |
+
+S1 uses bounded metadata reads without Git subprocesses/configuration or a root
+scan. It reuses existing path policy and trusted managed-worktree source authority.
+Generic shell strings, bubbles and multiple selected Codespaces remain excluded.
+Unknown identity is retained at an authority or traversal boundary. Managed
+source attachments that are themselves linked worktrees currently remain
+unavailable until S3 can supply verified lifecycle metadata provenance. Windows
+case-sensitive directory behavior, submodules and path reuse need later fixtures;
+the current checks do not claim those modes are validated.
 
 ## Implementation Phases
 
@@ -170,6 +193,8 @@ the new contract. A docs-only task does not rerun these baseline suites.
 | --- | --- |
 | 2026-10-20 | Created ADR-046 / SPEC-037 / PLAN-047 for Platform ADR-134 / SPEC-127 / PLAN-120. Planning only; implementation and native acceptance not started. Multi-root settings, bubble changes and worktree ownership changes are excluded. |
 | 2026-10-20 | Documentation validation passed: 34 references across the six new Platform/Runtime documents resolve against the local worktrees; numbering, index entries, LF/final newlines and code fences checked. Both repositories passed `git diff --check`. No application tests, builds or live acceptance were run for this docs-only task. |
+| 2026-10-20 | Owner authorized sliced implementation and incremental commits. Platform PR #289 was verified merged at `8bb3fd2f` with changes/validate/nodejs CI successful; both main checkouts pulled cleanly. Runtime worktree `plan047-workspace-activity` starts at `b2d888aa`; S1 and independent contract review are in progress. |
+| 2026-10-20 | S1 adds exported activity types and lazy admitted Git identity. Independent review fixes cover incomplete outer authority, managed-subdirectory attachments, foreign source/sibling pointers and bounded-walk exhaustion. Focused identity suite: 15 passed; Runtime TypeScript check passed; no live provider or Platform acceptance yet. |
 
 ---
 
