@@ -1,5 +1,9 @@
 # Implementation Plans
 
+- [PLAN-047: Session workspace activity](PLAN-047-session-workspace-activity.md)
+  — draft, 2026-10-20; shared observer, identity, provider evidence,
+  transport/recovery and Platform acceptance. Implementation not started.
+
 - [PLAN-046: Session MCP servers](PLAN-046-session-mcp-servers.md) — contract first, then
   Claude Code, Codex and (F3) GitHub Copilot CLI mappings.
 - [PLAN-045: Catalog basis (channel and plan)](PLAN-045-catalog-basis-channel-and-plan.md) —
@@ -57,6 +61,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
+| [PLAN-047](PLAN-047-session-workspace-activity.md) | Session Workspace Activity | Draft; planning only | [SPEC-037](../specs/SPEC-037-session-workspace-activity.md), [ADR-046](../decisions/046-expose-evidence-backed-session-workspace-activity.md) |
 | [PLAN-046](./PLAN-046-session-mcp-servers.md) | Session MCP Servers | Complete — R1–R4 merged, F3 adds Copilot; release separate | [SPEC-035](../specs/SPEC-035-session-mcp-servers.md), [ADR-044](../decisions/044-configure-session-mcp-servers-for-provider-clis.md) |
 | [PLAN-045](./PLAN-045-catalog-basis-channel-and-plan.md) | Catalog Basis (Channel and Plan) | Implemented — Runtime and Platform merged; ships with the next Desktop release | [SPEC-031](../specs/SPEC-031-provider-catalog-data-and-local-overrides.md#amendment-2026-09-29-catalog-basis) |
 | [PLAN-042](./PLAN-042-model-selector-custom-controls-route-and-cost-signals.md) | Model Selector Custom Controls, Route Display and Cost Signals | On Hold — not approved; waiting for SPEC-032 approval | [SPEC-032](../specs/SPEC-032-model-selector-custom-controls-route-and-cost-signals.md) |
@@ -127,7 +132,6 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 ---
 
 *See also: [specs/](../specs/) for feature specifications*
-*Last updated: 2026-09-16 (PLAN-039 tracks the shared Runtime, Platform, and Desktop
-selection-first bootstrap rollout and the accepted Runtime UX with retained observations.)*
+*Last updated: 2026-10-20 (PLAN-047 plans the observation contract and Code consumer acceptance.)*
 
 - [PLAN-043: Bounded image generation](PLAN-043-bounded-image-generation.md) — implementation and fixture validation.
