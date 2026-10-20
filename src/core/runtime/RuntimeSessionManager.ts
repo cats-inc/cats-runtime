@@ -1,6 +1,13 @@
 import { bindManagedNativeIdentity, hasManagedPluginExposure } from '../skills/managedPlugins.js';
 import { RuntimeSkillError } from '../skills/errors.js';
 import { randomUUID } from 'node:crypto';
+import { hostname } from 'node:os';
+import { resolve } from 'node:path';
+import { WorkspaceActivityStore, type WorkspaceActivityAttachment,
+  type WorkspaceActivityExecution } from '../workspace/workspaceActivity.js';
+import type { RuntimeWorkspaceActivitySnapshot, WorkspaceIdentityContext } from '../workspace/activityTypes.js';
+import { resolveWorkspaceIdentity } from '../workspace/workspaceIdentity.js';
+import type { LocalToolWorkspaceObserverFactory } from '../tools/workspaceObservation.js';
 import { assertRetainedSkillContent, getRuntimeSkillContentPolicy } from '../skills/contentPolicy.js';
 import type {
   AgentRuntimeService,
@@ -82,6 +89,7 @@ interface RuntimeObservedStreamState {
 }
 
 export interface RuntimeTrackedSessionStateSnapshot {
+  workspaceActivity?: RuntimeWorkspaceActivitySnapshot;
   state: RuntimeSessionExecutionState;
   wake: RuntimeWakeReason | null;
   maintenance: RuntimeTrackedSessionMaintenanceState;
@@ -128,6 +136,15 @@ class CliExecutionHandle implements ExecutionHandle {
 }
 
 export class RuntimeSessionManager {
+  private readonly workspaceAttachments = new Map<string, WorkspaceActivityAttachment>();
+  private readonly workspaceExecutions = new Map<string, WorkspaceActivityExecution>();
+  private readonly workspaceContexts = new Map<string, WorkspaceIdentityContext>();
+  private readonly workspaceModes = new Map<string, string>();
+  private pendingWorkspaceProbes = 0;
+  private readonly workspaceActivity = new WorkspaceActivityStore({ onChange: snapshot => {
+    this.recordObservedStreamEvent(snapshot.sessionId,
+      { type: 'workspace_activity', workspaceActivity: snapshot }, snapshot.observedAt);
+  } });
   private readonly sessionStates = new Map<string, RuntimeTrackedSessionStateSnapshot>();
 
   private readonly handleOverrides = new Map<string, ExecutionHandle>();
@@ -146,7 +163,100 @@ export class RuntimeSessionManager {
     private readonly apiBackend?: ApiBackendManager,
     private readonly agentBackend?: AgentBackendManager,
     private readonly getSessionBinding?: (sessionId: string) => SessionInfo | undefined,
-  ) {}
+  ) {
+    this.apiBackend?.setWorkspaceObserver(this.createToolWorkspaceObserver);
+  }
+
+  private readonly createToolWorkspaceObserver: LocalToolWorkspaceObserverFactory = context => {
+    // Capture the current lease before the tool's first asynchronous admission step.
+    const lease = this.workspaceExecutions.get(context.sessionId);
+    const identityContext = this.workspaceContexts.get(context.sessionId);
+    if (!lease || !identityContext || resolve(context.cwd) !== resolve(identityContext.cwd)) return undefined;
+    return {
+      start: async (target, signal) => {
+        if (this.pendingWorkspaceProbes >= 4) {
+          this.workspaceActivity.degrade(lease, 'observer_error');
+          return undefined;
+        }
+        this.pendingWorkspaceProbes++;
+        let result;
+        try { result = await resolveWorkspaceIdentity(identityContext, target.path); }
+        finally { this.pendingWorkspaceProbes--; }
+        if (signal.aborted) return undefined;
+        if (result.reason) this.workspaceActivity.degrade(lease, 'identity_unavailable');
+        if (!result.workspace) return undefined;
+        const id = randomUUID();
+        this.workspaceActivity.start(lease, { id, toolId: target.toolId,
+          kind: target.kind, evidence: 'runtime_tool', workspaces: [result.workspace] });
+        return outcome => this.workspaceActivity.complete(lease, id, outcome);
+      },
+      gap: (_sessionId, reason) => this.workspaceActivity.degrade(lease, reason),
+    };
+  };
+
+  private beginWorkspaceExecution(session: SessionInfo, executionId: string,
+    requestedMode?: 'local_tools' | 'unsupported' | 'unmapped'): void {
+    const mode = requestedMode ?? (session.providerBackend === 'api' || session.providerBackend === 'local'
+      ? 'local_tools' : 'unsupported');
+    let attachment = this.workspaceAttachments.get(session.id);
+    const existing = this.workspaceActivity.get(session.id);
+    if (!attachment || existing?.runtimeCwd !== session.cwd || this.workspaceModes.get(session.id) !== mode) {
+      attachment = this.workspaceActivity.attach(session.id,
+        { startupCwd: session.cwd, runtimeCwd: session.cwd },
+        { status: mode === 'local_tools' ? 'partial' : 'unsupported',
+          reason: mode === 'local_tools' ? 'runtime_tools_partial' : mode === 'unmapped'
+            ? 'execution_location_unmapped' : 'provider_unverified' });
+      if (!attachment) return;
+      this.workspaceAttachments.set(session.id, attachment);
+      this.workspaceModes.set(session.id, mode);
+    }
+    const worktree = session.origin === 'runtime' && session.workspace.kind === 'worktree'
+      ? session.workspace.worktree : undefined;
+    // Runtime-owned tools execute on the host. Native/guest providers do not inherit this mapping.
+    if (mode === 'local_tools') this.workspaceContexts.set(session.id, { cwd: session.cwd, local: true,
+      executionLocationId: `native:${hostname()}`,
+      ...(worktree ? { managedWorktree: { path: worktree.worktreePath, sourceRepoRoot: worktree.sourceRepoRoot } } : {}) });
+    else this.workspaceContexts.delete(session.id);
+    const execution = this.workspaceActivity.beginExecution(attachment, executionId);
+    if (execution) this.workspaceExecutions.set(session.id, execution);
+  }
+
+  private endWorkspaceExecution(sessionId: string, outcome: 'cancelled' | 'unknown', detach = false): void {
+    const execution = this.workspaceExecutions.get(sessionId);
+    if (execution) this.workspaceActivity.endExecution(execution, outcome);
+    this.workspaceExecutions.delete(sessionId);
+    if (detach) {
+      this.workspaceAttachments.delete(sessionId);
+      this.workspaceContexts.delete(sessionId);
+      this.workspaceModes.delete(sessionId);
+    }
+  }
+
+  getWorkspaceActivity(sessionId: string): RuntimeWorkspaceActivitySnapshot | undefined {
+    return this.workspaceActivity.get(sessionId);
+  }
+
+  isCurrentRun(sessionId: string, runId: string): boolean {
+    return this.sessionStates.get(sessionId)?.currentRun?.id === runId;
+  }
+
+  isLatestRun(sessionId: string, runId: string): boolean {
+    const tracked = this.sessionStates.get(sessionId);
+    return (tracked?.currentRun?.id ?? tracked?.lastRun?.id) === runId;
+  }
+
+  getWorkspaceExecution(sessionId: string): WorkspaceActivityExecution | undefined {
+    return this.workspaceExecutions.get(sessionId);
+  }
+
+  isWorkspaceExecutionCurrent(execution: WorkspaceActivityExecution): boolean {
+    const current = this.workspaceExecutions.get(execution.sessionId);
+    if (current) return current.observationEpoch === execution.observationEpoch
+      && current.executionToken === execution.executionToken;
+    // Cancellation stops observation immediately; its still-current turn may emit its terminal event.
+    return this.sessionStates.get(execution.sessionId)?.currentRun?.id === execution.executionId
+      && this.workspaceActivity.get(execution.sessionId)?.observationEpoch === execution.observationEpoch;
+  }
 
   get(sessionId: string): ExecutionHandle | undefined {
     const override = this.getOverride(sessionId);
@@ -297,6 +407,7 @@ export class RuntimeSessionManager {
     turn: TurnInput,
     options: {
       guardrail?: RuntimeGuardrailResult;
+      workspaceObservation?: 'local_tools' | 'unsupported' | 'unmapped';
     } = {},
   ): RuntimeRunInspection {
     bindManagedNativeIdentity(this.config.sessionBaseDir, session, session.providerSessionId);
@@ -327,6 +438,7 @@ export class RuntimeSessionManager {
     tracked.state = 'running';
     tracked.wake = wake;
     tracked.currentRun = run;
+    this.beginWorkspaceExecution(session, run.id, options.workspaceObservation);
 
     const target = describeRunTarget(session);
     this.runLogTargets.set(session.id, { target, startedAtMs: Date.now() });
@@ -383,8 +495,15 @@ export class RuntimeSessionManager {
     return cloneRun(run);
   }
 
-  observeEvent(sessionId: string, event: StreamEvent): void {
+  observeEvent(sessionId: string, event: StreamEvent, execution?: WorkspaceActivityExecution): void {
+    if (execution && !this.isWorkspaceExecutionCurrent(execution)) return;
+    // This event is emitted only by the Runtime-owned store, never accepted from providers.
+    if (event.type === 'workspace_activity') return;
     const tracked = this.ensureTrackedState(sessionId);
+    if (event.type === 'result' || event.type === 'error') {
+      this.endWorkspaceExecution(sessionId,
+        tracked.state === 'canceling' || tracked.state === 'closing' ? 'cancelled' : 'unknown');
+    }
     const observedAt = new Date().toISOString();
     this.recordObservedStreamEvent(sessionId, event, observedAt);
     const progress = eventToProgressSnapshot(event, observedAt);
@@ -459,7 +578,8 @@ export class RuntimeSessionManager {
 
   getTrackedState(sessionId: string): RuntimeTrackedSessionStateSnapshot | undefined {
     const tracked = this.sessionStates.get(sessionId);
-    return tracked ? cloneTrackedState(tracked) : undefined;
+    const workspaceActivity = this.workspaceActivity.get(sessionId);
+    return tracked ? { ...cloneTrackedState(tracked), ...(workspaceActivity ? { workspaceActivity } : {}) } : undefined;
   }
 
   subscribeObservedStream(
@@ -490,6 +610,7 @@ export class RuntimeSessionManager {
   }
 
   async cancel(session: SessionInfo): Promise<{ attached: boolean }> {
+    this.endWorkspaceExecution(session.id, 'cancelled');
     const tracked = this.ensureTrackedState(session.id);
     tracked.state = 'canceling';
 
@@ -533,6 +654,7 @@ export class RuntimeSessionManager {
     session: SessionInfo,
     reason: 'close' | 'delete' | 'reset' | 'shutdown' = 'close',
   ): Promise<void> {
+    this.endWorkspaceExecution(session.id, 'unknown', true);
     const tracked = this.ensureTrackedState(session.id);
     tracked.state = 'closing';
 
@@ -574,6 +696,7 @@ export class RuntimeSessionManager {
   }
 
   markClosed(sessionId: string): void {
+    this.endWorkspaceExecution(sessionId, 'unknown', true);
     this.detachExecutionHandle(sessionId);
     const tracked = this.ensureTrackedState(sessionId);
     this.clearObservedStreamState(sessionId);
@@ -634,6 +757,7 @@ export class RuntimeSessionManager {
   }
 
   clearProviderState(sessionId: string): void {
+    this.endWorkspaceExecution(sessionId, 'unknown', true);
     const tracked = this.ensureTrackedState(sessionId);
     tracked.state = this.isAttached(sessionId) ? 'idle' : 'closed';
   }
@@ -722,6 +846,8 @@ export class RuntimeSessionManager {
   }
 
   dropSession(sessionId: string): void {
+    this.endWorkspaceExecution(sessionId, 'unknown', true);
+    this.workspaceActivity.delete(sessionId);
     this.handleOverrides.delete(sessionId);
     this.observedStreamStates.delete(sessionId);
     this.sessionStates.delete(sessionId);

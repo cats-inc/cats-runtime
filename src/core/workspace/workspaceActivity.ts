@@ -184,7 +184,8 @@ export class WorkspaceActivityStore {
     | 'observation_limit' | 'observer_error'): void {
     const state = this.current(attachment);
     if (!state) return;
-    state.snapshot.coverage = { status: 'partial', reason };
+    if (reason === 'observation_limit') this.truncate(state);
+    else state.snapshot.coverage = { status: 'partial', reason };
     this.publish(state);
   }
 

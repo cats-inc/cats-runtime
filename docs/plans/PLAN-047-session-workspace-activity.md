@@ -29,7 +29,7 @@ version changes and publication remain separately authorized.
 | --- | --- | --- |
 | S1 | Runtime activity types and admitted repo/worktree identity | Complete; 15 focused tests and typecheck passed |
 | S2 | Runtime bounded reducer, ordering, snapshot validation and inactive reattachment | Complete; 11 focused tests and typecheck passed |
-| S3 | Runtime local-tool observation, session lifecycle, transport and memory-only restart checks | Pending |
+| S3 | Runtime local-tool observation, session lifecycle, transport and memory-only restart checks | Complete; scoped suites/typecheck and independent review passed |
 | S4 | Native provider structured evidence, coverage and fixture/native checks | Pending |
 | S5 | Platform participant attribution, work-area API and live projection | Pending |
 | S6 | Code right panel, avatar entry, localization and renderer regressions | Pending |
@@ -40,7 +40,7 @@ scan. It reuses existing path policy and trusted managed-worktree source authori
 Generic shell strings, bubbles and multiple selected Codespaces remain excluded.
 Unknown identity is retained at an authority or traversal boundary. Managed
 source attachments that are themselves linked worktrees currently remain
-unavailable until S3 can supply verified lifecycle metadata provenance. Windows
+unavailable pending a later identity/lifecycle fixture slice supplying verified provenance. Windows
 case-sensitive directory behavior, submodules and path reuse need later fixtures;
 the current checks do not claim those modes are validated.
 
@@ -52,35 +52,55 @@ are 32 rows, 8 running/8 recent operations per row and 64 KiB, with up to 1024
 correlation/tombstone IDs per execution. Out-of-order or dropped facts explicitly
 degrade coverage. Identity probe time is separate from operation completion time.
 
+S3 connects Runtime-owned API/local tools to the same reducer. Admission captures
+one turn-owned observer before asynchronous model/tool work; old attachments,
+callbacks and terminal events cannot mutate a new turn. The path hook observes
+only after the original path policy admits a target, including pre-delete facts.
+Probe waits are limited to 500 ms per target / 1500 ms per tool, 64 targets per
+tool and four outstanding probes. Tool execution continues when observation
+times out or fails; late probes are discarded. NDJSON, messages SSE and observe
+SSE coalesce slow readers to one pending latest snapshot and flush it before
+terminal output. Runtime-owned observations never become transcript blocks.
+
+| S3 input/mode | Coverage and boundary |
+| --- | --- |
+| API/local Runtime-owned file tools | Partial (`runtime_tools_partial`); verified admitted targets and correlated aggregate outcomes |
+| Batch read/inspect | Every admitted target; per-entry completion stays unknown without exact outcome evidence |
+| Copy / rename / delete / patch | Copy source read vs destination write; pre-mutation identities; no inferred changed-file counts |
+| Listing/search roots | Access to the admitted root; returned child names do not create child-repo observations |
+| Runtime `run_shell` | Initial cwd only; no parsing of commands or inferred test/Git success |
+| Native CLI / ACP | Unsupported pending S4's fixture-backed adapter/mode selection |
+| Peer/unmapped execution | Unsupported with no local path mapping or host filesystem probe |
+
 ## Implementation Phases
 
 ### Phase 1: Freeze the generic observation contract
 
-- [ ] Review SPEC-037 with Platform SPEC-127 for shape, identity, coverage,
+- [x] Review SPEC-037 with Platform SPEC-127 for shape, identity, coverage,
   observation epoch, ordering and reconciliation.
-- [ ] Trace existing local tool, CLI, API/agent execution and normalized transport
+- [x] Trace existing local tool, CLI, API/agent execution and normalized transport
   paths. Choose the shared observer/reducer injection points.
 - [ ] Inventory actual structured tool paths/results per provider and instance
   mode. Choose one fixture-backed native slice plus Runtime-owned local tools;
   record unsupported/partial modes explicitly.
-- [ ] Confirm no cwd/root settings change and no new observation-dependent
+- [x] Confirm no cwd/root settings change and no new observation-dependent
   execution refusal, tool grant or managed-worktree adoption.
-- [ ] Choose bounded snapshot/checkpoint limits and the existing session-store
-  extension. Define migration/backup/atomic-recovery tests if schema changes.
+- [x] Choose bounded snapshot limits and memory-only retention. No session-store
+  extension is selected; later persistence requires migration/backup/recovery tests.
 
 **Deliverable:** Reviewed typed contract and coverage/fixture matrix shared with
 Platform PLAN-120. Do not claim raw shell target inference as verified evidence.
 
 ### Phase 2: Implement identity resolution and the observation reducer
 
-- [ ] Add provider-neutral snapshot, workspace and operation types.
-- [ ] Implement location-qualified repository/checkout identity with bounded
+- [x] Add provider-neutral snapshot, workspace and operation types.
+- [x] Implement location-qualified repository/checkout identity with bounded
   read-only probes for `.git` files, nested repos, branches and detached HEAD.
-- [ ] Reuse existing path policy and managed ownership records; handle non-Git,
+- [x] Reuse existing path policy and managed ownership records; handle non-Git,
   missing/forbidden metadata, aliases and unmapped foreign paths explicitly.
-- [ ] Add a serialized bounded reducer for start/completion/cancel, multiple
+- [x] Add a serialized bounded reducer for start/completion/cancel, multiple
   targets, deduplication, limits and freshness.
-- [ ] Keep session binding context separate from observed operation association.
+- [x] Keep session binding context separate from observed operation association.
 - [ ] Cover branch/path replacement and identity cache invalidation without
   filesystem-wide watchers or recursive repository scans.
 
@@ -89,14 +109,14 @@ operation facts, with no product identity dependency.
 
 ### Phase 3: Capture Runtime tool and native provider evidence
 
-- [ ] Emit validated operation targets/outcomes from local read/list/write/patch/
+- [x] Emit validated operation targets/outcomes from local read/list/write/patch/
   rename/delete tool boundaries, including multi-target and pre-delete identity.
 - [ ] Wire the selected native adapter's verified structured events into the
   same observer; distinguish reported attempts from successful completion.
 - [ ] Resolve per-command paths on the correct execution location and mark
   opaque shell or uncorrelated results partial/unknown.
 - [ ] Report truthful coverage for each selected tool profile and execution mode.
-- [ ] Confirm observer/Git failures do not change a valid tool's result or grant
+- [x] Confirm observer/Git failures do not change a valid tool's result or grant
   more permissions, and unsupported providers continue existing execution.
 
 **Deliverable:** Fixture-backed local/native observations with actual path
@@ -104,17 +124,17 @@ provenance and documented coverage boundaries.
 
 ### Phase 4: Expose inspection, streaming and lifecycle recovery
 
-- [ ] Add optional `workspaceActivity` to session inspection and typed
+- [x] Add optional `workspaceActivity` to session inspection and typed
   `workspace_activity` updates through supported session streaming paths.
-- [ ] Keep normalized stream and inspection schema identical; preserve facts
+- [x] Keep Runtime stream and inspection schema identical; preserve facts
   without scraping transcript text or leaking raw provider payloads.
-- [ ] Implement observation epochs/revisions and an inspection reconciliation
+- [x] Implement observation epochs/revisions and an inspection reconciliation
   sequence covering subscription/snapshot races.
 - [ ] Integrate close/cancel/error/reset/resume/fork/delete and reject late results.
-- [ ] Persist only bounded last-known checkpoints, restore them inactive and
-  revalidate current attachment/identity before live claims.
-- [ ] Test recognized old data, backup/atomic upgrade if needed, corrupt state,
-  failure recovery, and interrupted write/restart behavior.
+- [x] Keep bounded last-known observations in memory, terminate pending work on
+  reattachment and revalidate identity before new observed-operation facts.
+- [x] Verify existing session records are unchanged by observation and no active
+  observations survive process restart. No new persisted schema or migration.
 - [ ] Exercise real HTTP/stream consumer fixtures with Platform's parser contract.
 
 **Deliverable:** Authenticated recoverable session observations with bounded
@@ -204,6 +224,7 @@ the new contract. A docs-only task does not rerun these baseline suites.
 | 2026-10-20 | Owner authorized sliced implementation and incremental commits. Platform PR #289 was verified merged at `8bb3fd2f` with changes/validate/nodejs CI successful; both main checkouts pulled cleanly. Runtime worktree `plan047-workspace-activity` starts at `b2d888aa`; S1 and independent contract review are in progress. |
 | 2026-10-20 | S1 adds exported activity types and lazy admitted Git identity. Independent review fixes cover incomplete outer authority, managed-subdirectory attachments, foreign source/sibling pointers and bounded-walk exhaustion. Focused identity suite: 15 passed; Runtime TypeScript check passed; no live provider or Platform acceptance yet. |
 | 2026-10-20 | S2 adds a bounded in-memory reducer and strict snapshot validator. Attachment/execution leases reject stale callbacks; duplicate/late and terminal-before-start evidence cannot invent active work. Review also verified envelope/retention limits, consumer failure isolation and identity/activity timestamps. Focused reducer suite: 11 passed; Runtime TypeScript check passed. Storage schema unchanged; S3 lifecycle/transport and native/UI acceptance remain pending. |
+| 2026-10-20 | S3 connects admitted API/local tools, turn-scoped observers, inspection and bounded NDJSON/SSE forwarding. Scoped checks passed: tool hooks 10, API backend 17, forwarder 3, NDJSON writer 5 (including real unread/slow ReadableStream capacity/order), session close/observe 25, message routes 16, Pi 8 and reducer 11; prior unchanged tool/run-log baselines also passed. MCP's 21 cases passed across scoped runs; its existing 10-second real-Git delivery case timed out once under machine load and passed on isolated retry with the mutation consumer. Runtime TypeScript and diff checks passed. No full-suite/native provider/Platform UI acceptance is claimed. |
 
 ---
 

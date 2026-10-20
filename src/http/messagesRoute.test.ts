@@ -16,6 +16,8 @@ import type { ProviderModelCatalogService } from '../core/models/providerModelCa
 import type { StreamEvent, TurnInput } from '../core/types.js';
 import { createRuntimeStartupState } from '../startup.js';
 import { parseCoreNdjson as parseNdjson } from '../../tests/streamEventTestUtils.js';
+import { parseNdjson as parseAllNdjson } from '../../tests/streamEventTestUtils.js';
+import { isWorkspaceActivitySnapshot } from '../core/workspace/workspaceActivityValidation.js';
 
 function makeConfig(
   sessionBaseDir: string,
@@ -147,10 +149,19 @@ describe('message route transcript persistence', () => {
       });
 
       expect(response.status).toBe(200);
-      expect(parseNdjson(await response.text())).toEqual([
+      const responseText = await response.text();
+      expect(parseNdjson(responseText)).toEqual([
         { type: 'text', text: 'Stored.' },
         { type: 'result' },
       ]);
+      const observations = parseAllNdjson(responseText).filter(event => event.type === 'workspace_activity');
+      expect(observations.length).toBeGreaterThan(0);
+      expect(observations.every(event => isWorkspaceActivitySnapshot(event.workspaceActivity))).toBe(true);
+      const observed = await (await app.request(`/sessions/${session.id}/observe`)).json();
+      expect(observed.session.inspection.workspaceActivity).toEqual(observations.at(-1)?.workspaceActivity);
+      const frames = parseAllNdjson(responseText);
+      expect(frames.findLastIndex(event => event.type === 'workspace_activity'))
+        .toBeLessThan(frames.findIndex(event => event.type === 'result'));
 
       expect(registry.get(session.id)?.lastInputPreview).toBe(
         'Investigate why the dashboard sidebar title is stale after sending a message. Include the persistence boundary in the explanation.',
@@ -900,6 +911,8 @@ describe('message route transcript persistence', () => {
   });
 
   it('records cooldown incidents and exposes them through diagnostics/runtime', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-20T00:00:00.000Z'));
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
     const sessionBaseDir = join(root, 'sessions');
     mkdirSync(sessionBaseDir, { recursive: true });
@@ -979,6 +992,7 @@ describe('message route transcript persistence', () => {
       });
       expect(streamMessage).toHaveBeenCalledTimes(1);
     } finally {
+      vi.useRealTimers();
       rmSync(root, { recursive: true, force: true });
     }
   });

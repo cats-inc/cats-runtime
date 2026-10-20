@@ -47,7 +47,7 @@ This does not change execution roots, provider permissions or worktree lifecycle
 
 ## Requirements
 
-### WA-01: Proposed typed snapshot and transport
+### WA-01: Typed snapshot and transport
 
 Add an optional typed `workspaceActivity` field to the existing session
 inspection response and emit `type: 'workspace_activity'` updates through the
@@ -55,8 +55,8 @@ existing Runtime session streaming paths. Both carry the same bounded full
 snapshot, avoiding a second product-specific delta protocol. Preserve the field
 through supported NDJSON/SSE and normalized output adapters.
 
-The types below are exported by the S1 slice. Session inspection and streaming
-integration follow in S3; a type export alone does not enable observation:
+The types below are exported by S1/S2; S3 adds session inspection and bounded
+NDJSON/SSE forwarding. Native/provider coverage remains explicitly scoped:
 
 ```ts
 interface RuntimeWorkspaceActivitySnapshot {
@@ -163,6 +163,14 @@ until validated. Do not claim complete filesystem tracing for native providers.
 
 Select the first native adapter slice from real fixture inventory in PLAN-047.
 Claude/Codex are candidate consumers, not a promised all-provider support matrix.
+
+S3 observes admitted Runtime-owned tools on the API/local host execution path.
+File reads/writes, patches, copies, renames and deletes report their validated
+targets; copies distinguish source reads from destination writes. Batch tools
+without per-entry outcome evidence finish as unknown. Listings/search roots do
+not infer activity in child repos from returned names. Shell observations prove
+only the process's initial cwd. Coverage stays partial; native CLI/ACP modes
+remain unsupported in S3, and unmapped peers have no host mapping or host probe.
 
 ### WA-04: Repository and checkout identity
 
@@ -279,6 +287,11 @@ No version bump or release is authorized by this planning task.
 - Observation is bounded and off the token-critical path where possible. It does
   not trigger a model turn or periodic root scan.
 - Observer/Git probe failure degrades coverage, not a valid operation's outcome.
+- Local-tool identity observation waits at most 500 ms per target and 1500 ms
+  per tool. Expired probes cannot admit late facts. At most four unresolved
+  identity probes are retained by the Runtime manager; target/correlation/stream
+  overflow degrades coverage. A tool observes at most 64 targets, with truncation
+  reported explicitly. A slow stream retains at most one pending latest snapshot.
 - Providers remain executable when observation is unsupported. Do not introduce
   exact provider-version execution gates.
 - Native Windows, macOS/Linux and supported guest mappings need path fixtures;

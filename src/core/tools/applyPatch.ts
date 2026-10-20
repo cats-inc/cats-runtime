@@ -2,8 +2,8 @@ import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import {
   assertSafeExistingFileMutation,
-  resolveSafeWorkspacePath,
 } from './pathSafety.js';
+import { resolveObservedWorkspacePath as resolveSafeWorkspacePath } from './workspaceObservation.js';
 
 const BEGIN_PATCH_MARKER = '*** Begin Patch';
 const END_PATCH_MARKER = '*** End Patch';

@@ -32,6 +32,7 @@ export interface ApiStrategyExecutionContextOptions {
   remoteInstance: RemoteProviderInstanceConfig;
   transport: ApiTransportClient;
   tools: LocalToolRuntime;
+  workspaceObserver?: import('../../../../core/tools/workspaceObservation.js').LocalToolWorkspaceObserver;
   toolProfile?: string;
   permissionMode: SessionInfo['permissionMode'];
   request: RuntimeExecutionStrategyRequest | undefined;

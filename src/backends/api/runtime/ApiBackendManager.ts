@@ -365,6 +365,11 @@ export class ApiBackendManager {
   private readonly targets = new Map<string, ProviderTargetDescriptor>();
   private readonly tools = new LocalToolRuntime();
   private readonly strategyRegistry = createApiRuntimeExecutionStrategyRegistry();
+  private workspaceObserver?: import('../../../core/tools/workspaceObservation.js').LocalToolWorkspaceObserverFactory;
+
+  setWorkspaceObserver(observer: import('../../../core/tools/workspaceObservation.js').LocalToolWorkspaceObserverFactory): void {
+    this.workspaceObserver = observer;
+  }
 
   constructor(
     private readonly config: Pick<CliRuntimeConfig, 'sessionBaseDir'>,
@@ -500,6 +505,10 @@ export class ApiBackendManager {
       throw new Error(`Session '${sessionId}' not found`);
     }
 
+    let workspaceObserver: import('../../../core/tools/workspaceObservation.js').LocalToolWorkspaceObserver | undefined;
+    try { workspaceObserver = this.workspaceObserver?.({ sessionId, cwd: initialSession.cwd }); }
+    catch { /* Observation setup must not change whether an API turn can execute. */ }
+
     const remoteInstance = ensureRemoteTarget(target);
     const model = initialSession.modelResolution?.model || initialSession.model || remoteInstance.model;
     if (!model) {
@@ -586,6 +595,7 @@ export class ApiBackendManager {
       remoteInstance,
       transport,
       tools: this.tools,
+      workspaceObserver,
       toolProfile: remoteInstance.toolProfile,
       permissionMode,
       request: effectiveRequest,

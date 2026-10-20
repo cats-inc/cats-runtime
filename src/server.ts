@@ -965,7 +965,10 @@ export function createRuntimeServer(
   );
   const runtime = new RuntimeSessionManager(config, pool, apiBackend, agentBackend,
     (sessionId) => registry.get(sessionId));
-  registry.onRemoved((sessionId) => runtime.mcpServers.remove(sessionId));
+  registry.onRemoved((sessionId) => {
+    runtime.mcpServers.remove(sessionId);
+    runtime.dropSession(sessionId);
+  });
   const wakeup = new RuntimeWakeupService({
     persistPath: join(dataDir, 'wakeups.json'),
     sessionExists: (sessionId) => registry.get(sessionId) !== undefined,

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createNdjsonStreamWriter, NDJSON_HEARTBEAT_EVENT } from './ndjsonStreamWriter.js';
+import { createNdjsonStreamWriter, NDJSON_HEARTBEAT_EVENT, type NdjsonStreamWriter } from './ndjsonStreamWriter.js';
 
 function fakeController() {
   const lines: unknown[] = [];
@@ -22,6 +22,50 @@ function fakeController() {
 describe('createNdjsonStreamWriter', () => {
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('bounds workspace snapshots in a real unread stream and flushes the latest before terminal output', async () => {
+    let writer!: NdjsonStreamWriter;
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const stream = new ReadableStream<Uint8Array>({
+      start(value) { controller = value; writer = createNdjsonStreamWriter(value); },
+      pull() { writer.pull(); },
+      cancel() { writer.cancel(); },
+    });
+    try {
+      for (let revision = 1; revision <= 100; revision++) {
+        writer.writeWorkspaceActivity({ type: 'workspace_activity', workspaceActivity: { revision, padding: 'x'.repeat(60_000) } });
+        await Promise.resolve();
+      }
+      expect(controller.desiredSize).toBe(0);
+      writer.write({ type: 'result' });
+      expect(controller.desiredSize).toBe(-2);
+      writer.close();
+      const text = await new Response(stream).text();
+      const frames = text.trim().split('\n').map(line => JSON.parse(line));
+      expect(frames.map(frame => frame.workspaceActivity?.revision ?? frame.type)).toEqual([1, 100, 'result']);
+      expect(Buffer.byteLength(text)).toBeLessThan(125_000);
+    } finally { writer.cancel(); }
+  });
+
+  it('releases a coalesced workspace snapshot when an active slow consumer pulls again', async () => {
+    let writer!: NdjsonStreamWriter;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) { writer = createNdjsonStreamWriter(controller); },
+      pull() { writer.pull(); },
+      cancel() { writer.cancel(); },
+    });
+    const reader = stream.getReader();
+    const decode = (chunk: Uint8Array | undefined) => JSON.parse(new TextDecoder().decode(chunk));
+    try {
+      for (let revision = 1; revision <= 10; revision++) writer.writeWorkspaceActivity({ revision });
+      expect(decode((await reader.read()).value).revision).toBe(1);
+      expect(decode((await reader.read()).value).revision).toBe(10);
+      writer.writeWorkspaceActivity({ revision: 11 });
+      expect(decode((await reader.read()).value).revision).toBe(11);
+      writer.close();
+      expect((await reader.read()).done).toBe(true);
+    } finally { writer.cancel(); await reader.cancel(); }
   });
 
   it('writes a heartbeat only after the stream has been silent', () => {

@@ -3,6 +3,7 @@ import type {
   ProviderModelSelection,
 } from './models/providerSelectionResolution.js';
 import type { SessionMcpServerLaunch } from './sessionMcpServers.js';
+import type { RuntimeWorkspaceActivitySnapshot } from './workspace/activityTypes.js';
 
 export type {
   RuntimeObservedWorkspace,
@@ -1542,6 +1543,7 @@ export interface RuntimeToolPolicyInspection {
 }
 
 export interface RuntimeSessionInspection {
+  workspaceActivity?: RuntimeWorkspaceActivitySnapshot;
   state: RuntimeSessionExecutionState;
   attached: boolean;
   busy: boolean;
@@ -1755,6 +1757,11 @@ export interface ProgressStreamEvent extends StreamEventBase, StreamEventStatePa
   isError?: boolean;
 }
 
+export interface WorkspaceActivityStreamEvent extends StreamEventBase {
+  type: 'workspace_activity';
+  workspaceActivity: RuntimeWorkspaceActivitySnapshot;
+}
+
 export type StreamEvent =
   | InitStreamEvent
   | TextStreamEvent
@@ -1763,6 +1770,7 @@ export type StreamEvent =
   | ResultStreamEvent
   | ErrorStreamEvent
   | RawStreamEvent
+  | WorkspaceActivityStreamEvent
   | ProgressStreamEvent;
 
 export type RuntimeContentBlockKind = 'text' | 'tool' | 'status';

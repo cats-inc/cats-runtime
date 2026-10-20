@@ -157,7 +157,10 @@ export function getRuntimeSessionManager(ctx: AppContext): RuntimeSessionManager
   if (!ctx.runtime) {
     const runtime = new RuntimeSessionManager(ctx.config, ctx.pool, ctx.apiBackend, ctx.agentBackend,
       (sessionId) => ctx.registry.get(sessionId));
-    ctx.registry.onRemoved?.((sessionId) => runtime.mcpServers.remove(sessionId));
+    ctx.registry.onRemoved?.((sessionId) => {
+      runtime.mcpServers.remove(sessionId);
+      runtime.dropSession(sessionId);
+    });
     ctx.runtime = runtime;
   }
   return ctx.runtime;
