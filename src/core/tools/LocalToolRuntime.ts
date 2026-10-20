@@ -12,9 +12,10 @@ import { applyPatch as applyStructuredPatch } from './applyPatch.js';
 import {
   assertDistinctWorkspaceFiles,
   assertSafeExistingFileMutation,
-  resolveSafeWorkspacePath,
   toRelativeDisplay,
 } from './pathSafety.js';
+import { observeLocalTool, resolveObservedWorkspacePath as resolveSafeWorkspacePath,
+  type LocalToolWorkspaceObserver, type LocalToolWorkspaceObserverFactory } from './workspaceObservation.js';
 import { WorkspaceSubstrateService } from '../runtime/WorkspaceSubstrateService.js';
 import { RuntimeDeliveryService } from '../runtime/RuntimeDeliveryService.js';
 import { RuntimeManagementService } from '../management/RuntimeManagementService.js';
@@ -109,6 +110,8 @@ export interface RuntimeToolCatalogInspection {
 }
 
 export interface ToolExecutionContext {
+  /** Captured by the owning execution at turn admission; never provider input. */
+  workspaceObserver?: LocalToolWorkspaceObserver;
   sessionId: string;
   cwd: string;
   workspaceMode?: WorkspaceMode;
@@ -1591,6 +1594,7 @@ async function executeShell(
 }
 
 export class LocalToolRuntime {
+  private workspaceObserver?: LocalToolWorkspaceObserverFactory;
   private readonly substrate = new WorkspaceSubstrateService();
   private readonly delivery = new RuntimeDeliveryService({});
   private readonly atomicWriteOps: AtomicWriteOps;
@@ -1604,11 +1608,20 @@ export class LocalToolRuntime {
     this.management = service;
   }
 
+  setWorkspaceObserver(observer: LocalToolWorkspaceObserverFactory): void {
+    this.workspaceObserver = observer;
+  }
+
   listTools(profile?: string): ToolDefinition[] {
     return listToolDefinitionsForProfile(profile);
   }
 
   async execute(context: ToolExecutionContext, call: ToolCall): Promise<ToolResult> {
+    const observer = context.workspaceObserver ? () => context.workspaceObserver : this.workspaceObserver;
+    return observeLocalTool(observer, context, call, () => this.executeCall(context, call));
+  }
+
+  private async executeCall(context: ToolExecutionContext, call: ToolCall): Promise<ToolResult> {
     try {
       const args = ensureObject(call.arguments);
       this.assertToolAllowed(context, call.name, args);
@@ -2196,6 +2209,10 @@ export class LocalToolRuntime {
       1,
       MAX_SHELL_TIMEOUT_MS,
     );
+    // This proves only the shell process's initial cwd, never targets parsed from its command.
+    if (this.workspaceObserver || context.workspaceObserver) {
+      await resolveSafeWorkspacePath(context.cwd, '.').catch(() => undefined);
+    }
     const result = await executeShell(command, context.cwd, timeoutMs);
     const sections = [
       `$ ${command}`,
@@ -2315,7 +2332,7 @@ export class LocalToolRuntime {
   ): Promise<ToolResult> {
     const sourcePath = requireString(args, 'source');
     const destPath = requireString(args, 'destination');
-    const { fullPath: fullSource, displayPath: sourceDisplayPath } = await resolveSafeWorkspacePath(context.cwd, sourcePath);
+    const { fullPath: fullSource, displayPath: sourceDisplayPath } = await resolveSafeWorkspacePath(context.cwd, sourcePath, 'read');
     const { fullPath: fullDest, displayPath: destinationDisplayPath } = await resolveSafeWorkspacePath(context.cwd, destPath);
     const overwrite = readOptionalBoolean(args, 'overwrite');
 

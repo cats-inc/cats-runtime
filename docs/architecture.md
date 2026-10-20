@@ -653,6 +653,17 @@ path is intentionally narrow:
 
 ### `src/core/workspace`
 
+- Owns bounded memory-only workspace activity independently of product roots,
+  participants and workspace lifecycle. Admitted targets lazily resolve Git
+  metadata; an execution-scoped reducer retains last-known identity and exact
+  operation evidence with epochs/revisions and strict byte/row/correlation caps.
+- Runtime local-tool boundaries and fixture-backed native Claude direct file
+  events feed the same state. Selected execution mode supplies path authority;
+  peer/guest/unverified modes cannot probe the host. Observation failures never
+  grant access or change execution outcomes. Generic commands are not parsed.
+- Session inspection and coalesced NDJSON/SSE expose the same snapshots outside
+  transcript content. Async probes/results carry execution leases; cancellation,
+  replacement and deletion invalidate them. Restart restores no activity state.
 - Owns the runtime-side workspace execution layer used by session lifecycle
   routes
 - Prepares source, sandbox, and worktree-backed runtime cwd state plus

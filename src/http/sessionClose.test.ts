@@ -13,6 +13,21 @@ import type { KiroNativeSessionService } from '../backends/cli/kiro/KiroNativeSe
 import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionService.js';
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
 import { RuntimeWakeupService } from '../core/wakeup/RuntimeWakeupService.js';
+import type { WorkspaceActivityStreamEvent } from '../core/types.js';
+
+const workspaceWriteProbe = vi.hoisted(() => ({
+  beforeWrite: undefined as ((event: WorkspaceActivityStreamEvent) => Promise<void>) | undefined,
+}));
+vi.mock('../core/runtime/workspaceStream.js', async importOriginal => {
+  const original = await importOriginal<typeof import('../core/runtime/workspaceStream.js')>();
+  return { ...original, forwardWorkspaceActivity: (
+    runtime: Parameters<typeof original.forwardWorkspaceActivity>[0], id: string,
+    write: Parameters<typeof original.forwardWorkspaceActivity>[2],
+  ) => original.forwardWorkspaceActivity(runtime, id, async event => {
+    await workspaceWriteProbe.beforeWrite?.(event);
+    await write(event);
+  }) };
+});
 
 function parseSse(text: string): Array<Record<string, unknown>> {
   return text
@@ -1865,32 +1880,33 @@ describe('session close route', () => {
 
     const response = await app.request(`/sessions/${session.id}/stream`);
     expect(response.status).toBe(200);
-    expect(parseSse(await response.text())).toEqual(expect.arrayContaining([
+    const replayEvents = parseSse(await response.text());
+    expect(replayEvents).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'progress',
         text: 'Collecting context',
         sessionId: session.id,
-        streamSeq: 1,
+        streamSeq: 3,
         streamSeqIndex: 0,
       }),
       expect.objectContaining({
         type: 'text',
         text: 'Partial streamed output',
         sessionId: session.id,
-        streamSeq: 2,
+        streamSeq: 4,
         streamSeqIndex: 0,
       }),
       expect.objectContaining({
         type: 'content_block',
         sessionId: session.id,
-        streamSeq: 2,
+        streamSeq: 4,
         streamSeqIndex: 1,
       }),
       expect.objectContaining({
         type: 'result',
         text: 'Final output',
         sessionId: session.id,
-        streamSeq: 3,
+        streamSeq: 6,
         streamSeqIndex: 0,
       }),
       expect.objectContaining({
@@ -1935,6 +1951,48 @@ describe('session close route', () => {
     expect(types.at(-1)).toBe('session_closed');
     expect(worker.alive).toBe(true);
     expect(runtime.getTrackedState(session.id)?.currentRun).toBeUndefined();
+  });
+
+  it('flushes the latest workspace snapshot before a terminal event for a slow SSE reader', async () => {
+    class SlowWorker extends EventEmitter { alive = true; busy = true; }
+    const cwd = join(rootDir, 'slow-workspace');
+    mkdirSync(cwd);
+    const session = registry.create({ id: 'slow-workspace-stream', providerName: 'claude', cwd });
+    const worker = new SlowWorker();
+    attachedWorkers.set(session.id, worker);
+    const runtime = getRuntimeSessionManager(ctx);
+    runtime.beginRun(session, { message: 'observe a slow reader' });
+    let entered!: () => void;
+    let release!: () => void;
+    const blocked = new Promise<void>(resolve => { release = resolve; });
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    let first = true;
+    workspaceWriteProbe.beforeWrite = async event => {
+      if (event.workspaceActivity.sessionId === session.id && first) {
+        first = false;
+        entered();
+        await blocked;
+      }
+    };
+    try {
+      const response = app.request(`/sessions/${session.id}/stream`);
+      await started;
+      runtime.observeEvent(session.id, { type: 'result', text: 'Finished' });
+      worker.alive = false;
+      worker.busy = false;
+      worker.emit('exit', 0, null);
+      release();
+      const events = parseSse(await (await response).text());
+      const terminalSnapshot = events.findIndex(event => event.type === 'workspace_activity'
+        && (event.workspaceActivity as { revision: number }).revision === 3);
+      const terminal = events.findIndex(event => event.type === 'result');
+      expect(terminalSnapshot).toBeGreaterThanOrEqual(0);
+      expect(terminal).toBeGreaterThan(terminalSnapshot);
+      expect(events.at(-1)?.type).toBe('session_closed');
+    } finally {
+      release();
+      workspaceWriteProbe.beforeWrite = undefined;
+    }
   });
 
   it('does not replay terminal observed events from the previous run when a session starts a new turn', async () => {

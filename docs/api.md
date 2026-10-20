@@ -2553,6 +2553,39 @@ intended for host/dashboard run inspectors:
 status when the runtime is actively canceling or closing a run. The block is
 additive: existing session fields remain stable.
 
+`inspection.workspaceActivity` is an optional schema-1 session observation
+snapshot. The identical snapshot is sent as
+`{ type: "workspace_activity", workspaceActivity: snapshot }` on message
+NDJSON/SSE and as a typed `workspace_activity` update on observe SSE. It is a
+separate side channel, never a transcript message or content block. Consumers
+subscribe before reconciling inspection and compare per-session observation
+epochs/revisions; revisions from different sessions are not comparable.
+
+The snapshot contains actual `startupCwd` / `runtimeCwd`, coverage, bounded
+`workspaces` and truncation. Each checkout has execution-location-qualified
+identity, optional repository identity/source root, branch/detached state,
+verification/management, identity-probe time and running/recent operations.
+Operations have Runtime-owned IDs, execution IDs, kind, outcome, evidence and
+timestamps. `session_binding` context is distinct from `observed_operation`.
+The selected product root remains a separate product binding.
+
+Snapshots are limited to 32 checkout rows, 8 running and 8 recent operations
+per row, and 64 KiB. Facts are memory-only: restart reports nothing until a new
+attachment; cancel/close/reset/replacement cannot leave old operations running.
+Identity verification is last-known at `identityObservedAt`; completion does
+not refresh it. Slow stream readers receive coalesced snapshots, with the last
+snapshot flushed before terminal output. Observations grant no path access,
+change no cwd and acquire no worktree lifecycle responsibility.
+
+API/local Runtime tools report partial `runtime_tools_partial` coverage.
+Native Claude direct Read/Write/Edit reports partial `native_tools_partial`
+coverage using structured absolute host paths and correlated results; see
+[native evidence](research/2026-10-20-native-workspace-activity.md). Native
+metadata admission is bounded to five seconds per target. Unmapped guest/peer
+execution and unverified providers have no host filesystem probe. Shell strings
+and tool-result prose never imply repo, Git or test success. Timeouts, limits
+and unavailable identity degrade coverage without changing tool execution.
+
 `currentRun.reportedModels` and `lastRun.reportedModels` list the models the
 provider says served the run, each as `{ model, matchesRequest? }`, in the
 provider's own naming. `matchesRequest: false` means the provider served another

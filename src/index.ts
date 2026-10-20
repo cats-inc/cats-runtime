@@ -56,6 +56,9 @@ import {
 export { loadConfig } from './core/config.js';
 export { createRuntimeServer } from './server.js';
 export { createRuntimeApp } from './http/app.js';
+export type { RuntimeWorkspaceActivitySnapshot, RuntimeObservedWorkspace,
+  RuntimeWorkspaceIdentity, RuntimeWorkspaceOperation, WorkspaceActivityCoverage } from './core/workspace/activityTypes.js';
+export { isWorkspaceActivitySnapshot } from './core/workspace/workspaceActivityValidation.js';
 
 let startup = createRuntimeStartupState();
 

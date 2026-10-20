@@ -3708,7 +3708,8 @@ describe('runtime MCP facade', () => {
     };
     expect(sent.result.structuredContent.responseStatus).toBe(200);
     expect(sent.result.structuredContent.sessionId).toBe(createdSessionId);
-    expect(stripAdditiveContentBlocks(sent.result.structuredContent.events)).toEqual([
+    expect(stripAdditiveContentBlocks(sent.result.structuredContent.events)
+      .filter(event => event.type !== 'workspace_activity')).toEqual([
       { type: 'text', text: 'reply: hello from mcp' },
       { type: 'result', summary: 'completed: hello from mcp' },
     ]);

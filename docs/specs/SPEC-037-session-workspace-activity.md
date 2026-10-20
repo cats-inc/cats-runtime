@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| **Status** | Draft; planning only, implementation not started |
+| **Status** | Approved; sliced implementation in progress, acceptance pending |
 | **Owner** | Runtime execution/workspace workstream |
 | **Reviewer** | Owner and Runtime/Platform integration owners; pending |
 | **Decision** | [ADR-046](../decisions/046-expose-evidence-backed-session-workspace-activity.md) |
@@ -47,7 +47,7 @@ This does not change execution roots, provider permissions or worktree lifecycle
 
 ## Requirements
 
-### WA-01: Proposed typed snapshot and transport
+### WA-01: Typed snapshot and transport
 
 Add an optional typed `workspaceActivity` field to the existing session
 inspection response and emit `type: 'workspace_activity'` updates through the
@@ -55,7 +55,8 @@ existing Runtime session streaming paths. Both carry the same bounded full
 snapshot, avoiding a second product-specific delta protocol. Preserve the field
 through supported NDJSON/SSE and normalized output adapters.
 
-The conceptual shape below is a proposed contract, not a current exported type:
+The types below are exported by S1/S2; S3 adds session inspection and bounded
+NDJSON/SSE forwarding. Native/provider coverage remains explicitly scoped:
 
 ```ts
 interface RuntimeWorkspaceActivitySnapshot {
@@ -89,6 +90,7 @@ interface RuntimeObservedWorkspace {
   management: 'runtime_managed' | 'unmanaged' | 'unknown';
   association: 'session_binding' | 'observed_operation';
   verification: 'verified' | 'unverified' | 'unavailable';
+  identityObservedAt: string;
   firstObservedAt: string;
   lastObservedAt: string;
   runningOperations: RuntimeWorkspaceOperation[];
@@ -111,6 +113,12 @@ interface RuntimeWorkspaceOperation {
 to the existing execution lifecycle rather than creating a second run engine.
 Raw provider input cannot assign `sessionId`, epoch or execution identity.
 Stable operation IDs are independent of optional provider tool IDs.
+`identityObservedAt` is the identity/branch probe time, distinct from activity
+timestamps updated by completions or cancellation. A verified fact remains a
+last-known fact at that time; a new attachment does not refresh that verification.
+`startupCwd` is the initial actual execution cwd supplied by the existing session
+attachment; `runtimeCwd` is the current actual execution cwd. The product-selected
+Codespace/source root remains the product binding, not either observation field.
 
 Existing create/resume cwd and workspace fields stay scalar. An older/recognized
 session with no activity has no invented observation; hosts can treat absence
@@ -153,8 +161,28 @@ profile allowing opaque shell or unsupported tools must be `partial` even if
 some file operations are visible. Adapters default to unsupported/unavailable
 until validated. Do not claim complete filesystem tracing for native providers.
 
-Select the first native adapter slice from real fixture inventory in PLAN-047.
-Claude/Codex are candidate consumers, not a promised all-provider support matrix.
+The first native slice is selected from real fixture inventory in PLAN-047:
+native Claude direct Read/Write/Edit. This is not an all-provider support matrix.
+
+S3 observes admitted Runtime-owned tools on the API/local host execution path.
+File reads/writes, patches, copies, renames and deletes report their validated
+targets; copies distinguish source reads from destination writes. Batch tools
+without per-entry outcome evidence finish as unknown. Listings/search roots do
+not infer activity in child repos from returned names. Shell observations prove
+only the process's initial cwd. Coverage stays partial; native CLI/ACP modes
+remain unsupported in S3, and unmapped peers have no host mapping or host probe.
+
+S4 adds fixture-backed native Claude complete direct calls (`caller.type: direct`,
+no parent tool ID), host-absolute `file_path` admission and correlated user-frame
+tool results. Missing/foreign/relative paths and nested callers cannot inherit
+startup cwd. Tool-result prose and shell commands do not supply evidence.
+Unverified/nested results cannot close direct operations. Native admission is
+bounded to five seconds per target, 32 queued facts and 1024 correlations per
+execution; the existing four-unresolved-probe manager cap also applies. Late
+probes and old execution leases cannot mutate a replacement or cancelled run.
+Coverage is partial `native_tools_partial`. Windows Claude Code 2.1.304 native
+capture/live evidence and explicit unsupported modes are recorded in the
+[native evidence note](../research/2026-10-20-native-workspace-activity.md).
 
 ### WA-04: Repository and checkout identity
 
@@ -172,10 +200,19 @@ under each filesystem's case rules; do not lowercase all paths globally. Missing
 paths can be resolved against the nearest admitted existing parent, with existing
 alias/containment protections intact.
 
+The implemented local identities hash the canonical path, execution location
+and admitted directory generation (`dev`, `ino`, `birthtimeNs`). Repository
+identity uses the common Git directory; checkout identity also includes its
+checkout/Git directory generation. Replacing `.git` at a reused path changes
+identity while changing the branch does not. These are observed filesystem
+identities, not permanent IDs across moves, restores or every network filesystem.
+
 `sourceRoot` and a human-readable source repository label are optional verified
 facts. Do not derive them by trimming `.git` strings or treating a worktree's
 arbitrary basename as its source repository. A bare/unresolvable repository or
-unavailable Git executable yields explicit unknown identity instead of a fake root.
+unsupported metadata layout yields explicit unknown identity instead of a fake
+root. The initial resolver reads bounded metadata files directly and needs no
+Git executable; it does not load Git configuration, hooks or external helpers.
 
 Cache identity by execution location and verified checkout, with bounded lifetime
 and invalidation after relevant observed Git actions, filesystem replacement,
@@ -249,6 +286,12 @@ is required; avoid a new unbounded event log. Absent legacy fields mean unknown
 coverage, never historical work inferred from cwd. Pure reads must not rewrite
 old profiles merely to populate observations.
 
+The initial implementation deliberately keeps bounded last-known facts in memory
+only. Reattachment within one Runtime process retains inactive facts in a new
+epoch; a process restart reports no activity until a validated current attachment
+starts observation. No session storage field/schema or upgrade is added. Any later
+durable checkpoint requires a separately tested format upgrade under this section.
+
 Document the persisted format boundary before implementation. Any schema upgrade
 must validate recognized input, create a backup, atomically replace, and preserve
 recoverability on validation/write/restart failure. Add interruption/restart tests.
@@ -263,6 +306,11 @@ No version bump or release is authorized by this planning task.
 - Observation is bounded and off the token-critical path where possible. It does
   not trigger a model turn or periodic root scan.
 - Observer/Git probe failure degrades coverage, not a valid operation's outcome.
+- Local-tool identity observation waits at most 500 ms per target and 1500 ms
+  per tool. Expired probes cannot admit late facts. At most four unresolved
+  identity probes are retained by the Runtime manager; target/correlation/stream
+  overflow degrades coverage. A tool observes at most 64 targets, with truncation
+  reported explicitly. A slow stream retains at most one pending latest snapshot.
 - Providers remain executable when observation is unsupported. Do not introduce
   exact provider-version execution gates.
 - Native Windows, macOS/Linux and supported guest mappings need path fixtures;

@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| **Status** | Draft; planning delivered, implementation not started |
+| **Status** | In Progress; owner-authorized sliced implementation, acceptance pending |
 | **Owner** | Runtime execution/workspace workstream |
 | **Reviewer** | Owner and Runtime/Platform integration owners; pending |
 | **Spec** | [SPEC-037](../specs/SPEC-037-session-workspace-activity.md) |
@@ -18,39 +18,92 @@ repos/worktrees beneath it. Runtime owns evidence, identity and observation
 lifecycle. Platform maps sessions to Code participants and renders work areas.
 This plan adds no multi-root settings, bubble fields or worktree lifecycle actions.
 
-The current task prepares documents only. All implementation phases remain open;
-no provider, transport, storage or native UI acceptance is claimed here.
+The owner authorized implementation and incremental commits after Platform
+PR #289 passed CI and merged. Both main checkouts were pulled before worktrees
+were created. Each slice receives scoped validation and a separate commit;
+version changes and publication remain separately authorized.
+
+## Delivery Slices
+
+| Slice | Repository and deliverable | State |
+| --- | --- | --- |
+| S1 | Runtime activity types and admitted repo/worktree identity | Complete; 15 focused tests and typecheck passed |
+| S2 | Runtime bounded reducer, ordering, snapshot validation and inactive reattachment | Complete; 11 focused tests and typecheck passed |
+| S3 | Runtime local-tool observation, session lifecycle, transport and memory-only restart checks | Complete; scoped suites/typecheck and independent review passed |
+| S4 | Native provider structured evidence, coverage and fixture/native checks | Complete; native Claude Windows live evidence, captured replay, scoped tests/typecheck and independent review |
+| S5 | Platform participant attribution, work-area API and live projection | Complete; Platform `d553b85b`, focused tests/typechecks and independent review |
+| S6 | Code right panel, avatar entry, localization and renderer regressions | Complete; Platform `8a075834`, seven renderer tests, 49 existing consumer tests and candidate builds |
+| S7 | Cross-repository native acceptance, recovery/privacy and documentation reconciliation | Identity hardening and two-session HTTP projection passed; final Electron work-area visual acceptance incomplete |
+
+S1 uses bounded metadata reads without Git subprocesses/configuration or a root
+scan. It reuses existing path policy and trusted managed-worktree source authority.
+Generic shell strings, bubbles and multiple selected Codespaces remain excluded.
+Unknown identity is retained at an authority or traversal boundary. Managed
+source attachments that are themselves linked worktrees currently remain
+unavailable without verified provenance; the explicit fixture confirms that this
+does not broaden metadata authority. Submodule and reused `.git` identity
+fixtures pass. The case-sensitive-filesystem fixture is capability-gated and
+skipped on this Windows filesystem; that mode and other OSes remain unvalidated.
+
+S2 keeps last-known facts in memory only. No existing session record is rewritten
+and no disk format is introduced. Process restart has no restored activity;
+reattachment within one process changes epoch and terminates pending operations.
+Every asynchronous mutation carries an attachment/execution lease. Snapshot budgets
+are 32 rows, 8 running/8 recent operations per row and 64 KiB, with up to 1024
+correlation/tombstone IDs per execution. Out-of-order or dropped facts explicitly
+degrade coverage. Identity probe time is separate from operation completion time.
+
+S3 connects Runtime-owned API/local tools to the same reducer. Admission captures
+one turn-owned observer before asynchronous model/tool work; old attachments,
+callbacks and terminal events cannot mutate a new turn. The path hook observes
+only after the original path policy admits a target, including pre-delete facts.
+Probe waits are limited to 500 ms per target / 1500 ms per tool, 64 targets per
+tool and four outstanding probes. Tool execution continues when observation
+times out or fails; late probes are discarded. NDJSON, messages SSE and observe
+SSE coalesce slow readers to one pending latest snapshot and flush it before
+terminal output. Runtime-owned observations never become transcript blocks.
+
+| S3 input/mode | Coverage and boundary |
+| --- | --- |
+| API/local Runtime-owned file tools | Partial (`runtime_tools_partial`); verified admitted targets and correlated aggregate outcomes |
+| Batch read/inspect | Every admitted target; per-entry completion stays unknown without exact outcome evidence |
+| Copy / rename / delete / patch | Copy source read vs destination write; pre-mutation identities; no inferred changed-file counts |
+| Listing/search roots | Access to the admitted root; returned child names do not create child-repo observations |
+| Runtime `run_shell` | Initial cwd only; no parsing of commands or inferred test/Git success |
+| Native Claude direct Read/Write/Edit | S4 partial (`native_tools_partial`); complete direct-call fields, absolute host paths and correlated user results |
+| Other native CLI / ACP | Unsupported; execution remains available independently of observation coverage |
+| Peer/unmapped execution | Unsupported with no local path mapping or host filesystem probe |
 
 ## Implementation Phases
 
 ### Phase 1: Freeze the generic observation contract
 
-- [ ] Review SPEC-037 with Platform SPEC-127 for shape, identity, coverage,
+- [x] Review SPEC-037 with Platform SPEC-127 for shape, identity, coverage,
   observation epoch, ordering and reconciliation.
-- [ ] Trace existing local tool, CLI, API/agent execution and normalized transport
+- [x] Trace existing local tool, CLI, API/agent execution and normalized transport
   paths. Choose the shared observer/reducer injection points.
-- [ ] Inventory actual structured tool paths/results per provider and instance
+- [x] Inventory actual structured tool paths/results per provider and instance
   mode. Choose one fixture-backed native slice plus Runtime-owned local tools;
   record unsupported/partial modes explicitly.
-- [ ] Confirm no cwd/root settings change and no new observation-dependent
+- [x] Confirm no cwd/root settings change and no new observation-dependent
   execution refusal, tool grant or managed-worktree adoption.
-- [ ] Choose bounded snapshot/checkpoint limits and the existing session-store
-  extension. Define migration/backup/atomic-recovery tests if schema changes.
+- [x] Choose bounded snapshot limits and memory-only retention. No session-store
+  extension is selected; later persistence requires migration/backup/recovery tests.
 
 **Deliverable:** Reviewed typed contract and coverage/fixture matrix shared with
 Platform PLAN-120. Do not claim raw shell target inference as verified evidence.
 
 ### Phase 2: Implement identity resolution and the observation reducer
 
-- [ ] Add provider-neutral snapshot, workspace and operation types.
-- [ ] Implement location-qualified repository/checkout identity with bounded
+- [x] Add provider-neutral snapshot, workspace and operation types.
+- [x] Implement location-qualified repository/checkout identity with bounded
   read-only probes for `.git` files, nested repos, branches and detached HEAD.
-- [ ] Reuse existing path policy and managed ownership records; handle non-Git,
+- [x] Reuse existing path policy and managed ownership records; handle non-Git,
   missing/forbidden metadata, aliases and unmapped foreign paths explicitly.
-- [ ] Add a serialized bounded reducer for start/completion/cancel, multiple
+- [x] Add a serialized bounded reducer for start/completion/cancel, multiple
   targets, deduplication, limits and freshness.
-- [ ] Keep session binding context separate from observed operation association.
-- [ ] Cover branch/path replacement and identity cache invalidation without
+- [x] Keep session binding context separate from observed operation association.
+- [x] Cover branch/path replacement and identity cache invalidation without
   filesystem-wide watchers or recursive repository scans.
 
 **Deliverable:** Isolated pure/model and real-temp-Git tests for identity and
@@ -58,14 +111,14 @@ operation facts, with no product identity dependency.
 
 ### Phase 3: Capture Runtime tool and native provider evidence
 
-- [ ] Emit validated operation targets/outcomes from local read/list/write/patch/
+- [x] Emit validated operation targets/outcomes from local read/list/write/patch/
   rename/delete tool boundaries, including multi-target and pre-delete identity.
-- [ ] Wire the selected native adapter's verified structured events into the
+- [x] Wire the selected native adapter's verified structured events into the
   same observer; distinguish reported attempts from successful completion.
-- [ ] Resolve per-command paths on the correct execution location and mark
+- [x] Resolve per-command paths on the correct execution location and mark
   opaque shell or uncorrelated results partial/unknown.
-- [ ] Report truthful coverage for each selected tool profile and execution mode.
-- [ ] Confirm observer/Git failures do not change a valid tool's result or grant
+- [x] Report truthful coverage for each selected tool profile and execution mode.
+- [x] Confirm observer/Git failures do not change a valid tool's result or grant
   more permissions, and unsupported providers continue existing execution.
 
 **Deliverable:** Fixture-backed local/native observations with actual path
@@ -73,29 +126,29 @@ provenance and documented coverage boundaries.
 
 ### Phase 4: Expose inspection, streaming and lifecycle recovery
 
-- [ ] Add optional `workspaceActivity` to session inspection and typed
+- [x] Add optional `workspaceActivity` to session inspection and typed
   `workspace_activity` updates through supported session streaming paths.
-- [ ] Keep normalized stream and inspection schema identical; preserve facts
+- [x] Keep Runtime stream and inspection schema identical; preserve facts
   without scraping transcript text or leaking raw provider payloads.
-- [ ] Implement observation epochs/revisions and an inspection reconciliation
+- [x] Implement observation epochs/revisions and an inspection reconciliation
   sequence covering subscription/snapshot races.
 - [ ] Integrate close/cancel/error/reset/resume/fork/delete and reject late results.
-- [ ] Persist only bounded last-known checkpoints, restore them inactive and
-  revalidate current attachment/identity before live claims.
-- [ ] Test recognized old data, backup/atomic upgrade if needed, corrupt state,
-  failure recovery, and interrupted write/restart behavior.
-- [ ] Exercise real HTTP/stream consumer fixtures with Platform's parser contract.
+- [x] Keep bounded last-known observations in memory, terminate pending work on
+  reattachment and revalidate identity before new observed-operation facts.
+- [x] Verify existing session records are unchanged by observation and no active
+  observations survive process restart. No new persisted schema or migration.
+- [x] Exercise real HTTP/stream consumer fixtures with Platform's parser contract.
 
 **Deliverable:** Authenticated recoverable session observations with bounded
 retention and no false running state after a lifecycle boundary.
 
 ### Phase 5: Cross-repository acceptance and documentation
 
-- [ ] Use synthetic temp repositories under a non-Git `cats-inc` parent; include
+- [x] Use synthetic temp repositories under a non-Git `cats-inc` parent; include
   a fourth-level repo, multiple linked worktrees and a plain directory.
-- [ ] Verify two sessions retain the same cwd while reading/writing distinct
+- [x] Verify two sessions retain the same cwd while reading/writing distinct
   child repos; exercise one session across several checkouts.
-- [ ] Run a bounded native provider acceptance on one named OS/profile with real
+- [x] Run a bounded native provider acceptance on one named OS/profile with real
   structured evidence and unchanged execution grants.
 - [ ] Consume facts in Platform PLAN-120; verify participant attribution,
   coverage/freshness and worktree management labels in an isolated renderer.
@@ -111,7 +164,7 @@ acceptance, without presenting fixtures as all-provider native validation.
 
 ## Files to Create/Modify
 
-Implementation candidates; none are changed by this documentation task:
+Implementation surfaces; completed and pending delivery is tracked by slice above:
 
 | Surface | Intended change |
 | --- | --- |
@@ -130,8 +183,9 @@ Implementation candidates; none are changed by this documentation task:
 
 ## Testing Strategy
 
-Documentation preparation checks numbering, links, scope and diffs only. No new
-application test/build or live provider acceptance is claimed in this task.
+Initial documentation preparation checked numbering, links, scope and diffs.
+Implementation checks and native acceptance are recorded per slice in the
+progress log and linked evidence, without a full-suite or all-provider claim.
 
 Implementation tests must use isolated temp roots and Runtime test environment
 helpers. Never read or mutate the user's `~/.cats/runtime` or actual Cats repos
@@ -168,8 +222,15 @@ the new contract. A docs-only task does not rerun these baseline suites.
 
 | Date | Update |
 | --- | --- |
+| 2026-10-20 | PR #175 CI caught duplicate full session cleanup between the registry removal callback and the existing delete route, plus an MCP test assuming the first NDJSON frame could not be a workspace side channel. Registry removal now clears observation state without prematurely dropping lifecycle state; the route retains its single full cleanup after recording the outcome. The MCP assertion excludes only workspace side-channel frames and still checks progress before model output. The four affected privacy/MCP/native-observer/session-close suites passed all 54 tests in CI's single-thread mode; Runtime TypeScript and independent review passed. |
+| 2026-10-20 | Final identity hardening includes admitted filesystem generation in repository/checkout IDs. The identity suite passed 18 cases with one capability skip for case-sensitive paths; Windows submodule setup uses a scoped 30-second fixture deadline. Independent review found no blocker. An isolated two-participant fixture passed real Runtime HTTP consumer projection checks: common cwd, fourth-level repo, two worktrees, multiple repos, shared checkout identity and coordinator's own session. Runtime/server/Desktop/Vite builds and candidate startup passed. Final Electron work-area visual acceptance did not complete: the isolated renderer harness exited before producing UI evidence. The owner requested commit and auto-merge PR delivery; this limitation is retained rather than claimed passed. No profile-format change, version bump or publication. |
 | 2026-10-20 | Created ADR-046 / SPEC-037 / PLAN-047 for Platform ADR-134 / SPEC-127 / PLAN-120. Planning only; implementation and native acceptance not started. Multi-root settings, bubble changes and worktree ownership changes are excluded. |
 | 2026-10-20 | Documentation validation passed: 34 references across the six new Platform/Runtime documents resolve against the local worktrees; numbering, index entries, LF/final newlines and code fences checked. Both repositories passed `git diff --check`. No application tests, builds or live acceptance were run for this docs-only task. |
+| 2026-10-20 | Owner authorized sliced implementation and incremental commits. Platform PR #289 was verified merged at `8bb3fd2f` with changes/validate/nodejs CI successful; both main checkouts pulled cleanly. Runtime worktree `plan047-workspace-activity` starts at `b2d888aa`; S1 and independent contract review are in progress. |
+| 2026-10-20 | S1 adds exported activity types and lazy admitted Git identity. Independent review fixes cover incomplete outer authority, managed-subdirectory attachments, foreign source/sibling pointers and bounded-walk exhaustion. Focused identity suite: 15 passed; Runtime TypeScript check passed; no live provider or Platform acceptance yet. |
+| 2026-10-20 | S2 adds a bounded in-memory reducer and strict snapshot validator. Attachment/execution leases reject stale callbacks; duplicate/late and terminal-before-start evidence cannot invent active work. Review also verified envelope/retention limits, consumer failure isolation and identity/activity timestamps. Focused reducer suite: 11 passed; Runtime TypeScript check passed. Storage schema unchanged; S3 lifecycle/transport and native/UI acceptance remain pending. |
+| 2026-10-20 | S3 connects admitted API/local tools, turn-scoped observers, inspection and bounded NDJSON/SSE forwarding. Scoped checks passed: tool hooks 10, API backend 17, forwarder 3, NDJSON writer 5 (including real unread/slow ReadableStream capacity/order), session close/observe 25, message routes 16, Pi 8 and reducer 11; prior unchanged tool/run-log baselines also passed. MCP's 21 cases passed across scoped runs; its existing 10-second real-Git delivery case timed out once under machine load and passed on isolated retry with the mutation consumer. Runtime TypeScript and diff checks passed. No full-suite/native provider/Platform UI acceptance is claimed. |
+| 2026-10-20 | S4 adds selected native Claude direct Read/Write/Edit observations and correlated user-frame results. Two isolated Windows Claude Code 2.1.304 conversations shared one parent cwd; the second streamed through Runtime and reported a successful worktree Read/Edit plus failed deep-repo Read, with unchanged cwd, grouped repository identity and no running work. Redacted native excerpts and a live Runtime snapshot are retained in tests; owned native fixtures/helpers were removed after capture. Scoped checks passed: manager 6, provider observer 7, Claude parser 35, prior captured Claude fixtures 2, messages 17 (native NDJSON/SSE inspection parity), session close/observe 25 and API backend 17. Final lifecycle guards also reject failed replacement envelopes; independent review and final TypeScript/diff checks passed. Native metadata has a measured five-second deadline; earlier shorter-budget replay timeouts degraded coverage as designed. The evidence note records exact scope; Platform, other providers/OSes and remaining identity fixtures stay pending. |
 
 ---
 

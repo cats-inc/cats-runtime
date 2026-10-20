@@ -3,6 +3,16 @@ import type {
   ProviderModelSelection,
 } from './models/providerSelectionResolution.js';
 import type { SessionMcpServerLaunch } from './sessionMcpServers.js';
+import type { RuntimeWorkspaceActivitySnapshot } from './workspace/activityTypes.js';
+
+export type {
+  RuntimeObservedWorkspace,
+  RuntimeWorkspaceActivitySnapshot,
+  RuntimeWorkspaceIdentity,
+  RuntimeWorkspaceOperation,
+  WorkspaceActivityCoverage,
+  WorkspaceActivityCoverageStatus,
+} from './workspace/activityTypes.js';
 
 export type {
   ProviderModelResolution,
@@ -1533,6 +1543,7 @@ export interface RuntimeToolPolicyInspection {
 }
 
 export interface RuntimeSessionInspection {
+  workspaceActivity?: RuntimeWorkspaceActivitySnapshot;
   state: RuntimeSessionExecutionState;
   attached: boolean;
   busy: boolean;
@@ -1711,6 +1722,8 @@ export interface ToolUseStreamEvent extends StreamEventBase {
   toolName?: string;
   toolId?: string;
   toolArgs?: Record<string, unknown>;
+  /** Adapter-verified structured target; never decoded from command strings. */
+  workspaceOperation?: { path: string; kind: 'read' | 'write' };
 }
 
 export interface ToolResultStreamEvent extends StreamEventBase {
@@ -1719,6 +1732,8 @@ export interface ToolResultStreamEvent extends StreamEventBase {
   toolName?: string;
   toolId?: string;
   isError?: boolean;
+  /** Only adapters with verified result semantics supply an observation outcome. */
+  workspaceOutcome?: 'succeeded' | 'failed' | 'unknown';
 }
 
 export interface ResultStreamEvent extends StreamEventBase, StreamEventStatePatch {
@@ -1746,6 +1761,11 @@ export interface ProgressStreamEvent extends StreamEventBase, StreamEventStatePa
   isError?: boolean;
 }
 
+export interface WorkspaceActivityStreamEvent extends StreamEventBase {
+  type: 'workspace_activity';
+  workspaceActivity: RuntimeWorkspaceActivitySnapshot;
+}
+
 export type StreamEvent =
   | InitStreamEvent
   | TextStreamEvent
@@ -1754,6 +1774,7 @@ export type StreamEvent =
   | ResultStreamEvent
   | ErrorStreamEvent
   | RawStreamEvent
+  | WorkspaceActivityStreamEvent
   | ProgressStreamEvent;
 
 export type RuntimeContentBlockKind = 'text' | 'tool' | 'status';

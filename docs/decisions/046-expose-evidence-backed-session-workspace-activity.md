@@ -2,8 +2,10 @@
 
 ## Status
 
-Proposed, 2026-10-20. Planning only; no implementation or provider acceptance
-is claimed. See [SPEC-037](../specs/SPEC-037-session-workspace-activity.md) and
+Accepted for implementation, 2026-10-20. The owner authorized sliced implementation
+and incremental commits after Platform PR #289 passed CI and merged. Implementation
+is in progress; provider acceptance remains pending. See
+[SPEC-037](../specs/SPEC-037-session-workspace-activity.md) and
 [PLAN-047](../plans/PLAN-047-session-workspace-activity.md).
 
 ## Context
@@ -65,6 +67,13 @@ Resolution is bounded, read-only and subject to existing path/metadata authority
 Never execute host Git against an unmapped guest/peer path, crawl the selected
 root, grant agent shell access or follow an otherwise forbidden alias merely to
 provide a label. Report unavailable facts explicitly.
+
+The first identity slice reads bounded Git attachment/HEAD/common-directory
+metadata directly, without launching Git or loading repository configuration.
+Only supported verified layouts establish identity; bare, malformed or unsupported
+metadata remains unknown. Source labels require a verified source attachment to
+the same common metadata. Reads are revalidated per observation, so no identity
+cache can retain stale branches or replaced paths in this slice.
 
 An observed agent-created/external worktree remains unmanaged. Existing
 managed-worktree state remains the only authority for Runtime lifecycle ownership;

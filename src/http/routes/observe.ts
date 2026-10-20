@@ -10,6 +10,7 @@ import { buildSessionProviderTargetSummary } from '../sessionProviderTarget.js';
 import { toSessionView } from '../../backends/cli/pool/sessionView.js';
 import { createRuntimeContentBlockProjector } from '../../core/runtime/contentBlocks.js';
 import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
+import { forwardWorkspaceActivity } from '../../core/runtime/workspaceStream.js';
 import type { ContentBlockStreamEvent, StreamEvent } from '../../core/types.js';
 
 export const observeRoutes = new Hono();
@@ -19,7 +20,7 @@ function buildSequencedObservedEvent(
   sourceSeq: number,
   outputIndex: number,
   event: StreamEvent | ContentBlockStreamEvent,
-): StreamEvent | ContentBlockStreamEvent | Record<string, unknown> {
+): Record<string, unknown> {
   return {
     ...event,
     sessionId: typeof event.sessionId === 'string' && event.sessionId.trim().length > 0
@@ -117,16 +118,27 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
         });
     };
 
+    const workspaceStream = forwardWorkspaceActivity(runtime, id, event => {
+      writeQueue = writeQueue.then(() => stream.writeSSE({
+        data: JSON.stringify(event), event: event.type,
+      })).catch(() => { closed = true; });
+      return writeQueue;
+    });
+    let closing: Promise<void> | undefined;
+    let terminalDelivery: Promise<void> | undefined;
     const closeStream = () => {
-      if (closed) return;
-      closed = true;
-      // Queued behind events already observed, such as the final result.
-      writeQueue = writeQueue
-        .then(() => stream.writeSSE({
+      if (closed || closing) return;
+      // Flush the bounded pending snapshot before reporting the attachment closed.
+      closing = (async () => {
+        await terminalDelivery;
+        closed = true;
+        await workspaceStream.close();
+        await writeQueue;
+        await stream.writeSSE({
           data: JSON.stringify({ type: 'session_closed' }),
           event: 'session_closed',
-        }))
-        .catch(() => {});
+        });
+      })().catch(() => {});
     };
 
     // An ephemeral provider's process exits after every turn, and Auggie and
@@ -140,10 +152,15 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
         return;
       }
       lastObservedSeq = entry.seq;
-      enqueueObservedEvent(entry.seq, entry.event);
-      if (closeWhenRunEnds && (entry.event.type === 'result' || entry.event.type === 'error')) {
-        closeStream();
+      if (entry.event.type === 'workspace_activity') return;
+      if (entry.event.type === 'result' || entry.event.type === 'error') {
+        terminalDelivery = workspaceStream.flush().then(() => {
+          enqueueObservedEvent(entry.seq, entry.event);
+          if (closeWhenRunEnds) closeStream();
+        });
+        return;
       }
+      enqueueObservedEvent(entry.seq, entry.event);
     };
 
     const onExit = () => {
@@ -161,6 +178,7 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
         continue;
       }
       lastObservedSeq = entry.seq;
+      if (entry.event.type === 'workspace_activity') continue;
       enqueueObservedEvent(entry.seq, entry.event);
     }
     worker.on('exit', onExit);
@@ -186,6 +204,8 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
       clearInterval(keepalive);
       unsubscribeObservedStream();
       worker.off('exit', onExit);
+      await workspaceStream.close();
+      await closing;
     }
     await writeQueue;
   });

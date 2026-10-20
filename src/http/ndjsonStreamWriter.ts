@@ -24,6 +24,10 @@ export interface NdjsonStreamWriterOptions {
 
 export interface NdjsonStreamWriter {
   write(value: unknown): void;
+  /** One coalesced workspace snapshot; never queue each update behind a slow reader. */
+  writeWorkspaceActivity(value: unknown): void;
+  /** The ReadableStream consumer requested another chunk. */
+  pull(): void;
   /** The client cancelled the stream. */
   cancel(): void;
   /** Stop heartbeats and close the stream if the client is still there. */
@@ -40,8 +44,9 @@ export function createNdjsonStreamWriter(
   const encoder = new TextEncoder();
   let open = true;
   let lastWriteAt = now();
+  let pendingWorkspace: unknown;
 
-  const write = (value: unknown) => {
+  const enqueue = (value: unknown) => {
     if (!open) return;
     try {
       controller.enqueue(encoder.encode(`${JSON.stringify(value)}\n`));
@@ -50,6 +55,18 @@ export function createNdjsonStreamWriter(
       open = false;
     }
   };
+  const flushWorkspace = (force = false) => {
+    if (!open || pendingWorkspace === undefined
+      || (!force && (controller.desiredSize ?? 0) <= 0)) return;
+    const next = pendingWorkspace;
+    pendingWorkspace = undefined;
+    enqueue(next);
+  };
+  const write = (value: unknown) => {
+    const type = value && typeof value === 'object' && 'type' in value ? value.type : undefined;
+    if (type === 'result' || type === 'error') flushWorkspace(true);
+    enqueue(value);
+  };
   const timer = setInterval(() => {
     if (now() - lastWriteAt >= heartbeatMs) write(NDJSON_HEARTBEAT_EVENT);
   }, options.checkMs ?? 5_000);
@@ -57,13 +74,21 @@ export function createNdjsonStreamWriter(
 
   return {
     write,
+    writeWorkspaceActivity(value) {
+      if (!open) return;
+      pendingWorkspace = value;
+      flushWorkspace();
+    },
+    pull() { flushWorkspace(); },
     cancel() {
       open = false;
+      pendingWorkspace = undefined;
       clearInterval(timer);
     },
     close() {
       clearInterval(timer);
       if (!open) return;
+      flushWorkspace(true);
       open = false;
       try {
         controller.close();

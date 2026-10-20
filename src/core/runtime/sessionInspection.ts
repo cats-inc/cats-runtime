@@ -80,6 +80,8 @@ export function buildSessionInspection(
   const agentSession = buildAgentSessionInspection(input.session);
 
   return {
+    ...(input.trackedState?.workspaceActivity
+      ? { workspaceActivity: structuredClone(input.trackedState.workspaceActivity) } : {}),
     state: resolveExecutionState(input),
     attached: input.view.attached,
     busy,

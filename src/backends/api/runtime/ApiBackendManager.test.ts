@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -9,6 +9,7 @@ import type { ProviderTargetDescriptor } from '../../../core/providerCatalog.js'
 import type { StreamEvent } from '../../../core/types.js';
 import { RuntimeSessionManager } from '../../../core/runtime/RuntimeSessionManager.js';
 import { buildSessionInspection } from '../../../core/runtime/sessionInspection.js';
+import type { LocalToolWorkspaceObserverFactory } from '../../../core/tools/workspaceObservation.js';
 
 async function collectEvents(stream: AsyncGenerator<StreamEvent>): Promise<StreamEvent[]> {
   const events: StreamEvent[] = [];
@@ -121,6 +122,81 @@ describe('ApiBackendManager', () => {
         }),
       ]),
     });
+  });
+
+  it('keeps API execution working when optional observer setup throws', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-api-observer-failure-'));
+    try {
+      const registry = new SessionRegistry();
+      const session = registry.create({ id: 'observer-failure', providerName: 'codex',
+        providerBackend: 'api', providerInstanceId: 'gateway', cwd: root });
+      const backend = new ApiBackendManager({ sessionBaseDir: root }, registry, {
+        env: { OPENAI_API_KEY: 'fixture-key' }, fetch: async () => new Response(JSON.stringify({
+          id: 'response', output: [{ type: 'message', content: [{ type: 'output_text', text: 'done' }] }],
+        }), { headers: { 'content-type': 'application/json' } }),
+      });
+      backend.setWorkspaceObserver(() => { throw new Error('optional observation unavailable'); });
+      const events = await collectEvents(backend.spawn(session.id, createTarget()).streamMessage({ message: 'hello' }));
+      expect(events.some(event => event.type === 'result')).toBe(true);
+      expect(events.some(event => event.type === 'error')).toBe(false);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('rejects old tool/terminal leases after reattachment and leaves existing disk records unchanged', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-api-workspace-leases-'));
+    const dataDir = join(root, 'data');
+    const sessionBaseDir = join(root, 'sessions');
+    mkdirSync(sessionBaseDir);
+    writeFileSync(join(root, 'file.txt'), 'fixture contents');
+    const registry = new SessionRegistry(dataDir, sessionBaseDir);
+    const session = registry.create({ id: 'workspace-leases', providerName: 'codex',
+      providerBackend: 'api', providerInstanceId: 'gateway', cwd: root });
+    registry.flush();
+    const before = readFileSync(join(dataDir, 'sessions.json'), 'utf8');
+    const backend = new ApiBackendManager({ sessionBaseDir }, registry);
+    let factory!: LocalToolWorkspaceObserverFactory;
+    const setObserver = backend.setWorkspaceObserver.bind(backend);
+    const setter = vi.spyOn(backend, 'setWorkspaceObserver').mockImplementation(value => {
+      factory = value;
+      setObserver(value);
+    });
+    try {
+      const runtime = createRuntimeManager(sessionBaseDir, backend);
+      expect(runtime.getWorkspaceActivity(session.id)).toBeUndefined();
+      expect(runtime.getTrackedState(session.id)).toBeUndefined();
+      expect(readFileSync(join(dataDir, 'sessions.json'), 'utf8')).toBe(before);
+      runtime.beginRun(session, { message: 'first turn' });
+      const oldLease = runtime.getWorkspaceExecution(session.id)!;
+      const oldObserver = factory({ sessionId: session.id, cwd: root })!;
+      const target = { sessionId: session.id, cwd: root, path: join(root, 'file.txt'),
+        toolId: 'read', kind: 'read' as const };
+      const oldProbe = oldObserver.start(target, new AbortController().signal);
+      runtime.clearProviderState(session.id);
+      const newRun = runtime.beginRun(session, { message: 'new turn' });
+      const oldFinish = await oldProbe;
+      oldFinish?.('succeeded');
+      (await oldObserver.start(target, new AbortController().signal))?.('succeeded');
+      runtime.observeEvent(session.id, { type: 'result' }, oldLease);
+      expect(runtime.isCurrentRun(session.id, newRun.id)).toBe(true);
+      expect(runtime.getWorkspaceActivity(session.id)!.workspaces).toEqual([]);
+      const observer = factory({ sessionId: session.id, cwd: root })!;
+      (await observer.start(target, new AbortController().signal))?.('succeeded');
+      expect(runtime.getWorkspaceActivity(session.id)!.workspaces[0].recentOperations[0])
+        .toMatchObject({ executionId: newRun.id, kind: 'read', state: 'succeeded' });
+      observer.gap(session.id, 'observation_limit');
+      expect(runtime.getWorkspaceActivity(session.id)).toMatchObject({ truncated: true,
+        coverage: { status: 'partial', reason: 'observation_limit' } });
+      await runtime.close(session, 'reset');
+      expect(runtime.getWorkspaceActivity(session.id)!.workspaces[0].runningOperations).toEqual([]);
+      runtime.dropSession(session.id);
+      expect(runtime.getWorkspaceActivity(session.id)).toBeUndefined();
+      expect(createRuntimeManager(sessionBaseDir, backend).getWorkspaceActivity(session.id)).toBeUndefined();
+      expect(readFileSync(join(dataDir, 'sessions.json'), 'utf8')).toBe(before);
+    } finally {
+      setter.mockRestore();
+      registry.flush();
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('keeps session-level instructions when a turn does not override them', async () => {
@@ -777,6 +853,10 @@ describe('ApiBackendManager', () => {
       });
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(inspection.workspaceActivity).toMatchObject({ sessionId: session.id,
+        coverage: { status: 'partial' }, workspaces: [{ path: repoDir,
+          association: 'observed_operation', runningOperations: [],
+          recentOperations: [{ kind: 'read', state: 'succeeded', evidence: 'runtime_tool' }] }] });
       expect(String(requestBodies[0]?.instructions)).toContain('Execution strategy: deps.');
       expect(String(requestBodies[0]?.instructions)).toContain(
         'Acceptance criteria:\nReturn only the verified file value.',

@@ -31,6 +31,7 @@ import {
 } from '../../core/runtime/agentDiagnosticsEvidence.js';
 import { createRuntimeContentBlockProjector } from '../../core/runtime/contentBlocks.js';
 import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
+import { forwardWorkspaceActivity } from '../../core/runtime/workspaceStream.js';
 import { buildRuntimeExecutionStrategySessionPatch } from '../../core/runtime/strategies/state.js';
 import { parsePeerMessageRoutingInput } from '../../core/peers/PeerRoutingService.js';
 import { toPeerExecutionErrorEvent } from '../../core/peers/errors.js';
@@ -763,12 +764,14 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   let startedRun: ReturnType<typeof runtime.beginRun>;
   try {
     startedRun = runtime.beginRun(executionSession, turnInput,
-      preflight.outcome === 'warned' ? { guardrail: preflight } : {});
+      { ...(preflight.outcome === 'warned' ? { guardrail: preflight } : {}),
+        ...(peerRouted ? { workspaceObservation: 'unmapped' as const } : {}) });
   } catch (error) {
     const skillError = toRuntimeSkillErrorResponse(error);
     if (skillError) return c.json(skillError.body, skillError.status);
     throw error;
   }
+  const workspaceExecution = runtime.getWorkspaceExecution(id);
   ctx.registry.updateStatus(id, 'busy');
 
   let peerHandle: ManagedExecutionHandle | undefined;
@@ -788,7 +791,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
         signal,
       ),
       onClose: async () => {
-        runtime.detachExecutionHandle(id);
+        runtime.detachExecutionHandle(id, peerHandle);
       },
     });
     runtime.attachExecutionHandle(id, peerHandle);
@@ -814,94 +817,111 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
 
     let writer: NdjsonStreamWriter | null = null;
     const stream = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        let assistantText = '';
-        const turnStartedAt = Date.now();
-        const contentBlocks = createRuntimeContentBlockProjector();
-        const output = createNdjsonStreamWriter(controller);
-        writer = output;
-        const write = (value: unknown) => output.write(value);
-        try {
-          for (const leadingEvent of [mcpServersEvent, warningEvent]) {
-            if (!leadingEvent) continue;
-            runtime.observeEvent(id, leadingEvent);
-            for (const outputEvent of toStreamOutputEvents(contentBlocks, leadingEvent)) {
+      start(controller) {
+        void (async () => {
+          let assistantText = '';
+          const turnStartedAt = Date.now();
+          const contentBlocks = createRuntimeContentBlockProjector();
+          const output = createNdjsonStreamWriter(controller);
+          writer = output;
+          const write = (value: unknown) => output.write(value);
+          const workspaceStream = forwardWorkspaceActivity(runtime, id, event => output.writeWorkspaceActivity(event));
+          try {
+            if (!runtime.isCurrentRun(id, startedRun.id)) return;
+            for (const leadingEvent of [mcpServersEvent, warningEvent]) {
+              if (!runtime.isCurrentRun(id, startedRun.id)) break;
+              if (!leadingEvent) continue;
+              runtime.observeEvent(id, leadingEvent, workspaceExecution);
+              for (const outputEvent of toStreamOutputEvents(contentBlocks, leadingEvent)) {
+                write(outputEvent);
+              }
+            }
+            const eventStream = withTurnTerminalEvent(peerRouted
+              ? worker!.streamMessage(turnInput)
+              : streamTurnWithPiRecovery(ctx, id, turnInput, () => {
+                  ensureRecoveredPiHistorySourcePath(ctx, id, turnInput, historyState);
+                }));
+            for await (const event of eventStream) {
+              if (!runtime.isCurrentRun(id, startedRun.id)) break;
+              if (event.type === 'workspace_activity') continue;
+              await runtime.observeProviderWorkspaceEvent(id, event, workspaceExecution);
+              if (!runtime.isCurrentRun(id, startedRun.id)) break;
+              const observedEvent = metering.observeEvent(executionSession, event, { turnStartedAt });
+              runtime.observeEvent(id, observedEvent, workspaceExecution);
+              if (!runtime.isLatestRun(id, startedRun.id)) break;
+
+              applyObservedEventToSession(ctx, id, session, observedEvent, {
+                peerRouted,
+              });
+
+              if (isTextStreamEvent(observedEvent)) {
+                assistantText += observedEvent.text;
+              }
+
+              if (isToolUseStreamEvent(observedEvent) && historyState.sourcePath) {
+                assistantText = flushAssistantText(historyState.sourcePath, assistantText);
+                appendHistory(historyState.sourcePath, {
+                  type: 'tool_use',
+                  toolId: observedEvent.toolId,
+                  toolName: observedEvent.toolName,
+                  arguments: observedEvent.toolArgs ?? {},
+                  timestamp: new Date().toISOString(),
+                });
+              }
+
+              if (isToolResultStreamEvent(observedEvent) && historyState.sourcePath) {
+                appendHistory(historyState.sourcePath, {
+                  type: 'tool_result',
+                  toolId: observedEvent.toolId,
+                  toolName: observedEvent.toolName,
+                  text: observedEvent.text ?? '',
+                  isError: observedEvent.isError === true,
+                  timestamp: new Date().toISOString(),
+                });
+              }
+
+              if (isResultStreamEvent(observedEvent)) {
+                assistantText = flushAssistantText(historyState.sourcePath, assistantText);
+                ctx.registry.recordMessage(
+                  id,
+                  observedEvent.usage,
+                );
+                restoreReadyIfSessionStillInteractive(ctx.registry, id);
+              }
+
+              if (isErrorStreamEvent(observedEvent)) {
+                assistantText = flushAssistantText(historyState.sourcePath, assistantText);
+                restoreReadyIfSessionStillInteractive(ctx.registry, id);
+              }
+              // Apply owned session/history effects synchronously before yielding to a slow client.
+              await workspaceStream.flush();
+              for (const outputEvent of toStreamOutputEvents(contentBlocks, observedEvent)) write(outputEvent);
+            }
+          } catch (err) {
+            if (!runtime.isCurrentRun(id, startedRun.id)) return;
+            const errorEvent = metering.observeEvent(executionSession, {
+              type: 'error',
+              text: String(err),
+            } satisfies ErrorStreamEvent, { turnStartedAt });
+            runtime.observeEvent(id, errorEvent, workspaceExecution);
+            assistantText = flushAssistantText(historyState.sourcePath, assistantText);
+            restoreReadyIfSessionStillInteractive(ctx.registry, id);
+            await workspaceStream.flush();
+            for (const outputEvent of toStreamOutputEvents(contentBlocks, errorEvent)) {
               write(outputEvent);
             }
+          } finally {
+            await workspaceStream.close();
+            await closeManagedHandle(peerHandle);
+            persistAgentTargetEvidence(ctx, id);
+            output.close();
           }
-          const eventStream = withTurnTerminalEvent(peerRouted
-            ? worker!.streamMessage(turnInput)
-            : streamTurnWithPiRecovery(ctx, id, turnInput, () => {
-                ensureRecoveredPiHistorySourcePath(ctx, id, turnInput, historyState);
-              }));
-          for await (const event of eventStream) {
-            const observedEvent = metering.observeEvent(executionSession, event, { turnStartedAt });
-            runtime.observeEvent(id, observedEvent);
-            for (const outputEvent of toStreamOutputEvents(contentBlocks, observedEvent)) {
-              write(outputEvent);
-            }
-
-            applyObservedEventToSession(ctx, id, session, observedEvent, {
-              peerRouted,
-            });
-
-            if (isTextStreamEvent(observedEvent)) {
-              assistantText += observedEvent.text;
-            }
-
-            if (isToolUseStreamEvent(observedEvent) && historyState.sourcePath) {
-              assistantText = flushAssistantText(historyState.sourcePath, assistantText);
-              appendHistory(historyState.sourcePath, {
-                type: 'tool_use',
-                toolId: observedEvent.toolId,
-                toolName: observedEvent.toolName,
-                arguments: observedEvent.toolArgs ?? {},
-                timestamp: new Date().toISOString(),
-              });
-            }
-
-            if (isToolResultStreamEvent(observedEvent) && historyState.sourcePath) {
-              appendHistory(historyState.sourcePath, {
-                type: 'tool_result',
-                toolId: observedEvent.toolId,
-                toolName: observedEvent.toolName,
-                text: observedEvent.text ?? '',
-                isError: observedEvent.isError === true,
-                timestamp: new Date().toISOString(),
-              });
-            }
-
-            if (isResultStreamEvent(observedEvent)) {
-              assistantText = flushAssistantText(historyState.sourcePath, assistantText);
-              ctx.registry.recordMessage(
-                id,
-                observedEvent.usage,
-              );
-              restoreReadyIfSessionStillInteractive(ctx.registry, id);
-            }
-
-            if (isErrorStreamEvent(observedEvent)) {
-              assistantText = flushAssistantText(historyState.sourcePath, assistantText);
-              restoreReadyIfSessionStillInteractive(ctx.registry, id);
-            }
-          }
-        } catch (err) {
-          const errorEvent = metering.observeEvent(executionSession, {
-            type: 'error',
-            text: String(err),
-          } satisfies ErrorStreamEvent, { turnStartedAt });
-          runtime.observeEvent(id, errorEvent);
-          assistantText = flushAssistantText(historyState.sourcePath, assistantText);
-          for (const outputEvent of toStreamOutputEvents(contentBlocks, errorEvent)) {
-            write(outputEvent);
-          }
-          restoreReadyIfSessionStillInteractive(ctx.registry, id);
-        } finally {
-          await closeManagedHandle(peerHandle);
-          persistAgentTargetEvidence(ctx, id);
-          output.close();
-        }
+        })().catch(error => {
+          writer?.cancel();
+          try { controller.error(error); } catch { /* The client already disconnected. */ }
+        });
       },
+      pull() { writer?.pull(); },
       cancel() {
         // The client left, for example on its idle timeout; the turn still finishes.
         writer?.cancel();
@@ -931,10 +951,15 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     let assistantText = '';
     const turnStartedAt = Date.now();
     const contentBlocks = createRuntimeContentBlockProjector();
+    const workspaceStream = forwardWorkspaceActivity(runtime, id, async event => {
+      await stream.writeSSE({ data: JSON.stringify(event), event: event.type });
+    });
     try {
+      if (!runtime.isCurrentRun(id, startedRun.id)) return;
       for (const leadingEvent of [mcpServersEvent, warningEvent]) {
+        if (!runtime.isCurrentRun(id, startedRun.id)) break;
         if (!leadingEvent) continue;
-        runtime.observeEvent(id, leadingEvent);
+        runtime.observeEvent(id, leadingEvent, workspaceExecution);
         for (const outputEvent of toStreamOutputEvents(contentBlocks, leadingEvent)) {
           await stream.writeSSE({
             data: JSON.stringify(outputEvent),
@@ -948,14 +973,13 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
             ensureRecoveredPiHistorySourcePath(ctx, id, turnInput, sseHistoryState);
           }));
       for await (const event of eventStream) {
+        if (!runtime.isCurrentRun(id, startedRun.id)) break;
+        if (event.type === 'workspace_activity') continue;
+        await runtime.observeProviderWorkspaceEvent(id, event, workspaceExecution);
+        if (!runtime.isCurrentRun(id, startedRun.id)) break;
         const observedEvent = metering.observeEvent(executionSession, event, { turnStartedAt });
-        runtime.observeEvent(id, observedEvent);
-        for (const outputEvent of toStreamOutputEvents(contentBlocks, observedEvent)) {
-          await stream.writeSSE({
-            data: JSON.stringify(outputEvent),
-            event: outputEvent.type,
-          });
-        }
+        runtime.observeEvent(id, observedEvent, workspaceExecution);
+        if (!runtime.isLatestRun(id, startedRun.id)) break;
 
         applyObservedEventToSession(ctx, id, session, observedEvent, {
           peerRouted,
@@ -1000,22 +1024,29 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
           restoreReadyIfSessionStillInteractive(ctx.registry, id);
         }
+        await workspaceStream.flush();
+        for (const outputEvent of toStreamOutputEvents(contentBlocks, observedEvent)) {
+          await stream.writeSSE({ data: JSON.stringify(outputEvent), event: outputEvent.type });
+        }
       }
     } catch (err) {
+      if (!runtime.isCurrentRun(id, startedRun.id)) return;
       assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
       const errorEvent = metering.observeEvent(executionSession, {
         type: 'error',
         text: String(err),
       } satisfies ErrorStreamEvent, { turnStartedAt });
-      runtime.observeEvent(id, errorEvent);
+      runtime.observeEvent(id, errorEvent, workspaceExecution);
+      restoreReadyIfSessionStillInteractive(ctx.registry, id);
+      await workspaceStream.flush();
       for (const outputEvent of toStreamOutputEvents(contentBlocks, errorEvent)) {
         await stream.writeSSE({
           data: JSON.stringify(outputEvent),
           event: outputEvent.type,
         });
       }
-      restoreReadyIfSessionStillInteractive(ctx.registry, id);
     } finally {
+      await workspaceStream.close();
       await closeManagedHandle(peerHandle);
       persistAgentTargetEvidence(ctx, id);
     }

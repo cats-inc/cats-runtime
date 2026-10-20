@@ -181,6 +181,7 @@ export class ApiStrategyExecutionContext {
     const signatures: string[] = [];
 
     for (const toolCall of toolCalls) {
+      if (this.options.signal.aborted) throw new DOMException('The execution was aborted.', 'AbortError');
       this.assertWithinTimeout('tool_execution');
       const toolResult = await this.options.tools.execute({
         sessionId: this.session.id,
@@ -189,6 +190,7 @@ export class ApiStrategyExecutionContext {
         permissionMode: this.options.permissionMode,
         allowedTools: this.session.allowedTools,
         toolProfile: this.options.toolProfile,
+        workspaceObserver: this.options.workspaceObserver,
       }, {
         id: toolCall.id,
         name: toolCall.name,

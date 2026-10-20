@@ -11,5 +11,7 @@ export function stripAdditiveContentBlocks<T extends { type?: unknown }>(events:
 }
 
 export function parseCoreNdjson(text: string): Array<Record<string, unknown>> {
-  return stripAdditiveContentBlocks(parseNdjson(text));
+  // These callers assert provider output; observation channels have dedicated raw-frame tests.
+  return stripAdditiveContentBlocks(parseNdjson(text))
+    .filter(event => event.type !== 'workspace_activity');
 }

@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "sessionId": "fixture-reviewer",
+  "observationEpoch": "fixture-epoch",
+  "revision": 9,
+  "observedAt": "2026-10-20T13:09:08.619Z",
+  "startupCwd": "<fixture-root>",
+  "runtimeCwd": "<fixture-root>",
+  "coverage": {
+    "status": "partial",
+    "reason": "native_tools_partial"
+  },
+  "workspaces": [
+    {
+      "checkoutId": "checkout-source",
+      "executionLocationId": "native:fixture-host",
+      "path": "<fixture-root>\\source\\teams\\deep\\repo",
+      "repository": {
+        "id": "repo-fixture",
+        "label": "repo",
+        "sourceRoot": "<fixture-root>\\source\\teams\\deep\\repo"
+      },
+      "kind": "original",
+      "branch": "main",
+      "detachedCommit": null,
+      "management": "unmanaged",
+      "verification": "verified",
+      "association": "observed_operation",
+      "identityObservedAt": "2026-10-20T13:09:05.839Z",
+      "firstObservedAt": "2026-10-20T13:09:05.839Z",
+      "lastObservedAt": "2026-10-20T13:09:06.129Z",
+      "runningOperations": [],
+      "recentOperations": [
+        {
+          "id": "fixture-operation-1",
+          "toolId": "fixture-tool-1",
+          "executionId": "fixture-review-run",
+          "kind": "read",
+          "evidence": "provider_structured",
+          "state": "failed",
+          "startedAt": "2026-10-20T13:09:05.839Z",
+          "endedAt": "2026-10-20T13:09:06.129Z"
+        }
+      ]
+    },
+    {
+      "checkoutId": "checkout-review",
+      "executionLocationId": "native:fixture-host",
+      "path": "<fixture-root>\\checkouts\\review",
+      "repository": {
+        "id": "repo-fixture",
+        "label": "repo",
+        "sourceRoot": "<fixture-root>\\source\\teams\\deep\\repo"
+      },
+      "kind": "worktree",
+      "branch": "fixture-review",
+      "detachedCommit": null,
+      "management": "unmanaged",
+      "verification": "verified",
+      "association": "observed_operation",
+      "identityObservedAt": "2026-10-20T13:09:05.200Z",
+      "firstObservedAt": "2026-10-20T13:09:01.881Z",
+      "lastObservedAt": "2026-10-20T13:09:05.717Z",
+      "runningOperations": [],
+      "recentOperations": [
+        {
+          "id": "fixture-operation-2",
+          "toolId": "fixture-tool-2",
+          "executionId": "fixture-review-run",
+          "kind": "write",
+          "evidence": "provider_structured",
+          "state": "succeeded",
+          "startedAt": "2026-10-20T13:09:05.200Z",
+          "endedAt": "2026-10-20T13:09:05.717Z"
+        },
+        {
+          "id": "fixture-operation-3",
+          "toolId": "fixture-tool-3",
+          "executionId": "fixture-review-run",
+          "kind": "read",
+          "evidence": "provider_structured",
+          "state": "succeeded",
+          "startedAt": "2026-10-20T13:09:01.880Z",
+          "endedAt": "2026-10-20T13:09:02.509Z"
+        }
+      ]
+    }
+  ],
+  "truncated": false
+}

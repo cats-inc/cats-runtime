@@ -1,11 +1,14 @@
 # Documentation Index
 
-[Session workspace activity](specs/SPEC-037-session-workspace-activity.md) proposes
+[Session workspace activity](specs/SPEC-037-session-workspace-activity.md) defines
 bounded, evidence-backed repo/worktree observations for the Platform Code
 participant panel. [ADR-046](decisions/046-expose-evidence-backed-session-workspace-activity.md)
 and [PLAN-047](plans/PLAN-047-session-workspace-activity.md) define coverage,
-identity, lifecycle and consumer validation. This is planning only; execution
-roots, permissions and worktree management are unchanged. Implementation has not started.
+identity, lifecycle and consumer validation. Sliced implementation has started
+with admitted Git identity, bounded activity state and API/local tool observation
+over inspection/NDJSON/SSE. Native Claude direct Read/Write/Edit now has
+[Windows native/captured evidence](research/2026-10-20-native-workspace-activity.md)
+with partial coverage. Code integration acceptance remains pending.
 
 [Cats Ask MCP probe](research/2026-09-29-cats-ask-mcp-probe.md) records the isolated
 question/answer experiment, matched Grok Bot synthetic and authenticated bookmark
