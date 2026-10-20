@@ -228,7 +228,9 @@ describe('session MCP servers HTTP contract (SPEC-035)', () => {
     expect(opts).toMatchObject({ resumeSessionId: 'native-claude-session' });
     expect(opts.mcpServers).toEqual([expect.objectContaining({ name: 'cats', bearerTokenEnvVar: 'CATS_MCP_CATS_TOKEN' })]);
     expect(env).toEqual({ CATS_MCP_CATS_TOKEN: TOKEN });
-    expect(JSON.parse(body.split('\n')[0]!)).toMatchObject({
+    const executionEvents = body.trim().split('\n').map(line => JSON.parse(line))
+      .filter(event => event.type !== 'workspace_activity');
+    expect(executionEvents[0]).toMatchObject({
       type: 'progress',
       metadata: { kind: 'mcp_servers', mcpServers: { status: 'delivered' } },
     });

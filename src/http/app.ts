@@ -159,7 +159,7 @@ export function getRuntimeSessionManager(ctx: AppContext): RuntimeSessionManager
       (sessionId) => ctx.registry.get(sessionId));
     ctx.registry.onRemoved?.((sessionId) => {
       runtime.mcpServers.remove(sessionId);
-      runtime.dropSession(sessionId);
+      runtime.clearWorkspaceActivity(sessionId);
     });
     ctx.runtime = runtime;
   }

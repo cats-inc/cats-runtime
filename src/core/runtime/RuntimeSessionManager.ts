@@ -874,9 +874,13 @@ export class RuntimeSessionManager {
     return cloneCompactionRecord(record);
   }
 
-  dropSession(sessionId: string): void {
+  clearWorkspaceActivity(sessionId: string): void {
     this.endWorkspaceExecution(sessionId, 'unknown', true);
     this.workspaceActivity.delete(sessionId);
+  }
+
+  dropSession(sessionId: string): void {
+    this.clearWorkspaceActivity(sessionId);
     this.handleOverrides.delete(sessionId);
     this.observedStreamStates.delete(sessionId);
     this.sessionStates.delete(sessionId);
