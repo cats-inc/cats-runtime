@@ -28,8 +28,8 @@ version changes and publication remain separately authorized.
 | Slice | Repository and deliverable | State |
 | --- | --- | --- |
 | S1 | Runtime activity types and admitted repo/worktree identity | Complete; 15 focused tests and typecheck passed |
-| S2 | Runtime bounded reducer, ordering, snapshot validation and inactive restore | Pending |
-| S3 | Runtime local-tool observation, session lifecycle, transport and checkpoint integration | Pending |
+| S2 | Runtime bounded reducer, ordering, snapshot validation and inactive reattachment | Complete; 11 focused tests and typecheck passed |
+| S3 | Runtime local-tool observation, session lifecycle, transport and memory-only restart checks | Pending |
 | S4 | Native provider structured evidence, coverage and fixture/native checks | Pending |
 | S5 | Platform participant attribution, work-area API and live projection | Pending |
 | S6 | Code right panel, avatar entry, localization and renderer regressions | Pending |
@@ -43,6 +43,14 @@ source attachments that are themselves linked worktrees currently remain
 unavailable until S3 can supply verified lifecycle metadata provenance. Windows
 case-sensitive directory behavior, submodules and path reuse need later fixtures;
 the current checks do not claim those modes are validated.
+
+S2 keeps last-known facts in memory only. No existing session record is rewritten
+and no disk format is introduced. Process restart has no restored activity;
+reattachment within one process changes epoch and terminates pending operations.
+Every asynchronous mutation carries an attachment/execution lease. Snapshot budgets
+are 32 rows, 8 running/8 recent operations per row and 64 KiB, with up to 1024
+correlation/tombstone IDs per execution. Out-of-order or dropped facts explicitly
+degrade coverage. Identity probe time is separate from operation completion time.
 
 ## Implementation Phases
 
@@ -195,6 +203,7 @@ the new contract. A docs-only task does not rerun these baseline suites.
 | 2026-10-20 | Documentation validation passed: 34 references across the six new Platform/Runtime documents resolve against the local worktrees; numbering, index entries, LF/final newlines and code fences checked. Both repositories passed `git diff --check`. No application tests, builds or live acceptance were run for this docs-only task. |
 | 2026-10-20 | Owner authorized sliced implementation and incremental commits. Platform PR #289 was verified merged at `8bb3fd2f` with changes/validate/nodejs CI successful; both main checkouts pulled cleanly. Runtime worktree `plan047-workspace-activity` starts at `b2d888aa`; S1 and independent contract review are in progress. |
 | 2026-10-20 | S1 adds exported activity types and lazy admitted Git identity. Independent review fixes cover incomplete outer authority, managed-subdirectory attachments, foreign source/sibling pointers and bounded-walk exhaustion. Focused identity suite: 15 passed; Runtime TypeScript check passed; no live provider or Platform acceptance yet. |
+| 2026-10-20 | S2 adds a bounded in-memory reducer and strict snapshot validator. Attachment/execution leases reject stale callbacks; duplicate/late and terminal-before-start evidence cannot invent active work. Review also verified envelope/retention limits, consumer failure isolation and identity/activity timestamps. Focused reducer suite: 11 passed; Runtime TypeScript check passed. Storage schema unchanged; S3 lifecycle/transport and native/UI acceptance remain pending. |
 
 ---
 

@@ -34,6 +34,8 @@ export interface RuntimeWorkspaceIdentity {
 }
 
 export interface RuntimeObservedWorkspace extends RuntimeWorkspaceIdentity {
+  /** Time identity/branch was probed; operation completion does not refresh it. */
+  identityObservedAt: string;
   association: 'session_binding' | 'observed_operation';
   firstObservedAt: string;
   lastObservedAt: string;

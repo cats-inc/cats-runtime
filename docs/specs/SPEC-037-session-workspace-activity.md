@@ -90,6 +90,7 @@ interface RuntimeObservedWorkspace {
   management: 'runtime_managed' | 'unmanaged' | 'unknown';
   association: 'session_binding' | 'observed_operation';
   verification: 'verified' | 'unverified' | 'unavailable';
+  identityObservedAt: string;
   firstObservedAt: string;
   lastObservedAt: string;
   runningOperations: RuntimeWorkspaceOperation[];
@@ -112,6 +113,12 @@ interface RuntimeWorkspaceOperation {
 to the existing execution lifecycle rather than creating a second run engine.
 Raw provider input cannot assign `sessionId`, epoch or execution identity.
 Stable operation IDs are independent of optional provider tool IDs.
+`identityObservedAt` is the identity/branch probe time, distinct from activity
+timestamps updated by completions or cancellation. A verified fact remains a
+last-known fact at that time; a new attachment does not refresh that verification.
+`startupCwd` is the initial actual execution cwd supplied by the existing session
+attachment; `runtimeCwd` is the current actual execution cwd. The product-selected
+Codespace/source root remains the product binding, not either observation field.
 
 Existing create/resume cwd and workspace fields stay scalar. An older/recognized
 session with no activity has no invented observation; hosts can treat absence
@@ -251,6 +258,12 @@ Use existing session storage for a bounded last-known checkpoint if persistence
 is required; avoid a new unbounded event log. Absent legacy fields mean unknown
 coverage, never historical work inferred from cwd. Pure reads must not rewrite
 old profiles merely to populate observations.
+
+The initial implementation deliberately keeps bounded last-known facts in memory
+only. Reattachment within one Runtime process retains inactive facts in a new
+epoch; a process restart reports no activity until a validated current attachment
+starts observation. No session storage field/schema or upgrade is added. Any later
+durable checkpoint requires a separately tested format upgrade under this section.
 
 Document the persisted format boundary before implementation. Any schema upgrade
 must validate recognized input, create a backup, atomically replace, and preserve
