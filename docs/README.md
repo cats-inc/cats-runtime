@@ -1,5 +1,10 @@
 # Documentation Index
 
+[Grok 4.7 / Extra High Studio sample](research/2026-10-23-grok47-xhigh-studio-sample.md)
+records the owner-selected non-Fast execution profile and one new Desktop Chat
+image, with independently verified original JPEG bytes. This is separate from
+fresh paid Studio HTTP/SDK acceptance and publication.
+
 [Session workspace activity](specs/SPEC-037-session-workspace-activity.md) defines
 bounded, evidence-backed repo/worktree observations for the Platform Code
 participant panel. [ADR-046](decisions/046-expose-evidence-backed-session-workspace-activity.md)

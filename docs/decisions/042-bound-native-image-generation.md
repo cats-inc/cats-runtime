@@ -14,7 +14,7 @@ binary artifact. Further paid probes are deferred by the user.
 
 Expose authenticated `/media/images` operations with durable request-ID receipts. Execute
 one native direct Grok process using the existing adapter, one model round and image_gen
-only. Keep the observed model/effort pin in catalog data (`media-profiles.json`); do not
+only. Keep the owner-selected model/effort pin in catalog data (`media-profiles.json`); do not
 silently follow a future default model or switch to a provider HTTP API.
 
 Share provider-selection leases, worker capacity/singletons and metering preflight/event

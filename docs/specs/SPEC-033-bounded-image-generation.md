@@ -22,6 +22,11 @@ running/cancelling/succeeded/failed/cancelled/interrupted status and optional JP
 
 ## Limits and persistence
 
+2026-10-23: the owner selected Grok 4.7 / Extra High (non-Fast). The catalog profile
+now sets grok-4.7 / xhigh; a separate Desktop Chat image produced the replacement
+Studio sample. See [evidence and route limits](../research/2026-10-23-grok47-xhigh-studio-sample.md).
+This does not claim a new paid bounded HTTP execution.
+
 One active image operation plus shared global capacity/selection/singleton limits; no queue.
 One model round, image_gen whitelist, one image, square aspect, no retries. Five-minute
 process deadline, 2 MiB combined process output, 8 MiB JPEG, decoder limit 4 megapixels.

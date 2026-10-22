@@ -128,6 +128,8 @@ describe('bounded image generation', () => {
     expect(() => parseImageRequest({ id: input.id, instance: 'native', prompt: 'a', command: 'grok' })).toThrow();
     input.env.XAI_API_KEY = 'fixture-only'; input.env.GROK_SESSION_ID = 'fixture-only';
     const invocation = imageInvocation(input);
+    expect(invocation.args[invocation.args.indexOf('--model') + 1]).toBe('grok-4.7');
+    expect(invocation.args[invocation.args.indexOf('--reasoning-effort') + 1]).toBe('xhigh');
     expect(invocation.args[invocation.args.indexOf('--max-turns') + 1]).toBe('1');
     expect(invocation.args[invocation.args.indexOf('--tools') + 1]).toBe('image_gen');
     expect(invocation.env.XAI_API_KEY).toBeUndefined(); expect(invocation.env.GROK_SESSION_ID).toBeUndefined();

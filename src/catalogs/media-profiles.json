@@ -1,7 +1,7 @@
 {
   "grokSingleImage": {
-    "agentModel": "grok-4.7-build-fast",
-    "reasoningEffort": "low",
-    "evidence": "2026-09-28-grok-single-image-spike"
+    "agentModel": "grok-4.7",
+    "reasoningEffort": "xhigh",
+    "evidence": "2026-10-23-grok47-xhigh-studio-sample"
   }
 }

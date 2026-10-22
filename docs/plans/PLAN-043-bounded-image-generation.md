@@ -6,6 +6,12 @@ the updated source is bundled in the authorized local Desktop update, not npm-pu
 Related: [SPEC-033](../specs/SPEC-033-bounded-image-generation.md),
 [ADR-042](../decisions/042-bound-native-image-generation.md).
 
+2026-10-23 follow-up: the owner selected grok-4.7 / xhigh (non-Fast) and authorized
+one replacement sample through Desktop Chat. The catalog profile and invocation
+regression are updated; 9 focused tests, Runtime TypeScript build and catalog
+checks pass. See [generation route and evidence limits](../research/2026-10-23-grok47-xhigh-studio-sample.md).
+This does not authorize publication or establish a new paid bounded HTTP run.
+
 - [x] Typed authenticated HTTP contract and durable receipts.
 - [x] One native Grok invocation, whitelist, deadline, output and artifact validation.
 - [x] Shared selection, pool admission/singleton/shutdown and usage/metering observation.
