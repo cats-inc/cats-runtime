@@ -60,7 +60,8 @@ export class ImageGenerationService {
         agentConfigs: [{ ...profile.agentConfig }], inputs: { min: 0, max: 0 }, aspectRatio: profile.aspectRatio });
     }
     const revision = createHash('sha256').update(JSON.stringify({ targets, profiles })).digest('hex').slice(0, 16);
-    return { schemaVersion: 2 as const, revision, maxPromptLength: IMAGE_MAX_PROMPT, maxImageBytes: IMAGE_MAX_BYTES, targets, profiles };
+    return { schemaVersion: 2 as const, revision, maxPromptLength: IMAGE_MAX_PROMPT, maxImageBytes: IMAGE_MAX_BYTES,
+      sourceSessionYield: true as const, targets, profiles };
   }
   private resolve(input: ImageRequest) {
     const target = parseImageTargetId(input.targetId);
@@ -88,7 +89,11 @@ export class ImageGenerationService {
       if (!validSchemaOne(value as Partial<SchemaOneReceipt>, id)) throw new ImageError('image_state_invalid', 503);
       return this.upgrade(value as SchemaOneReceipt);
     }
-    if (value.schemaVersion !== 2 || value.id !== id || !STATUSES.includes(value.status as ImageStatus)) throw new ImageError('image_state_invalid', 503);
+    if (value.schemaVersion !== 2 || value.id !== id || !STATUSES.includes(value.status as ImageStatus)
+      || (value.sourceSessionId !== undefined && (typeof value.sourceSessionId !== 'string'
+        || !value.sourceSessionId || value.sourceSessionId.length > 200 || /[\u0000-\u001f\u007f]/.test(value.sourceSessionId)))) {
+      throw new ImageError('image_state_invalid', 503);
+    }
     return value as ImageJob;
   }
   /**
@@ -122,7 +127,7 @@ export class ImageGenerationService {
     const profile = this.options.profiles.find((entry) => entry.id === job.profileId);
     const target = this.options.targets(job.provider).find((entry) => entry.id === job.instance);
     return profile && target ? { id: job.id, prompt: job.prompt, provider: job.provider, instance: job.instance, profile, cwd, target,
-      env: this.options.env, signal } : null;
+      env: this.options.env, signal, ...(job.sourceSessionId ? { sourceSessionId: job.sourceSessionId } : {}) } : null;
   }
   async get(id: string): Promise<ImageJob> {
     return this.serial(async () => {
@@ -174,7 +179,8 @@ export class ImageGenerationService {
         // Receipts upgraded from schema 1 recorded no configuration, so only the request itself can be compared.
         const sameConfig = previous.agentConfigId === null || (previous.profileId === input.profileId
           && previous.profileRevision === input.profileRevision && previous.agentConfigId === input.agentConfigId);
-        if (previous.targetId !== input.targetId || previous.operation !== input.operation || previous.prompt !== input.prompt || !sameConfig) {
+        if (previous.targetId !== input.targetId || previous.operation !== input.operation || previous.prompt !== input.prompt || !sameConfig
+          || (previous.sourceSessionId ?? null) !== (input.sourceSessionId ?? null)) {
           throw new ImageError('image_request_conflict', 409);
         }
         return previous; // Existing receipts never authorize another CLI invocation.
@@ -194,7 +200,8 @@ export class ImageGenerationService {
         profileId: profile.id, profileRevision: String(profile.revision), agentConfigId: profile.agentConfig.id,
         agentModel: profile.agentConfig.model, agentEffort: profile.agentConfig.effort, operation: input.operation,
         prompt: input.prompt, sourceIds: [], options: {}, status: 'running', createdAt: now, updatedAt: now,
-        error: null, warnings: [], executionOutcome: null, output: null };
+        error: null, warnings: [], executionOutcome: null, output: null,
+        ...(input.sourceSessionId ? { sourceSessionId: input.sourceSessionId } : {}) };
       await this.write(job);
       if (this.closing) {
         job.status = 'interrupted'; job.error = 'execution_interrupted'; await this.write(job); return job;
@@ -202,7 +209,8 @@ export class ImageGenerationService {
       const active = { controller: new AbortController(), done: undefined as Promise<void> | undefined };
       this.active.set(input.id, active);
       active.done = this.run(job, { id: job.id, prompt: job.prompt, provider, instance, profile, cwd, target: config,
-        env: this.options.env, signal: active.controller.signal });
+        env: this.options.env, signal: active.controller.signal,
+        ...(input.sourceSessionId ? { sourceSessionId: input.sourceSessionId } : {}) });
       return job;
     });
   }

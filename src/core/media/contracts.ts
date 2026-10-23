@@ -17,6 +17,8 @@ export interface ImageProfile {
 export interface ImageRequest {
   id: string; targetId: string; profileId: string; profileRevision: string; agentConfigId: string;
   operation: ImageOperation; prompt: string; sourceIds: []; options: Record<string, never>;
+  /** Trusted host may yield only the originating idle session; Apps never supply this field. */
+  sourceSessionId?: string;
 }
 export interface ImageMetadata {
   mimeType: 'image/jpeg' | 'image/png'; bytes: number; width: number; height: number; sha256: string;
@@ -37,6 +39,7 @@ export interface ImageJob {
   warnings: string[];
   executionOutcome: 'completed' | 'stopped_after_image' | null;
   output: ImageMetadata | null;
+  sourceSessionId?: string;
 }
 export class ImageError extends Error {
   constructor(readonly code: string, readonly status: 400 | 404 | 409 | 429 | 503 = 400) { super(code); }
@@ -55,7 +58,8 @@ const key = (value: unknown, max = 120) => typeof value === 'string' && value.le
 export function parseImageRequest(value: unknown): ImageRequest {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ImageError('invalid_image_request');
   const input = value as Record<string, unknown>;
-  if (Object.keys(input).length !== REQUEST_KEYS.length || REQUEST_KEYS.some((name) => !(name in input))
+  if (Object.keys(input).some((name) => !REQUEST_KEYS.includes(name) && name !== 'sourceSessionId')
+    || REQUEST_KEYS.some((name) => !(name in input))
     || typeof input.id !== 'string' || !IMAGE_ID.test(input.id)
     || typeof input.targetId !== 'string' || !parseImageTargetId(input.targetId)
     || !key(input.profileId) || !key(input.profileRevision, 40) || !key(input.agentConfigId)
@@ -63,7 +67,11 @@ export function parseImageRequest(value: unknown): ImageRequest {
     || !Array.isArray(input.sourceIds) || input.sourceIds.length
     || !input.options || typeof input.options !== 'object' || Array.isArray(input.options) || Object.keys(input.options).length
     || typeof input.prompt !== 'string' || !input.prompt.trim()
-    || Array.from(input.prompt).length > IMAGE_MAX_PROMPT) throw new ImageError('invalid_image_request');
+    || Array.from(input.prompt).length > IMAGE_MAX_PROMPT
+    || (input.sourceSessionId !== undefined && (!key(input.sourceSessionId, 200) || input.sourceSessionId === input.id))) {
+    throw new ImageError('invalid_image_request');
+  }
   return { id: input.id, targetId: input.targetId, profileId: input.profileId as string, profileRevision: input.profileRevision as string,
-    agentConfigId: input.agentConfigId as string, operation: 'image.generate', prompt: input.prompt.trim(), sourceIds: [], options: {} };
+    agentConfigId: input.agentConfigId as string, operation: 'image.generate', prompt: input.prompt.trim(), sourceIds: [], options: {},
+    ...(typeof input.sourceSessionId === 'string' ? { sourceSessionId: input.sourceSessionId } : {}) };
 }

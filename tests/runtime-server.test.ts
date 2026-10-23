@@ -4796,6 +4796,23 @@ providers:
     });
   });
 
+  it('GET observe reports the active source turn independently from a ready registry entry', async () => {
+    await withRuntime({}, {}, async runtime => {
+      const session = runtime.context.registry.create({ providerName: 'codex', cwd: runtime.context.config.sessionBaseDir });
+      runtime.context.registry.updateStatus(session.id, 'ready');
+      let busy = true;
+      const handle = vi.spyOn(runtime.context.runtime, 'get').mockImplementation(() => ({ active: true, busy }) as never);
+      const attached = vi.spyOn(runtime.context.runtime, 'isAttached').mockReturnValue(true);
+      try {
+        const running = await (await runtime.app.request(`/sessions/${session.id}/observe`)).json() as { session: { turnInFlight: boolean } };
+        expect(running.session.turnInFlight).toBe(true);
+        busy = false;
+        const finished = await (await runtime.app.request(`/sessions/${session.id}/observe`)).json() as { session: { turnInFlight: boolean } };
+        expect(finished.session.turnInFlight).toBe(false);
+      } finally { handle.mockRestore(); attached.mockRestore(); }
+    });
+  });
+
   it('POST /sessions keeps legacy model-only requests accepted during migration', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const spawnSpy = vi.spyOn(runtime.context.runtime, 'spawn').mockReturnValue(undefined);

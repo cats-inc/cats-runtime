@@ -37,6 +37,21 @@
 
 ## Progress log
 
+### Controlled Cat image consumer — in progress, 2026-10-23
+
+- Platform's owner-authorized golden path shares the image executor with Studio (Usage is
+  excluded). It requires source-turn handoff because an idle persistent Cat can own the same
+  native singleton or the final worker slot needed by its image.
+- Added optional `sourceSessionId` receipt/idempotency evidence, `sourceSessionYield` readiness,
+  explicit observed `turnInFlight`, and bounded pool handoff of that source only. Existing
+  schema 2 requests without the optional field are unchanged; schema 1 receipt upgrade keeps
+  its existing backup/atomic recovery path.
+- Focused worker/request suites passed 32 tests, including delayed helper closure, captured
+  handles, aborted shutdown claims and unrelated singleton preservation. Independent read-only
+  review found the initial exit-versus-helper-close and captured-handle races; both were fixed.
+  Observation integration, final consumer regression, live golden-path acceptance and release
+  gates remain pending. No version or release has been published for this work.
+
 | Date | Note |
 | --- | --- |
 | 2026-10-23 | The owner asked to open all four providers for testing and accepted runner-enforced bounds for Codex and Antigravity. One live call each passed: Codex, a 1254 x 1254 PNG in 27.0 s; Antigravity, a 1024 x 1024 JPEG in 27.1 s with one delegation. Both stopped after the image, and both profiles are enabled. An independent review led to stricter Muse result binding, an atomic receipt-upgrade backup, and documentation of the Muse memory-write risk. |

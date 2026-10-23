@@ -307,3 +307,28 @@ send({type:'max_turns_reached'});send({type:'end',sessionId:${JSON.stringify(inp
     await service.close();
   });
 });
+
+
+describe('originating session image request', () => {
+  it('persists the trusted source session and includes it in idempotency without another invocation', async () => {
+    const { root, input } = await fixture(); let calls = 0; let source: string | undefined;
+    const service = new ImageGenerationService(serviceOptions(path.join(root, 'receipts'), input, async (execution) => {
+      calls++; source = execution.sourceSessionId; return generated();
+    }));
+    const submission = request(input, { sourceSessionId: 'source-chat' });
+    const job = await service.submit(submission); const saved = await settle(service, job.id);
+    expect(source).toBe('source-chat'); expect(saved.sourceSessionId).toBe('source-chat');
+    expect(service.capabilities().sourceSessionYield).toBe(true);
+    expect((await service.submit(submission)).id).toBe(job.id);
+    await expect(service.submit({ ...submission, sourceSessionId: 'another-chat' })).rejects.toThrow('image_request_conflict');
+    expect(calls).toBe(1); await service.close();
+  });
+
+  it('rejects malformed or self-referential source identities before execution', async () => {
+    const { input } = await fixture();
+    for (const sourceSessionId of ['', null, input.id, 'x'.repeat(201), 'bad\nsource']) {
+      expect(() => parseImageRequest(request(input, { sourceSessionId }))).toThrow('invalid_image_request');
+    }
+    expect(parseImageRequest(request(input, { sourceSessionId: 'source-chat' })).sourceSessionId).toBe('source-chat');
+  });
+});
