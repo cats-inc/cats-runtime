@@ -56,7 +56,7 @@ import { createRuntimeAdapter } from './backends/cli/runtime/runtime.js';
 import { SessionRegistry } from './backends/cli/pool/SessionRegistry.js';
 import { ApiBackendManager } from './backends/api/runtime/ApiBackendManager.js';
 import { AgentBackendManager } from './backends/agent/runtime/AgentBackendManager.js';
-import { PoolCapacityError, WorkerPool } from './backends/cli/pool/WorkerPool.js';
+import { PoolCapacityError, PoolSourceBusyError, PoolSourceStopError, WorkerPool } from './backends/cli/pool/WorkerPool.js';
 import { RuntimeSessionManager } from './core/runtime/RuntimeSessionManager.js';
 import { resolveProviderTarget } from './core/providerCatalog.js';
 import {
@@ -1126,8 +1126,16 @@ export function createRuntimeServer(
         input.signal.addEventListener('abort', abort, { once: true });
         if (input.signal.aborted) abort();
         try {
-          try { release = pool.reserveExternalExecution(input.id, input.provider, input.instance, abort); }
-          catch (error) { throw new ImageError(error instanceof PoolCapacityError ? 'runtime_capacity_full' : 'image_service_busy', 429); }
+          try {
+            release = input.sourceSessionId
+              ? await pool.reserveExternalExecutionFromSession(input.id, input.provider, input.instance, abort, input.sourceSessionId, controller.signal)
+              : pool.reserveExternalExecution(input.id, input.provider, input.instance, abort);
+          } catch (error) {
+            const code = error instanceof PoolCapacityError ? 'runtime_capacity_full'
+              : error instanceof PoolSourceBusyError ? 'image_source_busy'
+                : error instanceof PoolSourceStopError ? 'image_source_unavailable' : 'image_service_busy';
+            throw new ImageError(code, error instanceof PoolSourceStopError ? 503 : 429);
+          }
           const turnStartedAt = Date.now();
           const run = { grok: executeGrokImage, muse: executeMuseImage, codex: executeCodexImage, antigravity: executeAntigravityImage }[input.provider];
           return await run({ ...input, signal: controller.signal,

@@ -12,6 +12,7 @@ export interface ImageExecution {
   id: string; prompt: string; provider: ImageProvider; instance: string; profile: ImageProfile;
   cwd: string; target: ProviderInstanceConfig; env: NodeJS.ProcessEnv; signal: AbortSignal;
   observe?: (event: StreamEvent) => void;
+  sourceSessionId?: string;
 }
 export interface ImageExecutionResult {
   bytes: Buffer; metadata: ImageMetadata;

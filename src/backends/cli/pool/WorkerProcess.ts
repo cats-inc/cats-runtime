@@ -57,6 +57,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   private spawnOpts: ProviderSpawnOptions;
   private commandConfig: ProviderCommandConfig;
   private isBusy = false;
+  private retiring = false;
   private _ephemeralKilled = false;
   private _providerSessionId: string | null = null;
   private activeTurnController: AbortController | null = null;
@@ -65,6 +66,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   private launchResponseObserved = false;
   private lastLaunchSummary = '';
   private ownedProcessStarted = false;
+  private readonly ownedGenerations = new Set<number>();
   get startupHasOwnedProcess(): boolean { return this.ownedProcessStarted; }
   private spawnResilience: SpawnResilienceConfig;
 
@@ -85,6 +87,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   }
 
   get alive(): boolean {
+    if (this.retiring) return false;
     if (this.provider.ephemeral) return !this._ephemeralKilled;
     return this.starting !== null || (this.process !== null && this.process.exitCode === null);
   }
@@ -94,7 +97,18 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     return this.isBusy;
   }
 
+  /** Actual child/startup ownership, including an ephemeral worker already marked for shutdown. */
+  get processRunning(): boolean {
+    return this.ownedGenerations.size > 0;
+  }
+
+  private ownedStopped(generation: number): void {
+    this.ownedGenerations.delete(generation);
+    this.emit('process-stopped');
+  }
+
   start(): void {
+    if (this.retiring) throw new Error('Worker is busy yielding execution resources');
     if (this.provider.ephemeral) return; // defer to sendMessage
     this.spawnProcess();
   }
@@ -149,6 +163,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     );
 
     this.startupError = null;
+    this.ownedGenerations.add(generation);
     const hostPath = windowsCodexHostPath(spawnConfig, this.provider.name);
     if (hostPath) {
       this.ownedProcessStarted = true;
@@ -186,7 +201,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       void starting.catch((error: Error) => {
         // Failure before CLI launch still owns any probe/guard children. Wait
         // for all their real close events; promise rejection is not stop proof.
-        if (!cliLaunchAttempted) void Promise.all(startupClosures).then(() => this.emit('process-stopped'));
+        if (!cliLaunchAttempted) void Promise.all(startupClosures).then(() => this.ownedStopped(generation));
         if (generation !== this.launchGeneration) return;
         this.stopCodeModeHost();
         this.startupError = error;
@@ -199,6 +214,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   }
 
   private launchProcess(spawnConfig: ProcessSpawnConfig, env: NodeJS.ProcessEnv): void {
+    const generation = this.launchGeneration;
     const ownedCodeModeHost = this.codeModeHost;
     this.ownedProcessStarted = true;
     const child = spawn(spawnConfig.command, spawnConfig.args, {
@@ -278,7 +294,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
 
     child.on('close', (code, signal) => {
       if (ownedCodeModeHost && ownedCodeModeHost !== this.codeModeHost) ownedCodeModeHost.stop();
-      void Promise.resolve(ownedCodeModeHost?.closed).then(() => this.emit('process-stopped'));
+      void Promise.resolve(ownedCodeModeHost?.closed).then(() => this.ownedStopped(generation));
       if (this.process !== child) return;
       this.stopCodeModeHost();
       this.activeTurnController?.abort();
@@ -323,9 +339,11 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
    * Send a message and yield StreamEvents as they arrive (for SSE streaming).
    */
   async *streamMessage(content: string | TurnInput): AsyncGenerator<StreamEvent> {
+    if (this.retiring) throw new Error('Worker is busy yielding execution resources');
     const turn = typeof content === 'string' ? { message: content } : content;
 
     if (this.starting) await this.starting;
+    if (this.retiring) throw new Error('Worker is busy yielding execution resources');
     if (this.startupError) throw this.startupError;
     if (!this.alive) {
       throw new Error('Worker process is not running');
@@ -603,6 +621,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   }
 
   kill(): void {
+    this.retiring = true;
     if (this.provider.ephemeral) this._ephemeralKilled = true;
     this.cancel();
 

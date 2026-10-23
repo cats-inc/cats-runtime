@@ -48,11 +48,20 @@ export class PoolCapacityError extends Error {
   constructor() { super('Max sessions reached'); this.name = 'PoolCapacityError'; }
 }
 
+export class PoolSourceBusyError extends Error {
+  constructor() { super('The originating session is busy or already yielding'); this.name = 'PoolSourceBusyError'; }
+}
+
+export class PoolSourceStopError extends Error {
+  constructor() { super('The originating session did not confirm shutdown'); this.name = 'PoolSourceStopError'; }
+}
+
 export class WorkerPool {
   private readonly sessionMcpConnections = new Map<string, Map<string, string>>();
 
   private workers = new Map<string, WorkerProcess>();
   private externalExecutions = new Map<string, { provider: string; cancel: () => void }>();
+  private externalSourceSessions = new Map<string, string>();
   private workerSingletonResources = new Map<string, string>();
   private config: CliRuntimeConfig;
   private registry: SessionRegistry;
@@ -85,8 +94,9 @@ export class WorkerPool {
 
   get activeCount(): number {
     let count = this.externalExecutions.size;
-    for (const w of this.workers.values()) {
-      if (w.alive) count++;
+    const yielding = new Set(this.externalSourceSessions.values());
+    for (const [id, w] of this.workers) {
+      if ((w.alive || w.processRunning) && !yielding.has(id)) count++;
     }
     return count;
   }
@@ -103,6 +113,79 @@ export class WorkerPool {
       if (released) return; released = true;
       this.externalExecutions.delete(id); this.releaseSingletonResource(id);
     };
+  }
+
+  /**
+   * A host-requested image may replace its own idle chat worker when they share a singleton,
+   * or when the pool is full. It never chooses another chat to evict. The reservation owns the
+   * source's slot during shutdown and holds singleton claims until process exit is confirmed.
+   */
+  async reserveExternalExecutionFromSession(
+    id: string, provider: ProviderName, instanceId: string, cancel: () => void,
+    sourceSessionId: string, signal?: AbortSignal,
+  ): Promise<() => void> {
+    if (signal?.aborted) throw new PoolSourceStopError();
+    const source = this.workers.get(sourceSessionId);
+    const instance = resolveProviderInstance(this.config, provider, instanceId);
+    const resource = instance.commandConfig.singleton;
+    const needsYield = source && ((resource && this.workerSingletonResources.get(sourceSessionId) === resource)
+      || this.activeCount >= this.config.maxSessions);
+    if (!source || !needsYield) return this.reserveExternalExecution(id, provider, instanceId, cancel);
+    if (sourceSessionId === id || source.busy || [...this.externalSourceSessions.values()].includes(sourceSessionId)) {
+      throw new PoolSourceBusyError();
+    }
+    if (this.workers.has(id) || this.externalExecutions.has(id)) throw new Error('Execution already reserved');
+    if (this.activeCount - (source.alive ? 1 : 0) >= this.config.maxSessions) throw new PoolCapacityError();
+    if (resource) this.reserveSingletonResource(resource, id, sourceSessionId);
+    this.externalSourceSessions.set(id, sourceSessionId);
+    this.externalExecutions.set(id, { provider, cancel });
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      this.externalSourceSessions.delete(id);
+      this.externalExecutions.delete(id);
+      this.releaseSingletonResource(id);
+    };
+    try {
+      if (!source.processRunning) {
+        source.kill();
+        if (this.workers.get(sourceSessionId) === source) {
+          this.workers.delete(sourceSessionId);
+          this.sessionMcpConnections.delete(sourceSessionId);
+          this.registry.updateStatus(sourceSessionId, 'closed');
+          this.releaseSingletonResource(sourceSessionId);
+        }
+      } else {
+        await new Promise<void>((resolve, reject) => {
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          let finished = false;
+          const cleanup = () => {
+            if (timer) clearTimeout(timer);
+            source.removeListener('process-stopped', stopped);
+            signal?.removeEventListener('abort', aborted);
+          };
+          const stopped = () => { if (finished || source.processRunning) return; finished = true; cleanup(); resolve(); };
+          const aborted = () => { if (finished) return; finished = true; cleanup(); reject(new PoolSourceStopError()); };
+          source.on('process-stopped', stopped);
+          signal?.addEventListener('abort', aborted, { once: true });
+          try { source.kill(); } catch { aborted(); }
+          if (!finished) { timer = setTimeout(aborted, 10000); timer.unref?.(); }
+        });
+      }
+      this.externalSourceSessions.delete(id);
+      return release;
+    } catch (error) {
+      if (!source.processRunning) release();
+      else {
+        const stopped = () => {
+          if (source.processRunning) return;
+          source.removeListener('process-stopped', stopped); release();
+        };
+        source.on('process-stopped', stopped); // Retain claims through all Runtime-owned closures.
+      }
+      throw error;
+    }
   }
 
   private resolveProvider(
@@ -224,6 +307,8 @@ export class WorkerPool {
     providerInstanceId?: string,
     launchEnv: Readonly<Record<string, string>> = {},
   ): WorkerProcess {
+    if ([...this.externalSourceSessions.values()].includes(sessionId)
+      || this.workers.get(sessionId)?.processRunning) throw new PoolSourceBusyError();
     if (this.activeCount >= this.config.maxSessions) {
       throw new Error(`Max sessions (${this.config.maxSessions}) reached`);
     }
@@ -293,17 +378,20 @@ export class WorkerPool {
         }
       });
 
-      worker.on('exit', (code) => {
+      const cleanupStoppedWorker = () => {
         // Ephemeral providers normally exit after each turn; keep the logical worker alive
         // unless it was explicitly killed.
         if (provider.ephemeral && worker?.alive) return;
+        if (worker?.processRunning) return;
         if (this.workers.get(sessionId) === worker) {
           this.registry.updateStatus(sessionId, 'closed');
           this.workers.delete(sessionId);
           this.sessionMcpConnections.delete(sessionId);
           this.releaseSingletonResource(sessionId);
         }
-      });
+      };
+      worker.on('exit', cleanupStoppedWorker);
+      worker.on('process-stopped', cleanupStoppedWorker);
 
       worker.on('error', (err) => {
         console.error(`[pool] Worker ${sessionId} error:`, err.message);
@@ -327,14 +415,15 @@ export class WorkerPool {
     }
   }
 
-  private reserveSingletonResource(resource: string, sessionId: string): void {
+  private reserveSingletonResource(resource: string, sessionId: string, handoffSourceId?: string): void {
     for (const [activeSessionId, activeResource] of this.workerSingletonResources.entries()) {
-      if (activeSessionId === sessionId || activeResource !== resource) {
+      if (activeSessionId === sessionId || activeSessionId === handoffSourceId || activeResource !== resource) {
         continue;
       }
 
       const worker = this.workers.get(activeSessionId);
-      if ((!worker || !worker.alive) && !this.externalExecutions.has(activeSessionId)) {
+      if ((!worker || (!worker.alive && !worker.processRunning)) && !this.externalExecutions.has(activeSessionId)
+        && ![...this.externalSourceSessions.values()].includes(activeSessionId)) {
         console.warn(
           `[pool] Reclaiming singleton '${resource}' from stale session '${activeSessionId}' `
           + '(worker missing or not alive). Exit handler may have been skipped.',
@@ -357,11 +446,12 @@ export class WorkerPool {
   }
 
   get(sessionId: string): WorkerProcess | undefined {
+    if ([...this.externalSourceSessions.values()].includes(sessionId)) return undefined;
     return this.workers.get(sessionId);
   }
 
   isAttached(sessionId: string): boolean {
-    return Boolean(this.workers.get(sessionId)?.alive);
+    return Boolean(this.get(sessionId)?.alive);
   }
 
   cancel(sessionId: string): void {

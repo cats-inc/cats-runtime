@@ -51,6 +51,9 @@ observeRoutes.get('/sessions/:id/observe', async (c) => {
   return c.json({
     session: {
       ...view,
+      // Registry status can be ready after an init event while its turn is still streaming.
+      // Upper layers use this explicit worker fact before releasing deferred media work.
+      turnInFlight: runtime.get(session.id)?.busy === true,
       providerTarget: buildSessionProviderTargetSummary(ctx, session),
       ...(wakeup ? { wakeup } : {}),
       inspection: buildSessionInspection({

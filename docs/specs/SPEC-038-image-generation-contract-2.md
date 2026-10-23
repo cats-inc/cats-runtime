@@ -23,6 +23,7 @@
 ```json
 {
   "schemaVersion": 2,
+  "sourceSessionYield": true,
   "revision": "16 hex chars over targets and profiles",
   "maxPromptLength": 2000,
   "maxImageBytes": 8388608,
@@ -52,7 +53,8 @@
   "sourceIds": [], "options": {} }
 ```
 
-- Exactly these keys. `sourceIds` must be empty and `options` empty; generation takes neither yet.
+- Exactly these required keys, with optional host-only `sourceSessionId` (below).
+  `sourceIds` must be empty and `options` empty; generation takes neither yet.
 - Errors:
   - Malformed request: 400 `invalid_image_request`.
   - Unknown or disabled profile, or a profile for another provider: 409 `image_profile_unavailable`.
@@ -64,6 +66,34 @@
   prompt only.
 
 ## Receipt
+
+### Originating session handoff (Platform controlled Cat images)
+
+The optional `sourceSessionId` is a trusted host resource hint, not a model tool argument,
+App SDK input, provider session ID or additional image source. It is a nonempty key of at most
+200 characters, cannot equal the image request ID, is persisted in the schema 2 receipt and
+participates in request idempotency. Existing requests and receipts without it remain valid.
+
+Platform first persists a held admission and finishes the originating Cat turn. A successful
+turn acknowledgement releases it; a lost acknowledgement retains it until Runtime observation
+proves the turn stopped. GET `/sessions/:id/observe` adds `session.turnInFlight`, derived from
+the actual execution handle rather than registry status (an init event can report ready while
+a turn is streaming). Platform also checks its own active-turn gate. A definite session 404
+allows recovery; failed observation does not.
+
+An image can replace only its own idle source worker, and only when capacity or its target's
+singleton requires it. An unrelated worker is never evicted. Reservation atomically owns the
+replacement slot and target singleton before shutdown; the source's complete owned lifetime,
+including helper/probe processes, must confirm `process-stopped` before image execution.
+Captured handles are retired immediately and cannot write another turn. A timeout/abort with
+unconfirmed shutdown retains the claims until all owned generations stop. The logical source
+session may be resumed after the image releases its reservation.
+
+`image_source_busy` and `image_source_unavailable` prove no image runner was invoked by that
+attempt. Platform may release its reservation for these definite admission refusals, while
+keeping the original request identity. A missing/ambiguous receipt or cancellation has no such
+proof and never causes a new generating POST. Runtime still owns provider execution, metering,
+native tool bounds and stop evidence; it owns no Cat policy, App installation or Telegram data.
 
 ```json
 { "schemaVersion": 2, "id": "<uuid>", "targetId": "muse/native", "provider": "muse", "instance": "native",

@@ -49,6 +49,36 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+### Prepared release notes — 0.6.0 (2026-10-23)
+
+- Image contract 2 exposes provider profiles, configuration/revision checks and
+  measured JPEG/PNG output. Enabled generation profiles include Grok, Muse, Codex
+  and Antigravity, with the runner bounds and limitations in SPEC-038/PLAN-048.
+  The changed HTTP request/capabilities contract is the next 0.x minor boundary.
+- Controlled Cat generation can identify its original source session through
+  optional host-owned `sourceSessionId`. `sourceSessionYield` advertises bounded
+  handoff: only that idle source may give up its singleton or last pool slot.
+  Other conversations are never evicted. A busy source is refused before image
+  execution; unknown stop outcomes keep the capacity claim until process-stopped.
+  Captured old handles cannot restart or write after retirement. Observe now
+  reports `turnInFlight` separately from registry readiness.
+- Existing schema 2 receipts need no conversion. Recognized schema 1 image receipts
+  use the existing validated, backed-up, atomic upgrade with repeat-start and
+  failure recovery; unknown or damaged data is preserved and refused. Catalogs,
+  credentials and user workspaces retain their current upgrade paths.
+- Focused worker/request regression: 32 passed, including delayed helper closure,
+  abort claims and unrelated singleton protection. The observe route integration
+  test also passed. Independent review found no remaining handoff blocker.
+  PR release-preflight and npm publication repeat the full release gate; publication
+  and live Cat/Telegram acceptance are not claimed by these fixture results.
+- Selected distribution: npm `@cats-inc/cats-runtime@0.6.0`, explicit `latest`, and
+  source bundling in the coordinated Desktop 0.9.3 **standard** preview. The
+  immutable merge commit is the Runtime source pin selected by Desktop; its hosted
+  source receipt records the same SHA. npm uses its existing trusted publisher and
+  provenance; Desktop retains standard per-platform signing. No Runtime GitHub
+  Release or cats-one version is selected. Hosted Actions/registry/source receipts
+  supply publication evidence without a later status-only documentation commit.
+
 ### Release notes — 0.5.4 (2026-10-23)
 
 - **Studio images report a full worker pool and the default pool grows to 50** (#181).

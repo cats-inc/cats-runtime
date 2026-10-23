@@ -70,7 +70,7 @@ describe('WorkerProcess with a managed Codex host', () => {
     await vi.waitFor(() => expect(host.stop).toHaveBeenCalledOnce());
     expect(spawnMock).not.toHaveBeenCalled();
     expect(worker.alive).toBe(false);
-    await expect(worker.sendMessage('hello')).rejects.toThrow('startup cancelled');
+    await expect(worker.sendMessage('hello')).rejects.toThrow(/busy yielding/);
     expect(stopped).not.toHaveBeenCalled();
     closed.resolve(); await vi.waitFor(() => expect(stopped).toHaveBeenCalledOnce());
   });
@@ -89,6 +89,21 @@ describe('WorkerProcess with a managed Codex host', () => {
     worker.start(); pending.resolve(null);
     await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledOnce());
     expect(spawnMock.mock.calls[0][1]).toEqual(['app-server']);
+  });
+
+  it('retires captured handles immediately and retains ownership through helper closure', async () => {
+    worker.start(); pending.resolve(host);
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledOnce());
+    const write = vi.spyOn(child.stdin, 'write');
+    worker.kill();
+    expect(worker.alive).toBe(false); expect(worker.processRunning).toBe(true);
+    await expect(worker.sendMessage('late owner turn')).rejects.toThrow(/busy yielding/);
+    expect(write).not.toHaveBeenCalled();
+    child.emit('close', 0);
+    expect(worker.processRunning).toBe(true);
+    closed.resolve();
+    await vi.waitFor(() => expect(worker.processRunning).toBe(false));
+    await expect(worker.sendMessage('another late turn')).rejects.toThrow(/busy yielding/);
   });
 
   it('isolates a restart from the cancelled startup finishing late', async () => {
