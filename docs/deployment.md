@@ -12,6 +12,9 @@ and notice text from the dependency packages in esbuild's actual input graph and
 fails if a bundled dependency has no license text. The JSON binds the entry and
 notice text by SHA-256; regenerate all three files together after a build change.
 External packages retain their own license/notice files when copied into Desktop.
+The ESM bundle supplies a `createRequire(import.meta.url)` bridge for bundled
+CommonJS codecs that require Node builtins. Validate the bundled entry itself;
+the split npm entry does not exercise this Desktop startup boundary.
 The reviewed jpeg-js supplement retains its decoder Apache-2.0 and Adobe encoder
 headers in addition to the package-root BSD license. A changed version or source
 hash blocks bundling until reviewed; see `scripts/licenses/README.md`. Review new
