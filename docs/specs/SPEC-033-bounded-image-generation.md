@@ -28,6 +28,9 @@ Studio sample. See [evidence and route limits](../research/2026-10-23-grok47-xhi
 This does not claim a new paid bounded HTTP execution.
 
 One active image operation plus shared global capacity/selection/singleton limits; no queue.
+A full worker pool (`maxSessions`, default 50 since 2026-10-23, counting idle chat workers)
+fails the attempt as `runtime_capacity_full`; another image or a held singleton stays
+`image_service_busy`. Both fail before any CLI starts.
 One model round, image_gen whitelist, one image, square aspect, no retries. Five-minute
 process deadline, 2 MiB combined process output, 8 MiB JPEG, decoder limit 4 megapixels.
 At most 500 receipt directories. An ambiguous pre-spawn directory is never overwritten.
