@@ -24,6 +24,15 @@ Runtime, Platform, and Desktop; avoid a second plan with competing contracts.
 
 ## Overview and Sequence
 
+### 2026-10-23 generated timeout correction
+
+- [x] Include the documented Antigravity 120-second and Copilot 60-second
+  budgets when creating built-in native instances.
+- [x] Preserve retained instances and explicit user-provided configurations.
+- [x] Bootstrap HTTP regression suite: 28 cases passed, including example/default
+  parity and retained custom budgets. No real provider invocation or profile edit.
+- Required PR CI remains the merge gate.
+
 Establish the runtime-owned selection contract, enforce it across provider work,
 then connect the three setup surfaces. Verify resource scope in isolated roots
 and ship matched Runtime/Platform contracts. WSL/Docker UX redesign is outside
