@@ -31,9 +31,10 @@ One active image operation plus shared global capacity/selection/singleton limit
 A full worker pool (`maxSessions`, default 50 since 2026-10-23, counting idle chat workers)
 fails the attempt as `runtime_capacity_full`; another image or a held singleton stays
 `image_service_busy`. Both fail before any CLI starts.
-`DELETE /media/images/jobs/:id` removes a finished receipt directory with its image
-(owner-requested deletion through Platform). A running or cancelling attempt answers
-409 `image_not_deletable`; a missing receipt is already deleted. Deletion never
+`DELETE /media/images/jobs/:id` removes a receipt directory with its image
+(owner-requested deletion through Platform). An attempt still live in this process answers
+409 `image_not_deletable`; a receipt left nonterminal by a failed final write is stale and
+is removed; a missing receipt is already deleted. Deletion never
 starts, retries or recovers an attempt.
 One model round, image_gen whitelist, one image, square aspect, no retries. Five-minute
 process deadline, 2 MiB combined process output, 8 MiB JPEG, decoder limit 4 megapixels.

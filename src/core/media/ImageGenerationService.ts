@@ -162,14 +162,12 @@ export class ImageGenerationService {
     await stopped; // Outside the queue: completion also needs the serial writer.
     return this.get(id);
   }
-  /** Deletes a finished receipt and its image. A running attempt must be cancelled first; a missing receipt is already gone. */
+  /** Deletes a receipt and its image unless its attempt is still live (cancel first); a missing receipt is already gone. */
   async remove(id: string): Promise<{ deleted: true }> {
     return this.serial(async () => {
-      const folder = this.folder(id);
+      // Only a live attempt can still write here; a receipt left nonterminal by a failed final write is stale.
       if (this.active.has(id)) throw new ImageError('image_not_deletable', 409);
-      const job = await this.read(id);
-      if (job && ['running', 'cancelling'].includes(job.status)) throw new ImageError('image_not_deletable', 409);
-      await rm(folder, { recursive: true, force: true });
+      await rm(this.folder(id), { recursive: true, force: true });
       return { deleted: true as const };
     });
   }
