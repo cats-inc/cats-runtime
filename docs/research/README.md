@@ -6,6 +6,8 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-10-23-codex-antigravity-bounded-image-acceptance](./2026-10-23-codex-antigravity-bounded-image-acceptance.md) | Codex 0.163.0 and Antigravity 1.4.6 generation through runner-enforced bounds | One verified image each (1254 x 1254 PNG, 1024 x 1024 JPEG) collected from the session-owned output folder and the process ended after the image; the bounds are the runner's, not the CLI's |
+| [2026-10-23-muse-bounded-image-acceptance](./2026-10-23-muse-bounded-image-acceptance.md) | Muse 1.4.12 generation through the bounded runner | First call without the image tool (`--disable-write` removes it), second call one verified 1920 x 1280 PNG in 18.6 s with one tool proposal, runner stop after the image |
 | [2026-10-23-grok47-xhigh-studio-sample](./2026-10-23-grok47-xhigh-studio-sample.md) | Grok 4.7 / Extra High Studio sample and execution profile | One image_gen through Desktop Chat, independently decoded 1024-square JPEG, unchanged original bytes and explicit bounded-runner acceptance limits |
 | [2026-10-20-native-workspace-activity](./2026-10-20-native-workspace-activity.md) | Native Claude 2.1.304 workspace activity | Two isolated conversations sharing a parent cwd, captured Read/Write/Edit/failure evidence, live Runtime projection and explicit coverage/deadline limits |
 | [2026-10-20-grok-context-window-transport](./2026-10-20-grok-context-window-transport.md) | Grok 1.0.62 context-window selection outside the TUI | No CLI flag, `-m` refuses a window, ACP offers only model and effort options and no `/context-window`; Cats keeps 256000 and adds no control |

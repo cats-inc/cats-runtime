@@ -23,7 +23,7 @@ imageRoutes.get('/media/images/jobs/:id', async (c) => c.json(await c.get('ctx')
 imageRoutes.post('/media/images/jobs/:id/cancel', async (c) => c.json(await c.get('ctx').images!.cancel(c.req.param('id'))));
 imageRoutes.delete('/media/images/jobs/:id', async (c) => c.json(await c.get('ctx').images!.remove(c.req.param('id'))));
 imageRoutes.get('/media/images/jobs/:id/image', async (c) => {
-  const bytes = await c.get('ctx').images!.image(c.req.param('id'));
-  return new Response(new Uint8Array(bytes), { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store',
+  const { bytes, mimeType } = await c.get('ctx').images!.image(c.req.param('id'));
+  return new Response(new Uint8Array(bytes), { headers: { 'Content-Type': mimeType, 'Cache-Control': 'no-store',
     'Content-Length': String(bytes.length), 'X-Content-Type-Options': 'nosniff' } });
 });

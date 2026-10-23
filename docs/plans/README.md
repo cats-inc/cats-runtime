@@ -61,6 +61,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
+| [PLAN-048](PLAN-048-image-generation-contract-2.md) | Image Generation Contract 2 | Contract 2 and Muse implemented; Codex and Antigravity open | [SPEC-038](../specs/SPEC-038-image-generation-contract-2.md), [ADR-047](../decisions/047-generalize-bounded-image-generation-to-provider-profiles.md) |
 | [PLAN-047](PLAN-047-session-workspace-activity.md) | Session Workspace Activity | S1–S6 implemented and scoped checks passed; final visual acceptance incomplete | [SPEC-037](../specs/SPEC-037-session-workspace-activity.md), [ADR-046](../decisions/046-expose-evidence-backed-session-workspace-activity.md) |
 | [PLAN-046](./PLAN-046-session-mcp-servers.md) | Session MCP Servers | Complete — R1–R4 merged, F3 adds Copilot; release separate | [SPEC-035](../specs/SPEC-035-session-mcp-servers.md), [ADR-044](../decisions/044-configure-session-mcp-servers-for-provider-clis.md) |
 | [PLAN-045](./PLAN-045-catalog-basis-channel-and-plan.md) | Catalog Basis (Channel and Plan) | Implemented — Runtime and Platform merged; ships with the next Desktop release | [SPEC-031](../specs/SPEC-031-provider-catalog-data-and-local-overrides.md#amendment-2026-09-29-catalog-basis) |
@@ -132,6 +133,6 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 ---
 
 *See also: [specs/](../specs/) for feature specifications*
-*Last updated: 2026-10-20 (PLAN-047 plans the observation contract and Code consumer acceptance.)*
+*Last updated: 2026-10-23 (PLAN-048 tracks image contract 2 and per-provider generation.)*
 
 - [PLAN-043: Bounded image generation](PLAN-043-bounded-image-generation.md) — implementation and fixture validation.

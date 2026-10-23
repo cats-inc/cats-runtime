@@ -1,5 +1,9 @@
 # Architecture Decision Records (ADR)
 
+- [ADR-047: Provider image profiles](047-generalize-bounded-image-generation-to-provider-profiles.md)
+  — accepted, 2026-10-23; contract 2 with per-provider execution profiles, Muse generation enabled,
+  Codex and Antigravity gated on a pre-execution bound.
+
 - [ADR-046: Session workspace activity](046-expose-evidence-backed-session-workspace-activity.md)
   — accepted for implementation, 2026-10-20; bounded evidence-backed observations for Platform's
   Code participant work areas. Execution roots and worktree ownership stay unchanged.
@@ -53,6 +57,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [ADR-047](047-generalize-bounded-image-generation-to-provider-profiles.md) | Generalize Bounded Image Generation to Provider Profiles | Accepted; Grok and Muse enabled | 2026-10-23 |
 | [ADR-046](046-expose-evidence-backed-session-workspace-activity.md) | Expose Evidence-Backed Session Workspace Activity | Accepted for sliced implementation; acceptance pending | 2026-10-20 |
 | [041-bridge-explicit-codex-read-tools-through-runtime](./041-bridge-explicit-codex-read-tools-through-runtime.md) | Bridge Explicit Codex Read Tools Through Runtime | Accepted; native local bridge verified | 2026-09-25 |
 | [040-use-data-driven-provider-catalogs-and-local-overrides](./040-use-data-driven-provider-catalogs-and-local-overrides.md) | Use Data-Driven Provider Catalogs and Local Overrides | Accepted | 2026-09-23 |
@@ -106,7 +111,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 ---
 
-*Last updated: 2026-10-20 (ADR-046 proposes session workspace observations for the Code consumer.)*
+*Last updated: 2026-10-23 (ADR-047 generalizes bounded image generation to provider profiles.)*
 
 *See also: [AGENTS.md](../../AGENTS.md) for decision-making protocols*
 

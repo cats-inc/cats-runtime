@@ -1,7 +1,45 @@
 {
-  "grokSingleImage": {
-    "agentModel": "grok-4.7",
-    "reasoningEffort": "xhigh",
-    "evidence": "2026-10-23-grok47-xhigh-studio-sample"
-  }
+  "schemaVersion": 2,
+  "profiles": [
+    {
+      "id": "grok-generate",
+      "revision": 1,
+      "provider": "grok",
+      "operation": "image.generate",
+      "enabled": true,
+      "agentConfig": { "id": "grok-4.7-xhigh", "model": "grok-4.7", "effort": "xhigh" },
+      "aspectRatio": { "mode": "native", "options": ["1:1"] },
+      "evidence": "2026-10-23-grok47-xhigh-studio-sample"
+    },
+    {
+      "id": "muse-generate",
+      "revision": 1,
+      "provider": "muse",
+      "operation": "image.generate",
+      "enabled": true,
+      "agentConfig": { "id": "muse-spark-1.3-xhigh", "model": "muse-spark-1.3", "effort": "xhigh" },
+      "aspectRatio": { "mode": "service" },
+      "evidence": "2026-10-23-muse-bounded-image-acceptance"
+    },
+    {
+      "id": "codex-generate",
+      "revision": 1,
+      "provider": "codex",
+      "operation": "image.generate",
+      "enabled": true,
+      "agentConfig": { "id": "gpt-6.1-sol-xhigh", "model": "gpt-6.1-sol", "effort": "xhigh" },
+      "aspectRatio": { "mode": "service" },
+      "evidence": "2026-10-23-codex-antigravity-bounded-image-acceptance"
+    },
+    {
+      "id": "antigravity-generate",
+      "revision": 1,
+      "provider": "antigravity",
+      "operation": "image.generate",
+      "enabled": true,
+      "agentConfig": { "id": "gemini-3.8-flash-high", "model": "gemini-3.8-flash-high", "effort": "high" },
+      "aspectRatio": { "mode": "native", "options": ["1:1"] },
+      "evidence": "2026-10-23-codex-antigravity-bounded-image-acceptance"
+    }
+  ]
 }
