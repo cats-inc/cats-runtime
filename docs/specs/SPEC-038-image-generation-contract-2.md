@@ -1,6 +1,6 @@
 # SPEC-038: Image generation contract 2
 
-- Status: Implemented for generation. Grok, Muse, Codex and Antigravity are enabled. Codex and
+- Status: Implemented for generation. Grok, Muse, Codex, Antigravity and Cursor are enabled. Codex and
   Antigravity have runner-enforced bounds, which the owner accepted on 2026-10-23.
 - Decision: [ADR-047](../decisions/047-generalize-bounded-image-generation-to-provider-profiles.md).
 - Plan: [PLAN-048](../plans/PLAN-048-image-generation-contract-2.md).
@@ -44,6 +44,8 @@
   - `muse-generate`: Muse Spark 1.3 / xhigh, service-decided ratio
   - `codex-generate`: GPT-6.1-Sol / xhigh, service-decided ratio
   - `antigravity-generate`: Gemini 3.8 Flash high, native 1:1 requested
+  - `cursor-generate`: GLM 5.3 (`glm-5p3[reasoning=max]`) / max, native 1:1 requested;
+    one owner-authorized image passed the new native runner and collection gate.
 
 ## Request
 
@@ -182,6 +184,37 @@ native tool bounds and stop evidence; it owns no Cat policy, App installation or
   - If no image appears before the process ends, the attempt fails with the classified error.
 
 ## Validation boundary
+
+### Cursor runner extension (2026-10-24)
+
+- Native direct `cursor-agent -p --trust --sandbox <mode> --output-format stream-json`,
+  with explicit `--model`, `--workspace` and the description after `--`. Custom args, shell and
+  non-native transports are refused. This CLI has no per-invocation media-call ceiling: the
+  bound is runner-enforced, as with Codex/Antigravity, not a guarantee against a second call
+  racing the stop. It never retries or falls back to another model/provider.
+- Attempt-local `.cursor/cli.json` allows `GenerateImage(*)` plus Write under this attempt's
+  `.cursor-data/projects/**`, and denies Shell/Read/Mcp/WebFetch/WebSearch/Task. `--force` is
+  omitted; a blanket Write deny also blocks the image tool's own save. Native sandbox is enabled
+  on macOS/Linux and explicitly disabled on Windows, where this CLI does not support it.
+  The runner admits one cursor/GenerateImage schema lookup (`getMcpToolsToolCall`) and one
+  `generateImageToolCall`; it stops on foreign tools, wrong ratio, references or another filename.
+  A tool may already have started when its stream event is observed.
+- `CURSOR_DATA_DIR` points at `<attempt workspace>/.cursor-data`; global config and CLI sign-in
+  are retained. Only a successful native completion matching the started call and initialized
+  session can name the source, under `projects/<workspace key>/assets/<basename>` in that data
+  root. No provider-home scan, assistant-text path or cwd filename guess is used.
+- A full original JPEG/PNG decode, path containment, regular single-link stable-file check,
+  size/deadline/output caps and process-tree stop apply. A requested PNG filename can return
+  JPEG; the receipt reports the signature, measured dimensions and original digest. A non-square
+  paid image is retained with `ratio_differs_from_request`.
+- Fixtures verify configuration/capabilities, framing, original JPEG retention, foreign tools,
+  extra calls, mismatched session/completion, missing/corrupt/foreign sources, output flooding
+  and cancellation. A native call failed its save permission; the owner's explicitly authorized
+  extra image passed the corrected runner: 1024-square JPEG, 90,500 original bytes, process
+  stopped after collection. Prior Chat evidence
+  is in [the Apps cross-CLI probe](../../../cats-apps/docs/research/2026-10-24-chinese-model-cross-cli-reprobe.md).
+  Implementation provenance, failed-attempt limits and native acceptance are recorded in
+  [the Cursor runner evidence](../research/2026-10-24-cursor-image-runner.md).
 
 - Fixtures cover invocation flags, real pipe framing with a Node stand-in for muse, stopping a
   run that keeps going, transparency, each refusal path, cancellation, PNG corruption and size

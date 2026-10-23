@@ -72,6 +72,14 @@ production only after two checks pass for that route:
 
 ## Consequences
 
+2026-10-24 extension: the owner requested Cursor generation in Studio. Add its own pinned
+GLM 5.3 / max profile and native runner, with attempt-isolated Cursor data and source collection
+from the matching native tool completion. It follows the existing runner-enforced bound:
+Cursor has no CLI media-call cap. Fixture validation and prior Chat generation do not replace
+the one-call new-runner live gate. The first image call failed native save permissions; an
+owner-authorized extra image passed the corrected Windows runner (1024-square JPEG, 90,500
+original bytes). The Cursor profile is enabled. The record grants no further media calls.
+
 - HTTP image routes change shape, so the next Runtime release moves to a new 0.x minor.
   Desktop bundles Runtime with the matching Platform.
 - Muse's ratio is service-decided. Profiles say so (`aspectRatio.mode: "service"`), and only
