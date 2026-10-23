@@ -49,6 +49,40 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+### Release notes — 0.5.4 (2026-10-23)
+
+- **Studio images report a full worker pool and the default pool grows to 50** (#181).
+  - Idle chat workers count against `maxSessions` and are not reclaimed. Before, ten
+    idle conversations made every image fail with `image_service_busy`.
+  - A full pool now fails the attempt as `runtime_capacity_full` before any CLI starts.
+  - The `CATS_RUNTIME_MAX_SESSIONS` default rises from 10 to 50 (owner request). An
+    explicitly configured value is kept.
+  - Reclaiming idle workers for bounded operations remains a separate design item.
+- **`DELETE /media/images/jobs/:id` removes a receipt directory with its image** (#182).
+  Platform uses it for owner deletion.
+  - An attempt still live in this process gets 409 `image_not_deletable`.
+  - A missing receipt counts as already deleted.
+  - Deletion never starts, retries or recovers an attempt.
+- **Studio image generation uses `grok-4.7` with `xhigh` effort** instead of
+  `grok-4.7-build-fast` at `low` (7850471a). Execution stays one round,
+  `image_gen`-only, with unchanged collection bounds.
+- **New provider selections get the documented per-instance timeouts** (#180, #183).
+  - Antigravity native instances get 120 seconds, Copilot 60 seconds and Muse 60 seconds.
+  - Retained and explicitly configured targets keep their values.
+  - The underlying Muse/Antigravity idle-event investigation (#178) is still open.
+- **Compatibility.** HTTP routes are added and none are changed. Configuration files,
+  receipts and catalogs keep their formats, so this is a compatible 0.5.x patch with
+  no data migration.
+- **Distribution.** Source bundling is selected for the Desktop 0.9.2 standard-profile
+  preview. Its preparation pins this bump's immutable merge commit across OS builds
+  and the complete source archive. No Runtime npm or cats-one release is selected.
+- **Validation.** Each change passed its focused suites and required PR
+  release-preflight. This preparation changes only version fields and notes. Its PR
+  release-preflight and the Desktop packaging workflow enforce the release checks.
+  Publication results: Desktop
+  [`v0.9.2`](https://github.com/cats-inc/cats-platform/releases/tag/v0.9.2) and its
+  workflow run.
+
 ### Release notes — 0.5.3 (2026-10-20)
 
 - Refresh five factory model catalogs (#172). Antigravity 1.4.2 adds Gemini 4
