@@ -15,6 +15,9 @@ const result = await build({
   platform: 'node',
   target: 'node22',
   format: 'esm',
+  // Bundled CommonJS image codecs require Node builtins (util, stream, zlib).
+  // ESM has no ambient require; esbuild's fallback otherwise throws at startup.
+  banner: { js: 'import { createRequire as __catsCreateRequire } from "node:module"; const require = __catsCreateRequire(import.meta.url);' },
   sourcemap: true,
   external: [
     // yaml's published CJS build uses dynamic require("process") when bundled to ESM.
