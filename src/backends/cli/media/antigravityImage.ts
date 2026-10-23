@@ -52,6 +52,7 @@ export async function executeAntigravityImage(input: ImageExecution, spawnProces
   if (input.signal.aborted) throw new ImageError('cancelled');
   const config = antigravityImageInvocation(input);
   const root = brainRoot(input);
+  const ratio = input.profile.aspectRatio.mode === 'native' ? input.profile.aspectRatio.options[0] : null;
   const normalizer = new AntigravityProvider();
   normalizer.prepareEphemeralTurn({ message: input.prompt });
   const watch = new AbortController();
@@ -60,7 +61,7 @@ export async function executeAntigravityImage(input: ImageExecution, spawnProces
       shell: config.shell, windowsVerbatimArguments: config.windowsVerbatimArguments,
       windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] });
     let buffer = ''; let observedBytes = 0; let errorText = ''; let failure: string | null = null;
-    let conversation: string | null = null; let delegations = 0; let collected: ImageExecutionResult | null = null; let completed = false;
+    let conversation: string | null = null; let imageCalls = 0; let collected: ImageExecutionResult | null = null; let completed = false;
     const decoder = new StringDecoder('utf8');
     const stop = (code: string) => {
       if (failure || collected) return;
@@ -71,14 +72,19 @@ export async function executeAntigravityImage(input: ImageExecution, spawnProces
     const timer = setTimeout(() => stop('generation_timeout'), IMAGE_PROCESS_DEADLINE_MS);
     input.signal.addEventListener('abort', abort, { once: true });
     if (input.signal.aborted) abort();
+    const warningsFor = (metadata: ImageExecutionResult['metadata'], others: number) => [
+      ...(others ? ['additional_image_generated'] : []),
+      // A paid image is kept; the ratio the child was asked for is not enforced by the CLI.
+      ...(ratio && metadata.width * Number(ratio.split(':')[1]) !== metadata.height * Number(ratio.split(':')[0]) ? ['ratio_differs_from_request'] : []),
+    ];
     const collect = (id: string) => {
       firstStableImage(root, path.join(root, id), watch.signal).then((image) => {
         if (!image || failure || collected) return;
-        collected = { bytes: image.bytes, metadata: validateImage(image.bytes), executionOutcome: completed ? 'completed' : 'stopped_after_image',
-          ...(image.others ? { warnings: ['additional_image_generated'] } : {}) };
+        const metadata = validateImage(image.bytes);
+        collected = { bytes: image.bytes, metadata, executionOutcome: completed ? 'completed' : 'stopped_after_image', warnings: warningsFor(metadata, image.others) };
         watch.abort();
         stopProcessTree(child);
-      }).catch(() => stop('invalid_image_source'));
+      }).catch((error) => stop(error instanceof ImageError ? error.code : 'invalid_image_source'));
     };
     const handle = (event: StreamEvent) => {
       if (event.type === 'init') {
@@ -87,7 +93,8 @@ export async function executeAntigravityImage(input: ImageExecution, spawnProces
       }
       if (event.type === 'tool_use') {
         if (!ALLOWED_TOOLS.has(event.toolName ?? '')) { stop('image_tool_limit'); return; }
-        if (event.toolName === 'invoke_subagent' && ++delegations > 1) { stop('image_tool_limit'); return; }
+        // One delegation or one direct image call in all; the child's own calls never reach this stream.
+        if (++imageCalls > 1) { stop('image_tool_limit'); return; }
       }
       if (event.type === 'tool_result' && event.isError) errorText += (event.text ?? '').slice(0, 16000);
       if (event.type === 'result') completed = true;
@@ -116,11 +123,11 @@ export async function executeAntigravityImage(input: ImageExecution, spawnProces
     });
     child.on('error', () => { failure = 'cli_unavailable'; });
     child.on('close', async () => {
-      clearTimeout(timer); input.signal.removeEventListener('abort', abort);
+      watch.abort(); clearTimeout(timer); input.signal.removeEventListener('abort', abort);
       line(buffer + decoder.end());
       if (!collected && !failure && conversation) {
-        const late = await firstStableImage(root, path.join(root, conversation), AbortSignal.timeout(2000), 200).catch(() => null);
-        if (late) collected = { bytes: late.bytes, metadata: validateImage(late.bytes), executionOutcome: 'completed' };
+        const late = await firstStableImage(root, path.join(root, conversation), AbortSignal.timeout(5000), 200).catch(() => null);
+        if (late) { const metadata = validateImage(late.bytes); collected = { bytes: late.bytes, metadata, executionOutcome: 'completed', warnings: warningsFor(metadata, late.others) }; }
       }
       watch.abort();
       if (collected) resolve(collected);

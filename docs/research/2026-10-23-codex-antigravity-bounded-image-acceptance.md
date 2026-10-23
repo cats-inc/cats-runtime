@@ -55,7 +55,7 @@ afterwards.
 ## Limits of this evidence
 
 - The bounds are the runner's, not the CLI's. A second image started before the stop could
-  still be generated and charged; it would not be kept, and the receipt would warn
-  `additional_image_generated`.
+  still be generated and charged. It is not kept; the receipt warns
+  `additional_image_generated` only if that file already existed when the first was collected.
 - It shows one route per provider with these flags and CLI versions. It does not show
   reliability, quality, cost, live cancellation, or the HTTP server or Desktop path.

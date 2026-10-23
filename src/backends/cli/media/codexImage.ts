@@ -10,8 +10,9 @@ import {
 } from './imageExecution.js';
 
 const record = (value: unknown): Record<string, unknown> | null => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
-// Items that are never part of generating one image. Code-mode execution that calls the image tool is not listed.
-const FOREIGN_ITEMS = new Set(['file_change', 'mcp_tool_call', 'web_search', 'collab_tool_call', 'todo_list']);
+// Items a one-image run may show (the live 0.163 run showed only an agent message; the image call is not an
+// item). Anything else, such as commands, file changes, MCP, web or dynamic tools, stops the run.
+const ALLOWED_ITEMS = new Set(['agent_message', 'reasoning', 'todo_list', 'image_generation']);
 const THREAD_ID = /^[A-Za-z0-9-]{8,80}$/;
 
 export function supportsCodexImage(target: ProviderInstanceConfig) {
@@ -76,7 +77,7 @@ export async function executeCodexImage(input: ImageExecution, spawnProcess: typ
           ...(image.others ? { warnings: ['additional_image_generated'] } : {}) };
         watch.abort();
         stopProcessTree(child);
-      }).catch(() => stop('invalid_image_source'));
+      }).catch((error) => stop(error instanceof ImageError ? error.code : 'invalid_image_source'));
     };
     const line = (text: string) => {
       if (failure || collected || !text.trim()) return;
@@ -89,7 +90,7 @@ export async function executeCodexImage(input: ImageExecution, spawnProcess: typ
         thread = value.thread_id; collect(thread);
       }
       const item = record(value.item);
-      if ((value.type === 'item.started' || value.type === 'item.completed') && item && FOREIGN_ITEMS.has(String(item.type))) { stop('image_tool_limit'); return; }
+      if (String(value.type).startsWith('item.') && item && !ALLOWED_ITEMS.has(String(item.type))) { stop('image_tool_limit'); return; }
       if (value.type === 'turn.completed') completed = true;
       if (value.type === 'turn.failed' || value.type === 'error') errorText += JSON.stringify(value).slice(0, 16000);
     };
@@ -107,11 +108,11 @@ export async function executeCodexImage(input: ImageExecution, spawnProcess: typ
     });
     child.on('error', () => { failure = 'cli_unavailable'; });
     child.on('close', async () => {
-      clearTimeout(timer); input.signal.removeEventListener('abort', abort);
+      watch.abort(); clearTimeout(timer); input.signal.removeEventListener('abort', abort);
       line(buffer + decoder.end());
       // A run that ended by itself may have saved its image just before exiting.
       if (!collected && !failure && thread) {
-        const late = await firstStableImage(home, path.join(home, 'generated_images', thread), AbortSignal.timeout(2000), 200).catch(() => null);
+        const late = await firstStableImage(home, path.join(home, 'generated_images', thread), AbortSignal.timeout(5000), 200).catch(() => null);
         if (late) collected = { bytes: late.bytes, metadata: validateImage(late.bytes), executionOutcome: 'completed' };
       }
       watch.abort();

@@ -90,7 +90,8 @@ export async function readStableImage(file: string, signal: AbortSignal): Promis
 
 /** Ends the whole process tree; the runner owns its child, so nothing it started outlives it. */
 export function stopProcessTree(child: ChildProcess) {
-  if (!child.pid) return;
+  // After exit the PID may already belong to another process; never signal it then.
+  if (!child.pid || child.exitCode !== null || child.signalCode !== null) return;
   if (process.platform === 'win32') {
     const killer = spawn('taskkill.exe', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true, stdio: 'ignore' });
     killer.on('error', () => child.kill());
@@ -111,24 +112,34 @@ const IMAGE_FILE = /\.(png|jpe?g)$/i;
 /**
  * For CLIs that save into a provider-owned folder keyed by this run's own session: returns the first image
  * file once it is complete (unchanged across two looks and decodable). Only that session's folder is read.
+ * A file that moves or changes while it is read is looked at again; one that stays unchanged yet never decodes
+ * fails with `invalid_image`, so the run is stopped instead of waiting for its deadline. Only a containment
+ * failure is `invalid_image_source`.
  */
 export async function firstStableImage(root: string, folder: string, signal: AbortSignal, intervalMs = 300):
   Promise<{ file: string; bytes: Buffer; others: number } | null> {
   let previous: { file: string; size: number; mtimeMs: number } | null = null;
+  let undecodable = 0;
   while (!signal.aborted) {
     let names: string[] = [];
     try { names = (await readdir(folder)).filter((name) => IMAGE_FILE.test(name)); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
-    if (names.length) {
-      const entries = await Promise.all(names.map(async (name) => ({ file: path.join(folder, name), info: await stat(path.join(folder, name)) })));
+    const entries = (await Promise.all(names.map(async (name) => {
+      try { return { file: path.join(folder, name), info: await stat(path.join(folder, name)) }; }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error; }
+    }))).filter((entry) => entry !== null);
+    if (entries.length) {
       entries.sort((a, b) => a.info.birthtimeMs - b.info.birthtimeMs || a.file.localeCompare(b.file));
       const first = entries[0]!;
       if (previous && previous.file === first.file && previous.size === first.info.size && previous.mtimeMs === first.info.mtimeMs && first.info.size > 0) {
         await containedImageFile(root, folder, first.file);
-        const bytes = await readStableImage(first.file, signal);
-        try { validateImage(bytes); return { file: first.file, bytes, others: entries.length - 1 }; }
-        catch { /* Still being written in place; look again. */ }
-      }
+        let bytes: Buffer | null = null;
+        try { bytes = await readStableImage(first.file, signal); } catch { if (signal.aborted) return null; }
+        if (bytes) {
+          try { validateImage(bytes); return { file: first.file, bytes, others: entries.length - 1 }; }
+          catch { if (++undecodable >= 5) throw new ImageError('invalid_image'); }
+        }
+      } else undecodable = 0;
       previous = { file: first.file, size: first.info.size, mtimeMs: first.info.mtimeMs };
     }
     await new Promise((resolve) => setTimeout(resolve, intervalMs));

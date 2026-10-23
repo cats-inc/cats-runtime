@@ -121,20 +121,25 @@
   --ignore-rules --sandbox read-only`, with `--disable` for `shell_tool`, `browser_use`,
   `computer_use`, `multi_agent` and `apps`, the model and effort as `-c` values,
   `--cd <workspace>`, and the prompt after `--`.
-  - `thread.started` names the thread. File change, MCP, web, collaboration or todo items stop
-    the run.
+  - `thread.started` names the thread. Only agent message, reasoning, todo list and image
+    items may appear; any other item stops the run.
   - The image is the first complete file in `$CODEX_HOME/generated_images/<thread>/`.
 - **Antigravity.** The invocation is `agy -p <prompt> --output-format stream-json` with the
   adapter's base arguments, `--add-dir <workspace>`, `--model`, `--dangerously-skip-permissions`
   (print mode cannot run a tool otherwise) and `--sandbox`.
-  - `init` names the conversation. Any tool other than one `invoke_subagent` (or a direct
-    `generate_image`) stops the run.
+  - `init` names the conversation. One `invoke_subagent` or one direct `generate_image` in all;
+    anything else stops the run. Print mode needs skipped permissions, so a stopped parent tool
+    may already have run. The image child's own calls never reach the stream, so what it may do
+    depends on that built-in child's toolset.
+  - A result whose ratio differs from the requested 1:1 is kept with `ratio_differs_from_request`.
   - The image is the first complete file in `~/.gemini/antigravity-cli/brain/<conversation>/`.
 - Shared rules for both:
   - Only that session's folder is read.
   - A file counts as complete when it is unchanged across two looks and decodes.
   - Containment and single-link checks apply.
-  - Extra files there add the `additional_image_generated` warning.
+  - Extra files present when the image is collected add the `additional_image_generated`
+    warning; an image finished after the stop is not seen.
+  - A file that keeps failing to decode stops the run with `invalid_image`.
   - If no image appears before the process ends, the attempt fails with the classified error.
 
 ## Validation boundary

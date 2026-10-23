@@ -66,6 +66,16 @@ describe('bounded Codex image generation', () => {
     await expect(executeCodexImage(input, await fakeCli(root, [{ type: 'thread.started', thread_id: randomUUID() },
       { type: 'item.started', item: { id: 'i', type: 'file_change' } }]))).rejects.toThrow('image_tool_limit');
     await expect(executeCodexImage(input, await fakeCli(root, [{ type: 'thread.started', thread_id: '../escape' }]))).rejects.toThrow('invalid_image_source');
+    // Only known items may appear: planning output is fine, a command is not.
+    const planned = randomUUID();
+    expect((await executeCodexImage(input, await fakeCli(root, [{ type: 'thread.started', thread_id: planned },
+      { type: 'item.completed', item: { id: 't', type: 'todo_list' } }], { file: path.join(root, '.codex', 'generated_images', planned, 'a.png'), bytes: png() }))).metadata.width).toBe(4);
+    await expect(executeCodexImage(input, await fakeCli(root, [{ type: 'thread.started', thread_id: randomUUID() },
+      { type: 'item.started', item: { id: 'c', type: 'command_execution' } }]))).rejects.toThrow('image_tool_limit');
+    // A stable file that never decodes stops the run instead of waiting for the deadline.
+    const broken = randomUUID();
+    await expect(executeCodexImage(input, await fakeCli(root, [{ type: 'thread.started', thread_id: broken }],
+      { file: path.join(root, '.codex', 'generated_images', broken, 'b.png'), bytes: Buffer.from('not really a png at all') }))).rejects.toThrow('invalid_image');
     await expect(executeCodexImage(input, await fakeCli(root, [{ type: 'thread.started', thread_id: randomUUID() },
       { type: 'turn.failed', error: { message: 'usage limit reached' } }], undefined, true))).rejects.toThrow('quota_exhausted');
   }, 30_000);
@@ -89,8 +99,13 @@ describe('bounded Antigravity image generation', () => {
     await mkdir(brain, { recursive: true }); await writeFile(path.join(brain, 'task.md'), 'not an image');
     const result = await executeAntigravityImage(input, await fakeCli(root, [init(conversation), tool(1, 'invoke_subagent')],
       { file: path.join(brain, 'orange_cat_1.jpg'), bytes: jpg() }));
-    expect(result).toMatchObject({ executionOutcome: 'stopped_after_image', metadata: { mimeType: 'image/jpeg', width: 4, height: 4 } });
-    for (const lines of [[init(randomUUID()), tool(1, 'run_command')], [init(randomUUID()), tool(1, 'invoke_subagent'), tool(2, 'invoke_subagent')]]) {
+    expect(result).toMatchObject({ executionOutcome: 'stopped_after_image', metadata: { mimeType: 'image/jpeg', width: 4, height: 4 }, warnings: [] });
+    // A paid image in another ratio is kept, with a warning; the CLI does not enforce the requested 1:1.
+    const wide = randomUUID(); const wideBytes = Buffer.from(jpeg.encode({ width: 8, height: 4, data: Buffer.alloc(128, 200) }).data);
+    expect((await executeAntigravityImage(input, await fakeCli(root, [init(wide), tool(1, 'invoke_subagent')],
+      { file: path.join(root, '.gemini', 'antigravity-cli', 'brain', wide, 'w.jpg'), bytes: wideBytes }))).warnings).toEqual(['ratio_differs_from_request']);
+    for (const lines of [[init(randomUUID()), tool(1, 'run_command')], [init(randomUUID()), tool(1, 'invoke_subagent'), tool(2, 'invoke_subagent')],
+      [init(randomUUID()), tool(1, 'generate_image'), tool(2, 'invoke_subagent')]]) {
       await expect(executeAntigravityImage(input, await fakeCli(root, lines))).rejects.toThrow('image_tool_limit');
     }
     await expect(executeAntigravityImage(input, await fakeCli(root, [init('../../etc')]))).rejects.toThrow('invalid_image_source');
