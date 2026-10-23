@@ -2,7 +2,9 @@ import { stopFencedPluginRuns } from './http/routes/managedPlugins.js';
 import { once } from 'node:events';
 import { warnIfNonLoopbackBind } from './listener.js';
 import { ImageGenerationService } from './core/media/ImageGenerationService.js';
-import { executeGrokImage } from './backends/cli/media/grokImage.js';
+import { executeGrokImage, recoverGrokImage, supportsGrokImage } from './backends/cli/media/grokImage.js';
+import { executeMuseImage, supportsMuseImage } from './backends/cli/media/museImage.js';
+import { loadImageProfiles } from './core/media/profiles.js';
 import { ImageError } from './core/media/contracts.js';
 import type { SessionInfo } from './core/types.js';
 import type { Server } from 'node:http';
@@ -1099,15 +1101,18 @@ export function createRuntimeServer(
   context.metering = new RuntimeMeteringService(config.metering);
   context.images = new ImageGenerationService({
     root: join(getRuntimeResolvedPaths(config).dataDir, 'image-generations'),
-    targets: () => Object.values(config.providerInstances?.grok ?? {}),
+    profiles: loadImageProfiles(),
+    targets: (provider) => Object.values(config.providerInstances?.[provider] ?? {}),
+    supports: (provider, target) => provider === 'grok' ? supportsGrokImage(target) : supportsMuseImage(target),
+    recover: (input) => input.provider === 'grok' ? recoverGrokImage(input) : null,
     env: { ...getRuntimeConfigEnv(config) },
     execute: async (input) => {
       const selection = context.bootstrapService!.selection;
-      const operation = selection.acquireOperation({ provider: 'grok', backend: 'cli', instance: input.instance }, config.providerSelectionRevision);
+      const operation = selection.acquireOperation({ provider: input.provider, backend: 'cli', instance: input.instance }, config.providerSelectionRevision);
       let release: (() => void) | undefined;
       try {
         const now = new Date().toISOString();
-        const session: SessionInfo = { id: input.id, providerSessionId: input.id, providerName: 'grok', providerBackend: 'cli',
+        const session: SessionInfo = { id: input.id, providerSessionId: input.id, providerName: input.provider, providerBackend: 'cli',
           providerInstanceId: input.instance, cwd: input.cwd, status: 'busy', origin: 'runtime',
           workspace: { kind: 'sandbox', access: 'read_write', runtimeCwd: input.cwd },
           createdAt: now, updatedAt: now, messageCount: 1, totalInputTokens: 0, totalOutputTokens: 0 };
@@ -1118,10 +1123,11 @@ export function createRuntimeServer(
         input.signal.addEventListener('abort', abort, { once: true });
         if (input.signal.aborted) abort();
         try {
-          try { release = pool.reserveExternalExecution(input.id, 'grok', input.instance, abort); }
+          try { release = pool.reserveExternalExecution(input.id, input.provider, input.instance, abort); }
           catch (error) { throw new ImageError(error instanceof PoolCapacityError ? 'runtime_capacity_full' : 'image_service_busy', 429); }
           const turnStartedAt = Date.now();
-          return await executeGrokImage({ ...input, signal: controller.signal,
+          const run = input.provider === 'grok' ? executeGrokImage : executeMuseImage;
+          return await run({ ...input, signal: controller.signal,
             observe: (event) => { context.metering!.observeEvent(session, event, { turnStartedAt }); } });
         } finally { input.signal.removeEventListener('abort', abort); }
       } finally { release?.(); selection.releaseOperation(operation); }

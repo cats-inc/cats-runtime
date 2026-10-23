@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted, 2026-09-28, for the user-authorized Studio single-image slice.
+Accepted, 2026-09-28, for the user-authorized Studio single-image slice. Extended by
+[ADR-047](047-generalize-bounded-image-generation-to-provider-profiles.md) (2026-10-23), which
+moves the contract to per-provider profiles.
 
 ## Context
 

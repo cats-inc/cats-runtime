@@ -59,6 +59,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 | Spec | Title | Status | Related Plan |
 |------|-------|--------|--------------|
+| [SPEC-038](SPEC-038-image-generation-contract-2.md) | Image Generation Contract 2 | Implemented for generation; Grok and Muse enabled | [PLAN-048](../plans/PLAN-048-image-generation-contract-2.md) |
 | [SPEC-037](SPEC-037-session-workspace-activity.md) | Session Workspace Activity | Approved; implementation in progress | [PLAN-047](../plans/PLAN-047-session-workspace-activity.md) |
 | [SPEC-032](./SPEC-032-model-selector-custom-controls-route-and-cost-signals.md) | Model Selector Custom Controls, Route Display and Cost Signals | Draft — pending approval (not approved) | [PLAN-042](../plans/PLAN-042-model-selector-custom-controls-route-and-cost-signals.md) (on hold) |
 | [SPEC-031](./SPEC-031-provider-catalog-data-and-local-overrides.md) | Provider Catalog Data and Local Overrides | Implemented — Runtime and Platform CI passed; 2026-09-29 basis amendment implemented in Runtime and Platform | [PLAN-040](../plans/PLAN-040-provider-catalog-data-and-local-overrides.md), [ADR-040](../decisions/040-use-data-driven-provider-catalogs-and-local-overrides.md), [PLAN-045](../plans/PLAN-045-catalog-basis-channel-and-plan.md) |
@@ -116,6 +117,6 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 ---
 
 *See also: [plans/](../plans/) for implementation plans*
-*Last updated: 2026-10-20 (SPEC-037 plans bounded workspace activity observations.)*
+*Last updated: 2026-10-23 (SPEC-038 defines image generation contract 2.)*
 
 - [SPEC-033: Bounded image generation](SPEC-033-bounded-image-generation.md) — authenticated single-image operation.

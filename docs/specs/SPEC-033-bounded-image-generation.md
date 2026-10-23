@@ -1,7 +1,9 @@
 # SPEC-033: Bounded image generation
 
 - Status: Implemented; native production execution is based on the earlier one-image spike,
-  with new HTTP/service/process paths validated using isolated fixtures.
+  with new HTTP/service/process paths validated using isolated fixtures. Since 2026-10-23 the
+  HTTP shapes are [SPEC-038](SPEC-038-image-generation-contract-2.md) (contract 2); the limits,
+  persistence, deletion and recovery rules below still apply to the Grok route.
 - Decision: [ADR-042](../decisions/042-bound-native-image-generation.md).
 - Plan: [PLAN-043](../plans/PLAN-043-bounded-image-generation.md).
 
