@@ -212,6 +212,25 @@ send({type:'max_turns_reached'});send({type:'end',sessionId:${JSON.stringify(inp
     const response = await app.request(`/media/images/jobs/${input.id}/image`);
     expect(response.headers.get('content-type')).toBe('image/jpeg');
     expect(Buffer.from(await response.arrayBuffer()).equals(picture())).toBe(true);
+    const deleted = await app.request(`/media/images/jobs/${input.id}`, { method: 'DELETE' });
+    expect(deleted.status).toBe(200); expect(await deleted.json()).toEqual({ deleted: true });
+    expect((await app.request(`/media/images/jobs/${input.id}`)).status).toBe(404);
+    expect((await app.request('/media/images/jobs/not-an-id', { method: 'DELETE' })).status).toBe(400);
+    await service.close();
+  });
+  it('deletes only finished receipts with their image and never touches a running attempt', async () => {
+    const { root, input } = await fixture(); let finish!: () => void;
+    const receipts = path.join(root, 'receipts');
+    const service = new ImageGenerationService({ root: receipts, targets: () => [input.target], env: input.env,
+      execute: async () => { await new Promise<void>((resolve) => { finish = resolve; }); const bytes = picture(); return { bytes, metadata: validateImage(bytes) }; } });
+    const job = await service.submit({ id: input.id, instance: input.instance, prompt: input.prompt });
+    await expect(service.remove(job.id)).rejects.toThrow('image_not_deletable');
+    finish(); expect((await settle(service, job.id)).status).toBe('succeeded');
+    expect(await readdir(path.join(receipts, job.id))).toContain('image.jpg');
+    await expect(service.remove(job.id)).resolves.toEqual({ deleted: true });
+    expect(await readdir(receipts)).toEqual([]);
+    await expect(service.get(job.id)).rejects.toThrow('image_not_found');
+    await expect(service.remove(job.id)).resolves.toEqual({ deleted: true });
     await service.close();
   });
 });
