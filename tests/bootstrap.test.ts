@@ -406,7 +406,7 @@ describe('selection-first bootstrap HTTP contract', () => {
     expect((await reloaded.json()).selection.targets).toEqual([{ provider: 'ollama', backend: 'local', instance: 'local' }]);
   });
 
-  it.each([['antigravity', 120_000], ['copilot', 60_000]] as const)(
+  it.each([['antigravity', 120_000], ['copilot', 60_000], ['muse', 60_000]] as const)(
     'uses the documented %s timeout for newly selected instances and preserves custom budgets',
     async (provider, timeoutMs) => {
       const { app, root } = fixture();

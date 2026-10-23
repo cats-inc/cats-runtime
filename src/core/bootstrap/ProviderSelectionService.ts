@@ -79,7 +79,7 @@ function templateFor(target: SelectedProviderTarget): Record<string, unknown> | 
     // Selection creates a fresh instance rather than copying the full example.
     // Keep the provider budgets from that example in newly generated profiles.
     const timeoutMs = entry.provider === 'antigravity' ? 120_000
-      : entry.provider === 'copilot' ? 60_000 : undefined;
+      : entry.provider === 'copilot' || entry.provider === 'muse' ? 60_000 : undefined;
     return { command: entry.binaryName, runner: 'auto', runtime: 'native',
       ...(timeoutMs === undefined ? {} : { timeout_ms: timeoutMs }) };
   }
