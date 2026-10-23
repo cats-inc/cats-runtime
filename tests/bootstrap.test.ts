@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { parse as parseYaml } from 'yaml';
 
 import {
   inspectRuntimeConfig,
@@ -404,6 +405,32 @@ describe('selection-first bootstrap HTTP contract', () => {
     expect(reloaded.status).toBe(200);
     expect((await reloaded.json()).selection.targets).toEqual([{ provider: 'ollama', backend: 'local', instance: 'local' }]);
   });
+
+  it.each([['antigravity', 120_000], ['copilot', 60_000]] as const)(
+    'uses the documented %s timeout for newly selected instances and preserves custom budgets',
+    async (provider, timeoutMs) => {
+      const { app, root } = fixture();
+      const target = { provider, backend: 'cli', instance: 'native' };
+      const first = await write(app, '/setup-selection', { targets: [target], expectedRevision: 'missing' });
+      expect(first.status).toBe(200);
+      const saved = await first.json();
+      const path = createRuntimeTestPaths(root).configPath;
+      const config = parseYaml(readFileSync(path, 'utf8'));
+      const example = parseYaml(readFileSync(new URL('../config/providers.yaml.example', import.meta.url), 'utf8'));
+      expect(config.backends.cli.providers[provider].instances.native.timeout_ms).toBe(timeoutMs);
+      expect(timeoutMs).toBe(example.backends.cli.providers[provider].instances.native.timeout_ms);
+
+      const custom = await write(app, '/setup-selection', { expectedRevision: saved.selection.revision,
+        targets: [{ ...target, configuration: { command: `custom-${provider}`, timeout_ms: 45_000 } }] });
+      expect(custom.status).toBe(200);
+      const customized = await custom.json();
+      const retained = await write(app, '/setup-selection', { expectedRevision: customized.selection.revision,
+        targets: [target, { provider: 'codex', backend: 'cli', instance: 'native' }] });
+      expect(retained.status).toBe(200);
+      expect(parseYaml(readFileSync(path, 'utf8')).backends.cli.providers[provider].instances.native)
+        .toMatchObject({ command: `custom-${provider}`, timeout_ms: 45_000 });
+    },
+  );
 
   it('returns retained observations consistently from saves, reads and configuration reloads', async () => {
     const { app, runtime, root } = fixture();

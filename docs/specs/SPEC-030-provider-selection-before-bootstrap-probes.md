@@ -25,6 +25,17 @@ to let Cats manage and use. It is not an automatic cost or model-ranking score.
 
 ## Current Findings
 
+### Generated CLI timeout defaults — 2026-10-23
+
+Creating a built-in native Antigravity instance writes `timeout_ms: 120000`;
+Copilot writes `timeout_ms: 60000`, matching the provider example. Selection's
+minimal instance template must not drop these documented execution budgets.
+Other providers keep the global fallback. Saving an existing target preserves
+its configuration, including a custom timeout or the absence of one; this is
+not an automatic rewrite of existing user profiles. HTTP bootstrap regressions
+check generated values against the example and preserve custom commands and
+budgets when other targets are added.
+
 These are source-inspection findings, not startup performance measurements:
 
 - The default active file is `~/.cats/runtime/config/providers.yaml`, resolved

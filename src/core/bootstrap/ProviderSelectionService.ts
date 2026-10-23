@@ -76,7 +76,12 @@ function templateFor(target: SelectedProviderTarget): Record<string, unknown> | 
     providerSelectionKey(candidate) === providerSelectionKey(target));
   if (!entry) return undefined;
   if (entry.backend === 'cli') {
-    return { command: entry.binaryName, runner: 'auto', runtime: 'native' };
+    // Selection creates a fresh instance rather than copying the full example.
+    // Keep the provider budgets from that example in newly generated profiles.
+    const timeoutMs = entry.provider === 'antigravity' ? 120_000
+      : entry.provider === 'copilot' ? 60_000 : undefined;
+    return { command: entry.binaryName, runner: 'auto', runtime: 'native',
+      ...(timeoutMs === undefined ? {} : { timeout_ms: timeoutMs }) };
   }
   if (entry.provider === 'devin') {
     return { transport: 'acp_stdio', command: 'devin', args: ['acp'], startup_timeout_ms: 15_000 };
