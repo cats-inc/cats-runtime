@@ -290,6 +290,7 @@ backends:
             # macOS and Linux, %LOCALAPPDATA%/Programs/muse/muse.cmd on Windows.
             command: muse
             runner: auto
+            timeout_ms: 60000
             # Dated durable logs provide automatic discovery and history.
             sessions_dir: ~/.local/share/muse/sessions
 
