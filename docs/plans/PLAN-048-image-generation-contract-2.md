@@ -15,10 +15,11 @@
   checks passed. The four image regression files passed 33 tests.
 - [x] Platform projection/SDK/shared-ledger consumer and Studio five-provider order/default
   implemented in their own worktrees; isolated real package/host fixture acceptance passed.
-- [ ] Successful live acceptance through the new runner. The one authorized image call failed
+- [x] Successful live acceptance through the new runner. The first authorized image call failed
   during native save because a blanket Write deny blocked it. Permissions and native framing
-  are corrected; another one-image allowance is required. The profile stays disabled until the
-  gate passes. No automatic generation retry or Runtime npm release is selected.
+  are corrected; the owner explicitly allowed one further image, which passed in 25.0 seconds:
+  JPEG 1024 x 1024, 90,500 original bytes, one image tool call and process stopped after collection.
+  The profile is enabled. No automatic generation retry or Runtime npm release is selected.
 - [ ] Independent review. Author-run mechanical checks are not independent review.
 
 - [x] Profiles in `catalogs/media-profiles.json` (catalog schema 2) with a validated loader and

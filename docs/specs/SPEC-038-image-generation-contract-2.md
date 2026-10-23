@@ -1,6 +1,6 @@
 # SPEC-038: Image generation contract 2
 
-- Status: Implemented for generation. Grok, Muse, Codex and Antigravity are enabled. Codex and
+- Status: Implemented for generation. Grok, Muse, Codex, Antigravity and Cursor are enabled. Codex and
   Antigravity have runner-enforced bounds, which the owner accepted on 2026-10-23.
 - Decision: [ADR-047](../decisions/047-generalize-bounded-image-generation-to-provider-profiles.md).
 - Plan: [PLAN-048](../plans/PLAN-048-image-generation-contract-2.md).
@@ -44,10 +44,8 @@
   - `muse-generate`: Muse Spark 1.3 / xhigh, service-decided ratio
   - `codex-generate`: GPT-6.1-Sol / xhigh, service-decided ratio
   - `antigravity-generate`: Gemini 3.8 Flash high, native 1:1 requested
-
-The new `cursor-generate` profile pins GLM 5.3 (`glm-5p3[reasoning=max]`) / max,
-native 1:1 requested. It is disabled pending new-runner live acceptance; the earlier successful
-Chat probe is separate evidence. No existing profile is disabled by this gate.
+  - `cursor-generate`: GLM 5.3 (`glm-5p3[reasoning=max]`) / max, native 1:1 requested;
+    one owner-authorized image passed the new native runner and collection gate.
 
 ## Request
 
@@ -211,10 +209,11 @@ native tool bounds and stop evidence; it owns no Cat policy, App installation or
   paid image is retained with `ratio_differs_from_request`.
 - Fixtures verify configuration/capabilities, framing, original JPEG retention, foreign tools,
   extra calls, mismatched session/completion, missing/corrupt/foreign sources, output flooding
-  and cancellation. A native call reached GenerateImage but failed its save permission; another
-  one-image allowance is required for acceptance of the corrected runner. Prior Chat evidence
+  and cancellation. A native call failed its save permission; the owner's explicitly authorized
+  extra image passed the corrected runner: 1024-square JPEG, 90,500 original bytes, process
+  stopped after collection. Prior Chat evidence
   is in [the Apps cross-CLI probe](../../../cats-apps/docs/research/2026-10-24-chinese-model-cross-cli-reprobe.md).
-  Implementation provenance and pending gates are recorded in
+  Implementation provenance, failed-attempt limits and native acceptance are recorded in
   [the Cursor runner evidence](../research/2026-10-24-cursor-image-runner.md).
 
 - Fixtures cover invocation flags, real pipe framing with a Node stand-in for muse, stopping a

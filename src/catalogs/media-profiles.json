@@ -46,7 +46,7 @@
       "revision": 1,
       "provider": "cursor",
       "operation": "image.generate",
-      "enabled": false,
+      "enabled": true,
       "agentConfig": { "id": "cursor-glm-5.3-max", "model": "glm-5p3[reasoning=max]", "effort": "max" },
       "aspectRatio": { "mode": "native", "options": ["1:1"] },
       "evidence": "2026-10-24-cursor-image-runner"

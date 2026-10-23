@@ -9,8 +9,9 @@ verified a native `cursor.GenerateImage` JPEG at 1024 x 1024 through Chat. Curso
 also generated an image, but its image-understanding turn failed. Neither observation isolates
 effort, identifies the media backend or proves native GLM vision.
 
-The owner selected the Studio/Desktop release and its one-image acceptance. Its profile is
-disabled until a live attempt through the corrected runner succeeds, per
+The owner selected the Studio/Desktop release and its one-image acceptance, then explicitly
+allowed one additional image after the failed save below. The corrected runner succeeded and
+the profile is enabled under
 [ADR-047](../decisions/047-generalize-bounded-image-generation-to-provider-profiles.md).
 
 ## Implementation evidence
@@ -45,13 +46,22 @@ and full image decoding. A PNG request may return JPEG, as the earlier probe dem
   billing is unknown.
 - The corrected invocation omits `--force`, removes the blanket Write deny and explicitly allows
   Write only under this attempt's `.cursor-data/projects/**`; ordinary tool events still stop
-  execution. Another image invocation requires the owner's additional one-image allowance;
-  no automatic generation retry is implemented.
+  execution. The owner authorized one further image; no automatic generation retry is implemented.
+- That extra invocation passed through `ImageGenerationService` and the native runner: one schema
+  lookup, one GenerateImage, zero other tool calls, 25.0 seconds, process stopped after collection.
+  Native session `2db1277e-78f6-4f23-8bb2-f897de4b89c2`, receipt
+  `42875b69-4cad-4712-b229-74ff9c67b146`. The tool requested `studio-image.png` and returned
+  `assets/studio-image.jpg` inside its isolated project root. Retained original: JPEG,
+  **1024 x 1024**, **90,500 bytes**, opaque, SHA-256
+  `207d70095e5080d94d2618970ef765dac510fbc28d8b81125e35d577124d8079`.
+  Complete Runtime decode and visual inspection passed; there was no format conversion or
+  replacement with an earlier sample. This validates the native Windows runner/service seam,
+  not a live paid Desktop SDK end-to-end call. Host/SDK coverage below uses fixtures.
 
 The four image regression files passed 33 tests. Cursor-specific fixtures cover explicit
 model/transport/capabilities, completion correlation, foreign tools and paths, extra calls,
 missing/corrupt output, output caps and cancellation. Runtime TypeScript passed. Platform's
 isolated actual Studio package/SDK/host fixture check passed five-card order and centered/default
 Grok, Cursor JPEG submission/download, reopening without generation and narrow layout; zero CLI
-calls. Independent review and successful live runner acceptance remain pending. Runtime keeps
+calls. Successful native runner acceptance passed; independent review was unavailable. Runtime keeps
 its existing package version and is selected by exact source SHA for Desktop, without npm publication.
