@@ -1,8 +1,9 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRuntimeApp as createApp, type AppContext } from './app.js';
+import { createRuntimeApp as createApp, getRuntimeSessionManager, type AppContext } from './app.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
@@ -204,6 +205,49 @@ describe('session MCP servers HTTP contract (SPEC-035)', () => {
     expect(JSON.parse(resumedText).mcpServers).toMatchObject({ status: 'delivered' });
     expect(resumedText).not.toContain(TOKEN);
     expect(lastSpawn().env).toEqual({ CATS_MCP_CATS_TOKEN: TOKEN });
+  });
+
+  it('waits for the complete old helper lifetime before applying MCP and writing a turn', async () => {
+    const { app, text } = await createSession({ provider: 'claude' });
+    const { id } = JSON.parse(text) as { id: string };
+    registry.setProviderSessionId(id, 'native-claude-session'); registry.updateStatus(id, 'ready');
+    const streamMessage = vi.fn(async function* () { yield { type: 'result' as const }; });
+    const worker = Object.assign(new EventEmitter(), { alive: true, busy: false, processRunning: true, streamMessage });
+    vi.mocked(pool.get).mockReturnValue(worker as never); vi.mocked(pool.spawn).mockClear();
+    const pending = app.request(`/sessions/${id}/messages`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
+      body: JSON.stringify({ message: 'hello', mcpServers: MCP_SERVERS }) });
+    await vi.waitFor(() => expect(pool.kill).toHaveBeenCalledWith(id));
+    worker.emit('exit', 0); await Promise.resolve();
+    expect(pool.spawn).not.toHaveBeenCalled(); expect(streamMessage).not.toHaveBeenCalled();
+    worker.processRunning = false; worker.emit('process-stopped');
+    const response = await pending; const body = await response.text();
+    expect(response.status, body).toBe(200); expect(body).not.toContain(TOKEN);
+    expect(pool.spawn).toHaveBeenCalledOnce(); expect(streamMessage).toHaveBeenCalledOnce();
+    expect(lastSpawn().opts.mcpServers).toEqual([expect.objectContaining({ name: 'cats' })]);
+  });
+
+  it('does not close a newer busy execution when an old MCP replacement is superseded', async () => {
+    const { app, text } = await createSession({ provider: 'claude' });
+    const { id } = JSON.parse(text) as { id: string };
+    registry.setProviderSessionId(id, 'native-claude-session'); registry.updateStatus(id, 'ready');
+    const streamMessage = vi.fn(async function* () { yield { type: 'result' as const }; });
+    const worker = Object.assign(new EventEmitter(), { alive: true, busy: false, processRunning: true, streamMessage });
+    vi.mocked(pool.get).mockReturnValue(worker as never); vi.mocked(pool.spawn).mockClear();
+    const pending = app.request(`/sessions/${id}/messages`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
+      body: JSON.stringify({ message: 'old', mcpServers: MCP_SERVERS }) });
+    await vi.waitFor(() => expect(pool.kill).toHaveBeenCalledWith(id));
+    const peer = { active: true, busy: true, kill: vi.fn() };
+    const runtime = getRuntimeSessionManager(context);
+    const run = runtime.beginRun(registry.get(id)!, { message: 'new peer turn' });
+    runtime.attachExecutionHandle(id, peer as never); registry.updateStatus(id, 'busy');
+    worker.processRunning = false; worker.emit('process-stopped');
+    const response = await pending; const body = await response.text();
+    expect(response.status, body).toBe(409); expect(JSON.parse(body).code).toBe('session_replacement_cancelled');
+    expect(registry.get(id)?.status).toBe('busy'); expect(runtime.get(id)).toBe(peer);
+    expect(runtime.getTrackedState(id)?.currentRun?.id).toBe(run.id);
+    expect(pool.spawn).not.toHaveBeenCalled(); expect(streamMessage).not.toHaveBeenCalled(); expect(peer.kill).not.toHaveBeenCalled();
   });
 
   it('recycles a live supporting worker through resume when a send changes the set', async () => {
