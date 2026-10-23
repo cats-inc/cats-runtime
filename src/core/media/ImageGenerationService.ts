@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, open, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, rename, rm, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { ProviderInstanceConfig } from '../../backends/cli/config.js';
 import { IMAGE_AGENT_MODEL, recoverGrokImage, type ImageExecution, type ImageExecutionResult } from '../../backends/cli/media/grokImage.js';
@@ -161,6 +161,15 @@ export class ImageGenerationService {
     });
     await stopped; // Outside the queue: completion also needs the serial writer.
     return this.get(id);
+  }
+  /** Deletes a receipt and its image unless its attempt is still live (cancel first); a missing receipt is already gone. */
+  async remove(id: string): Promise<{ deleted: true }> {
+    return this.serial(async () => {
+      // Only a live attempt can still write here; a receipt left nonterminal by a failed final write is stale.
+      if (this.active.has(id)) throw new ImageError('image_not_deletable', 409);
+      await rm(this.folder(id), { recursive: true, force: true });
+      return { deleted: true as const };
+    });
   }
   async image(id: string): Promise<Buffer> {
     const job = await this.get(id);
