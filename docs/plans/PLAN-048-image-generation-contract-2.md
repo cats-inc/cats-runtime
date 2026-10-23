@@ -20,12 +20,12 @@
 - [x] Schema 1 receipt upgrade, with backup, atomic replace, crash rerun, and refusal of unknown
   or damaged receipts.
 - [x] Muse live acceptance: one image through the runner, then the profile was enabled.
-- [ ] Codex: find a pre-execution bound for `image_gen__imagegen` (CLI 0.163.0 has none) or
-  get the owner's decision on a runner-enforced bound. Then a runner, fixtures and one live
-  call.
-- [ ] Antigravity: bound one `image-generator` child and one `generate_image` call, correlate
-  parent and child, and collect from the native artifact root. Then a runner, fixtures and one
-  live call.
+- [x] Codex: the CLI has no pre-execution bound; the owner accepted a runner-enforced bound
+  (2026-10-23). Runner, fixtures and one live call are done.
+- [x] Antigravity: one `invoke_subagent` and collection from this conversation's artifact
+  folder, under a runner-enforced bound. Fixtures and one live call are done.
+- [ ] Muse: find a muse 1.4 setting (for example an `--agents` overlay or a permission profile)
+  that keeps only `image_generation`, so the memory and artifact tools are off.
 - [ ] Release: next Runtime 0.x minor (HTTP contract change), bundled with the Platform
   contract 2 consumer in a Desktop preview.
 
@@ -39,4 +39,5 @@
 
 | Date | Note |
 | --- | --- |
+| 2026-10-23 | The owner asked to open all four providers for testing and accepted runner-enforced bounds for Codex and Antigravity. One live call each passed: Codex, a 1254 x 1254 PNG in 27.0 s; Antigravity, a 1024 x 1024 JPEG in 27.1 s with one delegation. Both stopped after the image, and both profiles are enabled. An independent review led to stricter Muse result binding, an atomic receipt-upgrade backup, and documentation of the Muse memory-write risk. |
 | 2026-10-23 | Contract 2 and the Muse runner were implemented. The first live Muse call ended without an image: `--disable-write` had removed `image_generation`, and the model replied only that the tool was unavailable. Writes now stay enabled inside the attempt workspace. The second call saved a 1920 x 1280 PNG in 18.6 s and the profile was enabled. |

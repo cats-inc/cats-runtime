@@ -256,7 +256,7 @@ send({type:'max_turns_reached'});send({type:'end',sessionId:${JSON.stringify(inp
     const { root, input } = await fixture();
     const museTarget = { id: 'native', providerName: 'muse' as const, commandConfig: { path: process.execPath, runner: 'direct' as const, runtime: { mode: 'native' as const } } };
     const service = new ImageGenerationService({ ...serviceOptions(path.join(root, 'receipts'), input, async () => generated()),
-      targets: (provider: string) => provider === 'grok' ? [input.target] : [museTarget, { ...museTarget, id: 'docker' }],
+      targets: (provider: string) => provider === 'grok' ? [input.target] : provider === 'muse' ? [museTarget, { ...museTarget, id: 'docker' }] : [],
       supports: (_provider: string, target: { id: string }) => target.id !== 'docker' });
     const capabilities = service.capabilities();
     expect(capabilities.targets.map((target) => target.id)).toEqual(['grok/native', 'muse/native']);
@@ -264,7 +264,7 @@ send({type:'max_turns_reached'});send({type:'end',sessionId:${JSON.stringify(inp
       operation: 'image.generate', targetIds: ['muse/native'], agentConfigs: [{ id: 'muse-spark-1.3-xhigh', model: 'muse-spark-1.3', effort: 'xhigh' }],
       inputs: { min: 0, max: 0 }, aspectRatio: { mode: 'service' } });
     const disabled = new ImageGenerationService({ ...serviceOptions(path.join(root, 'other'), input, async () => generated()),
-      profiles: profiles.map((profile) => ({ ...profile, enabled: profile.provider === 'grok' })), targets: () => [museTarget] });
+      profiles: profiles.map((profile) => ({ ...profile, enabled: profile.provider === 'grok' })), targets: (provider: string) => provider === 'grok' ? [input.target] : [museTarget] });
     expect(disabled.capabilities().profiles.map((profile) => profile.id)).toEqual(['grok-generate']);
     expect(capabilities.revision).not.toBe(disabled.capabilities().revision);
   });

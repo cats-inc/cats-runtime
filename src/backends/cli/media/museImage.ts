@@ -25,7 +25,8 @@ const WRITE_TOOLS = ['add_memory', 'apply_patch', 'artifact', 'edit_file', 'edit
 /**
  * One model step and no parallel tool calls are CLI limits, enforced before anything runs: the step that
  * calls the image tool is the run's last, so at most one tool runs. Shell and web tools are off; writes stay
- * on because the image tool needs them, and land only in this attempt's empty workspace.
+ * on because the image tool needs them. The runner stops a run whose one call is anything else, but approvals
+ * are off, so that call (for example a memory write) may already have run.
  */
 export function museImageInvocation(input: ImageExecution) {
   const provider = new MuseProvider();
@@ -69,12 +70,12 @@ export async function executeMuseImage(input: ImageExecution, spawnProcess: type
   const config = museImageInvocation(input);
   const normalizer = new MuseProvider();
   normalizer.prepareEphemeralTurn({ message: input.prompt });
-  const outcome = await new Promise<{ callId: string; completed: boolean }>((resolve, reject) => {
+  const outcome = await new Promise<{ callId: string }>((resolve, reject) => {
     const child = spawnProcess(config.command, config.args, { cwd: config.cwd ?? input.cwd, env: config.env,
       shell: config.shell, windowsVerbatimArguments: config.windowsVerbatimArguments,
       windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] });
     let buffer = ''; let observedBytes = 0; let errorText = ''; let failure: string | null = null;
-    let proposed = 0; let callId: string | null = null; let completed = false;
+    let proposed = 0; let callId: string | null = null;
     const decoder = new StringDecoder('utf8');
     const stop = (code: string) => {
       if (failure || callId) return;
@@ -91,6 +92,9 @@ export async function executeMuseImage(input: ImageExecution, spawnProcess: type
       if (proposal !== null && (proposal !== IMAGE_TOOL || ++proposed > 1)) { stop('image_tool_limit'); return; }
       if (event.type === 'tool_result') {
         if (event.toolName !== IMAGE_TOOL) { stop('image_tool_limit'); return; }
+        // The result must answer the one proposal of this run's own session.
+        const stream = (event.raw as { stream?: { kind?: unknown; id?: unknown } } | undefined)?.stream;
+        if (proposed !== 1 || stream?.kind !== 'session' || stream.id !== input.id) { stop('invalid_image_source'); return; }
         if (event.isError) { errorText += (event.text ?? '').slice(0, 16000); stop(classifyImageFailure(errorText)); return; }
         const saved = SAVED.exec(event.text ?? '');
         if (!saved || saved[1] !== event.toolId) { stop('invalid_image_source'); return; }
@@ -98,7 +102,6 @@ export async function executeMuseImage(input: ImageExecution, spawnProcess: type
         callId = saved[1]!;
         stopProcessTree(child);
       }
-      if (event.type === 'result') completed = true;
       if (event.type === 'error') errorText += event.text.slice(0, 16000);
     };
     const line = (text: string) => {
@@ -126,10 +129,11 @@ export async function executeMuseImage(input: ImageExecution, spawnProcess: type
     child.on('close', () => {
       clearTimeout(timer); input.signal.removeEventListener('abort', abort);
       line(buffer + decoder.end());
-      if (callId) resolve({ callId, completed });
+      if (callId) resolve({ callId });
       else reject(new ImageError(failure ?? classifyImageFailure(errorText)));
     });
   });
   const collected = await collectMuseImage(input, outcome.callId);
-  return { ...collected, executionOutcome: outcome.completed ? 'completed' : 'stopped_after_image' };
+  // The runner ends the run at the tool result, before any final answer.
+  return { ...collected, executionOutcome: 'stopped_after_image' };
 }

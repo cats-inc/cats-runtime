@@ -63,3 +63,5 @@ remained afterwards.
   server or Desktop path. Platform and Studio integration have their own acceptance.
 - The single-step limit, the parallel-call flag and the absent shell/web tools are CLI
   settings. The runner's stop on any other proposal is a second guard, not the primary bound.
+- Keeping writes on also enables Muse's memory and artifact tools. If the model's one call were
+  one of them, the runner would fail the attempt, but that call could already have run.

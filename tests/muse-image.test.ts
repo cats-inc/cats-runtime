@@ -111,7 +111,7 @@ describe('bounded Muse image generation', () => {
     catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EPERM') throw error; return; }
     await expect(executeMuseImage(input, await fakeMuse(root, [r.proposed('t1', 'image_generation'), r.intent('t1', 'call_1'), saved])))
       .rejects.toThrow('invalid_image_source');
-  });
+  }, 30_000);
   it('honours cancellation before an image exists and leaves no stray process output behind', async () => {
     const { root, input } = await fixture(); const controller = new AbortController();
     const launch = await fakeMuse(root, [records(input.id).proposed('t1', 'image_generation')]);

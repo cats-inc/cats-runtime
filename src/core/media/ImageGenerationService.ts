@@ -91,14 +91,17 @@ export class ImageGenerationService {
     if (value.schemaVersion !== 2 || value.id !== id || !STATUSES.includes(value.status as ImageStatus)) throw new ImageError('image_state_invalid', 503);
     return value as ImageJob;
   }
-  /** Back up the original, then replace atomically. A rerun after a crash finds the same backup and finishes. */
+  /**
+   * Back up the original, then replace atomically. `job.json` holds the original until that replace, so a backup
+   * left partial by a crash is rewritten from it; a rerun finds the same backup and finishes.
+   */
   private async upgrade(original: SchemaOneReceipt) {
     const backup = path.join(this.folder(original.id), 'job.schema-1.json');
     const text = await readFile(path.join(this.folder(original.id), 'job.json'), 'utf8');
-    try { await writeFile(backup, text, { flag: 'wx' }); }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      if (await readFile(backup, 'utf8') !== text) throw new ImageError('image_state_invalid', 503);
+    if (await readFile(backup, 'utf8').catch(() => null) !== text) {
+      const temporary = path.join(this.folder(original.id), `job.schema-1-${randomUUID()}.tmp`);
+      try { await writeFile(temporary, text, { flag: 'wx' }); await rename(temporary, backup); }
+      finally { await unlink(temporary).catch(() => {}); }
     }
     const upgraded = upgradeSchemaOne(original);
     await this.write(upgraded);
@@ -207,7 +210,7 @@ export class ImageGenerationService {
     try {
       const result = await this.options.execute(input);
       if (input.signal.aborted) throw new ImageError('cancelled');
-      const saved: ImageJob = { ...job, status: 'succeeded', output: result.metadata, executionOutcome: result.executionOutcome };
+      const saved: ImageJob = { ...job, status: 'succeeded', output: result.metadata, executionOutcome: result.executionOutcome, warnings: result.warnings ?? [] };
       const temporary = path.join(this.folder(job.id), 'image.tmp');
       await writeFile(temporary, result.bytes, { flag: 'wx' });
       await rename(temporary, path.join(this.folder(job.id), imageFile(saved)));

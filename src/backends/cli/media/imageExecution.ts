@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { lstat, open, realpath } from 'node:fs/promises';
+import { lstat, open, readdir, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import jpeg from 'jpeg-js';
 import { PNG } from 'pngjs';
@@ -17,6 +17,8 @@ export interface ImageExecutionResult {
   bytes: Buffer; metadata: ImageMetadata;
   /** `stopped_after_image`: the runner ended the process once the verified image existed. */
   executionOutcome: 'completed' | 'stopped_after_image';
+  /** For example `additional_image_generated` when a runner-bounded CLI saved more than the one image it keeps. */
+  warnings?: string[];
 }
 
 export const IMAGE_PROCESS_DEADLINE_MS = 300_000;
@@ -103,4 +105,33 @@ export function classifyImageFailure(text: string): string {
   if (/privacy|zero.data|\bzdr\b/i.test(text)) return 'privacy_required';
   if (/refus|content.policy|not.allowed|moderation/i.test(text)) return 'generation_refused';
   return 'generation_failed';
+}
+
+const IMAGE_FILE = /\.(png|jpe?g)$/i;
+/**
+ * For CLIs that save into a provider-owned folder keyed by this run's own session: returns the first image
+ * file once it is complete (unchanged across two looks and decodable). Only that session's folder is read.
+ */
+export async function firstStableImage(root: string, folder: string, signal: AbortSignal, intervalMs = 300):
+  Promise<{ file: string; bytes: Buffer; others: number } | null> {
+  let previous: { file: string; size: number; mtimeMs: number } | null = null;
+  while (!signal.aborted) {
+    let names: string[] = [];
+    try { names = (await readdir(folder)).filter((name) => IMAGE_FILE.test(name)); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+    if (names.length) {
+      const entries = await Promise.all(names.map(async (name) => ({ file: path.join(folder, name), info: await stat(path.join(folder, name)) })));
+      entries.sort((a, b) => a.info.birthtimeMs - b.info.birthtimeMs || a.file.localeCompare(b.file));
+      const first = entries[0]!;
+      if (previous && previous.file === first.file && previous.size === first.info.size && previous.mtimeMs === first.info.mtimeMs && first.info.size > 0) {
+        await containedImageFile(root, folder, first.file);
+        const bytes = await readStableImage(first.file, signal);
+        try { validateImage(bytes); return { file: first.file, bytes, others: entries.length - 1 }; }
+        catch { /* Still being written in place; look again. */ }
+      }
+      previous = { file: first.file, size: first.info.size, mtimeMs: first.info.mtimeMs };
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return null;
 }

@@ -1,7 +1,7 @@
 # SPEC-038: Image generation contract 2
 
-- Status: Implemented for generation. Grok and Muse are enabled; Antigravity and Codex have
-  no runner yet.
+- Status: Implemented for generation. Grok, Muse, Codex and Antigravity are enabled. Codex and
+  Antigravity have runner-enforced bounds, which the owner accepted on 2026-10-23.
 - Decision: [ADR-047](../decisions/047-generalize-bounded-image-generation-to-provider-profiles.md).
 - Plan: [PLAN-048](../plans/PLAN-048-image-generation-contract-2.md).
 - Supersedes the HTTP shapes of [SPEC-033](SPEC-033-bounded-image-generation.md). Its
@@ -41,6 +41,8 @@
 - Enabled profiles today:
   - `grok-generate`: Grok 4.7 / xhigh, native 1:1
   - `muse-generate`: Muse Spark 1.3 / xhigh, service-decided ratio
+  - `codex-generate`: GPT-6.1-Sol / xhigh, service-decided ratio
+  - `antigravity-generate`: Gemini 3.8 Flash high, native 1:1 requested
 
 ## Request
 
@@ -99,9 +101,11 @@
   - `--session-id <receipt id>`.
   - The prompt is passed only after `--`.
 - Writes stay enabled, because muse 1.4 removes `image_generation` with `--disable-write`. The
-  working directory is the attempt's own empty workspace.
+  working directory is the attempt's own empty workspace. This also enables memory and artifact
+  tools. A run whose one call is such a tool is stopped and fails, but that call may already have
+  run.
 - Accepted evidence is all of:
-  - the session stream equals the receipt ID;
+  - the session stream, including the result record, equals the receipt ID;
   - the only tool proposal is `image_generation`;
   - its result reads `Saved generated image to generated_images/<call id>.png`, where the call
     ID matches the result's call ID;
@@ -111,11 +115,34 @@
   file fail the attempt. The error is classified (`auth_required`, `quota_exhausted`,
   `generation_refused`, `generation_failed`). Nothing is retried.
 
+### Codex and Antigravity runners
+
+- **Codex.** The invocation is `codex exec --json --skip-git-repo-check --ignore-user-config
+  --ignore-rules --sandbox read-only`, with `--disable` for `shell_tool`, `browser_use`,
+  `computer_use`, `multi_agent` and `apps`, the model and effort as `-c` values,
+  `--cd <workspace>`, and the prompt after `--`.
+  - `thread.started` names the thread. File change, MCP, web, collaboration or todo items stop
+    the run.
+  - The image is the first complete file in `$CODEX_HOME/generated_images/<thread>/`.
+- **Antigravity.** The invocation is `agy -p <prompt> --output-format stream-json` with the
+  adapter's base arguments, `--add-dir <workspace>`, `--model`, `--dangerously-skip-permissions`
+  (print mode cannot run a tool otherwise) and `--sandbox`.
+  - `init` names the conversation. Any tool other than one `invoke_subagent` (or a direct
+    `generate_image`) stops the run.
+  - The image is the first complete file in `~/.gemini/antigravity-cli/brain/<conversation>/`.
+- Shared rules for both:
+  - Only that session's folder is read.
+  - A file counts as complete when it is unchanged across two looks and decodes.
+  - Containment and single-link checks apply.
+  - Extra files there add the `additional_image_generated` warning.
+  - If no image appears before the process ends, the attempt fails with the classified error.
+
 ## Validation boundary
 
 - Fixtures cover invocation flags, real pipe framing with a Node stand-in for muse, stopping a
   run that keeps going, transparency, each refusal path, cancellation, PNG corruption and size
   caps, capabilities gating, stale revisions and the schema 1 upgrade.
-- One owner-authorized live Muse image passed through `executeMuseImage`. See the
-  [acceptance record](../research/2026-10-23-muse-bounded-image-acceptance.md). That run went
-  through the runner, not the HTTP server or Desktop.
+- One owner-authorized live image each passed through the runner. These runs went through the
+  runner, not the HTTP server or Desktop.
+  - Muse: [acceptance](../research/2026-10-23-muse-bounded-image-acceptance.md).
+  - Codex and Antigravity: [acceptance](../research/2026-10-23-codex-antigravity-bounded-image-acceptance.md).

@@ -54,7 +54,10 @@ production only after two checks pass for that route:
    - Limits enforced by the CLI: `--max-model-steps 1`, `--no-parallel-tool-calls`, shell and
      web tools off, and a Runtime-chosen session ID.
    - Writes stay on, because muse 1.4 classes its image tool as a workspace write and
-     `--disable-write` removes it. Any write can land only in the attempt's empty workspace.
+     `--disable-write` removes it. That also enables Muse's memory and artifact tools. The
+     runner stops a run whose single call is anything else, but approvals are off, so that one
+     call (for example a memory write outside the workspace) may already have run. No muse 1.4
+     switch that keeps only the image tool was found.
    - Success is the matching `image_generation` result naming `generated_images/<call id>.png`,
      plus a valid PNG at that place. The runner then ends the process; it does not wait for a
      final answer, which may never come.
@@ -73,10 +76,18 @@ production only after two checks pass for that route:
   Desktop bundles Runtime with the matching Platform.
 - Muse's ratio is service-decided. Profiles say so (`aspectRatio.mode: "service"`), and only
   measured dimensions describe a result.
-- Codex 0.163.0 offers no CLI-enforced limit on media calls. Its image tool is reachable only
-  from inside native `exec` code. Under PLAN-006 that route stays disabled until a
-  pre-execution bound exists or the owner accepts a runner-enforced bound.
-- Antigravity still needs a check that the child delegation is bounded before it can be
+- Codex 0.163.0 and Antigravity 1.4.6 offer no CLI-enforced limit on media calls. On
+  2026-10-23 the owner accepted a runner-enforced bound for both. Each run:
+  - turns off what the CLI lets it turn off. Codex: shell, browser, computer and agent tools,
+    user config and rules, read-only sandbox. Antigravity: terminal restrictions;
+  - stops on a foreign tool (Codex: file change, MCP, web; Antigravity: any tool other than one
+    `invoke_subagent`);
+  - ends the process once the first image in its own session folder is complete. Codex reads
+    `$CODEX_HOME/generated_images/<thread>/`; Antigravity reads
+    `~/.gemini/antigravity-cli/brain/<conversation>/`.
+
+  A second image started before the stop may still be generated; it is not kept, and the
+  receipt warns `additional_image_generated`. Both routes passed one live call and are
   enabled.
 - Separate media charges remain unknown. A profile states what the CLI bounds, not a cost
   ceiling.

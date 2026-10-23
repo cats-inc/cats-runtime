@@ -4,6 +4,8 @@ import { warnIfNonLoopbackBind } from './listener.js';
 import { ImageGenerationService } from './core/media/ImageGenerationService.js';
 import { executeGrokImage, recoverGrokImage, supportsGrokImage } from './backends/cli/media/grokImage.js';
 import { executeMuseImage, supportsMuseImage } from './backends/cli/media/museImage.js';
+import { executeCodexImage, supportsCodexImage } from './backends/cli/media/codexImage.js';
+import { executeAntigravityImage, supportsAntigravityImage } from './backends/cli/media/antigravityImage.js';
 import { loadImageProfiles } from './core/media/profiles.js';
 import { ImageError } from './core/media/contracts.js';
 import type { SessionInfo } from './core/types.js';
@@ -1103,7 +1105,8 @@ export function createRuntimeServer(
     root: join(getRuntimeResolvedPaths(config).dataDir, 'image-generations'),
     profiles: loadImageProfiles(),
     targets: (provider) => Object.values(config.providerInstances?.[provider] ?? {}),
-    supports: (provider, target) => provider === 'grok' ? supportsGrokImage(target) : supportsMuseImage(target),
+    supports: (provider, target) => ({ grok: supportsGrokImage, muse: supportsMuseImage, codex: supportsCodexImage,
+      antigravity: supportsAntigravityImage })[provider](target),
     recover: (input) => input.provider === 'grok' ? recoverGrokImage(input) : null,
     env: { ...getRuntimeConfigEnv(config) },
     execute: async (input) => {
@@ -1126,7 +1129,7 @@ export function createRuntimeServer(
           try { release = pool.reserveExternalExecution(input.id, input.provider, input.instance, abort); }
           catch (error) { throw new ImageError(error instanceof PoolCapacityError ? 'runtime_capacity_full' : 'image_service_busy', 429); }
           const turnStartedAt = Date.now();
-          const run = input.provider === 'grok' ? executeGrokImage : executeMuseImage;
+          const run = { grok: executeGrokImage, muse: executeMuseImage, codex: executeCodexImage, antigravity: executeAntigravityImage }[input.provider];
           return await run({ ...input, signal: controller.signal,
             observe: (event) => { context.metering!.observeEvent(session, event, { turnStartedAt }); } });
         } finally { input.signal.removeEventListener('abort', abort); }
