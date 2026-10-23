@@ -687,7 +687,8 @@ Keep `.env` for runtime-wide values and secrets:
 - `CATS_RUNTIME_PORT=3110`
 - `CATS_RUNTIME_API_KEY=`
 - `CATS_RUNTIME_DIR=~/.cats/runtime`
-- `CATS_RUNTIME_MAX_SESSIONS=10`
+- `CATS_RUNTIME_MAX_SESSIONS=50` (live CLI workers, idle ones included, plus bounded
+  native operations such as Studio images; idle workers are not reclaimed yet)
 - `CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS=5000`
 - `CATS_RUNTIME_WSL_DISCOVERY_POLICY=if_running`
 - `CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS=15000`

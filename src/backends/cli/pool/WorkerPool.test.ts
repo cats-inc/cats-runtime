@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadConfig, resolveProviderInstance } from '../config.js';
-import { WorkerPool } from './WorkerPool.js';
+import { PoolCapacityError, WorkerPool } from './WorkerPool.js';
 import { SessionRegistry } from './SessionRegistry.js';
 
 describe('WorkerPool', () => {
@@ -20,6 +20,8 @@ describe('WorkerPool', () => {
     expect(() => pool.reserveExternalExecution('image-2', 'grok', instance.id, () => {})).toThrow(/singleton/);
     config.maxSessions = 1;
     expect(() => pool.spawn('chat-1', 'grok', { cwd: '/tmp/cats-runtime-workerpool-test' }, instance.id)).toThrow(/Max sessions/);
+    // A full pool is a capacity error, which callers report differently from a held singleton.
+    expect(() => pool.reserveExternalExecution('image-3', 'grok', instance.id, () => {})).toThrow(PoolCapacityError);
     pool.killAll(); expect(cancelled).toBe(1);
     expect(pool.activeCount).toBe(1); // Killing is not evidence of process exit.
     release(); release(); expect(pool.activeCount).toBe(0);

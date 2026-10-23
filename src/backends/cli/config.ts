@@ -514,7 +514,7 @@ export function loadConfig(
     ),
     maxSessions: parsePositiveInt(
       env.CATS_RUNTIME_MAX_SESSIONS,
-      10,
+      50,
       'CATS_RUNTIME_MAX_SESSIONS',
     ),
     spawnRetries: parsePositiveInt(

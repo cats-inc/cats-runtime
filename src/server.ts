@@ -52,7 +52,7 @@ import { createRuntimeAdapter } from './backends/cli/runtime/runtime.js';
 import { SessionRegistry } from './backends/cli/pool/SessionRegistry.js';
 import { ApiBackendManager } from './backends/api/runtime/ApiBackendManager.js';
 import { AgentBackendManager } from './backends/agent/runtime/AgentBackendManager.js';
-import { WorkerPool } from './backends/cli/pool/WorkerPool.js';
+import { PoolCapacityError, WorkerPool } from './backends/cli/pool/WorkerPool.js';
 import { RuntimeSessionManager } from './core/runtime/RuntimeSessionManager.js';
 import { resolveProviderTarget } from './core/providerCatalog.js';
 import {
@@ -1119,7 +1119,7 @@ export function createRuntimeServer(
         if (input.signal.aborted) abort();
         try {
           try { release = pool.reserveExternalExecution(input.id, 'grok', input.instance, abort); }
-          catch { throw new ImageError('image_service_busy', 429); }
+          catch (error) { throw new ImageError(error instanceof PoolCapacityError ? 'runtime_capacity_full' : 'image_service_busy', 429); }
           const turnStartedAt = Date.now();
           return await executeGrokImage({ ...input, signal: controller.signal,
             observe: (event) => { context.metering!.observeEvent(session, event, { turnStartedAt }); } });

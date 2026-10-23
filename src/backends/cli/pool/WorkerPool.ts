@@ -43,6 +43,11 @@ interface ProviderServiceResolvers {
   getOpencodeNative?: (instanceId?: string) => OpencodeNativeSessionService;
 }
 
+/** All `maxSessions` worker slots are taken, including idle chat workers; distinct from a held singleton. */
+export class PoolCapacityError extends Error {
+  constructor() { super('Max sessions reached'); this.name = 'PoolCapacityError'; }
+}
+
 export class WorkerPool {
   private readonly sessionMcpConnections = new Map<string, Map<string, string>>();
 
@@ -89,7 +94,7 @@ export class WorkerPool {
   /** Bounded native operations share worker admission/singletons, without creating a chat session. */
   reserveExternalExecution(id: string, provider: ProviderName, instanceId: string, cancel: () => void): () => void {
     if (this.workers.has(id) || this.externalExecutions.has(id)) throw new Error('Execution already reserved');
-    if (this.activeCount >= this.config.maxSessions) throw new Error('Max sessions reached');
+    if (this.activeCount >= this.config.maxSessions) throw new PoolCapacityError();
     const instance = resolveProviderInstance(this.config, provider, instanceId);
     if (instance.commandConfig.singleton) this.reserveSingletonResource(instance.commandConfig.singleton, id);
     this.externalExecutions.set(id, { provider, cancel });
