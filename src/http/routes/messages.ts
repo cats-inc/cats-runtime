@@ -25,6 +25,7 @@ import type {
 import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
 import { assertRetainedSkillContent, getRuntimeSkillContentPolicy } from '../../core/skills/contentPolicy.js';
 import { ManagedExecutionHandle } from '../../core/runtime/ManagedExecutionHandle.js';
+import { RuntimeSessionReplacementError } from '../../core/runtime/RuntimeSessionManager.js';
 import {
   buildAgentDiagnosticSessionActivity,
   buildAgentDiagnosticSessionEvidence,
@@ -189,7 +190,7 @@ async function* streamTurnWithPiRecovery(
       }
       return;
     } catch (err) {
-      if (recovered || sawEvent || !recoverPiUnknownSession(ctx, id, err)) {
+      if (recovered || sawEvent || !await recoverPiUnknownSession(ctx, id, err)) {
         throw err;
       }
 
@@ -219,11 +220,11 @@ async function* withTurnTerminalEvent(
   }
 }
 
-function recoverPiUnknownSession(
+async function recoverPiUnknownSession(
   ctx: AppContext,
   id: string,
   error: unknown,
-): boolean {
+): Promise<boolean> {
   const session = ctx.registry.get(id);
   if (
     !session
@@ -234,10 +235,9 @@ function recoverPiUnknownSession(
     return false;
   }
 
-  getRuntimeSessionManager(ctx).kill(id);
   ctx.registry.clearProviderResumeState(id, { clearProviderSourcePath: true });
   try {
-    getRuntimeSessionManager(ctx).spawn(id, session.providerName, {
+    await getRuntimeSessionManager(ctx).replace(id, session.providerName, {
       cwd: session.cwd,
       workspaceMode: session.workspaceMode,
       model: session.model,
@@ -288,10 +288,10 @@ function shouldRespawnPiWorkerForSkillMutation(
     !== nextSkills?.delivery.instructions?.filePath;
 }
 
-function tryRespawnPiWorkerForSkillMutation(
+async function tryRespawnPiWorkerForSkillMutation(
   ctx: AppContext,
   session: SessionInfo,
-): boolean {
+): Promise<boolean> {
   if (session.providerName !== 'pi' || session.providerBackend !== 'cli') {
     return false;
   }
@@ -304,8 +304,7 @@ function tryRespawnPiWorkerForSkillMutation(
   }
 
   const runtime = getRuntimeSessionManager(ctx);
-  runtime.kill(session.id);
-  runtime.spawn(session.id, session.providerName, {
+  await runtime.replace(session.id, session.providerName, {
     cwd: session.cwd,
     workspaceMode: session.workspaceMode,
     model: session.model,
@@ -318,10 +317,9 @@ function tryRespawnPiWorkerForSkillMutation(
   return true;
 }
 
-function recycleWorkerForSessionMcpServers(ctx: AppContext, session: SessionInfo): void {
+async function recycleWorkerForSessionMcpServers(ctx: AppContext, session: SessionInfo, signal?: AbortSignal): Promise<void> {
   const runtime = getRuntimeSessionManager(ctx);
-  runtime.kill(session.id);
-  runtime.spawn(session.id, session.providerName, {
+  await runtime.replace(session.id, session.providerName, {
     cwd: session.cwd,
     workspaceMode: session.workspaceMode,
     model: session.model,
@@ -329,7 +327,7 @@ function recycleWorkerForSessionMcpServers(ctx: AppContext, session: SessionInfo
     instructionsFile: session.skills?.delivery.instructions?.filePath,
     permissionMode: session.permissionMode,
     allowedTools: session.allowedTools,
-  }, session.providerInstanceId, session.providerBackend);
+  }, session.providerInstanceId, session.providerBackend, signal);
   ctx.registry.updateStatus(session.id, 'ready');
 }
 
@@ -701,7 +699,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
 
   if (!peerRouted && shouldRespawnPi) {
     const updatedSession = ctx.registry.get(id) ?? session;
-    if (tryRespawnPiWorkerForSkillMutation(ctx, updatedSession)) {
+    if (await tryRespawnPiWorkerForSkillMutation(ctx, updatedSession)) {
       worker = runtime.get(id);
     }
   }
@@ -720,9 +718,16 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     // SPEC-035 SMCP-08: the live worker runs an older set, so restart it through
     // resume at this turn boundary before any input is written.
     try {
-      recycleWorkerForSessionMcpServers(ctx, ctx.registry.get(id) ?? session);
+      await recycleWorkerForSessionMcpServers(ctx, ctx.registry.get(id) ?? session, c.req.raw.signal);
     } catch (error) {
-      ctx.registry.updateStatus(id, 'closed');
+      if (error instanceof RuntimeSessionReplacementError) {
+        if (error.code === 'worker_stop_unconfirmed' && !runtime.get(id)?.active && ctx.registry.get(id)) {
+          ctx.registry.updateStatus(id, 'closed');
+        }
+        return c.json({ error: error.message, code: error.code,
+          retryable: error.code === 'worker_stop_unconfirmed' }, error.code === 'worker_stop_unconfirmed' ? 503 : 409);
+      }
+      if (ctx.registry.get(id)) ctx.registry.updateStatus(id, 'closed');
       return c.json({
         error: `Failed to apply session MCP servers: ${error instanceof Error ? error.message : String(error)}`,
       }, 500);

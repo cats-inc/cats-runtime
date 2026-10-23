@@ -136,7 +136,15 @@ class CliExecutionHandle implements ExecutionHandle {
   }
 }
 
+export class RuntimeSessionReplacementError extends Error {
+  constructor(readonly code: 'worker_stop_unconfirmed' | 'session_replacement_cancelled') {
+    super(code === 'worker_stop_unconfirmed' ? 'The previous worker did not confirm shutdown' : 'Session replacement was cancelled');
+    this.name = 'RuntimeSessionReplacementError';
+  }
+}
+
 export class RuntimeSessionManager {
+  private readonly replacements = new Map<string, symbol>();
   private readonly workspaceAttachments = new Map<string, WorkspaceActivityAttachment>();
   private readonly workspaceExecutions = new Map<string, WorkspaceActivityExecution>();
   private readonly workspaceContexts = new Map<string, WorkspaceIdentityContext>();
@@ -305,6 +313,7 @@ export class RuntimeSessionManager {
     sessionId: string,
     handle: ExecutionHandle,
   ): ExecutionHandle {
+    this.replacements.delete(sessionId);
     this.handleOverrides.set(sessionId, handle);
     return handle;
   }
@@ -332,6 +341,7 @@ export class RuntimeSessionManager {
     providerInstanceId?: string,
     providerBackend?: BackendKind,
   ): ExecutionHandle | undefined {
+    this.replacements.delete(sessionId);
     const binding = this.getSessionBinding?.(sessionId);
     if (binding) bindManagedNativeIdentity(this.config.sessionBaseDir, binding, opts.resumeSessionId ?? binding.providerSessionId);
     assertRetainedSkillContent({
@@ -451,6 +461,7 @@ export class RuntimeSessionManager {
     const workspaceTarget = resolveProviderTarget(this.config, session.providerName,
       session.providerBackend && session.providerInstanceId
         ? `${session.providerBackend}/${session.providerInstanceId}` : session.providerInstanceId);
+    this.replacements.delete(session.id);
     const tracked = this.ensureTrackedState(session.id);
     const wake = extractWakeReason(turn.context || session.context);
     const startedAt = new Date().toISOString();
@@ -639,6 +650,7 @@ export class RuntimeSessionManager {
   }
 
   async cancel(session: SessionInfo): Promise<{ attached: boolean }> {
+    this.replacements.delete(session.id);
     this.endWorkspaceExecution(session.id, 'cancelled');
     const tracked = this.ensureTrackedState(session.id);
     tracked.state = 'canceling';
@@ -683,6 +695,7 @@ export class RuntimeSessionManager {
     session: SessionInfo,
     reason: 'close' | 'delete' | 'reset' | 'shutdown' = 'close',
   ): Promise<void> {
+    this.replacements.delete(session.id);
     this.endWorkspaceExecution(session.id, 'unknown', true);
     const tracked = this.ensureTrackedState(session.id);
     tracked.state = 'closing';
@@ -880,6 +893,7 @@ export class RuntimeSessionManager {
   }
 
   dropSession(sessionId: string): void {
+    this.replacements.delete(sessionId);
     this.clearWorkspaceActivity(sessionId);
     this.handleOverrides.delete(sessionId);
     this.observedStreamStates.delete(sessionId);
@@ -936,7 +950,50 @@ export class RuntimeSessionManager {
     return worker?.alive === true;
   }
 
+  /** Replace only after every process owned by the old CLI generation has stopped. */
+  async replace(
+    sessionId: string, providerName: string, opts: ProviderSpawnOptions,
+    providerInstanceId?: string, providerBackend?: BackendKind, signal?: AbortSignal,
+  ): Promise<ExecutionHandle | undefined> {
+    const worker = this.pool.get(sessionId);
+    this.kill(sessionId);
+    const ticket = Symbol();
+    this.replacements.set(sessionId, ticket);
+    let spawning = false;
+    try {
+      if (signal?.aborted) throw new RuntimeSessionReplacementError('session_replacement_cancelled');
+      if (worker?.processRunning) await new Promise<void>((resolve, reject) => {
+        const cleanup = () => {
+          clearTimeout(timer);
+          worker.removeListener('process-stopped', stopped);
+          signal?.removeEventListener('abort', aborted);
+        };
+        const stopped = () => { if (!worker.processRunning) { cleanup(); resolve(); } };
+        const aborted = () => { cleanup(); reject(new RuntimeSessionReplacementError('session_replacement_cancelled')); };
+        const timer = setTimeout(() => { cleanup(); reject(new RuntimeSessionReplacementError('worker_stop_unconfirmed')); }, 10000);
+        timer.unref?.();
+        worker.on('process-stopped', stopped);
+        signal?.addEventListener('abort', aborted, { once: true });
+        stopped();
+      });
+      if (signal?.aborted || this.replacements.get(sessionId) !== ticket
+        || (this.getSessionBinding && !this.getSessionBinding(sessionId))) {
+        throw new RuntimeSessionReplacementError('session_replacement_cancelled');
+      }
+      spawning = true;
+      return this.spawn(sessionId, providerName, opts, providerInstanceId, providerBackend);
+    } catch (error) {
+      if (!spawning && this.replacements.get(sessionId) !== ticket) {
+        throw new RuntimeSessionReplacementError('session_replacement_cancelled');
+      }
+      throw error;
+    } finally {
+      if (this.replacements.get(sessionId) === ticket) this.replacements.delete(sessionId);
+    }
+  }
+
   kill(sessionId: string): void {
+    this.replacements.delete(sessionId);
     const override = this.getOverride(sessionId);
     if (override) {
       override.kill();
@@ -950,6 +1007,7 @@ export class RuntimeSessionManager {
   }
 
   killAll(): void {
+    this.replacements.clear();
     for (const [sessionId, handle] of this.handleOverrides.entries()) {
       handle.kill();
       this.handleOverrides.delete(sessionId);

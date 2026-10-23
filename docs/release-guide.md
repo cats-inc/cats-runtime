@@ -49,6 +49,33 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+### Prepared release notes — 0.6.1 (2026-10-23)
+
+- Fix the concrete native Cat MCP setup failure found during isolated acceptance:
+  a changed descriptor set killed the old worker and immediately spawned its
+  replacement, while the old child/Code Mode helper still owned its lifetime.
+  The pool correctly refused that overlap. Replacement now waits for complete
+  process-stopped confirmation, bounded to ten seconds, before applying descriptors
+  and writing input. Pi resume/skill replacement uses the same protocol.
+- Cancellation, close, deletion, another spawn and shutdown invalidate pending
+  replacements. Unconfirmed stop returns retryable `worker_stop_unconfirmed`
+  (503); cancellation returns 409. Capacity/singleton claims remain held until
+  the old process lifetime actually ends; the pool guard is not weakened.
+- This is a compatible 0.6.x lifecycle fix, with no HTTP request, configuration
+  or stored-data format change. All receipt upgrade validation/backups/recovery
+  from 0.6.0 remain. Published 0.6.0 package and evidence stay immutable.
+- Targeted coverage includes the real WorkerProcess child/helper lifetime,
+  captured old handle, cancellation/close/deletion, timeout/abort capacity, and
+  MCP HTTP setup before input, plus unchanged-descriptor no-restart. Full hosted
+  preflight and native rerun remain required; the failed native probe admitted
+  no image. These tests do not claim live Telegram delivery.
+- Selected distribution: npm `@cats-inc/cats-runtime@0.6.1`, explicit `latest`,
+  and the coordinated Desktop 0.9.3 standard preview. Desktop pins this fix's
+  immutable merge SHA in its original release preparation and source receipt.
+  Existing trusted npm publisher/provenance and standard Desktop signing remain;
+  no Runtime GitHub Release or cats-one release is selected. Verify publication
+  in hosted Actions/registry without a later status-only edit.
+
 ### Prepared release notes — 0.6.0 (2026-10-23)
 
 - Image contract 2 exposes provider profiles, configuration/revision checks and
