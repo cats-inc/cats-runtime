@@ -5,6 +5,7 @@ import { ImageGenerationService } from './core/media/ImageGenerationService.js';
 import { executeGrokImage, recoverGrokImage, supportsGrokImage } from './backends/cli/media/grokImage.js';
 import { executeMuseImage, recoverMuseImage, supportsMuseImage } from './backends/cli/media/museImage.js';
 import { executeCodexImage, supportsCodexImage } from './backends/cli/media/codexImage.js';
+import { executeCursorImage, supportsCursorImage } from './backends/cli/media/cursorImage.js';
 import { executeAntigravityImage, supportsAntigravityImage } from './backends/cli/media/antigravityImage.js';
 import { loadImageProfiles } from './core/media/profiles.js';
 import { ImageError } from './core/media/contracts.js';
@@ -1106,7 +1107,7 @@ export function createRuntimeServer(
     profiles: loadImageProfiles(),
     targets: (provider) => Object.values(config.providerInstances?.[provider] ?? {}),
     supports: (provider, target) => ({ grok: supportsGrokImage, muse: supportsMuseImage, codex: supportsCodexImage,
-      antigravity: supportsAntigravityImage })[provider](target),
+      antigravity: supportsAntigravityImage, cursor: supportsCursorImage })[provider](target),
     recover: (input) => input.provider === 'grok' ? recoverGrokImage(input)
       : input.provider === 'muse' ? recoverMuseImage(input) : null,
     env: { ...getRuntimeConfigEnv(config) },
@@ -1138,7 +1139,8 @@ export function createRuntimeServer(
             throw new ImageError(code, error instanceof PoolSourceStopError ? 503 : 429);
           }
           const turnStartedAt = Date.now();
-          const run = { grok: executeGrokImage, muse: executeMuseImage, codex: executeCodexImage, antigravity: executeAntigravityImage }[input.provider];
+          const run = { grok: executeGrokImage, muse: executeMuseImage, codex: executeCodexImage,
+            antigravity: executeAntigravityImage, cursor: executeCursorImage }[input.provider];
           return await run({ ...input, signal: controller.signal,
             observe: (event) => { context.metering!.observeEvent(session, event, { turnStartedAt }); } });
         } finally { input.signal.removeEventListener('abort', abort); }

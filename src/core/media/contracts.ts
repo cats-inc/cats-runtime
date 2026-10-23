@@ -2,7 +2,7 @@ export const IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 export const IMAGE_MAX_PROMPT = 2000;
 export const IMAGE_ID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 /** Providers with a bounded Runtime runner. A provider appears in capabilities only with an enabled profile. */
-export const IMAGE_PROVIDERS = ['grok', 'muse', 'codex', 'antigravity'] as const;
+export const IMAGE_PROVIDERS = ['grok', 'muse', 'codex', 'antigravity', 'cursor'] as const;
 export type ImageProvider = typeof IMAGE_PROVIDERS[number];
 export type ImageOperation = 'image.generate';
 export type ImageAspectRatio = { mode: 'native'; options: [string] } | { mode: 'service' };
