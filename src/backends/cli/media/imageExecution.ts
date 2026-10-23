@@ -13,6 +13,8 @@ export interface ImageExecution {
   cwd: string; target: ProviderInstanceConfig; env: NodeJS.ProcessEnv; signal: AbortSignal;
   observe?: (event: StreamEvent) => void;
   sourceSessionId?: string;
+  /** Receipt creation time, used only to locate an existing provider transcript during recollection. */
+  createdAt?: string;
 }
 export interface ImageExecutionResult {
   bytes: Buffer; metadata: ImageMetadata;

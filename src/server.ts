@@ -3,7 +3,7 @@ import { once } from 'node:events';
 import { warnIfNonLoopbackBind } from './listener.js';
 import { ImageGenerationService } from './core/media/ImageGenerationService.js';
 import { executeGrokImage, recoverGrokImage, supportsGrokImage } from './backends/cli/media/grokImage.js';
-import { executeMuseImage, supportsMuseImage } from './backends/cli/media/museImage.js';
+import { executeMuseImage, recoverMuseImage, supportsMuseImage } from './backends/cli/media/museImage.js';
 import { executeCodexImage, supportsCodexImage } from './backends/cli/media/codexImage.js';
 import { executeAntigravityImage, supportsAntigravityImage } from './backends/cli/media/antigravityImage.js';
 import { loadImageProfiles } from './core/media/profiles.js';
@@ -1107,7 +1107,8 @@ export function createRuntimeServer(
     targets: (provider) => Object.values(config.providerInstances?.[provider] ?? {}),
     supports: (provider, target) => ({ grok: supportsGrokImage, muse: supportsMuseImage, codex: supportsCodexImage,
       antigravity: supportsAntigravityImage })[provider](target),
-    recover: (input) => input.provider === 'grok' ? recoverGrokImage(input) : null,
+    recover: (input) => input.provider === 'grok' ? recoverGrokImage(input)
+      : input.provider === 'muse' ? recoverMuseImage(input) : null,
     env: { ...getRuntimeConfigEnv(config) },
     execute: async (input) => {
       const selection = context.bootstrapService!.selection;

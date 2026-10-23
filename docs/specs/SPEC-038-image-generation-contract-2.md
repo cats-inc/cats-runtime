@@ -137,13 +137,22 @@ native tool bounds and stop evidence; it owns no Cat policy, App installation or
 - Accepted evidence is all of:
   - the session stream, including the result record, equals the receipt ID;
   - the only tool proposal is `image_generation`;
-  - its result reads `Saved generated image to generated_images/<call id>.png`, where the call
-    ID matches the result's call ID;
-  - that file is a contained, single-link, stable, valid PNG.
+  - its result reads `Saved generated image to generated_images/<call id>.<extension>`, where
+    the call ID matches the result's call ID and the extension is `png`, `jpg` or `jpeg`;
+  - that file is contained, single-link and stable, and completely decodes as PNG or JPEG
+    matching the reported extension. The original bytes are retained without conversion.
 - The runner then ends the process tree.
 - Other tools, a second proposal, a foreign session or result, an error result or a missing
   file fail the attempt. The error is classified (`auth_required`, `quota_exhausted`,
   `generation_refused`, `generation_failed`). Nothing is retried.
+- A completed attempt previously marked `failed / invalid_image_source` can be recollected on
+  read without starting Muse. Its bounded native `session.jsonl` must prove the exact receipt
+  session, workspace, original generation prompt, one run, one image tool proposal, matching
+  side-effect call ID, saved filename and completed tool. Missing, foreign, ambiguous or invalid
+  evidence preserves the failure. The existing service backs up the original failure receipt
+  before atomically saving the verified bytes and success receipt; repeat reads reuse that
+  result. Cancelled, interrupted and other failed attempts are not eligible. This adds no
+  request, SDK or persisted-schema contract.
 
 ### Codex and Antigravity runners
 

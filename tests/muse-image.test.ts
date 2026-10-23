@@ -1,11 +1,13 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, mkdir, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { PNG } from 'pngjs';
-import { executeMuseImage, museImageInvocation, supportsMuseImage } from '../src/backends/cli/media/museImage.js';
+import jpeg from 'jpeg-js';
+import { executeMuseImage, museImageInvocation, recoverMuseImage, supportsMuseImage } from '../src/backends/cli/media/museImage.js';
+import { ImageGenerationService } from '../src/core/media/ImageGenerationService.js';
 import { validateImage, type ImageExecution } from '../src/backends/cli/media/imageExecution.js';
 import { loadImageProfiles } from '../src/core/media/profiles.js';
 import { createRuntimeTestEnv } from './support/runtimeTestPaths.js';
@@ -40,12 +42,12 @@ const records = (session: string) => {
   };
 };
 /** A temporary Node program stands in for muse; it writes the image where muse 1.4 does and then never exits on its own. */
-async function fakeMuse(root: string, lines: unknown[], { image, exit = false }: { image?: { call: string; bytes: Buffer }; exit?: boolean } = {}) {
+async function fakeMuse(root: string, lines: unknown[], { image, exit = false }: { image?: { call: string; bytes: Buffer; extension?: string }; exit?: boolean } = {}) {
   const program = path.join(root, `muse-${randomUUID()}.cjs`);
   const bytes = image ? path.join(root, `${image.call}.bin`) : null;
   if (image && bytes) await writeFile(bytes, image.bytes);
   await writeFile(program, `const fs = require('fs'), path = require('path');
-${image ? `fs.mkdirSync('generated_images', { recursive: true }); fs.copyFileSync(${JSON.stringify(bytes)}, path.join('generated_images', ${JSON.stringify(`${image.call}.png`)}));` : ''}
+${image ? `fs.mkdirSync('generated_images', { recursive: true }); fs.copyFileSync(${JSON.stringify(bytes)}, path.join('generated_images', ${JSON.stringify(`${image.call}.${image.extension ?? 'png'}`)}));` : ''}
 for (const line of ${JSON.stringify(lines)}) console.log(JSON.stringify(line));
 ${exit ? '' : 'setInterval(() => {}, 1000);'}`);
   return ((_command: string, _args: string[], options: Parameters<typeof spawn>[2]) => spawn(process.execPath, [program], options)) as typeof spawn;
@@ -84,6 +86,27 @@ describe('bounded Muse image generation', () => {
       r.result('call_2', 'Saved generated image to generated_images/call_2.png'), r.completed()], { image: { call: 'call_2', bytes: png(2, 2, 0) }, exit: true });
     expect((await executeMuseImage(input, finished)).metadata.transparency).toBe('has-transparency');
   });
+  it.each(['jpg', 'jpeg'])('collects a matching Muse %s result without changing its original JPEG bytes', async (extension) => {
+    const { root, input } = await fixture(); const r = records(input.id);
+    const bytes = jpeg.encode({ width: 3, height: 2, data: Buffer.alloc(24, 255) }).data;
+    const launch = await fakeMuse(root, [r.proposed('t1', 'image_generation'), r.intent('t1', 'call_1'),
+      r.result('call_1', `Saved generated image to generated_images/call_1.${extension}`)], { image: { call: 'call_1', bytes, extension } });
+    const result = await executeMuseImage(input, launch);
+    expect(result.bytes.equals(bytes)).toBe(true);
+    expect(result.metadata).toMatchObject({ mimeType: 'image/jpeg', width: 3, height: 2, transparency: 'opaque' });
+    expect(result.executionOutcome).toBe('stopped_after_image');
+  });
+  it('rejects JPEG results with a foreign call, traversal, an unsupported extension or mismatched bytes', async () => {
+    const { root, input } = await fixture(); const r = records(input.id);
+    for (const result of ['generated_images/other.jpg', '../call_1.jpg', 'generated_images/call_1.webp']) {
+      const launch = await fakeMuse(root, [r.proposed('t1', 'image_generation'), r.intent('t1', 'call_1'),
+        r.result('call_1', `Saved generated image to ${result}`)], { exit: true });
+      await expect(executeMuseImage(input, launch)).rejects.toThrow('invalid_image_source');
+    }
+    const launch = await fakeMuse(root, [r.proposed('t1', 'image_generation'), r.intent('t1', 'call_1'),
+      r.result('call_1', 'Saved generated image to generated_images/call_1.jpg')], { image: { call: 'call_1', extension: 'jpg', bytes: png(2, 2) } });
+    await expect(executeMuseImage(input, launch)).rejects.toThrow('invalid_image');
+  }, 15_000);
   it('stops on any other tool, a second image call, a foreign result or session, and never accepts a stray file', async () => {
     const { root, input } = await fixture(); const r = records(input.id); const image = { call: 'call_1', bytes: png(2, 2) };
     const saved = r.result('call_1', 'Saved generated image to generated_images/call_1.png');
@@ -119,6 +142,83 @@ describe('bounded Muse image generation', () => {
     setTimeout(() => controller.abort(), 100);
     await expect(running).rejects.toThrow('cancelled');
     expect(await readdir(input.cwd)).toEqual([]);
+  });
+});
+
+describe('Muse source failure recollection', () => {
+  async function savedAttempt() {
+    const { root, input } = await fixture();
+    const receipts = path.join(root, 'receipts');
+    input.cwd = path.join(receipts, input.id, 'workspace');
+    input.createdAt = '2026-10-23T19:03:14.439Z';
+    input.target.museSessionsDir = path.join(root, '.local', 'share', 'muse', 'sessions');
+    const transcript = path.join(input.target.museSessionsDir, '2026', '10', '24', input.id, 'session.jsonl');
+    await mkdir(path.dirname(transcript), { recursive: true });
+    await mkdir(path.join(input.cwd, 'generated_images'), { recursive: true });
+    const bytes = jpeg.encode({ width: 3, height: 2, data: Buffer.alloc(24, 255) }).data;
+    const image = path.join(input.cwd, 'generated_images', 'call_1.jpg');
+    await writeFile(image, bytes);
+    const record = (payload_type: string, payload: unknown) => ({ stream: { kind: 'session', id: input.id }, payload_type, payload });
+    const task = (event: object, task_id = 't1') => record('runtime.session', { kind: 'task', run_id: 'run-1', task_id, event });
+    const lines = [
+      record('runtime.session.metadata', { record: { workspace_root: path.toNamespacedPath(input.cwd) } }),
+      record('runtime.session', { kind: 'run', run_id: 'run-1', event: { kind: 'started', prompt: museImageInvocation(input).args.at(-1) } }),
+      task({ kind: 'proposed', task_kind: 'model.meta.response' }, 'model-task'),
+      task({ kind: 'proposed', task_kind: 'tool.image_generation' }),
+      task({ kind: 'side_effect_intent', operation: 'tool:image_generation', idempotency_key: 'tool:call_1' }),
+      task({ kind: 'output', chunk: 'Saved generated image to generated_images/call_1.jpg', final_result: true }),
+      task({ kind: 'completed' }),
+    ];
+    const text = lines.map((line) => JSON.stringify(line)).join('\n');
+    await writeFile(transcript, text);
+    return { root, input, receipts, bytes, image, transcript, text, lines, task };
+  }
+  it.each([false, true])('recollects the existing JPEG, backs up and survives restart without execution (batch=%s)', async (batch) => {
+    const { input, receipts, bytes, transcript, lines } = await savedAttempt();
+    if (batch) await writeFile(transcript, JSON.stringify({ children: lines.map((line) => ({ record_json: JSON.stringify(line) })) }));
+    const original = JSON.stringify({ schemaVersion: 2, id: input.id, targetId: 'muse/native', provider: 'muse', instance: 'native',
+      profileId: muse.id, profileRevision: String(muse.revision), agentConfigId: muse.agentConfig.id,
+      agentModel: muse.agentConfig.model, agentEffort: muse.agentConfig.effort, operation: 'image.generate', prompt: input.prompt,
+      sourceIds: [], options: {}, status: 'failed', createdAt: input.createdAt, updatedAt: input.createdAt,
+      error: 'invalid_image_source', warnings: [], executionOutcome: null, output: null });
+    const receipt = path.join(receipts, input.id, 'job.json'); await writeFile(receipt, original);
+    const execute = vi.fn();
+    const options = { root: receipts, profiles: [muse], targets: () => [input.target], supports: () => true,
+      env: input.env, execute, recover: recoverMuseImage };
+    const service = new ImageGenerationService(options);
+    expect(await service.get(input.id)).toMatchObject({ status: 'succeeded', error: null,
+      output: { mimeType: 'image/jpeg', width: 3, height: 2 }, executionOutcome: 'stopped_after_image' });
+    expect(await readFile(path.join(receipts, input.id, 'job.before-image-source-recovery.json'), 'utf8')).toBe(original);
+    expect((await service.image(input.id)).bytes.equals(bytes)).toBe(true);
+    const restarted = new ImageGenerationService(options);
+    expect((await restarted.get(input.id)).status).toBe('succeeded');
+    expect((await restarted.image(input.id)).bytes.equals(bytes)).toBe(true);
+    expect(execute).not.toHaveBeenCalled();
+    await service.close(); await restarted.close();
+  });
+  it('requires the exact session, workspace, prompt, one tool call, matching file and completed tool', async () => {
+    const { input, transcript, text, lines, task, image } = await savedAttempt();
+    for (const invalid of [
+      text.replaceAll(input.id, randomUUID()),
+      text.replace('workspace_root', 'wrong_workspace'),
+      text.replace('An orange cat', 'Another image'),
+      text.replace('tool:call_1', 'tool:other'),
+      text.replace('generated_images/call_1.jpg', '../call_1.jpg'),
+      lines.slice(0, -1).map((line) => JSON.stringify(line)).join('\n'),
+      text + '\n' + JSON.stringify(task({ kind: 'proposed', task_kind: 'tool.image_generation' }, 't2')),
+      text + '\n' + JSON.stringify(task({ kind: 'proposed', task_kind: 'tool.write_file' }, 't2')),
+      JSON.stringify({ children: [{ record_json: '{' }] }),
+      text + '\n' + JSON.stringify({ children: [{ record_json: '{}' }] }),
+      text + '\n' + JSON.stringify({ children: [{ record_json: '1' }] }),
+      text + '\n' + JSON.stringify({ payload_type: 'runtime.session', payload: { kind: 'task', event: { kind: 'failed' } } }),
+      ...['failed', 'cancelled', 'timed_out', 'rejected'].map((kind) => text + '\n' + JSON.stringify(task({ kind }))),
+      'x'.repeat(2 * 1024 * 1024 + 1),
+    ]) {
+      await writeFile(transcript, invalid);
+      await expect(recoverMuseImage(input)).rejects.toThrow('invalid_image_source');
+    }
+    await writeFile(transcript, text); await writeFile(image, Buffer.from('not a JPEG'));
+    await expect(recoverMuseImage(input)).rejects.toThrow('invalid_image');
   });
 });
 

@@ -126,7 +126,7 @@ export class ImageGenerationService {
   private execution(job: ImageJob, cwd: string, signal: AbortSignal): ImageExecution | null {
     const profile = this.options.profiles.find((entry) => entry.id === job.profileId);
     const target = this.options.targets(job.provider).find((entry) => entry.id === job.instance);
-    return profile && target ? { id: job.id, prompt: job.prompt, provider: job.provider, instance: job.instance, profile, cwd, target,
+    return profile && target ? { id: job.id, prompt: job.prompt, provider: job.provider, instance: job.instance, profile, cwd, target, createdAt: job.createdAt,
       env: this.options.env, signal, ...(job.sourceSessionId ? { sourceSessionId: job.sourceSessionId } : {}) } : null;
   }
   async get(id: string): Promise<ImageJob> {
