@@ -4338,6 +4338,12 @@ current local default selection without reviving a sample-only shim route.
 
 ### Catalog data status and activation
 
+The CLI Auggie scope supports `auggie.reasoning_effort` as a per-model enum. Values come from
+that model's account-resolved `effortLevels` and are emitted as `--reasoning-effort`. No effort
+default is inferred; an untouched explicit model selection initializes to its first listed value.
+Rows without levels and custom model strings get no inferred control. This is an additive binding
+within schema 2; existing resolved session bindings remain unchanged.
+
 `GET /providers/catalogs` reports capabilities, availability, `catalogRevision`,
 `activationId`, source, factory/override digests, origins and diagnostics.
 `automaticSchema1Upgrade: true` advertises one-time conversion at writable Runtime

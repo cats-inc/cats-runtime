@@ -26,7 +26,9 @@ speed form, so one entry per family has:
   list's order, the first value starting a selection without a default claim;
 - `devin.speed` (Speed: Standard, Fast) where the family has `fast` (Claude) or `priority` (GPT)
   variants; both read Fast in the list;
-- separate entries for the `1m` and `thinking` forms, named as the list names them.
+- separate entries for the `1m`, `thinking` and `lightning` forms, named as the list names them.
+  Lightning is its own form, not an alias for the Fast speed control. The helper preserves each
+  form's exact UIDs and effort order without manufacturing missing combinations.
 
 Some bare UIDs carry an effort only in their label (`glm-5-2` is High); read it from the label.
 `scripts/catalog-scope-entries.mjs --snapshot <probe snapshot> --provider devin --exclude-family fusion --exclude-id '^MODEL_' --write <yaml>`

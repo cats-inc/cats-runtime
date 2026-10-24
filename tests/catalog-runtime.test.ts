@@ -70,17 +70,17 @@ describe('factory and executable catalog projections', () => {
 
   it('starts Junie effort at each model\'s first picker value and emits it as --effort', () => {
     const junie = knowledge(snapshot.document.catalogs.find(s => s.provider === 'junie' && s.backend === 'cli')!);
-    expect(junie.catalog.entries).toHaveLength(18);
+    expect(junie.catalog.entries).toHaveLength(20);
     expect(junie.catalog.entries.slice(0, 2).map(e => e.id)).toEqual(['Gemini 3.7 Flash', 'Junie Lite']);
-    expect(junie.catalog.entries.filter(e => e.default).map(e => e.id)).toEqual(['Gemini 3.7 Flash']);
+    expect(junie.catalog.entries.filter(e => e.default)).toEqual([]);
     // The picker shows no effort default, so none is declared and resolution uses the first value.
     expect(junie.catalog.entries.every(e => !e.controlDefaults)).toBe(true);
     const effort = (entryId: string, controls?: Record<string, string>) => resolveProviderSelection(junie,
       { entryId, entryMode: 'explicit', ...(controls ? { controls } : {}) }).resolution.controls['junie.reasoning_effort'];
-    expect(effort('GPT-5.6-SOL')).toBe('none');
+    expect(effort('GPT-5.6 Sol')).toBe('none');
     expect(effort('Junie Lite')).toBe('none');
-    expect(effort('GPT-6.1-SOL')).toBe('low');
-    expect(() => effort('GPT-6.1-SOL', { 'junie.reasoning_effort': 'none' })).toThrow();
+    expect(effort('GPT-6.1 Sol')).toBe('low');
+    expect(() => effort('GPT-6.1 Sol', { 'junie.reasoning_effort': 'none' })).toThrow();
     expect(effort('Gemini 3.6 Flash')).toBe('minimal');
     expect(effort('Gemini 3.7 Flash')).toBe('low');
     expect(effort('Claude Opus 5.5', { 'junie.reasoning_effort': 'xhigh' })).toBe('xhigh');
@@ -89,7 +89,7 @@ describe('factory and executable catalog projections', () => {
     const executed = junie.catalog.entries.map(e =>
       resolveProviderSelection(junie, { entryId: e.id, entryMode: 'explicit' }).execution.model);
     expect(executed.filter(model => !/^[a-z0-9][a-z0-9.-]*$/.test(model))).toEqual([]);
-    const selection = resolveProviderSelection(junie, { entryId: 'GPT-5.6-SOL', entryMode: 'explicit' });
+    const selection = resolveProviderSelection(junie, { entryId: 'GPT-5.6 Sol', entryMode: 'explicit' });
     const args = new JunieProvider().buildSpawnArgs({ cwd: '/tmp', model: selection.execution.model,
       modelControls: selection.resolution.controls });
     expect(args.slice(args.indexOf('--model'), args.indexOf('--model') + 2)).toEqual(['--model', 'gpt-5.6-sol']);
@@ -98,7 +98,7 @@ describe('factory and executable catalog projections', () => {
 
   it('starts Kiro effort at each row\'s own V3 default and sends --effort only where offered', () => {
     const kiro = knowledge(snapshot.document.catalogs.find(s => s.provider === 'kiro' && s.backend === 'cli')!);
-    expect(kiro.catalog.entries).toHaveLength(21);
+    expect(kiro.catalog.entries).toHaveLength(22);
     expect(kiro.catalog.entries[0].id).toBe('auto');
     // auto is the session's current model in the V3 config and default_model in --list-models;
     // neither is a catalog default.
@@ -126,10 +126,8 @@ describe('factory and executable catalog projections', () => {
       .resolution.controls['kiro.reasoning_effort']).toBe('xhigh');
     expect(() => resolve('claude-opus-4.6', { 'kiro.reasoning_effort': 'xhigh' })).toThrow();
     expect(() => resolve('claude-haiku-4.5', { 'kiro.reasoning_effort': 'low' })).toThrow();
-    expect(kiro.catalog.entries.filter(e => e.controls?.length).map(e => e.id)).toEqual([
-      'claude-opus-5.5', 'claude-sonnet-5.5', 'claude-opus-5', 'claude-sonnet-5', 'claude-opus-4.8', 'gpt-5.6-sol',
-      'gpt-5.6-terra', 'gpt-5.6-luna', 'claude-opus-4.7', 'claude-opus-4.6', 'claude-sonnet-4.6',
-    ]);
+    expect(effort('claude-haiku-5.5')).toBe('medium');
+    expect(effort('kimi-k3')).toBe('max');
     const sonnet = spawn('claude-sonnet-5.5', { 'kiro.reasoning_effort': 'max' });
     expect(sonnet.slice(sonnet.indexOf('--model'), sonnet.indexOf('--model') + 4))
       .toEqual(['--model', 'claude-sonnet-5.5', '--effort', 'max']);
@@ -143,36 +141,39 @@ describe('factory and executable catalog projections', () => {
       .toEqual(['--model', 'gpt-5.6-sol', '--effort', 'high']);
   });
 
-  it('lists the full Auggie picker with Claude Opus 5.5 as default and sends only --model', () => {
+  it('lists the full Auggie picker and sends each model\'s JSON-backed effort separately', () => {
     const auggie = knowledge(snapshot.document.catalogs.find(s => s.provider === 'auggie' && s.backend === 'cli')!);
     expect(auggie.catalog.entries).toHaveLength(37);
     expect(auggie.catalog.entries.slice(0, 7).map(e => e.id)).toEqual(['gpt-6-astra', 'gpt-6-1-sol', 'gpt-6-luna',
-      'claude-fable-5-1', 'claude-opus-5-5', 'claude-haiku-5-5', 'claude-sonnet-5-5']);
+      'claude-fable-5-1', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']);
     expect(auggie.catalog.entries.filter(e => e.default).map(e => e.id)).toEqual(['claude-opus-5-5']);
     expect(auggie.catalog.defaultSelection).toEqual(expect.objectContaining({ entryId: 'claude-opus-5-5', entryMode: 'explicit' }));
-    // Effort is recorded in notes only; no auggie.reasoning_effort binding exists.
-    expect(auggie.catalog.entries.every(e => !e.controls?.length && !e.controlDefaults)).toBe(true);
+    // No effort default is observed; first-value initialization is explicitly transported.
+    expect(auggie.catalog.entries.every(e => !e.controlDefaults)).toBe(true);
     expect(auggie.catalog.entries.find(e => e.id === 'butler_b')?.label).toBe('Prism (GPT)');
     const spawn = (entryId: string) => {
       const selected = resolveProviderSelection(auggie, { entryId, entryMode: 'explicit' });
       return new AuggieProvider({} as never, 10).buildSpawnArgs({ cwd: '/tmp',
         model: selected.execution.model, modelControls: selected.resolution.controls });
     };
-    for (const id of ['butler_b', 'claude-opus-4-8', 'gpt-6-1-sol', 'claude-sonnet-5-5', 'gemini-3-1-pro-preview', 'kimi-k2p7']) {
-      const args = spawn(id);
-      expect(args.slice(args.indexOf('--model'), args.indexOf('--model') + 2)).toEqual(['--model', id]);
-      expect(args).not.toContain('--reasoning-effort');
+    for (const entry of auggie.catalog.entries) {
+      const args = spawn(entry.id);
+      expect(args.slice(args.indexOf('--model'), args.indexOf('--model') + 2)).toEqual(['--model', entry.id]);
+      const effort = entry.controls?.find(c => c.key === 'auggie.reasoning_effort')?.values?.[0];
+      if (effort && typeof effort === 'object') {
+        expect(args.slice(args.indexOf('--reasoning-effort'), args.indexOf('--reasoning-effort') + 2))
+          .toEqual(['--reasoning-effort', effort.value]);
+      } else expect(args).not.toContain('--reasoning-effort');
     }
+    expect(auggie.catalog.entries.find(e => e.id === 'gemini-4-argon')?.controls?.[0].values)
+      .toMatchObject(['low', 'medium', 'high'].map(value => ({ value, label: value })));
   });
 
   it('lists the Pi openai-codex channel a ChatGPT account can run, with thinking defaulting to medium', () => {
     const pi = knowledge(snapshot.document.catalogs.find(s => s.provider === 'pi' && s.backend === 'cli')!);
-    // Pi's registry also lists gpt-5.3-codex-spark, which ChatGPT accounts reject.
-    expect(pi.catalog.entries.map(e => e.id)).toEqual([
-      'openai-codex/gpt-5.5', 'openai-codex/gpt-5.6-luna', 'openai-codex/gpt-5.6-sol',
-      'openai-codex/gpt-5.6-terra', 'openai-codex/gpt-6-astra', 'openai-codex/gpt-6-luna',
-      'openai-codex/gpt-6-sol', 'openai-codex/gpt-6.1-sol',
-    ]);
+    expect(pi.catalog.entries).toHaveLength(7);
+    expect(pi.catalog.entries[0].id).toBe('openai-codex/gpt-5.6-luna');
+    expect(pi.catalog.entries.some(e => e.id === 'openai-codex/gpt-5.5')).toBe(false);
     // Labels are bare model ids; the openai-codex channel is shown once, as the scope basis.
     expect(pi.catalog.entries.every(e => e.label === e.id.replace(/^openai-codex\//, ''))).toBe(true);
     expect(pi.catalog.basis).toEqual({ channel: { id: 'openai-codex', label: 'openai-codex' } });
@@ -183,16 +184,16 @@ describe('factory and executable catalog projections', () => {
       return new PiProvider().buildSpawnArgs({ cwd: '/tmp', model: selected.execution.model,
         modelProvider: selected.execution.provider, modelControls: selected.resolution.controls });
     };
-    expect(spawn('openai-codex/gpt-5.5')).toEqual([
-      '--mode', 'rpc', '--provider', 'openai-codex', '--model', 'gpt-5.5', '--thinking', 'medium',
+    expect(spawn('openai-codex/gpt-5.6-luna')).toEqual([
+      '--mode', 'rpc', '--provider', 'openai-codex', '--model', 'gpt-5.6-luna', '--thinking', 'medium',
     ]);
     expect(spawn('openai-codex/gpt-6-sol', { 'pi.thinking': 'max' }).slice(-2)).toEqual(['--thinking', 'max']);
-    expect(spawn('openai-codex/gpt-5.5', { 'pi.thinking': 'off' }).slice(-2)).toEqual(['--thinking', 'off']);
-    // Levels follow each model's thinkingLevelMap: gpt-6-astra and gpt-6.1-sol have no off, gpt-5.5 no max.
+    expect(spawn('openai-codex/gpt-5.6-luna', { 'pi.thinking': 'off' }).slice(-2)).toEqual(['--thinking', 'off']);
+    // Levels follow each model's thinkingLevelMap: Astra and 6.1 Sol have no off.
     expect(() => spawn('openai-codex/gpt-6-astra', { 'pi.thinking': 'off' })).toThrow();
     expect(() => spawn('openai-codex/gpt-6.1-sol', { 'pi.thinking': 'off' })).toThrow();
     expect(spawn('openai-codex/gpt-6.1-sol', { 'pi.thinking': 'max' }).slice(-4)).toEqual(['--model', 'gpt-6.1-sol', '--thinking', 'max']);
-    expect(() => spawn('openai-codex/gpt-5.5', { 'pi.thinking': 'max' })).toThrow();
+    expect(() => spawn('openai-codex/gpt-5.5')).toThrow();
   });
 
   it('carries each recorded basis in the advanced catalog without changing selection or arguments', () => {
@@ -223,13 +224,13 @@ describe('factory and executable catalog projections', () => {
 
   it('lists the Copilot Pro picker with Terra as default and first-value effort, context and tier', () => {
     const copilot = knowledge(snapshot.document.catalogs.find(s => s.provider === 'copilot' && s.backend === 'cli')!);
-    expect(copilot.catalog.entries).toHaveLength(19);
-    expect(copilot.catalog.entries.slice(0, 4).map(e => e.id)).toEqual(['auto', 'grok-4.7', 'gpt-5.6-terra', 'mai-code-1.1-flash']);
+    expect(copilot.catalog.entries).toHaveLength(14);
+    expect(copilot.catalog.entries.slice(0, 4).map(e => e.id)).toEqual(['auto', 'gpt-5.6-terra', 'grok-4.7', 'mai-code-1.1-flash']);
     expect(copilot.catalog.entries.filter(e => e.default).map(e => e.id)).toEqual(['gpt-5.6-terra']);
     // Plan-unavailable picker rows (Pro+ only) are omitted.
     expect(copilot.catalog.entries.some(e => /opus|fable|astra|sol|^gpt-5\.5$/.test(e.id))).toBe(false);
     const withContext = copilot.catalog.entries.filter(e => e.controls?.some(c => c.key === 'copilot.context'));
-    expect(withContext).toHaveLength(12);
+    expect(withContext).toHaveLength(9);
     const spawn = (entryId: string, controls?: Record<string, string>) => {
       const selected = resolveProviderSelection(copilot, { entryId, entryMode: 'explicit', ...(controls ? { controls } : {}) });
       const args = new CopilotProvider().buildSpawnArgs({ cwd: '/tmp',
@@ -237,13 +238,14 @@ describe('factory and executable catalog projections', () => {
       return args.slice(args.indexOf('--model'));
     };
     expect(spawn('gpt-5.6-terra')).toEqual(['--model', 'gpt-5.6-terra', '--effort', 'none', '--context', 'default']);
-    expect(spawn('gemini-3.7-flash')).toEqual(['--model', 'gemini-3.7-flash', '--effort', 'low', '--context', 'default']);
+    expect(spawn('gemini-3.8-flash')).toEqual(['--model', 'gemini-3.8-flash', '--effort', 'low', '--context', 'default']);
     expect(spawn('grok-4.7', { 'copilot.reasoning_effort': 'xhigh', 'copilot.context': 'long_context' }))
       .toEqual(['--model', 'grok-4.7', '--effort', 'xhigh', '--context', 'long_context']);
     expect(spawn('claude-sonnet-5.5', { 'copilot.reasoning_effort': 'max', 'copilot.context': 'long_context' }))
       .toEqual(['--model', 'claude-sonnet-5.5', '--effort', 'max', '--context', 'long_context']);
-    expect(spawn('gpt-5.4-mini')).toEqual(['--model', 'gpt-5.4-mini', '--effort', 'none']);
+    expect(() => spawn('gpt-5.4-mini')).toThrow();
     expect(spawn('auto')).toEqual(['--model', 'auto', '--auto-tier', 'efficiency']);
+    expect(() => spawn('auto', { 'copilot.auto_tier': 'fast' })).toThrow();
     expect(spawn('claude-haiku-4.5')).toEqual(['--model', 'claude-haiku-4.5']);
     expect(spawn('claude-haiku-5.5', { 'copilot.reasoning_effort': 'max', 'copilot.context': 'long_context' }))
       .toEqual(['--model', 'claude-haiku-5.5', '--effort', 'max', '--context', 'long_context']);
@@ -306,6 +308,27 @@ describe('factory and executable catalog projections', () => {
       model: selected.execution.model, modelControls: selected.resolution.controls });
     expect(args.slice(args.indexOf('--model'), args.indexOf('--model') + 4))
       .toEqual(['--model', 'fixture-unlisted-model', '--effort', 'fixture-effort']);
+  });
+
+  it('emits Auggie effort for an unknown model from data and rejects another entry\'s values', () => {
+    const auggie = knowledge({ provider: 'auggie', backend: 'cli', selection_mode: 'full', models: [{
+      id: 'fixture-unlisted-model', label: 'Fixture model', execution: { model: 'fixture-unlisted-model' },
+      controls: [{ key: 'auggie.reasoning_effort', label: 'Effort', kind: 'enum', scope: 'both',
+        values: [{ value: 'fixture-effort', label: 'Fixture effort' }] }],
+    }, { id: 'fixture-no-effort', label: 'No effort', execution: { model: 'fixture-no-effort' }, controls: [] }] });
+    const selected = resolveProviderSelection(auggie, { entryId: 'fixture-unlisted-model', entryMode: 'explicit' });
+    const provider = new AuggieProvider({} as never);
+    const args = provider.buildSpawnArgs({ cwd: '/tmp', model: selected.execution.model,
+      modelControls: selected.resolution.controls });
+    expect(args.slice(args.indexOf('--model'))).toEqual(['--model', 'fixture-unlisted-model',
+      '--reasoning-effort', 'fixture-effort']);
+    expect(selected.resolution.controls).toEqual({ 'auggie.reasoning_effort': 'fixture-effort' });
+    expect(() => resolveProviderSelection(auggie, { entryId: 'fixture-no-effort', entryMode: 'explicit',
+      controls: { 'auggie.reasoning_effort': 'fixture-effort' } })).toThrow();
+    expect(provider.buildSpawnArgs({ cwd: '/tmp', model: 'custom-model' })).not.toContain('--reasoning-effort');
+    expect(() => provider.buildSpawnArgs({ cwd: '/tmp', modelControls: {
+      'auggie.reasoning_effort': 'invalid\nvalue',
+    } })).toThrow('Unsupported Auggie reasoning effort.');
   });
 
   it('validates controls against the selected entry and omits request-only session defaults', () => {

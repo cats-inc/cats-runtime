@@ -18,6 +18,7 @@ export const CATALOG_BINDINGS: Readonly<Record<string, Binding>> = Object.freeze
   'antigravity.effort': { provider: 'antigravity', backend: 'cli', type: 'string', modelVariant: true },
   'grok.reasoning_effort': { provider: 'grok', backend: 'cli', type: 'string' },
   'muse.reasoning_effort': { provider: 'muse', backend: 'cli', type: 'string' },
+  'auggie.reasoning_effort': { provider: 'auggie', backend: 'cli', type: 'string' },
   'copilot.reasoning_effort': { provider: 'copilot', backend: 'cli', type: 'string' },
   'copilot.context': { provider: 'copilot', backend: 'cli', type: 'string' },
   'copilot.auto_tier': { provider: 'copilot', backend: 'cli', type: 'string' },

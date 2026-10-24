@@ -1,0 +1,42 @@
+{
+  "observedOn": "2026-10-24",
+  "sourceClass": "official versioned source and matching installed binary strings",
+  "sourceUrls": [
+    "https://github.com/block/goose/blob/v1.56.0/crates/goose/src/providers/chatgpt_codex.rs",
+    "https://github.com/block/goose/blob/v1.56.0/crates/goose-cli/src/commands/configure.rs"
+  ],
+  "binarySha256": "4da436a30ed6ca5b81a3a196e87a4596b862e06f0419a29a384cba1c9dad2977",
+  "releaseAssetByteIdentityChecked": false,
+  "models": [
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+    "gpt-5.6",
+    "gpt-5.5",
+    "gpt-5.4"
+  ],
+  "menu": [
+    {
+      "value": "off",
+      "label": "Off - No extended thinking"
+    },
+    {
+      "value": "low",
+      "label": "Low - Better latency, lighter reasoning"
+    },
+    {
+      "value": "medium",
+      "label": "Medium - Moderate thinking"
+    },
+    {
+      "value": "high",
+      "label": "High - Deep reasoning"
+    },
+    {
+      "value": "max",
+      "label": "Max - No constraints on thinking depth"
+    }
+  ],
+  "initialValue": "off",
+  "defaultClaim": false
+}

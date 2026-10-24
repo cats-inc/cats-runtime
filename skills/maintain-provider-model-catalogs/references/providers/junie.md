@@ -83,6 +83,14 @@ on this account without running an agent, pass a model that cannot exist, such a
 `--model "No Such Model"`, with a one-word prompt: Junie exits with `Invalid model` and lists every
 accepted alias and setting ID.
 
+Add `--efforts` to read each model's ordered effort values and labels through the installed JAR's
+`EffortLevel.Companion.availableForModel`, `getWireId` and `getDisplayName`. `fixedEffort`, when
+present, records `ModelOption.Specific.getEffort` separately. This starts no CLI and reads no
+settings, credentials or default-for-model method. Match the literal observed picker names to
+the output; static extra models are not entitlement evidence. The 26.10.20 picker has a new Eco
+column and channel tabs. Capture the configured JetBrains AI tab only; Eco is a current cell,
+not an effort default or a proven execution binding.
+
 Apply the [shared data workflow](../catalog-surfaces.md) and [local patch workflow](../local-soft-patch.md).
 Ordinary refreshes edit the authorized factory/override scope, evidence and generated JSON only.
 There are no independent Runtime, Playground or Desktop model tables to update. Existing generic

@@ -1,0 +1,50 @@
+Observed 2026-10-24. Independent read-only ZIP/class-file decoding of the installed JAR.
+Source class: installed static artifact; no CLI started, no classes loaded by the decoder.
+JAR: junie-release-3813.10-windows-amd64.jar
+SHA-256: 35a337067bb3ffb39eddfd3a3ef9c19896fbef702a7e079db98c9c1ee3a31fe7
+
+Class: com/intellij/ml/llm/matterhorn/ej/app/cli/standalone/tui/app/view/ChooseModelViewModel
+Decoded invocation excerpts (bytecode offsets):
+
+cycleEffort
+  @28 getstatic EffortLevel.Companion
+  @32 invokevirtual ModelOptionItem.getModelOption
+  @35 invokeinterface ModelOption.getLlm
+  @40 invokevirtual EffortLevel$Companion.availableForModel
+  @49 invokevirtual ModelOptionItem.getEffortLevel
+  @53 invokevirtual EffortLevel.next
+  alternate branch @60 getEffortLevel, @64 EffortLevel.prev
+
+The optional JAR reader calls the same getLlm -> availableForModel path as this picker cycle.
+Its output supplies supported effort values, not a default or account entitlement.
+Membership is separately established by the complete configured-channel picker capture.
+
+toggleEcoMode
+  @29 ModelOptionItem.getEcoMode
+  @36 instanceof ModelRowEcoMode$Preference
+  @55 Preference.getPreference
+  @66 getfield ecoModeOverrides
+  @74 ModelParametersKt.getSettingId
+  @84 EcoModePreference.ordinal
+  @112 getstatic EcoModePreference.Off
+  @118 getstatic EcoModePreference.On
+  @139 Map.put
+  @153 refreshRows
+
+rowEcoMode
+  @48 EcoModeAvailabilityContext.forSelection
+  @55 instanceof EcoModeAvailability$Available
+  @66 getfield ecoModeOverrides
+  @73 Map.get
+  fallback @90 SettingsState.getEcoModePerModel, @95 MutableStateFlow.getValue, @107 Map.get
+  fallback @120 getstatic EcoModePreference.On
+
+EcoModeAvailabilityContext.forSelection
+  @83 invokeinterface ModelOption.getEcoModeEfforts
+  @89 Set.contains (current effort argument)
+  false -> Unavailable.ModelAndEffort; true -> Available
+  It also rejects excluded/not-offered providers and Chat agent mode before this check.
+
+Eco is an independent On/Off preference, available conditionally on model/effort/provider/mode.
+The operator explicitly chose to retain it only in evidence for this refresh. No Eco wire
+mapping is claimed, and the read-only capture changed no effort or Eco selection.

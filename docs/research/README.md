@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-10-24-sixteen-cli-catalog-refresh](./2026-10-24-sixteen-cli-catalog-refresh.md) | Sixteen current CLI/channel scopes and Auggie effort | Native/read-only evidence, Auggie binding, Junie read-only/JAR helpers, Devin Lightning, and cross-repository validation |
 | [2026-10-24-cursor-image-runner](./2026-10-24-cursor-image-runner.md) | Cursor GLM 5.3 / max runner and Studio integration | Native Windows runner retained one 1024-square JPEG (90,500 bytes) after an owner-authorized extra image corrected a failed save; isolated data, correlated completion and cross-repository fixtures |
 | [2026-10-23-codex-antigravity-bounded-image-acceptance](./2026-10-23-codex-antigravity-bounded-image-acceptance.md) | Codex 0.163.0 and Antigravity 1.4.6 generation through runner-enforced bounds | One verified image each (1254 x 1254 PNG, 1024 x 1024 JPEG) collected from the session-owned output folder and the process ended after the image; the bounds are the runner's, not the CLI's |
 | [2026-10-23-muse-bounded-image-acceptance](./2026-10-23-muse-bounded-image-acceptance.md) | Muse 1.4.12 generation through the bounded runner | First call without the image tool (`--disable-write` removes it), second call one verified 1920 x 1280 PNG in 18.6 s with one tool proposal, runner stop after the image |

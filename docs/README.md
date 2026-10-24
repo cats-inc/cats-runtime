@@ -1,5 +1,8 @@
 # Documentation Index
 
+[Sixteen CLI catalog refresh](research/2026-10-24-sixteen-cli-catalog-refresh.md) records current
+channel evidence, the Auggie effort binding and selector validation.
+
 [Cursor image runner](research/2026-10-24-cursor-image-runner.md) records the GLM 5.3 / max
 source extension, bounded collection fixtures and successful native live acceptance.
 

@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { readCatalogFactory } from '../../catalogs/resolver.js';
 import {
   getStaticProviderModels,
   normalizeProviderCatalogModelId,
@@ -765,34 +766,17 @@ describe('ProviderModelCatalogService', () => {
         env: runtime.env,
       });
 
+      const factoryModels = readCatalogFactory({ packageRoot: process.cwd(), runtimeRoot: runtime.paths.runtimeDir })
+        .document.catalogs.find(scope => scope.provider === 'junie' && scope.backend === 'cli')!.models;
       expect(service.getImmediateCatalog('junie')).toMatchObject({
         provider: 'junie',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'Gemini 3.7 Flash',
+        defaultModel: null,
         source: 'static',
-        // Complete 26.9.22 (build 3419.29) picker, in picker order. Labels are the literal picker names;
+        // Complete current factory; labels and order come from its single authored fixture;
         // effort is a per-model control, not part of the label.
-        models: [
-          { id: 'Gemini 3.7 Flash', label: 'Gemini 3.7 Flash', default: true },
-          { id: 'Junie Lite', label: 'Junie Lite' },
-          { id: 'Claude Fable 5.1', label: 'Claude Fable 5.1' },
-          { id: 'Claude Opus 5', label: 'Claude Opus 5' },
-          { id: 'Claude Opus 5.5', label: 'Claude Opus 5.5' },
-          { id: 'Claude Sonnet 5', label: 'Claude Sonnet 5' },
-          { id: 'Claude Sonnet 5.5', label: 'Claude Sonnet 5.5' },
-          { id: 'Gemini 3.6 Flash', label: 'Gemini 3.6 Flash' },
-          { id: 'Gemini 3.8 Flash', label: 'Gemini 3.8 Flash' },
-          { id: 'GPT-5.6-LUNA', label: 'GPT-5.6-LUNA' },
-          { id: 'GPT-5.6-SOL', label: 'GPT-5.6-SOL' },
-          { id: 'GPT-5.6-TERRA', label: 'GPT-5.6-TERRA' },
-          { id: 'GPT-6-ASTRA', label: 'GPT-6-ASTRA' },
-          { id: 'GPT-6-LUNA', label: 'GPT-6-LUNA' },
-          { id: 'GPT-6-SOL', label: 'GPT-6-SOL' },
-          { id: 'GPT-6.1-SOL', label: 'GPT-6.1-SOL' },
-          { id: 'Grok 4.6', label: 'Grok 4.6' },
-          { id: 'Grok 4.7', label: 'Grok 4.7' },
-        ],
+        models: factoryModels.map(({ id, label, default: isDefault }) => ({ id, label, ...(isDefault ? { default: true } : {}) })),
         warnings: [],
       });
     } finally {

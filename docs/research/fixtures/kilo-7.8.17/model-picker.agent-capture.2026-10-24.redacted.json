@@ -1,0 +1,2882 @@
+{
+  "observedOn": "2026-10-24",
+  "host": "native Windows 11",
+  "sourceClass": "Windows UI Automation visible text; initial screenshot checked",
+  "inferenceSent": false,
+  "command": "/models",
+  "summary": {
+    "Rows": 343,
+    "Sections": [
+      {
+        "Section": "Kilo Gateway",
+        "Rows": 326
+      },
+      {
+        "Section": "Recent",
+        "Rows": 7
+      },
+      {
+        "Section": "Recommended",
+        "Rows": 10
+      }
+    ],
+    "RepeatedLabels": [
+      {
+        "Label": "ByteDance Seed: Seed 2.1 Turbo",
+        "Sections": [
+          "Recent",
+          "Kilo Gateway"
+        ]
+      },
+      {
+        "Label": "DeepSeek: DeepSeek V4.1 Flash",
+        "Sections": [
+          "Recent",
+          "Recommended"
+        ]
+      },
+      {
+        "Label": "Google: Nano Banana Pro (Gemini 3 Pro Image)",
+        "Sections": [
+          "Recent",
+          "Kilo Gateway"
+        ]
+      },
+      {
+        "Label": "MiniMax: MiniMax M3",
+        "Sections": [
+          "Recent",
+          "Kilo Gateway"
+        ]
+      },
+      {
+        "Label": "MoonshotAI: Kimi K3",
+        "Sections": [
+          "Recent",
+          "Recommended"
+        ]
+      },
+      {
+        "Label": "OpenAI: GPT-5.4",
+        "Sections": [
+          "Recent",
+          "Kilo Gateway"
+        ]
+      },
+      {
+        "Label": "Z.ai: GLM 5.3 Flash",
+        "Sections": [
+          "Recent",
+          "Recommended"
+        ]
+      }
+    ],
+    "Current": [
+      "Recent: MiniMax: MiniMax M3",
+      "Kilo Gateway: MiniMax: MiniMax M3"
+    ],
+    "Steps": 346,
+    "Screenshots": 0,
+    "StateUnchanged": true
+  },
+  "rows": [
+    {
+      "Index": 1,
+      "Section": "Recent",
+      "Label": "MiniMax: MiniMax M3",
+      "Description": "Kilo Gateway",
+      "Badges": [],
+      "Current": true
+    },
+    {
+      "Index": 2,
+      "Section": "Recent",
+      "Label": "Google: Nano Banana Pro (Gemini 3 Pro Image)",
+      "Description": "Kilo Gateway",
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 3,
+      "Section": "Recent",
+      "Label": "ByteDance Seed: Seed 2.1 Turbo",
+      "Description": "Kilo Gateway",
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 4,
+      "Section": "Recent",
+      "Label": "MoonshotAI: Kimi K3",
+      "Description": "Kilo Gateway",
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 5,
+      "Section": "Recent",
+      "Label": "Z.ai: GLM 5.3 Flash",
+      "Description": "Kilo Gateway",
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 6,
+      "Section": "Recent",
+      "Label": "DeepSeek: DeepSeek V4.1 Flash",
+      "Description": "Kilo Gateway",
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 7,
+      "Section": "Recent",
+      "Label": "OpenAI: GPT-5.4",
+      "Description": "Kilo Gateway",
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 8,
+      "Section": "Recommended",
+      "Label": "Auto Efficient",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 9,
+      "Section": "Recommended",
+      "Label": "Auto Free",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 10,
+      "Section": "Recommended",
+      "Label": "NVIDIA: Nemotron 3.5 Super VL (free)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 11,
+      "Section": "Recommended",
+      "Label": "Reflection: Beam 1.0 (free)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 12,
+      "Section": "Recommended",
+      "Label": "Stealth: Glyph Cluster (free)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 13,
+      "Section": "Recommended",
+      "Label": "Anthropic: Claude Opus 5.5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 14,
+      "Section": "Recommended",
+      "Label": "OpenAI: GPT-6.1 Sol",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 15,
+      "Section": "Recommended",
+      "Label": "DeepSeek: DeepSeek V4.1 Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 16,
+      "Section": "Recommended",
+      "Label": "MoonshotAI: Kimi K3",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 17,
+      "Section": "Recommended",
+      "Label": "Z.ai: GLM 5.3 Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 18,
+      "Section": "Kilo Gateway",
+      "Label": "Cohere: North Mini Code (free)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 19,
+      "Section": "Kilo Gateway",
+      "Label": "Dots Studio: Dots3-Note Preview (free)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 20,
+      "Section": "Kilo Gateway",
+      "Label": "LiquidAI: LFM2.5-2.6B (free)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 21,
+      "Section": "Kilo Gateway",
+      "Label": "LiquidAI: LFM2.5-24B-A2B",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 22,
+      "Section": "Kilo Gateway",
+      "Label": "Meta: Muse Spark 1.2 Contributor",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 23,
+      "Section": "Kilo Gateway",
+      "Label": "Meta: Muse Spark 1.3 Contributor",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 24,
+      "Section": "Kilo Gateway",
+      "Label": "NVIDIA: Nemotron 3 Nano Omni (free)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 25,
+      "Section": "Kilo Gateway",
+      "Label": "NVIDIA: Nemotron 3 Super (free)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 26,
+      "Section": "Kilo Gateway",
+      "Label": "NVIDIA: Nemotron 3 Ultra (free)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 27,
+      "Section": "Kilo Gateway",
+      "Label": "NVIDIA: Nemotron 3.5 Lightning (free)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 28,
+      "Section": "Kilo Gateway",
+      "Label": "OpenRouter Free Models Router",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 29,
+      "Section": "Kilo Gateway",
+      "Label": "Poolside: Laguna S 2.1 (free)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 30,
+      "Section": "Kilo Gateway",
+      "Label": "Poolside: Laguna S 2.1 (retires Oct 31)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 31,
+      "Section": "Kilo Gateway",
+      "Label": "Poolside: Laguna XS 2.1 (free)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 32,
+      "Section": "Kilo Gateway",
+      "Label": "Poolside: Laguna XS 2.1 (retires Oct 31)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 33,
+      "Section": "Kilo Gateway",
+      "Label": "Recursive: Flint (free)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 34,
+      "Section": "Kilo Gateway",
+      "Label": "Sakana: Sakana Namazu",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 35,
+      "Section": "Kilo Gateway",
+      "Label": "Stealth: Claude Opus 4.6 (20% off)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 36,
+      "Section": "Kilo Gateway",
+      "Label": "Stealth: Claude Opus 4.7 (20% off)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 37,
+      "Section": "Kilo Gateway",
+      "Label": "Stealth: Claude Opus 4.8 (20% off)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 38,
+      "Section": "Kilo Gateway",
+      "Label": "Stealth: Claude Sonnet 4.6 (20% off)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 39,
+      "Section": "Kilo Gateway",
+      "Label": "Stealth: Qwen3.6 Plus (50% off)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 40,
+      "Section": "Kilo Gateway",
+      "Label": "XingChen: Xing4.0 29B A4B (free)",
+      "Description": null,
+      "Badges": [
+        "May train"
+      ],
+      "Current": false
+    },
+    {
+      "Index": 41,
+      "Section": "Kilo Gateway",
+      "Label": "AionLabs: Aion 3.5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 42,
+      "Section": "Kilo Gateway",
+      "Label": "AionLabs: Aion 3.5 Mini",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 43,
+      "Section": "Kilo Gateway",
+      "Label": "AionLabs: Aion-2.0",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 44,
+      "Section": "Kilo Gateway",
+      "Label": "AionLabs: Aion-3.0",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 45,
+      "Section": "Kilo Gateway",
+      "Label": "AionLabs: Aion-3.0-Mini",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 46,
+      "Section": "Kilo Gateway",
+      "Label": "Amazon: Nova 2 Lite",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 47,
+      "Section": "Kilo Gateway",
+      "Label": "Amazon: Nova Lite 1.0",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 48,
+      "Section": "Kilo Gateway",
+      "Label": "Amazon: Nova Micro 1.0",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 49,
+      "Section": "Kilo Gateway",
+      "Label": "Amazon: Nova Premier 1.0",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 50,
+      "Section": "Kilo Gateway",
+      "Label": "Amazon: Nova Pro 1.0",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 51,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Fable 5 ($$$$)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 52,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Fable 5.1 ($$$$)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 53,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Fable Latest ($$$$)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 54,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Haiku 4.5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 55,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Haiku 5.5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 56,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Haiku Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 57,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Opus 4.1 ($$$$)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 58,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Opus 4.5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 59,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Opus 4.6",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 60,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Opus 4.7",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 61,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Opus 4.8",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 62,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Opus 5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 63,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Opus Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 64,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Sonnet 4.5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 65,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Sonnet 4.6",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 66,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Sonnet 5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 67,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Sonnet 5.5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 68,
+      "Section": "Kilo Gateway",
+      "Label": "Anthropic: Claude Sonnet Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 69,
+      "Section": "Kilo Gateway",
+      "Label": "Arcee AI: Trinity Large Thinking (retires Oct 26)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 70,
+      "Section": "Kilo Gateway",
+      "Label": "Auto Balanced",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 71,
+      "Section": "Kilo Gateway",
+      "Label": "Auto Frontier",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 72,
+      "Section": "Kilo Gateway",
+      "Label": "Auto Small",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 73,
+      "Section": "Kilo Gateway",
+      "Label": "ByteDance Seed: Seed 1.6 (retires Nov 11)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 74,
+      "Section": "Kilo Gateway",
+      "Label": "ByteDance Seed: Seed 1.6 Flash (retires Nov 11)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 75,
+      "Section": "Kilo Gateway",
+      "Label": "ByteDance Seed: Seed 2.1 Turbo",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 76,
+      "Section": "Kilo Gateway",
+      "Label": "ByteDance Seed: Seed-2.0-Code (retires Nov 11)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 77,
+      "Section": "Kilo Gateway",
+      "Label": "ByteDance Seed: Seed-2.0-Lite",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 78,
+      "Section": "Kilo Gateway",
+      "Label": "ByteDance Seed: Seed-2.0-Mini",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 79,
+      "Section": "Kilo Gateway",
+      "Label": "Cohere: Command A+",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 80,
+      "Section": "Kilo Gateway",
+      "Label": "Cohere: Command R (08-2024)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 81,
+      "Section": "Kilo Gateway",
+      "Label": "Cohere: Command R+ (08-2024)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 82,
+      "Section": "Kilo Gateway",
+      "Label": "DeepSeek: DeepSeek Flash Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 83,
+      "Section": "Kilo Gateway",
+      "Label": "DeepSeek: DeepSeek Pro Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 84,
+      "Section": "Kilo Gateway",
+      "Label": "DeepSeek: DeepSeek V3",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 85,
+      "Section": "Kilo Gateway",
+      "Label": "DeepSeek: DeepSeek V3 0324",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 86,
+      "Section": "Kilo Gateway",
+      "Label": "DeepSeek: DeepSeek V3.1",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 87,
+      "Section": "Kilo Gateway",
+      "Label": "DeepSeek: DeepSeek V3.1 Terminus",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 88,
+      "Section": "Kilo Gateway",
+      "Label": "DeepSeek: DeepSeek V3.2",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 89,
+      "Section": "Kilo Gateway",
+      "Label": "DeepSeek: DeepSeek V3.2 Exp",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 90,
+      "Section": "Kilo Gateway",
+      "Label": "DeepSeek: DeepSeek V4 Flash 0423",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 91,
+      "Section": "Kilo Gateway",
+      "Label": "DeepSeek: DeepSeek V4 Flash 0731",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 92,
+      "Section": "Kilo Gateway",
+      "Label": "DeepSeek: DeepSeek V4 Flash Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 93,
+      "Section": "Kilo Gateway",
+      "Label": "DeepSeek: DeepSeek V4 Flash Vision Exp",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 94,
+      "Section": "Kilo Gateway",
+      "Label": "DeepSeek: DeepSeek V4 Pro 0423",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 95,
+      "Section": "Kilo Gateway",
+      "Label": "DeepSeek: DeepSeek V4 Pro 0813",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 96,
+      "Section": "Kilo Gateway",
+      "Label": "DeepSeek: DeepSeek V4.1 Flash 1017",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 97,
+      "Section": "Kilo Gateway",
+      "Label": "DeepSeek: R1 0528",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 98,
+      "Section": "Kilo Gateway",
+      "Label": "Elorian: Glimpse",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 99,
+      "Section": "Kilo Gateway",
+      "Label": "Fireworks: Ember-1",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 100,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini 2.5 Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 101,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini 2.5 Flash Lite",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 102,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini 2.5 Pro",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 103,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini 2.5 Pro Preview 06-05",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 104,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini 3 Flash Preview",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 105,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini 3.1 Flash Lite",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 106,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini 3.1 Flash Lite Preview",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 107,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini 3.1 Pro Preview",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 108,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini 3.1 Pro Preview Custom Tools",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 109,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini 3.5 Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 110,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini 3.5 Flash Lite",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 111,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini 3.6 Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 112,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini 3.7 Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 113,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini 3.8 Flash (50% off)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 114,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini 4 Argon (50% off)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 115,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini Flash Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 116,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemini Pro Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 117,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemma 3 12B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 118,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemma 3 27B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 119,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemma 4 26B A4B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 120,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Gemma 4 31B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 121,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Nano Banana 2.1",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 122,
+      "Section": "Kilo Gateway",
+      "Label": "Google: Nano Banana Pro (Gemini 3 Pro Image)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 123,
+      "Section": "Kilo Gateway",
+      "Label": "IBM: Granite 4.2 8B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 124,
+      "Section": "Kilo Gateway",
+      "Label": "Inception: Mercury 2",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 125,
+      "Section": "Kilo Gateway",
+      "Label": "Inception: Mercury 2.5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 126,
+      "Section": "Kilo Gateway",
+      "Label": "Inception: Mercury 3",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 127,
+      "Section": "Kilo Gateway",
+      "Label": "Meituan: LongCat 2.0",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 128,
+      "Section": "Kilo Gateway",
+      "Label": "Meta: Llama 3.1 70B Instruct",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 129,
+      "Section": "Kilo Gateway",
+      "Label": "Meta: Llama 3.1 8B Instruct",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 130,
+      "Section": "Kilo Gateway",
+      "Label": "Meta: Llama 3.3 70B Instruct",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 131,
+      "Section": "Kilo Gateway",
+      "Label": "Meta: Llama 4 Maverick",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 132,
+      "Section": "Kilo Gateway",
+      "Label": "Meta: Llama 4 Scout",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 133,
+      "Section": "Kilo Gateway",
+      "Label": "Meta: Muse Glimmer 30B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 134,
+      "Section": "Kilo Gateway",
+      "Label": "Meta: Muse Spark 1.1",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 135,
+      "Section": "Kilo Gateway",
+      "Label": "Meta: Muse Spark 1.2",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 136,
+      "Section": "Kilo Gateway",
+      "Label": "Meta: Muse Spark 1.3",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 137,
+      "Section": "Kilo Gateway",
+      "Label": "Meta: Muse Spark Open",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 138,
+      "Section": "Kilo Gateway",
+      "Label": "Meta: Muse Wonder",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 139,
+      "Section": "Kilo Gateway",
+      "Label": "MiniMax: MiniMax M1",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 140,
+      "Section": "Kilo Gateway",
+      "Label": "MiniMax: MiniMax M2",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 141,
+      "Section": "Kilo Gateway",
+      "Label": "MiniMax: MiniMax M2.1",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 142,
+      "Section": "Kilo Gateway",
+      "Label": "MiniMax: MiniMax M2.5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 143,
+      "Section": "Kilo Gateway",
+      "Label": "MiniMax: MiniMax M2.7",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 144,
+      "Section": "Kilo Gateway",
+      "Label": "MiniMax: MiniMax M3",
+      "Description": null,
+      "Badges": [],
+      "Current": true
+    },
+    {
+      "Index": 145,
+      "Section": "Kilo Gateway",
+      "Label": "MiniMax: MiniMax M3.1 Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 146,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral Large",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 147,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral Large 2407",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 148,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Codestral 2508",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 149,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Devstral 2 2512",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 150,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Ministral 3 14B 2512",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 151,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Ministral 3 3B 2512",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 152,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Ministral 3 8B 2512",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 153,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Mistral Large 3 2512",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 154,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Mistral Large 4",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 155,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Mistral Medium 3",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 156,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Mistral Medium 3.1",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 157,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Mistral Medium 3.5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 158,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Mistral Nemo",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 159,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Mistral Small 3.1 24B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 160,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Mistral Small 3.2 24B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 161,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Mistral Small 4",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 162,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Mixtral 8x22B Instruct",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 163,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Saba",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 164,
+      "Section": "Kilo Gateway",
+      "Label": "Mistral: Voxtral Small 24B 2507",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 165,
+      "Section": "Kilo Gateway",
+      "Label": "MoonshotAI: Kimi K2 0711",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 166,
+      "Section": "Kilo Gateway",
+      "Label": "MoonshotAI: Kimi K2 0905",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 167,
+      "Section": "Kilo Gateway",
+      "Label": "MoonshotAI: Kimi K2 Thinking",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 168,
+      "Section": "Kilo Gateway",
+      "Label": "MoonshotAI: Kimi K2.5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 169,
+      "Section": "Kilo Gateway",
+      "Label": "MoonshotAI: Kimi K2.6",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 170,
+      "Section": "Kilo Gateway",
+      "Label": "MoonshotAI: Kimi K2.7 Code",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 171,
+      "Section": "Kilo Gateway",
+      "Label": "MoonshotAI: Kimi K3.1 Pro",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 172,
+      "Section": "Kilo Gateway",
+      "Label": "MoonshotAI: Kimi Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 173,
+      "Section": "Kilo Gateway",
+      "Label": "NVIDIA: Nemotron 3 Nano 30B A3B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 174,
+      "Section": "Kilo Gateway",
+      "Label": "NVIDIA: Nemotron 3 Super",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 175,
+      "Section": "Kilo Gateway",
+      "Label": "NVIDIA: Nemotron 3 Ultra",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 176,
+      "Section": "Kilo Gateway",
+      "Label": "NVIDIA: Nemotron 3.5 Lightning",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 177,
+      "Section": "Kilo Gateway",
+      "Label": "NVIDIA: Nemotron 3.5 Super VL",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 178,
+      "Section": "Kilo Gateway",
+      "Label": "NVIDIA: Switchyard",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 179,
+      "Section": "Kilo Gateway",
+      "Label": "Nex AGI: Nex-N2.5-Pro",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 180,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT Astra Latest ($$$$)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 181,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT Audio",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 182,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT Audio Mini",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 183,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT Chat Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 184,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT Luna Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 185,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT Mini Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 186,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT Sol Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 187,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT Terra Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 188,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-3.5 Turbo",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 189,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-3.5 Turbo (older v0613)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 190,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-3.5 Turbo 16k",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 191,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-4 ($$$$)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 192,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-4 Turbo ($$$$)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 193,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-4.1",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 194,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-4.1 Mini",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 195,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-4.1 Nano",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 196,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-4o",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 197,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-4o (2024-05-13)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 198,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-4o (2024-08-06)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 199,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-4o (2024-11-20)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 200,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-4o-mini",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 201,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-4o-mini (2024-07-18)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 202,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 203,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5 Mini",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 204,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5 Nano",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 205,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5 Pro ($$$$)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 206,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.1",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 207,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.1-Codex",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 208,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.1-Codex-Max",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 209,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.1-Codex-Mini",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 210,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.2",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 211,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.2 Chat",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 212,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.2 Pro ($$$$)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 213,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.2-Codex",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 214,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.3-Codex",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 215,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.4",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 216,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.4 Mini",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 217,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.4 Nano",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 218,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.4 Pro ($$$$)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 219,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 220,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.5 Pro ($$$$)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 221,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.6 Luna",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 222,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.6 Luna Pro",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 223,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.6 Sol",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 224,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.6 Sol Pro",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 225,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.6 Terra",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 226,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-5.6 Terra Pro",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 227,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-6 Astra ($$$$)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 228,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-6 Astra Pro ($$$$)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 229,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-6 Luna",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 230,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-6 Luna Pro",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 231,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-6 Sol",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 232,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-6 Sol Pro",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 233,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: GPT-6.1 Sol Pro",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 234,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: gpt-oss-120b",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 235,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: gpt-oss-20b",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 236,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: gpt-oss-safeguard-20b",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 237,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: o1 ($$$$)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 238,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: o3",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 239,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: o3 Mini",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 240,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: o3 Mini High",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 241,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: o3 Pro ($$$$)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 242,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: o4 Mini",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 243,
+      "Section": "Kilo Gateway",
+      "Label": "OpenAI: o4 Mini High",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 244,
+      "Section": "Kilo Gateway",
+      "Label": "OpenRouter Auto Router",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 245,
+      "Section": "Kilo Gateway",
+      "Label": "OpenRouter Auto Router (Beta)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 246,
+      "Section": "Kilo Gateway",
+      "Label": "OpenRouter Body Builder (beta)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 247,
+      "Section": "Kilo Gateway",
+      "Label": "OpenRouter Pareto Code Router",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 248,
+      "Section": "Kilo Gateway",
+      "Label": "OpenRouter: Fusion",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 249,
+      "Section": "Kilo Gateway",
+      "Label": "Pareto 26.10",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 250,
+      "Section": "Kilo Gateway",
+      "Label": "Pareto 26.9",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 251,
+      "Section": "Kilo Gateway",
+      "Label": "Pareto Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 252,
+      "Section": "Kilo Gateway",
+      "Label": "Perceptron: Perceptron Mk1.5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 253,
+      "Section": "Kilo Gateway",
+      "Label": "PrismML: Ternary Bonsai 2 27B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 254,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen2.5 72B Instruct",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 255,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen-Plus",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 256,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen2.5 7B Instruct",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 257,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3 14B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 258,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3 235B A22B Instruct 2507",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 259,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3 235B A22B Thinking 2507",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 260,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3 30B A3B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 261,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3 30B A3B Instruct 2507",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 262,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3 32B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 263,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3 Coder 30B A3B Instruct",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 264,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3 Coder 480B A35B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 265,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3 Coder Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 266,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3 Coder Next",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 267,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3 Next 80B A3B Instruct",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 268,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3 Next 80B A3B Thinking",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 269,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3 VL 235B A22B Instruct",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 270,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3 VL 30B A3B Instruct",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 271,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3 VL 30B A3B Thinking",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 272,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3 VL 8B Instruct",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 273,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.5 397B A17B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 274,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.5 Plus 2026-02-15",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 275,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.5 Plus 2026-04-20",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 276,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.5-122B-A10B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 277,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.5-27B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 278,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.5-35B-A3B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 279,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.5-9B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 280,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.5-Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 281,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.6 27B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 282,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.6 35B A3B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 283,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.6 Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 284,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.6 Plus",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 285,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.7 Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 286,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.7 Max",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 287,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.7 Plus",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 288,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.8 2.4T A95B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 289,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.8 27B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 290,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.8 Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 291,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.8 Max (0902)",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 292,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.8 Max Prime",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 293,
+      "Section": "Kilo Gateway",
+      "Label": "Qwen: Qwen3.8 Omni Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 294,
+      "Section": "Kilo Gateway",
+      "Label": "Reflection: Beam 1.0 501B A23B",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 295,
+      "Section": "Kilo Gateway",
+      "Label": "Reka Edge",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 296,
+      "Section": "Kilo Gateway",
+      "Label": "Relace: Relace Search",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 297,
+      "Section": "Kilo Gateway",
+      "Label": "Sakana: Fugu Max",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 298,
+      "Section": "Kilo Gateway",
+      "Label": "Sakana: Fugu Ultra",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 299,
+      "Section": "Kilo Gateway",
+      "Label": "Sakana: Fugu Ultra v2",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 300,
+      "Section": "Kilo Gateway",
+      "Label": "SpaceXAI: Grok 4.20",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 301,
+      "Section": "Kilo Gateway",
+      "Label": "SpaceXAI: Grok 4.3",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 302,
+      "Section": "Kilo Gateway",
+      "Label": "SpaceXAI: Grok 4.5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 303,
+      "Section": "Kilo Gateway",
+      "Label": "SpaceXAI: Grok 4.6",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 304,
+      "Section": "Kilo Gateway",
+      "Label": "SpaceXAI: Grok 4.7",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 305,
+      "Section": "Kilo Gateway",
+      "Label": "SpaceXAI: Grok Build 0.1",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 306,
+      "Section": "Kilo Gateway",
+      "Label": "StepFun: Step 3.5 Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 307,
+      "Section": "Kilo Gateway",
+      "Label": "StepFun: Step 3.7 Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 308,
+      "Section": "Kilo Gateway",
+      "Label": "StepFun: Step 5 Preview",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 309,
+      "Section": "Kilo Gateway",
+      "Label": "Tencent: Hy3",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 310,
+      "Section": "Kilo Gateway",
+      "Label": "Tencent: Hy3 preview",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 311,
+      "Section": "Kilo Gateway",
+      "Label": "Tencent: Hy4 preview",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 312,
+      "Section": "Kilo Gateway",
+      "Label": "Thinking Machines: Inkling",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 313,
+      "Section": "Kilo Gateway",
+      "Label": "Thinking Machines: Inkling Small",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 314,
+      "Section": "Kilo Gateway",
+      "Label": "TypeSafe: Jev Router",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 315,
+      "Section": "Kilo Gateway",
+      "Label": "Upstage: Solar Mini 4",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 316,
+      "Section": "Kilo Gateway",
+      "Label": "Upstage: Solar Pro 3",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 317,
+      "Section": "Kilo Gateway",
+      "Label": "Upstage: Solar Pro 4",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 318,
+      "Section": "Kilo Gateway",
+      "Label": "Xiaomi: MiMo-V2.5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 319,
+      "Section": "Kilo Gateway",
+      "Label": "Xiaomi: MiMo-V2.5-Pro",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 320,
+      "Section": "Kilo Gateway",
+      "Label": "Xiaomi: MiMo-V2.6-Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 321,
+      "Section": "Kilo Gateway",
+      "Label": "Xiaomi: MiMo-V2.6-Pro",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 322,
+      "Section": "Kilo Gateway",
+      "Label": "Xiaomi: MiMo-V2.6-Pro-UltraSpeed",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 323,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM 4.5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 324,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM 4.5 Air",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 325,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM 4.5V",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 326,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM 4.6",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 327,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM 4.6V",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 328,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM 4.7",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 329,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM 4.7 Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 330,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM 5",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 331,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM 5 Turbo",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 332,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM 5.1",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 333,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM 5.2",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 334,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM 5.3",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 335,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM 5.3 FlashX",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 336,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM 5.3 Prime",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 337,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM 5V Turbo",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 338,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM Flash Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 339,
+      "Section": "Kilo Gateway",
+      "Label": "Z.ai: GLM Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 340,
+      "Section": "Kilo Gateway",
+      "Label": "inclusionAI: Ling 3.0 Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 341,
+      "Section": "Kilo Gateway",
+      "Label": "inclusionAI: Ling 3.0 Flash VL",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 342,
+      "Section": "Kilo Gateway",
+      "Label": "inclusionAI: Ling 3.1 Flash",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    },
+    {
+      "Index": 343,
+      "Section": "Kilo Gateway",
+      "Label": "xAI: Grok Latest",
+      "Description": null,
+      "Badges": [],
+      "Current": false
+    }
+  ]
+}

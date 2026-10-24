@@ -49,6 +49,37 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+### Release notes — 0.6.2 (2026-10-24)
+
+- Refresh all sixteen configured CLI/channel catalogs from this installation's
+  observed lists and pickers: 615 model/family choices, 30 additions, 29 withdrawn
+  entries, and seven Junie picker-spelling corrections. Other channels and custom
+  model strings retain their existing behavior. Runtime's Playground and Platform
+  consume the same schema-2 factory, including per-model options and exact labels.
+- Add the `auggie.reasoning_effort` binding and pass `--reasoning-effort` only for
+  models whose observed JSON lists effort levels. Preserve literal values, with no
+  inferred default or control for unsupported/custom models. Existing sessions
+  retain their resolved bindings. Junie Eco remains evidence-only by owner choice.
+- This compatible 0.6.x patch keeps catalog schema 2, binding version 1, HTTP/config
+  contracts and stored-data formats. No new migration or data reset is required;
+  existing validated upgrades, backups and recovery remain in force. Older Runtime
+  binaries cannot execute the new binding, so Desktop selects this source revision.
+- Focused catalog, adapter, HTTP, Playground and TypeScript checks passed, as did
+  all sixteen actual API projections through Platform and all 615 Playground
+  choices. An isolated source Desktop candidate built and stopped cleanly. Native
+  picker evidence covers Windows only; Junie's unchanged traversal hash does not
+  establish an unchanged prelaunch-to-exit settings file. Detailed evidence and
+  limitations are in [the refresh record](research/2026-10-24-sixteen-cli-catalog-refresh.md).
+  PR/main release preflight enforces the full gate.
+- Selected distribution: source bundling in Desktop **0.9.7 standard-profile
+  preview**. Platform's original bump PR pins this change's immutable merge SHA;
+  the release workflow records identical Runtime identities in each OS/source
+  receipt. Expected trust: macOS **signed + notarized**, Windows **unsigned: no
+  certificate**, Linux **n/a**. Existing same-profile self-update paths remain
+  supported. Usage 0.5.4 keeps its exact artifact pin in Platform. This selects no
+  npm, App or cats-one publication. Publication results: Desktop's `v0.9.7`
+  GitHub prerelease and its Actions run.
+
 ### Prepared release notes — 0.6.1 (2026-10-23)
 
 - Fix the concrete native Cat MCP setup failure found during isolated acceptance:

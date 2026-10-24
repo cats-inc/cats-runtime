@@ -2873,13 +2873,9 @@ backends:
     });
   });
 
-  // Complete Kiro 2.27.1 picker, in picker order; the picker shows raw IDs only.
-  const KIRO_PICKER_IDS = [
-    'auto', 'claude-opus-5.5', 'claude-sonnet-5.5', 'claude-opus-5', 'claude-sonnet-5', 'claude-opus-4.8',
-    'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'claude-opus-4.7', 'claude-opus-4.6',
-    'claude-sonnet-4.6', 'claude-opus-4.5', 'claude-sonnet-4.5', 'claude-sonnet-4',
-    'claude-haiku-4.5', 'deepseek-3.2', 'minimax-m2.5', 'minimax-m2.1', 'glm-5', 'qwen3-coder-next',
-  ];
+  // The current factory owns membership/order; Kiro's picker displays these raw IDs.
+  const KIRO_PICKER_IDS = readCatalogFactory({ packageRoot: process.cwd(), runtimeRoot: process.cwd() })
+    .document.catalogs.find(scope => scope.provider === 'kiro' && scope.backend === 'cli')!.models.map(model => model.id);
 
   it('GET /kiro/models returns the local catalog without an upstream proxy', async () => {
     await withRuntime({ kiroRuntime: { mode: 'wsl' } }, {}, async (runtime) => {
@@ -4231,12 +4227,9 @@ providers:
     });
   });
 
-  // Complete Junie 26.9.22 (build 3419.29) picker, in picker order; ids and labels are the literal names.
-  const JUNIE_PICKER_NAMES = [
-    'Gemini 3.7 Flash', 'Junie Lite', 'Claude Fable 5.1', 'Claude Opus 5', 'Claude Opus 5.5', 'Claude Sonnet 5',
-    'Claude Sonnet 5.5', 'Gemini 3.6 Flash', 'Gemini 3.8 Flash', 'GPT-5.6-LUNA', 'GPT-5.6-SOL', 'GPT-5.6-TERRA',
-    'GPT-6-ASTRA', 'GPT-6-LUNA', 'GPT-6-SOL', 'GPT-6.1-SOL', 'Grok 4.6', 'Grok 4.7',
-  ];
+  const JUNIE_FACTORY_MODELS = readCatalogFactory({ packageRoot: process.cwd(), runtimeRoot: process.cwd() })
+    .document.catalogs.find(scope => scope.provider === 'junie' && scope.backend === 'cli')!.models;
+  const JUNIE_PICKER_NAMES = JUNIE_FACTORY_MODELS.map(model => model.id);
 
   it('GET /providers/junie/models returns the complete picker list', async () => {
     await withRuntime({}, {}, async (runtime) => {
@@ -4244,7 +4237,7 @@ providers:
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({
         provider: 'junie', backend: 'cli', instance: 'native',
-        defaultModel: 'Gemini 3.7 Flash', source: 'static', cache: null,
+        defaultModel: null, source: 'static', cache: null,
         models: JUNIE_PICKER_NAMES.map(name => ({ id: name, label: name })),
         warnings: [],
       });
@@ -4258,8 +4251,8 @@ providers:
       const payload = await response.json();
       expect(payload).toMatchObject({
         provider: 'junie', backend: 'cli', instance: 'native',
-        defaultModel: 'Gemini 3.7 Flash', source: 'static', cache: null,
-        entries: JUNIE_PICKER_NAMES.map((name, index) => ({ id: name, label: name, ...(index === 0 ? { default: true } : {}) })),
+        defaultModel: null, source: 'static', cache: null,
+        entries: JUNIE_FACTORY_MODELS.map(({ id, label }) => ({ id, label })),
         presets: [],
         defaultSelection: { entryMode: 'explicit', entryId: 'Gemini 3.7 Flash' },
         support: { tier: 'full', advancedMetadataStatus: 'verified_manifest' },
@@ -4267,7 +4260,7 @@ providers:
       });
       const values = (id: string) => payload.entries.find((entry: { id: string }) => entry.id === id)
         .controls[0].values.map((value: { value: string }) => value.value);
-      expect(values('GPT-5.6-SOL')).toEqual(['none', 'low', 'medium', 'high', 'xhigh', 'max']);
+      expect(values('GPT-5.6 Sol')).toEqual(['none', 'low', 'medium', 'high', 'xhigh', 'max']);
       expect(values('Gemini 3.6 Flash')).toEqual(['minimal', 'low', 'medium', 'high']);
       expect(values('Gemini 3.7 Flash')).toEqual(['low', 'medium', 'high']);
       expect(values('Grok 4.7')).toEqual(['low', 'medium', 'high', 'xhigh']);
@@ -5506,16 +5499,9 @@ providers:
           defaultModel: null,
           source: 'static',
           cache: null,
-          models: [
-            { id: 'openai-codex/gpt-5.5', label: 'gpt-5.5' },
-            { id: 'openai-codex/gpt-5.6-luna', label: 'gpt-5.6-luna' },
-            { id: 'openai-codex/gpt-5.6-sol', label: 'gpt-5.6-sol' },
-            { id: 'openai-codex/gpt-5.6-terra', label: 'gpt-5.6-terra' },
-            { id: 'openai-codex/gpt-6-astra', label: 'gpt-6-astra' },
-            { id: 'openai-codex/gpt-6-luna', label: 'gpt-6-luna' },
-            { id: 'openai-codex/gpt-6-sol', label: 'gpt-6-sol' },
-            { id: 'openai-codex/gpt-6.1-sol', label: 'gpt-6.1-sol' },
-          ],
+          models: readCatalogFactory({ packageRoot: process.cwd(), runtimeRoot: process.cwd() })
+            .document.catalogs.find(scope => scope.provider === 'pi' && scope.backend === 'cli')!.models
+            .map(({ id, label }) => ({ id, label })),
           warnings: [],
         });
         expect(spawnMock).not.toHaveBeenCalled();
