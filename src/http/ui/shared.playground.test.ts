@@ -242,7 +242,7 @@ describe('shared playground selection helpers', () => {
         expect(controls.innerHTML).toContain(`<option value="${value}" selected>${label}</option>`);
         firstValues[entry.id] = value;
       }
-      expect(firstValues).toMatchObject({ 'GPT-5.6-SOL': 'none', 'GPT-6-ASTRA': 'low',
+      expect(firstValues).toMatchObject({ 'GPT-5.6 Sol': 'none', 'GPT-6 Astra': 'low',
         'Gemini 3.6 Flash': 'minimal', 'Gemini 3.7 Flash': 'low', 'Grok 4.7': 'low' });
       expect(catsUI.normalizePlaygroundAgentSelection({
         provider: 'junie', modelSelection: { entryId: 'Claude Opus 5.5', entryMode: 'explicit',
@@ -271,7 +271,7 @@ describe('shared playground selection helpers', () => {
       div: { querySelector: () => controls }, catalog, entryId: '' };
     vm.createContext(context);
     vm.runInContext(html.slice(start, end), context);
-    expect(models).toHaveLength(21);
+    expect(models).toHaveLength(22);
     expect(models.some(model => model.default)).toBe(false);
     // No default is declared, so the UI initializes the first picker row (auto).
     expect(catsUI.normalizePlaygroundAgentSelection({ provider: 'kiro', selectableProviders: ['kiro'],
@@ -298,7 +298,7 @@ describe('shared playground selection helpers', () => {
     }).modelSelection.controls).toEqual({ 'kiro.reasoning_effort': 'xhigh' });
   });
 
-  it('initializes Auggie at the picker default Claude Opus 5.5 with no effort menu and keeps custom input', () => {
+  it('initializes Auggie at its picker default, renders per-model effort and keeps custom input', () => {
     const catsUI = createCatsUI();
     const target = { providerName: 'auggie', backend: 'cli' as const,
       instanceId: 'native', defaultTarget: true };
@@ -324,7 +324,11 @@ describe('shared playground selection helpers', () => {
     for (const entry of catalog.entries) {
       context.entryId = entry.id;
       vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
-      expect(controls.innerHTML).not.toMatch(/<option/);
+      const options = [...controls.innerHTML.matchAll(/<option value="([^"]+)"([^>]*)>/g)];
+      const effort = entry.controls?.find(control => control.key === 'auggie.reasoning_effort');
+      expect(options.map(option => option[1])).toEqual(effort?.values?.map(value =>
+        typeof value === 'object' ? String(value.value) : String(value)) ?? []);
+      if (options.length) expect(options[0][2]).toContain('selected');
     }
     const custom = 'fixture-unlisted-auggie-model';
     expect(catsUI.normalizePlaygroundAgentSelection({ ...input, model: custom }))
@@ -348,7 +352,7 @@ describe('shared playground selection helpers', () => {
       div: { querySelector: () => controls }, catalog, entryId: '' };
     vm.createContext(context);
     vm.runInContext(html.slice(start, end), context);
-    expect(models).toHaveLength(19);
+    expect(models).toHaveLength(14);
     expect(models.filter(model => model.default).map(model => model.id)).toEqual(['gpt-5.6-terra']);
     const input = { provider: 'copilot', selectableProviders: ['copilot'], providerOrder: ['copilot'],
       advancedCatalogs: { copilot: catalog } };
@@ -367,8 +371,7 @@ describe('shared playground selection helpers', () => {
       'gpt-5.6-terra': [['none', 'None'], ['default', '272K']],
       'claude-sonnet-5': [['low', 'Low'], ['default', '200K']],
       'claude-haiku-5.5': [['low', 'Low'], ['default', '100K']],
-      'gemini-3.7-flash': [['low', 'Low'], ['default', '200K']],
-      'gpt-5.4-mini': [['none', 'None']],
+      'gemini-3.8-flash': [['low', 'Low'], ['default', '200K']],
       'claude-haiku-4.5': [],
     });
     expect(catsUI.normalizePlaygroundAgentSelection({ ...input, modelSelection: {
@@ -451,11 +454,11 @@ describe('shared playground selection helpers', () => {
       div: { querySelector: () => controls }, catalog, entryId: '' };
     vm.createContext(context);
     vm.runInContext(html.slice(start, end), context);
-    expect(models).toHaveLength(8);
+    expect(models).toHaveLength(7);
     expect(models.some(model => model.default)).toBe(false);
     const input = { provider: 'pi', selectableProviders: ['pi'], providerOrder: ['pi'],
       advancedCatalogs: { pi: catalog } };
-    expect(catsUI.normalizePlaygroundAgentSelection(input).modelSelection.entryId).toBe('openai-codex/gpt-5.5');
+    expect(catsUI.normalizePlaygroundAgentSelection(input).modelSelection.entryId).toBe('openai-codex/gpt-5.6-luna');
     const levels: Record<string, string[]> = {};
     for (const entry of catalog.entries) {
       context.entryId = entry.id;
@@ -464,7 +467,7 @@ describe('shared playground selection helpers', () => {
       expect(options.filter(match => match[2]).map(match => match[1])).toEqual(['medium']);
       levels[entry.id] = options.map(match => match[1]);
     }
-    expect(levels['openai-codex/gpt-5.5']).toEqual(['off', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+    expect(levels['openai-codex/gpt-5.6-luna']).toEqual(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
     expect(levels['openai-codex/gpt-6-astra']).toEqual(['minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
     expect(levels['openai-codex/gpt-6-sol']).toEqual(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
     expect(levels['openai-codex/gpt-6.1-sol']).toEqual(['minimal', 'low', 'medium', 'high', 'xhigh', 'max']);

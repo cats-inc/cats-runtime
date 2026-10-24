@@ -261,14 +261,17 @@ powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/tests/Te
 semantics and takes the same platform helper path. It does not launch Copilot or interpret defaults.
 
 1. **Launch.** Clean the environment first (launch hygiene above, plus `COPILOT_*`). Open
-   interactive `copilot --no-auto-update --no-custom-instructions --disable-builtin-mcps
-   --no-remote --no-remote-export` in a uniquely titled window with `Start-WindowsUiTerminal`, from
+   interactive `copilot --no-auto-update --no-custom-instructions --disable-builtin-mcps`
+   in a uniquely titled window with `Start-WindowsUiTerminal`, from
    an already trusted folder. The first launch in Windows Terminal adds `askedSetupTerminals` to
    `~/.copilot/config.json`, so take the settings hash after startup. If focusing fails because
    Explorer owns the foreground, wait until the operator is idle and call the UI Automation
-   element's `SetFocus()` before the helper.
+   element's `SetFocus()` before the helper. Copilot 1.0.103 removed `--no-remote`;
+   `--no-remote-export` is also absent from its help, so do not pass those older flags.
 2. **Open the picker.** Type `/model`, wait for the command list and send one guarded Enter; that
    Enter runs the command and selects nothing. The picker must be on `group: recommended`.
+   Wait for the complete highlighted row as well as the footer: the footer can render first,
+   causing an immediate helper start to stop safely without sending input.
 3. **Capture.** Pass the settings file, normally `~/.copilot/config.json`:
 
 ```powershell
@@ -321,6 +324,11 @@ powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/scripts/
   footer description), presses Right until the Effort cell returns to its start, then Down. A row
   whose Effort cell does not change is recorded as single-valued. It returns to the starting row.
 - It sends only Up, Down and Right, and reports whether the settings file kept its SHA-256.
+- Use `-SkipEffortCycle` for a read-only Up/Down walk when a settings backup is unavailable. Its
+  `StartEffort` cells are current state only; `EffortCycle` is empty and `SingleValue` is false.
+  The helper guards the settings digest before each key in this mode. The 26.10.20 picker replaces
+  the Provider column with Eco; the helper records that cell separately rather than treating it
+  as a provider name. Effort menus can be read from the installed JAR with the Junie reader.
 - Afterwards close the picker with Escape and exit the owned Junie with `/quit` (typing `/exit`
   autocompletes to it).
 

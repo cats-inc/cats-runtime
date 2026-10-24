@@ -126,6 +126,14 @@ export class AuggieProvider implements Provider {
       args.push('--model', model);
     }
 
+    const effort = opts.modelControls?.['auggie.reasoning_effort'];
+    if (effort !== undefined) {
+      if (typeof effort !== 'string' || !effort.trim() || /[\u0000-\u001f]/.test(effort)) {
+        throw new Error('Unsupported Auggie reasoning effort.');
+      }
+      args.push('--reasoning-effort', effort);
+    }
+
     if (opts.resumeSessionId) {
       args.push('--resume', opts.resumeSessionId);
     }

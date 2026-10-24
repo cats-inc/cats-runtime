@@ -42,8 +42,9 @@ the executable variant UIDs on its agent/ACP target; ClinePass uses explicit CLI
 selection plus a per-model thinking-level control; Kiro uses verbatim picker IDs plus a separate
 per-model effort control; Junie uses literal picker names as entry IDs, executed as the JAR's
 setting IDs, plus a separate per-model effort control;
-Auggie uses CLI-observed IDs and exact picker labels; its picker shows no effort, so it has no
-option controls;
+Auggie uses CLI-observed IDs and exact picker labels, with per-model reasoning effort from the
+account-resolved JSON `effortLevels`, sent separately through `--reasoning-effort`; its model picker
+does not show effort or effort defaults;
 Goose uses provider-qualified IDs with raw-ID labels plus a per-model thinking-effort control sent
 as its native model suffix;
 Pi uses bare model-id labels with its channel in the scope basis, plus a separate per-model
@@ -242,7 +243,7 @@ authorizes that external mutation.
 - [Antigravity (agy)](./references/providers/antigravity.md): separate picker families/effort from
   executable model ids, first-item initialization without default claims, and structured selection.
 - [Auggie](./references/providers/auggie.md): the `/model` picker as the full list, JSON IDs
-  matched by display name, opaque IDs, the picker's `(default)` marker, no effort in the picker,
+  matched by display name, opaque IDs, the picker's `(default)` marker, JSON effort levels,
   the authorized Enter probe, and Windows-only evidence.
 - [Claude](./references/providers/claude.md): supplied picker fast path, arrow-only agent capture,
   alias/label projection, per-model effort and existing Runtime/Desktop support; compiled

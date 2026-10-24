@@ -1,0 +1,552 @@
+Claude Code 2.1.310; 2026-10-24; Windows UI Automation visible text; Claude Max account, identity omitted.
+Complete 13-row list and every effort range; arrow-only capture. No prompt. Settings SHA-256 unchanged.
+
+Screen: model-01-effort-01.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 1.  Default (recommended)  Opus 5.5 · Best for everyday, complex tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◉ xHigh effort ←/→ to adjust
+
+Screen: model-01-effort-02.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 1.  Default (recommended)  Opus 5.5 · Best for everyday, complex tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+Screen: model-01-effort-03.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 1.  Default (recommended)  Opus 5.5 · Best for everyday, complex tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ● High effort ←/→ to adjust
+
+Screen: model-01-effort-04.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 1.  Default (recommended)  Opus 5.5 · Best for everyday, complex tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◐ Medium effort (default) ←/→ to adjust
+
+Screen: model-01-effort-05.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 1.  Default (recommended)  Opus 5.5 · Best for everyday, complex tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ○ Low effort ←/→ to adjust
+
+Screen: model-01-effort-key.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 1.  Default (recommended)  Opus 5.5 · Best for everyday, complex tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◐ Medium effort (default) ←/→ to adjust
+
+Screen: model-02-effort-01.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 2.  Opus 5.5 ✔             For complex work and everyday tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ○ Low effort ←/→ to adjust
+
+Screen: model-02-effort-02.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 2.  Opus 5.5 ✔             For complex work and everyday tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◐ Medium effort (default) ←/→ to adjust
+
+Screen: model-02-effort-03.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 2.  Opus 5.5 ✔             For complex work and everyday tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ● High effort ←/→ to adjust
+
+Screen: model-02-effort-04.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 2.  Opus 5.5 ✔             For complex work and everyday tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◉ xHigh effort ←/→ to adjust
+
+Screen: model-02-effort-05.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 2.  Opus 5.5 ✔             For complex work and everyday tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+Screen: model-02-effort-key.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 2.  Opus 5.5 ✔             For complex work and everyday tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◐ Medium effort (default) ←/→ to adjust
+
+Screen: model-03-effort-01.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 3.  Fable 5.1              For your toughest challenges
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ○ Low effort ←/→ to adjust
+
+Screen: model-03-effort-02.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 3.  Fable 5.1              For your toughest challenges
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◐ Medium effort ←/→ to adjust
+
+Screen: model-03-effort-03.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 3.  Fable 5.1              For your toughest challenges
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ● High effort (default) ←/→ to adjust
+
+Screen: model-03-effort-04.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 3.  Fable 5.1              For your toughest challenges
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◉ xHigh effort ←/→ to adjust
+
+Screen: model-03-effort-05.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 3.  Fable 5.1              For your toughest challenges
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+Screen: model-03-effort-key.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 3.  Fable 5.1              For your toughest challenges
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ● High effort (default) ←/→ to adjust
+
+Screen: model-04-effort-01.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 4.  Sonnet 5.5             Most efficient for simpler tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ○ Low effort ←/→ to adjust
+
+Screen: model-04-effort-02.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 4.  Sonnet 5.5             Most efficient for simpler tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◐ Medium effort (default) ←/→ to adjust
+
+Screen: model-04-effort-03.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 4.  Sonnet 5.5             Most efficient for simpler tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ● High effort ←/→ to adjust
+
+Screen: model-04-effort-04.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 4.  Sonnet 5.5             Most efficient for simpler tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◉ xHigh effort ←/→ to adjust
+
+Screen: model-04-effort-05.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 4.  Sonnet 5.5             Most efficient for simpler tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+Screen: model-04-effort-key.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 4.  Sonnet 5.5             Most efficient for simpler tasks
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◐ Medium effort (default) ←/→ to adjust
+
+Screen: model-05-effort-01.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 5.  Haiku 5.5              Fastest for quick answers
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ○ Low effort ←/→ to adjust
+
+Screen: model-05-effort-02.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 5.  Haiku 5.5              Fastest for quick answers
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◐ Medium effort (default) ←/→ to adjust
+
+Screen: model-05-effort-03.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 5.  Haiku 5.5              Fastest for quick answers
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ● High effort ←/→ to adjust
+
+Screen: model-05-effort-04.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 5.  Haiku 5.5              Fastest for quick answers
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◉ xHigh effort ←/→ to adjust
+
+Screen: model-05-effort-05.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 5.  Haiku 5.5              Fastest for quick answers
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+Screen: model-05-effort-key.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 5.  Haiku 5.5              Fastest for quick answers
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+  ◐ Medium effort (default) ←/→ to adjust
+
+Screen: model-06-effort-01.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 6.  Haiku 4.5              Fastest for quick answers
+  ○ Effort not supported for Haiku 4.5
+
+Screen: model-06-effort-key.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ❯ 6.  Haiku 4.5              Fastest for quick answers
+  ○ Effort not supported for Haiku 4.5
+
+Screen: model-07-effort-01.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 2.  Opus 5.5 ✔             For complex work and everyday tasks
+  ❯ 7.  Sonnet 5               Efficient for routine tasks
+  ○ Low effort ←/→ to adjust
+
+Screen: model-07-effort-02.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 2.  Opus 5.5 ✔             For complex work and everyday tasks
+  ❯ 7.  Sonnet 5               Efficient for routine tasks
+  ◐ Medium effort ←/→ to adjust
+
+Screen: model-07-effort-03.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 2.  Opus 5.5 ✔             For complex work and everyday tasks
+  ❯ 7.  Sonnet 5               Efficient for routine tasks
+  ● High effort (default) ←/→ to adjust
+
+Screen: model-07-effort-04.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 2.  Opus 5.5 ✔             For complex work and everyday tasks
+  ❯ 7.  Sonnet 5               Efficient for routine tasks
+  ◉ xHigh effort ←/→ to adjust
+
+Screen: model-07-effort-05.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 2.  Opus 5.5 ✔             For complex work and everyday tasks
+  ❯ 7.  Sonnet 5               Efficient for routine tasks
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+Screen: model-07-effort-key.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 2.  Opus 5.5 ✔             For complex work and everyday tasks
+  ❯ 7.  Sonnet 5               Efficient for routine tasks
+  ● High effort (default) ←/→ to adjust
+
+Screen: model-08-effort-01.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 3.  Fable 5.1              For your toughest challenges
+  ❯ 8.  Opus 5                 Best for everyday, complex tasks
+  ○ Low effort ←/→ to adjust
+
+Screen: model-08-effort-02.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 3.  Fable 5.1              For your toughest challenges
+  ❯ 8.  Opus 5                 Best for everyday, complex tasks
+  ◐ Medium effort ←/→ to adjust
+
+Screen: model-08-effort-03.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 3.  Fable 5.1              For your toughest challenges
+  ❯ 8.  Opus 5                 Best for everyday, complex tasks
+  ● High effort (default) ←/→ to adjust
+
+Screen: model-08-effort-04.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 3.  Fable 5.1              For your toughest challenges
+  ❯ 8.  Opus 5                 Best for everyday, complex tasks
+  ◉ xHigh effort ←/→ to adjust
+
+Screen: model-08-effort-05.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 3.  Fable 5.1              For your toughest challenges
+  ❯ 8.  Opus 5                 Best for everyday, complex tasks
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+Screen: model-08-effort-key.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 3.  Fable 5.1              For your toughest challenges
+  ❯ 8.  Opus 5                 Best for everyday, complex tasks
+  ● High effort (default) ←/→ to adjust
+
+Screen: model-09-effort-01.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 4.  Sonnet 5.5             Most efficient for simpler tasks
+  ❯ 9.  Fable 5                Most capable for your hardest and longest-running tasks
+  ○ Low effort ←/→ to adjust
+
+Screen: model-09-effort-02.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 4.  Sonnet 5.5             Most efficient for simpler tasks
+  ❯ 9.  Fable 5                Most capable for your hardest and longest-running tasks
+  ◐ Medium effort ←/→ to adjust
+
+Screen: model-09-effort-03.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 4.  Sonnet 5.5             Most efficient for simpler tasks
+  ❯ 9.  Fable 5                Most capable for your hardest and longest-running tasks
+  ● High effort (default) ←/→ to adjust
+
+Screen: model-09-effort-04.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 4.  Sonnet 5.5             Most efficient for simpler tasks
+  ❯ 9.  Fable 5                Most capable for your hardest and longest-running tasks
+  ◉ xHigh effort ←/→ to adjust
+
+Screen: model-09-effort-05.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 4.  Sonnet 5.5             Most efficient for simpler tasks
+  ❯ 9.  Fable 5                Most capable for your hardest and longest-running tasks
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+Screen: model-09-effort-key.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 4.  Sonnet 5.5             Most efficient for simpler tasks
+  ❯ 9.  Fable 5                Most capable for your hardest and longest-running tasks
+  ● High effort (default) ←/→ to adjust
+
+Screen: model-10-effort-01.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 5.  Haiku 5.5              Fastest for quick answers
+  ❯ 10. Opus 4.8               Best for everyday, complex tasks
+  ○ Low effort ←/→ to adjust
+
+Screen: model-10-effort-02.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 5.  Haiku 5.5              Fastest for quick answers
+  ❯ 10. Opus 4.8               Best for everyday, complex tasks
+  ◐ Medium effort ←/→ to adjust
+
+Screen: model-10-effort-03.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 5.  Haiku 5.5              Fastest for quick answers
+  ❯ 10. Opus 4.8               Best for everyday, complex tasks
+  ● High effort (default) ←/→ to adjust
+
+Screen: model-10-effort-04.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 5.  Haiku 5.5              Fastest for quick answers
+  ❯ 10. Opus 4.8               Best for everyday, complex tasks
+  ◉ xHigh effort ←/→ to adjust
+
+Screen: model-10-effort-05.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 5.  Haiku 5.5              Fastest for quick answers
+  ❯ 10. Opus 4.8               Best for everyday, complex tasks
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+Screen: model-10-effort-key.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 5.  Haiku 5.5              Fastest for quick answers
+  ❯ 10. Opus 4.8               Best for everyday, complex tasks
+  ● High effort (default) ←/→ to adjust
+
+Screen: model-11-effort-01.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 6.  Haiku 4.5              Fastest for quick answers
+  ❯ 11. Opus 4.7               Best for everyday, complex tasks
+  ○ Low effort ←/→ to adjust
+
+Screen: model-11-effort-02.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 6.  Haiku 4.5              Fastest for quick answers
+  ❯ 11. Opus 4.7               Best for everyday, complex tasks
+  ◐ Medium effort ←/→ to adjust
+
+Screen: model-11-effort-03.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 6.  Haiku 4.5              Fastest for quick answers
+  ❯ 11. Opus 4.7               Best for everyday, complex tasks
+  ● High effort ←/→ to adjust
+
+Screen: model-11-effort-04.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 6.  Haiku 4.5              Fastest for quick answers
+  ❯ 11. Opus 4.7               Best for everyday, complex tasks
+  ◉ xHigh effort (default) ←/→ to adjust
+
+Screen: model-11-effort-05.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 6.  Haiku 4.5              Fastest for quick answers
+  ❯ 11. Opus 4.7               Best for everyday, complex tasks
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+Screen: model-11-effort-key.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 6.  Haiku 4.5              Fastest for quick answers
+  ❯ 11. Opus 4.7               Best for everyday, complex tasks
+  ◉ xHigh effort (default) ←/→ to adjust
+
+Screen: model-12-effort-01.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 7.  Sonnet 5               Efficient for routine tasks
+  ❯ 12. Opus 4.6               Best for everyday, complex tasks
+  ○ Low effort ←/→ to adjust
+
+Screen: model-12-effort-02.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 7.  Sonnet 5               Efficient for routine tasks
+  ❯ 12. Opus 4.6               Best for everyday, complex tasks
+  ◐ Medium effort ←/→ to adjust
+
+Screen: model-12-effort-03.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 7.  Sonnet 5               Efficient for routine tasks
+  ❯ 12. Opus 4.6               Best for everyday, complex tasks
+  ● High effort (default) ←/→ to adjust
+
+Screen: model-12-effort-04.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 7.  Sonnet 5               Efficient for routine tasks
+  ❯ 12. Opus 4.6               Best for everyday, complex tasks
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+Screen: model-12-effort-key.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 7.  Sonnet 5               Efficient for routine tasks
+  ❯ 12. Opus 4.6               Best for everyday, complex tasks
+  ● High effort (default) ←/→ to adjust
+
+Screen: model-13-effort-01.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 8.  Opus 5                 Best for everyday, complex tasks
+  ❯ 13. Sonnet 4.6             Efficient for routine tasks
+  ○ Low effort ←/→ to adjust
+
+Screen: model-13-effort-02.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 8.  Opus 5                 Best for everyday, complex tasks
+  ❯ 13. Sonnet 4.6             Efficient for routine tasks
+  ◐ Medium effort ←/→ to adjust
+
+Screen: model-13-effort-03.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 8.  Opus 5                 Best for everyday, complex tasks
+  ❯ 13. Sonnet 4.6             Efficient for routine tasks
+  ● High effort (default) ←/→ to adjust
+
+Screen: model-13-effort-04.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 8.  Opus 5                 Best for everyday, complex tasks
+  ❯ 13. Sonnet 4.6             Efficient for routine tasks
+  ◈ Max effort ←/→ to adjust
+  May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+
+Screen: model-13-effort-key.txt
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+  ↑ 8.  Opus 5                 Best for everyday, complex tasks
+  ❯ 13. Sonnet 4.6             Efficient for routine tasks
+  ● High effort (default) ←/→ to adjust
+
+Screen: models.txt
+  Select model
+  Switch between Claude models. Your pick becomes the default for new sessions. For other/previous model names,
+  specify with --model.
+
+    1.  Default (recommended)  Opus 5.5 · Best for everyday, complex tasks
+  ❯ 2.  Opus 5.5 ✔             For complex work and everyday tasks
+    3.  Fable 5.1              For your toughest challenges
+    4.  Sonnet 5.5             Most efficient for simpler tasks
+    5.  Haiku 5.5              Fastest for quick answers
+  ↓ 6.  Haiku 4.5              Fastest for quick answers
+     … +7 models
+
+  ◉ xHigh effort ←/→ to adjust
+
+  Use /fast to turn on Fast mode (Opus 5.5).
+
+  Enter to set as default · s to use this session only · Esc to cancel
+
+
+Session-only /status row mappings:
+[
+  {
+    "Row": 2,
+    "Label": "Opus 5.5",
+    "Confirmation": "Set model to Opus 5.5 for this session only",
+    "Version": "2.1.310",
+    "StatusModel": "opus (claude-opus-5-5)"
+  },
+  {
+    "Row": 3,
+    "Label": "Fable 5.1",
+    "Confirmation": "Set model to Fable 5.1 for this session only",
+    "Version": "2.1.310",
+    "StatusModel": "fable (claude-fable-5-1)"
+  },
+  {
+    "Row": 4,
+    "Label": "Sonnet 5.5",
+    "Confirmation": "Set model to Sonnet 5.5 for this session only",
+    "Version": "2.1.310",
+    "StatusModel": "sonnet (claude-sonnet-5-5)"
+  },
+  {
+    "Row": 5,
+    "Label": "Haiku 5.5",
+    "Confirmation": "Set model to Haiku 5.5 for this session only",
+    "Version": "2.1.310",
+    "StatusModel": "haiku (claude-haiku-5-5)"
+  },
+  {
+    "Row": 6,
+    "Label": "Haiku 4.5",
+    "Confirmation": "Set model to Haiku 4.5 for this session only",
+    "Version": "2.1.310",
+    "StatusModel": "claude-haiku-4-5-20251001"
+  },
+  {
+    "Row": 7,
+    "Label": "Sonnet 5",
+    "Confirmation": "Set model to Sonnet 5 for this session only",
+    "Version": "2.1.310",
+    "StatusModel": "claude-sonnet-5"
+  },
+  {
+    "Row": 8,
+    "Label": "Opus 5",
+    "Confirmation": "Set model to Opus 5 for this session only",
+    "Version": "2.1.310",
+    "StatusModel": "claude-opus-5"
+  },
+  {
+    "Row": 9,
+    "Label": "Fable 5",
+    "Confirmation": "Set model to Fable 5 for this session only",
+    "Version": "2.1.310",
+    "StatusModel": "claude-fable-5"
+  },
+  {
+    "Row": 10,
+    "Label": "Opus 4.8",
+    "Confirmation": "Set model to Opus 4.8 for this session only",
+    "Version": "2.1.310",
+    "StatusModel": "claude-opus-4-8"
+  },
+  {
+    "Row": 11,
+    "Label": "Opus 4.7",
+    "Confirmation": "Set model to Opus 4.7 for this session only",
+    "Version": "2.1.310",
+    "StatusModel": "claude-opus-4-7"
+  },
+  {
+    "Row": 12,
+    "Label": "Opus 4.6",
+    "Confirmation": "Set model to Opus 4.6 for this session only",
+    "Version": "2.1.310",
+    "StatusModel": "claude-opus-4-6"
+  },
+  {
+    "Row": 13,
+    "Label": "Sonnet 4.6",
+    "Confirmation": "Set model to Sonnet 4.6 for this session only",
+    "Version": "2.1.310",
+    "StatusModel": "claude-sonnet-4-6"
+  }
+]

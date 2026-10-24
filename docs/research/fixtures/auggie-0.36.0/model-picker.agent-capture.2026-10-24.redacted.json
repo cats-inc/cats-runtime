@@ -1,0 +1,349 @@
+{
+  "sourceClass": "Windows UI Automation visible text checked against an initial screenshot",
+  "observedOn": "2026-10-24",
+  "command": "/model",
+  "completeness": "complete; Up/Down in both directions, 37 rows",
+  "rows": [
+    {
+      "Index": 1,
+      "Label": "GPT-6 Astra",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$$$",
+      "Description": "OpenAI model for complex reasoning and long-horizon agent tasks"
+    },
+    {
+      "Index": 2,
+      "Label": "GPT-6.1 Sol",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$",
+      "Description": "OpenAI model for complex coding and agentic workflows"
+    },
+    {
+      "Index": 3,
+      "Label": "GPT-6 Luna",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$",
+      "Description": "OpenAI model for focused, high-volume tasks"
+    },
+    {
+      "Index": 4,
+      "Label": "Claude Fable 5.1",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$$$",
+      "Description": "Latest Anthropic Mythos-class model — Great for long horizon asynchronous tasks"
+    },
+    {
+      "Index": 5,
+      "Label": "Claude Opus 5.5",
+      "Current": true,
+      "Default": true,
+      "Badges": [],
+      "Cost": "$$$",
+      "Description": "Latest Anthropic model for complex tasks"
+    },
+    {
+      "Index": 6,
+      "Label": "Claude Sonnet 5.5",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$",
+      "Description": "Latest Sonnet model"
+    },
+    {
+      "Index": 7,
+      "Label": "Claude Haiku 5.5",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$",
+      "Description": "Claude Haiku 5.5"
+    },
+    {
+      "Index": 8,
+      "Label": "Grok 4.7",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$",
+      "Description": "xAI Grok 4.7 frontier model for coding and agentic tasks"
+    },
+    {
+      "Index": 9,
+      "Label": "Gemini 4 Argon",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$",
+      "Description": "Frontier reasoning for coding and complex workflows"
+    },
+    {
+      "Index": 10,
+      "Label": "Gemini 3.8 Flash",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$",
+      "Description": "Fast and cost-efficient, 1M context"
+    },
+    {
+      "Index": 11,
+      "Label": "Kimi K3",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$",
+      "Description": "Strong performance at lower cost"
+    },
+    {
+      "Index": 12,
+      "Label": "GLM 5.3 Flash",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$",
+      "Description": "Native vision and strong performance at lower cost, 1M context"
+    },
+    {
+      "Index": 13,
+      "Label": "DeepSeek V4.1 Flash 1017",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$",
+      "Description": "Multimodal DeepSeek 1017 snapshot with 1M context"
+    },
+    {
+      "Index": 14,
+      "Label": "Prism (Claude)",
+      "Current": false,
+      "Default": false,
+      "Badges": [
+        "New",
+        "Auto"
+      ],
+      "Cost": "$$$",
+      "Description": "Routes between Claude Opus 5.5, Claude Sonnet 5.5, and Claude Haiku 5.5 solver tiers."
+    },
+    {
+      "Index": 15,
+      "Label": "Prism (GPT)",
+      "Current": false,
+      "Default": false,
+      "Badges": [
+        "New",
+        "Auto"
+      ],
+      "Cost": "$$$",
+      "Description": "Routes between GPT-6.1 Sol deep, GPT-6 Luna xhigh fast, and GPT-6 Luna low solver tiers"
+    },
+    {
+      "Index": 16,
+      "Label": "Gemini 3.1 Pro",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$",
+      "Description": "Cost-efficient for complex tasks"
+    },
+    {
+      "Index": 17,
+      "Label": "GPT-5.6 Sol",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$$",
+      "Description": "OpenAI model for complex tasks"
+    },
+    {
+      "Index": 18,
+      "Label": "GPT-5.6 Terra",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$",
+      "Description": "OpenAI model for everyday tasks"
+    },
+    {
+      "Index": 19,
+      "Label": "GPT-5.6 Luna",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$",
+      "Description": "OpenAI model for small-scale automations"
+    },
+    {
+      "Index": 20,
+      "Label": "GPT-6 Sol",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$",
+      "Description": "OpenAI model for complex coding and agentic workflows"
+    },
+    {
+      "Index": 21,
+      "Label": "GPT-5.5",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$$",
+      "Description": "Best for complex tasks"
+    },
+    {
+      "Index": 22,
+      "Label": "Claude Opus 5",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$$",
+      "Description": "Great for complex tasks"
+    },
+    {
+      "Index": 23,
+      "Label": "Opus 4.8",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$$",
+      "Description": "Great for complex, multi-step agentic tasks"
+    },
+    {
+      "Index": 24,
+      "Label": "Claude Sonnet 5",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$",
+      "Description": "Previous Sonnet model"
+    },
+    {
+      "Index": 25,
+      "Label": "Opus 4.7",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$$",
+      "Description": "Great for complex, multi-step agentic tasks"
+    },
+    {
+      "Index": 26,
+      "Label": "Opus 4.7 (500K)",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$$",
+      "Description": "Anthropic Claude Opus 4.7, 500K context window"
+    },
+    {
+      "Index": 27,
+      "Label": "Claude Fable 5",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$$$",
+      "Description": "First Anthropic Mythos-class model — Great for long horizon asynchronous tasks"
+    },
+    {
+      "Index": 28,
+      "Label": "Opus 4.6",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$$",
+      "Description": "Good for complex, multi-step agentic tasks"
+    },
+    {
+      "Index": 29,
+      "Label": "Opus 4.6 (500K)",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$$",
+      "Description": "Anthropic Claude Opus 4.6, 500K context window"
+    },
+    {
+      "Index": 30,
+      "Label": "Claude Sonnet 5 (500K)",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$",
+      "Description": "Latest Sonnet model, 500K context window"
+    },
+    {
+      "Index": 31,
+      "Label": "Sonnet 4.6",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$",
+      "Description": "Latest Sonnet model with improved capabilities"
+    },
+    {
+      "Index": 32,
+      "Label": "Sonnet 4.6 (500K)",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$",
+      "Description": "Anthropic Claude Sonnet 4.6, 500K context window"
+    },
+    {
+      "Index": 33,
+      "Label": "Haiku 4.5",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$",
+      "Description": "Fast and efficient responses"
+    },
+    {
+      "Index": 34,
+      "Label": "Grok 4.5",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$",
+      "Description": "xAI Grok 4.5 frontier model for coding and agentic tasks"
+    },
+    {
+      "Index": 35,
+      "Label": "Grok 4.6",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$$",
+      "Description": "xAI Grok 4.6 frontier model for coding and agentic tasks"
+    },
+    {
+      "Index": 36,
+      "Label": "Gemini 3.7 Flash",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$",
+      "Description": "Fast and cost-efficient, 1M context"
+    },
+    {
+      "Index": 37,
+      "Label": "DeepSeek V4.1 Flash",
+      "Current": false,
+      "Default": false,
+      "Badges": [],
+      "Cost": "$",
+      "Description": "Multimodal DeepSeek model with 1M context"
+    }
+  ],
+  "selectionProbe": "Enter on GPT-6 Astra returned Using model: GPT-6 Astra, without an effort step. No prompt sent.",
+  "settingsUnchanged": true
+}

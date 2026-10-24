@@ -35,6 +35,14 @@ test('rejects unexpected or empty probe output', () => {
   assert.throws(() => parseJunieModelIds('alias\tgpt\n'), /no models/);
 });
 
+test('keeps per-model effort labels and fixed effort separate without default claims', () => {
+  const parsed = parseJunieModelIds('model\tEX\tex\tExample\neffort\tex\tlow\tLow\neffort\tex\txhigh\tXHigh\nfixed-effort\tex\tlow\n');
+  assert.deepEqual(parsed.models[0].efforts, [{ value: 'low', label: 'Low' }, { value: 'xhigh', label: 'XHigh' }]);
+  assert.equal(parsed.models[0].fixedEffort, 'low');
+  assert.equal(parsed.models[0].default, undefined);
+  assert.throws(() => parseJunieModelIds('effort\tmissing\tlow\tLow'), /precedes its model/);
+});
+
 test('resolves the current version and finds its JAR and bundled java', () => {
   const root = mkdtempSync(join(tmpdir(), 'junie-model-ids-test-'));
   try {

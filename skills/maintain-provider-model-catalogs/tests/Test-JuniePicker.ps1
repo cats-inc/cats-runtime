@@ -24,14 +24,15 @@ function Set-WindowsUiFocus { param($Target) }
 function Assert-WindowsUiFocus { param($Target) }
 function Get-WindowsUiText { param($Target)
     $s = $global:jk
+    $lastColumn = if ($global:mockEcoColumn) { 'Eco' } else { 'Provider' }
     $lines = @('     Select model', '     Current model: Example Lite JetBrains AI', '',
         '   >   Start typing to search for models', '',
-        '     Name                                   Input     Output               Effort      Provider')
+        "     Name                                   Input     Output               Effort      $lastColumn")
     for ($i = 0; $i -lt $s.Models.Count; $i++) {
         $m = $s.Models[$i]
         $lead = if ($i -eq $s.Row) { "   $jA " } else { '     ' }
         $lines += $lead + $m.Name.PadRight(39) + $m.In.PadRight(10) + ($m.Out + ' per Mtok').PadRight(19) +
-            ("$jL " + $m.Ring[$m.At] + " $jR").PadRight(12) + 'JetBrains AI'
+            ("$jL " + $m.Ring[$m.At] + " $jR").PadRight(12) + $(if ($global:mockEcoColumn) { 'On' } else { 'JetBrains AI' })
     }
     $lines += ('     {0}/{1}' -f ($s.Row + 1), $s.Models.Count), '', ('     ' + $s.Models[$s.Row].Desc)
     $lines -join "`n"
@@ -52,7 +53,7 @@ function Send-WindowsUiKey { param($Target, $Key, $ExpectedText)
 }
 '@ | Set-Content -LiteralPath $mock -Encoding UTF8
 
-$globals = 'jk', 'mockKeys', 'mockStuckRing'
+$globals = 'jk', 'mockKeys', 'mockStuckRing', 'mockEcoColumn'
 function Reset-Fixture([string]$Name) {
     foreach ($variable in $globals) { Remove-Variable -Name $variable -Scope Global -ErrorAction SilentlyContinue }
     $dir = Join-Path $scratch $Name
@@ -103,6 +104,21 @@ try {
     }
     if (@($global:mockKeys | Where-Object { $_ -notin 'Up', 'Down', 'Right' }).Count -ne 0) { throw 'A key other than Up/Down/Right was sent.' }
     Write-Output 'PASS walk records every row, badge and effort cycle, and restores the start'
+
+    $dir = Reset-Fixture 'read-only'
+    $result = Invoke-Capture $dir @{ SkipEffortCycle = $true }
+    $readRows = @((Get-Content -Raw -LiteralPath (Join-Path $dir 'evidence\rows.json') | ConvertFrom-Json) | ForEach-Object { $_ })
+    if ($result.EffortCycleCaptured -or @($global:mockKeys | Where-Object { $_ -eq 'Right' }).Count -ne 0 -or
+        @($readRows | Where-Object { $_.SingleValue -or $_.EffortCycle.Count -gt 0 }).Count -ne 0 -or
+        -not $result.ConfigUnchanged -or $global:jk.Row -ne 1) { throw 'Read-only capture sent effort keys or claimed menu values.' }
+    Write-Output 'PASS read-only mode sends only Up/Down and records no effort menu claims'
+
+    $dir = Reset-Fixture 'eco-column'
+    $global:mockEcoColumn = $true
+    $result = Invoke-Capture $dir @{ SkipEffortCycle = $true }
+    $ecoRows = @((Get-Content -Raw -LiteralPath (Join-Path $dir 'evidence\rows.json') | ConvertFrom-Json) | ForEach-Object { $_ })
+    if (@($ecoRows | Where-Object { $_.Provider -or $_.Eco -ne 'On' }).Count -gt 0) { throw 'Eco was misattributed to Provider.' }
+    Write-Output 'PASS redesigned Eco column is preserved separately from provider identity'
 
     $dir = Reset-Fixture 'count'
     Assert-Throws { Invoke-Capture $dir @{ ExpectedModelCount = 5 } } 'not the expected 5' 'A wrong expected count'

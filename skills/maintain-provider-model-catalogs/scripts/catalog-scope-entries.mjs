@@ -95,7 +95,7 @@ const EFFORT_WORDS = [
   ['High', 'high'], ['XHigh', 'xhigh'], ['X-High', 'xhigh'], ['Max', 'max'],
 ];
 const SPEED = { fast: 'fast', priority: 'fast' };
-const STRUCTURAL = { thinking: 'Thinking', '1m': '1M' };
+const STRUCTURAL = { thinking: 'Thinking', '1m': '1M', lightning: 'Lightning' };
 
 function labelEffort(label, familyLabel) {
   const rest = label.startsWith(familyLabel) ? label.slice(familyLabel.length).trim() : label;

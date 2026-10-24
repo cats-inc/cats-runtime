@@ -1,0 +1,447 @@
+{
+  "kind": "cats-catalog-probe-evidence",
+  "schemaVersion": 1,
+  "provider": "kiro",
+  "backend": "cli",
+  "transport": null,
+  "command": "kiro-cli chat --list-models --format json-pretty; kiro-cli acp --agent-engine v3 (initialize, session/new, session/delete)",
+  "sourceClass": "machine-readable",
+  "cliVersion": "2.34.0",
+  "versionSource": "--version",
+  "observedAt": "2026-10-24T12:40:07.405Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "accountScope": "The CLI's existing sign-in on the probing machine. No identity is recorded.",
+  "status": "ok",
+  "completeness": {
+    "membership": "complete",
+    "meaning": "The command lists what the picker offers; an absent row still needs picker confirmation before removal."
+  },
+  "authoritativeFor": {
+    "ids": true,
+    "label": false,
+    "efforts": "kiro.reasoning_effort",
+    "effortDefault": true
+  },
+  "stillNeedsPicker": "A model (default) marker, picker descriptions, picker order, and every field not listed under authoritativeFor still need picker evidence.",
+  "selection": "all 22 rows",
+  "sourceEvidence": {
+    "acpProbeSessionDeleted": true
+  },
+  "models": [
+    {
+      "id": "auto",
+      "label": "auto",
+      "efforts": [],
+      "effortDefault": null,
+      "evidence": {
+        "description": "Models chosen by task for optimal usage and consistent quality",
+        "contextWindowTokens": 1000000,
+        "rateMultiplier": 1,
+        "rateUnit": "Credit",
+        "listDefault": true,
+        "displayName": "Auto",
+        "thinkingToggleable": false,
+        "currentModel": true
+      }
+    },
+    {
+      "id": "claude-opus-5.5",
+      "label": "claude-opus-5.5",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "medium",
+      "evidence": {
+        "description": "Experimental preview of Claude Opus 5.5 model with 1M context window",
+        "contextWindowTokens": 1000000,
+        "rateMultiplier": 2,
+        "rateUnit": "Credit",
+        "displayName": "Claude Opus 5.5",
+        "effortSchemaPath": "output_config",
+        "thinkingToggleable": false
+      }
+    },
+    {
+      "id": "claude-sonnet-5.5",
+      "label": "claude-sonnet-5.5",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "high",
+      "evidence": {
+        "description": "Claude Sonnet 5.5 model with 1M context window",
+        "contextWindowTokens": 1000000,
+        "rateMultiplier": 1.3,
+        "rateUnit": "Credit",
+        "displayName": "Claude Sonnet 5.5",
+        "effortSchemaPath": "output_config",
+        "thinkingToggleable": false
+      }
+    },
+    {
+      "id": "claude-haiku-5.5",
+      "label": "claude-haiku-5.5",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "medium",
+      "evidence": {
+        "description": "Experimental preview of Claude Haiku 5.5 model with 1M context window",
+        "contextWindowTokens": 1000000,
+        "rateMultiplier": 0.06,
+        "rateUnit": "Credit",
+        "displayName": "Claude Haiku 5.5",
+        "effortSchemaPath": "output_config",
+        "thinkingToggleable": true,
+        "defaultThinkingEnabled": true
+      }
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "label": "gpt-5.6-sol",
+      "efforts": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "high",
+      "evidence": {
+        "description": "Experimental preview of OpenAI GPT 5.6 Sol with 1M context window",
+        "contextWindowTokens": 922000,
+        "rateMultiplier": 4.4,
+        "rateUnit": "Credit",
+        "displayName": "GPT 5.6 Sol",
+        "effortSchemaPath": "reasoning",
+        "thinkingToggleable": false
+      }
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "label": "gpt-5.6-terra",
+      "efforts": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "high",
+      "evidence": {
+        "description": "OpenAI GPT 5.6 Terra with 1M context window",
+        "contextWindowTokens": 922000,
+        "rateMultiplier": 2.2,
+        "rateUnit": "Credit",
+        "displayName": "GPT 5.6 Terra",
+        "effortSchemaPath": "reasoning",
+        "thinkingToggleable": false
+      }
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "label": "gpt-5.6-luna",
+      "efforts": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "high",
+      "evidence": {
+        "description": "OpenAI GPT 5.6 Luna with 1M context window",
+        "contextWindowTokens": 922000,
+        "rateMultiplier": 0.6,
+        "rateUnit": "Credit",
+        "displayName": "GPT 5.6 Luna",
+        "effortSchemaPath": "reasoning",
+        "thinkingToggleable": false
+      }
+    },
+    {
+      "id": "kimi-k3",
+      "label": "kimi-k3",
+      "efforts": [
+        "low",
+        "high",
+        "max"
+      ],
+      "effortDefault": "max",
+      "evidence": {
+        "description": "Experimental preview of Kimi K3. Kimi K3 is a Kiro Excluded Model. For more info, see documentation.",
+        "contextWindowTokens": 1000000,
+        "rateMultiplier": 2.4,
+        "rateUnit": "Credit",
+        "displayName": "Kimi K3",
+        "effortSchemaPath": "reasoning",
+        "thinkingToggleable": false
+      }
+    },
+    {
+      "id": "claude-opus-5",
+      "label": "claude-opus-5",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "high",
+      "evidence": {
+        "description": "Claude Opus 5 model with 1M context window",
+        "contextWindowTokens": 1000000,
+        "rateMultiplier": 2.2,
+        "rateUnit": "Credit",
+        "displayName": "Claude Opus 5",
+        "effortSchemaPath": "output_config",
+        "thinkingToggleable": true,
+        "defaultThinkingEnabled": true
+      }
+    },
+    {
+      "id": "claude-sonnet-5",
+      "label": "claude-sonnet-5",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "high",
+      "evidence": {
+        "description": "Claude Sonnet 5 model with 1M context window",
+        "contextWindowTokens": 1000000,
+        "rateMultiplier": 1.3,
+        "rateUnit": "Credit",
+        "displayName": "Claude Sonnet 5",
+        "effortSchemaPath": "output_config",
+        "thinkingToggleable": true,
+        "defaultThinkingEnabled": true
+      }
+    },
+    {
+      "id": "claude-opus-4.8",
+      "label": "claude-opus-4.8",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "high",
+      "evidence": {
+        "description": "Claude Opus 4.8 model with 1M context window",
+        "contextWindowTokens": 1000000,
+        "rateMultiplier": 2.2,
+        "rateUnit": "Credit",
+        "displayName": "Claude Opus 4.8",
+        "effortSchemaPath": "output_config",
+        "thinkingToggleable": true,
+        "defaultThinkingEnabled": true
+      }
+    },
+    {
+      "id": "claude-opus-4.7",
+      "label": "claude-opus-4.7",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortDefault": "xhigh",
+      "evidence": {
+        "description": "Claude Opus 4.7 model with 1M context window",
+        "contextWindowTokens": 1000000,
+        "rateMultiplier": 2.2,
+        "rateUnit": "Credit",
+        "displayName": "Claude Opus 4.7",
+        "effortSchemaPath": "output_config",
+        "thinkingToggleable": true,
+        "defaultThinkingEnabled": true
+      }
+    },
+    {
+      "id": "claude-opus-4.6",
+      "label": "claude-opus-4.6",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "effortDefault": "high",
+      "evidence": {
+        "description": "Claude Opus 4.6 model with 1M context window",
+        "contextWindowTokens": 1000000,
+        "rateMultiplier": 2.2,
+        "rateUnit": "Credit",
+        "displayName": "Claude Opus 4.6",
+        "effortSchemaPath": "output_config",
+        "thinkingToggleable": true,
+        "defaultThinkingEnabled": true
+      }
+    },
+    {
+      "id": "claude-sonnet-4.6",
+      "label": "claude-sonnet-4.6",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "effortDefault": "high",
+      "evidence": {
+        "description": "Claude Sonnet 4.6 model with 1M context window",
+        "contextWindowTokens": 1000000,
+        "rateMultiplier": 1.3,
+        "rateUnit": "Credit",
+        "displayName": "Claude Sonnet 4.6",
+        "effortSchemaPath": "output_config",
+        "thinkingToggleable": true,
+        "defaultThinkingEnabled": true
+      }
+    },
+    {
+      "id": "claude-opus-4.5",
+      "label": "claude-opus-4.5",
+      "efforts": [],
+      "effortDefault": null,
+      "evidence": {
+        "description": "Claude Opus 4.5 model",
+        "contextWindowTokens": 200000,
+        "rateMultiplier": 2.2,
+        "rateUnit": "Credit",
+        "displayName": "Claude Opus 4.5",
+        "thinkingToggleable": false
+      }
+    },
+    {
+      "id": "claude-sonnet-4.5",
+      "label": "claude-sonnet-4.5",
+      "efforts": [],
+      "effortDefault": null,
+      "evidence": {
+        "description": "Claude Sonnet 4.5 model",
+        "contextWindowTokens": 200000,
+        "rateMultiplier": 1.3,
+        "rateUnit": "Credit",
+        "displayName": "Claude Sonnet 4.5",
+        "thinkingToggleable": false
+      }
+    },
+    {
+      "id": "claude-haiku-4.5",
+      "label": "claude-haiku-4.5",
+      "efforts": [],
+      "effortDefault": null,
+      "evidence": {
+        "description": "The latest Claude Haiku model",
+        "contextWindowTokens": 200000,
+        "rateMultiplier": 0.4,
+        "rateUnit": "Credit",
+        "displayName": "Claude Haiku 4.5",
+        "thinkingToggleable": false
+      }
+    },
+    {
+      "id": "deepseek-3.2",
+      "label": "deepseek-3.2",
+      "efforts": [],
+      "effortDefault": null,
+      "evidence": {
+        "description": "Experimental preview of DeepSeek V3.2",
+        "contextWindowTokens": 164000,
+        "rateMultiplier": 0.25,
+        "rateUnit": "Credit",
+        "displayName": "Deepseek v3.2",
+        "thinkingToggleable": false
+      }
+    },
+    {
+      "id": "minimax-m2.5",
+      "label": "minimax-m2.5",
+      "efforts": [],
+      "effortDefault": null,
+      "evidence": {
+        "description": "MiniMax M2.5 model",
+        "contextWindowTokens": 196000,
+        "rateMultiplier": 0.25,
+        "rateUnit": "Credit",
+        "displayName": "MiniMax M2.5",
+        "thinkingToggleable": false
+      }
+    },
+    {
+      "id": "minimax-m2.1",
+      "label": "minimax-m2.1",
+      "efforts": [],
+      "effortDefault": null,
+      "evidence": {
+        "description": "Experimental preview of MiniMax M2.1",
+        "contextWindowTokens": 196000,
+        "rateMultiplier": 0.15,
+        "rateUnit": "Credit",
+        "displayName": "MiniMax M2.1",
+        "thinkingToggleable": false
+      }
+    },
+    {
+      "id": "glm-5",
+      "label": "glm-5",
+      "efforts": [],
+      "effortDefault": null,
+      "evidence": {
+        "description": "GLM-5 model",
+        "contextWindowTokens": 200000,
+        "rateMultiplier": 0.5,
+        "rateUnit": "Credit",
+        "displayName": "GLM 5",
+        "thinkingToggleable": false
+      }
+    },
+    {
+      "id": "qwen3-coder-next",
+      "label": "qwen3-coder-next",
+      "efforts": [],
+      "effortDefault": null,
+      "evidence": {
+        "description": "Experimental preview of Qwen3 Coder Next",
+        "contextWindowTokens": 256000,
+        "rateMultiplier": 0.05,
+        "rateUnit": "Credit",
+        "displayName": "Qwen3 Coder Next",
+        "thinkingToggleable": false
+      }
+    }
+  ],
+  "redaction": {
+    "method": "Projected public model fields only; no raw output, account identifier, price, endpoint or login text. String values passed through the skill redaction helper.",
+    "redactions": [],
+    "reviewBeforeCommit": "Check names, paths and provider-specific identifiers by hand; the helper catches only common shapes."
+  }
+}

@@ -75,6 +75,13 @@ picker marks `(default)`. The picker shows no effort, so no effort binding was a
 covers Windows native only; the shared scope does not establish equal WSL entitlement.
 Membership of the other groups is unchanged.
 
+**2026-10-24 Auggie effort amendment:** the owner authorized the additive
+`auggie.reasoning_effort` CLI binding. Use each account-resolved JSON `effortLevels` array as that
+model's enum, with literal token labels and no effort default. This supersedes the notes-only
+restriction above; the picker itself still has no effort step. Missing levels and custom models
+receive no inferred effort. Runtime emits `--reasoning-effort`; Playground and Platform consume
+the same catalog control. See [the sixteen-CLI refresh](../research/2026-10-24-sixteen-cli-catalog-refresh.md).
+
 **2026-09-27 Copilot amendment:** the owner moved GitHub Copilot CLI from the shortlist group to
 the full-catalog group. It now carries every `/model` picker row a Copilot Pro account can select,
 in the default recommended order, with `default: true` only on the row the picker marks

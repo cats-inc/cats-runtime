@@ -28,6 +28,20 @@ public class JunieModelIds {
     for (Object entry : specific.getEnumConstants()) {
       System.out.println("model\t" + ((Enum<?>) entry).name() + "\t" + settingId.invoke(null, entry)
           + "\t" + (displayName == null ? "" : displayName.invoke(entry)));
+      if (args.length > 0 && args[0].equals("efforts")) {
+        Class<?> effort = Class.forName("com.intellij.ml.llm.matterhorn.llm.EffortLevel");
+        Object companion = effort.getField("Companion").get(null);
+        Object llm = specific.getMethod("getLlm").invoke(entry);
+        Method available = companion.getClass().getMethod("availableForModel",
+            Class.forName("com.intellij.ml.llm.matterhorn.llm.LLM"));
+        for (Object level : (java.util.List<?>) available.invoke(companion, llm)) {
+          System.out.println("effort\t" + settingId.invoke(null, entry) + "\t"
+              + effort.getMethod("getWireId").invoke(level) + "\t"
+              + effort.getMethod("getDisplayName").invoke(level));
+        }
+        Object fixed = specific.getMethod("getEffort").invoke(entry);
+        if (fixed != null) System.out.println("fixed-effort\t" + settingId.invoke(null, entry) + "\t" + fixed);
+      }
     }
     Class<?> alias = Class.forName("com.intellij.ml.llm.matterhorn.llm.ModelAlias");
     Method getAlias = alias.getMethod("getAlias");
@@ -47,6 +61,14 @@ export function parseJunieModelIds(text) {
       models.push({ enumName: fields[0], settingId: fields[1], displayName: fields[2] || null });
     } else if (kind === 'alias' && fields.length === 1 && fields[0]) {
       aliases.push(fields[0]);
+    } else if (kind === 'effort' && fields.length === 3 && fields.every(Boolean)) {
+      const model = models.find((model) => model.settingId === fields[0]);
+      if (!model) throw new Error(`Effort precedes its model: ${fields[0]}`);
+      (model.efforts ??= []).push({ value: fields[1], label: fields[2] });
+    } else if (kind === 'fixed-effort' && fields.length === 2 && fields.every(Boolean)) {
+      const model = models.find((model) => model.settingId === fields[0]);
+      if (!model) throw new Error(`Fixed effort precedes its model: ${fields[0]}`);
+      model.fixedEffort = fields[1];
     } else {
       throw new Error(`Unexpected probe line: ${line}`);
     }
@@ -90,12 +112,12 @@ export function locateJunieJvm(junieHome) {
   return { jar, java };
 }
 
-function runProbe({ jar, java }) {
+function runProbe({ jar, java, efforts = false }) {
   const dir = mkdtempSync(join(tmpdir(), 'junie-model-ids-'));
   try {
     const source = join(dir, 'JunieModelIds.java');
     writeFileSync(source, JAVA_SOURCE);
-    const result = spawnSync(java, ['-Dstdout.encoding=UTF-8', '-cp', jar, source], {
+    const result = spawnSync(java, ['-Dstdout.encoding=UTF-8', '-cp', jar, source, ...efforts ? ['efforts'] : []], {
       encoding: 'utf8',
       windowsHide: true,
     });
@@ -112,10 +134,10 @@ export function defaultJunieDataDir(env = process.env) {
 }
 
 /** Reads the installed JAR's model enum; `jar` and `java` override the located pair. */
-export function readJunieModelIds({ dataDir = defaultJunieDataDir(), junieHome, jar, java } = {}) {
+export function readJunieModelIds({ dataDir = defaultJunieDataDir(), junieHome, jar, java, efforts = false } = {}) {
   const located = jar && java ? { jar, java } : locateJunieJvm(junieHome ?? resolveJunieHome(dataDir));
   if (!existsSync(located.jar) || !existsSync(located.java)) throw new Error('The JAR or java path does not exist.');
-  return { ...parseJunieModelIds(runProbe(located)), jar: located.jar };
+  return { ...parseJunieModelIds(runProbe({ ...located, efforts })), jar: located.jar };
 }
 
 function main() {
@@ -126,6 +148,7 @@ function main() {
       jar: { type: 'string' },
       java: { type: 'string' },
       input: { type: 'string' },
+      efforts: { type: 'boolean', default: false },
     },
   });
   const result = values.input
@@ -135,6 +158,7 @@ function main() {
       junieHome: values['junie-home'],
       jar: values.jar,
       java: values.java,
+      efforts: values.efforts,
     }));
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 }

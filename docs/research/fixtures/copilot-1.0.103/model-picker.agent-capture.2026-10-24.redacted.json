@@ -1,0 +1,909 @@
+{
+  "observedOn": "2026-10-24",
+  "host": "native Windows 11",
+  "sourceClass": "Windows UI Automation visible text; initial screenshot checked",
+  "inferenceSent": false,
+  "command": "/model",
+  "summary": {
+    "Rows": 32,
+    "Available": 14,
+    "Unavailable": [
+      "gpt-6.1-sol",
+      "gpt-6-sol",
+      "gpt-6-astra",
+      "gpt-5.6-sol",
+      "gpt-5.5",
+      "gpt-5.4",
+      "gpt-5.4-mini",
+      "gpt-5-mini",
+      "claude-fable-5.1",
+      "claude-fable-5",
+      "claude-opus-5.5",
+      "claude-opus-5",
+      "claude-opus-4.8",
+      "claude-opus-4.8-fast",
+      "claude-sonnet-4.6",
+      "gemini-4-argon",
+      "gemini-3.7-flash",
+      "grok-4.5"
+    ],
+    "Default": [
+      "GPT-5.6 Terra"
+    ],
+    "Current": [
+      "Auto"
+    ],
+    "ContextRows": [
+      "GPT-5.6 Terra",
+      "Grok 4.7",
+      "GPT-6 Luna",
+      "Claude Sonnet 5.5",
+      "GPT-5.6 Luna",
+      "Claude Sonnet 5",
+      "Claude Haiku 5.5",
+      "Gemini 3.8 Flash",
+      "Grok 4.6"
+    ],
+    "PaneUnmatched": [],
+    "Cycled": 13,
+    "Irregular": [
+      "Auto"
+    ],
+    "Steps": 217,
+    "Screenshots": 0,
+    "ConfigUnchanged": true
+  },
+  "rows": [
+    {
+      "Index": 1,
+      "Group": "",
+      "Label": "Auto",
+      "Default": false,
+      "Current": true,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [],
+      "Option": "Balance",
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 2,
+      "Group": "",
+      "Label": "GPT-5.6 Terra",
+      "Default": true,
+      "Current": false,
+      "Unavailable": false,
+      "Category": "Versatile",
+      "Context": [
+        "272K",
+        "922K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Medium",
+      "Credits": {
+        "Input": 200,
+        "Output": 1200,
+        "CacheRead": 20,
+        "CacheWrite": 250
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 3,
+      "Group": "",
+      "Label": "Grok 4.7",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": "Versatile",
+      "Context": [
+        "200K",
+        "500K"
+      ],
+      "Option": "High",
+      "CostTier": "Medium",
+      "Credits": {
+        "Input": 200,
+        "Output": 600,
+        "CacheRead": 50,
+        "CacheWrite": 0
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 4,
+      "Group": "",
+      "Label": "MAI-Code-1.1-Flash",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": "Lightweight",
+      "Context": [],
+      "Option": "Medium",
+      "CostTier": "Low",
+      "Credits": {
+        "Input": 20,
+        "Output": 120,
+        "CacheRead": 2,
+        "CacheWrite": 25
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 5,
+      "Group": "Recommended models",
+      "Label": "GPT-6 Luna",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": "Lightweight",
+      "Context": [
+        "272K",
+        "872K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Low",
+      "Credits": {
+        "Input": 10,
+        "Output": 50,
+        "CacheRead": 1,
+        "CacheWrite": 12.5
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 6,
+      "Group": "Recommended models",
+      "Label": "Claude Sonnet 5.5",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": "Versatile",
+      "Context": [
+        "200K",
+        "936K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Medium",
+      "Credits": {
+        "Input": 200,
+        "Output": 1000,
+        "CacheRead": 10,
+        "CacheWrite": 250
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 7,
+      "Group": "Other models",
+      "Label": "GPT-5.6 Luna",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": "Lightweight",
+      "Context": [
+        "200K",
+        "922K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Low",
+      "Credits": {
+        "Input": 20,
+        "Output": 120,
+        "CacheRead": 2,
+        "CacheWrite": 25
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 8,
+      "Group": "Other models",
+      "Label": "GPT-5.3-Codex",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": "Powerful",
+      "Context": [],
+      "Option": "Medium",
+      "CostTier": "Medium",
+      "Credits": {
+        "Input": 175,
+        "Output": 1400,
+        "CacheRead": 17.5,
+        "CacheWrite": 0
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 9,
+      "Group": "Other models",
+      "Label": "Claude Sonnet 5",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": "Versatile",
+      "Context": [
+        "200K",
+        "936K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Medium",
+      "Credits": {
+        "Input": 200,
+        "Output": 1000,
+        "CacheRead": 20,
+        "CacheWrite": 250
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 10,
+      "Group": "Other models",
+      "Label": "Claude Haiku 5.5",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": "Lightweight",
+      "Context": [
+        "100K",
+        "936K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Low",
+      "Credits": {
+        "Input": 10,
+        "Output": 50,
+        "CacheRead": 1,
+        "CacheWrite": 12.5
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 11,
+      "Group": "Other models",
+      "Label": "Claude Haiku 4.5",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": "Lightweight",
+      "Context": [],
+      "Option": null,
+      "CostTier": "Low",
+      "Credits": {
+        "Input": 100,
+        "Output": 500,
+        "CacheRead": 10,
+        "CacheWrite": 125
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 12,
+      "Group": "Other models",
+      "Label": "Gemini 3.8 Flash",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": "Versatile",
+      "Context": [
+        "200K",
+        "983K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Low",
+      "Credits": {
+        "Input": 75,
+        "Output": 375,
+        "CacheRead": 7.5,
+        "CacheWrite": 0
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 13,
+      "Group": "Other models",
+      "Label": "Grok 4.6",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": "Versatile",
+      "Context": [
+        "200K",
+        "500K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Medium",
+      "Credits": {
+        "Input": 200,
+        "Output": 600,
+        "CacheRead": 50,
+        "CacheWrite": 0
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 14,
+      "Group": "Other models",
+      "Label": "Kimi K3",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": "Powerful",
+      "Context": [],
+      "Option": "High",
+      "CostTier": "Medium",
+      "Credits": {
+        "Input": 300,
+        "Output": 1500,
+        "CacheRead": 30,
+        "CacheWrite": 0
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 15,
+      "Group": "Unavailable models",
+      "Label": "gpt-6.1-sol",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 16,
+      "Group": "Unavailable models",
+      "Label": "gpt-6-sol",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 17,
+      "Group": "Unavailable models",
+      "Label": "gpt-6-astra",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 18,
+      "Group": "Unavailable models",
+      "Label": "gpt-5.6-sol",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 19,
+      "Group": "Unavailable models",
+      "Label": "gpt-5.5",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 20,
+      "Group": "Unavailable models",
+      "Label": "gpt-5.4",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 21,
+      "Group": "Unavailable models",
+      "Label": "gpt-5.4-mini",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 22,
+      "Group": "Unavailable models",
+      "Label": "gpt-5-mini",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 23,
+      "Group": "Unavailable models",
+      "Label": "claude-fable-5.1",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 24,
+      "Group": "Unavailable models",
+      "Label": "claude-fable-5",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 25,
+      "Group": "Unavailable models",
+      "Label": "claude-opus-5.5",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 26,
+      "Group": "Unavailable models",
+      "Label": "claude-opus-5",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 27,
+      "Group": "Unavailable models",
+      "Label": "claude-opus-4.8",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 28,
+      "Group": "Unavailable models",
+      "Label": "claude-opus-4.8-fast",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 29,
+      "Group": "Unavailable models",
+      "Label": "claude-sonnet-4.6",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 30,
+      "Group": "Unavailable models",
+      "Label": "gemini-4-argon",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 31,
+      "Group": "Unavailable models",
+      "Label": "gemini-3.7-flash",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 32,
+      "Group": "Unavailable models",
+      "Label": "grok-4.5",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    }
+  ],
+  "options": [
+    {
+      "Index": 1,
+      "Label": "Auto",
+      "Arrival": "Balance",
+      "Left": [
+        "Balance",
+        "Efficiency",
+        "Intelligence",
+        "Balance"
+      ],
+      "LeftEnd": "repeat",
+      "Right": [
+        "Balance",
+        "Intelligence",
+        "Efficiency",
+        "Balance"
+      ],
+      "RightEnd": "repeat",
+      "Shape": "irregular",
+      "Order": null
+    },
+    {
+      "Index": 2,
+      "Label": "GPT-5.6 Terra",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low",
+        "None"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "None",
+        "Low",
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ]
+    },
+    {
+      "Index": 3,
+      "Label": "Grok 4.7",
+      "Arrival": "High",
+      "Left": [
+        "High",
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "High",
+        "Extra High"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High",
+        "Extra High"
+      ]
+    },
+    {
+      "Index": 4,
+      "Label": "MAI-Code-1.1-Flash",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High"
+      ]
+    },
+    {
+      "Index": 5,
+      "Label": "GPT-6 Luna",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low",
+        "None"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "None",
+        "Low",
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ]
+    },
+    {
+      "Index": 6,
+      "Label": "Claude Sonnet 5.5",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ]
+    },
+    {
+      "Index": 7,
+      "Label": "GPT-5.6 Luna",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low",
+        "None"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "None",
+        "Low",
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ]
+    },
+    {
+      "Index": 8,
+      "Label": "GPT-5.3-Codex",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High",
+        "Extra High"
+      ]
+    },
+    {
+      "Index": 9,
+      "Label": "Claude Sonnet 5",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ]
+    },
+    {
+      "Index": 10,
+      "Label": "Claude Haiku 5.5",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ]
+    },
+    {
+      "Index": 12,
+      "Label": "Gemini 3.8 Flash",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High"
+      ]
+    },
+    {
+      "Index": 13,
+      "Label": "Grok 4.6",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High",
+        "Extra High"
+      ]
+    },
+    {
+      "Index": 14,
+      "Label": "Kimi K3",
+      "Arrival": "High",
+      "Left": [
+        "High",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "High",
+        "Max"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "High",
+        "Max"
+      ]
+    }
+  ]
+}

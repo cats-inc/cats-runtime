@@ -22,6 +22,8 @@
     The settings file Junie writes, normally ~/.junie/settings.json.
 .PARAMETER ExpectedModelCount
     The footer's row count (i/N), checked before any key is sent.
+.PARAMETER SkipEffortCycle
+    Read rows and their current effort cells using Up/Down only. Records no effort menu claims.
 #>
 param(
     [Parameter(Mandatory)][string]$UiHelperPath,
@@ -29,6 +31,7 @@ param(
     [Parameter(Mandatory)][string]$OutputDirectory,
     [Parameter(Mandatory)][string]$ConfigPath,
     [Parameter(Mandatory)][ValidateRange(1,100)][int]$ExpectedModelCount,
+    [switch]$SkipEffortCycle,
     [ValidateRange(2,20)][int]$MaxEffortLevels = 9,
     [ValidateRange(500,20000)][int]$TimeoutMilliseconds = 3000
 )
@@ -68,10 +71,13 @@ function Read-JuniePicker([string]$Text) {
     if ($footer -lt 0) { throw 'The picker footer counter (i/N) is not visible.' }
     $counter = [regex]::Match($lines[$footer], '(\d+)/(\d+)')
     $description = @($lines[($footer + 1)..($lines.Count - 1)] | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -join ' '
+    $ecoColumn = $Text -match '(?m)^\s*Name\s+Input\s+Output\s+Effort\s+Eco\s*$'
     [pscustomobject]@{
         Position = [int]$counter.Groups[1].Value; Total = [int]$counter.Groups[2].Value
         NameCell = $match.Groups['name'].Value.Trim(); Input = $match.Groups['in'].Value; Output = $match.Groups['out'].Value
-        Effort = $(if ($effort.Success) { $effort.Value } else { $null }); Provider = $match.Groups['provider'].Value.Trim()
+        Effort = $(if ($effort.Success) { $effort.Value } else { $null })
+        Provider = $(if (-not $ecoColumn) { $match.Groups['provider'].Value.Trim() } else { $null })
+        Eco = $(if ($ecoColumn) { $match.Groups['provider'].Value.Trim() } else { $null })
         Description = $description
     }
 }
@@ -95,6 +101,9 @@ function Wait-JunieState([scriptblock]$Done) {
 }
 
 function Send-JunieKey([ValidateSet('Up','Down','Right')][string]$Key, $State) {
+    if ($SkipEffortCycle -and (Get-ConfigDigest) -ne $baseline) {
+        throw 'The settings file changed during read-only capture. Stop and inspect.'
+    }
     $guard = '(?m)^\s*' + $ARROW + '\s+' + [regex]::Escape($State.NameCell) + '\s'
     Send-WindowsUiKey $target -Key $Key -ExpectedText $guard
 }
@@ -122,10 +131,11 @@ for ($index = 1; $index -le $ExpectedModelCount; $index++) {
     $seen[$state.NameCell] = $index
     Save-Step ('row-{0:D2}' -f $index) (Get-WindowsUiText $target)
     $start = $state.Effort
-    $cycle = @($start)
+    $cycle = @()
+    if (-not $SkipEffortCycle) { $cycle = @($start) }
     $current = $state
     $closed = $false
-    if ($null -ne $start) {
+    if (-not $SkipEffortCycle -and $null -ne $start) {
         for ($press = 1; $press -le $MaxEffortLevels; $press++) {
             $before = $current.Effort
             Send-JunieKey Right $current
@@ -148,8 +158,9 @@ for ($index = 1; $index -le $ExpectedModelCount; $index++) {
         Index = $index; NameCell = $state.NameCell
         Name = $(if ($badge.Success) { $badge.Groups['name'].Value } else { $state.NameCell })
         Badge = $(if ($badge.Success) { $badge.Groups['badge'].Value } else { $null })
-        Input = $state.Input; Output = $state.Output; Provider = $state.Provider; Description = $state.Description
-        StartEffort = $start; EffortCycle = $cycle; SingleValue = ($null -ne $start -and $cycle.Count -eq 1)
+        Input = $state.Input; Output = $state.Output; Provider = $state.Provider; Eco = $state.Eco; Description = $state.Description
+        StartEffort = $start; EffortCycle = @($cycle)
+        SingleValue = (-not $SkipEffortCycle -and $null -ne $start -and $cycle.Count -eq 1)
     }
     if ($index -lt $ExpectedModelCount) {
         Send-JunieKey Down $current
@@ -169,7 +180,8 @@ $final = Get-ConfigDigest
 [pscustomobject]@{
     Rows = $rows.Count; ExpectedModelCount = $ExpectedModelCount; StartRow = $startPosition
     SingleValueRows = @($rows | Where-Object SingleValue | ForEach-Object { $_.Name })
-    Steps = $script:steps; ConfigUnchanged = ($final -eq $baseline)
+    Steps = $script:steps; ConfigUnchanged = ($final -eq $baseline); EffortCycleCaptured = (-not $SkipEffortCycle)
     Scope = 'This Windows Terminal picker, installation and account only.'
-    Completeness = 'Each EffortCycle is the Right-key order from the start value; take linear order from the JAR EffortLevel order.'
+    Completeness = $(if ($SkipEffortCycle) { 'Model list only; StartEffort is current state, not supported values or a default.' }
+        else { 'Each EffortCycle is the Right-key order from the start value; take linear order from the JAR EffortLevel order.' })
 } | ConvertTo-Json -Depth 4

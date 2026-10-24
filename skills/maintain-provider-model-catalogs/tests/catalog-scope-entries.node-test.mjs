@@ -80,6 +80,22 @@ test('Devin families become effort and speed controls over exact variant UIDs', 
   assert.throws(() => devinEntries([devinRow('ex-1-low', 'L', 'ex-1', 'Ex 1'), devinRow('ex-1-turbo', 'T', 'ex-1', 'Ex 1')]), /unknown variant token "turbo"/);
 });
 
+test('Devin keeps Lightning as a separate form with its exact effort UIDs', () => {
+  const entries = devinEntries([
+    devinRow('ex-high', 'Ex High', 'ex', 'Ex'),
+    devinRow('ex-medium', 'Ex Medium', 'ex', 'Ex'),
+    devinRow('ex-medium-lightning', 'Ex Medium Lightning', 'ex', 'Ex'),
+    devinRow('ex-high-lightning', 'Ex High Lightning', 'ex', 'Ex'),
+  ]);
+  assert.deepEqual(entries.map(({ label }) => label), ['Ex', 'Ex Lightning']);
+  assert.deepEqual(entries[1].controls[0].values, [
+    { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' },
+  ]);
+  assert.deepEqual(entries[1].execution.variants.map(({ model }) => model),
+    ['ex-medium-lightning', 'ex-high-lightning']);
+  assert.equal(entries[1].controls.length, 1);
+});
+
 test('Cursor families need every parameter combination and keep the exact variant strings', () => {
   const family = {
     id: 'ex-5', label: 'Ex 5',
