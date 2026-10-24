@@ -84,6 +84,10 @@ availability, not merely an indicator; its omission is explicitly authorized. Se
   providerModelCatalog 20, shared Playground 22, and the bounded HTTP catalog selection 22
   (53 unrelated server cases skipped). Factory-backed assertions now consume shared membership;
   frozen discovery/migration fixtures are unchanged. No full-suite pass is claimed.
+- The first hosted preflight passed 2,856 tests and found two additional stale factory-backed
+  assertions (Kiro management models and bundled Pi refresh). Both now compare the projection
+  with the shared factory, retaining exact order/labels and the no-spawn refresh assertion.
+  Their focused rerun passed; dynamic/migration fixtures remain unchanged.
 - Junie reader and scope-generator synthetic tests: 11 passed. Junie read-only/Eco helper tests
   passed without starting a CLI. Runtime TypeScript passed after installing existing lockfile
   dependencies in this worktree; the shared checkout lacked pngjs. Dependency/version files

@@ -5450,16 +5450,9 @@ providers:
     const spawnMock = vi.spyOn(providerInstallRunner, 'runSpawnedCommand');
     try {
       await withRuntime({}, {}, async (runtime) => {
-        const expected = [
-          { id: 'openai-codex/gpt-5.5', label: 'gpt-5.5' },
-          { id: 'openai-codex/gpt-5.6-luna', label: 'gpt-5.6-luna' },
-          { id: 'openai-codex/gpt-5.6-sol', label: 'gpt-5.6-sol' },
-          { id: 'openai-codex/gpt-5.6-terra', label: 'gpt-5.6-terra' },
-          { id: 'openai-codex/gpt-6-astra', label: 'gpt-6-astra' },
-          { id: 'openai-codex/gpt-6-luna', label: 'gpt-6-luna' },
-          { id: 'openai-codex/gpt-6-sol', label: 'gpt-6-sol' },
-          { id: 'openai-codex/gpt-6.1-sol', label: 'gpt-6.1-sol' },
-        ];
+        const expected = readCatalogFactory({ packageRoot: process.cwd(), runtimeRoot: process.cwd() })
+          .document.catalogs.find(scope => scope.provider === 'pi' && scope.backend === 'cli')!.models
+          .map(({ id, label }) => ({ id, label }));
         for (const route of ['/providers/pi/models', '/providers/pi/models?refresh=1']) {
           const response = await runtime.app.request(route);
           expect(response.status).toBe(200);
