@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Ready; owner authorized sliced implementation on 2026-10-28 |
+| Status | In progress; Runtime interaction core implemented, transport and consumers pending |
 | Owner | Runtime execution boundary |
 | Assigned To | Unassigned |
 | Reviewer | Product owner and consumer maintainers |
@@ -129,5 +129,6 @@ Fixture captures record versions as provenance, never as an execution allowlist.
 | Date | Update |
 | --- | --- |
 | 2026-10-28 | Worktree documentation drafted from source inspection and prior discovery; P0–P5 not started. Runtime behavior, versions and user settings unchanged. |
+| 2026-10-28 | P1 core slice: bounded generation-scoped interaction store, strict typed answers, idempotent delivery, cancellation/deadlines and redacted receipts. All 16 focused tests and TypeScript check pass. Independent review found action coercion and responding-timeout defects; both fixed and independently rechecked. No HTTP/provider integration is claimed yet. |
 
 *Created / last updated: 2026-10-28*
