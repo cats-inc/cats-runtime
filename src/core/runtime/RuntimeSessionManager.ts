@@ -1,6 +1,7 @@
 import { bindManagedNativeIdentity, hasManagedPluginExposure } from '../skills/managedPlugins.js';
 import { RuntimeSkillError } from '../skills/errors.js';
 import { randomUUID } from 'node:crypto';
+import { InteractionError, type InteractionHost, type InteractionSnapshot } from '../interactions/types.js';
 import { hostname } from 'node:os';
 import { resolve } from 'node:path';
 import { WorkspaceActivityStore, type WorkspaceActivityAttachment,
@@ -144,6 +145,37 @@ export class RuntimeSessionReplacementError extends Error {
 }
 
 export class RuntimeSessionManager {
+  private readonly interactionHosts = new Map<string, InteractionHost>();
+
+  assertInteractionSupport(host: InteractionHost | undefined, providerName: string,
+    providerInstanceId?: string, providerBackend?: BackendKind): void {
+    if (!host) return;
+    const supported = this.getCapabilities(providerName, providerInstanceId, providerBackend).interactions;
+    if (!supported || host.kinds.some(kind => !supported.kinds.includes(kind))) {
+      throw new InteractionError('interaction_unsupported', 'This provider target cannot host the requested native interactions.');
+    }
+  }
+
+  validateInteractionHost(sessionId: string, host: InteractionHost | undefined): void {
+    if (!host) return;
+    const current = this.interactionHosts.get(sessionId);
+    if (this.get(sessionId)?.active && JSON.stringify(current) !== JSON.stringify(host)) {
+      throw new InteractionError('interaction_conflict', 'Close the active worker before changing its interaction host.');
+    }
+  }
+
+  interactionSnapshot(sessionId: string): InteractionSnapshot {
+    return this.pool.get(sessionId)?.interactions?.snapshot() ?? {
+      version: 1, sessionId, workerGeneration: null, revision: 0, interactions: [],
+    };
+  }
+
+  respondToInteraction(sessionId: string, interactionId: string, response: unknown) {
+    const store = this.pool.get(sessionId)?.interactions;
+    if (!store) throw new InteractionError('interaction_conflict', 'The interaction worker is no longer attached.');
+    return store.respond(interactionId, response);
+  }
+
   private readonly replacements = new Map<string, symbol>();
   private readonly workspaceAttachments = new Map<string, WorkspaceActivityAttachment>();
   private readonly workspaceExecutions = new Map<string, WorkspaceActivityExecution>();
@@ -342,6 +374,10 @@ export class RuntimeSessionManager {
     providerBackend?: BackendKind,
   ): ExecutionHandle | undefined {
     this.replacements.delete(sessionId);
+    const interactionHost = opts.interactionHost ?? this.interactionHosts.get(sessionId);
+    this.assertInteractionSupport(interactionHost, providerName, providerInstanceId, providerBackend);
+    this.validateInteractionHost(sessionId, interactionHost);
+    if (interactionHost) opts = { ...opts, interactionHost: structuredClone(interactionHost) };
     const binding = this.getSessionBinding?.(sessionId);
     if (binding) bindManagedNativeIdentity(this.config.sessionBaseDir, binding, opts.resumeSessionId ?? binding.providerSessionId);
     assertRetainedSkillContent({
@@ -380,6 +416,7 @@ export class RuntimeSessionManager {
         )
         : this.pool.spawn(sessionId, providerName, normalizedOpts, cliInstanceId)) as WorkerProcess | undefined;
       this.mcpServers.recordLaunch(sessionId, mcpLaunch ? mcpServers : []);
+      if (worker && interactionHost) this.interactionHosts.set(sessionId, structuredClone(interactionHost));
       return worker ? new CliExecutionHandle(worker, () => this.pool.kill(sessionId)) : undefined;
     }
 
@@ -893,6 +930,7 @@ export class RuntimeSessionManager {
   }
 
   dropSession(sessionId: string): void {
+    this.interactionHosts.delete(sessionId);
     this.replacements.delete(sessionId);
     this.clearWorkspaceActivity(sessionId);
     this.handleOverrides.delete(sessionId);

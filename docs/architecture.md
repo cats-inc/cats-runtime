@@ -4,6 +4,15 @@
 
 ## Overview
 
+Native provider interactions are owned by a bounded in-memory store per worker
+generation. Codex maps native callbacks into typed prompts; Runtime authenticates
+snapshot reads and revision/idempotency-checked replies, which write directly to
+the same live child without entering its model-turn queue. Abort signals and
+deadlines invalidate callbacks. Streams contain redacted receipts only, so hosts
+reconcile pending prompts through the authenticated snapshot endpoint. Platform
+and Bot remain responsible for their own request UI and ownership checks. See
+[SPEC-039](specs/SPEC-039-provider-session-capabilities-and-interactions.md).
+
 Managed skill content is bounded by the executing artifact's release/preview
 manifest, independent of signing, provider choice or caller-selected catalog
 roots. Runtime enforces discovery and delivery policy, journals preview exposure

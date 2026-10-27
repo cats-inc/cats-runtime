@@ -31,6 +31,8 @@ import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import type { SessionMcpServerLaunch } from '../../../core/sessionMcpServers.js';
 import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 import { CodexReadTools, codexReadToolError, grantedCodexReadTools } from './codexReadTools.js';
+import { INTERACTION_KINDS } from '../../../core/interactions/types.js';
+import { CODEX_INTERACTION_METHODS, codexInteractionFallback, mapCodexInteraction } from './codexInteractions.js';
 
 interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -77,6 +79,7 @@ export class CodexProvider implements Provider {
     fork: true,
     permissions: true,
     sessionMcpServers: true,
+    interactions: { version: 1, kinds: [...INTERACTION_KINDS] },
   };
 
   private state: CodexState = 'uninitialized';
@@ -105,6 +108,7 @@ export class CodexProvider implements Provider {
   private _threadBootstrapId: number | null = null;
   private _readTurnId: string | null = null;
   private _readCallIds = new Set<string>();
+  private readonly _interactions = new Map<string, { id: string; resolve(id: string): void }>();
 
   constructor(
     private readonly compatibilityProfile?: CompatibilityProfileSelection,
@@ -211,7 +215,10 @@ export class CodexProvider implements Provider {
       const lines = [
         this.makeRequest('initialize', {
           clientInfo: { name: 'cats-runtime', version: '1.0.0' },
-          ...(this._readTools ? { capabilities: { experimentalApi: true } } : {}),
+          ...(this._readTools || this._spawnOpts.interactionHost ? { capabilities: {
+            experimentalApi: true,
+            ...(this._spawnOpts.interactionHost?.kinds.includes('mcp_form') ? { extensions: { 'openai/form': {} } } : {}),
+          } } : {}),
         }),
         this.makeNotification('initialized'),
         this.makeRequest(
@@ -249,6 +256,7 @@ export class CodexProvider implements Provider {
     this._lastUsageNative = null;
     this._readTurnId = null;
     this._readCallIds.clear();
+    this._interactions.clear();
     this._turnStartRequestId = this.nextId;
     return this.makeRequest('turn/start', {
       threadId: this.threadId,
@@ -281,6 +289,8 @@ export class CodexProvider implements Provider {
     if (!msg.method || msg.id === undefined) {
       return null;
     }
+
+    if (this._spawnOpts?.interactionHost && CODEX_INTERACTION_METHODS.has(msg.method)) return null;
 
     if (msg.method === 'item/commandExecution/requestApproval') {
       const decision = this.decideCommandApproval(msg.params);
@@ -341,6 +351,57 @@ export class CodexProvider implements Provider {
   ): Promise<string | null> {
     let message: Record<string, unknown> | undefined;
     try { message = asRecord(JSON.parse(line)); } catch { return null; }
+    if (this._spawnOpts?.interactionHost && message) {
+      const params = asRecord(message.params);
+      if (message.method === 'serverRequest/resolved' && params?.threadId === this.threadId) {
+        const entry = this._interactions.get(JSON.stringify(params.requestId));
+        if (entry) entry.resolve(entry.id);
+        return null;
+      }
+      if (typeof message.method === 'string' && CODEX_INTERACTION_METHODS.has(message.method)) {
+        const method = message.method;
+        const id = message.id;
+        if (!(typeof id === 'string' && id.length > 0 && id.length <= 256
+          || typeof id === 'number' && Number.isSafeInteger(id))) return null;
+        const fallback = () => codexInteractionFallback(method, id);
+        const key = JSON.stringify(id);
+        // A retransmission shares its original callback; never write two replies.
+        if (this._interactions.has(key)) return null;
+        if (this._interactions.size >= 64) throw new Error('Provider interaction request limit exceeded.');
+        // A handled-ID tombstone includes declined/unsupported requests.
+        this._interactions.set(key, { id: '', resolve: () => {} });
+        const matchingTurn = params?.turnId === this._readTurnId
+          || method === 'mcpServer/elicitation/request' && params?.turnId === null;
+        if (!context.interactions || context.signal.aborted || this.state !== 'ready'
+          || !this._readTurnId || params?.threadId !== this.threadId || !matchingTurn
+          || line.length > 65_536) return fallback();
+        const unavailable = (reason: string) => {
+          const kind = method === 'item/commandExecution/requestApproval' ? 'command_approval'
+            : method === 'item/fileChange/requestApproval' ? 'file_approval'
+              : method === 'item/permissions/requestApproval' ? 'permission_grant'
+                : method.includes('requestUserInput') ? 'user_input' : params?.mode === 'url' ? 'mcp_url' : 'mcp_form';
+          context.interactions?.unavailable?.(kind, reason);
+          return fallback();
+        };
+        // A UI cannot broaden a host's read-only or whitelist execution boundary.
+        const approval = method.includes('requestApproval');
+        if (approval && (this._spawnOpts.workspaceMode === 'read_only'
+          || this._permissionMode === 'whitelist' && (
+            method === 'item/permissions/requestApproval'
+            || method === 'item/commandExecution/requestApproval' && this.decideCommandApproval(params) === 'decline'
+            || method === 'item/fileChange/requestApproval' && this.decideFileChangeApproval() === 'decline'))) return unavailable('host_policy_restriction');
+        try {
+          const mapped = mapCodexInteraction(method, params!);
+          const runtimeId = context.interactions.request({ prompt: mapped.prompt, deadlineMs: mapped.deadlineMs,
+            response: answer => method.includes('requestUserInput') && answer.action !== 'accept'
+              ? fallback() : JSON.stringify({ jsonrpc: '2.0', id, result: mapped.result(answer) }) + '\n',
+            fallback,
+          });
+          this._interactions.set(key, { id: runtimeId, resolve: context.interactions.resolve });
+          return null;
+        } catch { return unavailable('unsupported_or_unavailable_interaction'); }
+      }
+    }
     if (message?.method !== 'item/tool/call') return null;
     const requestId = message.id;
     const validId = (typeof requestId === 'string' && requestId.length > 0 && requestId.length <= 256)
@@ -510,6 +571,16 @@ export class CodexProvider implements Provider {
   private handleNotification(msg: JsonRpcResponse): StreamEvent | StreamEvent[] | null {
     const method = msg.method!;
     const params = msg.params ?? {};
+
+    // Resolve in wire order, before a subsequent turn/completed aborts its signal.
+    if (method === 'serverRequest/resolved' && params.threadId === this.threadId) {
+      const key = JSON.stringify(params.requestId);
+      const entry = this._interactions.get(key);
+      if (entry) {
+        entry.resolve(entry.id);
+        this._interactions.set(key, { id: '', resolve: () => {} });
+      }
+    }
 
     // SPEC-035 connection evidence, reported only for this session's own servers.
     if (method === 'mcpServer/startupStatus/updated') {
@@ -712,15 +783,18 @@ export class CodexProvider implements Provider {
       || method === 'item/fileChange/requestApproval'
       || method === 'item/permissions/requestApproval'
       || method === 'item/tool/requestUserInput'
+      || method === 'tool/requestUserInput'
       || method === 'mcpServer/elicitation/request'
+      || method === 'serverRequest/resolved'
       || method === 'applyPatchApproval'
       || method === 'execCommandApproval'
       || method === 'item/tool/call'
     ) {
       return observeIgnored(this.evolutionObserver, {
         rawEventType: method,
-        reason: 'auto_approved_request',
-        rawSample: msg,
+        reason: 'server_request_handled',
+        // Questions, form values and one-time URLs must not enter evidence logs.
+        rawSample: { method },
       }, null);
     }
 

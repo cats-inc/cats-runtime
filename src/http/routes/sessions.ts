@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { parseInteractionHost } from '../../core/interactions/validation.js';
+import { InteractionError, type InteractionHost } from '../../core/interactions/types.js';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { Hono } from 'hono';
@@ -491,6 +493,7 @@ function buildSpawnOptions(input: {
   permissionMode?: SessionInfo['permissionMode'];
   allowedTools?: string[];
   forkSession?: boolean;
+  interactionHost?: InteractionHost;
 }): ProviderSpawnOptions {
   const modelControls = cloneProviderControls(input.modelResolution?.controls);
   return {
@@ -504,6 +507,7 @@ function buildSpawnOptions(input: {
     ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
     ...(input.allowedTools ? { allowedTools: input.allowedTools } : {}),
     ...(input.forkSession ? { forkSession: input.forkSession } : {}),
+    ...(input.interactionHost ? { interactionHost: input.interactionHost } : {}),
   };
 }
 
@@ -2675,6 +2679,7 @@ sessionRoutes.post('/sessions', async (c) => {
     instructions?: string;
     skills?: unknown;
     mcpServers?: unknown;
+    interactionHost?: unknown;
     context?: SessionInvocationContext;
     outputDir?: string;
   }>();
@@ -2694,6 +2699,15 @@ sessionRoutes.post('/sessions', async (c) => {
     providerTarget = resolveRequestedProviderTarget(ctx, providerName, body.instance);
   } catch (err) {
     return c.json({ error: `${err}` }, 400);
+  }
+
+  let interactionHost: InteractionHost | undefined;
+  try {
+    interactionHost = parseInteractionHost(body.interactionHost);
+    runtime.assertInteractionSupport(interactionHost, providerName, providerTarget.instanceId, providerTarget.backend);
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : 'Invalid interaction host',
+      ...(error instanceof InteractionError ? { code: error.code } : {}) }, 400);
   }
 
   const selection = ctx.bootstrapService?.selection;
@@ -2761,6 +2775,8 @@ sessionRoutes.post('/sessions', async (c) => {
         }, 409);
       }
     } else {
+      try { runtime.validateInteractionHost(existing.id, interactionHost); }
+      catch (error) { return c.json({ error: error instanceof Error ? error.message : 'Interaction host conflict' }, 409); }
       const existingSourceCwd = getSessionWorkspaceSourceCwd(existing) ?? existing.cwd;
       const contentError = sessionContentError(ctx, existing);
       if (contentError) return c.json(contentError.body, contentError.status);
@@ -3293,6 +3309,7 @@ sessionRoutes.post('/sessions', async (c) => {
         instructionsFile: skills?.delivery.instructions?.filePath,
         permissionMode: resolved.permissionMode,
         allowedTools: body.allowedTools,
+        interactionHost,
       }),
       providerTarget.instanceId,
       providerTarget.backend,
@@ -4292,8 +4309,18 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   } catch {
     return c.json({ error: 'This session provider is no longer selected' }, 409);
   }
-  const resumeBody = await c.req.json<{ mcpServers?: unknown }>()
-    .catch(() => ({} as { mcpServers?: unknown }));
+  const resumeBody = await c.req.json<{ mcpServers?: unknown; interactionHost?: unknown }>()
+    .catch(() => ({} as { mcpServers?: unknown; interactionHost?: unknown }));
+  let interactionHost: InteractionHost | undefined;
+  try {
+    interactionHost = parseInteractionHost(resumeBody.interactionHost);
+    runtime.assertInteractionSupport(interactionHost, session.providerName, session.providerInstanceId, session.providerBackend);
+    runtime.validateInteractionHost(id, interactionHost);
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : 'Invalid interaction host',
+      ...(error instanceof InteractionError ? { code: error.code } : {}) },
+    error instanceof InteractionError && error.code === 'interaction_conflict' ? 409 : 400);
+  }
   const parsedMcpServers = parseSessionMcpServers(resumeBody.mcpServers);
   if (!parsedMcpServers.ok) {
     return c.json({ error: parsedMcpServers.error }, 400);
@@ -4565,6 +4592,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         permissionMode,
         allowedTools: (body as { allowedTools?: string[] }).allowedTools
           ?? hydratedSession.allowedTools,
+        interactionHost,
       }),
       hydratedSession.providerInstanceId,
       hydratedSession.providerBackend,

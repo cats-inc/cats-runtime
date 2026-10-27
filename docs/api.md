@@ -7,6 +7,40 @@
 `cats-runtime` serves the runtime contract directly. Requests no longer hop
 through a second local runtime service.
 
+### Native provider interactions (opt-in)
+
+Native Codex sessions accept `interactionHost` on create and resume:
+`{ "version": 1, "kinds": ["command_approval", "file_approval", "permission_grant",
+"user_input", "mcp_form", "mcp_url"], "timeoutMs": 1800000 }`.
+Select the kinds the host actually renders. The deadline must be 1 minute–24 hours;
+a shorter provider deadline wins. Other providers and non-native targets reject
+the option. Omission preserves legacy behavior. Changing the descriptor requires
+closing the active worker. Negotiation is memory-only and must be resent after a
+Runtime restart.
+
+- `GET /sessions/:id/interactions`: versioned snapshot with worker generation,
+  monotonic revision and bounded pending requests/terminal receipts.
+- `POST /sessions/:id/interactions/:interactionId/responses`: submit
+  `{ "expectedRevision": 1, "idempotencyKey": "unique-request-key", "answer": ... }`.
+  This control request runs while the model turn is occupied. Answer actions are
+  `accept`, `decline` or `cancel`; acceptance uses the offered `choice`, typed
+  `values`, or selected `grants` and `scope`, depending on the prompt kind.
+
+Both endpoints use normal Runtime authentication and `Cache-Control: no-store`.
+Responses are capped at 32 KiB (HTTP envelope 36 KiB); invalid answers return 400,
+unknown sessions/requests 404, and stale/conflicting replies 409. Retrying the same
+idempotency key and body returns the same receipt without writing to Codex again.
+Do not retry a conflicting answer under a new key.
+
+Opted-in streams carry additive `progress` events with metadata kind
+`interaction_requested` or `interaction_updated` and a redacted `interaction`
+receipt. Fetch the authenticated snapshot for the pending prompt; do not treat
+the stream as the complete request store. Terminal receipts contain no prompt or
+answer. `providerConfirmed: false` means a reply was written, not that the provider
+has confirmed completion. A cancelled/restarted worker invalidates its callbacks.
+Flat primitive/enum MCP forms are supported; unsupported schemas and URL schemes
+are declined. URL navigation remains a host action, never an automatic fetch.
+
 ### Skill content profile and retained sessions
 
 The executing artifact determines managed skill eligibility. Requests cannot

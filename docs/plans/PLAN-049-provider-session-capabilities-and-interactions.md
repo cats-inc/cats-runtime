@@ -130,5 +130,6 @@ Fixture captures record versions as provenance, never as an execution allowlist.
 | --- | --- |
 | 2026-10-28 | Worktree documentation drafted from source inspection and prior discovery; P0–P5 not started. Runtime behavior, versions and user settings unchanged. |
 | 2026-10-28 | P1 core slice: bounded generation-scoped interaction store, strict typed answers, idempotent delivery, cancellation/deadlines and redacted receipts. All 16 focused tests and TypeScript check pass. Independent review found action coercion and responding-timeout defects; both fixed and independently rechecked. No HTTP/provider integration is claimed yet. |
+| 2026-10-28 | P1/P2 transport slice connects native worker callbacks, negotiated create/resume hosts and authenticated snapshots/responses. Synthetic worker proves replies bypass the occupied model turn and cancellation invalidates callbacks. Focused interaction/HTTP/worker tests: 30 pass; Codex/read-tool regressions: 98 pass; worker/pool regressions: 29 pass; session HTTP tests: 14 pass. Independent review led to experimental/form capability negotiation, fallback tombstones, strict form constraint rejection and transactional host negotiation. A wire-order test covers provider resolution immediately before turn completion. Policy/inventory and both consumers remain pending. |
 
 *Created / last updated: 2026-10-28*

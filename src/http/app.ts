@@ -59,6 +59,7 @@ import { compatibilityEvidenceRoutes } from './routes/compatibilityEvidence.js';
 import { setupDiagnosticsRoutes } from './routes/setupDiagnostics.js';
 import { healthRoutes } from './routes/health.js';
 import { sessionRoutes } from './routes/sessions.js';
+import { interactionRoutes } from './routes/interactions.js';
 import { setupRoutes } from './routes/setup.js';
 import { messageRoutes } from './routes/messages.js';
 import { acpRoutes } from './routes/acp.js';
@@ -433,6 +434,7 @@ export function createRuntimeApp(ctx: AppContext) {
   app.route('/', browserRoutes);
   app.route('/', deliveryRoutes);
   app.route('/', sessionRoutes);
+  app.route('/', interactionRoutes);
   app.route('/', messageRoutes);
   app.route('/', acpRoutes);
   app.route('/', mcpRoutes);

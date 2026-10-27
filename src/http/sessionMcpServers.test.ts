@@ -346,4 +346,29 @@ describe('session MCP servers HTTP contract (SPEC-035)', () => {
     expect(registry.unregister(id)).toBe(true);
     expect(context.runtime!.mcpServers.get(id)).toEqual([]);
   });
+
+  it('does not negotiate an interaction host on rejected resume/reuse or failed spawn', async () => {
+    vi.mocked(pool.getCapabilities).mockReturnValue({ resume: true, fork: true, permissions: true,
+      interactions: { version: 1, kinds: ['user_input'] } });
+    const host = { version: 1, kinds: ['user_input'], timeoutMs: 60_000 };
+    const { app, response, text } = await createSession({ provider: 'codex', sessionKey: 'interaction-fixture' });
+    expect(response.status, text).toBe(201);
+    const { id } = JSON.parse(text) as { id: string };
+    registry.setProviderSessionId(id, 'native-fixture');
+    registry.updateStatus(id, 'closed');
+    const invalid = await app.request(`/sessions/${id}/resume`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interactionHost: host, mcpServers: 'invalid' }) });
+    expect(invalid.status).toBe(400);
+    const conflict = await createSession({ provider: 'codex', sessionKey: 'interaction-fixture', reusePolicy: 'require_existing',
+      cwd: join(rootDir, 'different'), interactionHost: host });
+    expect(conflict.response.status).toBe(409);
+    context.runtime!.spawn(id, 'codex', { cwd: join(rootDir, 'repo') }, 'default', 'cli');
+    expect(lastSpawn().opts.interactionHost).toBeUndefined();
+    vi.mocked(pool.spawn).mockImplementationOnce(() => { throw new Error('fixture spawn failure'); });
+    const failure = await app.request(`/sessions/${id}/resume`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interactionHost: host }) });
+    expect(failure.status, await failure.text()).toBe(500);
+    context.runtime!.spawn(id, 'codex', { cwd: join(rootDir, 'repo') }, 'default', 'cli');
+    expect(lastSpawn().opts.interactionHost).toBeUndefined();
+  });
 });

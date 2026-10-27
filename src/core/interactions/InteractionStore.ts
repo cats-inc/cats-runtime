@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import {
-  InteractionError, type InteractionAnswer, type InteractionHost, type InteractionPrompt,
+  InteractionError, type InteractionAnswer, type InteractionHost, type InteractionKind, type InteractionPrompt,
   type InteractionSnapshot, type InteractionStatus, type ProviderInteraction,
 } from './types.js';
 import { parseInteractionResponse, validateAnswer } from './validation.js';
@@ -45,6 +45,17 @@ export class InteractionStore {
   snapshot(): InteractionSnapshot {
     return { version: 1, sessionId: this.sessionId, workerGeneration: this.generation,
       revision: this.revision, interactions: [...this.entries.values()].map(entry => structuredClone(entry.view)) };
+  }
+
+  unavailable(executionId: string, kind: InteractionKind, reason: string): string {
+    const at = new Date(this.now()).toISOString();
+    const view: ProviderInteraction = { interactionId: randomUUID(), sessionId: this.sessionId,
+      workerGeneration: this.generation, executionId, revision: ++this.revision,
+      createdAt: at, expiresAt: at, status: 'unsupported', kind, reason };
+    this.entries.set(view.interactionId, { view });
+    this.prune();
+    this.changed(structuredClone(view));
+    return view.interactionId;
   }
 
   register(input: InteractionRegistration): string {

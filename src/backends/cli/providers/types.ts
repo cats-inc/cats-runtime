@@ -7,6 +7,7 @@ import type {
   TurnInput,
 } from '../../../core/types.js';
 import type { CompatibilityProfileSelection } from '../../../core/compatibility/types.js';
+import type { InteractionAnswer, InteractionPrompt } from '../../../core/interactions/types.js';
 
 export type { CompatibilityProfileSelection } from '../../../core/compatibility/types.js';
 
@@ -159,6 +160,16 @@ export interface ProviderExecutionContext {
 
 export interface ProviderServerRequestContext {
   signal: AbortSignal;
+  interactions?: {
+    request(input: {
+      prompt: InteractionPrompt;
+      deadlineMs?: number;
+      response(answer: InteractionAnswer): string;
+      fallback(reason: string): string;
+    }): string;
+    resolve(interactionId: string): void;
+    unavailable?(kind: InteractionPrompt['kind'], reason: string): void;
+  };
 }
 
 export interface ProviderLaunchFailureInput {

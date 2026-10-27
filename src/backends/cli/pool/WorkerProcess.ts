@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { createInterface } from 'node:readline';
 import type { ProviderCommandConfig } from '../config.js';
@@ -19,6 +20,7 @@ import { buildProcessSpawnConfig, type ProcessSpawnConfig } from '../runtime/run
 import { startWindowsCodexHost, windowsCodexHostPath, type ManagedCodexHost } from '../runtime/windowsCodexHost.js';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 import { appendStderrLines } from '../stderrLines.js';
+import { InteractionStore } from '../../../core/interactions/InteractionStore.js';
 
 export interface WorkerProcessEvents {
   event: [StreamEvent];
@@ -47,6 +49,8 @@ function isTerminalStreamEvent(
 }
 
 export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
+  interactions?: InteractionStore;
+  private interactionExecutionId = '';
   private process: ChildProcess | null = null;
   private starting: Promise<void> | null = null;
   private startupController: AbortController | null = null;
@@ -78,6 +82,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     private readonly managedPluginExecution = false,
     /** SPEC-035 secrets for this child only; never logged or placed in argv. */
     private readonly launchEnv: Readonly<Record<string, string>> = {},
+    private readonly runtimeSessionId: string = randomUUID(),
   ) {
     super();
     this.provider = provider;
@@ -116,6 +121,15 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   private spawnProcess(): void {
     if (this.managedPluginExecution && this.launchGeneration > 0) throw new Error('Managed Plugin worker restart requires a fresh execution receipt.');
     const generation = ++this.launchGeneration;
+    this.interactions?.interrupt();
+    this.interactions = this.spawnOpts.interactionHost
+      ? new InteractionStore(this.runtimeSessionId, this.spawnOpts.interactionHost, interaction => {
+        const { prompt: _prompt, ...receipt } = interaction;
+        this.emit('event', { type: 'progress', text: interaction.status === 'pending'
+          ? 'Waiting for your response.' : `Provider interaction: ${interaction.status}.`,
+          metadata: { source: 'runtime', kind: interaction.status === 'pending'
+            ? 'interaction_requested' : 'interaction_updated', interaction: receipt } });
+      }) : undefined;
     this.startupController?.abort();
     this.startupController = null;
     this.starting = null;
@@ -312,7 +326,27 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       && !child.killed && this.activeTurnController === controller && !controller.signal.aborted
       && Boolean(child.stdin && !child.stdin.destroyed && !child.stdin.writableEnded);
     void Promise.resolve().then(() => isCurrent()
-      ? handler.call(this.provider, line, { signal: controller.signal }) : null)
+      ? handler.call(this.provider, line, { signal: controller.signal,
+        ...(this.interactions ? { interactions: {
+          request: input => this.interactions!.register({ executionId: this.interactionExecutionId,
+            prompt: input.prompt, deadlineMs: input.deadlineMs, signal: controller.signal,
+            abortDelivery: () => { if (isCurrent()) this.cancel(); },
+            respond: async answer => {
+              if (!isCurrent()) throw new Error('Provider interaction is stale.');
+              const response = input.response(answer);
+              await new Promise<void>((resolve, reject) => child.stdin!.write(response,
+                error => error ? reject(new Error('Provider response delivery failed.')) : resolve()));
+            },
+            fallback: async reason => {
+              if (!isCurrent()) return;
+              await new Promise<void>((resolve, reject) => child.stdin!.write(input.fallback(reason),
+                error => error ? reject(new Error('Provider response delivery failed.')) : resolve()));
+            },
+          }),
+          resolve: id => this.interactions!.resolve(id),
+          unavailable: (kind, reason) => { this.interactions!.unavailable(this.interactionExecutionId, kind, reason); },
+        } } : {}),
+      }) : null)
       .then((response) => {
         if (response && isCurrent()) child.stdin!.write(response);
       }).catch(() => {
@@ -351,6 +385,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     if (this.isBusy) {
       throw new Error('Worker is busy processing another message');
     }
+    this.interactionExecutionId = randomUUID();
 
     if (this.provider.streamTurn) {
       this.isBusy = true;
