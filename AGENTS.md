@@ -561,15 +561,19 @@ Agent-specific instructions and handoff checklists MUST use this scope.
   reason to use a PR here — not review, which a single account cannot provide.
 - The head branch is deleted on the remote, but the local one survives. Since the
   merge is a squash, `git branch -d` reports "not fully merged" and refuses every
-  time — the merge evidence here is the upstream being gone, not commit
-  reachability. Run `git config --global fetch.prune true` once so those `gone`
-  markers appear without remembering `--prune`.
+  time — the upstream being gone is the trigger, not commit reachability, and the
+  sweep then proves the branch landed before deleting it. Run
+  `git config --global fetch.prune true` once so those `gone` markers appear
+  without remembering `--prune`.
 - Sweep the leftovers with `.\scripts\windows\Remove-MergedBranches.ps1`, which is
   meant to open a session in this shared clone. It stops on a dirty working tree,
-  never touches a branch that was never pushed, and skips any branch held by
-  another worktree. `-WhatIf` previews; `-ReturnToDefault` also lands you on an
-  up-to-date default branch, but only moves off a branch whose upstream is gone
-  and warns when the fast-forward fails.
+  never touches a branch that was never pushed, skips any branch held by another
+  worktree, and deletes a gone branch only when `origin/main` already contains all
+  of its changes (Git 2.38 or newer): a pull request closed without merging, or a
+  branch with commits added after its merge, is kept and reported with the manual
+  delete command. `-WhatIf` previews; `-ReturnToDefault` also lands you on an
+  up-to-date default branch, but only moves off a branch that has landed and
+  warns when the fast-forward fails.
 - When you clean up after a merge, remove the worktree you created for that PR
   before sweeping; the sweep skips any branch a worktree still holds. Remove only
   worktrees you created, since another may hold a different agent's live work,

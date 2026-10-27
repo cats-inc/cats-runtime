@@ -85,8 +85,14 @@ platform-specific wrapper scripts:
 This project squash-merges and lets GitHub delete the head branch, so every
 landed PR leaves a local branch behind. Because a squashed commit has a
 different SHA than the branch it came from, `git branch -d` reports "not fully
-merged" and refuses. The script keys off upstream state instead: a branch counts
-as merged once it had an upstream and that upstream is gone.
+merged" and refuses. The script keys off upstream state instead: a branch is a
+candidate once it had an upstream and that upstream is gone, and it is deleted
+only when `origin/main` already contains all of its changes — merging it would
+change nothing, or a commit on `main` carries exactly its tree (a branch rebased
+before its squash merge). A pull request closed without merging, or a branch
+with commits added after its merge, is kept and reported with the manual delete
+command. The check needs Git 2.38 or newer; an older Git keeps every candidate
+and says so.
 
 ```powershell
 .\scripts\windows\Remove-MergedBranches.ps1 -WhatIf
@@ -95,7 +101,7 @@ as merged once it had an upstream and that upstream is gone.
 
 It refuses to run on a dirty working tree, never sweeps a branch that was never
 pushed, and skips branches checked out in another worktree. `-ReturnToDefault`
-only leaves a branch whose upstream is gone: a clean checkout on an unmerged
+only leaves a branch that has landed: a clean checkout on an unmerged
 branch may be another agent waiting on CI, so it stays put with a warning. A
 fast-forward that fails is reported as a warning, not as success. Run
 `git config --global fetch.prune true` once so the `gone` markers it reads
