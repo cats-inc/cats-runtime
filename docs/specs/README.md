@@ -1,5 +1,10 @@
 # Feature Specifications
 
+- [SPEC-039: Provider session capabilities and interactions](SPEC-039-provider-session-capabilities-and-interactions.md)
+  — approved, 2026-10-28; live request/reply lifecycle, effective execution policy,
+  session tool inventory and host integration. Implementation not started;
+  see [PLAN-049](../plans/PLAN-049-provider-session-capabilities-and-interactions.md).
+
 - [SPEC-037: Session workspace activity](SPEC-037-session-workspace-activity.md)
   — approved, 2026-10-20; typed session snapshots, verified Git identity and
   honest tool/provider coverage. Sliced implementation in progress.

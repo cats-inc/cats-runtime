@@ -1,5 +1,9 @@
 # Architecture Decision Records (ADR)
 
+- [ADR-048: Provider interactions and effective session capabilities](048-bridge-provider-interactions-and-report-effective-session-capabilities.md)
+  — accepted, 2026-10-28; Runtime protocol/policy/discovery with independent
+  Platform and Bot hosts. Sliced implementation authorized; not started.
+
 - [ADR-047: Provider image profiles](047-generalize-bounded-image-generation-to-provider-profiles.md)
   — accepted, 2026-10-23; contract 2 with per-provider execution profiles, Muse generation enabled,
   Codex and Antigravity gated on a pre-execution bound.

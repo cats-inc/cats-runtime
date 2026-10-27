@@ -1,5 +1,15 @@
 # Documentation Index
 
+[Provider session capabilities and interactions](specs/SPEC-039-provider-session-capabilities-and-interactions.md)
+is approved for sliced implementation (2026-10-28): native approvals/input, effective policy
+and observed tools shared by Platform and standalone Bots.
+[ADR-048](decisions/048-bridge-provider-interactions-and-report-effective-session-capabilities.md)
+records the accepted ownership boundary;
+[PLAN-049](plans/PLAN-049-provider-session-capabilities-and-interactions.md) sequences
+the work; the [Codex investigation](research/2026-10-28-codex-host-capability-gaps.md)
+separates discovery evidence from unverified computer/browser operation.
+Implementation has not started.
+
 [Sixteen CLI catalog refresh](research/2026-10-24-sixteen-cli-catalog-refresh.md) records current
 channel evidence, the Auggie effort binding and selector validation.
 

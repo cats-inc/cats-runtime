@@ -1,5 +1,9 @@
 # Implementation Plans
 
+- [PLAN-049: Provider session capabilities and interactions](PLAN-049-provider-session-capabilities-and-interactions.md)
+  — ready, 2026-10-28; contract, Runtime/Codex, inventory,
+  Platform/Bot integration and controlled native acceptance. All phases pending.
+
 - [PLAN-047: Session workspace activity](PLAN-047-session-workspace-activity.md)
   — in progress, 2026-10-20; shared observer, identity, provider evidence,
   transport/recovery and Platform acceptance delivered in seven validated slices.
