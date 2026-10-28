@@ -109,7 +109,22 @@ Platform's first matched native probe exposed a separate Runtime discovery race
 before tool invocation. Only the dedicated test cwd was used. The regression fix
 retains the release-content gate, waits for Codex's exact thread ID and preserves
 native transcripts on failed admission; it does not infer identity from cwd.
-The fixed native Platform comparison is recorded separately after completion.
+The fixed Platform probe used source `50ef02b4686c1fff6b60819d292acc5b2e1ef773`
+packed as `@cats-inc/cats-runtime` 0.6.2 (SHA-1
+`5f360927ece194dc3e0abbd690fb7b43cb292fc3`). It went through the real Platform
+runtime client and Chat channel dispatch with an isolated MemoryChatStore. The
+same-worker observation verified the explicit policy and the same configured
+279/3/4 tools. Chrome creation reached `mcp__cua_repl.js` and returned the same
+unavailable-browser error; computer-use listing through `@oai/sky` returned the
+same missing native pipe. The product turn completed and stopped its owned
+Runtime. This proves the product call path, not successful browser/desktop use.
+
+Separate scripted-provider acceptance exercised the actual Windows Electron
+candidate: pending request reload, same-execution response, required empty
+string/array and empty enum, terminal receipts, and policy/tool diagnostics.
+Those UI fixtures are not native-tool-operation evidence. Both consumer plans
+record their own source/packaged scope; macOS/Linux and helper recovery remain
+unverified. No provider credentials were copied into candidate profiles.
 
 ## Official sources consulted on 2026-10-28
 
@@ -129,9 +144,12 @@ The observed gap is partly Runtime's interaction/policy translation and partly t
 host's presentation/dependency integration. App-server is a suitable structured
 execution mode; changing process creation alone would not close those gaps.
 
-Before claiming parity, match executable/account/configuration/cwd/trust/policy and
-helper environment, then test a real request/reply and separate controlled Chrome
-and desktop actions through each host. The proposed work is Runtime SPEC-039 /
-PLAN-049, Platform SPEC-132 / PLAN-124 and Bots SPEC-004 / PLAN-004.
+The three matched call paths now reach the native tools and expose the same
+configured MCP inventory, with Bot's own injection as an intentional addition.
+Successful Chrome navigation and a visible desktop action still require the
+upstream helper/browser prerequisites to work in Terminal first. This remaining
+environment acceptance must not be reported as passed. Implementation and
+consumer evidence are tracked in Runtime SPEC-039 / PLAN-049, Platform SPEC-132 /
+PLAN-124 and Bots SPEC-004 / PLAN-004.
 
 *Created / last updated: 2026-10-28*
