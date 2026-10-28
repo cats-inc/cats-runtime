@@ -311,7 +311,9 @@ correlated by `request_id`) stay private to the adapter.
   session, changed only after the active worker is closed, and resent after a
   Runtime restart. A fork inherits it only onto a target that advertises it.
   It does not imply a host: without one, or under `skip`, Chrome tools follow the
-  session's legacy permission behavior.
+  session's legacy permission behavior. With a host, Claude Code still decides which
+  Chrome tools ask; `tabs_context_mcp` ran without a permission request in `manual`
+  mode, and the extension's per-site prompts are not host interactions.
 - **Dependencies.** Browser is `unknown` when `claude-in-chrome` is connected,
   because the extension may still have no browser; `unavailable` when the
   server is absent, with browser integration (or `--chrome` in the instance
