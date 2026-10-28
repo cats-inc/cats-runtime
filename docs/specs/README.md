@@ -2,8 +2,9 @@
 
 - [SPEC-039: Provider session capabilities and interactions](SPEC-039-provider-session-capabilities-and-interactions.md)
   — approved, 2026-10-28; live request/reply lifecycle, effective execution policy,
-  session tool inventory and host integration. Implementation not started;
-  see [PLAN-049](../plans/PLAN-049-provider-session-capabilities-and-interactions.md).
+  session tool inventory and host integration. Codex implemented in
+  [PLAN-049](../plans/PLAN-049-provider-session-capabilities-and-interactions.md); the Claude Code
+  mapping (R8) is sequenced by [PLAN-050](../plans/PLAN-050-claude-provider-interactions.md).
 
 - [SPEC-037: Session workspace activity](SPEC-037-session-workspace-activity.md)
   — approved, 2026-10-20; typed session snapshots, verified Git identity and
