@@ -35,10 +35,10 @@ function host() {
 }
 
 describe('Codex native interaction mapping', () => {
-  it('presents native MCP approval as Allow once and preserves accept, decline and cancel wire semantics', () => {
+  it('presents native MCP approval and preserves accept, decline and cancel wire semantics', () => {
     const mapped = mapCodexInteraction('mcpServer/elicitation/request', mcpApproval());
     expect(mapped.prompt).toMatchObject({ kind: 'tool_approval', server: 'cats-desktop',
-      choices: [{ id: 'accept', label: 'Allow once' }] });
+      choices: [{ id: 'accept', label: 'Allow' }] });
     expect(mapped.prompt.message).toContain('read_ui');
     expect(mapped.prompt.message).toContain('window-1');
     expect(mapped.result({ action: 'accept', choice: 'accept' })).toEqual({ action: 'accept', content: {}, _meta: null });
@@ -46,6 +46,17 @@ describe('Codex native interaction mapping', () => {
       expect(mapped.result({ action })).toEqual({ action, content: null, _meta: null });
     }
     expect(mapCodexInteraction('mcpServer/elicitation/request', mcpApproval({ _meta: {} })).prompt.kind).toBe('mcp_form');
+  });
+
+  it('preserves a plugin app-consent message without inventing one-call grant scope', () => {
+    const mapped = mapCodexInteraction('mcpServer/elicitation/request', mcpApproval({
+      serverName: 'node_repl', message: 'Allow Codex to use Paint?',
+      _meta: { codex_approval_kind: 'mcp_tool_call', tool_params: { app: 'paint-fixture' } },
+    }));
+    expect(mapped.prompt).toMatchObject({ kind: 'tool_approval', server: 'node_repl',
+      choices: [{ id: 'accept', label: 'Allow' }] });
+    expect(mapped.prompt.message).toContain('Allow Codex to use Paint?');
+    expect(mapped.prompt.message).toContain('paint-fixture');
   });
 
   it('does not discard changed MCP approval schemas or turn them into empty grants', () => {

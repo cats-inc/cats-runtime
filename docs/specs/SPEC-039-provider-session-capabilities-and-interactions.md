@@ -126,15 +126,18 @@ Negotiate extended/experimental forms only when both adapter and host support th
 Codex MCP tool approvals (native 0.165.0 evidence, 2026-10-29) use
 `mcpServer/elicitation/request`, `mode: form`, an empty object schema and
 `_meta.codex_approval_kind: mcp_tool_call`. A host negotiating `tool_approval`
-receives an Allow once card with the server, provider message and bounded input
+receives an Allow card with the server, provider message and bounded input
 summary. Accept returns `{ action: 'accept', content: {}, _meta: null }`; decline,
 cancel and expiry do not grant the call. A changed/nonempty approval schema is
 unsupported. Hosts negotiating only `mcp_form` retain their existing form flow.
 Explicit `on-request` and `untrusted` policies set injected servers' native
 `default_tools_approval_mode` to `prompt`, including read-only tools. Legacy and
 explicit `never` keep `approve`; provider mode inherits its native configuration.
-This adds no persisted format or HTTP version and does not grant access through
-an upstream computer-use plugin's separate host permissions.
+This adds no persisted format or HTTP version. Native plugin app-consent requests
+using the same marked form are also answerable; their grant scope is defined by
+the provider message, not assumed to last one call. Other plugin or OS permission
+protocols are not bridged by this mapping. An interactive approval policy is needed:
+the legacy permission-mode path may select `never` and suppress a native prompt.
 
 Never treat a generic task approval as a form answer. Render provider content as
 untrusted text; bound schemas and payload sizes, reject unsupported schema features

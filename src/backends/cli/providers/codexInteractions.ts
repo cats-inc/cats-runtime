@@ -112,15 +112,16 @@ export function mapCodexInteraction(method: string, params: Record<string, unkno
     const server = text(params.serverName);
     const common = { title: 'MCP input request', message: text(params.message), server };
     if (toolApprovals && codexInteractionKind(method, params) === 'tool_approval') {
-      // Native 0.165.0: accepting this empty form authorizes this call only. Never
-      // turn a changed/nonempty schema into an implicit successful empty answer.
+      // Native 0.165.0 uses this for tool calls and plugin app consent. Preserve
+      // the provider's stated scope; do not imply an app grant expires after one call.
+      // Never turn a changed/nonempty schema into an implicit empty answer.
       if (params.mode !== 'form' || !server || !common.message || mcpFormFields(params.requestedSchema).length) return unsupported();
       const meta = record(params._meta)!;
       const input = record(meta.tool_params);
       const summary = input ? JSON.stringify(input, null, 2) : '';
       return { prompt: { ...common, title: 'Tool approval', kind: 'tool_approval',
         message: [common.message, summary.length > 4096 ? `${summary.slice(0, 4096)}\n… (input truncated)` : summary].filter(Boolean).join('\n\n'),
-        choices: [{ id: 'accept', label: 'Allow once' }] },
+        choices: [{ id: 'accept', label: 'Allow' }] },
       result: answer => ({ action: answer.action, content: answer.action === 'accept' ? {} : null, _meta: null }) };
     }
     if (params.mode === 'url') {
