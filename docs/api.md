@@ -7,6 +7,92 @@
 `cats-runtime` serves the runtime contract directly. Requests no longer hop
 through a second local runtime service.
 
+### Native provider interactions (opt-in)
+
+Before creating a session, inspect the selected provider target's `continuity`
+on provider discovery. `interactions.version: 1` advertises supported kinds;
+`sessionCapabilities.version: 1` advertises policy verification and inventory.
+Missing fields mean unavailable, including older Runtime artifacts. Hosts must
+not send new controls to an older server that may ignore unknown JSON fields.
+
+Native Codex sessions accept `interactionHost` on create and resume:
+`{ "version": 1, "kinds": ["command_approval", "file_approval", "permission_grant",
+"user_input", "mcp_form", "mcp_url"], "timeoutMs": 1800000 }`.
+Select the kinds the host actually renders. The deadline must be 1 minute–24 hours;
+a shorter provider deadline wins. Other providers and non-native targets reject
+the option. Omission preserves legacy behavior. Changing the descriptor requires
+closing the active worker. Negotiation is memory-only and must be resent after a
+Runtime restart. A protected admission marker prevents such a session from falling
+back to legacy behavior: resume/fork without the required controls returns 409
+with `code: "interaction_admission_required"`. Fork inherits live parent controls;
+after restart the host must provide them again. Native thread identities retain
+the requirement even when a session is unregistered and rediscovered.
+
+- `GET /sessions/:id/interactions`: versioned snapshot with worker generation,
+  monotonic revision and bounded pending requests/terminal receipts.
+- `POST /sessions/:id/interactions/:interactionId/responses`: submit
+  `{ "expectedRevision": 1, "idempotencyKey": "unique-request-key", "answer": ... }`.
+  This control request runs while the model turn is occupied. Answer actions are
+  `accept`, `decline` or `cancel`; acceptance uses the offered `choice`, typed
+  `values`, or selected `grants` and `scope`, depending on the prompt kind.
+
+Both endpoints use normal Runtime authentication and `Cache-Control: no-store`.
+Responses are capped at 32 KiB (HTTP envelope 36 KiB); invalid answers return 400,
+unknown sessions/requests 404, and stale/conflicting replies 409. Retrying the same
+idempotency key and body returns the same receipt without writing to Codex again.
+Do not retry a conflicting answer under a new key.
+
+Opted-in streams carry additive `progress` events with metadata kind
+`interaction_requested` or `interaction_updated` and a redacted `interaction`
+receipt. Fetch the authenticated snapshot for the pending prompt; do not treat
+the stream as the complete request store. Terminal receipts contain no prompt or
+answer. `providerConfirmed: false` means a reply was written, not that the provider
+has confirmed completion. A cancelled/restarted worker invalidates its callbacks.
+Flat primitive/enum MCP forms are supported; unsupported schemas and URL schemes
+are declined. URL navigation remains a host action, never an automatic fetch.
+
+### Verified execution policy and session tools
+
+Create/resume/fork may select `executionPolicy` (requires `interactionHost`):
+
+```json
+{ "version": 1, "mode": "provider", "constraints": { "maxAccess": "workspace-write", "network": false } }
+```
+
+```json
+{ "version": 1, "mode": "explicit", "access": "workspace-write", "network": false, "approval": "on-request" }
+```
+
+Access values are `read-only`, `workspace-write`, `full-access`; explicit approvals
+are `never`, `untrusted`, `on-request`, with the user as reviewer. Read-only with
+network enabled and full access with network disabled are currently unsupported.
+Provider mode leaves native policy untouched, then checks it against the host's
+ceiling. A native auto-reviewer that can approve escapes is incompatible with a
+restricted ceiling. The effective cwd must resolve to the admitted workspace.
+Do not combine a new or retained policy with legacy `permissionMode`/`allowedTools`.
+Changing policy requires closing the worker; no existing saved setting is widened
+by omission or upgrade.
+
+Approval replies also respect the admitted ceiling. Command/file retry approval
+cannot express a narrower native sandbox, so it is offered only when the host
+explicitly admits full access and network. Permission grants are checked against
+the ceiling and canonical filesystem paths again at delivery. A later grant marks
+the bootstrap observation incomplete instead of continuing to claim the original
+effective permissions. Local sandbox limits do not constrain remote MCP effects.
+
+`GET /sessions/:id/capabilities` reads the worker's cached observation.
+`?refresh=true` can initialize that same worker's thread and perform bounded native
+discovery; it does not start a model turn, call tools or refresh credentials.
+The snapshot contains worker generation, requested/effective policy, configuration
+source categories and top-level MCP inventory. Inventory distinguishes configured,
+injected and Runtime dynamic tools, auth mechanism, connection and invocation
+evidence. It caps 16 pages/128 servers/8192 tools, has a 10-second discovery budget
+and marks cached observations stale after 15 seconds. Partial/unsupported discovery
+is explicit. Names are returned without endpoint URLs, schemas, raw errors or
+credentials. Built-in and nested lazy catalogs are not claimed exhaustive.
+Desktop/browser helper readiness remains unknown until independently verified;
+a connected MCP server alone does not prove a usable Chrome or desktop target.
+
 ### Skill content profile and retained sessions
 
 The executing artifact determines managed skill eligibility. Requests cannot

@@ -129,14 +129,14 @@ export async function ensureSessionAwake(
     throw new Error('No provider session ID to resume.');
   }
 
+  const executionPolicy = options.runtime.getExecutionPolicy(session.id);
   options.runtime.spawn(session.id, session.providerName, {
     cwd: session.cwd,
     workspaceMode: session.workspaceMode,
     model: session.model,
     resumeSessionId: session.providerSessionId,
     instructionsFile: session.skills?.delivery.instructions?.filePath,
-    permissionMode: session.permissionMode,
-    allowedTools: session.allowedTools,
+    ...(executionPolicy ? { executionPolicy } : { permissionMode: session.permissionMode, allowedTools: session.allowedTools }),
   }, session.providerInstanceId, 'cli');
   options.registry.updateStatus(session.id, 'ready');
   const updated = options.registry.get(session.id) ?? session;

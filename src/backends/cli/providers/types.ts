@@ -7,6 +7,7 @@ import type {
   TurnInput,
 } from '../../../core/types.js';
 import type { CompatibilityProfileSelection } from '../../../core/compatibility/types.js';
+import type { InteractionAnswer, InteractionPrompt } from '../../../core/interactions/types.js';
 
 export type { CompatibilityProfileSelection } from '../../../core/compatibility/types.js';
 
@@ -144,6 +145,12 @@ export interface Provider {
   /** Host-owned asynchronous replies, scoped to one live child and active turn. */
   buildServerResponse?(line: string, context: ProviderServerRequestContext): Promise<string | null>;
   getPendingTurnStart?(): string | null;
+  /** Initializes a session for inspection without creating a model turn. */
+  buildInitialization?(): string | null;
+  isSessionInitializing?(): boolean;
+  getPendingControlMessages?(): string | null;
+  readSessionCapabilities?(request: (line: string, timeoutMs?: number) => Promise<Record<string, unknown>>,
+    refresh: boolean): Promise<import('../../../core/interactions/capabilities.js').ProviderSessionCapabilities>;
   streamTurn?(turn: TurnInput, opts: ProviderTurnOptions): AsyncGenerator<StreamEvent>;
   /** Called before spawn for ephemeral providers that need the message in args (e.g. -p flag). */
   prepareEphemeralTurn?(turn: TurnInput): void;
@@ -159,6 +166,16 @@ export interface ProviderExecutionContext {
 
 export interface ProviderServerRequestContext {
   signal: AbortSignal;
+  interactions?: {
+    request(input: {
+      prompt: InteractionPrompt;
+      deadlineMs?: number;
+      response(answer: InteractionAnswer): string;
+      fallback(reason: string): string;
+    }): string;
+    resolve(interactionId: string): void;
+    unavailable?(kind: InteractionPrompt['kind'], reason: string): void;
+  };
 }
 
 export interface ProviderLaunchFailureInput {

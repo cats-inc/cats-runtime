@@ -133,6 +133,31 @@ describe('buildProviderContinuitySummary', () => {
     }
   });
 
+  it('negotiates interaction and policy APIs only for supporting native targets', () => {
+    const capabilities = {
+      resume: true, fork: true, permissions: true,
+      interactions: { version: 1 as const, kinds: ['user_input' as const] },
+      sessionCapabilities: { version: 1 as const, executionPolicy: true, inventory: true },
+    };
+    const target = (mode: 'native' | 'wsl') => ({
+      providerName: 'codex', backend: 'cli', instanceId: 'default', defaultTarget: true,
+      cliInstance: { id: 'default', providerName: 'codex', commandConfig: {
+        path: 'codex', runner: 'auto', runtime: mode === 'native' ? { mode } : { mode, distro: 'Ubuntu' },
+      } },
+    }) as ProviderTargetDescriptor;
+    const native = buildProviderContinuitySummary(target('native'), { capabilities });
+    expect(native.interactions).toEqual(capabilities.interactions);
+    expect(native.sessionCapabilities).toEqual(capabilities.sessionCapabilities);
+    native.interactions!.kinds.length = 0;
+    expect(capabilities.interactions.kinds).toEqual(['user_input']);
+    const remote = buildProviderContinuitySummary(target('wsl'), { capabilities });
+    expect(remote.interactions).toBeUndefined();
+    expect(remote.sessionCapabilities).toBeUndefined();
+    expect(buildProviderContinuitySummary(target('native'), {
+      capabilities: { resume: true, fork: true, permissions: true },
+    }).sessionCapabilities).toBeUndefined();
+  });
+
   it('describes provider-managed continuity for agent targets', () => {
     const summary = buildProviderContinuitySummary({
       providerName: 'claude',

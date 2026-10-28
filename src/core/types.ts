@@ -3,6 +3,8 @@ import type {
   ProviderModelSelection,
 } from './models/providerSelectionResolution.js';
 import type { SessionMcpServerLaunch } from './sessionMcpServers.js';
+import type { InteractionHost, InteractionKind } from './interactions/types.js';
+import type { SessionExecutionPolicy } from './interactions/policy.js';
 import type { RuntimeWorkspaceActivitySnapshot } from './workspace/activityTypes.js';
 
 export type {
@@ -1629,6 +1631,9 @@ export interface ProviderCapabilities {
   permissions: boolean;
   /** Adapter maps SPEC-035 session MCP servers into its launch configuration. */
   sessionMcpServers?: boolean;
+  /** Negotiated host interactions; absent means unsupported. */
+  interactions?: { version: 1; kinds: InteractionKind[] };
+  sessionCapabilities?: { version: 1; executionPolicy: boolean; inventory: boolean };
 }
 
 export type PermissionMode = 'skip' | 'whitelist' | 'default';
@@ -1649,6 +1654,8 @@ export interface ProviderSpawnOptions {
   instructionsFile?: string;
   /** SPEC-035 servers to configure; secrets arrive only through the child environment. */
   mcpServers?: SessionMcpServerLaunch[];
+  interactionHost?: InteractionHost;
+  executionPolicy?: SessionExecutionPolicy;
 }
 
 export interface ProviderTurnOptions extends ProviderSpawnOptions {

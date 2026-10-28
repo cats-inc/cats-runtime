@@ -294,10 +294,16 @@ export class WorkerPool {
   }
 
   getCapabilities(providerName: string, providerInstanceId?: string): ProviderCapabilities {
-    return this.resolveProvider(
+    const resolved = this.resolveProvider(
       providerName as ProviderName,
       providerInstanceId,
-    ).provider.capabilities;
+    );
+    const capabilities = { ...resolved.provider.capabilities };
+    if (resolved.commandConfig.runtime.mode !== 'native') {
+      delete capabilities.interactions;
+      delete capabilities.sessionCapabilities;
+    }
+    return capabilities;
   }
 
   spawn(
@@ -352,7 +358,12 @@ export class WorkerPool {
         && (!provider.capabilities.sessionMcpServers || commandConfig.runtime.mode !== 'native')) {
         throw new Error('Session MCP servers require a supporting adapter in a native CLI runtime.');
       }
-      worker = new WorkerProcess(provider, opts, commandConfig, resilience, managed, launchEnv);
+      if (opts.interactionHost && (commandConfig.runtime.mode !== 'native'
+        || !provider.capabilities.interactions
+        || opts.interactionHost.kinds.some(kind => !provider.capabilities.interactions!.kinds.includes(kind)))) {
+        throw new Error('Provider does not support the requested interaction host.');
+      }
+      worker = new WorkerProcess(provider, opts, commandConfig, resilience, managed, launchEnv, sessionId);
       this.sessionMcpConnections.delete(sessionId);
       worker.on('native-session', nativeId => { this.registry.setProviderSessionId(sessionId, nativeId, !opts.resumeSessionId); });
       if (managed) {

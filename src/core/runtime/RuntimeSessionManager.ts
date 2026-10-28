@@ -1,8 +1,12 @@
 import { bindManagedNativeIdentity, hasManagedPluginExposure } from '../skills/managedPlugins.js';
 import { RuntimeSkillError } from '../skills/errors.js';
 import { randomUUID } from 'node:crypto';
+import { InteractionError, type InteractionHost, type InteractionSnapshot } from '../interactions/types.js';
+import { assertExecutionPolicyAdmission, type SessionExecutionPolicy } from '../interactions/policy.js';
+import type { SessionCapabilitiesSnapshot } from '../interactions/capabilities.js';
 import { hostname } from 'node:os';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
+import { SessionAdmissionStore } from '../interactions/SessionAdmissionStore.js';
 import { WorkspaceActivityStore, type WorkspaceActivityAttachment,
   type WorkspaceActivityExecution } from '../workspace/workspaceActivity.js';
 import type { RuntimeWorkspaceActivitySnapshot, WorkspaceIdentityContext } from '../workspace/activityTypes.js';
@@ -144,6 +148,87 @@ export class RuntimeSessionReplacementError extends Error {
 }
 
 export class RuntimeSessionManager {
+  private readonly interactionHosts = new Map<string, InteractionHost>();
+  private readonly executionPolicies = new Map<string, SessionExecutionPolicy>();
+  private readonly admissions?: SessionAdmissionStore;
+
+  assertSessionControlAdmission(sessionId: string, host?: InteractionHost, policy?: SessionExecutionPolicy,
+    nativeId?: string, providerName?: string): void {
+    const binding = this.getSessionBinding?.(sessionId);
+    const provider = providerName ?? binding?.providerName;
+    const resumeId = nativeId ?? binding?.providerSessionId;
+    const requirements = [this.admissions?.get(`session:${sessionId}`),
+      ...(provider && resumeId ? [this.admissions?.get(`native:${provider}:${resumeId}`)] : [])];
+    const effectiveHost = host ?? this.interactionHosts.get(sessionId);
+    const effectivePolicy = policy ?? this.executionPolicies.get(sessionId);
+    if (requirements.some(marker => marker && (!effectiveHost || marker.requiresPolicy && !effectivePolicy))) {
+      throw new InteractionError('interaction_admission_required', 'Re-negotiate this session with interactionHost and its executionPolicy after Runtime restart.');
+    }
+    if (!this.admissions && effectiveHost) throw new InteractionError('interaction_unsupported', 'Durable session admission storage is unavailable.');
+  }
+
+  getExecutionPolicy(sessionId: string): SessionExecutionPolicy | undefined {
+    const policy = this.executionPolicies.get(sessionId);
+    return policy ? structuredClone(policy) : undefined;
+  }
+
+  getInteractionHost(sessionId: string): InteractionHost | undefined {
+    const host = this.interactionHosts.get(sessionId);
+    return host ? structuredClone(host) : undefined;
+  }
+
+  assertExecutionPolicySupport(policy: SessionExecutionPolicy | undefined, providerName: string,
+    providerInstanceId?: string, providerBackend?: BackendKind): void {
+    if (policy && !this.getCapabilities(providerName, providerInstanceId, providerBackend).sessionCapabilities?.executionPolicy) {
+      throw new InteractionError('interaction_unsupported', 'This provider target cannot verify the requested execution policy.');
+    }
+  }
+
+  validateExecutionPolicy(sessionId: string, policy: SessionExecutionPolicy | undefined): void {
+    if (policy && this.get(sessionId)?.active && JSON.stringify(this.executionPolicies.get(sessionId)) !== JSON.stringify(policy)) {
+      throw new InteractionError('interaction_conflict', 'Close the active worker before changing its execution policy.');
+    }
+  }
+
+  async sessionCapabilities(sessionId: string, refresh: boolean): Promise<SessionCapabilitiesSnapshot> {
+    const session = this.getSessionBinding?.(sessionId);
+    const supported = Boolean(session && this.getCapabilities(session.providerName,
+      session.providerInstanceId, session.providerBackend).sessionCapabilities?.inventory);
+    const worker = this.pool.get(sessionId);
+    const observation = supported && worker ? await worker.readCapabilities(refresh) : undefined;
+    return { version: 1, sessionId, workerGeneration: observation && worker ? worker.generation : null, supported,
+      ...(observation ? { observation } : { reason: supported ? 'no_live_observation' : 'provider_target_unsupported' }) };
+  }
+
+  assertInteractionSupport(host: InteractionHost | undefined, providerName: string,
+    providerInstanceId?: string, providerBackend?: BackendKind): void {
+    if (!host) return;
+    const supported = this.getCapabilities(providerName, providerInstanceId, providerBackend).interactions;
+    if (!supported || host.kinds.some(kind => !supported.kinds.includes(kind))) {
+      throw new InteractionError('interaction_unsupported', 'This provider target cannot host the requested native interactions.');
+    }
+  }
+
+  validateInteractionHost(sessionId: string, host: InteractionHost | undefined): void {
+    if (!host) return;
+    const current = this.interactionHosts.get(sessionId);
+    if (this.get(sessionId)?.active && JSON.stringify(current) !== JSON.stringify(host)) {
+      throw new InteractionError('interaction_conflict', 'Close the active worker before changing its interaction host.');
+    }
+  }
+
+  interactionSnapshot(sessionId: string): InteractionSnapshot {
+    return this.pool.get(sessionId)?.interactions?.snapshot() ?? {
+      version: 1, sessionId, workerGeneration: null, revision: 0, interactions: [],
+    };
+  }
+
+  respondToInteraction(sessionId: string, interactionId: string, response: unknown) {
+    const store = this.pool.get(sessionId)?.interactions;
+    if (!store) throw new InteractionError('interaction_conflict', 'The interaction worker is no longer attached.');
+    return store.respond(interactionId, response);
+  }
+
   private readonly replacements = new Map<string, symbol>();
   private readonly workspaceAttachments = new Map<string, WorkspaceActivityAttachment>();
   private readonly workspaceExecutions = new Map<string, WorkspaceActivityExecution>();
@@ -174,6 +259,8 @@ export class RuntimeSessionManager {
     private readonly agentBackend?: AgentBackendManager,
     private readonly getSessionBinding?: (sessionId: string) => SessionInfo | undefined,
   ) {
+    if (config.sessionBaseDir) this.admissions = new SessionAdmissionStore(join(config.dataDir
+      ?? join(config.sessionBaseDir, '..', 'data'), 'session-admissions'));
     this.apiBackend?.setWorkspaceObserver(this.createToolWorkspaceObserver);
   }
 
@@ -342,6 +429,19 @@ export class RuntimeSessionManager {
     providerBackend?: BackendKind,
   ): ExecutionHandle | undefined {
     this.replacements.delete(sessionId);
+    const interactionHost = opts.interactionHost ?? this.interactionHosts.get(sessionId);
+    const executionPolicy = opts.executionPolicy ?? this.executionPolicies.get(sessionId);
+    this.assertSessionControlAdmission(sessionId, interactionHost, executionPolicy, opts.resumeSessionId, providerName);
+    if (executionPolicy && (opts.permissionMode !== undefined || opts.allowedTools !== undefined)) {
+      throw new InteractionError('interaction_invalid', 'Do not combine an effective executionPolicy with legacy permission controls.');
+    }
+    this.assertInteractionSupport(interactionHost, providerName, providerInstanceId, providerBackend);
+    this.validateInteractionHost(sessionId, interactionHost);
+    this.assertExecutionPolicySupport(executionPolicy, providerName, providerInstanceId, providerBackend);
+    this.validateExecutionPolicy(sessionId, executionPolicy);
+    assertExecutionPolicyAdmission(executionPolicy, { ...opts, interactionHost });
+    opts = { ...opts, ...(interactionHost ? { interactionHost: structuredClone(interactionHost) } : {}),
+      ...(executionPolicy ? { executionPolicy: structuredClone(executionPolicy) } : {}) };
     const binding = this.getSessionBinding?.(sessionId);
     if (binding) bindManagedNativeIdentity(this.config.sessionBaseDir, binding, opts.resumeSessionId ?? binding.providerSessionId);
     assertRetainedSkillContent({
@@ -370,16 +470,27 @@ export class RuntimeSessionManager {
       const mcpLaunch = mcpServers.length > 0 && this.supportsSessionMcpServers(target, providerName, cliInstanceId)
         ? toSessionMcpLaunchConfig(mcpServers)
         : undefined;
-      const worker = (mcpLaunch
-        ? this.pool.spawn(
+      const rollback = interactionHost ? this.admissions!.stage(`session:${sessionId}`, Boolean(executionPolicy)) : undefined;
+      let worker: WorkerProcess | undefined;
+      try {
+        worker = (mcpLaunch ? this.pool.spawn(
           sessionId,
           providerName,
           { ...normalizedOpts, mcpServers: mcpLaunch.servers },
           cliInstanceId,
           mcpLaunch.env,
         )
-        : this.pool.spawn(sessionId, providerName, normalizedOpts, cliInstanceId)) as WorkerProcess | undefined;
+          : this.pool.spawn(sessionId, providerName, normalizedOpts, cliInstanceId)) as WorkerProcess | undefined;
+        if (!worker) rollback?.();
+      } catch (error) { rollback?.(); throw error; }
+      if (worker && interactionHost) {
+        worker.on('native-session', nativeId => {
+          this.admissions!.stage(`native:${providerName}:${nativeId}`, Boolean(executionPolicy));
+        });
+      }
       this.mcpServers.recordLaunch(sessionId, mcpLaunch ? mcpServers : []);
+      if (worker && interactionHost) this.interactionHosts.set(sessionId, structuredClone(interactionHost));
+      if (worker && executionPolicy) this.executionPolicies.set(sessionId, structuredClone(executionPolicy));
       return worker ? new CliExecutionHandle(worker, () => this.pool.kill(sessionId)) : undefined;
     }
 
@@ -893,6 +1004,8 @@ export class RuntimeSessionManager {
   }
 
   dropSession(sessionId: string): void {
+    this.interactionHosts.delete(sessionId);
+    this.executionPolicies.delete(sessionId);
     this.replacements.delete(sessionId);
     this.clearWorkspaceActivity(sessionId);
     this.handleOverrides.delete(sessionId);

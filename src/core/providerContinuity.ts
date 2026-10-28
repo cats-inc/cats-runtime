@@ -10,6 +10,8 @@ export interface ProviderContinuitySummary {
   permissions: boolean;
   /** Target accepts SPEC-035 per-session `mcpServers` (a supporting CLI adapter in a native runtime). */
   sessionMcpServers: boolean;
+  interactions?: ProviderCapabilities['interactions'];
+  sessionCapabilities?: ProviderCapabilities['sessionCapabilities'];
   providerManagedSessions: boolean;
   sessionKey: boolean;
   providerSessionState: boolean;
@@ -80,6 +82,10 @@ export function buildProviderContinuitySummary(
     fork: options.capabilities.fork,
     permissions: options.capabilities.permissions,
     sessionMcpServers: targetSupportsSessionMcpServers(target, options.capabilities),
+    ...(target.cliInstance?.commandConfig.runtime.mode === 'native' && options.capabilities.interactions
+      ? { interactions: structuredClone(options.capabilities.interactions) } : {}),
+    ...(target.cliInstance?.commandConfig.runtime.mode === 'native' && options.capabilities.sessionCapabilities
+      ? { sessionCapabilities: { ...options.capabilities.sessionCapabilities } } : {}),
     providerManagedSessions: true,
     sessionKey: false,
     providerSessionState: false,

@@ -31,6 +31,12 @@ import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import type { SessionMcpServerLaunch } from '../../../core/sessionMcpServers.js';
 import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 import { CodexReadTools, codexReadToolError, grantedCodexReadTools } from './codexReadTools.js';
+import { INTERACTION_KINDS } from '../../../core/interactions/types.js';
+import { CODEX_INTERACTION_METHODS, codexInteractionFallback, mapCodexInteraction } from './codexInteractions.js';
+import { assertExecutionPolicyAdmission, type EffectiveExecutionPolicy } from '../../../core/interactions/policy.js';
+import type { ProviderSessionCapabilities, SessionToolInventory } from '../../../core/interactions/capabilities.js';
+import { assertCodexMcpOverrideNames, codexInteractionWithinPolicy, codexPolicyParameters, inspectCodexConfiguration, verifyCodexPolicy } from './codexPolicy.js';
+import { codexInventoryPage, emptyCodexInventory } from './codexInventory.js';
 
 interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -77,6 +83,8 @@ export class CodexProvider implements Provider {
     fork: true,
     permissions: true,
     sessionMcpServers: true,
+    interactions: { version: 1, kinds: [...INTERACTION_KINDS] },
+    sessionCapabilities: { version: 1, executionPolicy: true, inventory: true },
   };
 
   private state: CodexState = 'uninitialized';
@@ -105,6 +113,16 @@ export class CodexProvider implements Provider {
   private _threadBootstrapId: number | null = null;
   private _readTurnId: string | null = null;
   private _readCallIds = new Set<string>();
+  private readonly _interactions = new Map<string, { id: string; resolve(id: string): void }>();
+  private _configurationRequestId: number | null = null;
+  private _deferredBootstrap: string | null = null;
+  private _pendingControl: string | null = null;
+  private _configurationSources: string[] = [];
+  private _policyObservation: EffectiveExecutionPolicy = { source: 'legacy', status: 'not_observed',
+    coverage: 'local-process-only', configurationSources: [] };
+  private _inventory: SessionToolInventory = emptyCodexInventory();
+  private _inventoryRefresh?: Promise<void>;
+  private _capabilityEpoch = 0;
 
   constructor(
     private readonly compatibilityProfile?: CompatibilityProfileSelection,
@@ -135,6 +153,22 @@ export class CodexProvider implements Provider {
   }
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
+    assertExecutionPolicyAdmission(opts.executionPolicy, opts);
+    this.state = 'uninitialized';
+    this.threadId = null;
+    this._readTurnId = null;
+    this._pendingMessage = null;
+    this._interactions.clear();
+    this._configurationRequestId = null;
+    this._deferredBootstrap = null;
+    this._pendingControl = null;
+    this._configurationSources = [];
+    this._inventory = emptyCodexInventory();
+    this._capabilityEpoch++;
+    this._inventoryRefresh = undefined;
+    this._policyObservation = { source: opts.executionPolicy?.mode ?? 'legacy', status: 'not_observed',
+      ...(opts.executionPolicy ? { requested: structuredClone(opts.executionPolicy) } : {}),
+      coverage: 'local-process-only', configurationSources: [] };
     this._spawnOpts = { ...opts };
     this._collectingUsage = false;
     this._permissionMode = opts.permissionMode ?? 'skip';
@@ -155,12 +189,16 @@ export class CodexProvider implements Provider {
         `model_reasoning_effort=${JSON.stringify(opts.modelControls['codex.reasoning_effort'])}`,
       );
     }
-    args.push(...buildCodexSessionMcpOverrides(opts.mcpServers ?? []));
+    args.push(...buildCodexSessionMcpOverrides(opts.mcpServers ?? [], !opts.executionPolicy
+      || opts.executionPolicy.mode === 'explicit' && opts.executionPolicy.approval === 'never'));
 
     return args;
   }
 
   composeLaunchArgs(configuredArgs: readonly string[], spawnArgs: readonly string[]): string[] {
+    if (this._spawnOpts?.interactionHost || this._spawnOpts?.executionPolicy) {
+      assertCodexMcpOverrideNames(configuredArgs, this._spawnOpts.mcpServers?.map(server => server.name) ?? []);
+    }
     const subcommand = spawnArgs.indexOf('app-server');
     if (subcommand < 0) return [...configuredArgs, ...spawnArgs];
     const globalArgs: string[] = [];
@@ -211,7 +249,10 @@ export class CodexProvider implements Provider {
       const lines = [
         this.makeRequest('initialize', {
           clientInfo: { name: 'cats-runtime', version: '1.0.0' },
-          ...(this._readTools ? { capabilities: { experimentalApi: true } } : {}),
+          ...(this._readTools || this._spawnOpts.interactionHost ? { capabilities: {
+            experimentalApi: true,
+            ...(this._spawnOpts.interactionHost?.kinds.includes('mcp_form') ? { extensions: { 'openai/form': {} } } : {}),
+          } } : {}),
         }),
         this.makeNotification('initialized'),
         this.makeRequest(
@@ -219,6 +260,13 @@ export class CodexProvider implements Provider {
           this.buildThreadBootstrapParams(this._spawnOpts),
         ),
       ];
+
+      if (this._spawnOpts.executionPolicy || this._spawnOpts.interactionHost && this._spawnOpts.mcpServers?.length) {
+        // Inspect configuration layers before admitting a thread with policy/overlay overrides.
+        this._deferredBootstrap = lines.pop()!;
+        this._configurationRequestId = this.nextId;
+        lines.push(this.makeRequest('config/read', { cwd: this._spawnOpts.cwd, includeLayers: true }));
+      }
 
       // We need the threadId for turn/start, but since we're pipelining,
       // we'll send turn/start after receiving thread/start response.
@@ -249,11 +297,13 @@ export class CodexProvider implements Provider {
     this._lastUsageNative = null;
     this._readTurnId = null;
     this._readCallIds.clear();
+    this._interactions.clear();
     this._turnStartRequestId = this.nextId;
     return this.makeRequest('turn/start', {
       threadId: this.threadId,
       input: [{ type: 'text', text: content }],
-      approvalPolicy: policy.approvalPolicy,
+      ...(!this._spawnOpts?.executionPolicy ? { approvalPolicy: policy.approvalPolicy }
+        : this._spawnOpts.executionPolicy.mode === 'explicit' ? { approvalPolicy: this._spawnOpts.executionPolicy.approval, approvalsReviewer: 'user' } : {}),
     });
   }
 
@@ -265,6 +315,70 @@ export class CodexProvider implements Provider {
       return msg;
     }
     return null;
+  }
+
+  buildInitialization(): string | null {
+    if (this.state !== 'uninitialized') return null;
+    const message = this.buildStdinMessage('');
+    this._pendingMessage = null;
+    return message;
+  }
+
+  isSessionInitializing(): boolean { return this.state === 'initializing'; }
+
+  getPendingControlMessages(): string | null {
+    const message = this._pendingControl;
+    this._pendingControl = null;
+    return message;
+  }
+
+  async readSessionCapabilities(request: (line: string, timeoutMs?: number) => Promise<Record<string, unknown>>,
+    refresh: boolean): Promise<ProviderSessionCapabilities> {
+    const threadId = this.threadId;
+    const epoch = this._capabilityEpoch;
+    if (refresh && this.state === 'ready' && threadId && !this._inventoryRefresh) {
+      this._inventoryRefresh = (async () => {
+        const inventory: SessionToolInventory = { ...emptyCodexInventory(), state: 'observed',
+          observedAt: new Date().toISOString(), dynamicTools: this._readTools?.definitions().map(tool => ({ name: tool.name, source: 'runtime-dynamic' })) ?? [] };
+        delete inventory.reason;
+        const deadline = Date.now() + 10_000;
+        const cursors = new Set<string>();
+        const names = new Set<string>();
+        let cursor: string | undefined;
+        try {
+          do {
+            if (inventory.pages >= 16 || Date.now() >= deadline) throw new Error('bounded discovery');
+            const page = codexInventoryPage(await request(JSON.stringify({ jsonrpc: '2.0', id: `cats-runtime-control-${this.nextId++}`,
+              method: 'mcpServerStatus/list', params: { threadId, limit: 64, ...(cursor ? { cursor } : {}) } }) + '\n',
+            Math.min(5000, deadline - Date.now())), new Set(this._spawnOpts?.mcpServers?.map(server => server.name)));
+            inventory.pages++;
+            for (const server of page.servers) {
+              if (names.has(server.name) || inventory.servers.length >= 128
+                || inventory.servers.reduce((count, entry) => count + entry.tools.length, 0) + server.tools.length > 8192) throw new Error('bounded discovery');
+              names.add(server.name); inventory.servers.push(server);
+              if (server.discovery !== 'advertised') inventory.state = 'partial';
+            }
+            cursor = page.cursor;
+            if (cursor && cursors.has(cursor)) throw new Error('repeated cursor');
+            if (cursor) cursors.add(cursor);
+          } while (cursor);
+        } catch {
+          inventory.state = inventory.pages ? 'partial' : 'unavailable';
+          inventory.reason = 'provider_discovery_incomplete_or_unavailable';
+        }
+        if (this._capabilityEpoch === epoch && this.threadId === threadId && this.state === 'ready') this._inventory = inventory;
+      })().finally(() => { if (this._capabilityEpoch === epoch) this._inventoryRefresh = undefined; });
+    }
+    if (refresh) await this._inventoryRefresh;
+    const inventory = structuredClone(this._inventory);
+    inventory.stale = inventory.observedAt !== null && Date.now() - Date.parse(inventory.observedAt) > 15_000;
+    return { interactions: { version: 1, supported: [...INTERACTION_KINDS],
+      ...(this._spawnOpts?.interactionHost ? { host: structuredClone(this._spawnOpts.interactionHost) } : {}) },
+    policy: structuredClone(this._policyObservation), inventory,
+    dependencies: (['computer_use', 'browser'] as const).map(kind => ({ kind, status: 'unknown',
+      evidence: 'MCP discovery does not verify the upstream desktop/browser helper or permission to use a target.',
+      remediation: 'Use the supported Codex host setup, then verify a dedicated test window. Runtime does not own the upstream helper.' })),
+    };
   }
 
   buildAutoResponse(line: string): string | null {
@@ -280,6 +394,21 @@ export class CodexProvider implements Provider {
 
     if (!msg.method || msg.id === undefined) {
       return null;
+    }
+
+    if (this._spawnOpts?.interactionHost && CODEX_INTERACTION_METHODS.has(msg.method)) {
+      if (this._readTurnId) return null;
+      // Out-of-turn discovery cannot ask an unavailable turn owner for input.
+      if (!(typeof msg.id === 'string' && msg.id.length > 0 && msg.id.length <= 256
+        || typeof msg.id === 'number' && Number.isSafeInteger(msg.id))) throw new Error('Invalid provider interaction identifier.');
+      const key = JSON.stringify(msg.id);
+      if (this._interactions.has(key)) return null;
+      if (this._interactions.size >= 64) throw new Error('Provider interaction request limit exceeded.');
+      this._interactions.set(key, { id: '', resolve: () => {} });
+      return codexInteractionFallback(msg.method, msg.id);
+    }
+    if (this._spawnOpts?.executionPolicy && ['applyPatchApproval', 'execCommandApproval'].includes(msg.method)) {
+      return this.makeApprovalResponse(msg.id, 'denied');
     }
 
     if (msg.method === 'item/commandExecution/requestApproval') {
@@ -341,6 +470,66 @@ export class CodexProvider implements Provider {
   ): Promise<string | null> {
     let message: Record<string, unknown> | undefined;
     try { message = asRecord(JSON.parse(line)); } catch { return null; }
+    if (this._spawnOpts?.interactionHost && message) {
+      const params = asRecord(message.params);
+      if (message.method === 'serverRequest/resolved' && params?.threadId === this.threadId) {
+        const entry = this._interactions.get(JSON.stringify(params.requestId));
+        if (entry) entry.resolve(entry.id);
+        return null;
+      }
+      if (typeof message.method === 'string' && CODEX_INTERACTION_METHODS.has(message.method)) {
+        const method = message.method;
+        const id = message.id;
+        if (!(typeof id === 'string' && id.length > 0 && id.length <= 256
+          || typeof id === 'number' && Number.isSafeInteger(id))) return null;
+        const fallback = () => codexInteractionFallback(method, id);
+        const key = JSON.stringify(id);
+        // A retransmission shares its original callback; never write two replies.
+        if (this._interactions.has(key)) return null;
+        if (this._interactions.size >= 64) throw new Error('Provider interaction request limit exceeded.');
+        // A handled-ID tombstone includes declined/unsupported requests.
+        this._interactions.set(key, { id: '', resolve: () => {} });
+        const matchingTurn = params?.turnId === this._readTurnId
+          || method === 'mcpServer/elicitation/request' && params?.turnId === null;
+        if (!context.interactions || context.signal.aborted || this.state !== 'ready'
+          || !this._readTurnId || params?.threadId !== this.threadId || !matchingTurn
+          || line.length > 65_536) return fallback();
+        const unavailable = (reason: string) => {
+          const kind = method === 'item/commandExecution/requestApproval' ? 'command_approval'
+            : method === 'item/fileChange/requestApproval' ? 'file_approval'
+              : method === 'item/permissions/requestApproval' ? 'permission_grant'
+                : method.includes('requestUserInput') ? 'user_input' : params?.mode === 'url' ? 'mcp_url' : 'mcp_form';
+          context.interactions?.unavailable?.(kind, reason);
+          return fallback();
+        };
+        // A UI cannot broaden a host's read-only or whitelist execution boundary.
+        const approval = method.includes('requestApproval');
+        if (this._spawnOpts.executionPolicy && !codexInteractionWithinPolicy(method, params!,
+          this._spawnOpts.executionPolicy, this._spawnOpts.cwd)) return unavailable('host_policy_restriction');
+        if (approval && (this._spawnOpts.workspaceMode === 'read_only'
+          || this._permissionMode === 'whitelist' && (
+            method === 'item/permissions/requestApproval'
+            || method === 'item/commandExecution/requestApproval' && this.decideCommandApproval(params) === 'decline'
+            || method === 'item/fileChange/requestApproval' && this.decideFileChangeApproval() === 'decline'))) return unavailable('host_policy_restriction');
+        try {
+          const mapped = mapCodexInteraction(method, params!);
+          const runtimeId = context.interactions.request({ prompt: mapped.prompt, deadlineMs: mapped.deadlineMs,
+            response: answer => {
+              if (answer.action === 'accept' && this._spawnOpts?.executionPolicy && !codexInteractionWithinPolicy(method, params!,
+                this._spawnOpts.executionPolicy, this._spawnOpts.cwd)) throw new Error('Interaction admission changed before delivery.');
+              if (approval && answer.action === 'accept' && this._spawnOpts?.executionPolicy) this._policyObservation = {
+                ...this._policyObservation, status: 'not_observed', reason: 'additional_grants_not_in_bootstrap_observation',
+              };
+              return method.includes('requestUserInput') && answer.action !== 'accept'
+                ? fallback() : JSON.stringify({ jsonrpc: '2.0', id, result: mapped.result(answer) }) + '\n';
+            },
+            fallback,
+          });
+          this._interactions.set(key, { id: runtimeId, resolve: context.interactions.resolve });
+          return null;
+        } catch { return unavailable('unsupported_or_unavailable_interaction'); }
+      }
+    }
     if (message?.method !== 'item/tool/call') return null;
     const requestId = message.id;
     const validId = (typeof requestId === 'string' && requestId.length > 0 && requestId.length <= 256)
@@ -415,6 +604,19 @@ export class CodexProvider implements Provider {
   }
 
   private handleResponse(msg: JsonRpcResponse): StreamEvent | null {
+    if (this._configurationRequestId !== null && msg.id === this._configurationRequestId) {
+      this._configurationRequestId = null;
+      if (msg.error) return this.failBootstrap('Codex configuration evidence is unavailable. No model turn was started.');
+      try {
+        this._configurationSources = inspectCodexConfiguration(asRecord(msg.result) ?? {}, this._spawnOpts?.mcpServers?.map(server => server.name) ?? []);
+        this._policyObservation.configurationSources = [...this._configurationSources];
+      } catch (error) {
+        return this.failBootstrap(error instanceof Error ? error.message : 'Codex configuration admission failed.');
+      }
+      this._pendingControl = this._deferredBootstrap ? this._deferredBootstrap + '\n' : null;
+      this._deferredBootstrap = null;
+      return null;
+    }
     if (msg.error) {
       const readBootstrapFailed = this.state === 'initializing' && this._readTools !== null;
       if (this.state === 'initializing') {
@@ -456,7 +658,10 @@ export class CodexProvider implements Provider {
       const policy = this.resolvePermissionPolicy(this._spawnOpts);
       const expectedSandbox = policy.sandbox === 'read-only' ? 'readOnly' : 'workspaceWrite';
       const sandboxType = asRecord(result.sandbox)?.type;
-      if (sandboxType !== expectedSandbox || result.approvalPolicy !== policy.approvalPolicy) {
+      if (this._spawnOpts?.executionPolicy) {
+        this._policyObservation = verifyCodexPolicy(this._spawnOpts.executionPolicy, result, this._spawnOpts.cwd, this._configurationSources);
+        if (this._policyObservation.status !== 'verified') return this.failBootstrap('Codex effective execution policy does not satisfy host admission. No model turn was started.');
+      } else if (sandboxType !== expectedSandbox || result.approvalPolicy !== policy.approvalPolicy) {
         // Only report known discriminants, never arbitrary provider response contents.
         const observedSandbox = sandboxType === 'readOnly' || sandboxType === 'workspaceWrite'
           || sandboxType === 'dangerFullAccess' || sandboxType === 'externalSandbox'
@@ -472,6 +677,8 @@ export class CodexProvider implements Provider {
           + ' No model turn was started. Check the provider permission configuration before recreating the session.'
           + setupHint);
       }
+      if (!this._spawnOpts?.executionPolicy) this._policyObservation = { ...this._policyObservation,
+        status: 'not_observed', reason: 'legacy_policy_has_partial_coverage' };
       this.threadId = tid;
       this.state = 'ready';
       return observeNormalized(this.evolutionObserver, {
@@ -504,12 +711,27 @@ export class CodexProvider implements Provider {
     this._pendingMessage = null;
     this.threadId = null;
     this._readTurnId = null;
+    this._pendingControl = null;
+    this._deferredBootstrap = null;
+    if (this._policyObservation.status === 'not_observed') this._policyObservation = {
+      ...this._policyObservation, status: 'unsupported', reason: 'session_admission_failed',
+    };
     return { type: 'error', text };
   }
 
   private handleNotification(msg: JsonRpcResponse): StreamEvent | StreamEvent[] | null {
     const method = msg.method!;
     const params = msg.params ?? {};
+
+    // Resolve in wire order, before a subsequent turn/completed aborts its signal.
+    if (method === 'serverRequest/resolved' && params.threadId === this.threadId) {
+      const key = JSON.stringify(params.requestId);
+      const entry = this._interactions.get(key);
+      if (entry) {
+        entry.resolve(entry.id);
+        this._interactions.set(key, { id: '', resolve: () => {} });
+      }
+    }
 
     // SPEC-035 connection evidence, reported only for this session's own servers.
     if (method === 'mcpServer/startupStatus/updated') {
@@ -609,6 +831,7 @@ export class CodexProvider implements Provider {
       if (typeof turnId === 'string') {
         this._collectingUsage = true;
         this._usageTurnId = turnId;
+        if (params.threadId === this.threadId && this.state === 'ready') this._readTurnId = turnId;
       }
     }
 
@@ -712,15 +935,18 @@ export class CodexProvider implements Provider {
       || method === 'item/fileChange/requestApproval'
       || method === 'item/permissions/requestApproval'
       || method === 'item/tool/requestUserInput'
+      || method === 'tool/requestUserInput'
       || method === 'mcpServer/elicitation/request'
+      || method === 'serverRequest/resolved'
       || method === 'applyPatchApproval'
       || method === 'execCommandApproval'
       || method === 'item/tool/call'
     ) {
       return observeIgnored(this.evolutionObserver, {
         rawEventType: method,
-        reason: 'auto_approved_request',
-        rawSample: msg,
+        reason: 'server_request_handled',
+        // Questions, form values and one-time URLs must not enter evidence logs.
+        rawSample: { method },
       }, null);
     }
 
@@ -909,8 +1135,8 @@ export class CodexProvider implements Provider {
     const policy = this.resolvePermissionPolicy(opts);
     const params: Record<string, unknown> = {
       cwd: opts.cwd,
-      approvalPolicy: policy.approvalPolicy,
-      sandbox: policy.sandbox,
+      ...(opts.executionPolicy ? codexPolicyParameters(opts.executionPolicy)
+        : { approvalPolicy: policy.approvalPolicy, sandbox: policy.sandbox }),
     };
     if (this._readTools) {
       params.dynamicTools = this._readTools.definitions();
@@ -1483,12 +1709,12 @@ function unixSecondsToIso(value: unknown): string | undefined {
  * from the named environment variable, and approval is granted for that server's
  * tools only; `approvalPolicy: never` otherwise rejects MCP tool calls.
  */
-export function buildCodexSessionMcpOverrides(servers: readonly SessionMcpServerLaunch[]): string[] {
+export function buildCodexSessionMcpOverrides(servers: readonly SessionMcpServerLaunch[], approve = true): string[] {
   return servers.flatMap((server) => [
     '-c', `mcp_servers.${server.name}.url=${JSON.stringify(server.url)}`,
     ...(server.bearerTokenEnvVar
       ? ['-c', `mcp_servers.${server.name}.bearer_token_env_var=${JSON.stringify(server.bearerTokenEnvVar)}`]
       : []),
-    '-c', `mcp_servers.${server.name}.default_tools_approval_mode="approve"`,
+    ...(approve ? ['-c', `mcp_servers.${server.name}.default_tools_approval_mode="approve"`] : []),
   ]);
 }
