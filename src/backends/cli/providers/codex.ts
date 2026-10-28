@@ -31,8 +31,7 @@ import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import type { SessionMcpServerLaunch } from '../../../core/sessionMcpServers.js';
 import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 import { CodexReadTools, codexReadToolError, grantedCodexReadTools } from './codexReadTools.js';
-import { INTERACTION_KINDS } from '../../../core/interactions/types.js';
-import { CODEX_INTERACTION_METHODS, codexInteractionFallback, mapCodexInteraction } from './codexInteractions.js';
+import { CODEX_INTERACTION_KINDS, CODEX_INTERACTION_METHODS, codexInteractionFallback, mapCodexInteraction } from './codexInteractions.js';
 import { assertExecutionPolicyAdmission, type EffectiveExecutionPolicy } from '../../../core/interactions/policy.js';
 import type { ProviderSessionCapabilities, SessionToolInventory } from '../../../core/interactions/capabilities.js';
 import { assertCodexMcpOverrideNames, codexInteractionWithinPolicy, codexPolicyParameters, inspectCodexConfiguration, verifyCodexPolicy } from './codexPolicy.js';
@@ -83,7 +82,7 @@ export class CodexProvider implements Provider {
     fork: true,
     permissions: true,
     sessionMcpServers: true,
-    interactions: { version: 1, kinds: [...INTERACTION_KINDS] },
+    interactions: { version: 1, kinds: [...CODEX_INTERACTION_KINDS] },
     sessionCapabilities: { version: 1, executionPolicy: true, inventory: true },
   };
 
@@ -372,7 +371,7 @@ export class CodexProvider implements Provider {
     if (refresh) await this._inventoryRefresh;
     const inventory = structuredClone(this._inventory);
     inventory.stale = inventory.observedAt !== null && Date.now() - Date.parse(inventory.observedAt) > 15_000;
-    return { interactions: { version: 1, supported: [...INTERACTION_KINDS],
+    return { interactions: { version: 1, supported: [...CODEX_INTERACTION_KINDS],
       ...(this._spawnOpts?.interactionHost ? { host: structuredClone(this._spawnOpts.interactionHost) } : {}) },
     policy: structuredClone(this._policyObservation), inventory,
     dependencies: (['computer_use', 'browser'] as const).map(kind => ({ kind, status: 'unknown',

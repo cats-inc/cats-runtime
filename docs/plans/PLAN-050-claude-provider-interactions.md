@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Ready, 2026-10-28; all phases pending |
+| Status | In progress, 2026-10-28; P1 implemented |
 | Owner | Runtime execution boundary |
 | Assigned To | Claude |
 | Reviewer | Product owner and consumer maintainers |
@@ -26,15 +26,15 @@ publication is part of this plan; the Bot consumes a packed artifact.
 
 ### P1 — Contract plumbing and Claude interactions
 
-- [ ] Let the provider supply worker control-channel correlation; keep JSON-RPC
+- [x] Let the provider supply worker control-channel correlation; keep JSON-RPC
   as the default and use `request_id` for Claude.
-- [ ] Add the `tool_approval` kind and move the bounded MCP form parser out of
+- [x] Add the `tool_approval` kind and move the bounded MCP form parser out of
   the Codex module so both adapters share it.
-- [ ] Map `can_use_tool` and `elicitation` to typed prompts and answers; add
+- [x] Map `can_use_tool` and `elicitation` to typed prompts and answers; add
   `--permission-prompt-tool stdio` only for a negotiated host.
-- [ ] Decline hostless elicitation, answer unknown control requests with an
+- [x] Decline hostless elicitation, answer unknown control requests with an
   error, and resolve interactions on `control_cancel_request`.
-- [ ] Launch read-only and allowlist sessions with `--permission-mode manual`.
+- [x] Launch read-only and allowlist sessions with `--permission-mode manual`.
 
 **Exit:** scripted-CLI tests complete every advertised kind, a hostless
 elicitation no longer waits, and existing Claude fixtures pass unchanged.
@@ -78,5 +78,6 @@ has a test or an explicit rejection.
 | Date | Update |
 | --- | --- |
 | 2026-10-28 | Plan created from direct CLI probes (no Runtime involvement). |
+| 2026-10-28 | P1: provider-supplied control correlation, `tool_approval`, shared MCP form parser, Claude `can_use_tool`/`elicitation` mapping, hostless elicitation decline, unknown-request errors, CLI cancellation and `manual` mode for read-only/allowlist sessions. Scripted adapter, mapping and worker tests added; focused runs: 99 files / 1089 tests in `src/backends/cli`, interaction, continuity and session-MCP suites, plus 3 provider/agent integration files / 53 tests. Policy, inventory and Bot consumption pending. |
 
 *Created / last updated: 2026-10-28*
