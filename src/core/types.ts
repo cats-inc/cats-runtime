@@ -1639,6 +1639,8 @@ export interface ProviderCapabilities {
     inventory: boolean;
     /** Access/network ceilings the target can enforce; absent means every valid ceiling. */
     admissibleCeilings?: Array<{ access: ExecutionAccess; network: boolean }>;
+    /** Accepts `browserIntegration` on create/resume/fork (Claude in Chrome). */
+    browserIntegration?: boolean;
   };
 }
 
@@ -1662,6 +1664,8 @@ export interface ProviderSpawnOptions {
   mcpServers?: SessionMcpServerLaunch[];
   interactionHost?: InteractionHost;
   executionPolicy?: SessionExecutionPolicy;
+  /** Provider browser integration on/off; absent keeps the provider's own default. */
+  browserIntegration?: boolean;
 }
 
 export interface ProviderTurnOptions extends ProviderSpawnOptions {

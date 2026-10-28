@@ -61,6 +61,18 @@ inspection.
 - [x] Platform intersects advertised kinds with its own, so it needs no change
   until its next Runtime pin; record that boundary.
 
+### P4 — Per-session Claude in Chrome for shared Runtimes
+
+Desktop shares one Runtime whose `providers.yaml` is written by Runtime setup,
+so a host cannot add `--chrome` per conversation the way the Bot writes its own
+launch arguments.
+
+- [x] Advertise `sessionCapabilities.browserIntegration` on the Claude target and
+  accept a boolean `browserIntegration` on create/resume/fork (`--chrome` /
+  `--no-chrome`; omission keeps the user's default).
+- [x] Retain it per session like the policy, refuse a change while the worker is
+  active, and inherit it on fork only onto an advertising target.
+
 ## Testing Strategy and Risks
 
 Focused Vitest suites for the Claude adapter, control channel, interaction
@@ -81,5 +93,6 @@ has a test or an explicit rejection.
 | 2026-10-28 | P1: provider-supplied control correlation, `tool_approval`, shared MCP form parser, Claude `can_use_tool`/`elicitation` mapping, hostless elicitation decline, unknown-request errors, CLI cancellation and `manual` mode for read-only/allowlist sessions. Scripted adapter, mapping and worker tests added; focused runs: 99 files / 1089 tests in `src/backends/cli`, interaction, continuity and session-MCP suites, plus 3 provider/agent integration files / 53 tests. Policy, inventory and Bot consumption pending. |
 | 2026-10-28 | P2: `admissibleCeilings` (Claude: full-access with network only) rejected at HTTP admission and spawn; explicit approval mapped to `manual`/`bypassPermissions`; first turn held until `initialize` verifies the reported mode; `mcp_status` inventory with injected/configured provenance, built-ins after `system/init`, browser/computer-use dependencies. Focused runs: new capability and HTTP admission tests pass; `src/backends/cli`, `src/http`, `src/core/{interactions,runtime}`, continuity and three provider/agent integration files: 1544 of 1550 pass in one combined run, and the 6 failures (MCP facade, Pi, diagnostics, worktree routes) pass in isolation (93/93). |
 | 2026-10-28 | P3: Bots pins Runtime `e38e56bf` (cats-bots #30): `tool_approval` card, per-bot Claude in Chrome (`--chrome`), save-time ceiling refusal, scripted Claude CLI integration. Real acceptance: Claude Code 2.1.312 (haiku) through the packed Runtime and a fresh isolated test Bot, explicit full-access/network/on-request policy, Claude in Chrome on. A question (`user_input`), a Write (`file_approval`), the Bot's own `schedule_list` MCP tool (`tool_approval`, server `cats-bot`) and a declined shell redirect (`command_approval`) each completed the same turn; the file was written, the declined one was not. Policy `verified` (reported `default`, reviewer `user`); a workspace-write policy was refused at save. Inventory: `cats-bot` session-injected, `claude-in-chrome` (22) and seven claude.ai connectors provider-configured, 34 built-ins; browser `unknown`, computer use `unavailable`. Not exercised for real: a Chrome browser action (no browser was running), MCP form/URL elicitation (scripted and direct-CLI only). Platform picks this up at its next Runtime pin; it intersects advertised kinds, so `tool_approval` is simply not negotiated until it renders it. |
+| 2026-10-28 | P4: per-session `browserIntegration` for Claude in Chrome, requested by the owner for Desktop. Adapter flag mapping, HTTP admission (unsupported target, invalid value, active-worker conflict, reclaim reuse, resume change, fork inheritance and cross-provider fork) covered by focused tests; typecheck passes. Platform consumes it in its own follow-up. |
 
 *Created / last updated: 2026-10-28*

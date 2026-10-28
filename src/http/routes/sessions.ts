@@ -496,6 +496,7 @@ function buildSpawnOptions(input: {
   forkSession?: boolean;
   interactionHost?: InteractionHost;
   executionPolicy?: SessionExecutionPolicy;
+  browserIntegration?: boolean;
 }): ProviderSpawnOptions {
   const modelControls = cloneProviderControls(input.modelResolution?.controls);
   return {
@@ -511,7 +512,14 @@ function buildSpawnOptions(input: {
     ...(input.forkSession ? { forkSession: input.forkSession } : {}),
     ...(input.interactionHost ? { interactionHost: input.interactionHost } : {}),
     ...(input.executionPolicy ? { executionPolicy: input.executionPolicy } : {}),
+    ...(input.browserIntegration !== undefined ? { browserIntegration: input.browserIntegration } : {}),
   };
+}
+
+function parseBrowserIntegration(value: unknown): boolean | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'boolean') throw new InteractionError('interaction_invalid', 'browserIntegration must be a boolean.');
+  return value;
 }
 
 function normalizeLegacyModelForTarget(
@@ -2684,6 +2692,7 @@ sessionRoutes.post('/sessions', async (c) => {
     mcpServers?: unknown;
     interactionHost?: unknown;
     executionPolicy?: unknown;
+    browserIntegration?: unknown;
     context?: SessionInvocationContext;
     outputDir?: string;
   }>();
@@ -2707,6 +2716,7 @@ sessionRoutes.post('/sessions', async (c) => {
 
   let interactionHost: InteractionHost | undefined;
   let executionPolicy: SessionExecutionPolicy | undefined;
+  let browserIntegration: boolean | undefined;
   try {
     interactionHost = parseInteractionHost(body.interactionHost);
     runtime.assertInteractionSupport(interactionHost, providerName, providerTarget.instanceId, providerTarget.backend);
@@ -2716,6 +2726,8 @@ sessionRoutes.post('/sessions', async (c) => {
     }
     runtime.assertExecutionPolicySupport(executionPolicy, providerName, providerTarget.instanceId, providerTarget.backend);
     assertExecutionPolicyAdmission(executionPolicy, { interactionHost, workspaceMode: body.workspaceMode });
+    browserIntegration = parseBrowserIntegration(body.browserIntegration);
+    runtime.assertBrowserIntegrationSupport(browserIntegration, providerName, providerTarget.instanceId, providerTarget.backend);
   } catch (error) {
     return c.json({ error: error instanceof Error ? error.message : 'Invalid interaction host',
       ...(error instanceof InteractionError ? { code: error.code } : {}) }, 400);
@@ -2789,7 +2801,8 @@ sessionRoutes.post('/sessions', async (c) => {
       if (runtime.getExecutionPolicy(existing.id) && (body.permissionMode !== undefined || body.allowedTools !== undefined)) {
         return c.json({ error: 'Do not combine a retained executionPolicy with legacy permission controls.' }, 400);
       }
-      try { runtime.validateInteractionHost(existing.id, interactionHost); runtime.validateExecutionPolicy(existing.id, executionPolicy); }
+      try { runtime.validateInteractionHost(existing.id, interactionHost); runtime.validateExecutionPolicy(existing.id, executionPolicy);
+        runtime.validateBrowserIntegration(existing.id, browserIntegration); }
       catch (error) { return c.json({ error: error instanceof Error ? error.message : 'Interaction host conflict' }, 409); }
       const existingSourceCwd = getSessionWorkspaceSourceCwd(existing) ?? existing.cwd;
       const contentError = sessionContentError(ctx, existing);
@@ -3325,6 +3338,7 @@ sessionRoutes.post('/sessions', async (c) => {
         allowedTools: body.allowedTools,
         interactionHost,
         executionPolicy,
+        browserIntegration,
       }),
       providerTarget.instanceId,
       providerTarget.backend,
@@ -4330,10 +4344,14 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   const resumeBody = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
   let interactionHost: InteractionHost | undefined;
   let executionPolicy: SessionExecutionPolicy | undefined;
+  let browserIntegration: boolean | undefined;
   try {
     interactionHost = parseInteractionHost(resumeBody.interactionHost);
     runtime.assertInteractionSupport(interactionHost, session.providerName, session.providerInstanceId, session.providerBackend);
     runtime.validateInteractionHost(id, interactionHost);
+    browserIntegration = parseBrowserIntegration(resumeBody.browserIntegration);
+    runtime.assertBrowserIntegrationSupport(browserIntegration, session.providerName, session.providerInstanceId, session.providerBackend);
+    runtime.validateBrowserIntegration(id, browserIntegration);
     executionPolicy = parseExecutionPolicy(resumeBody.executionPolicy) ?? runtime.getExecutionPolicy(id);
     if (executionPolicy && (resumeBody.permissionMode !== undefined || resumeBody.allowedTools !== undefined)) {
       throw new InteractionError('interaction_invalid', 'Do not combine executionPolicy with legacy permission controls.');
@@ -4621,6 +4639,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
           ?? hydratedSession.allowedTools,
         interactionHost,
         executionPolicy,
+        browserIntegration,
       }),
       hydratedSession.providerInstanceId,
       hydratedSession.providerBackend,
@@ -4710,8 +4729,14 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   let childModelState: ResolvedSessionModelState = { warnings: [] };
   let childInteractionHost: InteractionHost | undefined;
   let childExecutionPolicy: SessionExecutionPolicy | undefined;
+  let childBrowserIntegration: boolean | undefined;
   try {
     childInteractionHost = parseInteractionHost(rawBody.interactionHost) ?? runtime.getInteractionHost(id);
+    // A branch onto a target without browser integration does not inherit the parent's choice.
+    childBrowserIntegration = parseBrowserIntegration(rawBody.browserIntegration)
+      ?? (runtime.getCapabilities(childTarget.providerName, childTarget.instanceId, childTarget.backend)
+        .sessionCapabilities?.browserIntegration ? runtime.getBrowserIntegration(id) : undefined);
+    runtime.assertBrowserIntegrationSupport(childBrowserIntegration, childTarget.providerName, childTarget.instanceId, childTarget.backend);
     childExecutionPolicy = parseExecutionPolicy(rawBody.executionPolicy) ?? runtime.getExecutionPolicy(id);
     if (childExecutionPolicy && (rawBody.permissionMode !== undefined || rawBody.allowedTools !== undefined)) {
       throw new InteractionError('interaction_invalid', 'Do not combine executionPolicy with legacy permission controls.');
@@ -4973,6 +4998,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
         allowedTools: body.allowedTools ?? session.allowedTools,
         interactionHost: childInteractionHost,
         executionPolicy: childExecutionPolicy,
+        browserIntegration: childBrowserIntegration,
       }),
       childTarget.instanceId,
       childTarget.backend,

@@ -303,11 +303,20 @@ correlated by `request_id`) stay private to the adapter.
   overlay are `session-injected`, all others `provider-configured`, including
   claude.ai connectors. Built-in tools are reported once `system/init` has
   listed them, after the first user message.
+- **Browser integration.** The target advertises
+  `sessionCapabilities.browserIntegration: true` and accepts a boolean
+  `browserIntegration` on create, resume and fork: `true` launches `--chrome`,
+  `false` launches `--no-chrome`, and omission keeps the user's own Claude Code
+  default. Like the policy it is memory-only, retained for later workers of the
+  session, changed only after the active worker is closed, and resent after a
+  Runtime restart. A fork inherits it only onto a target that advertises it.
+  It does not imply a host: without one, or under `skip`, Chrome tools follow the
+  session's legacy permission behavior.
 - **Dependencies.** Browser is `unknown` when `claude-in-chrome` is connected,
   because the extension may still have no browser; `unavailable` when the
-  server is absent, with `--chrome` in the instance launch arguments as the
-  remediation. Computer use is `unavailable`: Claude Code offers it only to
-  interactive macOS sessions.
+  server is absent, with browser integration (or `--chrome` in the instance
+  launch arguments) as the remediation. Computer use is `unavailable`: Claude
+  Code offers it only to interactive macOS sessions.
 
 ## Acceptance Criteria
 
