@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
@@ -115,6 +115,39 @@ describe('session MCP servers HTTP contract (SPEC-035)', () => {
     const call = vi.mocked(pool.spawn).mock.calls.at(-1)!;
     return { opts: call[2] as ProviderSpawnOptions, env: call[4] };
   }
+
+  it('does not adopt an older Codex thread discovered while create waits for compatibility', async () => {
+    const transcript = join(rootDir, 'older-native.jsonl');
+    writeFileSync(transcript, 'older transcript must survive');
+    context.compatibility = { assessCliTarget: async () => {
+      const fresh = registry.list().find(s => s.origin === 'runtime')!;
+      expect(fresh.hydration?.metadata?.runtimeSkillContent).toMatchObject({ releaseCompatible: true });
+      expect(registry.upsertDiscovered('older-native', { providerName: 'codex', providerInstanceId: 'default',
+        cwd: join(rootDir, 'repo'), sourcePath: transcript })).toBeNull();
+      await Promise.resolve();
+      expect(fresh.providerSessionId).toBeUndefined();
+      expect(fresh.hydration?.metadata?.runtimeSkillContent).toMatchObject({ releaseCompatible: true });
+    } } as unknown as AppContext['compatibility'];
+    const { response, text } = await createSession({ provider: 'codex' });
+    expect(response.status, text).toBe(201);
+    expect(pool.spawn).toHaveBeenCalledOnce();
+    expect(readFileSync(transcript, 'utf8')).toBe('older transcript must survive');
+    expect(registry.get(JSON.parse(text).id)?.providerSessionId).toBeUndefined();
+  });
+
+  it('failed fresh spawn unregisters without deleting any linked native transcript', async () => {
+    const transcript = join(rootDir, 'retained-native.jsonl');
+    writeFileSync(transcript, 'retained native history');
+    vi.mocked(pool.spawn).mockImplementation((id) => {
+      registry.setSourcePath(id, transcript);
+      throw new Error('fixture spawn failure');
+    });
+    const { response } = await createSession({ provider: 'codex' });
+    expect(response.status).toBe(500);
+    expect(existsSync(transcript)).toBe(true);
+    expect(readFileSync(transcript, 'utf8')).toBe('retained native history');
+    expect(registry.list()).toHaveLength(0);
+  });
 
   it('configures a supporting native adapter without exposing the token', async () => {
     const { app, response, text } = await createSession({ provider: 'claude', mcpServers: MCP_SERVERS });

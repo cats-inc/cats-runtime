@@ -241,6 +241,11 @@ host is not evidence that OpenAI computer-use/browser helpers are running.
   interruption. No automatic replay, broadened grants or fabricated completion.
 - Human waiting must not trigger idle eviction or be mistaken for a hung model.
   Keep a separate deadline and make cancellation/control requests responsive.
+- Codex discovery must wait for the worker's exact native thread ID. A single
+  pending worker in the same cwd is not identity evidence; startup scans can find
+  older terminal threads before spawn completes. Failed fresh admission unregisters
+  the Runtime row without deleting provider transcripts. Other providers' existing
+  discovery-only identity strategies are outside this Codex change.
 
 ## Acceptance Criteria
 

@@ -83,6 +83,34 @@ evidence of Chrome navigation, desktop actions, either product's integration, or
 packaged/macOS/Linux acceptance. The inherited auto-reviewer cannot be used to
 enforce a restrictive host ceiling; admission now rejects that combination.
 
+## Actual Terminal and Bot tool calls, 2026-10-28
+
+The normal Windows user environment and installed Codex 0.164.0 were used with
+the same dedicated cwd and explicit workspace-write/offline/on-request policy,
+reviewer `user`. Terminal used `codex exec --ephemeral`; standalone Bot used its
+real core and the exact Runtime `b75da37b` packed artifact. The Bot additionally
+injected its own four-tool MCP server. Neither run modified an existing browser
+tab or another application's data.
+
+Both runs actually invoked `mcp__cua_repl.js` to create a single Chrome tab at an
+example.com test URL. Both received `Browser is not available: chrome`, before
+any tab was created. For the owned WinForms window titled `Cats Native Acceptance`,
+Terminal's computer-use `@oai/sky` listing through `mcp__node_repl__js` and Bot's
+native window listing through `mcp__cua_repl.js` both failed because the native
+pipe was unavailable (OS error 2). No verification button was clicked.
+
+Bot's same-worker observation verified the requested policy and found the same
+279/3/4 configured tool counts above, plus its injected Bot tools. This establishes
+that those calls passed through Cats to the native tools. It does **not** establish
+successful Chrome/desktop operation: the upstream helper is unavailable even in
+Terminal. Helper installation/reconfiguration and macOS/Linux remain unverified.
+
+Platform's first matched native probe exposed a separate Runtime discovery race
+before tool invocation. Only the dedicated test cwd was used. The regression fix
+retains the release-content gate, waits for Codex's exact thread ID and preserves
+native transcripts on failed admission; it does not infer identity from cwd.
+The fixed native Platform comparison is recorded separately after completion.
+
 ## Official sources consulted on 2026-10-28
 
 - [Codex App Server](https://learn.chatgpt.com/docs/app-server): structured

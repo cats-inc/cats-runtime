@@ -3336,7 +3336,10 @@ sessionRoutes.post('/sessions', async (c) => {
       workspaceMode: resolved.workspaceMode,
       workspaceIsolation: resolved.workspaceIsolation,
     });
-    ctx.registry.remove(session.id);
+    // A failed admission is not a user request to delete native history.
+    // Keep a record closed if a pending deletion prevents unregistering it.
+    ctx.registry.updateStatus(session.id, 'closed');
+    ctx.registry.unregister(session.id);
     return c.json({ error: `Failed to spawn session: ${err}` }, 500);
   }
 
