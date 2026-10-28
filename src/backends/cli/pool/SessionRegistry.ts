@@ -994,6 +994,13 @@ export class SessionRegistry {
     }
 
     const candidates = this.findPendingRuntimeCandidates(mergedData);
+    if (mergedData.providerName === 'codex' && candidates.length > 0) {
+      // Codex reports the exact thread ID. A startup scan can find an older
+      // terminal thread in this cwd while compatibility/spawn is still pending.
+      // Never adopt that thread (or its transcript) by cwd, even for one worker.
+      this.pendingDiscovered.set(pendingKey, mergedData);
+      return null;
+    }
     if (candidates.length === 1) {
       // A cwd match is not proof this is the new native context we created.
       candidates[0].hydration = invalidateSkillContentProvenance(candidates[0].hydration);

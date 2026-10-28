@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In progress; Runtime control, policy and inventory implemented; consumer integration and tool invocation acceptance pending |
+| Status | Implementation complete; both consumers integrated and native calls measured; successful browser/desktop operations blocked by upstream helper availability |
 | Owner | Runtime execution boundary |
 | Assigned To | Unassigned |
 | Reviewer | Product owner and consumer maintainers |
@@ -23,16 +23,17 @@ independently. Native Windows Codex is the first measured end-to-end target.
 
 ### P0 — Freeze the contract and capture protocol evidence
 
-- [ ] Review ADR-048/SPEC-039 with `cats-platform SPEC-132 / PLAN-124` and
+- [x] Review ADR-048/SPEC-039 with `cats-platform SPEC-132 / PLAN-124` and
   `cats-bots SPEC-004 / PLAN-004`; freeze schemas, limits and capability negotiation.
-- [ ] Characterize existing default/skip/whitelist, read-only, ADR-041 dynamic
+- [x] Characterize existing default/skip/whitelist, read-only, ADR-041 dynamic
   tools and SPEC-035 injection behavior, including the MCP `approve` overlay.
-- [ ] Capture sanitized request/reply/resolve fixtures from the selected Codex
-  executable. Confirm user-input aliases, form/URL completion and initialization
-  capabilities without relying solely on documentation or version equality.
-- [ ] Freeze execution-policy source/constraints, event compatibility, typed
+- [x] Freeze request/reply/resolve protocol fixtures and initialization capabilities;
+  validate actual executable policy/catalog behavior. Scripted requests cover all
+  supported kinds; installed-CLI form/URL variants not provoked remain unverified,
+  and unknown schemas fail closed rather than implying support from version equality.
+- [x] Freeze execution-policy source/constraints, event compatibility, typed
   responses, deadlines, receipt retention and failure/restart semantics.
-- [ ] Inventory affected persisted settings and determine whether additive reads
+- [x] Inventory affected persisted settings and determine whether additive reads
   suffice or protected migrations are required in each owner repository.
 
 **Exit:** both consumers can implement against one reviewed fixture/schema set;
@@ -72,7 +73,8 @@ label or process-start success substitutes for effective-policy evidence.
   observation identity, policy coverage and stale/no-worker states.
 - [x] Keep configured/injected/dynamic tool provenance distinct; avoid leaking
   secrets or claiming a lazy tool host's nested catalog is complete.
-- [ ] Report helper/browser availability with evidence and bounded refresh.
+- [x] Report helper/browser observations with bounded refresh; unavailable health
+  evidence is explicitly `unknown` with setup guidance, never inferred from MCP.
   Do not start another model turn or take ownership of upstream helper processes.
 
 **Exit:** A5 passes with global and injected MCP, unavailable auth/helper and partial
@@ -80,27 +82,30 @@ discovery. Read-only inspection does not execute a sample tool.
 
 ### P4 — Consumer integration and matched-environment acceptance
 
-- [ ] Supply contract fixtures to Platform PLAN-124 and Bots PLAN-004.
-- [ ] Complete each host's request/reply, reconnect, cancel, expiry and stale-response
+- [x] Supply contract fixtures to Platform PLAN-124 and Bots PLAN-004.
+- [x] Complete each host's request/reply, reconnect, cancel, expiry and stale-response
   checks. Use temporary state and explicit test destinations.
-- [ ] Compare terminal vs each host with the same executable/account/config/cwd,
+- [x] Compare terminal vs each host with the same executable/account/config/cwd,
   project trust and policy; record intentional differences and provider limits.
 - [ ] Separately verify a controlled Chrome navigation/read and a harmless desktop
   interaction in a dedicated test window. Record target identity, tool invocation
   and observed result, then verify helper-off behavior. Do not use user data as fixtures.
-- [ ] Record Windows evidence separately from macOS/Linux and packaged acceptance;
+- [x] Record Windows evidence separately from macOS/Linux and packaged acceptance;
   do not mark unsupported or unrun cells successful.
 
-**Exit:** A7/A8 and consumer criteria pass. Discovery alone cannot complete this phase.
+**Result:** native tool invocations reached all three paths, but Chrome was unavailable
+and the desktop native pipe was missing even in Terminal. Successful operations and
+helper recovery remain unverified; see the linked research and consumer plans.
 
 ### P5 — Compatibility and release preparation, when authorized
 
-- [ ] Pin the exact Runtime source/artifact for each consumer; old Runtime must
+- [x] Pin the exact Runtime source/artifact for each consumer; old Runtime must
   show capability unavailable rather than silently starting a different mode.
-- [ ] Verify any protected migration and rollback/failure behavior before changing
+- [x] Verify any protected migration and rollback/failure behavior before changing
   persisted policy. Never migrate an existing setting to broader access implicitly.
-- [ ] Prepare notes and version boundaries: additive opt-in within 0.6.x; changed
-  legacy meaning needs the next minor. Bump/publish only under release authorization.
+- [x] Record version boundaries: Runtime additive opt-in remains within 0.6.x;
+  consumer data upgrades require Bot 0.2 / Platform 0.12. Bump, release notes and
+  publication remain a separately authorized release task.
 
 ## Files to Create/Modify
 
@@ -128,6 +133,8 @@ Fixture captures record versions as provenance, never as an execution allowlist.
 
 | Date | Update |
 | --- | --- |
+| 2026-10-28 | Final consumer comparison: standalone Bot and actual Platform Chat dispatch reach the same native Chrome/computer-use tools as Terminal under Codex 0.164.0 and matching explicit policy. All three encounter the same external helper failures. Platform fixed-runtime run verifies policy and 279/3/4 configured tools; Bots adds four injected tools. Source/artifact identity and UI fixture scope are recorded in the research and consumer plans. Successful browser/desktop actions, helper recovery and other OS remain unverified; no release performed. |
+| 2026-10-28 | Consumer acceptance exposed a Codex discovery race: a previous terminal thread in the same dedicated test cwd could be adopted while a fresh session awaited compatibility. Codex now waits for the exact worker-reported thread ID; failed fresh admission preserves native transcript files. Registry, HTTP interleaving/rollback and retained-content security regression checks: 74 pass; build passes. |
 | 2026-10-28 | Worktree documentation drafted from source inspection and prior discovery; P0–P5 not started. Runtime behavior, versions and user settings unchanged. |
 | 2026-10-28 | P1 core slice: bounded generation-scoped interaction store, strict typed answers, idempotent delivery, cancellation/deadlines and redacted receipts. All 16 focused tests and TypeScript check pass. Independent review found action coercion and responding-timeout defects; both fixed and independently rechecked. No HTTP/provider integration is claimed yet. |
 | 2026-10-28 | P1/P2 transport slice connects native worker callbacks, negotiated create/resume hosts and authenticated snapshots/responses. Synthetic worker proves replies bypass the occupied model turn and cancellation invalidates callbacks. Focused interaction/HTTP/worker tests: 30 pass; Codex/read-tool regressions: 98 pass; worker/pool regressions: 29 pass; session HTTP tests: 14 pass. Independent review led to experimental/form capability negotiation, fallback tombstones, strict form constraint rejection and transactional host negotiation. A wire-order test covers provider resolution immediately before turn completion. Policy/inventory and both consumers remain pending. |

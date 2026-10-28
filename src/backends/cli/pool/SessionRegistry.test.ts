@@ -521,6 +521,31 @@ describe('SessionRegistry', () => {
     );
   });
 
+  it('waits for an exact Codex thread ID even when discovery has one cwd candidate', () => {
+    const session = registry.create({ providerName: 'codex', cwd: '/repo' });
+    for (const status of ['initializing', 'ready', 'busy'] as const) {
+      registry.updateStatus(session.id, status);
+      expect(registry.upsertDiscovered('older-terminal-thread', {
+        providerName: 'codex', cwd: '/repo', sourcePath: '/native/older.jsonl',
+      })).toBeNull();
+      expect(session.providerSessionId).toBeUndefined();
+      expect(session.sourcePath).toBeUndefined();
+      expect(session.providerSourcePath).toBeUndefined();
+    }
+    expect(registry.upsertDiscovered('actual-new-thread', {
+      providerName: 'codex', cwd: '/repo', summary: 'Exact new thread',
+    })).toBeNull();
+    registry.setProviderSessionId(session.id, 'actual-new-thread', true);
+    expect(session.providerSessionId).toBe('actual-new-thread');
+    expect(session.summary).toBe('Exact new thread');
+    expect(session.sourcePath).toBeUndefined();
+    const older = registry.upsertDiscovered('older-terminal-thread', {
+      providerName: 'codex', cwd: '/repo', sourcePath: '/native/older.jsonl',
+    });
+    expect(older?.id).not.toBe(session.id);
+    expect(older?.origin).toBe('discovered');
+  });
+
   it('persists provider discovery source paths for runtime-managed history sessions', () => {
     const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-provider-discovery-test-'));
     const runtimeSessionBaseDir = join(persistDir, 'runtime-sessions');
