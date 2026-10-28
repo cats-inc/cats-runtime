@@ -152,4 +152,28 @@ environment acceptance must not be reported as passed. Implementation and
 consumer evidence are tracked in Runtime SPEC-039 / PLAN-049, Platform SPEC-132 /
 PLAN-124 and Bots SPEC-004 / PLAN-004.
 
-*Created / last updated: 2026-10-28*
+## 2026-10-29 follow-up: native MCP tool approval
+
+Codex 0.165.0 was probed through a separate ephemeral app-server thread, with the
+owner's existing sign-in and a loopback echo-only MCP fixture. No real Bot profile
+or desktop input was used. An explicit `default_tools_approval_mode="prompt"`
+produced `mcpServer/elicitation/request` with `mode: "form"`, an empty object
+schema and `_meta.codex_approval_kind: "mcp_tool_call"`. The provider supplies the
+server name, explanatory message and tool parameters. Decline produced a failed
+MCP item with `user rejected MCP tool call`; the fixture received zero calls.
+A second probe with `readOnlyHint: true` still prompted; accepting with empty
+content executed exactly one fixture call and returned its result.
+
+The adapter had omitted `tool_approval` from its supported kinds, making consumers
+such as Bots refuse desktop-control injection. Its explicit interactive MCP
+overlay also omitted the approval setting instead of requiring `prompt`.
+SPEC-039 now maps this recognized approval shape and explicitly requests prompts.
+
+Primary sources consulted on 2026-10-29:
+
+- [App Server MCP elicitation](https://learn.chatgpt.com/docs/app-server): request/reply lifecycle.
+- [Plugin server policy](https://developers.openai.com/plugins/build/plugins#configure-installed-server-policy): `default_tools_approval_mode`.
+- Installed Codex 0.165.0 `app-server generate-json-schema --experimental`, plus
+  the native wire observations above. Version is evidence, not an execution gate.
+
+*Created: 2026-10-28; last updated: 2026-10-29*

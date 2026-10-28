@@ -51,7 +51,8 @@ describe('Codex policy and session discovery', () => {
     expect(result).toMatchObject({ type: 'error' }); expect(thread).toBeNull(); expect(provider.getPendingTurnStart()).toBeNull();
     const next = configure({ mcpServers: [server] });
     expect(() => next.composeLaunchArgs(['-c', 'mcp_servers.fixture.command="fixture"'], ['app-server'])).toThrow('conflicts');
-    expect(next.buildSpawnArgs({ cwd: process.cwd(), interactionHost: host, executionPolicy: policy, mcpServers: [server] }).join(' ')).not.toContain('default_tools_approval_mode');
+    expect(next.buildSpawnArgs({ cwd: process.cwd(), interactionHost: host, executionPolicy: policy, mcpServers: [server] }).join(' '))
+      .toContain('default_tools_approval_mode="prompt"');
   });
   it('initializes and reads paginated top-level inventory without creating a model turn', async () => {
     const provider = configure();

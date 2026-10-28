@@ -24,12 +24,86 @@ function boot(options: Partial<ProviderSpawnOptions> = {}) {
 
 const command = (extra = {}) => JSON.stringify({ id: 42, method: 'item/commandExecution/requestApproval',
   params: { threadId: 'thread', turnId: 'turn', command: 'echo fixture', cwd: '/workspace', ...extra } });
+// Redacted native Codex 0.165.0 app-server request (2026-10-29).
+const mcpApproval = (extra = {}) => ({ threadId: 'thread', turnId: 'turn', serverName: 'cats-desktop',
+  mode: 'form', _meta: { codex_approval_kind: 'mcp_tool_call', tool_params: { window_id: 'window-1' } },
+  message: 'Allow the cats-desktop MCP server to run tool "read_ui"?',
+  requestedSchema: { type: 'object', properties: {} }, ...extra });
 function host() {
   return { signal: new AbortController().signal,
     interactions: { request: vi.fn(() => 'runtime-id'), resolve: vi.fn(), unavailable: vi.fn() } } satisfies ProviderServerRequestContext;
 }
 
 describe('Codex native interaction mapping', () => {
+  it('presents native MCP approval and preserves accept, decline and cancel wire semantics', () => {
+    const mapped = mapCodexInteraction('mcpServer/elicitation/request', mcpApproval());
+    expect(mapped.prompt).toMatchObject({ kind: 'tool_approval', server: 'cats-desktop',
+      choices: [{ id: 'accept', label: 'Allow' }] });
+    expect(mapped.prompt.message).toContain('read_ui');
+    expect(mapped.prompt.message).toContain('window-1');
+    expect(mapped.result({ action: 'accept', choice: 'accept' })).toEqual({ action: 'accept', content: {}, _meta: null });
+    for (const action of ['decline', 'cancel'] as const) {
+      expect(mapped.result({ action })).toEqual({ action, content: null, _meta: null });
+    }
+    expect(mapCodexInteraction('mcpServer/elicitation/request', mcpApproval({ _meta: {} })).prompt.kind).toBe('mcp_form');
+  });
+
+  it('preserves a plugin app-consent message without inventing one-call grant scope', () => {
+    const mapped = mapCodexInteraction('mcpServer/elicitation/request', mcpApproval({
+      serverName: 'node_repl', message: 'Allow Codex to use Paint?',
+      _meta: { codex_approval_kind: 'mcp_tool_call', tool_params: { app: 'paint-fixture' } },
+    }));
+    expect(mapped.prompt).toMatchObject({ kind: 'tool_approval', server: 'node_repl',
+      choices: [{ id: 'accept', label: 'Allow' }] });
+    expect(mapped.prompt.message).toContain('Allow Codex to use Paint?');
+    expect(mapped.prompt.message).toContain('paint-fixture');
+  });
+
+  it('does not discard changed MCP approval schemas or turn them into empty grants', () => {
+    for (const extra of [
+      { requestedSchema: { type: 'object', properties: { scope: { type: 'string' } } } },
+      { requestedSchema: { type: 'object', properties: {}, anyOf: [] } },
+      { mode: 'url', url: 'https://example.test' }, { serverName: '' }, { message: '' },
+    ]) expect(() => mapCodexInteraction('mcpServer/elicitation/request', mcpApproval(extra))).toThrow('Unsupported');
+  });
+
+  it('keeps the same approval answerable as a form by a host that negotiated only forms', async () => {
+    const provider = boot({ interactionHost: { version: 1, kinds: ['mcp_form'], timeoutMs: 60_000 } });
+    const context = host();
+    await provider.buildServerResponse(JSON.stringify({ id: 'form-consent', method: 'mcpServer/elicitation/request',
+      params: mcpApproval() }), context);
+    const input = context.interactions.request.mock.calls[0]![0] as unknown as
+      Parameters<NonNullable<ProviderServerRequestContext['interactions']>['request']>[0];
+    expect(input.prompt.kind).toBe('mcp_form');
+    expect(JSON.parse(input.response({ action: 'accept', values: {} })).result)
+      .toEqual({ action: 'accept', content: {}, _meta: null });
+  });
+
+  it('holds a tool approval for its owner and fences duplicates, foreign turns and unsupported shapes', async () => {
+    const provider = boot(); const context = host();
+    const frame = (params = mcpApproval()) => JSON.stringify({ id: 'tool-consent', method: 'mcpServer/elicitation/request', params });
+    expect(provider.buildAutoResponse(frame())).toBeNull();
+    expect(await provider.buildServerResponse(frame(), context)).toBeNull();
+    expect(provider.parseStreamLine(frame())).toBeNull();
+    const input = context.interactions.request.mock.calls[0]![0] as unknown as
+      Parameters<NonNullable<ProviderServerRequestContext['interactions']>['request']>[0];
+    expect(input.prompt.kind).toBe('tool_approval');
+    expect(JSON.parse(input.response({ action: 'accept', choice: 'accept' }))).toMatchObject({
+      id: 'tool-consent', result: { action: 'accept', content: {}, _meta: null },
+    });
+    expect(JSON.parse(input.fallback()).result.action).toBe('decline');
+    await provider.buildServerResponse(frame(), context);
+    expect(context.interactions.request).toHaveBeenCalledTimes(1);
+    for (const params of [mcpApproval({ turnId: 'other' }), mcpApproval({ threadId: 'other' })]) {
+      const other = host();
+      expect(JSON.parse((await boot().buildServerResponse(frame(params), other))!).result.action).toBe('decline');
+      expect(other.interactions.request).not.toHaveBeenCalled();
+    }
+    const invalid = host();
+    await boot().buildServerResponse(frame(mcpApproval({ requestedSchema: { type: 'object', properties: { x: { type: 'string' } } } })), invalid);
+    expect(invalid.interactions.unavailable).toHaveBeenCalledWith('tool_approval', 'unsupported_or_unavailable_interaction');
+  });
+
   it('negotiates experimental methods and extended forms only for a capable host', () => {
     const provider = new CodexProvider();
     provider.buildSpawnArgs({ cwd: '/workspace', interactionHost: { version: 1, kinds: ['user_input', 'mcp_form'], timeoutMs: 60_000 } });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CodexProvider } from './codex.js';
 import { toSessionMcpConnection } from '../../../core/sessionMcpServers.js';
+import { INTERACTION_KINDS } from '../../../core/interactions/types.js';
 
 const mcpServers = [
   {
@@ -13,6 +14,21 @@ const mcpServers = [
 ];
 
 describe('CodexProvider session MCP servers (SPEC-035)', () => {
+  it('forces per-call prompts only for an explicit interactive policy and preserves provider inheritance', () => {
+    const interactionHost = { version: 1 as const, kinds: [...INTERACTION_KINDS], timeoutMs: 60_000 };
+    for (const approval of ['on-request', 'untrusted', 'never'] as const) {
+      const provider = new CodexProvider();
+      const args = provider.buildSpawnArgs({ cwd: process.cwd(), mcpServers, interactionHost,
+        executionPolicy: { version: 1, mode: 'explicit', access: 'workspace-write', network: false, approval } });
+      for (const server of mcpServers) expect(args).toContain(
+        `mcp_servers.${server.name}.default_tools_approval_mode="${approval === 'never' ? 'approve' : 'prompt'}"`);
+      expect(provider.capabilities.interactions?.kinds).toContain('tool_approval');
+    }
+    const inherited = new CodexProvider().buildSpawnArgs({ cwd: process.cwd(), mcpServers, interactionHost,
+      executionPolicy: { version: 1, mode: 'provider', constraints: { maxAccess: 'workspace-write', network: false } } });
+    expect(inherited.join(' ')).not.toContain('default_tools_approval_mode');
+  });
+
   it('configures each server after app-server with a bearer variable and scoped approval', () => {
     const provider = new CodexProvider();
     const spawn = provider.buildSpawnArgs({ cwd: '/tmp', model: 'gpt-test', mcpServers });
