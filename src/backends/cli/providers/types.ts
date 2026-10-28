@@ -149,6 +149,8 @@ export interface Provider {
   buildInitialization?(): string | null;
   isSessionInitializing?(): boolean;
   getPendingControlMessages?(): string | null;
+  /** How control replies match the control requests Runtime writes; JSON-RPC `id` when absent. */
+  controlCorrelation?: ProviderControlCorrelation;
   readSessionCapabilities?(request: (line: string, timeoutMs?: number) => Promise<Record<string, unknown>>,
     refresh: boolean): Promise<import('../../../core/interactions/capabilities.js').ProviderSessionCapabilities>;
   streamTurn?(turn: TurnInput, opts: ProviderTurnOptions): AsyncGenerator<StreamEvent>;
@@ -158,6 +160,17 @@ export interface Provider {
   resolveFirstEventTimeoutMs?(defaultTimeoutMs: number): number;
   beforeTurn?(opts: ProviderSpawnOptions): Promise<void>;
   afterTurn?(opts: ProviderSpawnOptions): Promise<StreamEvent | StreamEvent[] | null>;
+}
+
+export interface ProviderControlCorrelation {
+  /** Identifier of a control request Runtime is about to write, or undefined when invalid. */
+  requestId(frame: Record<string, unknown>): string | number | undefined;
+  /** The reply's identifier and payload, or undefined when the frame is not a control reply. */
+  reply(frame: Record<string, unknown>): {
+    id: string | number;
+    result?: Record<string, unknown>;
+    failed: boolean;
+  } | undefined;
 }
 
 export interface ProviderExecutionContext {

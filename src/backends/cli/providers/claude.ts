@@ -3,11 +3,22 @@ import type {
   CompatibilityProfileSelection,
   Provider,
   ProviderCapabilities,
+  ProviderServerRequestContext,
   ProviderSpawnOptions,
   StreamEvent,
   ClaudeStreamEvent,
   TurnInput,
 } from './types.js';
+import {
+  CLAUDE_CONTROL,
+  CLAUDE_INTERACTION_KINDS,
+  claudeControlError,
+  claudeControlResponse,
+  claudeFallback,
+  claudeInteractionKind,
+  mapClaudeInteraction,
+  parseClaudeControlFrame,
+} from './claudeInteractions.js';
 import type {
   InitStreamEvent,
   ProgressStreamEvent,
@@ -22,6 +33,7 @@ import type {
 import type { SessionMcpServerLaunch } from '../../../core/sessionMcpServers.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
 import {
+  observeIgnored,
   observeNormalized,
   observeRawPassthrough,
 } from '../../../core/compatibility/providerEvolution.js';
@@ -35,7 +47,9 @@ export class ClaudeProvider implements Provider {
     fork: true,
     permissions: true,
     sessionMcpServers: true,
+    interactions: { version: 1, kinds: [...CLAUDE_INTERACTION_KINDS] },
   };
+  controlCorrelation = CLAUDE_CONTROL;
 
   /**
    * Latest account rate-limit snapshot observed on this worker. Claude Code emits a
@@ -46,6 +60,9 @@ export class ClaudeProvider implements Provider {
   private requestedModel: string | null = null;
   /** Models of this turn's main-conversation replies, reported with its result. */
   private turnModels: string[] = [];
+  private spawnOpts: ProviderSpawnOptions | null = null;
+  /** CLI control request ID → Runtime interaction; a handled ID is never answered twice. */
+  private readonly interactions = new Map<string, { id: string; resolve(id: string): void }>();
 
   constructor(
     private readonly compatibilityProfile?: CompatibilityProfileSelection,
@@ -86,10 +103,22 @@ export class ClaudeProvider implements Provider {
     // `-p` denies tools that are not pre-approved, so session MCP servers must be
     // allowed explicitly unless every permission check is already skipped.
     const mcpAllowedTools = mcpServers.map((server) => `mcp__${server.name}`);
+    this.spawnOpts = { ...opts };
+    this.interactions.clear();
+    if (opts.interactionHost) {
+      // Without this the CLI denies approvals itself and hides AskUserQuestion.
+      args.push('--permission-prompt-tool', 'stdio');
+    }
+    // A user's default mode (for example `auto`) would approve actions outside a
+    // read-only workspace or an allowlist; `manual` asks, and asking is denied.
+    const restricted = isRestricted(opts);
+    if (restricted) {
+      args.push('--permission-mode', 'manual');
+    }
 
     switch (opts.permissionMode) {
       case 'skip':
-        args.push('--dangerously-skip-permissions');
+        if (!restricted) args.push('--dangerously-skip-permissions');
         break;
       case 'whitelist': {
         const allowedTools = [...(opts.allowedTools ?? []), ...mcpAllowedTools];
@@ -108,6 +137,8 @@ export class ClaudeProvider implements Provider {
   }
 
   buildStdinMessage(content: string, turn?: TurnInput): string {
+    // A turn starts only after the previous one finished, so no request is still waiting.
+    this.interactions.clear();
     const msg = {
       type: 'user',
       message: {
@@ -116,6 +147,51 @@ export class ClaudeProvider implements Provider {
       },
     };
     return JSON.stringify(msg) + '\n';
+  }
+
+  /**
+   * Answers every CLI-initiated control request. Without a negotiated host the CLI still
+   * asks for MCP elicitation and would wait forever, so it is declined at once.
+   */
+  async buildServerResponse(line: string, context: ProviderServerRequestContext): Promise<string | null> {
+    const frame = parseClaudeControlFrame(line);
+    if (!frame) return null;
+    if (frame.type === 'cancel') {
+      const entry = this.interactions.get(frame.requestId);
+      if (entry?.id) entry.resolve(entry.id);
+      return null;
+    }
+    const { requestId, request } = frame;
+    if (request.subtype !== 'can_use_tool' && request.subtype !== 'elicitation') {
+      return claudeControlError(requestId, 'Unsupported control request.');
+    }
+    if (this.interactions.has(requestId)) return null;
+    if (this.interactions.size >= 64) throw new Error('Provider interaction request limit exceeded.');
+    this.interactions.set(requestId, { id: '', resolve: () => {} });
+    const fallback = () => claudeControlResponse(requestId, claudeFallback(request));
+    const opts = this.spawnOpts;
+    if (!opts?.interactionHost || !context.interactions || context.signal.aborted
+      || line.length > 4_194_304) return fallback();
+    const kind = claudeInteractionKind(request);
+    const unavailable = (reason: string) => {
+      context.interactions?.unavailable?.(kind, reason);
+      return fallback();
+    };
+    if (!opts.interactionHost.kinds.includes(kind)) return unavailable('kind_not_negotiated');
+    try {
+      const mapped = mapClaudeInteraction(request, opts.cwd);
+      // A UI cannot widen a read-only workspace or a tool allowlist.
+      if (mapped.approval && isRestricted(opts)) return unavailable('host_policy_restriction');
+      const id = context.interactions.request({
+        prompt: mapped.prompt,
+        response: answer => claudeControlResponse(requestId, mapped.response(answer)),
+        fallback,
+      });
+      this.interactions.set(requestId, { id, resolve: context.interactions.resolve });
+      return null;
+    } catch {
+      return unavailable('unsupported_or_unavailable_interaction');
+    }
   }
 
   /**
@@ -164,6 +240,15 @@ export class ClaudeProvider implements Provider {
     }
 
     this.noteServedModel(event);
+
+    // Host control traffic is answered by buildServerResponse, not shown as output.
+    if (typeof event.type === 'string' && event.type.startsWith('control_')) {
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: event.type,
+        reason: 'host_control_frame',
+        rawSample: { type: event.type },
+      }, null);
+    }
 
     // system/init — session ID
     if (event.type === 'system' && event.subtype === 'init') {
@@ -295,6 +380,11 @@ export class ClaudeProvider implements Provider {
       raw: event,
     } satisfies RawStreamEvent);
   }
+}
+
+function isRestricted(opts: ProviderSpawnOptions): boolean {
+  return opts.workspaceMode === 'read_only' || opts.workspaceAccess === 'read_only'
+    || opts.permissionMode === 'whitelist';
 }
 
 function extractClaudeAssistantEvents(

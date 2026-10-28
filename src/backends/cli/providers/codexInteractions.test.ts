@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CodexProvider } from './codex.js';
-import { codexFormFields, codexInteractionFallback, mapCodexInteraction } from './codexInteractions.js';
+import { codexInteractionFallback, mapCodexInteraction } from './codexInteractions.js';
+import { mcpFormFields } from './mcpElicitation.js';
 import { INTERACTION_KINDS } from '../../../core/interactions/types.js';
 import type { ProviderServerRequestContext, ProviderSpawnOptions } from './types.js';
 
@@ -117,7 +118,7 @@ describe('Codex native interaction mapping', () => {
       count: { type: 'integer', minimum: 1, maximum: 5 },
       tags: { type: 'array', items: { type: 'string', enum: ['a', 'b'] } },
     } };
-    expect(codexFormFields(schema)[0]).toMatchObject({ type: 'integer', min: 1, max: 5, required: true });
+    expect(mcpFormFields(schema)[0]).toMatchObject({ type: 'integer', min: 1, max: 5, required: true });
     for (const property of [{ type: ['string'] }, { type: 'string', pattern: '^x' }, { type: 'object' },
       { type: 'string', enum: ['a', 'b'], oneOf: [{ const: 'a' }] },
       { type: 'string', oneOf: [{ const: 'a', maxLength: 0 }] },
@@ -125,7 +126,7 @@ describe('Codex native interaction mapping', () => {
       { type: 'array', anyOf: [{ minItems: 1 }], items: { type: 'string', enum: ['a', 'b'] } },
       { type: 'integer', enum: ['1', '2'] },
     ]) {
-      expect(() => codexFormFields({ type: 'object', properties: { x: property } })).toThrow('Unsupported');
+      expect(() => mcpFormFields({ type: 'object', properties: { x: property } })).toThrow('Unsupported');
     }
     expect(() => mapCodexInteraction('mcpServer/elicitation/request', { mode: 'url', url: 'file:///secret' })).toThrow('Unsupported');
   });

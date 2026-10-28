@@ -15,12 +15,13 @@ on provider discovery. `interactions.version: 1` advertises supported kinds;
 Missing fields mean unavailable, including older Runtime artifacts. Hosts must
 not send new controls to an older server that may ignore unknown JSON fields.
 
-Native Codex sessions accept `interactionHost` on create and resume:
-`{ "version": 1, "kinds": ["command_approval", "file_approval", "permission_grant",
-"user_input", "mcp_form", "mcp_url"], "timeoutMs": 1800000 }`.
-Select the kinds the host actually renders. The deadline must be 1 minute–24 hours;
-a shorter provider deadline wins. Other providers and non-native targets reject
-the option. Omission preserves legacy behavior. Changing the descriptor requires
+Native Codex and Claude Code sessions accept `interactionHost` on create and resume:
+`{ "version": 1, "kinds": ["command_approval", "file_approval", "tool_approval",
+"permission_grant", "user_input", "mcp_form", "mcp_url"], "timeoutMs": 1800000 }`.
+Select the kinds the host actually renders, intersected with the target's advertised
+kinds: Codex never advertises `tool_approval`, Claude Code never advertises
+`permission_grant`. The deadline must be 1 minute–24 hours; a shorter provider
+deadline wins. Other providers and non-native targets reject the option. Omission preserves legacy behavior. Changing the descriptor requires
 closing the active worker. Negotiation is memory-only and must be resent after a
 Runtime restart. A protected admission marker prevents such a session from falling
 back to legacy behavior: resume/fork without the required controls returns 409
@@ -50,6 +51,15 @@ answer. `providerConfirmed: false` means a reply was written, not that the provi
 has confirmed completion. A cancelled/restarted worker invalidates its callbacks.
 Flat primitive/enum MCP forms are supported; unsupported schemas and URL schemes
 are declined. URL navigation remains a host action, never an automatic fetch.
+
+Claude Code `tool_approval` covers every tool that is neither a shell command nor a
+file edit, including MCP and Claude in Chrome tools; its prompt carries the tool label,
+MCP server and an input summary capped at 4 KiB. File approvals carry the path and size,
+not the proposed contents. "Allow for this session" adds only session-scoped rules.
+Claude Code asks for MCP elicitation even without a negotiated host; Runtime declines it
+immediately. Read-only and allowlist Claude sessions launch in `manual` permission mode
+so the user's own default mode cannot approve actions outside them. See
+[SPEC-039 R8](specs/SPEC-039-provider-session-capabilities-and-interactions.md#r8-claude-code-mapping).
 
 ### Verified execution policy and session tools
 

@@ -1,6 +1,6 @@
 /** Host-facing interaction contract. Native provider request IDs stay in the adapter. */
 export const INTERACTION_KINDS = [
-  'command_approval', 'file_approval', 'permission_grant', 'user_input', 'mcp_form', 'mcp_url',
+  'command_approval', 'file_approval', 'tool_approval', 'permission_grant', 'user_input', 'mcp_form', 'mcp_url',
 ] as const;
 export type InteractionKind = typeof INTERACTION_KINDS[number];
 export type InteractionStatus = 'pending' | 'responding' | 'resolved' | 'expired'

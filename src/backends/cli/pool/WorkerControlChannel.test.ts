@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WorkerControlChannel } from './WorkerControlChannel.js';
+import { CLAUDE_CONTROL } from '../providers/claudeInteractions.js';
 
 afterEach(() => vi.useRealTimers());
 describe('worker discovery control channel', () => {
@@ -21,6 +22,15 @@ describe('worker discovery control channel', () => {
     await vi.advanceTimersByTimeAsync(100);
     expect((await result).message).toContain('timed out');
     expect(channel.consume('{"id":"cats-runtime-control-1","error":{"message":"private-token"}}')).toBe(true);
+  });
+  it('uses the provider correlation for control replies that are not JSON-RPC', async () => {
+    const channel = new WorkerControlChannel((_line, done) => done(), CLAUDE_CONTROL);
+    const result = channel.request(JSON.stringify({ type: 'control_request', request_id: 'cats-runtime-control-1',
+      request: { subtype: 'mcp_status' } }) + '\n');
+    expect(channel.consume('{"type":"control_response","response":{"subtype":"success","request_id":"other","response":{}}}')).toBe(false);
+    expect(channel.consume('{"type":"control_response","response":{"subtype":"success","request_id":"cats-runtime-control-1","response":{"mcpServers":[]}}}')).toBe(true);
+    await expect(result).resolves.toEqual({ mcpServers: [] });
+    await expect(channel.request('{"id":"json-rpc-shape"}')).rejects.toThrow('Invalid');
   });
   it('rejects pending reads on worker shutdown and sanitizes provider errors', async () => {
     const channel = new WorkerControlChannel((_line, done) => done());

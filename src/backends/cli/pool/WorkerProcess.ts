@@ -289,7 +289,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         done(new Error('Worker unavailable')); return;
       }
       child.stdin.write(line, done);
-    });
+    }, this.provider.controlCorrelation);
     this.control = control;
     child.stdin?.on('error', () => {
       const controller = this.activeTurnController;
