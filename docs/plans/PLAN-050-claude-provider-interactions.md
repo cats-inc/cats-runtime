@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In progress, 2026-10-28; P1 implemented |
+| Status | In progress, 2026-10-28; P1 and P2 implemented |
 | Owner | Runtime execution boundary |
 | Assigned To | Claude |
 | Reviewer | Product owner and consumer maintainers |
@@ -41,11 +41,11 @@ elicitation no longer waits, and existing Claude fixtures pass unchanged.
 
 ### P2 — Policy and inventory
 
-- [ ] Advertise `admissibleAccess` and reject narrower ceilings at session
+- [x] Advertise `admissibleAccess` and reject narrower ceilings at session
   admission.
-- [ ] Map explicit approval to a permission mode, send `initialize` before the
+- [x] Map explicit approval to a permission mode, send `initialize` before the
   first user message, and verify the reported mode before releasing the turn.
-- [ ] Read `mcp_status` through the worker control channel; report built-in
+- [x] Read `mcp_status` through the worker control channel; report built-in
   tools from `system/init`; report browser and computer-use dependencies.
 
 **Exit:** A4/A5/A9 pass against scripted frames; no model turn is started for
@@ -79,5 +79,6 @@ has a test or an explicit rejection.
 | --- | --- |
 | 2026-10-28 | Plan created from direct CLI probes (no Runtime involvement). |
 | 2026-10-28 | P1: provider-supplied control correlation, `tool_approval`, shared MCP form parser, Claude `can_use_tool`/`elicitation` mapping, hostless elicitation decline, unknown-request errors, CLI cancellation and `manual` mode for read-only/allowlist sessions. Scripted adapter, mapping and worker tests added; focused runs: 99 files / 1089 tests in `src/backends/cli`, interaction, continuity and session-MCP suites, plus 3 provider/agent integration files / 53 tests. Policy, inventory and Bot consumption pending. |
+| 2026-10-28 | P2: `admissibleCeilings` (Claude: full-access with network only) rejected at HTTP admission and spawn; explicit approval mapped to `manual`/`bypassPermissions`; first turn held until `initialize` verifies the reported mode; `mcp_status` inventory with injected/configured provenance, built-ins after `system/init`, browser/computer-use dependencies. Focused runs: new capability and HTTP admission tests pass; `src/backends/cli`, `src/http`, `src/core/{interactions,runtime}`, continuity and three provider/agent integration files: 1544 of 1550 pass in one combined run, and the 6 failures (MCP facade, Pi, diagnostics, worktree routes) pass in isolation (93/93). |
 
 *Created / last updated: 2026-10-28*

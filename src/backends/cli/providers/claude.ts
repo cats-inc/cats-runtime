@@ -19,7 +19,14 @@ import {
   mapClaudeInteraction,
   parseClaudeControlFrame,
 } from './claudeInteractions.js';
+import { CLAUDE_ADMISSIBLE_CEILINGS, claudeAdmitsPolicy, claudePermissionMode, verifyClaudePolicy } from './claudePolicy.js';
+import { claudeDependencies, claudeInventory, emptyClaudeInventory } from './claudeInventory.js';
+import { assertExecutionPolicyAdmission, type EffectiveExecutionPolicy } from '../../../core/interactions/policy.js';
+import type { ProviderSessionCapabilities, SessionToolInventory } from '../../../core/interactions/capabilities.js';
+import { InteractionError } from '../../../core/interactions/types.js';
+import { record } from '../../../core/interactions/validation.js';
 import type {
+  ErrorStreamEvent,
   InitStreamEvent,
   ProgressStreamEvent,
   RawStreamEvent,
@@ -48,6 +55,8 @@ export class ClaudeProvider implements Provider {
     permissions: true,
     sessionMcpServers: true,
     interactions: { version: 1, kinds: [...CLAUDE_INTERACTION_KINDS] },
+    sessionCapabilities: { version: 1, executionPolicy: true, inventory: true,
+      admissibleCeilings: CLAUDE_ADMISSIBLE_CEILINGS.map(ceiling => ({ ...ceiling })) },
   };
   controlCorrelation = CLAUDE_CONTROL;
 
@@ -63,6 +72,17 @@ export class ClaudeProvider implements Provider {
   private spawnOpts: ProviderSpawnOptions | null = null;
   /** CLI control request ID → Runtime interaction; a handled ID is never answered twice. */
   private readonly interactions = new Map<string, { id: string; resolve(id: string): void }>();
+  /** An admitted policy holds the first turn until `initialize` confirms the permission mode. */
+  private admission: 'ready' | 'uninitialized' | 'initializing' | 'failed' = 'ready';
+  private admissionRequestId: string | null = null;
+  private heldTurn: string | null = null;
+  private pendingControl: string | null = null;
+  private nextControlId = 0;
+  private policyObservation: EffectiveExecutionPolicy = legacyClaudePolicy();
+  private inventory: SessionToolInventory = emptyClaudeInventory();
+  private inventoryRefresh?: Promise<void>;
+  private builtinTools: string[] | null = null;
+  private capabilityEpoch = 0;
 
   constructor(
     private readonly compatibilityProfile?: CompatibilityProfileSelection,
@@ -103,8 +123,25 @@ export class ClaudeProvider implements Provider {
     // `-p` denies tools that are not pre-approved, so session MCP servers must be
     // allowed explicitly unless every permission check is already skipped.
     const mcpAllowedTools = mcpServers.map((server) => `mcp__${server.name}`);
+    const policy = opts.executionPolicy;
+    if (policy) {
+      assertExecutionPolicyAdmission(policy, opts);
+      if (!claudeAdmitsPolicy(policy)) {
+        throw new InteractionError('interaction_unsupported', 'Claude Code cannot enforce the requested access or network limit.');
+      }
+    }
     this.spawnOpts = { ...opts };
     this.interactions.clear();
+    this.capabilityEpoch++;
+    this.inventory = emptyClaudeInventory();
+    this.inventoryRefresh = undefined;
+    this.builtinTools = null;
+    this.admission = policy ? 'uninitialized' : 'ready';
+    this.admissionRequestId = null;
+    this.heldTurn = null;
+    this.pendingControl = null;
+    this.policyObservation = policy ? { requested: structuredClone(policy), source: policy.mode, status: 'not_observed',
+      coverage: 'local-process-only', configurationSources: [] } : legacyClaudePolicy();
     if (opts.interactionHost) {
       // Without this the CLI denies approvals itself and hides AskUserQuestion.
       args.push('--permission-prompt-tool', 'stdio');
@@ -112,9 +149,12 @@ export class ClaudeProvider implements Provider {
     // A user's default mode (for example `auto`) would approve actions outside a
     // read-only workspace or an allowlist; `manual` asks, and asking is denied.
     const restricted = isRestricted(opts);
-    if (restricted) {
-      args.push('--permission-mode', 'manual');
+    const mode = policy ? claudePermissionMode(policy) : restricted ? 'manual' : undefined;
+    if (mode) {
+      args.push('--permission-mode', mode);
     }
+    // SPEC-035 pre-approval must not bypass a policy that asked for interactive approval.
+    const preapproveMcp = !policy || policy.mode === 'explicit' && policy.approval === 'never';
 
     switch (opts.permissionMode) {
       case 'skip':
@@ -128,7 +168,7 @@ export class ClaudeProvider implements Provider {
         break;
       }
       default:
-        if (mcpAllowedTools.length) {
+        if (mcpAllowedTools.length && preapproveMcp) {
           args.push('--allowedTools', mcpAllowedTools.join(','));
         }
     }
@@ -137,6 +177,9 @@ export class ClaudeProvider implements Provider {
   }
 
   buildStdinMessage(content: string, turn?: TurnInput): string {
+    if (this.admission === 'failed') {
+      throw new Error('Claude session admission failed earlier. Close and recreate the session.');
+    }
     // A turn starts only after the previous one finished, so no request is still waiting.
     this.interactions.clear();
     const msg = {
@@ -146,7 +189,74 @@ export class ClaudeProvider implements Provider {
         content: compileRuntimeTurnPrompt(content, turn),
       },
     };
-    return JSON.stringify(msg) + '\n';
+    const frame = JSON.stringify(msg) + '\n';
+    if (this.admission === 'uninitialized') {
+      this.admission = 'initializing';
+      this.admissionRequestId = `cats-runtime-admission-${this.nextControlId++}`;
+      this.heldTurn = frame;
+      return JSON.stringify({ type: 'control_request', request_id: this.admissionRequestId,
+        request: { subtype: 'initialize' } }) + '\n';
+    }
+    if (this.admission === 'initializing') {
+      this.heldTurn = frame;
+      return '';
+    }
+    return frame;
+  }
+
+  isSessionInitializing(): boolean { return this.admission === 'initializing'; }
+
+  getPendingControlMessages(): string | null {
+    const message = this.pendingControl;
+    this.pendingControl = null;
+    return message;
+  }
+
+  /** The verified mode releases the held turn; anything else ends it before a model call. */
+  private finishAdmission(response: Record<string, unknown> | undefined): ErrorStreamEvent | null {
+    this.admissionRequestId = null;
+    const policy = this.spawnOpts?.executionPolicy;
+    if (!policy) return null;
+    const reported = response?.subtype === 'success' ? record(response.response)?.current_permission_mode : undefined;
+    this.policyObservation = verifyClaudePolicy(policy, reported);
+    if (this.policyObservation.status !== 'verified') {
+      this.admission = 'failed';
+      this.heldTurn = null;
+      return { type: 'error', text: 'Claude Code effective permission mode does not satisfy host admission. No model turn was started.' };
+    }
+    this.admission = 'ready';
+    this.pendingControl = this.heldTurn;
+    this.heldTurn = null;
+    return null;
+  }
+
+  async readSessionCapabilities(request: (line: string, timeoutMs?: number) => Promise<Record<string, unknown>>,
+    refresh: boolean): Promise<ProviderSessionCapabilities> {
+    const epoch = this.capabilityEpoch;
+    if (refresh && !this.inventoryRefresh) {
+      const injected = new Set(this.spawnOpts?.mcpServers?.map(server => server.name));
+      this.inventoryRefresh = (async () => {
+        let inventory: SessionToolInventory;
+        try {
+          // Turn-free: the CLI answers mcp_status with or without initialize.
+          inventory = claudeInventory(await request(JSON.stringify({ type: 'control_request',
+            request_id: `cats-runtime-control-${this.nextControlId++}`, request: { subtype: 'mcp_status' } }) + '\n', 5000), injected);
+        } catch {
+          inventory = { ...emptyClaudeInventory('provider_discovery_incomplete_or_unavailable'), state: 'unavailable' };
+        }
+        if (this.capabilityEpoch === epoch) this.inventory = inventory;
+      })().finally(() => { if (this.capabilityEpoch === epoch) this.inventoryRefresh = undefined; });
+    }
+    if (refresh) await this.inventoryRefresh;
+    const inventory = structuredClone(this.inventory);
+    if (this.builtinTools) {
+      inventory.builtins = 'observed';
+      inventory.builtinTools = [...this.builtinTools];
+    }
+    inventory.stale = inventory.observedAt !== null && Date.now() - Date.parse(inventory.observedAt) > 15_000;
+    const host = this.spawnOpts?.interactionHost;
+    return { interactions: { version: 1, supported: [...CLAUDE_INTERACTION_KINDS], ...(host ? { host: structuredClone(host) } : {}) },
+      policy: structuredClone(this.policyObservation), inventory, dependencies: claudeDependencies(inventory) };
   }
 
   /**
@@ -241,6 +351,10 @@ export class ClaudeProvider implements Provider {
 
     this.noteServedModel(event);
 
+    if (event.type === 'control_response' && this.admissionRequestId) {
+      const response = record((event as unknown as Record<string, unknown>).response);
+      if (response?.request_id === this.admissionRequestId) return this.finishAdmission(response);
+    }
     // Host control traffic is answered by buildServerResponse, not shown as output.
     if (typeof event.type === 'string' && event.type.startsWith('control_')) {
       return observeIgnored(this.evolutionObserver, {
@@ -252,6 +366,11 @@ export class ClaudeProvider implements Provider {
 
     // system/init — session ID
     if (event.type === 'system' && event.subtype === 'init') {
+      const tools = (event as unknown as Record<string, unknown>).tools;
+      if (Array.isArray(tools)) {
+        this.builtinTools = tools.filter((tool): tool is string => typeof tool === 'string'
+          && !tool.startsWith('mcp__') && tool.length <= 256).slice(0, 512);
+      }
       return observeNormalized(this.evolutionObserver, {
         rawEventType: 'system:init',
         rawSample: event,
@@ -380,6 +499,11 @@ export class ClaudeProvider implements Provider {
       raw: event,
     } satisfies RawStreamEvent);
   }
+}
+
+function legacyClaudePolicy(): EffectiveExecutionPolicy {
+  return { source: 'legacy', status: 'not_observed', reason: 'legacy_policy_has_partial_coverage',
+    coverage: 'local-process-only', configurationSources: [] };
 }
 
 function isRestricted(opts: ProviderSpawnOptions): boolean {
