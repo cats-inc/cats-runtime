@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-10-28-claude-computer-use-remote-devices-gate](2026-10-28-claude-computer-use-remote-devices-gate.md) | Claude Code 2.1.312 computer use on Windows | The enable stub lives in the CLI and is listed only in remote sessions; the desktop app's `remote-devices` bridge requires a server-injected session id; Runtime-launched Claude stays `unavailable` by construction |
 | [2026-10-28-claude-host-control-protocol](2026-10-28-claude-host-control-protocol.md) | Claude Code 2.1.312 stream-json host control | Approvals, questions, form/URL elicitation, mode reporting, turn-free MCP status, hostless elicitation wait and Windows limits |
 | [2026-10-28-codex-host-capability-gaps](2026-10-28-codex-host-capability-gaps.md) | Terminal Codex versus Runtime-hosted Codex | Source baselines, read-only MCP discovery, interaction/policy gaps and unverified desktop/browser operation |
 | [2026-10-24-sixteen-cli-catalog-refresh](./2026-10-24-sixteen-cli-catalog-refresh.md) | Sixteen current CLI/channel scopes and Auggie effort | Native/read-only evidence, Auggie binding, Junie read-only/JAR helpers, Devin Lightning, and cross-repository validation |

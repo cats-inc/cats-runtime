@@ -90,7 +90,8 @@ No `computer-use` server appeared. Anthropic documentation states that Claude
 Code computer use is a macOS research preview for interactive sessions; on
 Windows it is offered only through the Claude desktop application. The same
 documentation states that Claude Code's sandbox runs on macOS, Linux and WSL2,
-not native Windows.
+not native Windows. The [computer use gate note](2026-10-28-claude-computer-use-remote-devices-gate.md)
+traces that desktop-app path and why a local launch cannot reach it.
 
 ## Design consequences
 
