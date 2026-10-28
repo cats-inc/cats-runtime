@@ -4,11 +4,11 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Approved for sliced implementation; implementation not started |
+| Status | Codex implemented (PLAN-049); Claude Code mapping approved for sliced implementation (PLAN-050) |
 | Owner | Runtime execution boundary |
 | Reviewer | Product owner and Runtime/Platform/Bots maintainers |
 | Decision | [ADR-048](../decisions/048-bridge-provider-interactions-and-report-effective-session-capabilities.md) |
-| Plan | [PLAN-049](../plans/PLAN-049-provider-session-capabilities-and-interactions.md) |
+| Plan | [PLAN-049](../plans/PLAN-049-provider-session-capabilities-and-interactions.md) (Codex), [PLAN-050](../plans/PLAN-050-claude-provider-interactions.md) (Claude Code) |
 | Baseline | Runtime `7e92601a` (0.6.2 source); Bots consumes Runtime 0.6.1 |
 
 ## Summary
@@ -49,7 +49,7 @@ with a versioned host descriptor, provisionally:
 ```ts
 interface InteractionHostV1 {
   version: 1;
-  kinds: ('command_approval' | 'file_approval' | 'permission_grant'
+  kinds: ('command_approval' | 'file_approval' | 'tool_approval' | 'permission_grant'
     | 'user_input' | 'mcp_form' | 'mcp_url')[];
   timeoutMs: number;
 }
@@ -111,6 +111,7 @@ cards. Memory-only callbacks are not promised to survive a Runtime restart.
 | Kind | Host data and response |
 | --- | --- |
 | Command / file approval | Provider-supplied command or file-change summary, cwd, offered choices and scope; return one supported choice |
+| Tool approval | Any other tool call the provider asks to run, such as an MCP or browser tool: tool label, MCP server and a bounded input summary; return one supported choice |
 | Permission grant | Requested filesystem/network/platform subset and supported scope; response may grant only an authorized subset |
 | User input | Stable question IDs, text, options and free-text support; validate answers against the request |
 | MCP form | Server identity, message and supported form schema; typed answer, decline or cancel |
@@ -247,6 +248,67 @@ host is not evidence that OpenAI computer-use/browser helpers are running.
   the Runtime row without deleting provider transcripts. Other providers' existing
   discovery-only identity strategies are outside this Codex change.
 
+### R8. Claude Code mapping
+
+Claude Code is the second native target, delivered by
+[PLAN-050](../plans/PLAN-050-claude-provider-interactions.md). Evidence and
+limits are in the [Claude protocol note](../research/2026-10-28-claude-host-control-protocol.md).
+Its `stream-json` control frames (`control_request` / `control_response`,
+correlated by `request_id`) stay private to the adapter.
+
+- **Negotiation.** The Claude CLI target advertises `command_approval`,
+  `file_approval`, `tool_approval`, `user_input`, `mcp_form` and `mcp_url`. It
+  never advertises `permission_grant`, which has no Claude Code counterpart. A
+  negotiated host adds `--permission-prompt-tool stdio`; without that flag the
+  CLI denies approvals itself and omits `AskUserQuestion`.
+- **Mapping.** `can_use_tool` for `AskUserQuestion` becomes `user_input` (one
+  field per question; answers return keyed by question text). `Bash` and
+  `PowerShell` become `command_approval`; `Write`, `Edit`, `MultiEdit` and
+  `NotebookEdit` become `file_approval` with the path and size, never the file
+  contents. Every other tool, including MCP and Claude in Chrome tools, becomes
+  `tool_approval` with the tool label, MCP server and an input summary of at
+  most 4 KiB. `elicitation` becomes `mcp_form` or `mcp_url`, reusing the bounded
+  MCP form rules above.
+- **Answers.** Accept returns `allow` with the original input; "allow for this
+  session" is offered only for `addRules` suggestions and is forwarded with
+  destination `session`. Persistent destinations and `setMode` suggestions are
+  never forwarded. Decline returns `deny`; cancel returns `deny` with
+  `interrupt`. A request whose kind was not negotiated, or an approval that
+  would widen a read-only workspace, a tool allowlist or an admitted policy,
+  is denied as unavailable.
+- **Hostless requests.** The CLI asks for MCP elicitation even when no host was
+  negotiated. The adapter declines it immediately instead of leaving the turn
+  waiting. Unknown CLI control requests receive an error response;
+  `control_cancel_request` resolves the matching interaction.
+- **Legacy boundaries.** A read-only workspace and a tool allowlist launch with
+  `--permission-mode manual`, so the user's own default mode (for example
+  `auto`) cannot approve actions outside them. Unrestricted `default` keeps the
+  user's configured mode; `skip` keeps `--dangerously-skip-permissions`.
+- **Policy.** Claude Code has no sandbox on native Windows, so this adapter can
+  enforce no filesystem or network ceiling. The target advertises
+  `admissibleAccess: ['full-access']`; any narrower provider constraint or
+  explicit access is rejected before execution with `interaction_unsupported`.
+  Explicit `on-request` and `untrusted` launch `--permission-mode manual`;
+  `never` launches `bypassPermissions`. Provider mode passes no mode flag. The
+  adapter sends `initialize` before the first user message and verifies the
+  reported `current_permission_mode` (`manual` reports `default`) before
+  releasing the turn; a managed setting that changes the mode is a mismatch.
+  The observed approval is the reported mode, and the reviewer is `user`,
+  `auto_classifier` (for `auto`) or `none` (for `bypassPermissions` and
+  `dontAsk`). Session MCP tools are pre-approved only without a policy or with
+  explicit `never`.
+- **Inventory.** `mcp_status` is read through the live worker without a model
+  turn. Status maps to the connection enum (`pending` to `starting`,
+  `needs-auth` to `authenticationRequired`); servers named like the session
+  overlay are `session-injected`, all others `provider-configured`, including
+  claude.ai connectors. Built-in tools are reported once `system/init` has
+  listed them, after the first user message.
+- **Dependencies.** Browser is `unknown` when `claude-in-chrome` is connected,
+  because the extension may still have no browser; `unavailable` when the
+  server is absent, with `--chrome` in the instance launch arguments as the
+  remediation. Computer use is `unavailable`: Claude Code offers it only to
+  interactive macOS sessions.
+
 ## Acceptance Criteria
 
 | ID | Required evidence |
@@ -259,6 +321,7 @@ host is not evidence that OpenAI computer-use/browser helpers are running.
 | A6 | Secrets/form answers stay out of logs, snapshots and transcript; overlay collision never silently replaces user configuration |
 | A7 | Platform and standalone Bot independently complete an interaction; Bot works without Platform |
 | A8 | Matched terminal/host comparison records CLI/config/cwd/policy/helper differences; controlled Chrome and desktop actions are verified separately |
+| A9 | Claude: every advertised kind completes against a scripted CLI and a real CLI run; hostless elicitation is declined; narrower policies are rejected before execution; read-only and allowlist sessions cannot be widened by the user's default mode |
 
 ## Dependencies and Open Questions
 

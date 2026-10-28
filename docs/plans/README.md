@@ -1,8 +1,13 @@
 # Implementation Plans
 
+- [PLAN-050: Claude Code provider interactions](PLAN-050-claude-provider-interactions.md)
+  — ready, 2026-10-28; Claude approvals, questions and MCP elicitation, policy and
+  inventory through SPEC-039, then standalone Bot consumption. All phases pending.
+
 - [PLAN-049: Provider session capabilities and interactions](PLAN-049-provider-session-capabilities-and-interactions.md)
   — ready, 2026-10-28; contract, Runtime/Codex, inventory,
-  Platform/Bot integration and controlled native acceptance. All phases pending.
+  Platform/Bot integration and controlled native acceptance. Implemented; successful
+  Chrome/desktop operation remains blocked by upstream helper availability.
 
 - [PLAN-047: Session workspace activity](PLAN-047-session-workspace-activity.md)
   — in progress, 2026-10-20; shared observer, identity, provider evidence,

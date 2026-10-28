@@ -8,7 +8,10 @@ records the accepted ownership boundary;
 [PLAN-049](plans/PLAN-049-provider-session-capabilities-and-interactions.md) sequences
 the work; the [Codex investigation](research/2026-10-28-codex-host-capability-gaps.md)
 separates discovery evidence from unverified computer/browser operation.
-Implementation has not started.
+The Codex implementation is complete. Claude Code is the second target:
+[PLAN-050](plans/PLAN-050-claude-provider-interactions.md) maps its stream-json control
+protocol per [SPEC-039 R8](specs/SPEC-039-provider-session-capabilities-and-interactions.md#r8-claude-code-mapping),
+from the [Claude protocol note](research/2026-10-28-claude-host-control-protocol.md).
 
 [Sixteen CLI catalog refresh](research/2026-10-24-sixteen-cli-catalog-refresh.md) records current
 channel evidence, the Auggie effort binding and selector validation.

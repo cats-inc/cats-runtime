@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-10-28-claude-host-control-protocol](2026-10-28-claude-host-control-protocol.md) | Claude Code 2.1.312 stream-json host control | Approvals, questions, form/URL elicitation, mode reporting, turn-free MCP status, hostless elicitation wait and Windows limits |
 | [2026-10-28-codex-host-capability-gaps](2026-10-28-codex-host-capability-gaps.md) | Terminal Codex versus Runtime-hosted Codex | Source baselines, read-only MCP discovery, interaction/policy gaps and unverified desktop/browser operation |
 | [2026-10-24-sixteen-cli-catalog-refresh](./2026-10-24-sixteen-cli-catalog-refresh.md) | Sixteen current CLI/channel scopes and Auggie effort | Native/read-only evidence, Auggie binding, Junie read-only/JAR helpers, Devin Lightning, and cross-repository validation |
 | [2026-10-24-cursor-image-runner](./2026-10-24-cursor-image-runner.md) | Cursor GLM 5.3 / max runner and Studio integration | Native Windows runner retained one 1024-square JPEG (90,500 bytes) after an owner-authorized extra image corrected a failed save; isolated data, correlated completion and cross-repository fixtures |
