@@ -126,8 +126,10 @@ the user's own Claude Code default. Other targets reject the field with 400
 choice is memory-only like the policy: later workers of the session reuse it, a change
 while the worker is active returns 409 `interaction_conflict`, and the host resends it
 after a Runtime restart. A fork inherits it only onto a target that advertises it. It
-does not add approval prompts by itself; negotiate an `interactionHost` and an
-on-request policy for Chrome actions to arrive as `tool_approval`.
+does not add approval prompts by itself. Claude Code decides which Chrome tools ask:
+with a negotiated `interactionHost` and an on-request policy, the requests it sends arrive
+as `tool_approval`, but some tools run without one (`tabs_context_mcp` did, 2026-10-28)
+and the extension's own site prompts stay in the browser.
 
 ### Skill content profile and retained sessions
 
