@@ -319,14 +319,14 @@ async function tryRespawnPiWorkerForSkillMutation(
 
 async function recycleWorkerForSessionMcpServers(ctx: AppContext, session: SessionInfo, signal?: AbortSignal): Promise<void> {
   const runtime = getRuntimeSessionManager(ctx);
+  const executionPolicy = runtime.getExecutionPolicy(session.id);
   await runtime.replace(session.id, session.providerName, {
     cwd: session.cwd,
     workspaceMode: session.workspaceMode,
     model: session.model,
     ...(session.providerSessionId ? { resumeSessionId: session.providerSessionId } : {}),
     instructionsFile: session.skills?.delivery.instructions?.filePath,
-    permissionMode: session.permissionMode,
-    allowedTools: session.allowedTools,
+    ...(executionPolicy ? { executionPolicy } : { permissionMode: session.permissionMode, allowedTools: session.allowedTools }),
   }, session.providerInstanceId, session.providerBackend, signal);
   ctx.registry.updateStatus(session.id, 'ready');
 }

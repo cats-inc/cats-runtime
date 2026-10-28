@@ -8,6 +8,7 @@ import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import type { ProviderSpawnOptions } from '../core/types.js';
+import { ensureSessionAwake } from '../core/runtime/sessionWakeup.js';
 
 const TOKEN = 'synthetic-session-mcp-secret';
 const MCP_SERVERS = [{
@@ -370,5 +371,57 @@ describe('session MCP servers HTTP contract (SPEC-035)', () => {
     expect(failure.status, await failure.text()).toBe(500);
     context.runtime!.spawn(id, 'codex', { cwd: join(rootDir, 'repo') }, 'default', 'cli');
     expect(lastSpawn().opts.interactionHost).toBeUndefined();
+  });
+
+  it('admits explicit policy separately from legacy fields and rejects unsupported targets before spawning', async () => {
+    vi.mocked(pool.getCapabilities).mockReturnValue({ resume: true, fork: true, permissions: true,
+      interactions: { version: 1, kinds: ['user_input'] },
+      sessionCapabilities: { version: 1, executionPolicy: true, inventory: true } });
+    const interactionHost = { version: 1, kinds: ['user_input'], timeoutMs: 60_000 };
+    const executionPolicy = { version: 1, mode: 'explicit', access: 'workspace-write', network: false, approval: 'on-request' };
+    const accepted = await createSession({ provider: 'codex', interactionHost, executionPolicy });
+    expect(accepted.response.status, accepted.text).toBe(201);
+    expect(lastSpawn().opts).toMatchObject({ interactionHost, executionPolicy });
+    vi.mocked(pool.spawn).mockClear();
+    const conflict = await createSession({ provider: 'codex', interactionHost, executionPolicy, permissionMode: 'skip' });
+    expect(conflict.response.status).toBe(400); expect(pool.spawn).not.toHaveBeenCalled();
+    const readonly = await createSession({ provider: 'codex', interactionHost, executionPolicy, workspaceMode: 'read_only' });
+    expect(readonly.response.status).toBe(400); expect(pool.spawn).not.toHaveBeenCalled();
+    vi.mocked(pool.getCapabilities).mockReturnValue({ resume: true, fork: true, permissions: true });
+    const unsupported = await createSession({ provider: 'codex', interactionHost, executionPolicy });
+    expect(unsupported.response.status).toBe(400); expect(pool.spawn).not.toHaveBeenCalled();
+  });
+
+  it('requires renegotiation after Runtime restart and protects a rediscovered native thread', async () => {
+    vi.mocked(pool.getCapabilities).mockReturnValue({ resume: true, fork: true, permissions: true,
+      interactions: { version: 1, kinds: ['user_input'] }, sessionCapabilities: { version: 1, executionPolicy: true, inventory: true } });
+    const worker = Object.assign(new EventEmitter(), { alive: false });
+    vi.mocked(pool.spawn).mockReturnValue(worker as never);
+    const interactionHost = { version: 1, kinds: ['user_input'], timeoutMs: 60_000 };
+    const executionPolicy = { version: 1, mode: 'explicit', access: 'read-only', network: false, approval: 'never' };
+    const { app, response, text } = await createSession({ provider: 'codex', interactionHost, executionPolicy });
+    expect(response.status, text).toBe(201);
+    const { id } = JSON.parse(text) as { id: string };
+    registry.setProviderSessionId(id, 'native-admission-fixture'); registry.updateStatus(id, 'closed');
+    worker.emit('native-session', 'native-admission-fixture');
+    const resume = (app: ReturnType<typeof createApp>, body: object) => app.request(`/sessions/${id}/resume`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    expect((await resume(app, { permissionMode: 'default' })).status).toBe(400);
+    expect(() => context.runtime!.spawn(id, 'codex', { cwd: join(rootDir, 'repo'), permissionMode: 'default' }, 'default', 'cli')).toThrow('legacy');
+    await ensureSessionAwake({ config: context.config, registry, runtime: context.runtime!, sessionId: id });
+    expect(lastSpawn().opts.executionPolicy).toEqual(executionPolicy);
+    expect(lastSpawn().opts.permissionMode).toBeUndefined();
+    registry.updateStatus(id, 'closed');
+    context.runtime = undefined;
+    const restarted = createApp(context); vi.mocked(pool.spawn).mockClear();
+    expect((await resume(restarted, {})).status).toBe(409);
+    expect((await resume(restarted, { interactionHost })).status).toBe(409);
+    expect(pool.spawn).not.toHaveBeenCalled();
+    expect(() => context.runtime!.spawn('rediscovered-fixture', 'codex', { cwd: join(rootDir, 'repo'),
+      resumeSessionId: 'native-admission-fixture' }, 'default', 'cli')).toThrow('Re-negotiate');
+    const admitted = await resume(restarted, { interactionHost, executionPolicy });
+    expect(admitted.status, await admitted.text()).toBe(200);
+    expect(lastSpawn().opts.executionPolicy).toEqual(executionPolicy);
   });
 });

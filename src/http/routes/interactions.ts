@@ -6,6 +6,15 @@ import { InteractionError } from '../../core/interactions/types.js';
 /** Mounted after the same bearer-auth middleware as session execution. */
 export const interactionRoutes = new Hono<{ Variables: { ctx: AppContext } }>();
 
+interactionRoutes.get('/sessions/:id/capabilities', async c => {
+  c.header('Cache-Control', 'no-store');
+  const ctx = c.get('ctx');
+  const id = c.req.param('id');
+  if (!ctx.registry.get(id)) return c.json({ error: 'Session not found' }, 404);
+  try { return c.json(await getRuntimeSessionManager(ctx).sessionCapabilities(id, c.req.query('refresh') === 'true')); }
+  catch { return c.json({ error: 'Session capability observation unavailable' }, 409); }
+});
+
 interactionRoutes.get('/sessions/:id/interactions', c => {
   c.header('Cache-Control', 'no-store');
   const ctx = c.get('ctx');

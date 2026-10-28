@@ -55,7 +55,7 @@ export function parseInteractionResponse(value: unknown): InteractionResponse {
         || Array.isArray(item) && item.length <= 64 && item.every(entry => typeof entry === 'string'))) invalid();
     }
   }
-  if (JSON.stringify(answer).length > 32_768) invalid();
+  if (Buffer.byteLength(JSON.stringify(answer), 'utf8') > 32_768) invalid();
   return { expectedRevision: Number(input.expectedRevision), idempotencyKey: input.idempotencyKey,
     answer: structuredClone(answer) as unknown as InteractionAnswer };
 }

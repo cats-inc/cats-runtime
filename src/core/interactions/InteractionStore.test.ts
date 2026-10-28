@@ -12,10 +12,11 @@ function fixture(prompt: InteractionPrompt = { kind: 'command_approval', title: 
   const controller = new AbortController();
   const send = vi.fn(async () => undefined);
   const fallback = vi.fn(async () => undefined);
-  const id = store.register({ executionId: 'turn-a', prompt, signal: controller.signal, respond: send, fallback });
+  const abortDelivery = vi.fn();
+  const id = store.register({ executionId: 'turn-a', prompt, signal: controller.signal, respond: send, fallback, abortDelivery });
   const revision = store.snapshot().interactions[0]!.revision;
   const response = { expectedRevision: revision, idempotencyKey: 'response-1', answer: { action: 'accept', choice: 'accept' } };
-  return { store, controller, send, fallback, id, response, changed };
+  return { store, controller, send, fallback, id, response, changed, abortDelivery };
 }
 
 describe('provider interaction lifecycle', () => {
@@ -122,6 +123,26 @@ describe('provider interaction lifecycle', () => {
     expect(store.snapshot().interactions[0]!.prompt!.choices![0]!.id).toBe('accept');
     store.interrupt();
   });
+  it('interrupts the worker when delivery fails instead of leaving the native request waiting', async () => {
+    const { store, id, response, send, abortDelivery } = fixture();
+    send.mockRejectedValue(new Error('fixture admission changed'));
+    expect(await store.respond(id, response)).toMatchObject({ status: 'interrupted', reason: 'response_delivery_failed' });
+    expect(abortDelivery).toHaveBeenCalledOnce();
+  });
+  it('bounds fallback delivery after expiry and interrupts only once on a late rejection', async () => {
+    vi.useFakeTimers();
+    const { store, fallback, abortDelivery } = fixture();
+    let reject!: (error: Error) => void;
+    fallback.mockImplementation(() => new Promise<void>((_resolve, no) => { reject = no; }));
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(store.snapshot().interactions[0]!.status).toBe('expired');
+    expect(fallback).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(abortDelivery).toHaveBeenCalledOnce();
+    reject(new Error('late failure'));
+    await Promise.resolve();
+    expect(abortDelivery).toHaveBeenCalledOnce();
+  });
 
   it('bounds pending requests and terminal receipts', () => {
     const { store, controller } = fixture();
@@ -184,5 +205,6 @@ describe('interaction validation', () => {
       { action: 'accept', values: { text: 'x'.repeat(33_000) } }]) {
       expect(() => parseInteractionResponse({ ...base, answer })).toThrow();
     }
+    expect(() => parseInteractionResponse({ ...base, answer: { action: 'accept', values: { text: '貓'.repeat(11_000) } } })).toThrow();
   });
 });

@@ -41,6 +41,25 @@ async function fixture() {
 }
 
 describe('worker interaction control channel', () => {
+  it('initializes and observes inventory on the same child without starting a model turn', async () => {
+    const native = child(); children.push(native); spawnMock.mockReturnValue(native);
+    const worker = new WorkerProcess(new CodexProvider(), { cwd: 'fixture',
+      interactionHost: { version: 1, kinds: [...INTERACTION_KINDS], timeoutMs: 60_000 } },
+    { path: 'fixture', runner: 'direct', runtime: { mode: 'native' } });
+    worker.on('error', () => {}); worker.start();
+    const pending = worker.readCapabilities(true);
+    await vi.waitFor(() => expect(native.stdin.readableLength).toBeGreaterThan(0));
+    const frames = native.stdin.read().toString().trim().split('\n').map((line: string) => JSON.parse(line));
+    expect(frames.map((frame: { method: string }) => frame.method)).toEqual(['initialize', 'initialized', 'thread/start']);
+    native.stdout.write(JSON.stringify({ id: frames[2].id, result: { thread: { id: 'thread' },
+      approvalPolicy: 'never', sandbox: { type: 'workspaceWrite' } } }) + '\n');
+    await vi.waitFor(() => expect(native.stdin.readableLength).toBeGreaterThan(0));
+    const request = JSON.parse(native.stdin.read().toString());
+    expect(request.method).toBe('mcpServerStatus/list'); expect(request.params.threadId).toBe('thread');
+    native.stdout.write(JSON.stringify({ id: request.id, result: { data: [{ name: 'fixture', tools: { inspect: {} } }], nextCursor: null } }) + '\n');
+    expect((await pending)?.inventory).toMatchObject({ state: 'observed', pages: 1 });
+    expect(worker.busy).toBe(false); expect(native.stdin.readableLength).toBe(0);
+  });
   it('delivers a reply during an occupied turn and only emits redacted progress', async () => {
     const { process, worker, turn } = await fixture();
     expect(worker.busy).toBe(true);

@@ -136,6 +136,40 @@ human input, but it cannot invent required user data.
 
 ### R5. Execution policy and configuration provenance
 
+The initial policy wire schema is additive and memory-only. Both modes use `version: 1`.
+`provider` requires `constraints: { maxAccess, network }`, where `maxAccess` is
+`read-only`, `workspace-write` or `full-access`, and `network` is a boolean ceiling.
+`explicit` requires `access` from the same enum, `network` boolean and `approval`
+of `never`, `untrusted` or `on-request`; its reviewer is explicitly the user.
+The first native adapter rejects read-only with network enabled and full access
+with network disabled because those combinations need a different native policy
+representation. Workspace-write admits the provider's standard temporary-directory
+access and only writable roots inside the session cwd. Enforcement coverage is
+local processes; remote MCP side effects remain outside this sandbox boundary.
+An interaction host is required, and new policy cannot override host read-only
+constraints or a tool allowlist. New policy and request-level legacy permission
+fields cannot be combined. This schema is being implemented in PLAN-049 P2.
+
+Runtime persists only a versioned admission requirement marker for opted-in Runtime
+and native thread identities. New sessions are recorded before execution; native
+identities are bound before the first model turn. Markers contain `requiresHost`
+and `requiresPolicy`, not settings, grants, prompts or callbacks. After restart a
+marked session must re-negotiate before resuming/forking; absence of transient
+settings cannot silently restore legacy execution. Existing unmarked sessions
+retain their legacy behavior and data. A current validated backup is committed
+before atomic primary replacement; recovery uses the stricter valid requirement,
+unknown formats fail closed, and synchronous spawn failures restore prior state.
+Markers remain when a session is unregistered so rediscovery cannot bypass them.
+Consumers must capability-gate this opt-in contract before using an older Runtime.
+
+Native auto-review cannot enforce a restricted host ceiling if it can approve
+escapes without a Runtime callback, so provider mode rejects that combination.
+Command/file approval replies can authorize a sandbox retry without bounded grant
+parameters; this initial adapter offers them only under an admitted full-access /
+network ceiling. Permission requests remain subject to subset and canonical-path
+checks at registration and delivery. Later grants invalidate the completeness of
+the bootstrap observation. These limits must be visible in host policy UI.
+
 Add a versioned `executionPolicy` union with two modes:
 
 - `provider`: preserve the selected provider's effective policy/configuration.

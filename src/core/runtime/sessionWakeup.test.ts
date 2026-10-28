@@ -36,6 +36,7 @@ function makeRuntime(overrides?: {
     get: vi.fn(() => overrides?.handle),
     isAttached: vi.fn(() => overrides?.attached ?? false),
     spawn: vi.fn(),
+    getExecutionPolicy: vi.fn(() => undefined),
   };
 }
 

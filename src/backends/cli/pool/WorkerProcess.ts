@@ -21,6 +21,7 @@ import { startWindowsCodexHost, windowsCodexHostPath, type ManagedCodexHost } fr
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 import { appendStderrLines } from '../stderrLines.js';
 import { InteractionStore } from '../../../core/interactions/InteractionStore.js';
+import { WorkerControlChannel } from './WorkerControlChannel.js';
 
 export interface WorkerProcessEvents {
   event: [StreamEvent];
@@ -51,6 +52,46 @@ function isTerminalStreamEvent(
 export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   interactions?: InteractionStore;
   private interactionExecutionId = '';
+  private control?: WorkerControlChannel;
+  private workerGeneration = randomUUID();
+  private bootstrapTimer?: ReturnType<typeof setTimeout>;
+  get generation(): string { return this.interactions?.generation ?? this.workerGeneration; }
+
+  async readCapabilities(refresh: boolean) {
+    if (this.starting) await this.starting;
+    if (!this.alive || !this.control || !this.provider.readSessionCapabilities) return undefined;
+    const generation = this.generation;
+    if (refresh) {
+      const initialization = this.provider.buildInitialization?.();
+      if (initialization) {
+        const child = this.process;
+        await new Promise<void>(resolve => {
+          const done = () => { clearTimeout(timer); this.off('event', event); this.off('exit', done); resolve(); };
+          const event = (value: StreamEvent) => { if (value.type === 'init' || value.type === 'error') done(); };
+          const timer = setTimeout(done, 10_000);
+          this.on('event', event); this.on('exit', done);
+          if (child) this.armBootstrapTimeout(child);
+          child?.stdin?.write(initialization, error => { if (error) done(); });
+        });
+      }
+    }
+    if (!this.alive || !this.control) return undefined;
+    const control = this.control;
+    const result = await this.provider.readSessionCapabilities((line, timeout) => control.request(line, timeout), refresh);
+    return this.generation === generation && this.alive ? result : undefined;
+  }
+
+  private armBootstrapTimeout(child: ChildProcess): void {
+    if (this.bootstrapTimer || !this.provider.isSessionInitializing?.()) return;
+    this.bootstrapTimer = setTimeout(() => {
+      this.bootstrapTimer = undefined;
+      if (this.process === child && this.provider.isSessionInitializing?.()) {
+        this.emit('error', new Error('Provider session initialization timed out.'));
+        this.cancel();
+      }
+    }, 10_000);
+    this.bootstrapTimer.unref?.();
+  }
   private process: ChildProcess | null = null;
   private starting: Promise<void> | null = null;
   private startupController: AbortController | null = null;
@@ -121,6 +162,9 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   private spawnProcess(): void {
     if (this.managedPluginExecution && this.launchGeneration > 0) throw new Error('Managed Plugin worker restart requires a fresh execution receipt.');
     const generation = ++this.launchGeneration;
+    this.control?.close();
+    clearTimeout(this.bootstrapTimer); this.bootstrapTimer = undefined;
+    this.workerGeneration = randomUUID();
     this.interactions?.interrupt();
     this.interactions = this.spawnOpts.interactionHost
       ? new InteractionStore(this.runtimeSessionId, this.spawnOpts.interactionHost, interaction => {
@@ -240,6 +284,13 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       ...hiddenWindowsSpawnOptions(),
     });
     this.process = child;
+    const control = new WorkerControlChannel((line, done) => {
+      if (this.process !== child || child.killed || child.exitCode !== null || !child.stdin || child.stdin.destroyed) {
+        done(new Error('Worker unavailable')); return;
+      }
+      child.stdin.write(line, done);
+    });
+    this.control = control;
     child.stdin?.on('error', () => {
       const controller = this.activeTurnController;
       if (this.process !== child || !controller || controller.signal.aborted) return;
@@ -252,16 +303,26 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     const rl = createInterface({ input: child.stdout! });
     rl.on('line', (line) => {
       if (this.process !== child || child.exitCode !== null) return;
+      if (control.consume(line)) return;
       // Handle auto-response (e.g. Codex approval requests)
       if (this.provider.buildAutoResponse) {
-        const response = this.provider.buildAutoResponse(line);
-        if (response) {
-          child.stdin!.write(response);
+        try {
+          const response = this.provider.buildAutoResponse(line);
+          if (response) child.stdin!.write(response);
+        } catch {
+          this.emit('error', new Error('Provider server-request protocol failed.'));
+          this.cancel();
+          return;
         }
       }
       this.respondToServerRequest(line, child);
 
       const parsed = this.provider.parseStreamLine(line);
+      if (!this.provider.isSessionInitializing?.()) {
+        clearTimeout(this.bootstrapTimer); this.bootstrapTimer = undefined;
+      }
+      const pendingControl = this.provider.getPendingControlMessages?.();
+      if (pendingControl) child.stdin!.write(pendingControl);
       if (parsed) {
         const events = Array.isArray(parsed) ? parsed : [parsed];
         for (const event of events) {
@@ -307,9 +368,11 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     });
 
     child.on('close', (code, signal) => {
+      control.close();
       if (ownedCodeModeHost && ownedCodeModeHost !== this.codeModeHost) ownedCodeModeHost.stop();
       void Promise.resolve(ownedCodeModeHost?.closed).then(() => this.ownedStopped(generation));
       if (this.process !== child) return;
+      clearTimeout(this.bootstrapTimer); this.bootstrapTimer = undefined;
       this.stopCodeModeHost();
       this.activeTurnController?.abort();
       this.process = null;
@@ -611,6 +674,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       } else {
         await this.runProviderBeforeTurn();
         const msg = this.provider.buildStdinMessage(turn.message, turn);
+        this.armBootstrapTimeout(this.process!);
         this.process!.stdin!.write(msg);
       }
 
@@ -638,6 +702,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   }
 
   cancel(): void {
+    clearTimeout(this.bootstrapTimer); this.bootstrapTimer = undefined;
+    this.control?.close();
     this.startupController?.abort();
     this.stopCodeModeHost();
     this.activeTurnController?.abort();

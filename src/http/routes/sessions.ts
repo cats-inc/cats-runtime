@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { parseInteractionHost } from '../../core/interactions/validation.js';
 import { InteractionError, type InteractionHost } from '../../core/interactions/types.js';
+import { assertExecutionPolicyAdmission, parseExecutionPolicy, type SessionExecutionPolicy } from '../../core/interactions/policy.js';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { Hono } from 'hono';
@@ -494,6 +495,7 @@ function buildSpawnOptions(input: {
   allowedTools?: string[];
   forkSession?: boolean;
   interactionHost?: InteractionHost;
+  executionPolicy?: SessionExecutionPolicy;
 }): ProviderSpawnOptions {
   const modelControls = cloneProviderControls(input.modelResolution?.controls);
   return {
@@ -504,10 +506,11 @@ function buildSpawnOptions(input: {
     ...(input.modelResolution?.executionProvider ? { modelProvider: input.modelResolution.executionProvider } : {}),
     ...(input.resumeSessionId ? { resumeSessionId: input.resumeSessionId } : {}),
     ...(input.instructionsFile ? { instructionsFile: input.instructionsFile } : {}),
-    ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
-    ...(input.allowedTools ? { allowedTools: input.allowedTools } : {}),
+    ...(!input.executionPolicy && input.permissionMode ? { permissionMode: input.permissionMode } : {}),
+    ...(!input.executionPolicy && input.allowedTools ? { allowedTools: input.allowedTools } : {}),
     ...(input.forkSession ? { forkSession: input.forkSession } : {}),
     ...(input.interactionHost ? { interactionHost: input.interactionHost } : {}),
+    ...(input.executionPolicy ? { executionPolicy: input.executionPolicy } : {}),
   };
 }
 
@@ -2680,6 +2683,7 @@ sessionRoutes.post('/sessions', async (c) => {
     skills?: unknown;
     mcpServers?: unknown;
     interactionHost?: unknown;
+    executionPolicy?: unknown;
     context?: SessionInvocationContext;
     outputDir?: string;
   }>();
@@ -2702,9 +2706,16 @@ sessionRoutes.post('/sessions', async (c) => {
   }
 
   let interactionHost: InteractionHost | undefined;
+  let executionPolicy: SessionExecutionPolicy | undefined;
   try {
     interactionHost = parseInteractionHost(body.interactionHost);
     runtime.assertInteractionSupport(interactionHost, providerName, providerTarget.instanceId, providerTarget.backend);
+    executionPolicy = parseExecutionPolicy(body.executionPolicy);
+    if (executionPolicy && (body.permissionMode !== undefined || body.allowedTools !== undefined)) {
+      throw new InteractionError('interaction_invalid', 'Do not combine executionPolicy with legacy permission controls.');
+    }
+    runtime.assertExecutionPolicySupport(executionPolicy, providerName, providerTarget.instanceId, providerTarget.backend);
+    assertExecutionPolicyAdmission(executionPolicy, { interactionHost, workspaceMode: body.workspaceMode });
   } catch (error) {
     return c.json({ error: error instanceof Error ? error.message : 'Invalid interaction host',
       ...(error instanceof InteractionError ? { code: error.code } : {}) }, 400);
@@ -2775,7 +2786,10 @@ sessionRoutes.post('/sessions', async (c) => {
         }, 409);
       }
     } else {
-      try { runtime.validateInteractionHost(existing.id, interactionHost); }
+      if (runtime.getExecutionPolicy(existing.id) && (body.permissionMode !== undefined || body.allowedTools !== undefined)) {
+        return c.json({ error: 'Do not combine a retained executionPolicy with legacy permission controls.' }, 400);
+      }
+      try { runtime.validateInteractionHost(existing.id, interactionHost); runtime.validateExecutionPolicy(existing.id, executionPolicy); }
       catch (error) { return c.json({ error: error instanceof Error ? error.message : 'Interaction host conflict' }, 409); }
       const existingSourceCwd = getSessionWorkspaceSourceCwd(existing) ?? existing.cwd;
       const contentError = sessionContentError(ctx, existing);
@@ -3310,6 +3324,7 @@ sessionRoutes.post('/sessions', async (c) => {
         permissionMode: resolved.permissionMode,
         allowedTools: body.allowedTools,
         interactionHost,
+        executionPolicy,
       }),
       providerTarget.instanceId,
       providerTarget.backend,
@@ -4309,17 +4324,26 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   } catch {
     return c.json({ error: 'This session provider is no longer selected' }, 409);
   }
-  const resumeBody = await c.req.json<{ mcpServers?: unknown; interactionHost?: unknown }>()
-    .catch(() => ({} as { mcpServers?: unknown; interactionHost?: unknown }));
+  const resumeBody = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
   let interactionHost: InteractionHost | undefined;
+  let executionPolicy: SessionExecutionPolicy | undefined;
   try {
     interactionHost = parseInteractionHost(resumeBody.interactionHost);
     runtime.assertInteractionSupport(interactionHost, session.providerName, session.providerInstanceId, session.providerBackend);
     runtime.validateInteractionHost(id, interactionHost);
+    executionPolicy = parseExecutionPolicy(resumeBody.executionPolicy) ?? runtime.getExecutionPolicy(id);
+    if (executionPolicy && (resumeBody.permissionMode !== undefined || resumeBody.allowedTools !== undefined)) {
+      throw new InteractionError('interaction_invalid', 'Do not combine executionPolicy with legacy permission controls.');
+    }
+    runtime.assertExecutionPolicySupport(executionPolicy, session.providerName, session.providerInstanceId, session.providerBackend);
+    runtime.validateExecutionPolicy(id, executionPolicy);
+    runtime.assertSessionControlAdmission(id, interactionHost, executionPolicy);
+    assertExecutionPolicyAdmission(resumeBody.executionPolicy === undefined ? undefined : executionPolicy, { interactionHost, workspaceMode: session.workspaceMode,
+      permissionMode: session.permissionMode, allowedTools: session.allowedTools });
   } catch (error) {
     return c.json({ error: error instanceof Error ? error.message : 'Invalid interaction host',
       ...(error instanceof InteractionError ? { code: error.code } : {}) },
-    error instanceof InteractionError && error.code === 'interaction_conflict' ? 409 : 400);
+    error instanceof InteractionError && ['interaction_conflict', 'interaction_admission_required'].includes(error.code) ? 409 : 400);
   }
   const parsedMcpServers = parseSessionMcpServers(resumeBody.mcpServers);
   if (!parsedMcpServers.ok) {
@@ -4593,6 +4617,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         allowedTools: (body as { allowedTools?: string[] }).allowedTools
           ?? hydratedSession.allowedTools,
         interactionHost,
+        executionPolicy,
       }),
       hydratedSession.providerInstanceId,
       hydratedSession.providerBackend,
@@ -4680,6 +4705,24 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   }
 
   let childModelState: ResolvedSessionModelState = { warnings: [] };
+  let childInteractionHost: InteractionHost | undefined;
+  let childExecutionPolicy: SessionExecutionPolicy | undefined;
+  try {
+    childInteractionHost = parseInteractionHost(rawBody.interactionHost) ?? runtime.getInteractionHost(id);
+    childExecutionPolicy = parseExecutionPolicy(rawBody.executionPolicy) ?? runtime.getExecutionPolicy(id);
+    if (childExecutionPolicy && (rawBody.permissionMode !== undefined || rawBody.allowedTools !== undefined)) {
+      throw new InteractionError('interaction_invalid', 'Do not combine executionPolicy with legacy permission controls.');
+    }
+    runtime.assertSessionControlAdmission(id, childInteractionHost, childExecutionPolicy);
+    runtime.assertInteractionSupport(childInteractionHost, childTarget.providerName, childTarget.instanceId, childTarget.backend);
+    runtime.assertExecutionPolicySupport(childExecutionPolicy, childTarget.providerName, childTarget.instanceId, childTarget.backend);
+    assertExecutionPolicyAdmission(childExecutionPolicy, { interactionHost: childInteractionHost,
+      workspaceMode: body.workspaceMode ?? session.workspaceMode, permissionMode: session.permissionMode, allowedTools: session.allowedTools });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : 'Session control admission failed',
+      ...(error instanceof InteractionError ? { code: error.code } : {}) },
+    error instanceof InteractionError && ['interaction_conflict', 'interaction_admission_required'].includes(error.code) ? 409 : 400);
+  }
   try {
     childModelState = body.model || forkSelection.selection
       ? await resolveRequestedSessionModelState(ctx, childTarget, {
@@ -4925,6 +4968,8 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
           : {}),
         permissionMode: forkPermissionMode,
         allowedTools: body.allowedTools ?? session.allowedTools,
+        interactionHost: childInteractionHost,
+        executionPolicy: childExecutionPolicy,
       }),
       childTarget.instanceId,
       childTarget.backend,

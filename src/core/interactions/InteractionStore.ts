@@ -67,7 +67,7 @@ export class InteractionStore {
       || entry.view.status === 'responding').length >= 16) {
       throw new InteractionError('interaction_limit', 'Too many pending provider interactions.');
     }
-    if (JSON.stringify(input.prompt).length > 65_536) {
+    if (Buffer.byteLength(JSON.stringify(input.prompt), 'utf8') > 65_536) {
       throw new InteractionError('interaction_limit', 'Provider interaction is too large.');
     }
     const created = this.now();
@@ -121,7 +121,11 @@ export class InteractionStore {
           if (entry.view.status === 'responding') {
             this.finish(entry, input.answer.action === 'cancel' ? 'cancelled' : 'resolved', 'response_sent', false);
           }
-        } catch { this.finish(entry, 'interrupted', 'response_delivery_failed'); }
+        } catch {
+          const abortDelivery = entry.abortDelivery;
+          this.finish(entry, 'interrupted', 'response_delivery_failed');
+          abortDelivery?.();
+        }
       }
       resolve(structuredClone(entry.view));
     });
@@ -152,7 +156,12 @@ export class InteractionStore {
     const fallback = entry.fallback;
     const abortDelivery = entry.abortDelivery;
     this.finish(entry, 'expired', 'deadline_exceeded');
-    try { await fallback?.('deadline_exceeded'); } catch { abortDelivery?.(); }
+    let aborted = false;
+    const stopDelivery = () => { if (!aborted) { aborted = true; abortDelivery?.(); } };
+    const deliveryTimeout = setTimeout(stopDelivery, 5000);
+    deliveryTimeout.unref?.();
+    try { await fallback?.('deadline_exceeded'); } catch { stopDelivery(); }
+    finally { clearTimeout(deliveryTimeout); }
   }
 
   private finish(entry: Entry, status: InteractionStatus, reason: string, providerConfirmed = false): void {

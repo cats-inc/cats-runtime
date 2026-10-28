@@ -61,6 +61,28 @@ This establishes discoverability for that launch. It does not establish identica
 terminal/host inventories, live tool execution, approval forwarding, nested tool
 coverage or helper availability after the upstream desktop application exits.
 
+## Runtime implementation observation, 2026-10-28
+
+The candidate Runtime adapter was exercised against the same installed Codex
+0.164.0 executable through `WorkerProcess`, using an empty dedicated workspace
+and an ephemeral thread. No `turn/start` or tool invocation was allowed by the
+probe. Both runs ended their own app-server/code-mode host processes.
+
+- Provider inheritance with an explicitly unrestricted admission ceiling observed
+  read-only, network disabled, `on-request`, reviewer `auto_review`.
+- Explicit workspace-write/offline/`on-request` observed workspace-write,
+  network disabled and reviewer `user`, with canonical cwd verification.
+- Both runs discovered `codex_apps` (279 tools, connected, bearer auth), `cua_repl`
+  (3 tools, connected, auth mechanism unsupported), `node_repl` (4 tools, connected,
+  auth mechanism unsupported), and disabled `codex_app` (0 tools).
+- Configuration provenance categories were `user` and `system`. Raw configuration,
+  endpoints, credentials, tool schemas and errors were excluded from probe output.
+
+This validates native policy mapping and same-worker catalog reads only. It is not
+evidence of Chrome navigation, desktop actions, either product's integration, or
+packaged/macOS/Linux acceptance. The inherited auto-reviewer cannot be used to
+enforce a restrictive host ceiling; admission now rejects that combination.
+
 ## Official sources consulted on 2026-10-28
 
 - [Codex App Server](https://learn.chatgpt.com/docs/app-server): structured

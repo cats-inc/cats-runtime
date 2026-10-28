@@ -128,8 +128,11 @@ export function mapCodexInteraction(method: string, params: Record<string, unkno
     if (!requested || Object.keys(requested).some(key => !['network', 'fileSystem'].includes(key))) return unsupported();
     const units: Array<{ id: string; label: string; key: 'network' | 'read' | 'write'; value: unknown }> = [];
     const network = record(requested.network);
+    if (requested.network != null && (!network || Object.keys(network).some(key => key !== 'enabled')
+      || network.enabled != null && typeof network.enabled !== 'boolean')) return unsupported();
     if (network?.enabled === true) units.push({ id: 'network', label: 'Network access', key: 'network', value: true });
     const fs = record(requested.fileSystem);
+    if (requested.fileSystem != null && (!fs || Object.keys(fs).some(key => !['read', 'write', 'entries', 'globScanMaxDepth'].includes(key)))) return unsupported();
     // Structured filesystem entries need their own admission mapping; never broaden them to a path.
     if (fs?.entries !== undefined || fs?.globScanMaxDepth !== undefined) return unsupported();
     for (const key of ['read', 'write'] as const) {

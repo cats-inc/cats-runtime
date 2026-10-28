@@ -89,7 +89,7 @@ export interface InteractionSnapshot {
 
 export class InteractionError extends Error {
   constructor(readonly code: 'interaction_invalid' | 'interaction_conflict' | 'interaction_not_found'
-    | 'interaction_limit' | 'interaction_unsupported', message: string) {
+    | 'interaction_limit' | 'interaction_unsupported' | 'interaction_admission_required', message: string) {
     super(message);
     this.name = 'InteractionError';
   }

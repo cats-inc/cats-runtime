@@ -299,7 +299,10 @@ export class WorkerPool {
       providerInstanceId,
     );
     const capabilities = { ...resolved.provider.capabilities };
-    if (resolved.commandConfig.runtime.mode !== 'native') delete capabilities.interactions;
+    if (resolved.commandConfig.runtime.mode !== 'native') {
+      delete capabilities.interactions;
+      delete capabilities.sessionCapabilities;
+    }
     return capabilities;
   }
 
