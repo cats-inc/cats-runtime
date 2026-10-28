@@ -425,6 +425,27 @@ describe('session MCP servers HTTP contract (SPEC-035)', () => {
     expect(unsupported.response.status).toBe(400); expect(pool.spawn).not.toHaveBeenCalled();
   });
 
+  it('rejects a ceiling the target cannot enforce before spawning', async () => {
+    vi.mocked(pool.getCapabilities).mockReturnValue({ resume: true, fork: true, permissions: true,
+      interactions: { version: 1, kinds: ['user_input'] },
+      sessionCapabilities: { version: 1, executionPolicy: true, inventory: true,
+        admissibleCeilings: [{ access: 'full-access', network: true }] } });
+    const interactionHost = { version: 1, kinds: ['user_input'], timeoutMs: 60_000 };
+    for (const executionPolicy of [
+      { version: 1, mode: 'explicit', access: 'workspace-write', network: false, approval: 'on-request' },
+      { version: 1, mode: 'provider', constraints: { maxAccess: 'full-access', network: false } },
+    ]) {
+      const rejected = await createSession({ provider: 'claude', interactionHost, executionPolicy });
+      expect(rejected.response.status).toBe(400);
+      expect(rejected.text).toContain('cannot enforce');
+    }
+    expect(pool.spawn).not.toHaveBeenCalled();
+    const executionPolicy = { version: 1, mode: 'explicit', access: 'full-access', network: true, approval: 'on-request' };
+    const accepted = await createSession({ provider: 'claude', interactionHost, executionPolicy });
+    expect(accepted.response.status, accepted.text).toBe(201);
+    expect(lastSpawn().opts).toMatchObject({ interactionHost, executionPolicy });
+  });
+
   it('requires renegotiation after Runtime restart and protects a rediscovered native thread', async () => {
     vi.mocked(pool.getCapabilities).mockReturnValue({ resume: true, fork: true, permissions: true,
       interactions: { version: 1, kinds: ['user_input'] }, sessionCapabilities: { version: 1, executionPolicy: true, inventory: true } });

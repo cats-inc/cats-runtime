@@ -4,7 +4,7 @@ import type {
 } from './models/providerSelectionResolution.js';
 import type { SessionMcpServerLaunch } from './sessionMcpServers.js';
 import type { InteractionHost, InteractionKind } from './interactions/types.js';
-import type { SessionExecutionPolicy } from './interactions/policy.js';
+import type { ExecutionAccess, SessionExecutionPolicy } from './interactions/policy.js';
 import type { RuntimeWorkspaceActivitySnapshot } from './workspace/activityTypes.js';
 
 export type {
@@ -1633,7 +1633,13 @@ export interface ProviderCapabilities {
   sessionMcpServers?: boolean;
   /** Negotiated host interactions; absent means unsupported. */
   interactions?: { version: 1; kinds: InteractionKind[] };
-  sessionCapabilities?: { version: 1; executionPolicy: boolean; inventory: boolean };
+  sessionCapabilities?: {
+    version: 1;
+    executionPolicy: boolean;
+    inventory: boolean;
+    /** Access/network ceilings the target can enforce; absent means every valid ceiling. */
+    admissibleCeilings?: Array<{ access: ExecutionAccess; network: boolean }>;
+  };
 }
 
 export type PermissionMode = 'skip' | 'whitelist' | 'default';

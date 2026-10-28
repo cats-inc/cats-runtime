@@ -21,7 +21,9 @@ export interface SessionToolInventory {
   pages: number;
   servers: SessionToolServer[];
   dynamicTools: Array<{ name: string; source: 'runtime-dynamic' }>;
-  builtins: 'not_exposed_by_provider';
+  /** Built-in provider tools: listed once the provider reports them, otherwise not claimed. */
+  builtins: 'not_exposed_by_provider' | 'not_observed' | 'observed';
+  builtinTools?: string[];
   reason?: string;
 }
 

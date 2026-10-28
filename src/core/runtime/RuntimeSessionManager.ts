@@ -179,8 +179,16 @@ export class RuntimeSessionManager {
 
   assertExecutionPolicySupport(policy: SessionExecutionPolicy | undefined, providerName: string,
     providerInstanceId?: string, providerBackend?: BackendKind): void {
-    if (policy && !this.getCapabilities(providerName, providerInstanceId, providerBackend).sessionCapabilities?.executionPolicy) {
+    if (!policy) return;
+    const capabilities = this.getCapabilities(providerName, providerInstanceId, providerBackend).sessionCapabilities;
+    if (!capabilities?.executionPolicy) {
       throw new InteractionError('interaction_unsupported', 'This provider target cannot verify the requested execution policy.');
+    }
+    const access = policy.mode === 'explicit' ? policy.access : policy.constraints.maxAccess;
+    const network = policy.mode === 'explicit' ? policy.network : policy.constraints.network;
+    if (capabilities.admissibleCeilings
+      && !capabilities.admissibleCeilings.some(ceiling => ceiling.access === access && ceiling.network === network)) {
+      throw new InteractionError('interaction_unsupported', 'This provider target cannot enforce the requested access or network limit.');
     }
   }
 

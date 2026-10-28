@@ -74,7 +74,8 @@ Create/resume/fork may select `executionPolicy` (requires `interactionHost`):
 ```
 
 Access values are `read-only`, `workspace-write`, `full-access`; explicit approvals
-are `never`, `untrusted`, `on-request`, with the user as reviewer. Read-only with
+are `never`, `untrusted`, `on-request`, with the user as reviewer. A target may advertise
+`sessionCapabilities.admissibleCeilings`; a ceiling outside that list is rejected. Read-only with
 network enabled and full access with network disabled are currently unsupported.
 Provider mode leaves native policy untouched, then checks it against the host's
 ceiling. A native auto-reviewer that can approve escapes is incompatible with a
@@ -102,6 +103,20 @@ is explicit. Names are returned without endpoint URLs, schemas, raw errors or
 credentials. Built-in and nested lazy catalogs are not claimed exhaustive.
 Desktop/browser helper readiness remains unknown until independently verified;
 a connected MCP server alone does not prove a usable Chrome or desktop target.
+
+Claude Code targets advertise `sessionCapabilities.admissibleCeilings:
+[{ "access": "full-access", "network": true }]`: Claude Code has no sandbox on native
+Windows, so any narrower explicit access or provider ceiling is rejected with 400
+`interaction_unsupported` before a worker starts. Explicit `on-request`/`untrusted` run
+in `manual` permission mode and `never` in `bypassPermissions`; provider mode keeps the
+user's mode. The first turn waits for Claude Code's `initialize` reply, and a reported mode
+that differs (for example a managed setting) ends the turn before any model call. The
+observed approval is that reported mode; the reviewer is `user`, `auto_classifier` or
+`none`. Session MCP tools are pre-approved only without a policy or with `never`.
+Inventory comes from Claude Code's turn-free `mcp_status`, including claude.ai connectors,
+and lists built-in tools (`builtins: "observed"`, `builtinTools`) after the first message.
+A connected `claude-in-chrome` server reports the browser as `unknown`; computer use is
+`unavailable` because Claude Code offers it only to interactive macOS sessions.
 
 ### Skill content profile and retained sessions
 
