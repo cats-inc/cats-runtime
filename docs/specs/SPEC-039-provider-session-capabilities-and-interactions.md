@@ -286,7 +286,7 @@ correlated by `request_id`) stay private to the adapter.
   user's configured mode; `skip` keeps `--dangerously-skip-permissions`.
 - **Policy.** Claude Code has no sandbox on native Windows, so this adapter can
   enforce no filesystem or network ceiling. The target advertises
-  `admissibleAccess: ['full-access']`; any narrower provider constraint or
+  `admissibleCeilings: [{ access: 'full-access', network: true }]`; any narrower provider constraint or
   explicit access is rejected before execution with `interaction_unsupported`.
   Explicit `on-request` and `untrusted` launch `--permission-mode manual`;
   `never` launches `bypassPermissions`. Provider mode passes no mode flag. The

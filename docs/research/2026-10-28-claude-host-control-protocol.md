@@ -108,6 +108,29 @@ not native Windows.
 - `mcp_status` gives turn-free MCP inventory; `system/init.tools` lists built-in
   tools after the first message. Correlation uses `request_id`, not JSON-RPC `id`.
 
+## Runtime and Bot acceptance, 2026-10-28
+
+After PLAN-050 P1/P2 merged, Runtime `e38e56bf` was packed and pinned by the
+standalone Bot. A fresh test Bot with an isolated data root ran Claude Code
+2.1.312 (haiku) in a scratch directory, with the owner's normal sign-in, an
+explicit full-access/network/on-request policy and Claude in Chrome enabled.
+The whole run took 23 seconds.
+
+| Turn | Request the owner received | Answer | Outcome |
+| --- | --- | --- | --- |
+| Ask a color | `user_input`, one field | Blue | Reply `Blue` |
+| Write `probe.txt` | `file_approval`: path and size only | Allow once | File written |
+| Bot's `schedule_list` MCP tool | `tool_approval`, server `cats-bot`, input `{}` | Allow once | Tool ran |
+| `echo … > declined.txt` | `command_approval` with the command | Decline | `NOT ALLOWED`; no file |
+
+The capability snapshot reported the policy `verified` (mode `default`, reviewer
+`user`), `cats-bot` as session-injected, `claude-in-chrome` (22 tools) and seven
+claude.ai connectors as provider-configured, 34 built-in tools, browser `unknown`
+and computer use `unavailable`. Saving a workspace-write policy was refused.
+
+Not exercised for real: a browser action through Claude in Chrome (no browser was
+running) and MCP form/URL elicitation (scripted and direct-CLI evidence only).
+
 ## Official sources consulted on 2026-10-28
 
 - [Headless mode](https://code.claude.com/docs/en/headless.md) and

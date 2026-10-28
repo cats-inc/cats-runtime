@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In progress, 2026-10-28; P1 and P2 implemented |
+| Status | Done, 2026-10-28; Chrome browser actions and real MCP form/URL requests not yet exercised |
 | Owner | Runtime execution boundary |
 | Assigned To | Claude |
 | Reviewer | Product owner and consumer maintainers |
@@ -41,7 +41,7 @@ elicitation no longer waits, and existing Claude fixtures pass unchanged.
 
 ### P2 — Policy and inventory
 
-- [x] Advertise `admissibleAccess` and reject narrower ceilings at session
+- [x] Advertise `admissibleCeilings` and reject narrower ceilings at session
   admission.
 - [x] Map explicit approval to a permission mode, send `initialize` before the
   first user message, and verify the reported mode before releasing the turn.
@@ -53,12 +53,12 @@ inspection.
 
 ### P3 — Bot consumption and acceptance
 
-- [ ] Pack the merged Runtime source for `cats-bots` and record its provenance.
-- [ ] Bots renders `tool_approval`, offers Claude in Chrome per bot, and passes
+- [x] Pack the merged Runtime source for `cats-bots` and record its provenance.
+- [x] Bots renders `tool_approval`, offers Claude in Chrome per bot, and passes
   a Claude scripted-CLI integration test.
-- [ ] Run one real Claude CLI turn through Runtime and a fresh test Bot with
+- [x] Run one real Claude CLI turn through Runtime and a fresh test Bot with
   isolated state. Record which kinds were exercised and which were not.
-- [ ] Platform intersects advertised kinds with its own, so it needs no change
+- [x] Platform intersects advertised kinds with its own, so it needs no change
   until its next Runtime pin; record that boundary.
 
 ## Testing Strategy and Risks
@@ -80,5 +80,6 @@ has a test or an explicit rejection.
 | 2026-10-28 | Plan created from direct CLI probes (no Runtime involvement). |
 | 2026-10-28 | P1: provider-supplied control correlation, `tool_approval`, shared MCP form parser, Claude `can_use_tool`/`elicitation` mapping, hostless elicitation decline, unknown-request errors, CLI cancellation and `manual` mode for read-only/allowlist sessions. Scripted adapter, mapping and worker tests added; focused runs: 99 files / 1089 tests in `src/backends/cli`, interaction, continuity and session-MCP suites, plus 3 provider/agent integration files / 53 tests. Policy, inventory and Bot consumption pending. |
 | 2026-10-28 | P2: `admissibleCeilings` (Claude: full-access with network only) rejected at HTTP admission and spawn; explicit approval mapped to `manual`/`bypassPermissions`; first turn held until `initialize` verifies the reported mode; `mcp_status` inventory with injected/configured provenance, built-ins after `system/init`, browser/computer-use dependencies. Focused runs: new capability and HTTP admission tests pass; `src/backends/cli`, `src/http`, `src/core/{interactions,runtime}`, continuity and three provider/agent integration files: 1544 of 1550 pass in one combined run, and the 6 failures (MCP facade, Pi, diagnostics, worktree routes) pass in isolation (93/93). |
+| 2026-10-28 | P3: Bots pins Runtime `e38e56bf` (cats-bots #30): `tool_approval` card, per-bot Claude in Chrome (`--chrome`), save-time ceiling refusal, scripted Claude CLI integration. Real acceptance: Claude Code 2.1.312 (haiku) through the packed Runtime and a fresh isolated test Bot, explicit full-access/network/on-request policy, Claude in Chrome on. A question (`user_input`), a Write (`file_approval`), the Bot's own `schedule_list` MCP tool (`tool_approval`, server `cats-bot`) and a declined shell redirect (`command_approval`) each completed the same turn; the file was written, the declined one was not. Policy `verified` (reported `default`, reviewer `user`); a workspace-write policy was refused at save. Inventory: `cats-bot` session-injected, `claude-in-chrome` (22) and seven claude.ai connectors provider-configured, 34 built-ins; browser `unknown`, computer use `unavailable`. Not exercised for real: a Chrome browser action (no browser was running), MCP form/URL elicitation (scripted and direct-CLI only). Platform picks this up at its next Runtime pin; it intersects advertised kinds, so `tool_approval` is simply not negotiated until it renders it. |
 
 *Created / last updated: 2026-10-28*
