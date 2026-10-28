@@ -31,7 +31,7 @@ import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import type { SessionMcpServerLaunch } from '../../../core/sessionMcpServers.js';
 import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 import { CodexReadTools, codexReadToolError, grantedCodexReadTools } from './codexReadTools.js';
-import { CODEX_INTERACTION_KINDS, CODEX_INTERACTION_METHODS, codexInteractionFallback, mapCodexInteraction } from './codexInteractions.js';
+import { CODEX_INTERACTION_KINDS, CODEX_INTERACTION_METHODS, codexInteractionFallback, codexInteractionKind, mapCodexInteraction } from './codexInteractions.js';
 import { assertExecutionPolicyAdmission, type EffectiveExecutionPolicy } from '../../../core/interactions/policy.js';
 import type { ProviderSessionCapabilities, SessionToolInventory } from '../../../core/interactions/capabilities.js';
 import { assertCodexMcpOverrideNames, codexInteractionWithinPolicy, codexPolicyParameters, inspectCodexConfiguration, verifyCodexPolicy } from './codexPolicy.js';
@@ -188,8 +188,10 @@ export class CodexProvider implements Provider {
         `model_reasoning_effort=${JSON.stringify(opts.modelControls['codex.reasoning_effort'])}`,
       );
     }
-    args.push(...buildCodexSessionMcpOverrides(opts.mcpServers ?? [], !opts.executionPolicy
-      || opts.executionPolicy.mode === 'explicit' && opts.executionPolicy.approval === 'never'));
+    const mcpApproval = !opts.executionPolicy ? 'approve'
+      : opts.executionPolicy.mode === 'explicit' ? opts.executionPolicy.approval === 'never' ? 'approve' : 'prompt'
+        : null;
+    args.push(...buildCodexSessionMcpOverrides(opts.mcpServers ?? [], mcpApproval));
 
     return args;
   }
@@ -493,12 +495,10 @@ export class CodexProvider implements Provider {
         if (!context.interactions || context.signal.aborted || this.state !== 'ready'
           || !this._readTurnId || params?.threadId !== this.threadId || !matchingTurn
           || line.length > 65_536) return fallback();
+        const toolApprovals = this._spawnOpts.interactionHost.kinds.includes('tool_approval');
         const unavailable = (reason: string) => {
-          const kind = method === 'item/commandExecution/requestApproval' ? 'command_approval'
-            : method === 'item/fileChange/requestApproval' ? 'file_approval'
-              : method === 'item/permissions/requestApproval' ? 'permission_grant'
-                : method.includes('requestUserInput') ? 'user_input' : params?.mode === 'url' ? 'mcp_url' : 'mcp_form';
-          context.interactions?.unavailable?.(kind, reason);
+          const kind = codexInteractionKind(method, params!);
+          context.interactions?.unavailable?.(kind === 'tool_approval' && !toolApprovals ? 'mcp_form' : kind, reason);
           return fallback();
         };
         // A UI cannot broaden a host's read-only or whitelist execution boundary.
@@ -511,7 +511,8 @@ export class CodexProvider implements Provider {
             || method === 'item/commandExecution/requestApproval' && this.decideCommandApproval(params) === 'decline'
             || method === 'item/fileChange/requestApproval' && this.decideFileChangeApproval() === 'decline'))) return unavailable('host_policy_restriction');
         try {
-          const mapped = mapCodexInteraction(method, params!);
+          // Older hosts can still answer the native empty form they negotiated.
+          const mapped = mapCodexInteraction(method, params!, toolApprovals);
           const runtimeId = context.interactions.request({ prompt: mapped.prompt, deadlineMs: mapped.deadlineMs,
             response: answer => {
               if (answer.action === 'accept' && this._spawnOpts?.executionPolicy && !codexInteractionWithinPolicy(method, params!,
@@ -1705,15 +1706,16 @@ function unixSecondsToIso(value: unknown): string | undefined {
 
 /**
  * SPEC-035: configure each session MCP server for app-server. The bearer is read
- * from the named environment variable, and approval is granted for that server's
- * tools only; `approvalPolicy: never` otherwise rejects MCP tool calls.
+ * from the named environment variable. Explicit interactive policy prompts for
+ * every call; legacy/never approves only the injected server's tools. Provider
+ * mode leaves the native approval setting inherited (null).
  */
-export function buildCodexSessionMcpOverrides(servers: readonly SessionMcpServerLaunch[], approve = true): string[] {
+export function buildCodexSessionMcpOverrides(servers: readonly SessionMcpServerLaunch[], approval: 'approve' | 'prompt' | null = 'approve'): string[] {
   return servers.flatMap((server) => [
     '-c', `mcp_servers.${server.name}.url=${JSON.stringify(server.url)}`,
     ...(server.bearerTokenEnvVar
       ? ['-c', `mcp_servers.${server.name}.bearer_token_env_var=${JSON.stringify(server.bearerTokenEnvVar)}`]
       : []),
-    ...(approve ? ['-c', `mcp_servers.${server.name}.default_tools_approval_mode="approve"`] : []),
+    ...(approval ? ['-c', `mcp_servers.${server.name}.default_tools_approval_mode=${JSON.stringify(approval)}`] : []),
   ]);
 }

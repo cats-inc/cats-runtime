@@ -2,9 +2,9 @@ import { record } from '../../../core/interactions/validation.js';
 import type { InteractionAnswer, InteractionKind, InteractionOption, InteractionPrompt } from '../../../core/interactions/types.js';
 import { boundedText as text, fieldId, mcpElicitationUrl, mcpFormFields } from './mcpElicitation.js';
 
-/** Every kind except tool approval, which Codex reports as command or file changes. */
+/** Codex MCP tool approvals arrive as marked elicitations, not command approvals. */
 export const CODEX_INTERACTION_KINDS: InteractionKind[] = [
-  'command_approval', 'file_approval', 'permission_grant', 'user_input', 'mcp_form', 'mcp_url',
+  'command_approval', 'file_approval', 'tool_approval', 'permission_grant', 'user_input', 'mcp_form', 'mcp_url',
 ];
 
 export const CODEX_INTERACTION_METHODS = new Set([
@@ -21,7 +21,17 @@ export interface CodexInteraction {
 
 function unsupported(): never { throw new Error('Unsupported Codex interaction shape.'); }
 
-export function mapCodexInteraction(method: string, params: Record<string, unknown>): CodexInteraction {
+/** Preserve the kind even when the provider shape cannot be answered. */
+export function codexInteractionKind(method: string, params: Record<string, unknown>): InteractionKind {
+  if (method === 'item/commandExecution/requestApproval') return 'command_approval';
+  if (method === 'item/fileChange/requestApproval') return 'file_approval';
+  if (method === 'item/permissions/requestApproval') return 'permission_grant';
+  if (method.includes('requestUserInput')) return 'user_input';
+  if (record(params._meta)?.codex_approval_kind === 'mcp_tool_call') return 'tool_approval';
+  return params.mode === 'url' ? 'mcp_url' : 'mcp_form';
+}
+
+export function mapCodexInteraction(method: string, params: Record<string, unknown>, toolApprovals = true): CodexInteraction {
   if (method === 'item/commandExecution/requestApproval' || method === 'item/fileChange/requestApproval') {
     const command = method === 'item/commandExecution/requestApproval';
     const offered = params.availableDecisions ?? ['accept', 'acceptForSession', 'decline', 'cancel'];
@@ -101,6 +111,18 @@ export function mapCodexInteraction(method: string, params: Record<string, unkno
   if (method === 'mcpServer/elicitation/request') {
     const server = text(params.serverName);
     const common = { title: 'MCP input request', message: text(params.message), server };
+    if (toolApprovals && codexInteractionKind(method, params) === 'tool_approval') {
+      // Native 0.165.0: accepting this empty form authorizes this call only. Never
+      // turn a changed/nonempty schema into an implicit successful empty answer.
+      if (params.mode !== 'form' || !server || !common.message || mcpFormFields(params.requestedSchema).length) return unsupported();
+      const meta = record(params._meta)!;
+      const input = record(meta.tool_params);
+      const summary = input ? JSON.stringify(input, null, 2) : '';
+      return { prompt: { ...common, title: 'Tool approval', kind: 'tool_approval',
+        message: [common.message, summary.length > 4096 ? `${summary.slice(0, 4096)}\n… (input truncated)` : summary].filter(Boolean).join('\n\n'),
+        choices: [{ id: 'accept', label: 'Allow once' }] },
+      result: answer => ({ action: answer.action, content: answer.action === 'accept' ? {} : null, _meta: null }) };
+    }
     if (params.mode === 'url') {
       return { prompt: { ...common, kind: 'mcp_url', url: mcpElicitationUrl(params.url) },
         result: answer => ({ action: answer.action, content: null, _meta: null }) };
