@@ -150,6 +150,7 @@ export class RuntimeSessionReplacementError extends Error {
 export class RuntimeSessionManager {
   private readonly interactionHosts = new Map<string, InteractionHost>();
   private readonly executionPolicies = new Map<string, SessionExecutionPolicy>();
+  private readonly browserIntegrations = new Map<string, boolean>();
   private readonly admissions?: SessionAdmissionStore;
 
   assertSessionControlAdmission(sessionId: string, host?: InteractionHost, policy?: SessionExecutionPolicy,
@@ -189,6 +190,24 @@ export class RuntimeSessionManager {
     if (capabilities.admissibleCeilings
       && !capabilities.admissibleCeilings.some(ceiling => ceiling.access === access && ceiling.network === network)) {
       throw new InteractionError('interaction_unsupported', 'This provider target cannot enforce the requested access or network limit.');
+    }
+  }
+
+  getBrowserIntegration(sessionId: string): boolean | undefined {
+    return this.browserIntegrations.get(sessionId);
+  }
+
+  assertBrowserIntegrationSupport(enabled: boolean | undefined, providerName: string,
+    providerInstanceId?: string, providerBackend?: BackendKind): void {
+    if (enabled === undefined) return;
+    if (!this.getCapabilities(providerName, providerInstanceId, providerBackend).sessionCapabilities?.browserIntegration) {
+      throw new InteractionError('interaction_unsupported', 'This provider target cannot change its browser integration.');
+    }
+  }
+
+  validateBrowserIntegration(sessionId: string, enabled: boolean | undefined): void {
+    if (enabled !== undefined && this.get(sessionId)?.active && this.browserIntegrations.get(sessionId) !== enabled) {
+      throw new InteractionError('interaction_conflict', 'Close the active worker before changing its browser integration.');
     }
   }
 
@@ -448,8 +467,12 @@ export class RuntimeSessionManager {
     this.assertExecutionPolicySupport(executionPolicy, providerName, providerInstanceId, providerBackend);
     this.validateExecutionPolicy(sessionId, executionPolicy);
     assertExecutionPolicyAdmission(executionPolicy, { ...opts, interactionHost });
+    const browserIntegration = opts.browserIntegration ?? this.browserIntegrations.get(sessionId);
+    this.assertBrowserIntegrationSupport(browserIntegration, providerName, providerInstanceId, providerBackend);
+    this.validateBrowserIntegration(sessionId, browserIntegration);
     opts = { ...opts, ...(interactionHost ? { interactionHost: structuredClone(interactionHost) } : {}),
-      ...(executionPolicy ? { executionPolicy: structuredClone(executionPolicy) } : {}) };
+      ...(executionPolicy ? { executionPolicy: structuredClone(executionPolicy) } : {}),
+      ...(browserIntegration !== undefined ? { browserIntegration } : {}) };
     const binding = this.getSessionBinding?.(sessionId);
     if (binding) bindManagedNativeIdentity(this.config.sessionBaseDir, binding, opts.resumeSessionId ?? binding.providerSessionId);
     assertRetainedSkillContent({
@@ -499,6 +522,7 @@ export class RuntimeSessionManager {
       this.mcpServers.recordLaunch(sessionId, mcpLaunch ? mcpServers : []);
       if (worker && interactionHost) this.interactionHosts.set(sessionId, structuredClone(interactionHost));
       if (worker && executionPolicy) this.executionPolicies.set(sessionId, structuredClone(executionPolicy));
+      if (worker && browserIntegration !== undefined) this.browserIntegrations.set(sessionId, browserIntegration);
       return worker ? new CliExecutionHandle(worker, () => this.pool.kill(sessionId)) : undefined;
     }
 
@@ -1014,6 +1038,7 @@ export class RuntimeSessionManager {
   dropSession(sessionId: string): void {
     this.interactionHosts.delete(sessionId);
     this.executionPolicies.delete(sessionId);
+    this.browserIntegrations.delete(sessionId);
     this.replacements.delete(sessionId);
     this.clearWorkspaceActivity(sessionId);
     this.handleOverrides.delete(sessionId);

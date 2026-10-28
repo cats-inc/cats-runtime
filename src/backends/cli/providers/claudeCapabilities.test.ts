@@ -70,6 +70,15 @@ describe('Claude execution policy', () => {
     const { claude } = boot();
     expect(JSON.parse(claude.buildStdinMessage('first')).type).toBe('user');
   });
+
+  it('maps browser integration to Claude in Chrome flags and otherwise keeps the user default', () => {
+    expect(new ClaudeProvider().capabilities.sessionCapabilities?.browserIntegration).toBe(true);
+    expect(boot({ browserIntegration: true }).args).toContain('--chrome');
+    expect(boot({ browserIntegration: false }).args).toContain('--no-chrome');
+    const unset = boot().args;
+    expect(unset).not.toContain('--chrome');
+    expect(unset).not.toContain('--no-chrome');
+  });
 });
 
 describe('Claude session inventory', () => {

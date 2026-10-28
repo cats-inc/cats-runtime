@@ -118,6 +118,17 @@ and lists built-in tools (`builtins: "observed"`, `builtinTools`) after the firs
 A connected `claude-in-chrome` server reports the browser as `unknown`; computer use is
 `unavailable` because Claude Code offers it only to interactive macOS sessions.
 
+Targets that advertise `sessionCapabilities.browserIntegration: true` (Claude Code)
+accept `"browserIntegration": true | false` on create, resume and fork. `true` turns
+Claude in Chrome on (`--chrome`), `false` turns it off (`--no-chrome`), omission keeps
+the user's own Claude Code default. Other targets reject the field with 400
+`interaction_unsupported`, and a non-boolean value is 400 `interaction_invalid`. The
+choice is memory-only like the policy: later workers of the session reuse it, a change
+while the worker is active returns 409 `interaction_conflict`, and the host resends it
+after a Runtime restart. A fork inherits it only onto a target that advertises it. It
+does not add approval prompts by itself; negotiate an `interactionHost` and an
+on-request policy for Chrome actions to arrive as `tool_approval`.
+
 ### Skill content profile and retained sessions
 
 The executing artifact determines managed skill eligibility. Requests cannot

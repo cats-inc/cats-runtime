@@ -60,7 +60,7 @@ export function claudeDependencies(inventory: SessionToolInventory): ProviderSes
       : { kind: 'browser', status: inventory.state === 'not_observed' ? 'unknown' : 'unavailable',
         evidence: inventory.state === 'not_observed' ? 'MCP servers have not been observed for this worker yet.'
           : `No ${CLAUDE_CHROME_SERVER} MCP server is configured for this session.`,
-        remediation: 'Add --chrome to the Claude instance launch arguments to enable Claude in Chrome.' },
+        remediation: 'Enable browser integration for the session, or add --chrome to the Claude instance launch arguments.' },
     { kind: 'computer_use', status: 'unavailable',
       evidence: 'Claude Code offers computer use only to interactive macOS sessions, not to headless runs.',
       remediation: 'Use the Claude desktop application for computer use; Runtime cannot provide it.' },

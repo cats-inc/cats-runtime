@@ -446,6 +446,45 @@ describe('session MCP servers HTTP contract (SPEC-035)', () => {
     expect(lastSpawn().opts).toMatchObject({ interactionHost, executionPolicy });
   });
 
+  it('accepts browser integration only where advertised and keeps it for the session worker', async () => {
+    vi.mocked(pool.getCapabilities).mockImplementation((providerName: string) => ({ resume: true, fork: true, permissions: true,
+      ...(providerName === 'claude' ? { sessionCapabilities: { version: 1, executionPolicy: true, inventory: true, browserIntegration: true } } : {}) }));
+    const worker = Object.assign(new EventEmitter(), { alive: false });
+    vi.mocked(pool.spawn).mockReturnValue(worker as never);
+    for (const body of [{ provider: 'codex', browserIntegration: true }, { provider: 'claude', browserIntegration: 'yes' }]) {
+      const rejected = await createSession(body);
+      expect(rejected.response.status, rejected.text).toBe(400);
+    }
+    expect(pool.spawn).not.toHaveBeenCalled();
+    const { app, response, text } = await createSession({ provider: 'claude', browserIntegration: true });
+    expect(response.status, text).toBe(201);
+    expect(lastSpawn().opts.browserIntegration).toBe(true);
+    const { id } = JSON.parse(text) as { id: string };
+    registry.setProviderSessionId(id, 'native-browser-fixture'); registry.updateStatus(id, 'closed');
+    await ensureSessionAwake({ config: context.config, registry, runtime: context.runtime!, sessionId: id });
+    expect(lastSpawn().opts.browserIntegration).toBe(true);
+    const resume = (body: object) => app.request(`/sessions/${id}/resume`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    vi.mocked(pool.get).mockReturnValue({ alive: true } as never);
+    const conflict = await resume({ browserIntegration: false });
+    expect(conflict.status).toBe(409);
+    vi.mocked(pool.get).mockReturnValue(undefined);
+    registry.updateStatus(id, 'closed');
+    const changed = await resume({ browserIntegration: false });
+    expect(changed.status, await changed.text()).toBe(200);
+    expect(lastSpawn().opts.browserIntegration).toBe(false);
+    const fork = (body: object) => app.request(`/sessions/${id}/fork`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cwd: join(rootDir, 'repo'), ...body }),
+    });
+    const inherited = await fork({});
+    expect(inherited.status, await inherited.text()).toBe(201);
+    expect(lastSpawn().opts.browserIntegration).toBe(false);
+    const crossProvider = await fork({ provider: 'codex' });
+    expect(crossProvider.status, await crossProvider.text()).toBe(201);
+    expect(lastSpawn().opts.browserIntegration).toBeUndefined();
+  });
+
   it('requires renegotiation after Runtime restart and protects a rediscovered native thread', async () => {
     vi.mocked(pool.getCapabilities).mockReturnValue({ resume: true, fork: true, permissions: true,
       interactions: { version: 1, kinds: ['user_input'] }, sessionCapabilities: { version: 1, executionPolicy: true, inventory: true } });

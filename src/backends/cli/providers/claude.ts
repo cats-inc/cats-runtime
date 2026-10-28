@@ -56,7 +56,7 @@ export class ClaudeProvider implements Provider {
     sessionMcpServers: true,
     interactions: { version: 1, kinds: [...CLAUDE_INTERACTION_KINDS] },
     sessionCapabilities: { version: 1, executionPolicy: true, inventory: true,
-      admissibleCeilings: CLAUDE_ADMISSIBLE_CEILINGS.map(ceiling => ({ ...ceiling })) },
+      admissibleCeilings: CLAUDE_ADMISSIBLE_CEILINGS.map(ceiling => ({ ...ceiling })), browserIntegration: true },
   };
   controlCorrelation = CLAUDE_CONTROL;
 
@@ -145,6 +145,10 @@ export class ClaudeProvider implements Provider {
     if (opts.interactionHost) {
       // Without this the CLI denies approvals itself and hides AskUserQuestion.
       args.push('--permission-prompt-tool', 'stdio');
+    }
+    // Claude in Chrome loads only with `--chrome` unless the user's own default enables it.
+    if (opts.browserIntegration !== undefined) {
+      args.push(opts.browserIntegration ? '--chrome' : '--no-chrome');
     }
     // A user's default mode (for example `auto`) would approve actions outside a
     // read-only workspace or an allowlist; `manual` asks, and asking is denied.
