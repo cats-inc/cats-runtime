@@ -49,6 +49,62 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+### Release notes — 0.6.2 on npm (2026-10-30)
+
+- npm `@cats-inc/cats-runtime` moves from 0.6.1 to 0.6.2. The version was
+  prepared on 2026-10-24 for source bundling only (below) and never published to
+  npm, so this npm release reuses it. It carries everything merged since 0.6.1,
+  #188 to #202.
+- **Provider interactions and session capabilities** ([ADR-048](decisions/048-bridge-provider-interactions-and-report-effective-session-capabilities.md),
+  [SPEC-039](specs/SPEC-039-provider-session-capabilities-and-interactions.md)).
+  - A host that negotiates interaction hosting before it creates a session
+    receives Codex (#194) and Claude Code (#197) approvals, questions and MCP
+    elicitation. Its typed reply returns to the same live request while the
+    model turn stays occupied. Replies are bound to the live worker's
+    generation, revision and idempotency key. Cancellation, deadlines and worker
+    loss invalidate them and leave redacted receipts.
+  - Explicit and provider execution policies are admitted only with a verified
+    effective policy (#194, #198). `sessionCapabilities` reports admissible
+    ceilings, the session's tools and browser integration. Claude Code on native
+    Windows admits only `full-access` with network; narrower requests return 400
+    `interaction_unsupported` before a worker starts.
+  - Codex's native MCP consent arrives as `tool_approval`, and explicitly
+    interactive policies make injected session MCP servers ask before each call
+    (#202).
+  - `POST /sessions`, `/resume` and `/fork` accept `browserIntegration` for
+    Claude in Chrome: `true` launches `--chrome`, `false` launches `--no-chrome`,
+    and omitting it keeps the user's own default (#200).
+- **Media.** Native Cursor image generation with GLM 5.3 / max (#190). Muse
+  JPEG output is accepted, and existing source failures are recovered from
+  matching native evidence without calling the provider again (#189). The
+  bundled image codecs load in the shipped entry (#188).
+- **Catalogs.** The sixteen CLI/channel catalogs and the
+  `auggie.reasoning_effort` binding of the 2026-10-24 notes below (#191).
+- **Codex discovery.** A fresh Codex session no longer adopts an older thread
+  from the same folder, and a failed fresh session keeps the provider's
+  transcript (#195).
+- **Compatibility.** This is a compatible 0.6.x patch. Callers that do not
+  negotiate interactions or send the new fields keep their existing behavior
+  (SPEC-039 R7). The new routes and fields are additive, and consumers
+  capability-gate them before relying on them. Existing request meanings,
+  configuration files, catalog schema 2, binding version 1 and stored-data
+  formats are unchanged. No new migration is required, and the existing
+  validated upgrades, backups and recovery remain in force.
+- **Exact source.** The workflow publishes from `main` at the merged commit of
+  this change, which adds only this section. Its package contents are those of
+  `399e63571be8188fc685ba3925ff47f80a256f27` (#202). Desktop 0.12.2 bundles that
+  commit, and Cats Bot 0.3.0 vendors a 0.6.2 tarball built from a source tree
+  identical to it.
+- **Checks.** Each PR passed its focused suites, independent review and full CI.
+  Desktop 0.12.2's release gates started this exact Runtime code in packaged
+  hosts. `npm-publish.yml` repeats the full test gate and a fresh build before
+  trusted publication with provenance. An installed npm consumer upgrade from
+  0.6.1 is not exercised beyond those gates.
+- **Selected distribution.** npm `@cats-inc/cats-runtime@0.6.2` with explicit
+  `latest`. Platform/Desktop 0.12.3 bundles this source, and cats-one 0.6.0
+  raises its Runtime range to `^0.6.2`. There is no Runtime GitHub Release.
+  Publication results: the npm registry entry and the `npm-publish.yml` run.
+
 ### Release notes — 0.6.2 (2026-10-24)
 
 - Refresh all sixteen configured CLI/channel catalogs from this installation's
