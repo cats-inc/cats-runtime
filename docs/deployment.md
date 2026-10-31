@@ -136,7 +136,9 @@ publish npm or require any other Cats product to release.
 The [release preflight](../.github/workflows/release-preflight.yml) runs
 `npm run release:check` without publishing. The manual
 [npm publish workflow](../.github/workflows/npm-publish.yml) runs the same full
-release gate before publishing with the configured npm trusted publisher.
+release gate before publishing with the configured npm trusted publisher, unless
+the preflight already passed on that commit on `main`; `prepack` still builds
+fresh artifacts. Dispatching after main's preflight finishes saves the repeat.
 Update `package.json` and the root package-lock version together, integrate the
 latest remote main, then dispatch the chosen release commit:
 
