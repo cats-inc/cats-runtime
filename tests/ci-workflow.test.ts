@@ -44,7 +44,7 @@ function stubGh(bin: string): void {
     'printf \'%s\\n\' "$2" >> "$STUB_LOG"',
     'case "$2" in',
     '  */pulls) [ -n "${STUB_PULLS:-}" ] || exit 1; printf \'%s\\n\' "$STUB_PULLS" ;;',
-    '  */actions/workflows/*) printf \'%s\\n\' "${STUB_PASSED:-0}" ;;',
+    '  */actions/workflows/*) [ -n "${STUB_PASSED:-}" ] || exit 1; printf \'%s\\n\' "$STUB_PASSED" ;;',
     '  *) exit 1 ;;',
     'esac',
   ].join('\n') + '\n', { mode: 0o755 });
