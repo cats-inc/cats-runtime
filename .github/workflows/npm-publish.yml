@@ -15,6 +15,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  actions: read
 
 jobs:
   publish:
@@ -38,7 +39,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # When the release preflight already passed on this exact commit on main,
+      # it ran this same release:check, so the publish does not repeat it.
+      # Anything else, or a failed lookup, runs the gate here as before.
+      # npm publish still builds fresh artifacts through prepack.
+      - name: Check whether the release preflight passed on this commit on main
+        id: ci
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/release-preflight.yml/runs?head_sha=$GITHUB_SHA&event=push&branch=main&status=success&per_page=1" --jq '.total_count' 2>/dev/null || true)
+          if [[ "$passed" =~ ^[1-9][0-9]*$ ]]; then tested=true; else tested=false; fi
+          echo "tested=$tested" | tee -a "$GITHUB_OUTPUT"
+
       - name: Run release gate
+        if: steps.ci.outputs.tested != 'true'
         run: npm run release:check
 
       - name: Publish package

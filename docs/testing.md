@@ -70,6 +70,22 @@ The release preflight workflow first checks whether every changed file is under
 passing, so the pull request still merges. Any other path, a manual run or a failed
 detection runs the full gate.
 
+A push to `main` also skips the gate when its merged pull request already passed on
+the same tree. `main` requires up-to-date branches, so a squash merge usually lands
+exactly what the pull request's preflight tested. The `changes` job reuses that run
+only when all of these hold:
+
+- the push adds one commit on the previous `main`;
+- the GitHub API names that commit as a pull request's merge;
+- the request's final head, fetched from `refs/pull/<n>/head`, contains the
+  previous `main` and has the pushed commit's tree;
+- the preflight passed on that head as a `pull_request` run.
+
+Any other push, or any failed lookup, runs the full gate. `npm-publish.yml` likewise
+skips `release:check` when the preflight passed on the dispatched commit on `main`,
+and runs it otherwise. `tests/ci-workflow.test.ts` runs both steps against a local
+origin with a stubbed `gh`.
+
 Tests and scripts must therefore not read repository documentation. Executable
 inputs live under `tests/fixtures/`: captured provider output that tests replay in
 `tests/fixtures/provider-captures/<cli>-<version>/`, and schema-1 catalog profiles in
