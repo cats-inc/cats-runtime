@@ -1,0 +1,812 @@
+{
+  "observedOn": "2026-11-01",
+  "sourceClass": "interactive-picker",
+  "command": "/model and session-only /status",
+  "version": "2.1.316",
+  "accountScope": "Existing signed-in Claude Ultra account on native Windows 11; no identity retained.",
+  "completeness": "complete: Default sentinel plus twelve explicit models, each effort range/default and each explicit row status.",
+  "capture": {
+    "CapturedModels": [
+      {
+        "Index": 1,
+        "Label": "Default (recommended)",
+        "Current": false,
+        "Description": "Opus 5.5 · Best for everyday, complex tasks",
+        "Unsupported": false,
+        "CycleComplete": true,
+        "Shape": "linear",
+        "Order": [
+          "Low",
+          "Medium",
+          "High",
+          "xHigh",
+          "Max"
+        ],
+        "EffortCycle": [
+          {
+            "Line": "◉ xHigh effort ←/→ to adjust",
+            "Level": "xHigh",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◈ Max effort ←/→ to adjust",
+            "Level": "Max",
+            "Default": false,
+            "Detail": [
+              "May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.",
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "● High effort ←/→ to adjust",
+            "Level": "High",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◐ Medium effort (default) ←/→ to adjust",
+            "Level": "Medium",
+            "Default": true,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "○ Low effort ←/→ to adjust",
+            "Level": "Low",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          }
+        ]
+      },
+      {
+        "Index": 2,
+        "Label": "Opus 5.5",
+        "Current": true,
+        "Description": "For complex work and everyday tasks",
+        "Unsupported": false,
+        "CycleComplete": true,
+        "Shape": "linear",
+        "Order": [
+          "Low",
+          "Medium",
+          "High",
+          "xHigh",
+          "Max"
+        ],
+        "EffortCycle": [
+          {
+            "Line": "○ Low effort ←/→ to adjust",
+            "Level": "Low",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◐ Medium effort (default) ←/→ to adjust",
+            "Level": "Medium",
+            "Default": true,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "● High effort ←/→ to adjust",
+            "Level": "High",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◉ xHigh effort ←/→ to adjust",
+            "Level": "xHigh",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◈ Max effort ←/→ to adjust",
+            "Level": "Max",
+            "Default": false,
+            "Detail": [
+              "May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.",
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          }
+        ]
+      },
+      {
+        "Index": 3,
+        "Label": "Fable 5.1",
+        "Current": false,
+        "Description": "For your toughest challenges",
+        "Unsupported": false,
+        "CycleComplete": true,
+        "Shape": "linear",
+        "Order": [
+          "Low",
+          "Medium",
+          "High",
+          "xHigh",
+          "Max"
+        ],
+        "EffortCycle": [
+          {
+            "Line": "○ Low effort ←/→ to adjust",
+            "Level": "Low",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◐ Medium effort ←/→ to adjust",
+            "Level": "Medium",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "● High effort (default) ←/→ to adjust",
+            "Level": "High",
+            "Default": true,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◉ xHigh effort ←/→ to adjust",
+            "Level": "xHigh",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◈ Max effort ←/→ to adjust",
+            "Level": "Max",
+            "Default": false,
+            "Detail": [
+              "May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.",
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          }
+        ]
+      },
+      {
+        "Index": 4,
+        "Label": "Sonnet 5.5",
+        "Current": false,
+        "Description": "Most efficient for simpler tasks",
+        "Unsupported": false,
+        "CycleComplete": true,
+        "Shape": "linear",
+        "Order": [
+          "Low",
+          "Medium",
+          "High",
+          "xHigh",
+          "Max"
+        ],
+        "EffortCycle": [
+          {
+            "Line": "○ Low effort ←/→ to adjust",
+            "Level": "Low",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◐ Medium effort (default) ←/→ to adjust",
+            "Level": "Medium",
+            "Default": true,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "● High effort ←/→ to adjust",
+            "Level": "High",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◉ xHigh effort ←/→ to adjust",
+            "Level": "xHigh",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◈ Max effort ←/→ to adjust",
+            "Level": "Max",
+            "Default": false,
+            "Detail": [
+              "May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.",
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          }
+        ]
+      },
+      {
+        "Index": 5,
+        "Label": "Haiku 5.5",
+        "Current": false,
+        "Description": "Fastest for quick answers",
+        "Unsupported": false,
+        "CycleComplete": true,
+        "Shape": "linear",
+        "Order": [
+          "Low",
+          "Medium",
+          "High",
+          "xHigh",
+          "Max"
+        ],
+        "EffortCycle": [
+          {
+            "Line": "○ Low effort ←/→ to adjust",
+            "Level": "Low",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◐ Medium effort (default) ←/→ to adjust",
+            "Level": "Medium",
+            "Default": true,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "● High effort ←/→ to adjust",
+            "Level": "High",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◉ xHigh effort ←/→ to adjust",
+            "Level": "xHigh",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◈ Max effort ←/→ to adjust",
+            "Level": "Max",
+            "Default": false,
+            "Detail": [
+              "May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.",
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          }
+        ]
+      },
+      {
+        "Index": 6,
+        "Label": "Haiku 4.5",
+        "Current": false,
+        "Description": "Fastest for quick answers",
+        "Unsupported": true,
+        "CycleComplete": true,
+        "Shape": "none",
+        "Order": [],
+        "EffortCycle": [
+          {
+            "Line": "○ Effort not supported for Haiku 4.5",
+            "Level": null,
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          }
+        ]
+      },
+      {
+        "Index": 7,
+        "Label": "Sonnet 5",
+        "Current": false,
+        "Description": "Efficient for routine tasks",
+        "Unsupported": false,
+        "CycleComplete": true,
+        "Shape": "linear",
+        "Order": [
+          "Low",
+          "Medium",
+          "High",
+          "xHigh",
+          "Max"
+        ],
+        "EffortCycle": [
+          {
+            "Line": "○ Low effort ←/→ to adjust",
+            "Level": "Low",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◐ Medium effort ←/→ to adjust",
+            "Level": "Medium",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "● High effort (default) ←/→ to adjust",
+            "Level": "High",
+            "Default": true,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◉ xHigh effort ←/→ to adjust",
+            "Level": "xHigh",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◈ Max effort ←/→ to adjust",
+            "Level": "Max",
+            "Default": false,
+            "Detail": [
+              "May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.",
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          }
+        ]
+      },
+      {
+        "Index": 8,
+        "Label": "Opus 5",
+        "Current": false,
+        "Description": "Best for everyday, complex tasks",
+        "Unsupported": false,
+        "CycleComplete": true,
+        "Shape": "linear",
+        "Order": [
+          "Low",
+          "Medium",
+          "High",
+          "xHigh",
+          "Max"
+        ],
+        "EffortCycle": [
+          {
+            "Line": "○ Low effort ←/→ to adjust",
+            "Level": "Low",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◐ Medium effort ←/→ to adjust",
+            "Level": "Medium",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "● High effort (default) ←/→ to adjust",
+            "Level": "High",
+            "Default": true,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◉ xHigh effort ←/→ to adjust",
+            "Level": "xHigh",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◈ Max effort ←/→ to adjust",
+            "Level": "Max",
+            "Default": false,
+            "Detail": [
+              "May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.",
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          }
+        ]
+      },
+      {
+        "Index": 9,
+        "Label": "Fable 5",
+        "Current": false,
+        "Description": "Most capable for your hardest and longest-running tasks",
+        "Unsupported": false,
+        "CycleComplete": true,
+        "Shape": "linear",
+        "Order": [
+          "Low",
+          "Medium",
+          "High",
+          "xHigh",
+          "Max"
+        ],
+        "EffortCycle": [
+          {
+            "Line": "○ Low effort ←/→ to adjust",
+            "Level": "Low",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◐ Medium effort ←/→ to adjust",
+            "Level": "Medium",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "● High effort (default) ←/→ to adjust",
+            "Level": "High",
+            "Default": true,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◉ xHigh effort ←/→ to adjust",
+            "Level": "xHigh",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◈ Max effort ←/→ to adjust",
+            "Level": "Max",
+            "Default": false,
+            "Detail": [
+              "May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.",
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          }
+        ]
+      },
+      {
+        "Index": 10,
+        "Label": "Opus 4.8",
+        "Current": false,
+        "Description": "Best for everyday, complex tasks",
+        "Unsupported": false,
+        "CycleComplete": true,
+        "Shape": "linear",
+        "Order": [
+          "Low",
+          "Medium",
+          "High",
+          "xHigh",
+          "Max"
+        ],
+        "EffortCycle": [
+          {
+            "Line": "○ Low effort ←/→ to adjust",
+            "Level": "Low",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◐ Medium effort ←/→ to adjust",
+            "Level": "Medium",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "● High effort (default) ←/→ to adjust",
+            "Level": "High",
+            "Default": true,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◉ xHigh effort ←/→ to adjust",
+            "Level": "xHigh",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◈ Max effort ←/→ to adjust",
+            "Level": "Max",
+            "Default": false,
+            "Detail": [
+              "May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.",
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          }
+        ]
+      },
+      {
+        "Index": 11,
+        "Label": "Opus 4.7",
+        "Current": false,
+        "Description": "Best for everyday, complex tasks",
+        "Unsupported": false,
+        "CycleComplete": true,
+        "Shape": "linear",
+        "Order": [
+          "Low",
+          "Medium",
+          "High",
+          "xHigh",
+          "Max"
+        ],
+        "EffortCycle": [
+          {
+            "Line": "○ Low effort ←/→ to adjust",
+            "Level": "Low",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◐ Medium effort ←/→ to adjust",
+            "Level": "Medium",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "● High effort ←/→ to adjust",
+            "Level": "High",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◉ xHigh effort (default) ←/→ to adjust",
+            "Level": "xHigh",
+            "Default": true,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◈ Max effort ←/→ to adjust",
+            "Level": "Max",
+            "Default": false,
+            "Detail": [
+              "May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.",
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          }
+        ]
+      },
+      {
+        "Index": 12,
+        "Label": "Opus 4.6",
+        "Current": false,
+        "Description": "Best for everyday, complex tasks",
+        "Unsupported": false,
+        "CycleComplete": true,
+        "Shape": "linear",
+        "Order": [
+          "Low",
+          "Medium",
+          "High",
+          "Max"
+        ],
+        "EffortCycle": [
+          {
+            "Line": "○ Low effort ←/→ to adjust",
+            "Level": "Low",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◐ Medium effort ←/→ to adjust",
+            "Level": "Medium",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "● High effort (default) ←/→ to adjust",
+            "Level": "High",
+            "Default": true,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◈ Max effort ←/→ to adjust",
+            "Level": "Max",
+            "Default": false,
+            "Detail": [
+              "May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.",
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          }
+        ]
+      },
+      {
+        "Index": 13,
+        "Label": "Sonnet 4.6",
+        "Current": false,
+        "Description": "Efficient for routine tasks",
+        "Unsupported": false,
+        "CycleComplete": true,
+        "Shape": "linear",
+        "Order": [
+          "Low",
+          "Medium",
+          "High",
+          "Max"
+        ],
+        "EffortCycle": [
+          {
+            "Line": "○ Low effort ←/→ to adjust",
+            "Level": "Low",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◐ Medium effort ←/→ to adjust",
+            "Level": "Medium",
+            "Default": false,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "● High effort (default) ←/→ to adjust",
+            "Level": "High",
+            "Default": true,
+            "Detail": [
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          },
+          {
+            "Line": "◈ Max effort ←/→ to adjust",
+            "Level": "Max",
+            "Default": false,
+            "Detail": [
+              "May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.",
+              "Use /fast to turn on Fast mode (Opus 5.5)."
+            ]
+          }
+        ]
+      }
+    ],
+    "TextCaptures": 74,
+    "Screenshots": 0,
+    "ConfigUnchanged": true,
+    "Completeness": "Effort Order is linear (lowest first) or the Right-key cycle from each row's starting level; reconcile with screenshots"
+  },
+  "status": [
+    {
+      "Row": 2,
+      "Label": "Opus 5.5",
+      "Confirmation": "Set model to Opus 5.5 for this session only",
+      "Version": "2.1.316",
+      "StatusModel": "opus (claude-opus-5-5)"
+    },
+    {
+      "Row": 3,
+      "Label": "Fable 5.1",
+      "Confirmation": "Set model to Fable 5.1 for this session only",
+      "Version": "2.1.316",
+      "StatusModel": "fable (claude-fable-5-1)"
+    },
+    {
+      "Row": 4,
+      "Label": "Sonnet 5.5",
+      "Confirmation": "Set model to Sonnet 5.5 for this session only",
+      "Version": "2.1.316",
+      "StatusModel": "sonnet (claude-sonnet-5-5)"
+    },
+    {
+      "Row": 5,
+      "Label": "Haiku 5.5",
+      "Confirmation": "Set model to Haiku 5.5 for this session only",
+      "Version": "2.1.316",
+      "StatusModel": "haiku (claude-haiku-5-5)"
+    },
+    {
+      "Row": 6,
+      "Label": "Haiku 4.5",
+      "Confirmation": "Set model to Haiku 4.5 for this session only",
+      "Version": "2.1.316",
+      "StatusModel": "claude-haiku-4-5-20251001"
+    },
+    {
+      "Row": 7,
+      "Label": "Sonnet 5",
+      "Confirmation": "Set model to Sonnet 5 for this session only",
+      "Version": "2.1.316",
+      "StatusModel": "claude-sonnet-5"
+    },
+    {
+      "Row": 8,
+      "Label": "Opus 5",
+      "Confirmation": "Set model to Opus 5 for this session only",
+      "Version": "2.1.316",
+      "StatusModel": "claude-opus-5"
+    },
+    {
+      "Row": 9,
+      "Label": "Fable 5",
+      "Confirmation": "Set model to Fable 5 for this session only",
+      "Version": "2.1.316",
+      "StatusModel": "claude-fable-5"
+    },
+    {
+      "Row": 10,
+      "Label": "Opus 4.8",
+      "Confirmation": "Set model to Opus 4.8 for this session only",
+      "Version": "2.1.316",
+      "StatusModel": "claude-opus-4-8"
+    },
+    {
+      "Row": 11,
+      "Label": "Opus 4.7",
+      "Confirmation": "Set model to Opus 4.7 for this session only",
+      "Version": "2.1.316",
+      "StatusModel": "claude-opus-4-7"
+    },
+    {
+      "Row": 12,
+      "Label": "Opus 4.6",
+      "Confirmation": "Set model to Opus 4.6 for this session only",
+      "Version": "2.1.316",
+      "StatusModel": "claude-opus-4-6"
+    },
+    {
+      "Row": 13,
+      "Label": "Sonnet 4.6",
+      "Confirmation": "Set model to Sonnet 4.6 for this session only",
+      "Version": "2.1.316",
+      "StatusModel": "claude-sonnet-4-6"
+    }
+  ]
+}

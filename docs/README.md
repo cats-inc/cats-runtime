@@ -1,5 +1,8 @@
 # Documentation Index
 
+[Seven CLI catalog refresh](research/2026-11-01-seven-cli-catalog-refresh.md) records the
+six confirmed refreshes, Copilot's account feature 403, and Playground/Platform/Bot validation.
+
 [Provider session capabilities and interactions](specs/SPEC-039-provider-session-capabilities-and-interactions.md)
 is approved for sliced implementation (2026-10-28): native approvals/input, effective policy
 and observed tools shared by Platform and standalone Bots.

@@ -4,8 +4,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Claude
-    cli_version: 2.1.310
-    last_updated: 2026-10-24
+    cli_version: 2.1.316
+    last_updated: 2026-11-01
     notes:
       - Model list, every model's effort line and every row's value re-read 2026-10-03 by an
         agent-operated capture of the Claude Code 2.1.288 `/model` picker (Windows UI Automation
@@ -83,6 +83,15 @@ catalogs:
         prior catalog; settings unchanged. Evidence:
         docs/research/fixtures/claude-2.1.310/model-picker.agent-capture.2026-10-24.redacted.txt.
         Research: docs/research/2026-10-24-sixteen-cli-catalog-refresh.md."
+      - "Re-read 2026-11-01 on native Windows 11 within the configured channel/account. This supersedes
+        earlier current-list/count claims; unobserved fields retain their original provenance. Complete
+        13-row /model capture (Default sentinel plus twelve explicit models), every per-row effort
+        range/default, and all twelve session-only /status mappings match the previous catalog. Existing
+        operator choices for the Default sentinel and pinned Fable execution are retained. Current account
+        banner says Claude Ultra; no plan restriction is asserted. Settings hash remained unchanged.
+        Evidence:
+        docs/research/fixtures/claude-2.1.316/model-picker.agent-capture.2026-11-01.redacted.json.
+        Research: docs/research/2026-11-01-seven-cli-catalog-refresh.md."
     models:
       - default: true
         id: opus
@@ -473,8 +482,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Codex
-    cli_version: 0.164.0
-    last_updated: 2026-10-24
+    cli_version: 0.166.0
+    last_updated: 2026-11-01
     notes:
       - Complete visible model list and every per-model reasoning/advanced menu captured on 2026-10-01
         Asia/Taipei (2026-09-30 UTC) from Codex CLI 0.159.2 in Windows Terminal using UI Automation
@@ -510,6 +519,16 @@ catalogs:
         previous picker provenance. Evidence:
         docs/research/fixtures/codex-0.164.0/model-list-2026-10-24.probe.redacted.json. Research:
         docs/research/2026-10-24-sixteen-cli-catalog-refresh.md."
+      - "Re-read 2026-11-01 on native Windows 11 within the configured channel/account. This supersedes
+        earlier current-list/count claims; unobserved fields retain their original provenance. Complete
+        debug models and picker lists confirm eight visible rows; GPT-6.1 Terra is new, third in picker
+        order. Existing labels, effort tokens/defaults and context limits are unchanged. Terra supports
+        Low through Ultra, default Low, context 500000; More reasoning hierarchy is retained in evidence
+        and projected using the earlier operator-approved flat effort policy. Existing model-default
+        policy is retained; no row showed (default). Evidence:
+        docs/research/fixtures/codex-0.166.0/model-list-2026-11-01.probe.redacted.json and
+        docs/research/fixtures/codex-0.166.0/terra-picker.2026-11-01.redacted.txt. Research:
+        docs/research/2026-11-01-seven-cli-catalog-refresh.md."
     models:
       - default: false
         id: gpt-6.1-sol
@@ -589,6 +608,42 @@ catalogs:
             default: medium
         limits:
           contextWindowTokens: 272000
+      - id: gpt-6.1-terra
+        label: GPT-6.1 Terra
+        execution:
+          model: gpt-6.1-terra
+        controls:
+          - key: codex.reasoning_effort
+            label: Reasoning effort
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: Low
+                description: Fast responses with lighter reasoning
+              - value: medium
+                label: Medium
+                description: Balances speed and reasoning depth for everyday tasks
+              - value: high
+                label: High
+                description: Greater reasoning depth for complex problems
+              - value: xhigh
+                label: Extra high
+                description: Extra high reasoning depth for complex problems
+              - value: max
+                label: Max
+                description: For difficult problems when quality matters more than speed · higher usage
+              - value: ultra
+                label: Ultra
+                description: For demanding work using multiple agents · highest usage
+            default: low
+            semanticTags:
+              - reasoning_intensity
+        limits:
+          contextWindowTokens: 500000
+        notes:
+          - "Picker description: GPT-6.1 Terra Codex model."
+          - "2026-11-01: Codex 0.166.0 lists Terra third. Its reasoning picker shows Low (default), Medium, High, Extra high; More reasoning contains Max and Ultra. The previously approved flat effort projection is retained; navigation and usage warning remain in the evidence. Raw ID, effort tokens/default and 500000 context come from account-resolved debug models. Evidence: docs/research/fixtures/codex-0.166.0/terra-picker.2026-11-01.redacted.txt"
       - default: false
         id: gpt-6-sol
         label: GPT-6-Sol
@@ -784,8 +839,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Antigravity
-    cli_version: 1.4.7
-    last_updated: 2026-10-24
+    cli_version: 1.4.12
+    last_updated: 2026-11-01
     notes:
       - Complete operator-supplied /model picker and all per-model effort screens on Antigravity CLI
         1.2.3, observed 2026-09-16; account scope is the operator's CLI.
@@ -808,6 +863,13 @@ catalogs:
         families. Slider labels/options retain 2026-10-20 picker provenance. Evidence:
         docs/research/fixtures/antigravity-1.4.7/model-list-2026-10-24.probe.redacted.json. Research:
         docs/research/2026-10-24-sixteen-cli-catalog-refresh.md."
+      - "Re-read 2026-11-01 on native Windows 11 within the configured channel/account. This supersedes
+        earlier current-list/count claims; unobserved fields retain their original provenance. Complete
+        agy models enumeration confirms all thirteen executable variants underlying the same five picker
+        families. Existing slider labels/order and descriptions retain their earlier picker provenance; no
+        slider was recaptured. Evidence:
+        docs/research/fixtures/antigravity-1.4.12/model-list-2026-11-01.probe.redacted.json. Research:
+        docs/research/2026-11-01-seven-cli-catalog-refresh.md."
     models:
       - id: gemini-4-argon-low
         label: Gemini 4 Argon
@@ -945,7 +1007,7 @@ catalogs:
     selection_mode: full
     source_cli: Grok
     cli_version: 1.0.70
-    last_updated: 2026-10-24
+    last_updated: 2026-11-01
     notes:
       - "Complete four-model /model list and per-model effort menus captured 2026-09-25 from Grok
         Build 1.0.41 by operating the CLI menus. UI Automation text was checked against window
@@ -977,6 +1039,15 @@ catalogs:
         docs/research/fixtures/grok-1.0.70/model-list-2026-10-24.probe.redacted.json,
         docs/research/fixtures/grok-1.0.70/model-options-2026-10-24.cache.redacted.json. Research:
         docs/research/2026-10-24-sixteen-cli-catalog-refresh.md."
+      - "Re-read 2026-11-01 on native Windows 11 within the configured channel/account. This supersedes
+        earlier current-list/count claims; unobserved fields retain their original provenance. Complete
+        grok models list confirms the same four models. The CLI-owned account cache was reread: exact
+        labels, per-model effort values/descriptions and default context 256000 agree with the catalog.
+        Context 500000 alternatives remain evidence only because no new transport was established.
+        Existing operator-approved first-value policy without default claims is retained. Evidence:
+        docs/research/fixtures/grok-1.0.70/model-list-2026-11-01.probe.redacted.json and
+        docs/research/fixtures/grok-1.0.70/models-cache.2026-11-01.redacted.json. Research:
+        docs/research/2026-11-01-seven-cli-catalog-refresh.md."
     models:
       - id: grok-4.7
         label: Grok 4.7
@@ -1107,8 +1178,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Muse
-    cli_version: 1.4.12-R6909.1
-    last_updated: 2026-10-24
+    cli_version: 1.4.14-R7309.1
+    last_updated: 2026-11-01
     notes:
       - "Model list re-read 2026-09-26 on Muse Code 1.4.0 (muse-bin-1.4.0-R4161.1): MSP `model/list`
         over `muse serve --no-session-log` (providerId `meta`, profileId `tbh`, source
@@ -1165,6 +1236,13 @@ catalogs:
         No MSP isDefault is copied into model or effort defaults. Evidence:
         docs/research/fixtures/muse-1.4.12-R6909.1/model-list-2026-10-24.probe.redacted.json. Research:
         docs/research/2026-10-24-sixteen-cli-catalog-refresh.md."
+      - "Re-read 2026-11-01 on native Windows 11 within the configured channel/account. This supersedes
+        earlier current-list/count claims; unobserved fields retain their original provenance. Complete
+        account-resolved MSP providerCatalog lists the same three models; labels, ordered variants and
+        context/output limits agree. Prior per-model picker effort provenance is retained; MSP isDefault
+        is not a curated default. Evidence:
+        docs/research/fixtures/muse-1.4.14-R7309.1/model-list-2026-11-01.probe.redacted.json. Research:
+        docs/research/2026-11-01-seven-cli-catalog-refresh.md."
     models:
       - id: muse-wonder-1.0
         label: muse-wonder-1.0
@@ -1282,7 +1360,7 @@ catalogs:
     selection_mode: full
     source_cli: Cursor
     cli_version: 2026.10.22-27dcf5f
-    last_updated: 2026-10-24
+    last_updated: 2026-11-01
     notes:
       - "The complete Cursor CLI 2026.10.01-e373342 model picker, replacing the 2026-09-18 shortlist at the operator's request on 2026-10-14: the 44 families of the account-resolved parameterizedModels reply in its order, without gemini-2.5-flash, which the CLI excludes. Captured with scripts/capture-cursor-parameterized-models.mjs, a process-local read of the reply `cursor-agent --list-models` already fetches; no installed file, credential or inference was involved. Evidence: docs/research/fixtures/cursor-2026.10.01-e373342/parameterized-models.redacted.json and docs/research/2026-10-14-shortlists-to-full.md."
       - "Each family's parameters are controls (cursor.context, cursor.effort, cursor.reasoning, cursor.reasoning_effort, cursor.thinking, cursor.fast) whose combinations select the server's exact variantStringRepresentation, passed as one --model argument. Enum values use the picker's display names; thinking and fast are the picker's on/off switches, here Off and On. A parameter with one value is fixed and not shown, as in the picker."
@@ -1296,6 +1374,14 @@ catalogs:
         supply control defaults. Evidence:
         docs/research/fixtures/cursor-2026.10.22-27dcf5f/parameterized-models-2026-10-24.redacted.json.
         Research: docs/research/2026-10-24-sixteen-cli-catalog-refresh.md."
+      - "Re-read 2026-11-01 on native Windows 11 within the configured channel/account. This supersedes
+        earlier current-list/count claims; unobserved fields retain their original provenance. Complete
+        account-resolved parameterized reply contains 46 CLI-filtered families, projected losslessly to 49
+        entries. DeepSeek V4.1 Flash 1017 is new; all prior executable variants, labels, controls/defaults
+        and rows are unchanged. Defaults follow picker-preselected isDefaultNonMaxConfig variants; no
+        unlisted combination is offered. Evidence:
+        docs/research/fixtures/cursor-2026.10.22-27dcf5f/parameterized-models-2026-11-01.redacted.json.
+        Research: docs/research/2026-11-01-seven-cli-catalog-refresh.md."
     models:
       - id: default[]
         label: Auto
@@ -4847,6 +4933,43 @@ catalogs:
             values:
               - value: low
                 label: Low
+              - value: high
+                label: High
+              - value: max
+                label: Max
+            default: high
+      - id: deepseek-v41-flash-1017[reasoning_effort=high]
+        label: DeepSeek V4.1 Flash 1017
+        execution:
+          model: deepseek-v41-flash-1017[reasoning_effort=high]
+          variants:
+            - when:
+                cursor.reasoning_effort: high
+              model: deepseek-v41-flash-1017[reasoning_effort=high]
+            - when:
+                cursor.reasoning_effort: none
+              model: deepseek-v41-flash-1017[reasoning_effort=none]
+            - when:
+                cursor.reasoning_effort: low
+              model: deepseek-v41-flash-1017[reasoning_effort=low]
+            - when:
+                cursor.reasoning_effort: medium
+              model: deepseek-v41-flash-1017[reasoning_effort=medium]
+            - when:
+                cursor.reasoning_effort: max
+              model: deepseek-v41-flash-1017[reasoning_effort=max]
+        controls:
+          - key: cursor.reasoning_effort
+            label: Reasoning
+            kind: enum
+            scope: both
+            values:
+              - value: none
+                label: None
+              - value: low
+                label: Low
+              - value: medium
+                label: Medium
               - value: high
                 label: High
               - value: max
