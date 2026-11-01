@@ -4196,7 +4196,9 @@ providers:
         defaultModel: factoryModels.find(model => model.default)?.id ?? null,
         source: 'static',
         cache: null,
-        models: factoryModels.map(({ id, label, default: isDefault }) => ({ id, label, default: isDefault })),
+        models: factoryModels.map(({ id, label, default: isDefault }) => ({
+          id, label, ...(isDefault === undefined ? {} : { default: isDefault }),
+        })),
         warnings: [],
       });
     });

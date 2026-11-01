@@ -45,6 +45,12 @@ are empty. There are no removals, new bindings, inferred capabilities or model-d
 - Same saved six-source probe snapshot revalidated clean (notes only). Claude picker and Cursor
   parameterized evidence cover fields the basic probe cannot verify. Copilot's failed snapshot
   remains separate and inconclusive.
+- Hosted preflight passed 2953 tests and exposed one HTTP-test expectation that required an
+  explicit `default: undefined` property for Terra's optional absent default. JSON omits undefined
+  fields. The factory-backed expectation now preserves explicit true/false and omits absent
+  defaults, matching the unchanged HTTP contract; no model default is invented to satisfy a test.
+  Its focused HTTP model/catalog rerun passed 31 cases (44 unrelated cases skipped), TypeScript
+  checking passed, and independent review found no issue with this assertion-only correction.
 - Focused Runtime: catalog-data 22, catalog-runtime 38, providerModelCatalog 20 passed.
   Playground shared selection/default/agent suites passed another 30 tests (110 total focused
   Runtime tests). No full-suite claim.
