@@ -1,0 +1,15 @@
+Date: 2026-11-01 (UTC+8)
+Platform: native Windows 11
+Scope: existing CLI sign-in; identity and request metadata omitted.
+
+After the operator confirmed completing sign-in, the targeted models.list read returned:
+HTTP 403 Forbidden
+unauthorized: not authorized to use this Copilot feature
+
+Independent interactive observation:
+Copilot v1.0.105
+Model catalog failed to load: Error: 403 "unauthorized: not authorized to use this Copilot feature\n"
+
+Completeness: unavailable. No membership, model IDs, labels, options or defaults established.
+The older factory catalog and last_updated remain unchanged.
+No prompt/inference, authentication action or permission-policy change was performed.
