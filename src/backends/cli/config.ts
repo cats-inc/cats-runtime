@@ -224,6 +224,7 @@ export interface CliRuntimeConfig {
   maxSessions: number;
   spawnRetries: number;
   spawnTimeoutMs: number;
+  messageIdleTimeoutMs: number;
   sessionBaseDir: string;
   metering?: RuntimeMeteringConfig;
   providerCommands: Record<ProviderName, ProviderCommandConfig>;
@@ -389,6 +390,10 @@ export function defaultSpawnTimeoutMs(): number {
   return 30000;
 }
 
+export function defaultMessageIdleTimeoutMs(): number {
+  return 120000;
+}
+
 export function defaultCompatibilityProbeTimeoutMs(): number {
   return 10000;
 }
@@ -528,6 +533,12 @@ export function loadConfig(
       env.CATS_RUNTIME_SPAWN_TIMEOUT_MS,
       defaultSpawnTimeoutMs(),
       'CATS_RUNTIME_SPAWN_TIMEOUT_MS',
+    ),
+    messageIdleTimeoutMs: parseNonNegativeInt(
+      // Explicit old spawn settings covered both phases, including 0 (disabled).
+      env.CATS_RUNTIME_MESSAGE_IDLE_TIMEOUT_MS || env.CATS_RUNTIME_SPAWN_TIMEOUT_MS,
+      defaultMessageIdleTimeoutMs(),
+      'CATS_RUNTIME_MESSAGE_IDLE_TIMEOUT_MS',
     ),
     sessionBaseDir,
     metering: {

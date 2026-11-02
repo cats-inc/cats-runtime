@@ -3432,6 +3432,14 @@ Current normalized progress kinds:
   session history, observe events or metering. If the client disconnects, the
   turn still runs to completion and later lines are dropped.
 
+Legacy ephemeral CLI workers have separate provider-event inactivity limits:
+30 seconds for the first event and 120 seconds of silence after it by default.
+Each provider event resets the latter timer; HTTP heartbeats do not. Configure
+the latter with `CATS_RUNTIME_MESSAGE_IDLE_TIMEOUT_MS` (`0` disables it). An
+explicit legacy `CATS_RUNTIME_SPAWN_TIMEOUT_MS` still covers both phases when
+the new setting is absent, and an explicit CLI instance `timeout_ms` overrides
+both global values. A long turn that emits progress can exceed either budget.
+
 Runtime-owned strategy loops emit additive `progress` events with
 `metadata.kind: "strategy"` and statuses such as `started`, `updated`,
 `completed`, or `failed`. This extends the existing stream/observe/session

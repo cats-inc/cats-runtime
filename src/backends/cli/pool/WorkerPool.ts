@@ -352,6 +352,7 @@ export class WorkerPool {
           instance.timeoutMs,
           this.config.spawnTimeoutMs,
         ),
+        idleTimeoutMs: instance.timeoutMs ?? this.config.messageIdleTimeoutMs,
       };
       const managed = hasManagedPluginExposure(this.config.sessionBaseDir, sessionId);
       const executionId = randomUUID();

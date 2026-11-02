@@ -21,6 +21,7 @@ import {
   defaultProviderRuntimeMode,
   defaultSpawnRetries,
   defaultSpawnTimeoutMs,
+  defaultMessageIdleTimeoutMs,
   defaultDockerDiscoveryPolicy,
   defaultWslDiscoveryPolicy,
   listProviderInstances,
@@ -137,6 +138,36 @@ describe('config platform defaults', () => {
 
   it('defaults spawn timeout to 30 seconds', () => {
     expect(defaultSpawnTimeoutMs()).toBe(30000);
+  });
+
+  it('keeps the message silence budget separate from startup and aligned with Desktop', () => {
+    expect(defaultMessageIdleTimeoutMs()).toBe(120000);
+    const config = loadConfigWithoutProviderFile();
+    expect(config.spawnTimeoutMs).toBe(30000);
+    expect(config.messageIdleTimeoutMs).toBe(120000);
+  });
+
+  it('configures or disables message silence without changing the startup budget', () => {
+    for (const value of ['45000', '0']) {
+      const config = loadConfigWithoutProviderFile({ CATS_RUNTIME_MESSAGE_IDLE_TIMEOUT_MS: value });
+      expect(config.messageIdleTimeoutMs).toBe(Number(value));
+      expect(config.spawnTimeoutMs).toBe(30000);
+    }
+    expect(() => loadConfigWithoutProviderFile({ CATS_RUNTIME_MESSAGE_IDLE_TIMEOUT_MS: '-1' }))
+      .toThrow(/CATS_RUNTIME_MESSAGE_IDLE_TIMEOUT_MS/);
+  });
+
+  it('preserves explicit legacy spawn settings for both phases unless idle is selected separately', () => {
+    for (const value of ['15000', '0']) {
+      const legacy = loadConfigWithoutProviderFile({ CATS_RUNTIME_SPAWN_TIMEOUT_MS: value });
+      expect(legacy.spawnTimeoutMs).toBe(Number(value));
+      expect(legacy.messageIdleTimeoutMs).toBe(Number(value));
+      const separate = loadConfigWithoutProviderFile({
+        CATS_RUNTIME_SPAWN_TIMEOUT_MS: value, CATS_RUNTIME_MESSAGE_IDLE_TIMEOUT_MS: '45000',
+      });
+      expect(separate.spawnTimeoutMs).toBe(Number(value));
+      expect(separate.messageIdleTimeoutMs).toBe(45000);
+    }
   });
 
   it('defaults compatibility probe timeouts to 10 seconds for native and 20 seconds for WSL/Docker', () => {

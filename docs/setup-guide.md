@@ -694,6 +694,14 @@ Keep `.env` for runtime-wide values and secrets:
 - `CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS=15000`
 - `CATS_RUNTIME_SPAWN_RETRIES=1`
 - `CATS_RUNTIME_SPAWN_TIMEOUT_MS=30000`
+- `CATS_RUNTIME_MESSAGE_IDLE_TIMEOUT_MS=120000` (silence after the first event of an
+  ephemeral CLI turn, reset by each subsequent event; separate from startup and
+  equal in duration to Cats Desktop's default HTTP stream idle budget). `0` disables
+  this timer. Runtime HTTP heartbeats reset Desktop's byte-idle budget, but do not
+  reset this provider-event timer. When the new setting is omitted, an explicitly
+  configured `CATS_RUNTIME_SPAWN_TIMEOUT_MS` retains its old meaning for both phases,
+  including `0`. An explicit CLI instance `timeout_ms` overrides both global values.
+  These are inactivity limits, not total turn limits.
 - `CATS_RUNTIME_PEERS_ENABLED=false`
 - `CATS_RUNTIME_PEER_ID=`
 - `CATS_RUNTIME_PEER_NAME=`

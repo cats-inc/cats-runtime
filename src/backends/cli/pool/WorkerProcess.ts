@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { createInterface } from 'node:readline';
-import type { ProviderCommandConfig } from '../config.js';
+import { defaultMessageIdleTimeoutMs, type ProviderCommandConfig } from '../config.js';
 import type {
   ErrorStreamEvent,
   InitStreamEvent,
@@ -36,6 +36,8 @@ export interface WorkerProcessEvents {
 export interface SpawnResilienceConfig {
   retries: number;
   timeoutMs: number;
+  /** Silence after the first event; an explicit instance timeout still covers both phases. */
+  idleTimeoutMs?: number;
 }
 
 function isSessionIdentityEvent(
@@ -120,7 +122,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     provider: Provider,
     spawnOpts: ProviderSpawnOptions,
     commandConfig: ProviderCommandConfig,
-    spawnResilience: SpawnResilienceConfig = { retries: 1, timeoutMs: 30_000 },
+    spawnResilience: SpawnResilienceConfig = { retries: 1, timeoutMs: 30_000, idleTimeoutMs: defaultMessageIdleTimeoutMs() },
     private readonly managedPluginExecution = false,
     /** SPEC-035 secrets for this child only; never logged or placed in argv. */
     private readonly launchEnv: Readonly<Record<string, string>> = {},
@@ -515,7 +517,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     let error: Error | null = null;
     let sawEvent = false;
     let sawTerminalEvent = false;
-    let currentAttemptTimeoutMs = 0;
+    let currentAttemptIdleTimeoutMs = 0;
     let turnInactivityTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const push = (item: StreamEvent | null) => {
@@ -535,7 +537,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
 
     const armTurnInactivityTimeout = () => {
       clearTurnInactivityTimeout();
-      if (currentAttemptTimeoutMs <= 0 || sawTerminalEvent) {
+      if (currentAttemptIdleTimeoutMs <= 0 || sawTerminalEvent) {
         return;
       }
 
@@ -545,7 +547,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         }
         error = this.buildProviderRefusalError({
           category: 'true_timeout',
-          message: `${formatProviderDisplayName(this.provider.name)} stopped responding after the initial response for ${currentAttemptTimeoutMs}ms.`,
+          message: `${formatProviderDisplayName(this.provider.name)} stopped responding after the initial response for ${currentAttemptIdleTimeoutMs}ms.`,
           retryable: true,
           source: 'timeout',
           evidenceSummary: this.stderrLines.length > 0
@@ -554,7 +556,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         });
         this.emit('error', error);
         this.terminateLaunchProcess();
-      }, currentAttemptTimeoutMs);
+      }, currentAttemptIdleTimeoutMs);
     };
 
     const onEvent = (event: StreamEvent) => {
@@ -637,7 +639,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
           error = null;
           queue.length = 0;
           clearTurnInactivityTimeout();
-          currentAttemptTimeoutMs = timeoutMs;
+          currentAttemptIdleTimeoutMs = this.spawnResilience.idleTimeoutMs ?? timeoutMs;
 
           if (this._providerSessionId) {
             this.spawnOpts = { ...this.spawnOpts, resumeSessionId: this._providerSessionId };
