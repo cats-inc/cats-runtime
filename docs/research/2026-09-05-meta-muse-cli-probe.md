@@ -380,6 +380,109 @@ Validation:
   the four corrected menus, no declared effort defaults, and no warnings. No restart was needed
   for this check. No installed Desktop visual smoke or provider inference was performed.
 
+## 2026-11-03 addendum: computer use and desktop automation on Linux
+
+An owner reported that a Muse-backed Bot could use neither native computer use nor the
+`desktop-ui-automation` developer skill. A terminal Muse session on the same machine served as the
+control.
+
+Baseline: Muse Code 1.4.14-R7309.1 on Linux aarch64 (Debian 13, labwc on Wayland), Cats Bot 0.4.8
+with its bundled Runtime 0.6.2. The evidence falls into two classes:
+
+- **First-hand.** MSP requests with no model turn, `muse skills` output, native session and CLI
+  logs, the installed Runtime code, and the screenshots reviewed for this note.
+- **Model self-report.** What a model said about its own tools and environment. It is labeled below
+  and is not evidence of behavior. The terminal model's answers changed from "yes, through the
+  skill" to "no native tool" to a guess that the host was headless before it ran any check.
+
+Session logs and screenshots stay out of the repository because they show the owner's desktop.
+
+### Native computer use is unavailable on this host
+
+- The binary ships the feature. Its MSP schema defines `computerUseSetup/{read,start,check,changed}`
+  and `computerUseSettings/{read,update}`, and describes `computerUseSetup/start` as doing what the
+  TUI's `/cua on` does.
+- `computerUseSetup/read` and `computerUseSettings/read` returned `-32033`,
+  `kind: computerUseUnavailable`, `retryable: false`, with the message "computer use is unavailable
+  on this host". `computerUseSetup/check` returned the same error in the run that tried it.
+  `initialize` requesting `computerUseHostSetup` returned `grantedCapabilities: []`.
+- Two runs agree: one with the default provider and `experimentalApi: true`, and one with
+  `--provider echo --no-session-log` started by the `:unrestricted` terminal session. `DISPLAY`,
+  `WAYLAND_DISPLAY` and `XDG_SESSION_TYPE=wayland` were set, so neither a headless host nor the
+  permission profile explains the refusal.
+- **The gate's condition is not established.** The schema says only that the error applies "while
+  the CUA gate is off". The setup permissions it describes are macOS ones (Accessibility, Screen
+  Recording, Input Monitoring, bundle IDs), and the binary also holds the string
+  `kill.cua_gate_off`. A platform gate is plausible, but an account or feature gate is not excluded.
+  No macOS or Windows host was probed.
+
+Runtime's Muse adapters do not report a `computer_use` dependency today. `muse --help` and
+`muse exec --help` name no computer-use launch argument.
+
+To re-check on a new version, run `muse serve --provider echo --no-session-log`, send `initialize`
+and `initialized`, then the two read requests above. This needs no prompt or model turn.
+
+### Why a legacy-mode Bot session cannot reach the skill
+
+The same binary behaves differently because of how it is launched:
+
+| Fact | Terminal session in a trusted checkout | Bot session with `permissionMode: default` |
+| --- | --- | --- |
+| Workspace trust | Recorded as trusted in `~/.config/muse/trust.json` | `trust.resolve outcome=untrusted source=missing_record` |
+| Skill catalog | `project_skills=10`: five skills, with the `.claude/skills` mirrors shadowed by `.agents/skills` | `skills=0 user_skills=0 project_skills=0`, and the workspace is empty |
+| Permissions | `:unrestricted`; filesystem `unrestricted`, network `enabled` | `launch_overrides`; filesystem `managed`, network `proxy_only` |
+| Shell | `bash` ran | Disabled, by the fail-safe mapping below |
+
+- The Bot's flags are the fail-safe `default` mapping in
+  [Permissions](#permissions--approval-mode-does-not-gate-anything-headless):
+  `--disable-write --disable-shell --disable-web-tools`. The exact argv was not captured. The mapping
+  comes from `appendMusePermissionArgs` in the installed Runtime and the persisted
+  `permissionMode: default`, and the session log agrees (`security_mode` source
+  `explicit-cli-flag`, profile cause `launch_overrides`).
+- The Bot's `workspaceAccess: read_write` does not lift these switches. Its settings label for this
+  mode, "The CLI's own default", is misleading for Muse, because this is the most restrictive mode
+  and the native default profile on this machine was `:unrestricted`.
+- A skill would not be enough by itself, because the Linux recipe needs a shell.
+- `providerPolicy` `provider` mode launches `muse serve` without these switches; see
+  [the host protocol note](./native-provider-host-protocols-2026-11-02.md). Runtime passes it no
+  workspace trust and `composeLaunchArgs` refuses a configured `--trust-workspace`, so the skill
+  would still need a native trust record or a user-scope install. `muse skills validate` reports the
+  skill compatible, but this path was neither installed nor tested.
+- **Unverified drift.** Under all three switches, the Bot's model listed `workflow`, `monitor`,
+  `write_todos`, `cron_create`, `cron_delete` and goal tools among its available tools. That is
+  self-report, and the session recorded no tool call. Still, the
+  [1.0.3 roster](#permissions--approval-mode-does-not-gate-anything-headless) puts `monitor` behind
+  `--disable-shell` and does not name the others, so the "genuinely read-only" conclusion above
+  should be re-verified on this version rather than assumed.
+
+### Skill-driven desktop control works from the terminal session
+
+At the owner's request, the terminal session read `desktop-ui-automation` (`source: project`) and
+its Linux reference, then exercised a disposable `lxterminal` window that it closed afterward:
+
+- **Observation.** `grim -c` wrote a 1920×1080 PNG, and `read_file` returned it as a model-visible
+  image.
+- **Focus.** `wlrctl window focus` followed by `wlrctl window find ... state:active` exited 0.
+- **Keyboard.** `wtype "echo CATS_INPUT_OK"` then `wtype -k Return`. The screenshot shows the command
+  and its output.
+- **Pointer.** `wlrctl pointer move` exited 0 and the cursor moved. It reached the screen's
+  bottom-right corner, and the next screenshot after `move -200 -300` showed it at about
+  (1352, 644) rather than (1719, 779). The cause was not established, so confirm coordinates with a
+  screenshot.
+- **Click.** `wlrctl pointer click` exited 0 over the desktop background. No click on a control was
+  tested.
+- **Lost input.** The `exit` and Return sent right after that click never reached the test terminal.
+  A later `state:active` check passed and a retry worked. Why the input was lost and where those
+  keystrokes went were not established, so verify input by screenshot, not by exit codes.
+
+This proves the tools work for a session with a shell and access to the Wayland socket. It does not
+prove the same for a Bot-launched session, which was not tested.
+
+**Recipe trap.** The session reported `wlrctl` and `wtype` as not installed, although both were
+(0.2.2-2 and 0.4-3+b1). The recipe then used `command -v grim wlrctl wtype xdotool gdbus`, which
+printed only the first path through Muse's `bash` tool. Here `sh -c` (dash) reproduces that and
+`bash -c` prints every path, so the recipe now checks each tool separately.
+
 ## Fixtures
 
 All under `tests/fixtures/provider-captures/muse-1.0.3/`:
