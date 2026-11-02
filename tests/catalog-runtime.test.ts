@@ -224,13 +224,13 @@ describe('factory and executable catalog projections', () => {
 
   it('lists the Copilot Pro picker with Terra as default and first-value effort, context and tier', () => {
     const copilot = knowledge(snapshot.document.catalogs.find(s => s.provider === 'copilot' && s.backend === 'cli')!);
-    expect(copilot.catalog.entries).toHaveLength(14);
+    expect(copilot.catalog.entries).toHaveLength(15);
     expect(copilot.catalog.entries.slice(0, 4).map(e => e.id)).toEqual(['auto', 'gpt-5.6-terra', 'grok-4.7', 'mai-code-1.1-flash']);
     expect(copilot.catalog.entries.filter(e => e.default).map(e => e.id)).toEqual(['gpt-5.6-terra']);
     // Plan-unavailable picker rows (Pro+ only) are omitted.
     expect(copilot.catalog.entries.some(e => /opus|fable|astra|sol|^gpt-5\.5$/.test(e.id))).toBe(false);
     const withContext = copilot.catalog.entries.filter(e => e.controls?.some(c => c.key === 'copilot.context'));
-    expect(withContext).toHaveLength(9);
+    expect(withContext).toHaveLength(10);
     const spawn = (entryId: string, controls?: Record<string, string>) => {
       const selected = resolveProviderSelection(copilot, { entryId, entryMode: 'explicit', ...(controls ? { controls } : {}) });
       const args = new CopilotProvider().buildSpawnArgs({ cwd: '/tmp',
@@ -244,7 +244,7 @@ describe('factory and executable catalog projections', () => {
     expect(spawn('claude-sonnet-5.5', { 'copilot.reasoning_effort': 'max', 'copilot.context': 'long_context' }))
       .toEqual(['--model', 'claude-sonnet-5.5', '--effort', 'max', '--context', 'long_context']);
     expect(() => spawn('gpt-5.4-mini')).toThrow();
-    expect(spawn('auto')).toEqual(['--model', 'auto', '--auto-tier', 'efficiency']);
+    expect(spawn('auto')).toEqual(['--model', 'auto', '--auto-tier', 'balance']);
     expect(() => spawn('auto', { 'copilot.auto_tier': 'fast' })).toThrow();
     expect(spawn('claude-haiku-4.5')).toEqual(['--model', 'claude-haiku-4.5']);
     expect(spawn('claude-haiku-5.5', { 'copilot.reasoning_effort': 'max', 'copilot.context': 'long_context' }))

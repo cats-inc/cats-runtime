@@ -1,5 +1,8 @@
 # Documentation Index
 
+[Copilot catalog refresh](research/2026-11-02-copilot-catalog-refresh.md) completes the previously
+blocked Copilot scope with GPT-6.1 Terra and the operator-confirmed Fusion Standard mapping.
+
 [Seven CLI catalog refresh](research/2026-11-01-seven-cli-catalog-refresh.md) records the
 six confirmed refreshes, Copilot's account feature 403, and Playground/Platform/Bot validation.
 
