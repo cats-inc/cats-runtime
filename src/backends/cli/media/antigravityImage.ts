@@ -16,7 +16,7 @@ const ALLOWED_TOOLS = new Set(['invoke_subagent', 'generate_image']);
 const CONVERSATION_ID = /^[A-Za-z0-9-]{8,80}$/;
 
 export function supportsAntigravityImage(target: ProviderInstanceConfig) {
-  return target.commandConfig.runtime.mode === 'native' && ['auto', 'direct'].includes(target.commandConfig.runner)
+  return target.commandConfig.protocol !== 'hosted' && target.commandConfig.runtime.mode === 'native' && ['auto', 'direct'].includes(target.commandConfig.runner)
     && !target.commandConfig.args?.length;
 }
 

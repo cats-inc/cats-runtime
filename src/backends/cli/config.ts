@@ -55,6 +55,8 @@ export interface ProviderRuntimeConfig {
 
 export interface ProviderCommandConfig {
   path: string;
+  /** Native host protocol, explicitly selected; absence preserves the legacy CLI surface. */
+  protocol?: 'hosted';
   args?: string[];
   singleton?: string;
   runner: RunnerMode;
@@ -1560,6 +1562,7 @@ function buildCommandConfigFromFile(
   );
   const path = readString(raw.command)
     || readString(raw.path)
+    || (raw.protocol === 'hosted' && provider === 'antigravity' ? process.platform === 'win32' ? 'agy_acp_server.exe' : 'agy_acp_server.par' : undefined)
     || fallback.path;
   const runner = parseRunnerModeValue(
     raw.runner,
@@ -1579,9 +1582,14 @@ function buildCommandConfigFromFile(
     launch?.singleton,
     `${provider}.instances.${instanceId}.launch.singleton`,
   );
+  const protocol = raw.protocol;
+  if (protocol !== undefined && (protocol !== 'hosted' || !['muse', 'grok', 'antigravity'].includes(provider) || runtime.mode !== 'native')) {
+    throw new Error(`${provider}.instances.${instanceId}.protocol requires a supported native hosted target.`);
+  }
 
   return {
     path,
+    ...(protocol === 'hosted' ? { protocol } : {}),
     ...(args !== undefined ? { args } : {}),
     ...(singleton ? { singleton } : {}),
     runner,

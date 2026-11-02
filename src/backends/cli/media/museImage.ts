@@ -22,7 +22,7 @@ const imagePrompt = (prompt: string) => `Generate exactly one image by calling $
   + 'Do not retry, edit, search, read or write files. Stop after the tool finishes. Description: ' + JSON.stringify(prompt);
 
 export function supportsMuseImage(target: ProviderInstanceConfig) {
-  return target.commandConfig.runtime.mode === 'native' && ['auto', 'direct'].includes(target.commandConfig.runner)
+  return target.commandConfig.protocol !== 'hosted' && target.commandConfig.runtime.mode === 'native' && ['auto', 'direct'].includes(target.commandConfig.runner)
     && !target.commandConfig.args?.length;
 }
 

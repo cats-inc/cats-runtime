@@ -1,5 +1,7 @@
 # Implementation Plans
 
+[PLAN-051: Native Provider Tools and Interactions](PLAN-051-native-provider-tools-and-interactions.md) — in progress (2026-11-02).
+
 - [PLAN-050: Claude Code provider interactions](PLAN-050-claude-provider-interactions.md)
   — ready, 2026-10-28; Claude approvals, questions and MCP elicitation, policy and
   inventory through SPEC-039, then standalone Bot consumption. All phases pending.

@@ -1,5 +1,7 @@
 # Feature Specifications
 
+[SPEC-040: Native Provider Tools and Interactions](SPEC-040-native-provider-tools-and-interactions.md) — approved, implementation in progress (2026-11-02).
+
 - [SPEC-039: Provider session capabilities and interactions](SPEC-039-provider-session-capabilities-and-interactions.md)
   — approved, 2026-10-28; live request/reply lifecycle, effective execution policy,
   session tool inventory and host integration. Codex implemented in

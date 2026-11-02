@@ -87,6 +87,8 @@ export function validateAnswer(prompt: InteractionPrompt, answer: InteractionAns
       || field.max !== undefined && value > field.max)) invalid();
     if (field.type === 'string' && typeof value !== 'string') invalid();
     if (field.type === 'strings' && (!Array.isArray(value) || !value.every(item => typeof item === 'string'))) invalid();
+    if (Array.isArray(value) && ((field.min !== undefined || field.max !== undefined) && new Set(value).size !== value.length || field.min !== undefined && value.length < field.min
+      || field.max !== undefined && value.length > field.max)) invalid();
     const strings = typeof value === 'string' ? [value] : Array.isArray(value) ? value : [];
     for (const text of strings) {
       if (text.length < (field.minLength ?? 0) || text.length > (field.maxLength ?? 16_384)) invalid();

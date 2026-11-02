@@ -23,6 +23,8 @@ import { GrokProvider } from '../providers/grok.js';
 import { ClineProvider } from '../providers/cline.js';
 import { DevinProvider } from '../providers/devin.js';
 import { MuseProvider } from '../providers/muse.js';
+import { MuseMspProvider } from '../providers/museMsp.js';
+import { HostedAcpProvider } from '../providers/hostedAcp.js';
 import { ClaudeProvider } from '../providers/claude.js';
 import { CodexProvider } from '../providers/codex.js';
 import { CopilotProvider } from '../providers/copilot.js';
@@ -210,12 +212,12 @@ export class WorkerPool {
         };
       case 'antigravity':
         return {
-          provider: new AntigravityProvider(compatibilityProfile),
+          provider: instance.commandConfig.protocol === 'hosted' ? new HostedAcpProvider('antigravity') : new AntigravityProvider(compatibilityProfile),
           commandConfig: instance.commandConfig,
         };
       case 'grok':
         return {
-          provider: new GrokProvider(compatibilityProfile),
+          provider: instance.commandConfig.protocol === 'hosted' ? new HostedAcpProvider('grok') : new GrokProvider(compatibilityProfile),
           commandConfig: instance.commandConfig,
         };
       case 'cline':
@@ -230,7 +232,7 @@ export class WorkerPool {
         };
       case 'muse':
         return {
-          provider: new MuseProvider(compatibilityProfile),
+          provider: instance.commandConfig.protocol === 'hosted' ? new MuseMspProvider() : new MuseProvider(compatibilityProfile),
           commandConfig: instance.commandConfig,
         };
       case 'claude':

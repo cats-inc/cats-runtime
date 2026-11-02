@@ -1,5 +1,7 @@
 # Architecture Decision Records (ADR)
 
+[ADR-049: Native control protocols for hosted provider tools](049-use-native-control-protocols-for-hosted-provider-tools.md) — accepted, 2026-11-02.
+
 - [ADR-048: Provider interactions and effective session capabilities](048-bridge-provider-interactions-and-report-effective-session-capabilities.md)
   — accepted, 2026-10-28; Runtime protocol/policy/discovery with independent
   Platform and Bot hosts. Sliced implementation authorized; not started.
