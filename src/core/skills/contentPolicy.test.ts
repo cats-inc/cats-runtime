@@ -236,6 +236,38 @@ describe('artifact skill content policy', () => {
     expect(policy.readSkillContentProvenance(attached?.hydration)?.releaseCompatible).toBe(false);
   });
 
+  it.each(['codex', 'grok'])('keeps fresh %s context verified when discovery precedes native identity', async (providerName) => {
+    const f = fixture('release');
+    const release = policy.loadRuntimeSkillContentPolicy(f.skillsRoot);
+    vi.spyOn(policy, 'getRuntimeSkillContentPolicy').mockReturnValue(release);
+    const input = { ...f.input, providerName };
+    const fresh = await hydrateSessionState(input);
+    const dataDir = join(f.root, 'data');
+    const registry = new SessionRegistry(dataDir, f.sessionBaseDir);
+    const session = registry.create({ id: input.sessionId, providerName, cwd: f.cwd, hydration: fresh.hydration });
+    registry.updateStatus(session.id, 'busy');
+    // The first message has already passed admission when the CLI writes its files.
+    await hydrateSessionState({ ...input, trigger: 'message', existingHydration: session.hydration });
+    expect(registry.upsertDiscovered('actual-native-thread', { providerName, cwd: f.cwd })).toBeNull();
+    // The stream reports the same exact ID later, at the end of Grok's first turn.
+    registry.setProviderSessionId(session.id, 'actual-native-thread', true);
+    registry.updateStatus(session.id, 'ready');
+    const next = await hydrateSessionState({ ...input, trigger: 'message', existingHydration: session.hydration });
+    expect(policy.readSkillContentProvenance(next.hydration)?.releaseCompatible).toBe(true);
+    registry.flush();
+    const restored = new SessionRegistry(dataDir, f.sessionBaseDir);
+    const resumed = await hydrateSessionState({ ...input, trigger: 'resume',
+      existingHydration: restored.get(session.id)?.hydration });
+    expect(policy.readSkillContentProvenance(resumed.hydration)?.releaseCompatible).toBe(true);
+    // An actual switch to a different native history must still invalidate proof.
+    restored.setProviderSessionId(session.id, 'different-native-thread');
+    expect(() => policy.assertRetainedSkillContent({ policy: release, cwd: f.cwd,
+      hydration: restored.get(session.id)?.hydration, sessionId: session.id,
+      sessionBaseDir: f.sessionBaseDir,
+    })).toThrow(/Start a new session/u);
+    restored.flush();
+  });
+
   it('loaded aliases never discard exposure authority or become clean through merge order', async () => {
     const f = fixture('preview');
     const fresh = await hydrateSessionState(f.input);

@@ -923,6 +923,11 @@ For file-backed providers:
 6. Muse discovery reads dated `session.jsonl` durable logs. Session metadata,
    nested run-start prompts, and committed assistant messages provide the list
    and history; permission frames, tool output, and reasoning are not chat text.
+7. Codex and Grok discovery waits for the worker's exact native session ID while
+   a runtime session in the same cwd is awaiting identity. Grok may write its
+   session files before reporting the ID at turn end. Such scans remain pending
+   and cannot attach history or invalidate fresh skill-content provenance by
+   cwd alone. Unverified retained contexts still require a fresh session.
 
 For agent-backed providers such as Devin:
 

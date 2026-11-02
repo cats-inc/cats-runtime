@@ -994,10 +994,11 @@ export class SessionRegistry {
     }
 
     const candidates = this.findPendingRuntimeCandidates(mergedData);
-    if (mergedData.providerName === 'codex' && candidates.length > 0) {
-      // Codex reports the exact thread ID. A startup scan can find an older
-      // terminal thread in this cwd while compatibility/spawn is still pending.
-      // Never adopt that thread (or its transcript) by cwd, even for one worker.
+    if ((mergedData.providerName === 'codex' || mergedData.providerName === 'grok') && candidates.length > 0) {
+      // These providers report exact native IDs through the worker stream;
+      // Grok reports its ID at turn end, after discovery can see its files.
+      // A cwd match cannot establish that identity and would invalidate the
+      // fresh context's provenance before its next message. Wait for the ID.
       this.pendingDiscovered.set(pendingKey, mergedData);
       return null;
     }
