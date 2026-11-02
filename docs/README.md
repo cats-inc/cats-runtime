@@ -1,5 +1,7 @@
 # Documentation Index
 
+[Native provider tools](specs/SPEC-040-native-provider-tools-and-interactions.md) and [PLAN-051](plans/PLAN-051-native-provider-tools-and-interactions.md) track hosted Muse MSP and Grok/official Antigravity ACP implementation.
+
 [Seven CLI catalog refresh](research/2026-11-01-seven-cli-catalog-refresh.md) records the
 six confirmed refreshes, Copilot's account feature 403, and Playground/Platform/Bot validation.
 

@@ -17,7 +17,7 @@ const nativeRatio = (input: ImageExecution) => input.profile.aspectRatio.mode ==
 
 /** Grok needs its native session store to collect; nothing else is a supported transport. */
 export function supportsGrokImage(target: ProviderInstanceConfig) {
-  return target.commandConfig.runtime.mode === 'native' && ['auto', 'direct'].includes(target.commandConfig.runner)
+  return target.commandConfig.protocol !== 'hosted' && target.commandConfig.runtime.mode === 'native' && ['auto', 'direct'].includes(target.commandConfig.runner)
     && !target.commandConfig.args?.length && !!target.grokSessionsDir;
 }
 

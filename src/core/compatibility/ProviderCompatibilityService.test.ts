@@ -72,6 +72,19 @@ describe('ProviderCompatibilityService', () => {
     }
   });
 
+  it('does not probe hosted transports with raw version/help flags or return raw Antigravity setup', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-hosted-compat-')); tempDirs.push(root);
+    const runner = { run: vi.fn(async () => { throw new Error('raw probes are forbidden'); }) };
+    const service = new ProviderCompatibilityService({ dataDir: join(root, 'data'), sessionBaseDir: join(root, 'sessions') },
+      { runner, installCheckRunner: createInstallCheckRunner() });
+    const target = createCliTarget('antigravity'); target.cliInstance!.commandConfig.protocol = 'hosted';
+    const assessment = await service.assessCliTarget(target, { purpose: 'diagnostics', probeMode: 'live' });
+    expect(runner.run).not.toHaveBeenCalled();
+    expect(assessment.profile.id).toBe('antigravity-hosted');
+    expect(assessment.setup.install.binaryName).toMatch(/^agy_acp_server\./u);
+    expect(assessment.setup.install.install.command).toBeUndefined();
+  });
+
   it('selects the ready profile when version and help signature match', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-service-'));
     tempDirs.push(root);

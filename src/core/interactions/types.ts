@@ -27,6 +27,7 @@ export interface InteractionField {
   secret?: boolean;
   options?: InteractionOption[];
   allowOther?: boolean;
+  /** Numeric bound, or selection-count bound for a strings field. */
   min?: number;
   max?: number;
   minLength?: number;

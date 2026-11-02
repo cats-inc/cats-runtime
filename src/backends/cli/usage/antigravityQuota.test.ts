@@ -27,6 +27,8 @@ describe('Antigravity CLI built-in /usage report', () => {
   });
 
   it('rejects custom argv that could disable built-in slash commands without spawning', async () => {
+    expect(await readAntigravityQuota({ path: 'must-not-spawn', runner: 'auto', runtime: { mode: 'native' }, protocol: 'hosted' }))
+      .toEqual({ status: 'unsupported' });
     for (const args of [['--disable-slash-commands'], ['--input-format', 'stream-json'], ['--continue'], ['unexpected prompt']]) {
       expect(await readAntigravityQuota({ path: 'must-not-spawn', args, runner: 'auto', runtime: { mode: 'native' } }))
         .toEqual({ status: 'unsupported' });
