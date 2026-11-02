@@ -4,8 +4,26 @@ import path from 'node:path';
 import { loadConfig, resolveProviderInstance } from '../config.js';
 import { PoolCapacityError, PoolSourceBusyError, WorkerPool } from './WorkerPool.js';
 import { SessionRegistry } from './SessionRegistry.js';
+import { supportsGrokImage } from '../media/grokImage.js';
+import { supportsMuseImage } from '../media/museImage.js';
+import { supportsAntigravityImage } from '../media/antigravityImage.js';
 
 describe('WorkerPool', () => {
+  it('resolves hosted capabilities per target and excludes hosted protocols from bounded raw media', () => {
+    for (const provider of ['grok', 'muse', 'antigravity'] as const) {
+      const config = loadConfig({ HOME: '/tmp/cats-runtime-workerpool-test', USERPROFILE: '' }, {
+        providerYaml: `providers: { ${provider}: { instances: { native: {}, hosted: { protocol: hosted } } } }`,
+      });
+      const registry = new SessionRegistry(undefined, undefined, config.providerDefaultInstances, config.providerDefaultTargets);
+      const pool = new WorkerPool(config, registry, {} as never, {} as never, {} as never, {} as never,
+        { getCachedAssessment: () => undefined } as never);
+      expect(pool.getCapabilities(provider, 'native').interactions).toBeUndefined();
+      expect(pool.getCapabilities(provider, 'hosted').interactions?.version).toBe(1);
+      expect(pool.getCapabilities(provider, 'hosted').sessionMcpServers).toBe(provider !== 'antigravity');
+      const hosted = resolveProviderInstance(config, provider, 'hosted');
+      expect(({ grok: supportsGrokImage, muse: supportsMuseImage, antigravity: supportsAntigravityImage })[provider](hosted)).toBe(false);
+    }
+  });
   it('shares admission, singleton ownership and shutdown with bounded external executions', () => {
     const config = loadConfig({ HOME: '/tmp/cats-runtime-workerpool-test', USERPROFILE: '' }, {
       providerYaml: 'providers: { grok: { instances: { native: {} } } }',

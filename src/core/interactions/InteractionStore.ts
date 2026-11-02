@@ -137,6 +137,12 @@ export class InteractionStore {
     if (entry) this.finish(entry, 'resolved', 'provider_resolved', true);
   }
 
+  /** A provider replaced the question; this is not confirmation of an answer. */
+  supersede(id: string): void {
+    const entry = this.entries.get(id);
+    if (entry) this.finish(entry, 'cancelled', 'provider_request_superseded');
+  }
+
   interrupt(): void {
     for (const entry of this.entries.values()) {
       if (entry.view.status === 'pending' || entry.view.status === 'responding') {

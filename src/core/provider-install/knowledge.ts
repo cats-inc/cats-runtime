@@ -1,4 +1,4 @@
-import type { ProviderRuntimeConfig } from '../../backends/cli/config.js';
+import type { ProviderCommandConfig, ProviderRuntimeConfig } from '../../backends/cli/config.js';
 import type { ProviderName } from '../../backends/cli/providers/types.js';
 import type {
   ProviderExecutionPlatform,
@@ -848,5 +848,26 @@ export function buildProviderInstallCatalogView(
         expectedPrefix: knowledge.check.npmExpectedPrefix?.[executionPlatform],
       }
       : undefined,
+  };
+}
+
+/** Setup belongs to an execution target: hosted ACP is not the raw agy CLI. */
+export function buildProviderTargetInstallCatalogView(
+  provider: ProviderName,
+  command: ProviderCommandConfig,
+  hostPlatform: NodeJS.Platform = process.platform,
+): ProviderInstallCatalogView {
+  const view = buildProviderInstallCatalogView(provider, command.runtime, hostPlatform);
+  if (provider !== 'antigravity' || command.protocol !== 'hosted') return view;
+  return { ...view, familyLabel: 'Google Antigravity ACP',
+    binaryName: view.executionPlatform === 'windows' ? 'agy_acp_server.exe' : 'agy_acp_server.par',
+    path: {}, prerequisites: [], npm: undefined,
+    install: { supported: true, installerId: 'antigravity-acp', method: 'native_installer',
+      docsUrl: 'https://github.com/agentclientprotocol/registry/tree/main/antigravity-acp',
+      notes: ['Install the official Google archive for this platform, verify its SHA-256, and configure the extracted executable.',
+        'Cats session MCP is unavailable until native credential persistence is verified.'] },
+    auth: { requiredAfterInstall: true, envVars: [], interactive: true,
+      hint: 'Sign in using the official Antigravity ACP client or its native authentication configuration.',
+      docsUrl: 'https://antigravity.google/docs/ide/extensions' },
   };
 }

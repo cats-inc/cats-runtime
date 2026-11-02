@@ -30,7 +30,7 @@ export function readAntigravityQuota(
 ): Promise<QuotaCollectionResult> {
   // --disable-slash-commands or injected prompt/stream/resume flags could turn
   // /usage into a model turn. Custom argv is not a verified quota-only contract.
-  if (command.args?.length) return Promise.resolve({ status: 'unsupported' });
+  if (command.protocol === 'hosted' || command.args?.length) return Promise.resolve({ status: 'unsupported' });
   return runQuotaCli(command, 'antigravity', {
     args: ['--print', '/usage', '--output-format', 'text', '--print-timeout', '8s'],
     framing: 'text',

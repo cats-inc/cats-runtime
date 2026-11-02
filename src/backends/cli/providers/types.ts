@@ -133,6 +133,8 @@ export interface Provider {
   name: string;
   capabilities: ProviderCapabilities;
   ephemeral?: boolean;
+  /** These adapters resolve grants privately and send them over the owned stdin pipe. */
+  sessionMcpTransport?: 'stdin';
   buildSpawnArgs(opts: ProviderSpawnOptions): string[];
   /** Internal host path mapping; absent for remote/unverified execution environments. */
   configureExecution?(context: ProviderExecutionContext): void;
@@ -148,6 +150,8 @@ export interface Provider {
   /** Initializes a session for inspection without creating a model turn. */
   buildInitialization?(): string | null;
   isSessionInitializing?(): boolean;
+  /** A failed protocol admission must stop the child, including any native queued work. */
+  isSessionFailed?(): boolean;
   getPendingControlMessages?(): string | null;
   /** How control replies match the control requests Runtime writes; JSON-RPC `id` when absent. */
   controlCorrelation?: ProviderControlCorrelation;
@@ -175,6 +179,9 @@ export interface ProviderControlCorrelation {
 
 export interface ProviderExecutionContext {
   localWorkspaceCwd?: string;
+  runtimeSessionId?: string;
+  /** Private session grant lookup; never process.env or serialized provider state. */
+  sessionMcpToken?(envVar: string): string | undefined;
 }
 
 export interface ProviderServerRequestContext {
@@ -187,6 +194,7 @@ export interface ProviderServerRequestContext {
       fallback(reason: string): string;
     }): string;
     resolve(interactionId: string): void;
+    supersede?(interactionId: string): void;
     unavailable?(kind: InteractionPrompt['kind'], reason: string): void;
   };
 }

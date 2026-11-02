@@ -20,6 +20,14 @@ function fixture(prompt: InteractionPrompt = { kind: 'command_approval', title: 
 }
 
 describe('provider interaction lifecycle', () => {
+  it('supersedes a pending requirement without a provider resolution or sending its stale answer', async () => {
+    const { store, id, response, send, fallback } = fixture();
+    store.supersede(id);
+    expect(store.snapshot().interactions[0]).toMatchObject({ status: 'cancelled', reason: 'provider_request_superseded' });
+    expect(store.snapshot().interactions[0]?.providerConfirmed).not.toBe(true);
+    await expect(store.respond(id, response)).rejects.toMatchObject({ code: 'interaction_conflict' });
+    expect(send).not.toHaveBeenCalled(); expect(fallback).not.toHaveBeenCalled();
+  });
   it('returns one response receipt for duplicate concurrent requests without another provider write', async () => {
     const { store, id, response, send } = fixture();
     const results = await Promise.all([store.respond(id, response), store.respond(id, response)]);

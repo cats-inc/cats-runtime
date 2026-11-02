@@ -21,7 +21,7 @@ import {
 } from '../provider-install/ProviderInstallCheckRunner.js';
 import { expandNativeEnvPath } from '../provider-install/pathUtils.js';
 import {
-  buildProviderInstallCatalogView,
+  buildProviderTargetInstallCatalogView,
   GENERIC_AUTH_ERROR_PATTERNS,
   getProviderInstallKnowledge,
 } from '../provider-install/knowledge.js';
@@ -382,13 +382,14 @@ export class ProviderCompatibilityService {
     assertCurrent();
     const instance = target.cliInstance as ProviderInstanceConfig;
     const providerName = target.providerName as ProviderName;
-    const compatibilityKnowledge = getProviderCompatibilityKnowledge(providerName);
+    const hosted = instance.commandConfig.protocol === 'hosted';
+    const compatibilityKnowledge = hosted ? undefined : getProviderCompatibilityKnowledge(providerName);
     const installKnowledge = getProviderInstallKnowledge(providerName);
-    const installView = buildProviderInstallCatalogView(
-      providerName,
-      instance.commandConfig.runtime,
-    );
-    const defaultProfile = getDefaultCompatibilityProfile(target.providerName as ProviderName);
+    const installView = buildProviderTargetInstallCatalogView(providerName, instance.commandConfig);
+    const defaultProfile: ProviderCompatibilityProfile = hosted ? {
+      id: `${providerName}-hosted`, provider: providerName, label: `${providerName} native hosted protocol`,
+      protocolFamily: providerName === 'muse' ? 'msp' : 'acp', parserId: `${providerName}-hosted`, allowUnknownVersion: true,
+    } : getDefaultCompatibilityProfile(target.providerName as ProviderName);
     const key = createCacheKey(
       providerName,
       target.instanceId,
@@ -410,11 +411,11 @@ export class ProviderCompatibilityService {
     const nowMs = this.now();
     const checkedAt = new Date(nowMs).toISOString();
     const baseCacheState = this.buildCacheState(nowMs, false);
-    const healthOnly = options.purpose === 'health';
+    const healthOnly = hosted || options.purpose === 'health';
     // Informational CLI commands can update installations or start daemons.
     // Executing probes requires an explicit live diagnostics request for every
     // provider. Missing metadata never authorizes falling back to execution.
-    const metadataOnly = options.purpose !== 'diagnostics' || options.probeMode !== 'live';
+    const metadataOnly = hosted || options.purpose !== 'diagnostics' || options.probeMode !== 'live';
     const probeTimeoutMs = this.resolveProbeTimeoutMs(
       instance.commandConfig.runtime.mode,
       providerName as ProviderName,

@@ -22,6 +22,7 @@ import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js
 import { appendStderrLines } from '../stderrLines.js';
 import { InteractionStore } from '../../../core/interactions/InteractionStore.js';
 import { WorkerControlChannel } from './WorkerControlChannel.js';
+import { SessionSecretRedactor } from './SessionSecretRedactor.js';
 
 export interface WorkerProcessEvents {
   event: [StreamEvent];
@@ -182,8 +183,10 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     // for a host. Invalidate it now, rather than only once the new child spawns.
     this.process = null;
     this.provider.configureExecution?.({
+      runtimeSessionId: this.runtimeSessionId,
       ...(this.commandConfig.runtime.mode === 'native'
-        ? { localWorkspaceCwd: this.spawnOpts.cwd } : {}),
+        ? { localWorkspaceCwd: this.spawnOpts.cwd,
+          sessionMcpToken: (envVar: string) => this.launchEnv[envVar] } : {}),
     });
     const configuredArgs = this.commandConfig.args ?? [];
     const providerArgs = this.provider.buildSpawnArgs(this.spawnOpts);
@@ -207,7 +210,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       if (this.commandConfig.runtime.mode !== 'native') {
         throw new Error('Session MCP servers require a native CLI runtime.');
       }
-      Object.assign(env, this.launchEnv);
+      if (this.provider.sessionMcpTransport !== 'stdin') Object.assign(env, this.launchEnv);
     }
     delete env.CATS_PLUGIN_MANAGEMENT_KEY;
     this.stderrLines = [];
@@ -301,8 +304,10 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
 
     // Read stdout line-by-line (NDJSON)
     const rl = createInterface({ input: child.stdout! });
+    const secrets = new SessionSecretRedactor(Object.values(this.launchEnv));
     rl.on('line', (line) => {
       if (this.process !== child || child.exitCode !== null) return;
+      line = secrets.line(line);
       if (control.consume(line)) return;
       // Handle auto-response (e.g. Codex approval requests)
       if (this.provider.buildAutoResponse) {
@@ -317,7 +322,17 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       }
       this.respondToServerRequest(line, child);
 
-      const parsed = this.provider.parseStreamLine(line);
+      let parsed: StreamEvent | StreamEvent[] | null;
+      try { parsed = this.provider.parseStreamLine(line); }
+      catch {
+        this.emit('error', new Error('Provider stream protocol failed.'));
+        this.cancel(); return;
+      }
+      if (this.provider.isSessionFailed?.()) {
+        this.cancel();
+        for (const event of parsed ? Array.isArray(parsed) ? parsed : [parsed] : []) this.emit('event', event);
+        return;
+      }
       if (!this.provider.isSessionInitializing?.()) {
         clearTimeout(this.bootstrapTimer); this.bootstrapTimer = undefined;
       }
@@ -347,7 +362,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     // Drain stderr to prevent buffer deadlock
     child.stderr?.on('data', (chunk: Buffer) => {
       if (this.process !== child) return;
-      const text = chunk.toString('utf-8').trim();
+      const text = secrets.chunk(chunk.toString('utf-8')).trim();
       if (text) {
         this.captureStderr(text);
         const refusal = this.recordLaunchFailureRefusal({
@@ -388,8 +403,11 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     const isCurrent = () => this.process === child && child.exitCode === null
       && !child.killed && this.activeTurnController === controller && !controller.signal.aborted
       && Boolean(child.stdin && !child.stdin.destroyed && !child.stdin.writableEnded);
-    void Promise.resolve().then(() => isCurrent()
-      ? handler.call(this.provider, line, { signal: controller.signal,
+    // Invoke before parsing the next wire frame: a resolution immediately followed
+    // by turn completion must close its card before the turn controller aborts.
+    let response: ReturnType<NonNullable<Provider['buildServerResponse']>>;
+    try {
+      response = handler.call(this.provider, line, { signal: controller.signal,
         ...(this.interactions ? { interactions: {
           request: input => this.interactions!.register({ executionId: this.interactionExecutionId,
             prompt: input.prompt, deadlineMs: input.deadlineMs, signal: controller.signal,
@@ -407,9 +425,17 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
             },
           }),
           resolve: id => this.interactions!.resolve(id),
+          supersede: id => this.interactions!.supersede(id),
           unavailable: (kind, reason) => { this.interactions!.unavailable(this.interactionExecutionId, kind, reason); },
         } } : {}),
-      }) : null)
+      });
+    } catch {
+      controller.abort();
+      this.emit('error', new Error('Provider server-request response failed.'));
+      child.kill('SIGTERM');
+      return;
+    }
+    void Promise.resolve(response)
       .then((response) => {
         if (response && isCurrent()) child.stdin!.write(response);
       }).catch(() => {

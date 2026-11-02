@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { buildProviderInstallCatalogView, getProviderInstallKnowledge } from './knowledge.js';
+import { buildProviderInstallCatalogView, buildProviderTargetInstallCatalogView, getProviderInstallKnowledge } from './knowledge.js';
 
 describe('buildProviderInstallCatalogView', () => {
+  it('uses the official ACP distribution for a hosted Antigravity target without raw CLI hints', () => {
+    const view = buildProviderTargetInstallCatalogView('antigravity', { path: 'agy_acp_server.par', runner: 'auto',
+      runtime: { mode: 'native' }, protocol: 'hosted' }, 'linux');
+    expect(view.binaryName).toBe('agy_acp_server.par');
+    expect(view.install.docsUrl).toContain('antigravity-acp');
+    expect(view.install.command).toBeUndefined();
+    expect(view.path.expectedPath).toBeUndefined();
+    expect(view.auth.envVars).toEqual([]);
+  });
   it('uses the current native Windows Cursor launcher directory', () => {
     const view = buildProviderInstallCatalogView('cursor', { mode: 'native' }, 'win32');
     expect(view.path.expectedPath?.replaceAll('\\', '/')).toBe('%LOCALAPPDATA%/cursor-agent/cursor-agent.cmd');

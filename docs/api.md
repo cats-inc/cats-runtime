@@ -15,13 +15,15 @@ on provider discovery. `interactions.version: 1` advertises supported kinds;
 Missing fields mean unavailable, including older Runtime artifacts. Hosts must
 not send new controls to an older server that may ignore unknown JSON fields.
 
-Native Codex and Claude Code sessions accept `interactionHost` on create and resume:
+Native Codex/Claude Code and opted-in hosted Muse/Grok/Antigravity targets accept
+`interactionHost` on create and resume:
 `{ "version": 1, "kinds": ["command_approval", "file_approval", "tool_approval",
 "permission_grant", "user_input", "mcp_form", "mcp_url"], "timeoutMs": 1800000 }`.
 Select the kinds the host actually renders, intersected with the target's advertised
 kinds: Codex never advertises `tool_approval`, Claude Code never advertises
 `permission_grant`. The deadline must be 1 minute–24 hours; a shorter provider
-deadline wins. Other providers and non-native targets reject the option. Omission preserves legacy behavior. Changing the descriptor requires
+deadline wins. Other providers and non-native targets reject the option. Targets
+without `protocol: hosted` preserve legacy behavior. Changing the descriptor requires
 closing the active worker. Negotiation is memory-only and must be resent after a
 Runtime restart. A protected admission marker prevents such a session from falling
 back to legacy behavior: resume/fork without the required controls returns 409
@@ -130,6 +132,53 @@ does not add approval prompts by itself. Claude Code decides which Chrome tools 
 with a negotiated `interactionHost` and an on-request policy, the requests it sends arrive
 as `tool_approval`, but some tools run without one (`tabs_context_mcp` did, 2026-10-28)
 and the extension's own site prompts stay in the browser.
+
+### Hosted Muse, Grok and official Antigravity ACP
+
+Set `protocol: hosted` on a native CLI instance under
+`backends.cli.providers.<provider>.instances.<instance>` to select the new
+adapter; `interactionHost` alone does not enable it. Muse uses `muse serve`,
+Grok uses `grok agent --no-leader stdio`, and Antigravity requires Google's
+separate `agy_acp_server.par` (`agy_acp_server.exe` on Windows), not raw `agy`.
+For example, an instance body is:
+
+```yaml
+environment: native
+protocol: hosted
+command: muse
+runner: auto
+```
+
+All three require an interaction host and this policy on create/resume:
+
+```json
+{ "version": 1, "mode": "provider", "constraints": { "maxAccess": "full-access", "network": true } }
+```
+
+Explicit overrides, narrower ceilings, legacy tool allowlists and read-only
+workspaces are rejected. Native permission settings/reviewers remain in force;
+the verified full ceiling does not imply unconditional approval. Muse may expose
+its native baseline policy; ACP does not claim effective approval-mode readback.
+Resume uses the exact native identity, never silently starts fresh, and does not
+replay history into the current turn. Fork is unsupported. Grok reasoning effort
+is set and read back after new/resumed session initialization when needed.
+
+Muse/Grok deliver HTTP session MCP through the private child input pipe, without
+exporting grant values in the child environment. Native configured-name collisions
+are rejected before credentials are sent. Grok inventory uses native discovery;
+Muse reports `not_observed` because MSP does not expose a tool inventory. Neither
+status implies verified tool invocation. Antigravity advertises no session MCP and
+refuses overlays until native credential persistence/name isolation is verified;
+its local tool/approval adapter remains available. The official Linux ARM64 build
+cannot initialize on the verified 16 KiB-page host; see the
+[dated evidence](research/native-provider-host-protocols-2026-11-02.md).
+
+Supported approvals carry bounded input/scope summaries. Only ACP `allow_once`
+choices are offered; Muse also supports offered session-scoped approval, but no
+persistent amendments. Native Muse questions and Grok questions/plan review use
+the existing interaction API. Unsupported custom host methods are declined.
+Changing a Muse approval requirement invalidates the earlier card; terminal tool
+updates invalidate unanswered ACP cards. Neither produces a late grant.
 
 ### Skill content profile and retained sessions
 

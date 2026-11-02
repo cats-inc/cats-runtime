@@ -59,6 +59,16 @@ function loadConfigWithoutProviderFile(env: NodeJS.ProcessEnv = {}, providerYaml
 }
 
 describe('config platform defaults', () => {
+  it('opts native provider tools in per target without replacing legacy defaults', () => {
+    for (const provider of ['muse', 'grok', 'antigravity'] as const) {
+      const config = loadConfigWithoutProviderFile({}, `providers: { ${provider}: { instances: { native: { protocol: hosted } } } }`);
+      const target = resolveProviderInstance(config, provider);
+      expect(target.commandConfig.protocol).toBe('hosted');
+      if (provider === 'antigravity') expect(target.commandConfig.path).toMatch(/agy_acp_server\.(par|exe)$/u);
+      expect(resolveProviderInstance(loadConfigWithoutProviderFile({}, `providers: { ${provider}: { instances: { native: {} } } }`), provider).commandConfig.protocol).toBeUndefined();
+    }
+    expect(() => loadConfigWithoutProviderFile({}, 'providers: { claude: { instances: { native: { protocol: hosted } } } }')).toThrow('supported native hosted target');
+  });
   it('defaults Cursor and Kiro to native on every platform', () => {
     expect(defaultCursorRuntimeMode('win32')).toBe('native');
     expect(defaultCursorRuntimeMode('darwin')).toBe('native');

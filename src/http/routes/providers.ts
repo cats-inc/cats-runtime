@@ -11,7 +11,7 @@ import { inspectProviderActiveConfig } from '../../core/providerActiveConfig.js'
 import type { ProviderName } from '../../backends/cli/providers/types.js';
 import { inspectAgentTarget } from '../../backends/agent/inspection.js';
 import { inspectApiTarget } from '../../backends/api/inspection.js';
-import { buildProviderInstallCatalogView } from '../../core/provider-install/knowledge.js';
+import { buildProviderTargetInstallCatalogView } from '../../core/provider-install/knowledge.js';
 import {
   createCompatibilityEvidenceService,
   summarizeCompatibilityEvidenceArtifactForReadModel,
@@ -201,9 +201,9 @@ providerRoutes.get('/providers/config', async (c) => {
               latestProbeArtifactSummary,
             ),
             install: instance.backend === 'cli' && instance.cliInstance
-              ? buildProviderInstallCatalogView(
+              ? buildProviderTargetInstallCatalogView(
                 instance.providerName as ProviderName,
-                instance.cliInstance.commandConfig.runtime,
+                instance.cliInstance.commandConfig,
               )
               : null,
             compatibility: instance.backend === 'cli'
