@@ -4979,12 +4979,13 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Copilot
-    cli_version: 1.0.103
-    last_updated: 2026-10-24
+    cli_version: 1.0.105
+    last_updated: 2026-11-02
     basis:
       plan:
         label: Copilot Pro
     notes:
+      - "Refreshed 2026-11-02 from Copilot CLI 1.0.105 on Windows native, Copilot Pro: complete 33-row recommended-group picker walked in both directions and every selectable reasoning/tier range cycled. Fifteen rows are selectable and eighteen are plan-unavailable. New GPT-6.1 Terra follows Claude Sonnet 5.5, with Low/Medium/High/Extra High/Max reasoning and 272K/1M context. All previous model rows, reasoning/context values and the GPT-5.6 Terra default remain unchanged. Auto now displays Copilot Fusion; this account can select only Standard, with High/Max explicitly plan-unavailable. The operator confirmed Standard maps to --auto-tier balance and approved removing the old Efficiency/Intelligence choices. No control default is inferred. Evidence: docs/research/fixtures/copilot-1.0.105/model-list-2026-11-02.probe.redacted.json and model-picker.agent-capture.2026-11-02.redacted.json; research: docs/research/2026-11-02-copilot-catalog-refresh.md."
       - "Complete /model picker for a Copilot Pro account: 18 selectable rows (Auto plus 17 models). First captured 2026-09-27 (UTC+8) from GitHub Copilot CLI 1.0.88 on Windows native by operating the picker; the 2026-10-03 capture of 1.0.91 added Claude Sonnet 5.5 and moved gemini-3.6-flash, gemini-3.5-flash and kimi-k2.7-code to Unavailable models. Rows follow the 2026-09-27 recommended grouping in arrival order; Claude Sonnet 5.5 follows Claude Sonnet 5. Evidence: docs/research/fixtures/copilot-1.0.91/model-picker.agent-capture.redacted.txt, docs/research/fixtures/copilot-1.0.91/model-list.probe.redacted.json, docs/research/fixtures/copilot-1.0.88/model-picker.agent-capture.redacted.txt and docs/research/2026-09-27-copilot-picker-full-catalog.md."
       - "On 2026-10-03 the operator confirmed removing gemini-3.6-flash, gemini-3.5-flash and kimi-k2.7-code, which the 1.0.91 picker listed under Unavailable models (Your plan doesn't include this model). They remain reachable as custom model strings on plans that include them."
       - "The 1.0.91 picker lists 16 Unavailable models whose detail pane says the plan does not include them (gpt-6.1-sol, gpt-6-sol, gpt-6-astra, gpt-5.6-sol, gpt-5.5, claude-fable-5.1, claude-fable-5, claude-opus-5.5, claude-opus-5, claude-opus-4.8, claude-opus-4.8-fast, claude-opus-4.7, claude-sonnet-4.6, gemini-3.6-flash, gemini-3.5-flash, kimi-k2.7-code). They are omitted; users whose plan includes them can enter those IDs as custom model strings."
@@ -5007,13 +5008,15 @@ catalogs:
         Research: docs/research/2026-10-24-sixteen-cli-catalog-refresh.md."
     models:
       - id: auto
-        label: Auto
+        label: Copilot Fusion
         notes:
-          - "Picker group on 2026-10-24: ."
+          - "2026-11-02 picker: Copilot Fusion, Standard only; High and Max are unavailable for this Copilot Pro plan. The current-session check mark is not a model default."
+          - "The operator confirmed the installed CLI's Standard / Auto Balance mapping as --auto-tier balance on 2026-11-02."
           - No effort, context or tier default is declared; current arrival values are not defaults.
         source_names:
           - auto
           - Auto
+          - Copilot Fusion
         execution:
           model: auto
         controls:
@@ -5023,15 +5026,9 @@ catalogs:
             kind: enum
             scope: both
             values:
-              - value: efficiency
-                label: Efficiency
-                description: Favors faster models while preserving the quality needed for the task.
               - value: balance
-                label: Balance
-                description: Balances model quality and speed while adapting to each task.
-              - value: intelligence
-                label: Intelligence
-                description: Favors stronger models for complex work while remaining adaptive for simpler tasks.
+                label: Standard
+                description: Prioritizes versatile models for efficient everyday coding.
       - id: gpt-5.6-terra
         label: GPT-5.6 Terra
         notes:
@@ -5205,6 +5202,41 @@ catalogs:
                 label: 200K
               - value: long_context
                 label: 936K
+      - id: gpt-6.1-terra
+        label: GPT-6.1 Terra
+        notes:
+          - "2026-11-02 /model picker and account models.list agree on the model ID and reasoning tokens. Picker Context: 272K / 1M; machine contextMax/longContextMax: 272000/1000000."
+          - "Picker arrival reasoning Medium is session state, not a default. No model or control default marker was present."
+        source_names:
+          - gpt-6.1-terra
+          - GPT-6.1 Terra
+        execution:
+          model: gpt-6.1-terra
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: Low
+              - value: medium
+                label: Medium
+              - value: high
+                label: High
+              - value: xhigh
+                label: Extra High
+              - value: max
+                label: Max
+          - key: copilot.context
+            label: Context
+            kind: enum
+            scope: both
+            values:
+              - value: default
+                label: 272K
+              - value: long_context
+                label: 1M
       - id: gpt-5.6-luna
         label: GPT-5.6 Luna
         notes:

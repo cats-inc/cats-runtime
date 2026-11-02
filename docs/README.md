@@ -1,5 +1,8 @@
 # Documentation Index
 
+[Copilot catalog refresh](research/2026-11-02-copilot-catalog-refresh.md) completes the previously
+blocked Copilot scope with GPT-6.1 Terra and the operator-confirmed Fusion Standard mapping.
+
 [Native provider tools](specs/SPEC-040-native-provider-tools-and-interactions.md) and [PLAN-051](plans/PLAN-051-native-provider-tools-and-interactions.md) track hosted Muse MSP and Grok/official Antigravity ACP implementation.
 
 [Seven CLI catalog refresh](research/2026-11-01-seven-cli-catalog-refresh.md) records the

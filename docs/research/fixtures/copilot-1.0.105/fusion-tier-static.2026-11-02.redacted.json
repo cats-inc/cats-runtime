@@ -1,0 +1,12 @@
+{
+  "sourceClass": "static-artifact",
+  "packages": ["@github/copilot@1.0.105", "@github/copilot-win32-x64@1.0.105"],
+  "buildCommit": "845c22879d4",
+  "executable": {"path": "@github/copilot-win32-x64/copilot.exe", "size": 172637984, "sha256": "ab6d710d551c137c766a6c8ef6ee2e7779c106870c96b9a91a91fa17b9748624"},
+  "embeddedMember": {"path": "package/prebuilds/win32-x64/runtime.node", "size": 125623584, "sha256": "6f5f640903296c8a124131d60ac0d47b200ccc9d6768b3305bce74e5e752e4c9"},
+  "schema": {"title": "Managed Settings for Copilot Clients", "id": "https://github.com/schemas/copilot/managed-settings/v0", "property": "properties.fusionTier.description"},
+  "excerpt": "Standard uses Auto Balance; High uses HydraFusion with Auto Intelligence as fallback; Max uses HydraFusion Max.",
+  "warning": "Never synthesize autoTier from fusionTier.",
+  "scope": "Supporting static semantics only. This does not prove account availability or a raw tier ID. The explicit operator confirmation recorded with the picker evidence settles balance -> Standard. No mapping for High or Max is adopted.",
+  "method": "Independent read-only in-memory inspection of the installed executable's embedded gzip/tar data; no embedded module was extracted to disk or executed."
+}

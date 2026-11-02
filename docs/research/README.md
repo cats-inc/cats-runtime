@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-11-02-copilot-catalog-refresh](2026-11-02-copilot-catalog-refresh.md) | Copilot CLI 1.0.105, Copilot Pro | Successful account read and complete 33-row picker, new Terra, confirmed Fusion Standard/balance mapping, fifteen selectable rows and focused validation |
 | [native-provider-host-protocols-2026-11-02](native-provider-host-protocols-2026-11-02.md) | Muse MSP, Grok ACP, Google ACP | Native Worker MCP/continuity, inherited permission ceilings, private grants, and Google ARM64 page-size blocker |
 | [2026-11-01-seven-cli-catalog-refresh](2026-11-01-seven-cli-catalog-refresh.md) | Seven requested CLI scopes | Six refreshed; Codex Terra and Cursor DeepSeek added, Copilot feature 403 retained, three consumer surfaces validated |
 | [2026-10-28-claude-computer-use-remote-devices-gate](2026-10-28-claude-computer-use-remote-devices-gate.md) | Claude Code 2.1.312 computer use on Windows | The enable stub lives in the CLI and is listed only in remote sessions; the desktop app's `remote-devices` bridge requires a server-injected session id; Runtime-launched Claude stays `unavailable` by construction |

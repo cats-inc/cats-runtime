@@ -352,7 +352,7 @@ describe('shared playground selection helpers', () => {
       div: { querySelector: () => controls }, catalog, entryId: '' };
     vm.createContext(context);
     vm.runInContext(html.slice(start, end), context);
-    expect(models).toHaveLength(14);
+    expect(models).toHaveLength(15);
     expect(models.filter(model => model.default).map(model => model.id)).toEqual(['gpt-5.6-terra']);
     const input = { provider: 'copilot', selectableProviders: ['copilot'], providerOrder: ['copilot'],
       advancedCatalogs: { copilot: catalog } };
@@ -367,7 +367,8 @@ describe('shared playground selection helpers', () => {
       rendered[entry.id] = options.filter(match => match[2]).map(match => [match[1], match[3]]);
     }
     expect(rendered).toMatchObject({
-      auto: [['efficiency', 'Efficiency']],
+      auto: [['balance', 'Standard']],
+      'gpt-6.1-terra': [['low', 'Low'], ['default', '272K']],
       'gpt-5.6-terra': [['none', 'None'], ['default', '272K']],
       'claude-sonnet-5': [['low', 'Low'], ['default', '200K']],
       'claude-haiku-5.5': [['low', 'Low'], ['default', '100K']],
