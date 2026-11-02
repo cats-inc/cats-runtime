@@ -47,7 +47,7 @@ describe('WorkerPool', () => {
     release(); release(); expect(pool.activeCount).toBe(0);
     pool.reserveExternalExecution('image-2', 'grok', instance.id, () => {})();
   });
-  it('uses the global spawn timeout for Antigravity', () => {
+  it('gives Antigravity separate startup and message silence budgets', () => {
     const config = loadConfig({
       HOME: '/tmp/cats-runtime-workerpool-test',
       USERPROFILE: '',
@@ -78,6 +78,7 @@ describe('WorkerPool', () => {
     expect((worker as unknown as { spawnResilience: { timeoutMs: number } }).spawnResilience)
       .toMatchObject({
         timeoutMs: 30_000,
+        idleTimeoutMs: 120_000,
       });
   });
 
@@ -117,7 +118,25 @@ describe('WorkerPool', () => {
     expect((worker as unknown as { spawnResilience: { timeoutMs: number } }).spawnResilience)
       .toMatchObject({
         timeoutMs: 45_000,
+        idleTimeoutMs: 45_000,
       });
+  });
+
+  it('passes custom idle budgets and preserves an instance timeout of zero', () => {
+    const config = loadConfig({
+      HOME: '/tmp/cats-runtime-workerpool-test', USERPROFILE: '', CATS_RUNTIME_MESSAGE_IDLE_TIMEOUT_MS: '90000',
+    }, { providerYaml: 'providers: { antigravity: { instances: { native: {} } } }' });
+    const registry = new SessionRegistry(undefined, undefined, config.providerDefaultInstances, config.providerDefaultTargets);
+    const pool = new WorkerPool(config, registry, {} as never, {} as never, {} as never, {} as never,
+      { getCachedAssessment: () => undefined } as never);
+    const options = { cwd: '/tmp/cats-runtime-workerpool-test' };
+    const first = pool.spawn('custom-idle', 'antigravity', options);
+    expect((first as unknown as { spawnResilience: { timeoutMs: number; idleTimeoutMs: number } }).spawnResilience)
+      .toMatchObject({ timeoutMs: 30_000, idleTimeoutMs: 90_000 });
+    resolveProviderInstance(config, 'antigravity').timeoutMs = 0;
+    const disabled = pool.spawn('disabled-idle', 'antigravity', options);
+    expect((disabled as unknown as { spawnResilience: { timeoutMs: number; idleTimeoutMs: number } }).spawnResilience)
+      .toMatchObject({ timeoutMs: 0, idleTimeoutMs: 0 });
   });
 
   it('rejects a second active worker for the same configured singleton resource', () => {

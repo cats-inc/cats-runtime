@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { once } from 'node:events';
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -171,7 +171,64 @@ describe('WorkerProcess PowerShell helpers', () => {
     );
     expect(Date.now() - startedAt).toBeLessThan(3000);
   });
+
+  it.each([120_000, 0])('allows silence beyond startup when the idle budget is %ims', async idleTimeoutMs => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const worker = new WorkerProcess(createClockedProvider(), { cwd: process.cwd() }, createNodeCommandConfig(),
+      { retries: 1, timeoutMs: 30_000, idleTimeoutMs });
+    const stream = worker.streamMessage('ignored');
+    try {
+      expect((await stream.next()).value).toMatchObject({ type: 'init' });
+      let settled = false;
+      const result = stream.next();
+      void result.then(() => { settled = true; }, () => { settled = true; });
+      await vi.advanceTimersByTimeAsync(idleTimeoutMs === 0 ? 240_000 : 31_000);
+      expect(settled).toBe(false);
+      worker.emit('event', { type: 'result', sessionId: 'clocked-session' });
+      await expect(result).resolves.toMatchObject({ value: { type: 'result' }, done: false });
+      await expect(stream.next()).resolves.toMatchObject({ done: true });
+    } finally {
+      worker.cancel();
+      vi.useRealTimers();
+    }
+  });
+
+  it('resets the idle budget on progress and still ends a genuinely silent turn', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const worker = new WorkerProcess(createClockedProvider(), { cwd: process.cwd() }, createNodeCommandConfig(),
+      { retries: 1, timeoutMs: 30_000, idleTimeoutMs: 120_000 });
+    const stream = worker.streamMessage('ignored');
+    try {
+      expect((await stream.next()).value).toMatchObject({ type: 'init' });
+      const progress = stream.next();
+      await vi.advanceTimersByTimeAsync(90_000);
+      worker.emit('event', { type: 'text', text: 'still working' });
+      await expect(progress).resolves.toMatchObject({ value: { type: 'text' } });
+      let settled = false;
+      const result = stream.next();
+      void result.then(() => { settled = true; }, () => { settled = true; });
+      const failure = expect(result).rejects.toThrow('Antigravity stopped responding after the initial response for 120000ms.');
+      await vi.advanceTimersByTimeAsync(119_999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await failure;
+    } finally {
+      worker.cancel();
+      vi.useRealTimers();
+    }
+  });
 });
+
+function createClockedProvider(): Provider {
+  return {
+    name: 'antigravity', ephemeral: true,
+    capabilities: { resume: true, fork: false, permissions: false },
+    buildSpawnArgs: () => ['-e',
+      "console.log(JSON.stringify({ type: 'init', sessionId: 'clocked-session' })); setInterval(() => {}, 1000);"],
+    buildStdinMessage: () => '',
+    parseStreamLine: line => JSON.parse(line) as StreamEvent,
+  };
+}
 
 it('routes native Codex read requests through the real Worker transport and shared filesystem tools', async () => {
   const cwd = mkdtempSync(join(tmpdir(), 'cats-codex-native-read-'));
