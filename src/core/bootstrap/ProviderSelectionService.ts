@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { parseDocument } from 'yaml';
 import { providerConfigRevision, type BackendKind } from '../../backends/cli/config.js';
 import { KNOWN_PROVIDERS } from '../../backends/cli/providers/types.js';
@@ -33,6 +33,35 @@ export interface ProviderSelectionSnapshot {
 export interface ProviderSelectionCatalogEntry extends SelectedProviderTarget {
   familyLabel: string;
   binaryName: string;
+}
+
+const INVALID_CONFIG_BACKUPS_KEPT = 5;
+
+/**
+ * An unparsable file still holds what someone wrote. Saving replaces it, so a copy goes
+ * beside it first, and a copy that cannot be made refuses the save.
+ */
+function backUpInvalidConfig(configPath: string, source: string): void {
+  const stem = `${basename(configPath)}.invalid-`;
+  const stamp = new Date().toISOString().replace(/[-:.]/g, '');
+  const backup = `${configPath}.invalid-${stamp}-${randomUUID().slice(0, 8)}.bak`;
+  try {
+    writeFileSync(backup, source, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+  } catch (error) {
+    throw new ProviderSelectionError(
+      `Could not back up the unreadable provider configuration: ${(error as Error).message}`,
+      409,
+    );
+  }
+  const directory = dirname(configPath);
+  const older = readdirSync(directory)
+    .filter((name) => name.startsWith(stem) && name.endsWith('.bak'))
+    .sort()
+    .reverse()
+    .slice(INVALID_CONFIG_BACKUPS_KEPT);
+  for (const name of older) {
+    try { unlinkSync(join(directory, name)); } catch { /* A stale backup is harmless. */ }
+  }
 }
 
 export class ProviderSelectionError extends Error {
@@ -327,6 +356,7 @@ export class ProviderSelectionService {
     this.prepare(candidate);
     this.assertRevision(expectedRevision);
     mkdirSync(dirname(this.options.configPath), { recursive: true });
+    if (this.state === 'invalid' && source !== null) backUpInvalidConfig(this.options.configPath, source);
     const temporary = `${this.options.configPath}.${randomUUID()}.tmp`;
     try {
       writeFileSync(temporary, yaml, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
