@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parse } from 'yaml';
@@ -31,6 +31,67 @@ function fixture(yaml?: string) {
   const selection = new ProviderSelectionService(options);
   return { ...options, root, paths, selection };
 }
+
+describe('saving over a provider configuration it could not read', () => {
+  const broken = 'backends: [this is not\n  valid: yaml';
+  const backups = (f: ReturnType<typeof fixture>) => readdirSync(f.paths.configDir)
+    .filter((name) => name.includes('.invalid-') && name.endsWith('.bak'));
+  /** Runtime started with no file, then found this one: the only way to reach 'invalid'. */
+  function brokenFixture() {
+    const f = fixture();
+    writeFileSync(f.paths.configPath, broken);
+    return { ...f, selection: new ProviderSelectionService({ config: f.config, configPath: f.configPath, dataDir: f.dataDir }) };
+  }
+
+  it('keeps a copy of the old file, then replaces it', () => {
+    const f = brokenFixture();
+    expect(f.selection.getSnapshot().state).toBe('invalid');
+    f.selection.save([codex], f.selection.getSnapshot().revision);
+    expect(f.selection.getSnapshot().state).toBe('selected');
+    const [backup] = backups(f);
+    expect(backup).toBeDefined();
+    expect(readFileSync(join(f.paths.configDir, backup!), 'utf8')).toBe(broken);
+    expect(readFileSync(f.paths.configPath, 'utf8')).not.toBe(broken);
+    if (process.platform !== 'win32') {
+      expect(statSync(join(f.paths.configDir, backup!)).mode & 0o777).toBe(0o600);
+    }
+  });
+
+  it('keeps only the five newest copies', () => {
+    const f = brokenFixture();
+    const stem = `${f.paths.configPath}.invalid-`;
+    for (let index = 0; index < 6; index += 1) writeFileSync(`${stem}2020010${index}T000000000Z-old.bak`, 'old');
+    f.selection.save([codex], f.selection.getSnapshot().revision);
+    const kept = backups(f);
+    expect(kept).toHaveLength(5);
+    expect(kept.filter((name) => name.endsWith('-old.bak')).sort()[0]).toContain('20200102');
+    expect(kept.some((name) => !name.endsWith('-old.bak'))).toBe(true);
+  });
+
+  it.runIf(process.platform !== 'win32' && process.getuid?.() !== 0)('refuses the save when no copy can be made', () => {
+    const f = brokenFixture();
+    const revision = f.selection.getSnapshot().revision;
+    chmodSync(f.paths.configDir, 0o500);
+    try {
+      expect(() => f.selection.save([codex], revision)).toThrow('Could not back up');
+    } finally {
+      chmodSync(f.paths.configDir, 0o700);
+    }
+    expect(readFileSync(f.paths.configPath, 'utf8')).toBe(broken);
+    expect(f.selection.getSnapshot().state).toBe('invalid');
+  });
+
+  it('adds no copy for a missing or readable file', () => {
+    const missing = fixture();
+    missing.selection.save([codex], missing.selection.getSnapshot().revision);
+    expect(existsSync(missing.paths.configPath)).toBe(true);
+    expect(backups(missing)).toHaveLength(0);
+
+    const readable = fixture('version: 1\nbackends: {}\n');
+    readable.selection.save([codex], readable.selection.getSnapshot().revision);
+    expect(backups(readable)).toHaveLength(0);
+  });
+});
 
 describe('provider intent and resource scope', () => {
   it.each(['url', 'base_url', 'connect'])('edits an endpoint without replacing auth or transport settings (%s)', (shape) => {

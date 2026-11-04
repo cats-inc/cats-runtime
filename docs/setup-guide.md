@@ -370,7 +370,9 @@ The bootstrap flow:
 The active config is the resource boundary for standalone Runtime, Platform,
 and Desktop. A selected target is a provider/backend/instance tuple. Saving or
 reloading reconciles provider services; it does not delete history or uninstall
-CLIs. Missing or invalid files start with no provider work. The full example
+CLIs. Missing or invalid files start with no provider work. Saving over a file
+Runtime could not read first keeps a copy beside it (`providers.yaml.invalid-*.bak`,
+the five newest), and refuses the save if that copy cannot be made. The full example
 is for reference: copy only the targets you intend to use, or use the editor.
 
 Setup artifacts are persisted under `<dataDir>/setup/`:
