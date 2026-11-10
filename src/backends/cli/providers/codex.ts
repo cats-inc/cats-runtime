@@ -28,6 +28,7 @@ import {
   observeUnknown,
 } from '../../../core/compatibility/providerEvolution.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
+import { providerSessionUnavailableEvent } from '../../../core/runtime/providerSessionUnavailable.js';
 import type { SessionMcpServerLaunch } from '../../../core/sessionMcpServers.js';
 import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 import { CodexReadTools, codexReadToolError, grantedCodexReadTools } from './codexReadTools.js';
@@ -619,6 +620,9 @@ export class CodexProvider implements Provider {
     }
     if (msg.error) {
       const readBootstrapFailed = this.state === 'initializing' && this._readTools !== null;
+      const resumeMissing = msg.id === this._threadBootstrapId
+        && Boolean(this._spawnOpts?.resumeSessionId) && !this._spawnOpts?.forkSession
+        && isCodexResumeMissing(msg.error);
       if (this.state === 'initializing') {
         this.state = 'failed';
         this._pendingMessage = null;
@@ -626,6 +630,12 @@ export class CodexProvider implements Provider {
       }
       this._readTurnId = null;
 
+      if (resumeMissing) {
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: 'jsonrpc:error',
+          rawSample: msg,
+        }, providerSessionUnavailableEvent(formatJsonRpcError(msg.error)));
+      }
       return observeNormalized(this.evolutionObserver, {
         rawEventType: 'jsonrpc:error',
         rawSample: msg,
@@ -1267,6 +1277,15 @@ function firstCommandToken(command: string): string {
 
 function normalizeAllowedToken(value: string | null | undefined): string {
   return (value || '').trim().toLowerCase().replace(/[^a-z0-9*]+/g, '');
+}
+
+/**
+ * Codex 0.167.0 app-server answers `thread/resume` for a thread it has no rollout
+ * for with JSON-RPC error -32600 `no rollout found for thread id <id>`
+ * (capture: codex-0.167.0/thread-resume-missing.error.redacted.ndjson).
+ */
+export function isCodexResumeMissing(error: NonNullable<JsonRpcResponse['error']>): boolean {
+  return typeof error.message === 'string' && /\bno rollout found for thread id\b/iu.test(error.message);
 }
 
 function formatJsonRpcError(error: NonNullable<JsonRpcResponse['error']>): string {

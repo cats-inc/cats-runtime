@@ -4,6 +4,7 @@ import { assertExecutionPolicyAdmission, type EffectiveExecutionPolicy, type Exe
 import type { ProviderSessionCapabilities, SessionToolInventory, SessionToolServer } from '../../../core/interactions/capabilities.js';
 import { record } from '../../../core/interactions/validation.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
+import { providerSessionUnavailableEvent } from '../../../core/runtime/providerSessionUnavailable.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 import { ACP_INTERACTION_KINDS, GROK_INTERACTION_KINDS, acpReply, mapAcpPermission, mapGrokInput } from './hostedAcpInteractions.js';
 import { sameHostedWorkspace } from './hostedWorkspace.js';
@@ -142,10 +143,10 @@ export class HostedAcpProvider implements Provider {
         headers: token ? [{ name: 'Authorization', value: `Bearer ${token}` }] : [] };
     });
   }
-  private fail(message: string): StreamEvent {
+  private fail(message: string, resumeMissing = false): StreamEvent {
     this.state = 'failed'; this.pendingPrompt = null; this.pendingControl = null; this.promptId = undefined;
     this.policy = { ...this.policy, status: 'unsupported', reason: 'native_session_initialization_failed' };
-    return { type: 'error', text: message };
+    return resumeMissing ? providerSessionUnavailableEvent(message) : { type: 'error', text: message };
   }
   private ready(): StreamEvent {
     this.state = 'ready';
@@ -180,6 +181,9 @@ export class HostedAcpProvider implements Provider {
       if (!method) return null;
       this.requests.delete(input.id);
       const result = record(input.result);
+      if (input.error && hostedResumeMissing(this.name, method, input.error)) {
+        return this.fail(`${this.name} has no saved session to resume; no action was retried. Continue in a new session.`, true);
+      }
       if (input.error || !result) return this.fail(`${this.name} rejected ${method}; no action was retried. Check the native provider sign-in and settings.`);
       if (method === 'initialize') {
         const capabilities = record(result.agentCapabilities);
@@ -337,4 +341,16 @@ export class HostedAcpProvider implements Provider {
     return { category: 'provider_unavailable', message: 'The official Antigravity ACP binary does not support this operating system page size. Install a compatible official build.',
       retryable: false, source: input.source, evidenceSummary: 'Native ACP exited before initialization: page size mismatch.' };
   }
+}
+
+/**
+ * Grok 1.0.77 `agent stdio` answers `session/resume` for a session it has no local
+ * directory for with JSON-RPC -32603 `Path not found.` and `data.code: FS_NOT_FOUND`
+ * (capture: grok-1.0.77/acp-resume-missing.error.redacted.ndjson). `session/load`,
+ * other hosted providers and other rejections stay generic until a capture shows
+ * their shape.
+ */
+export function hostedResumeMissing(provider: string, method: string, error: unknown): boolean {
+  if (provider !== 'grok' || method !== 'session/resume') return false;
+  return record(record(error)?.data)?.code === 'FS_NOT_FOUND';
 }

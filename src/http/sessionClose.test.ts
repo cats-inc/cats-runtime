@@ -451,6 +451,28 @@ describe('session close route', () => {
     expect(historyBody.inspection.maintenance.resetBoundary.status).toBe('cleared');
   });
 
+  it('clears the provider-session-unavailable marker with the stale native id on reset', async () => {
+    const session = registry.create({
+      id: 'session-reset-gone',
+      providerName: 'claude',
+      cwd: join(rootDir, 'repo-reset-gone'),
+    });
+    registry.setProviderSessionId(session.id, 'provider-session-gone');
+    registry.markProviderSessionUnavailable(session.id, 'No conversation found with session ID: provider-session-gone');
+    const refused = await app.request(`/sessions/${session.id}/resume`, { method: 'POST' });
+    expect(refused.status).toBe(410);
+
+    const res = await app.request(`/sessions/${session.id}/reset`, { method: 'POST' });
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.providerSessionId).toBeUndefined();
+    expect(body).not.toHaveProperty('providerSessionUnavailable');
+    expect(registry.get(session.id)?.providerSessionUnavailable).toBeUndefined();
+    // Without a native id nothing stale can be spawned; resume now gives its ordinary answer.
+    const resumed = await app.request(`/sessions/${session.id}/resume`, { method: 'POST' });
+    expect(resumed.status).not.toBe(410);
+  });
+
   it('clears scheduled wakeups when resetting a session', async () => {
     const session = registry.create({
       id: 'session-reset-wakeup',

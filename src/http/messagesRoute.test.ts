@@ -1169,3 +1169,28 @@ describe('message route session MCP servers (SPEC-035)', () => {
     }
   });
 });
+
+// The typed path runs end to end through the real worker pool in providerSessionUnavailable.test.ts.
+describe('message route provider session unavailable (ADR-006 rule 8)', () => {
+  it('keeps an untyped provider error recoverable', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-provider-session-gone-'));
+    const sessionBaseDir = join(root, 'sessions');
+    mkdirSync(sessionBaseDir, { recursive: true });
+    try {
+      const { app, registry, session } = makeApp(sessionBaseDir, async function* () {
+        yield { type: 'error', text: 'Synthetic provider error' };
+      });
+      const response = await app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/x-ndjson' },
+        body: JSON.stringify({ message: 'hello' }),
+      });
+      expect(response.status).toBe(200);
+      await response.text();
+      expect(registry.get(session.id)?.status).toBe('ready');
+      expect(registry.get(session.id)?.providerSessionUnavailable).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

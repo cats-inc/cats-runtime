@@ -31,6 +31,7 @@ import {
   buildAgentDiagnosticSessionEvidence,
 } from '../../core/runtime/agentDiagnosticsEvidence.js';
 import { createRuntimeContentBlockProjector } from '../../core/runtime/contentBlocks.js';
+import { providerSessionUnavailableResponse } from '../../core/runtime/providerSessionUnavailable.js';
 import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
 import { forwardWorkspaceActivity } from '../../core/runtime/workspaceStream.js';
 import { buildRuntimeExecutionStrategySessionPatch } from '../../core/runtime/strategies/state.js';
@@ -465,6 +466,11 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     return c.json({ error: 'Session not found' }, 404);
   }
 
+  const providerSessionGone = providerSessionUnavailableResponse(session);
+  if (providerSessionGone) {
+    return c.json(providerSessionGone, 410);
+  }
+
   try {
     assertRetainedSkillContent({
       policy: getRuntimeSkillContentPolicy(), hydration: session.hydration, skills: session.skills,
@@ -720,6 +726,10 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     try {
       await recycleWorkerForSessionMcpServers(ctx, ctx.registry.get(id) ?? session, c.req.raw.signal);
     } catch (error) {
+      // ADR-006 rule 8: the pool refused to respawn a native id the provider lost.
+      const providerSessionGoneOnRecycle = ctx.registry.get(id)
+        ? providerSessionUnavailableResponse(ctx.registry.get(id)!) : null;
+      if (providerSessionGoneOnRecycle) return c.json(providerSessionGoneOnRecycle, 410);
       if (error instanceof RuntimeSessionReplacementError) {
         if (error.code === 'worker_stop_unconfirmed' && !runtime.get(id)?.active && ctx.registry.get(id)) {
           ctx.registry.updateStatus(id, 'closed');

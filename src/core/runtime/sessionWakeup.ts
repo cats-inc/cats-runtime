@@ -6,6 +6,7 @@ import { normalizeProviderCatalogModelId } from '../models/providerModelCatalog.
 import { resolveProviderTarget } from '../providerCatalog.js';
 import { resolvePiResumeTarget } from '../../backends/cli/pi/resume.js';
 import type { RuntimeWakeupTriggerOutcome } from '../types.js';
+import { providerSessionUnavailableResponse } from './providerSessionUnavailable.js';
 
 export interface EnsureSessionAwakeResult {
   sessionId: string;
@@ -60,6 +61,9 @@ export async function ensureSessionAwake(
   if (!session) {
     throw new Error(`Session '${options.sessionId}' not found.`);
   }
+  // ADR-006 rule 8: never spawn a native id the provider reported it no longer has.
+  const providerSessionGone = providerSessionUnavailableResponse(session);
+  if (providerSessionGone) throw new Error(providerSessionGone.error);
   resolveProviderTarget(options.config, session.providerName,
     session.providerBackend && session.providerInstanceId
       ? `${session.providerBackend}/${session.providerInstanceId}` : session.providerInstanceId);

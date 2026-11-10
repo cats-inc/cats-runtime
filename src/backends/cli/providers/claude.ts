@@ -45,6 +45,7 @@ import {
   observeRawPassthrough,
 } from '../../../core/compatibility/providerEvolution.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
+import { providerSessionUnavailableEvent } from '../../../core/runtime/providerSessionUnavailable.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 export class ClaudeProvider implements Provider {
@@ -70,6 +71,8 @@ export class ClaudeProvider implements Provider {
   /** Models of this turn's main-conversation replies, reported with its result. */
   private turnModels: string[] = [];
   private spawnOpts: ProviderSpawnOptions | null = null;
+  /** Assistant, tool or streaming output seen from this spawn's native conversation. */
+  private conversationOutputObserved = false;
   /** CLI control request ID → Runtime interaction; a handled ID is never answered twice. */
   private readonly interactions = new Map<string, { id: string; resolve(id: string): void }>();
   /** An admitted policy holds the first turn until `initialize` confirms the permission mode. */
@@ -131,6 +134,7 @@ export class ClaudeProvider implements Provider {
       }
     }
     this.spawnOpts = { ...opts };
+    this.conversationOutputObserved = false;
     this.interactions.clear();
     this.capabilityEpoch++;
     this.inventory = emptyClaudeInventory();
@@ -354,6 +358,9 @@ export class ClaudeProvider implements Provider {
     }
 
     this.noteServedModel(event);
+    if (['assistant', 'user', 'stream_event', 'content_block_start', 'content_block_delta'].includes(event.type)) {
+      this.conversationOutputObserved = true;
+    }
 
     if (event.type === 'control_response' && this.admissionRequestId) {
       const response = record((event as unknown as Record<string, unknown>).response);
@@ -466,6 +473,18 @@ export class ClaudeProvider implements Provider {
         rawEventType: 'rate_limit_event',
         rawSample: event,
       }, createClaudeQuotaProgressEvent(snapshot, event.rate_limit_info));
+    }
+
+    // A `--resume` id the CLI no longer has fails before any turn (ADR-006 rule 8):
+    // only a resumed spawn with no conversation output yet can report it.
+    const resumeMissing = event.type === 'result' && this.spawnOpts?.resumeSessionId
+      && !this.conversationOutputObserved && (event.num_turns === undefined || event.num_turns === 0)
+      ? claudeResumeMissingError(event) : null;
+    if (resumeMissing) {
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'result:error_during_execution',
+        rawSample: event,
+      }, providerSessionUnavailableEvent(resumeMissing, event));
     }
 
     // result — done, with token usage, list-price cost, and the latest quota snapshot
@@ -831,6 +850,19 @@ function createClaudeQuotaProgressEvent(
       quota: snapshot.quota,
     },
   });
+}
+
+/**
+ * Claude Code 2.1.322 started with `--resume <id>` for a conversation it does not
+ * have writes one `result` frame (`error_during_execution`, `is_error: true`,
+ * `errors: ["No conversation found with session ID: <id>"]`) and exits 1 without
+ * reading input (capture: claude-2.1.322/resume-missing.error.redacted.ndjson).
+ */
+export function claudeResumeMissingError(event: ClaudeStreamEvent): string | null {
+  if (event.type !== 'result' || event.is_error !== true || !Array.isArray(event.errors)) return null;
+  const sentence = event.errors.find((value): value is string =>
+    typeof value === 'string' && /\bNo conversation found with session ID\b/iu.test(value));
+  return sentence ?? null;
 }
 
 function buildClaudeResultMetadata(

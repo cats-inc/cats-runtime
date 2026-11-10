@@ -74,6 +74,8 @@ export interface ClaudeStreamEvent {
   rate_limit_info?: ClaudeRateLimitInfo;
   /** Present on `result` frames. */
   is_error?: boolean;
+  /** Present on `result:error_during_execution` frames: the CLI's own failure sentences. */
+  errors?: unknown[];
   total_cost_usd?: number;
   duration_ms?: number;
   duration_api_ms?: number;

@@ -49,6 +49,28 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
+### Pending release notes — next Runtime minor, 0.7.0 (unreleased, not bumped)
+
+- **Lost provider sessions are reported, not retried** ([ADR-006 rule 8](decisions/006-agent-backend-and-shared-runtime-contracts.md#2026-11-11-amendment-report-a-lost-provider-session-instead-of-replacing-it)).
+  When Grok (streaming JSON or hosted ACP), Claude Code or Codex answers that the
+  session's native session cannot be resumed, the session is marked
+  `provider_session_unavailable` and closes for good; a turn that saw the answer
+  streams an `error` event with that `code` and records `errorCode`. The marker
+  persists across restarts, the worker pool refuses to spawn the session, and
+  messages, resume and explicit native fork answer HTTP 410 with the code. The
+  default fork falls back to a context transplant, `sessionKey` reuse skips the
+  session, and reset clears the marker with the stale id. Callers continue in a
+  new session with their own handoff. See
+  [Provider session unavailable](api.md#provider-session-unavailable).
+- **Compatibility boundary.** A send that used to leave the session `ready` after
+  this in-stream error now closes it, and the next send or resume answers 410
+  instead of 200 or 400. A caller that treated 410 as "resume and retry" would
+  now get a second 410. The additive fields (`code`, `errorCode`,
+  `providerSessionUnavailable`) need no data migration; existing sessions load
+  unchanged. This HTTP behavior change requires the next 0.x **minor**, 0.7.0.
+  The Cats Bot and Cats Desktop consumers are being updated against this
+  contract.
+
 ### Release notes — 0.6.2 on npm (2026-10-30)
 
 - npm `@cats-inc/cats-runtime` moves from 0.6.1 to 0.6.2. The version was

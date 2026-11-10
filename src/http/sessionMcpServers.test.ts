@@ -381,6 +381,24 @@ describe('session MCP servers HTTP contract (SPEC-035)', () => {
     expect(context.runtime!.mcpServers.get(id)).toEqual([]);
   });
 
+  it('does not reuse a sessionKey session whose provider session is gone (ADR-006 rule 8)', async () => {
+    const first = await createSession({ provider: 'codex', sessionKey: 'gone-fixture' });
+    expect(first.response.status, first.text).toBe(201);
+    const { id } = JSON.parse(first.text) as { id: string };
+    registry.setProviderSessionId(id, 'native-gone');
+    registry.markProviderSessionUnavailable(id, 'no rollout found for thread id native-gone');
+
+    const required = await createSession({ provider: 'codex', sessionKey: 'gone-fixture', reusePolicy: 'require_existing' });
+    expect(required.response.status).toBe(409);
+    expect(required.text).toContain('No existing codex session found');
+
+    // Changed metadata used to dead-end in a reuse conflict; the marked session is now skipped.
+    const preferred = await createSession({ provider: 'codex', sessionKey: 'gone-fixture', reusePolicy: 'prefer_existing',
+      cwd: join(rootDir, 'different') });
+    expect(preferred.response.status, preferred.text).toBe(201);
+    expect((JSON.parse(preferred.text) as { id: string }).id).not.toBe(id);
+  });
+
   it('does not negotiate an interaction host on rejected resume/reuse or failed spawn', async () => {
     vi.mocked(pool.getCapabilities).mockReturnValue({ resume: true, fork: true, permissions: true,
       interactions: { version: 1, kinds: ['user_input'] } });

@@ -109,6 +109,12 @@ import {
 import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
 import { isWithinRuntimeSessions } from '../../core/runtime/transcriptPaths.js';
 import {
+  PROVIDER_SESSION_UNAVAILABLE,
+  ProviderSessionUnavailableError,
+  providerSessionUnavailableBody,
+  providerSessionUnavailableResponse,
+} from '../../core/runtime/providerSessionUnavailable.js';
+import {
   canRuntimeCompactSessionTranscript,
   compactRuntimeManagedTranscript,
 } from '../../core/runtime/sessionCompaction.js';
@@ -961,7 +967,9 @@ function findReusableSession(
   return ctx.registry.list({ provider: providerName }).find((session) =>
     session.sessionKey === sessionKey
       && session.providerBackend === providerTarget.backend
-      && session.providerInstanceId === providerTarget.instanceId,
+      && session.providerInstanceId === providerTarget.instanceId
+      // ADR-006 rule 8: a session that can never run again is not reusable.
+      && !session.providerSessionUnavailable,
   );
 }
 
@@ -4334,6 +4342,9 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   if (!session) {
     return c.json({ error: 'Session not found' }, 404);
   }
+  // ADR-006 rule 8: terminal, checked before any worker is reused or spawned.
+  const providerSessionGone = providerSessionUnavailableResponse(session);
+  if (providerSessionGone) return c.json(providerSessionGone, 410);
   const contentError = sessionContentError(ctx, session);
   if (contentError) return c.json(contentError.body, contentError.status);
   try {
@@ -4646,6 +4657,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
     );
     ctx.registry.updateStatus(id, hydratedSession.providerBackend === 'cli' ? 'initializing' : 'ready');
   } catch (err) {
+    if (err instanceof ProviderSessionUnavailableError) return c.json(providerSessionUnavailableBody(), 410);
     return c.json({ error: `Failed to resume: ${err}` }, 500);
   }
 
@@ -4785,6 +4797,8 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   if (branchDecision.error) {
     return c.json({
       error: branchDecision.error.message,
+      ...(branchDecision.error.kind === 'provider_session_unavailable'
+        ? { code: PROVIDER_SESSION_UNAVAILABLE } : {}),
       branch: branchDecision,
     }, branchDecision.error.status);
   }

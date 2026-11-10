@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { loadConfig, resolveProviderInstance } from '../config.js';
@@ -9,6 +10,62 @@ import { supportsMuseImage } from '../media/museImage.js';
 import { supportsAntigravityImage } from '../media/antigravityImage.js';
 
 describe('WorkerPool', () => {
+  it('closes a session for good when its provider reports the native session is gone (ADR-006 rule 8)', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'cats-runtime-workerpool-gone-'));
+    try {
+      const config = loadConfig({ HOME: root, USERPROFILE: '' }, {
+        providerYaml: 'providers: { grok: { instances: { native: {} } } }',
+      });
+      const dataDir = path.join(root, 'data');
+      const registry = new SessionRegistry(dataDir, undefined, config.providerDefaultInstances, config.providerDefaultTargets);
+      registry.create({ id: 'session-1', providerName: 'grok', cwd: root });
+      registry.setProviderSessionId('session-1', 'stale-native');
+      registry.updateStatus('session-1', 'ready');
+      const pool = new WorkerPool(config, registry, {} as never, {} as never, {} as never, {} as never,
+        { getCachedAssessment: () => undefined } as never);
+      const worker = pool.spawn('session-1', 'grok', { cwd: root, resumeSessionId: 'stale-native' });
+      const seen: string[] = [];
+      worker.on('event', event => { seen.push(`${event.type}:${registry.get('session-1')?.status}`); });
+
+      worker.emit('event', { type: 'error', text: 'No saved copy of session stale-native was found remotely.',
+        code: 'provider_session_unavailable' });
+
+      // The turn's own listener already sees a closed session, so nothing restores it to ready.
+      expect(seen).toEqual(['error:closed']);
+      expect(registry.get('session-1')?.providerSessionUnavailable).toMatchObject({
+        providerSessionId: 'stale-native', reason: expect.stringContaining('No saved copy'),
+      });
+      await new Promise(resolve => setImmediate(resolve));
+      expect(pool.get('session-1')).toBeUndefined();
+
+      // The marker survives a Runtime restart.
+      const reloaded = new SessionRegistry(dataDir, undefined, config.providerDefaultInstances, config.providerDefaultTargets);
+      expect(reloaded.get('session-1')).toMatchObject({
+        status: 'closed',
+        providerSessionUnavailable: { providerSessionId: 'stale-native' },
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('leaves untyped provider errors to the turn', () => {
+    const config = loadConfig({ HOME: '/tmp/cats-runtime-workerpool-test', USERPROFILE: '' }, {
+      providerYaml: 'providers: { grok: { instances: { native: {} } } }',
+    });
+    const registry = new SessionRegistry(undefined, undefined, config.providerDefaultInstances, config.providerDefaultTargets);
+    registry.create({ id: 'session-1', providerName: 'grok', cwd: '/tmp/cats-runtime-workerpool-test' });
+    registry.updateStatus('session-1', 'ready');
+    const pool = new WorkerPool(config, registry, {} as never, {} as never, {} as never, {} as never,
+      { getCachedAssessment: () => undefined } as never);
+    const worker = pool.spawn('session-1', 'grok', { cwd: '/tmp/cats-runtime-workerpool-test' });
+    worker.emit('event', { type: 'error', text: 'Not signed in.' });
+    expect(registry.get('session-1')?.status).toBe('ready');
+    expect(registry.get('session-1')?.providerSessionUnavailable).toBeUndefined();
+    expect(pool.get('session-1')).toBe(worker);
+    pool.killAll();
+  });
+
   it('resolves hosted capabilities per target and excludes hosted protocols from bounded raw media', () => {
     for (const provider of ['grok', 'muse', 'antigravity'] as const) {
       const config = loadConfig({ HOME: '/tmp/cats-runtime-workerpool-test', USERPROFILE: '' }, {

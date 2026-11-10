@@ -37,6 +37,10 @@ import { JunieProvider } from '../providers/junie.js';
 import { PiProvider } from '../providers/pi.js';
 import { WorkerProcess, type SpawnResilienceConfig } from './WorkerProcess.js';
 import type { SessionRegistry } from './SessionRegistry.js';
+import {
+  isProviderSessionUnavailableEvent,
+  ProviderSessionUnavailableError,
+} from '../../../core/runtime/providerSessionUnavailable.js';
 
 interface ProviderServiceResolvers {
   getAuggieSessions?: (instanceId?: string) => AuggieSessionService;
@@ -315,6 +319,8 @@ export class WorkerPool {
     providerInstanceId?: string,
     launchEnv: Readonly<Record<string, string>> = {},
   ): WorkerProcess {
+    // ADR-006 rule 8: the one place every resume, recycle, wakeup and fork spawn passes.
+    if (this.registry.get(sessionId)?.providerSessionUnavailable) throw new ProviderSessionUnavailableError();
     if ([...this.externalSourceSessions.values()].includes(sessionId)
       || this.workers.get(sessionId)?.processRunning) throw new PoolSourceBusyError();
     if (this.activeCount >= this.config.maxSessions) {
@@ -376,6 +382,15 @@ export class WorkerPool {
       }
 
       worker.on('event', (event) => {
+        if (isProviderSessionUnavailableEvent(event)) {
+          if (this.workers.get(sessionId) !== worker) return;
+          // ADR-006 rule 8: close for good before any consumer reads this event, and
+          // never respawn the stale native id; the transcript owner starts a new session.
+          this.registry.markProviderSessionUnavailable(sessionId, event.text);
+          // Let the running turn's listener receive this event before the worker stops.
+          setImmediate(() => { if (this.workers.get(sessionId) === worker) worker?.kill(); });
+          return;
+        }
         if ((event.type === 'init' || event.type === 'progress') && event.mcpServers
           && this.workers.get(sessionId) === worker) {
           // Claude reports every server at init; Codex reports one server per update.

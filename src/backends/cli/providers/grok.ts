@@ -25,9 +25,20 @@ import {
   observeUnknown,
 } from '../../../core/compatibility/providerEvolution.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
+import { providerSessionUnavailableEvent } from '../../../core/runtime/providerSessionUnavailable.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 export const GROK_STREAMING_JSON_PROFILE_ID = 'grok-cli-streaming-json-1.0.0';
+
+/**
+ * Grok 1.0.77 answers `--resume <id>` for a session it has neither locally nor in
+ * its remote registry with `No saved copy of session <id> was found remotely. …`
+ * on stdout, then exits 1 (capture: grok-1.0.77/resume-missing.error.redacted.ndjson).
+ * Only the stable prefix is matched; the trailing location wording may change.
+ */
+export function isGrokResumeMissing(message: string): boolean {
+  return /\bNo saved copy of session\b/iu.test(message);
+}
 
 export const GROK_STREAMING_JSON_BASE_ARGS = [
   '--output-format', 'streaming-json',
@@ -117,6 +128,10 @@ export class GrokProvider implements Provider {
 
   private pendingPrompt: string | null = null;
   private requestedModel: string | null = null;
+  /** This spawn passed `--resume`; only then can a missing native session be reported. */
+  private resumeRequested = false;
+  /** Assistant or tool output already seen in this turn. */
+  private turnOutputObserved = false;
   private readonly pendingTools = new Map<string, PendingGrokTool>();
 
   constructor(
@@ -127,6 +142,7 @@ export class GrokProvider implements Provider {
   prepareEphemeralTurn(turn: TurnInput): void {
     this.pendingPrompt = compileRuntimeTurnPrompt(turn.message, turn);
     this.pendingTools.clear();
+    this.turnOutputObserved = false;
   }
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
@@ -158,6 +174,8 @@ export class GrokProvider implements Provider {
     if (opts.resumeSessionId) {
       args.push('--resume', opts.resumeSessionId);
     }
+    this.resumeRequested = Boolean(opts.resumeSessionId);
+    this.turnOutputObserved = false;
     if (opts.forkSession) {
       if (!opts.resumeSessionId) {
         throw new Error('Grok CLI fork requires a resume session id.');
@@ -261,6 +279,7 @@ export class GrokProvider implements Provider {
     }
 
     if (event.type === 'text' && typeof event.data === 'string' && event.data) {
+      this.turnOutputObserved = true;
       return observeNormalized(this.evolutionObserver, {
         rawEventType: 'text',
         rawSample: event,
@@ -272,10 +291,12 @@ export class GrokProvider implements Provider {
     }
 
     if (event.type === 'tool_call') {
+      this.turnOutputObserved = true;
       return this.parseToolCall(event);
     }
 
     if (event.type === 'tool_call_update') {
+      this.turnOutputObserved = true;
       return this.parseToolCallUpdate(event);
     }
 
@@ -286,7 +307,8 @@ export class GrokProvider implements Provider {
       return observeNormalized(this.evolutionObserver, {
         rawEventType: 'error',
         rawSample: event,
-      }, {
+      }, this.resumeRequested && !this.turnOutputObserved && isGrokResumeMissing(message)
+        ? providerSessionUnavailableEvent(message, event) : {
         type: 'error',
         text: message,
         raw: event,

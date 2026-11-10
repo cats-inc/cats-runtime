@@ -174,10 +174,12 @@ export function sessionControls(
 ): SessionControls {
   const activity = sessionActivity(session, options);
   const controlMode = sessionControlMode(session, options);
+  // ADR-006 rule 8: a session whose native session is gone never runs again.
+  const runnable = !session.providerSessionUnavailable;
 
   return {
-    canSend: options.attached === true && activity === 'interactive' && session.status !== 'busy',
-    canResume: controlMode === 'resume_only' && activity === 'inactive',
+    canSend: runnable && options.attached === true && activity === 'interactive' && session.status !== 'busy',
+    canResume: runnable && controlMode === 'resume_only' && activity === 'inactive',
     canClose: options.attached === true && activity === 'interactive',
     canDelete: activity !== 'tearing_down' && !(activity === 'interactive' && options.attached !== true),
     canRefresh: options.attached !== true || activity !== 'interactive',
