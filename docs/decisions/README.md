@@ -1,5 +1,9 @@
 # Architecture Decision Records (ADR)
 
+- [ADR-050: Separate provider session persistence from product history](050-separate-provider-session-persistence-from-product-history.md)
+  — accepted, 2026-11-11; ephemeral internal jobs, persistent conversation identity
+  and product-owned labels. Existing history remains intact.
+
 [ADR-049: Native control protocols for hosted provider tools](049-use-native-control-protocols-for-hosted-provider-tools.md) — accepted, 2026-11-02.
 
 - [ADR-048: Provider interactions and effective session capabilities](048-bridge-provider-interactions-and-report-effective-session-capabilities.md)

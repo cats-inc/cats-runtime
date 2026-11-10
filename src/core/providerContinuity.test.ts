@@ -138,6 +138,7 @@ describe('buildProviderContinuitySummary', () => {
       resume: true, fork: true, permissions: true,
       interactions: { version: 1 as const, kinds: ['user_input' as const] },
       sessionCapabilities: { version: 1 as const, executionPolicy: true, inventory: true },
+      providerSessionPersistence: ['persistent', 'ephemeral'] as Array<'persistent' | 'ephemeral'>,
     };
     const target = (mode: 'native' | 'wsl') => ({
       providerName: 'codex', backend: 'cli', instanceId: 'default', defaultTarget: true,
@@ -148,11 +149,15 @@ describe('buildProviderContinuitySummary', () => {
     const native = buildProviderContinuitySummary(target('native'), { capabilities });
     expect(native.interactions).toEqual(capabilities.interactions);
     expect(native.sessionCapabilities).toEqual(capabilities.sessionCapabilities);
+    expect(native.providerSessionPersistence).toEqual(['persistent', 'ephemeral']);
+    native.providerSessionPersistence!.pop();
+    expect(capabilities.providerSessionPersistence).toEqual(['persistent', 'ephemeral']);
     native.interactions!.kinds.length = 0;
     expect(capabilities.interactions.kinds).toEqual(['user_input']);
     const remote = buildProviderContinuitySummary(target('wsl'), { capabilities });
     expect(remote.interactions).toBeUndefined();
     expect(remote.sessionCapabilities).toBeUndefined();
+    expect(remote.providerSessionPersistence).toBeUndefined();
     expect(buildProviderContinuitySummary(target('native'), {
       capabilities: { resume: true, fork: true, permissions: true },
     }).sessionCapabilities).toBeUndefined();

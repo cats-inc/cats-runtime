@@ -320,6 +320,7 @@ interface BranchCapabilityInput {
     | 'providerInstanceId'
     | 'providerSessionId'
     | 'providerSessionUnavailable'
+    | 'providerSessionPersistence'
     | 'workspaceMode'
     | 'cwd'
     | 'model'
@@ -454,7 +455,10 @@ export function buildSessionBranchCapabilityTruth(
   let errorKind: SessionBranchErrorKind | undefined;
   let reason: string | undefined;
 
-  if (
+  if (input.parentSession.providerSessionPersistence === 'ephemeral') {
+    errorKind = 'capability_unavailable';
+    reason = 'Ephemeral provider sessions cannot be forked.';
+  } else if (
     input.parentSession.providerName === 'cursor'
     && (input.parentSession.providerBackend || 'cli') === 'cli'
   ) {
@@ -487,7 +491,7 @@ export function buildSessionBranchCapabilityTruth(
       reason,
     },
     contextTransplant: {
-      supported: true,
+      supported: input.parentSession.providerSessionPersistence !== 'ephemeral',
     },
   };
 }
@@ -500,6 +504,7 @@ export function buildSessionSelfBranchCapabilityTruth(
     | 'providerInstanceId'
     | 'providerSessionId'
     | 'providerSessionUnavailable'
+    | 'providerSessionPersistence'
     | 'workspaceMode'
     | 'cwd'
     | 'model'
@@ -546,6 +551,11 @@ export function resolveSessionBranchDecision(
     capabilityTruth,
     warnings: [],
   };
+
+  if (input.parentSession.providerSessionPersistence === 'ephemeral') {
+    return { ...result, error: { status: 410, kind: 'capability_unavailable',
+      message: 'Ephemeral provider sessions cannot be forked.' } };
+  }
 
   if (requestedMode === 'native_fork') {
     if (!capabilityTruth.nativeFork.available) {

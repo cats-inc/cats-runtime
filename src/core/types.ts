@@ -1571,12 +1571,18 @@ export interface RuntimeSessionInspection {
   actions: RuntimeSessionInspectionActions;
 }
 
+export type ProviderSessionPersistence = 'persistent' | 'ephemeral';
+
 export interface SessionInfo {
   id: string;
   providerName: string;
   providerBackend?: ProviderBackend;
   providerInstanceId?: string;
   providerSessionId?: string;
+  /** Native history lifetime; omitted legacy records are persistent. */
+  providerSessionPersistence?: ProviderSessionPersistence;
+  /** Product-owned seed for a native conversation name; never an identity. */
+  sessionLabel?: string;
   providerState?: SessionProviderState;
   sessionKey?: string;
   reusePolicy?: SessionReusePolicy;
@@ -1647,6 +1653,7 @@ export interface ProviderCapabilities {
   resume: boolean;
   fork: boolean;
   permissions: boolean;
+  providerSessionPersistence?: ProviderSessionPersistence[];
   /** Adapter maps SPEC-035 session MCP servers into its launch configuration. */
   sessionMcpServers?: boolean;
   /** Negotiated host interactions; absent means unsupported. */
@@ -1666,6 +1673,8 @@ export type PermissionMode = 'skip' | 'whitelist' | 'default';
 
 export interface ProviderSpawnOptions {
   cwd: string;
+  providerSessionPersistence?: ProviderSessionPersistence;
+  sessionLabel?: string;
   workspaceKind?: WorkspaceKind;
   workspaceAccess?: WorkspaceAccess;
   workspaceMode?: WorkspaceMode;

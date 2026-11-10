@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { providerSessionSpawnOptions } from '../../../core/runtime/providerSessionPersistence.js';
 import { hasManagedPluginExposure, recordManagedPluginRun, finishManagedPluginRun } from '../../../core/skills/managedPlugins.js';
 import {
   resolveProviderInstance,
@@ -308,6 +309,7 @@ export class WorkerPool {
     if (resolved.commandConfig.runtime.mode !== 'native') {
       delete capabilities.interactions;
       delete capabilities.sessionCapabilities;
+      delete capabilities.providerSessionPersistence;
     }
     return capabilities;
   }
@@ -321,6 +323,11 @@ export class WorkerPool {
   ): WorkerProcess {
     // ADR-006 rule 8: the one place every resume, recycle, wakeup and fork spawn passes.
     if (this.registry.get(sessionId)?.providerSessionUnavailable) throw new ProviderSessionUnavailableError();
+    opts = providerSessionSpawnOptions(this.registry.get(sessionId), opts);
+    if (opts.providerSessionPersistence === 'ephemeral'
+      && !this.getCapabilities(providerName, providerInstanceId).providerSessionPersistence?.includes('ephemeral')) {
+      throw new Error('This provider target does not support ephemeral sessions.');
+    }
     if ([...this.externalSourceSessions.values()].includes(sessionId)
       || this.workers.get(sessionId)?.processRunning) throw new PoolSourceBusyError();
     if (this.activeCount >= this.config.maxSessions) {

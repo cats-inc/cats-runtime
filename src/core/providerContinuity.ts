@@ -12,6 +12,7 @@ export interface ProviderContinuitySummary {
   sessionMcpServers: boolean;
   interactions?: ProviderCapabilities['interactions'];
   sessionCapabilities?: ProviderCapabilities['sessionCapabilities'];
+  providerSessionPersistence?: ProviderCapabilities['providerSessionPersistence'];
   providerManagedSessions: boolean;
   sessionKey: boolean;
   providerSessionState: boolean;
@@ -86,6 +87,8 @@ export function buildProviderContinuitySummary(
       ? { interactions: structuredClone(options.capabilities.interactions) } : {}),
     ...(target.cliInstance?.commandConfig.runtime.mode === 'native' && options.capabilities.sessionCapabilities
       ? { sessionCapabilities: { ...options.capabilities.sessionCapabilities } } : {}),
+    ...(target.cliInstance?.commandConfig.runtime.mode === 'native' && options.capabilities.providerSessionPersistence
+      ? { providerSessionPersistence: [...options.capabilities.providerSessionPersistence] } : {}),
     providerManagedSessions: true,
     sessionKey: false,
     providerSessionState: false,

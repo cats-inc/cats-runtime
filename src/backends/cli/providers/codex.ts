@@ -82,6 +82,7 @@ export class CodexProvider implements Provider {
     resume: true,
     fork: true,
     permissions: true,
+    providerSessionPersistence: ['persistent', 'ephemeral'],
     sessionMcpServers: true,
     interactions: { version: 1, kinds: [...CODEX_INTERACTION_KINDS] },
     sessionCapabilities: { version: 1, executionPolicy: true, inventory: true },
@@ -111,6 +112,7 @@ export class CodexProvider implements Provider {
   private _readTools: CodexReadTools | null = null;
   private _initializeRequestId: number | null = null;
   private _threadBootstrapId: number | null = null;
+  private _nameRequestId: number | null = null;
   private _readTurnId: string | null = null;
   private _readCallIds = new Set<string>();
   private readonly _interactions = new Map<string, { id: string; resolve(id: string): void }>();
@@ -153,6 +155,9 @@ export class CodexProvider implements Provider {
   }
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
+    if (opts.providerSessionPersistence === 'ephemeral' && (opts.resumeSessionId || opts.forkSession)) {
+      throw new Error('Ephemeral Codex sessions cannot resume or fork native history.');
+    }
     assertExecutionPolicyAdmission(opts.executionPolicy, opts);
     this.state = 'uninitialized';
     this.threadId = null;
@@ -162,6 +167,7 @@ export class CodexProvider implements Provider {
     this._configurationRequestId = null;
     this._deferredBootstrap = null;
     this._pendingControl = null;
+    this._nameRequestId = null;
     this._configurationSources = [];
     this._inventory = emptyCodexInventory();
     this._capabilityEpoch++;
@@ -605,6 +611,11 @@ export class CodexProvider implements Provider {
   }
 
   private handleResponse(msg: JsonRpcResponse): StreamEvent | null {
+    if (this._nameRequestId !== null && msg.id === this._nameRequestId) {
+      // Naming is metadata only. Failure cannot consume a turn or fail bootstrap.
+      this._nameRequestId = null;
+      return null;
+    }
     if (this._configurationRequestId !== null && msg.id === this._configurationRequestId) {
       this._configurationRequestId = null;
       if (msg.error) return this.failBootstrap('Codex configuration evidence is unavailable. No model turn was started.');
@@ -665,6 +676,10 @@ export class CodexProvider implements Provider {
           ? 'Codex read-tool registration did not return a valid thread.'
           : 'Codex bootstrap did not return a valid thread. No model turn was started.');
       }
+      if (this._spawnOpts?.providerSessionPersistence === 'ephemeral'
+        && asRecord(result.thread)?.ephemeral !== true) {
+        return this.failBootstrap('Codex did not confirm ephemeral session persistence. No model turn was started.');
+      }
       const policy = this.resolvePermissionPolicy(this._spawnOpts);
       const expectedSandbox = policy.sandbox === 'read-only' ? 'readOnly' : 'workspaceWrite';
       const sandboxType = asRecord(result.sandbox)?.type;
@@ -691,6 +706,14 @@ export class CodexProvider implements Provider {
         status: 'not_observed', reason: 'legacy_policy_has_partial_coverage' };
       this.threadId = tid;
       this.state = 'ready';
+      const nativeName = asRecord(result.thread)?.name;
+      if (this._spawnOpts?.sessionLabel && this._spawnOpts.providerSessionPersistence !== 'ephemeral'
+        && !(typeof nativeName === 'string' && nativeName.trim())) {
+        this._nameRequestId = this.nextId;
+        this._pendingControl = this.makeRequest('thread/name/set', {
+          threadId: tid, name: this._spawnOpts.sessionLabel,
+        }) + '\n';
+      }
       return observeNormalized(this.evolutionObserver, {
         rawEventType: 'thread/start',
         rawSample: msg,
@@ -1154,6 +1177,7 @@ export class CodexProvider implements Provider {
 
     if (!opts.resumeSessionId) {
       params.experimentalRawEvents = false;
+      if (opts.providerSessionPersistence === 'ephemeral') params.ephemeral = true;
     } else {
       params.threadId = opts.resumeSessionId;
     }

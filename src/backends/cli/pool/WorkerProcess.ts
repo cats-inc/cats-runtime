@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import { ProviderSessionNotResumableError } from '../../../core/runtime/providerSessionPersistence.js';
 import { createInterface } from 'node:readline';
 import { defaultMessageIdleTimeoutMs, type ProviderCommandConfig } from '../config.js';
 import type {
@@ -163,6 +164,9 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   }
 
   private spawnProcess(): void {
+    if (this.spawnOpts.providerSessionPersistence === 'ephemeral' && this.launchGeneration > 0) {
+      throw new ProviderSessionNotResumableError();
+    }
     if (this.managedPluginExecution && this.launchGeneration > 0) throw new Error('Managed Plugin worker restart requires a fresh execution receipt.');
     const generation = ++this.launchGeneration;
     this.control?.close();
