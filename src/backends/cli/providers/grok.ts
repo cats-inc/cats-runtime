@@ -25,9 +25,20 @@ import {
   observeUnknown,
 } from '../../../core/compatibility/providerEvolution.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
+import { providerSessionUnavailableEvent } from '../../../core/runtime/providerSessionUnavailable.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 export const GROK_STREAMING_JSON_PROFILE_ID = 'grok-cli-streaming-json-1.0.0';
+
+/**
+ * Grok 1.0.77 answers `--resume <id>` for a session it has neither locally nor in
+ * its remote registry with `No saved copy of session <id> was found remotely. …`
+ * on stdout, then exits 1 (capture: grok-1.0.77/resume-missing.error.redacted.ndjson).
+ * Only the stable prefix is matched; the trailing location wording may change.
+ */
+export function isGrokResumeMissing(message: string): boolean {
+  return /\bNo saved copy of session\b/iu.test(message);
+}
 
 export const GROK_STREAMING_JSON_BASE_ARGS = [
   '--output-format', 'streaming-json',
@@ -286,7 +297,7 @@ export class GrokProvider implements Provider {
       return observeNormalized(this.evolutionObserver, {
         rawEventType: 'error',
         rawSample: event,
-      }, {
+      }, isGrokResumeMissing(message) ? providerSessionUnavailableEvent(message, event) : {
         type: 'error',
         text: message,
         raw: event,

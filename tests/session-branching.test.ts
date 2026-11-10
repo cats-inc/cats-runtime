@@ -68,6 +68,46 @@ function createMockPool(
 }
 
 describe('session branching route', () => {
+  it('refuses a native fork of a session whose provider session is gone (ADR-006 rule 8)', async () => {
+    const { config, cleanup } = createTestConfig();
+    const registry = new SessionRegistry();
+    const pool = createMockPool();
+    const app = createRuntimeApp({
+      config,
+      registry,
+      pool,
+      cursorNative: {} as never,
+      gooseNative: {} as never,
+      kiroNative: {} as never,
+      auggieSessions: {} as never,
+      opencodeNative: {} as never,
+    } as never);
+
+    try {
+      const parent = registry.create({
+        id: 'parent-gone',
+        providerName: 'codex',
+        cwd: join(config.sessionBaseDir, 'repo'),
+        workspaceMode: 'shared',
+        model: 'gpt-5.4',
+      });
+      registry.setProviderSessionId(parent.id, 'thread-parent');
+      registry.markProviderSessionUnavailable(parent.id, 'no rollout found for thread id thread-parent');
+
+      const response = await app.request(`/sessions/${parent.id}/fork`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ mode: 'native_fork' }),
+      });
+
+      expect(response.status).toBe(410);
+      expect(await response.json()).toMatchObject({ code: 'provider_session_unavailable' });
+      expect(pool.spawn).not.toHaveBeenCalled();
+    } finally {
+      cleanup();
+    }
+  });
+
   it('preserves native_fork lineage for compatible branches', async () => {
     const { config, cleanup } = createTestConfig();
     const registry = new SessionRegistry();

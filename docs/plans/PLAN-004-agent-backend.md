@@ -317,8 +317,10 @@ difference between logical session identity and provider-managed resume tokens.
   session-key behavior so upstream callers get one reusable continuity model.
 - `sessionKey` is the caller-visible logical identity; `providerSessionId` is a
   backend-owned continuity pointer that may be cleared and reacquired.
-- Provider resume failure should degrade to fresh provider session creation
-  without discarding runtime-owned logical session identity.
+- Provider resume failure is reported, not repaired in place (ADR-006 rule 8 as
+  amended 2026-11-11): the adapter emits `provider_session_unavailable`, Runtime
+  closes the session for good and answers 410 afterwards, and the caller that
+  owns the transcript continues in a new Runtime session.
 - Bootstrap context and output contracts should stay backend-neutral and should
   not assume Git repositories or code-generation workflows.
 - Provider-managed session state becomes the authoritative continuity mechanism

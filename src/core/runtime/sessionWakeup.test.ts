@@ -159,6 +159,18 @@ describe('ensureSessionAwake', () => {
     expect(registry.get('session-1')?.workspace.kind).toBe('sandbox');
   });
 
+  it('never spawns the stale native id of a session whose provider session is gone', async () => {
+    const registry = new SessionRegistry();
+    registry.create(makeSession());
+    registry.setProviderSessionId('session-1', 'provider-session-1');
+    registry.markProviderSessionUnavailable('session-1', 'No conversation found with session ID: provider-session-1');
+    const runtime = makeRuntime();
+    await expect(ensureSessionAwake({
+      config: makeConfig() as never, registry, runtime: runtime as never, sessionId: 'session-1',
+    })).rejects.toThrow('Create a new session');
+    expect(runtime.spawn).not.toHaveBeenCalled();
+  });
+
   it('returns already_awake when an execution handle is already active', async () => {
     const registry = new SessionRegistry();
     registry.create(makeSession());

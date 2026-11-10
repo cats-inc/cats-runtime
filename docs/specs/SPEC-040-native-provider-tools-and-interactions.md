@@ -65,6 +65,9 @@ isolated worktrees, careful planning and implementation on 2026-11-02.
    Resume does not replay historical output as a new answer or re-execute tools.
    Reject incompatible native histories explicitly so a host can preserve the
    transcript and use its existing handoff path. Never silently start fresh.
+   A native session the provider no longer has is reported as
+   `provider_session_unavailable` (ADR-006 rule 8, amended 2026-11-11): the
+   Runtime session closes for good and the host continues in a new one.
 6. **R6 — Diagnostics.** Expose supported interaction kinds and actual policy/tool
    observations. Unobserved inventory, unavailable sandbox and missing executable
    remain explicit. Model/reasoning controls must reach the native protocol.

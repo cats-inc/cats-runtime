@@ -33,6 +33,7 @@ import type {
   RuntimeRunInspection,
   RuntimeRunStatus,
   RuntimeSessionExecutionState,
+  RuntimeStreamErrorCode,
   RuntimeUsageSignal,
   RuntimeWakeReason,
   SessionInfo,
@@ -754,6 +755,7 @@ export class RuntimeSessionManager {
         observedAt,
         {
           error: event.text,
+          ...(event.code ? { errorCode: event.code } : {}),
         },
       );
     }
@@ -1277,6 +1279,7 @@ export class RuntimeSessionManager {
     patch: {
       resultSummary?: string;
       error?: string;
+      errorCode?: RuntimeStreamErrorCode;
     } = {},
   ): void {
     if (!tracked.currentRun) {
@@ -1289,6 +1292,7 @@ export class RuntimeSessionManager {
       endedAt,
       ...(patch.resultSummary !== undefined ? { resultSummary: patch.resultSummary } : {}),
       ...(patch.error !== undefined ? { error: patch.error } : {}),
+      ...(patch.errorCode !== undefined ? { errorCode: patch.errorCode } : {}),
     };
     tracked.lastRun = cloneRun(tracked.currentRun);
     this.logRunEnd(sessionId, tracked.currentRun);

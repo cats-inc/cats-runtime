@@ -1472,6 +1472,8 @@ export interface RuntimeRunInspection {
   inputPreview?: string;
   resultSummary?: string;
   error?: string;
+  /** The machine-readable reason of a failed run, when the stream `error` carried one. */
+  errorCode?: RuntimeStreamErrorCode;
   progress?: RuntimeProgressSnapshot;
   usage?: RuntimeUsageSignal;
   guardrail?: RuntimeGuardrailResult;
@@ -1593,6 +1595,12 @@ export interface SessionInfo {
   skills?: SessionSkillState;
   hydration?: SessionHydrationState;
   maintenanceState?: RuntimeSessionMaintenanceState;
+  /**
+   * ADR-006 rule 8: set once the provider reported that this session's native
+   * session cannot be resumed. Terminal: messages and resume answer 410 with
+   * `provider_session_unavailable`, and the stale native id is never spawned again.
+   */
+  providerSessionUnavailable?: ProviderSessionUnavailableMarker;
   /** Runtime-owned retry fence; paths are never used as automatic deletion targets. */
   pendingFileDeletionPaths?: string[];
   context?: SessionInvocationContext;
@@ -1613,6 +1621,14 @@ export interface SessionInfo {
   createdAt: string;
   updatedAt: string;
   lastActivity?: string;
+}
+
+export interface ProviderSessionUnavailableMarker {
+  observedAt: string;
+  /** The native id the provider could not resume, kept for diagnostics only. */
+  providerSessionId: string | null;
+  /** The provider's own sentence, clipped. */
+  reason: string;
 }
 
 export interface SessionView extends SessionInfo {
@@ -1758,9 +1774,18 @@ export interface ResultStreamEvent extends StreamEventBase, StreamEventStatePatc
   text?: string;
 }
 
+/**
+ * Machine-readable reasons a stream `error` event may carry.
+ * `provider_session_unavailable` (ADR-006 rule 8): the provider CLI cannot resume
+ * this session's native session, so the Runtime session is closed for good and the
+ * caller that owns the transcript continues in a new Runtime session.
+ */
+export type RuntimeStreamErrorCode = 'provider_session_unavailable';
+
 export interface ErrorStreamEvent extends StreamEventBase {
   type: 'error';
   text: string;
+  code?: RuntimeStreamErrorCode;
 }
 
 export interface RawStreamEvent extends StreamEventBase {

@@ -108,6 +108,7 @@ import {
 } from '../../core/runtime/sessionBranching.js';
 import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
 import { isWithinRuntimeSessions } from '../../core/runtime/transcriptPaths.js';
+import { providerSessionUnavailableResponse } from '../../core/runtime/providerSessionUnavailable.js';
 import {
   canRuntimeCompactSessionTranscript,
   compactRuntimeManagedTranscript,
@@ -4334,6 +4335,9 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   if (!session) {
     return c.json({ error: 'Session not found' }, 404);
   }
+  // ADR-006 rule 8: terminal, checked before any worker is reused or spawned.
+  const providerSessionGone = providerSessionUnavailableResponse(session);
+  if (providerSessionGone) return c.json(providerSessionGone, 410);
   const contentError = sessionContentError(ctx, session);
   if (contentError) return c.json(contentError.body, contentError.status);
   try {
@@ -4789,6 +4793,9 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     }, branchDecision.error.status);
   }
   const branchMode = branchDecision.resolvedMode!;
+  // ADR-006 rule 8: a native fork would spawn the native id the provider no longer has.
+  const providerSessionGone = branchMode === 'native_fork' ? providerSessionUnavailableResponse(session) : null;
+  if (providerSessionGone) return c.json(providerSessionGone, 410);
   const warnings = [...branchDecision.warnings];
 
   const forkId = randomUUID();

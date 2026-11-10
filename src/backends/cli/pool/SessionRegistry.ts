@@ -479,6 +479,26 @@ export class SessionRegistry {
     return true;
   }
 
+  /**
+   * ADR-006 rule 8: the provider cannot resume this session's native session.
+   * Closes the session for good and persists why, so a Runtime restart keeps
+   * answering 410 instead of spawning the stale native id again.
+   */
+  markProviderSessionUnavailable(id: string, reason: string): boolean {
+    const session = this.sessions.get(id);
+    if (!session) return false;
+    const now = new Date().toISOString();
+    session.providerSessionUnavailable ??= {
+      observedAt: now,
+      providerSessionId: session.providerSessionId ?? null,
+      reason: reason.slice(0, 500),
+    };
+    session.status = 'closed';
+    session.updatedAt = now;
+    this.saveToDisk();
+    return true;
+  }
+
   clearProviderResumeState(
     id: string,
     options: {

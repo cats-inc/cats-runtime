@@ -45,6 +45,7 @@ import {
   observeRawPassthrough,
 } from '../../../core/compatibility/providerEvolution.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
+import { providerSessionUnavailableEvent } from '../../../core/runtime/providerSessionUnavailable.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 export class ClaudeProvider implements Provider {
@@ -468,6 +469,15 @@ export class ClaudeProvider implements Provider {
       }, createClaudeQuotaProgressEvent(snapshot, event.rate_limit_info));
     }
 
+    // A `--resume` id the CLI no longer has fails before any turn (ADR-006 rule 8).
+    const resumeMissing = event.type === 'result' ? claudeResumeMissingError(event) : null;
+    if (resumeMissing) {
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'result:error_during_execution',
+        rawSample: event,
+      }, providerSessionUnavailableEvent(resumeMissing, event));
+    }
+
     // result — done, with token usage, list-price cost, and the latest quota snapshot
     if (event.type === 'result') {
       const estimatedCost = finiteNumber(event.total_cost_usd);
@@ -831,6 +841,19 @@ function createClaudeQuotaProgressEvent(
       quota: snapshot.quota,
     },
   });
+}
+
+/**
+ * Claude Code 2.1.322 started with `--resume <id>` for a conversation it does not
+ * have writes one `result` frame (`error_during_execution`, `is_error: true`,
+ * `errors: ["No conversation found with session ID: <id>"]`) and exits 1 without
+ * reading input (capture: claude-2.1.322/resume-missing.error.redacted.ndjson).
+ */
+export function claudeResumeMissingError(event: ClaudeStreamEvent): string | null {
+  if (event.type !== 'result' || event.is_error !== true || !Array.isArray(event.errors)) return null;
+  const sentence = event.errors.find((value): value is string =>
+    typeof value === 'string' && /\bNo conversation found with session ID\b/iu.test(value));
+  return sentence ?? null;
 }
 
 function buildClaudeResultMetadata(

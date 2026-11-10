@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":"resume","error":{"code":-32603,"message":"Path not found.","data":{"detail":"<redacted localized OS error> (os error 3)","code":"FS_NOT_FOUND"}}}

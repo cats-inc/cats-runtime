@@ -55,9 +55,11 @@ This decision includes:
 7. `providerSessionId` and related provider state remain backend-owned
    continuity pointers, not the caller-facing identity of the session.
 8. When provider resume fails because a provider session is expired, unknown, or
-   otherwise invalid, the runtime preserves logical session identity and
-   runtime-owned transcript/context, clears the provider continuity pointer, and
-   retries via fresh provider session creation when appropriate.
+   otherwise invalid, the runtime reports it as `provider_session_unavailable`,
+   closes that Runtime session for good, and never spawns the stale native id
+   again. It does not start a fresh provider session in place or inject context:
+   the caller that owns the transcript continues in a new Runtime session.
+   Amended 2026-11-11; see the amendment below for the contract and reasons.
 9. Bootstrap context remains backend-neutral and may carry `message`,
    optional `instructions`, structured `context`, and future metadata without
    requiring provider-specific prompt hacks.
@@ -100,6 +102,70 @@ This decision includes:
 
 - some CLI and API backends may not use every new field immediately, but the
   shared contract still applies to them
+
+## 2026-11-11 Amendment: Report a Lost Provider Session Instead of Replacing It
+
+Rule 8 originally said the runtime would clear the provider continuity pointer
+and retry with a fresh provider session "when appropriate". Only Pi ever did
+that. Every other adapter kept the stale native id: a Cats Bot conversation on
+Grok answered each turn for six hours with `No saved copy of session <id> was
+found remotely`, because the error arrived inside an HTTP 200 stream and the
+session went back to `ready`.
+
+The amended contract:
+
+- An adapter that recognizes its CLI's own "this native session cannot be
+  resumed" answer emits the stream `error` event with
+  `code: "provider_session_unavailable"`, keeping the provider's sentence in
+  `text`. The run inspection records the same value as `lastRun.errorCode`.
+- Runtime then persists `providerSessionUnavailable` (observed time, the stale
+  native id, the provider's sentence) on the session record, sets the session
+  to `closed`, and stops the worker. The marker survives a Runtime restart.
+- From then on `POST /sessions/:id/messages`, `POST /sessions/:id/resume` and
+  a native `POST /sessions/:id/fork` refuse with HTTP 410 and
+  `{ "error": …, "code": "provider_session_unavailable" }`, and a scheduled
+  wakeup fails without spawning. Session controls report `canSend: false` and
+  `canResume: false`. History stays readable.
+- The caller that owns the product transcript creates a new Runtime session
+  (`POST /sessions`) with the same `cwd` and supplies its own handoff context.
+
+Why Runtime reports instead of replacing:
+
+- Runtime does not hold the product transcript. Its per-session history covers
+  one Runtime session, while a product conversation spans many; only the
+  product can build the right handoff.
+- Cats Desktop decides whether a turn needs a context transplant by whether the
+  Runtime session id changed. Swapping the native session under an unchanged
+  Runtime session id would make the next turn start with no context and no
+  signal: silent amnesia.
+- Under the `release` skill content profile, putting a different native id on
+  the same Runtime session invalidates its skill provenance, so the next send
+  would fail with 409 `skill_content_profile_conflict` anyway.
+
+This also settles the earlier conflict with SPEC-040 R5, which already required
+hosted ACP to reject incompatible native histories explicitly so the host could
+use its own handoff path.
+
+Classified answers, each captured live without a model turn:
+
+- Grok 1.0.77 streaming JSON: `No saved copy of session <id> was found …` on
+  stdout, then exit 1.
+- Grok 1.0.77 hosted ACP: `session/resume` rejected with JSON-RPC -32603
+  `Path not found.` and `data.code: FS_NOT_FOUND`.
+- Claude Code 2.1.322: a `result` frame (`error_during_execution`,
+  `is_error: true`) whose `errors` contain `No conversation found with session
+  ID: <id>`, then exit 1 before reading input.
+- Codex 0.167.0 app-server: `thread/resume` rejected with JSON-RPC -32600
+  `no rollout found for thread id <id>`.
+
+Other providers stay unclassified until a capture shows their answer; their
+resume failures remain ordinary errors. The captures live under
+`tests/fixtures/provider-captures/`.
+
+Pi's existing in-place recovery (`recoverPiUnknownSession` in
+`src/http/routes/messages.ts`) still replaces the native session behind the
+same Runtime session without context. It is a documented exception to revisit,
+not a pattern for other adapters.
 
 ## Alternatives Considered
 

@@ -31,6 +31,7 @@ import {
   buildAgentDiagnosticSessionEvidence,
 } from '../../core/runtime/agentDiagnosticsEvidence.js';
 import { createRuntimeContentBlockProjector } from '../../core/runtime/contentBlocks.js';
+import { providerSessionUnavailableResponse } from '../../core/runtime/providerSessionUnavailable.js';
 import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
 import { forwardWorkspaceActivity } from '../../core/runtime/workspaceStream.js';
 import { buildRuntimeExecutionStrategySessionPatch } from '../../core/runtime/strategies/state.js';
@@ -463,6 +464,11 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
 
   if (!session) {
     return c.json({ error: 'Session not found' }, 404);
+  }
+
+  const providerSessionGone = providerSessionUnavailableResponse(session);
+  if (providerSessionGone) {
+    return c.json(providerSessionGone, 410);
   }
 
   try {
