@@ -114,6 +114,8 @@ import {
   providerSessionUnavailableBody,
   providerSessionUnavailableResponse,
 } from '../../core/runtime/providerSessionUnavailable.js';
+import { ephemeralSessionResponse, parseProviderSessionPersistence,
+  parseSessionLabel } from '../../core/runtime/providerSessionPersistence.js';
 import {
   canRuntimeCompactSessionTranscript,
   compactRuntimeManagedTranscript,
@@ -2701,6 +2703,8 @@ sessionRoutes.post('/sessions', async (c) => {
     interactionHost?: unknown;
     executionPolicy?: unknown;
     browserIntegration?: unknown;
+    providerSessionPersistence?: unknown;
+    sessionLabel?: unknown;
     context?: SessionInvocationContext;
     outputDir?: string;
   }>();
@@ -2725,7 +2729,17 @@ sessionRoutes.post('/sessions', async (c) => {
   let interactionHost: InteractionHost | undefined;
   let executionPolicy: SessionExecutionPolicy | undefined;
   let browserIntegration: boolean | undefined;
+  let providerSessionPersistence: SessionInfo['providerSessionPersistence'];
+  let sessionLabel: string | undefined;
   try {
+    providerSessionPersistence = parseProviderSessionPersistence(body.providerSessionPersistence);
+    sessionLabel = parseSessionLabel(body.sessionLabel);
+    if (providerSessionPersistence === 'ephemeral'
+      && !runtime.getCapabilities(providerName, providerTarget.instanceId, providerTarget.backend)
+        .providerSessionPersistence?.includes('ephemeral')) {
+      return c.json({ error: 'This provider target does not support ephemeral sessions.',
+        code: 'provider_session_persistence_unsupported' }, 400);
+    }
     interactionHost = parseInteractionHost(body.interactionHost);
     runtime.assertInteractionSupport(interactionHost, providerName, providerTarget.instanceId, providerTarget.backend);
     executionPolicy = parseExecutionPolicy(body.executionPolicy);
@@ -2806,6 +2820,9 @@ sessionRoutes.post('/sessions', async (c) => {
         }, 409);
       }
     } else {
+      if ((existing.providerSessionPersistence ?? 'persistent') !== providerSessionPersistence) {
+        return c.json({ error: 'providerSessionPersistence cannot change when reusing a session.' }, 409);
+      }
       if (runtime.getExecutionPolicy(existing.id) && (body.permissionMode !== undefined || body.allowedTools !== undefined)) {
         return c.json({ error: 'Do not combine a retained executionPolicy with legacy permission controls.' }, 400);
       }
@@ -3311,6 +3328,8 @@ sessionRoutes.post('/sessions', async (c) => {
     providerBackend: providerTarget.backend,
     providerInstanceId: providerTarget.instanceId,
     cwd: resolved.cwd,
+    providerSessionPersistence,
+    sessionLabel,
     workspace: resolved.workspace,
     workspaceMode: resolved.workspaceMode,
     workspaceIsolation: resolved.workspaceIsolation,
@@ -4345,6 +4364,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   // ADR-006 rule 8: terminal, checked before any worker is reused or spawned.
   const providerSessionGone = providerSessionUnavailableResponse(session);
   if (providerSessionGone) return c.json(providerSessionGone, 410);
+  if (session.providerSessionPersistence === 'ephemeral') return c.json(ephemeralSessionResponse(), 410);
   const contentError = sessionContentError(ctx, session);
   if (contentError) return c.json(contentError.body, contentError.status);
   try {
@@ -4353,6 +4373,18 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
     return c.json({ error: 'This session provider is no longer selected' }, 409);
   }
   const resumeBody = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+  try {
+    if (resumeBody.providerSessionPersistence !== undefined
+      && parseProviderSessionPersistence(resumeBody.providerSessionPersistence)
+        !== (session.providerSessionPersistence ?? 'persistent')) {
+      return c.json({ error: 'providerSessionPersistence cannot change after creation.' }, 400);
+    }
+    const label = parseSessionLabel(resumeBody.sessionLabel);
+    // A resume can seed an old unlabeled record, but never replaces an existing product label.
+    if (label && !session.sessionLabel) ctx.registry.updateSessionMetadata(id, { sessionLabel: label });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+  }
   let interactionHost: InteractionHost | undefined;
   let executionPolicy: SessionExecutionPolicy | undefined;
   let browserIntegration: boolean | undefined;
@@ -4677,6 +4709,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   if (!session) {
     return c.json({ error: 'Session not found' }, 404);
   }
+  if (session.providerSessionPersistence === 'ephemeral') return c.json(ephemeralSessionResponse(), 410);
   const contentError = sessionContentError(ctx, session);
   if (contentError) return c.json(contentError.body, contentError.status);
 

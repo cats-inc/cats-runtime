@@ -32,6 +32,7 @@ import {
 } from '../../core/runtime/agentDiagnosticsEvidence.js';
 import { createRuntimeContentBlockProjector } from '../../core/runtime/contentBlocks.js';
 import { providerSessionUnavailableResponse } from '../../core/runtime/providerSessionUnavailable.js';
+import { ephemeralSessionResponse, ProviderSessionNotResumableError } from '../../core/runtime/providerSessionPersistence.js';
 import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
 import { forwardWorkspaceActivity } from '../../core/runtime/workspaceStream.js';
 import { buildRuntimeExecutionStrategySessionPatch } from '../../core/runtime/strategies/state.js';
@@ -483,6 +484,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   }
 
   if (session.status === 'closed' || session.status === 'closing') {
+    if (session.providerSessionPersistence === 'ephemeral') return c.json(ephemeralSessionResponse(), 410);
     return c.json({ error: 'Session is closed. Resume it first.' }, 400);
   }
   try {
@@ -609,6 +611,10 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   let routingInput;
   try {
     routingInput = parsePeerMessageRoutingInput(body.routing);
+    if (session.providerSessionPersistence === 'ephemeral' && routingInput?.mode === 'peer') {
+      return c.json({ error: 'Peer execution does not support ephemeral provider sessions.',
+        code: 'provider_session_persistence_unsupported' }, 400);
+    }
   } catch (error) {
     const routingErrorEvent = toPeerExecutionErrorEvent(error, {
       code: 'peer_not_routable',
@@ -711,11 +717,13 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   }
 
   if (!peerRouted && !worker) {
+    if (session.providerSessionPersistence === 'ephemeral') return c.json(ephemeralSessionResponse(), 410);
     return c.json({ error: 'No active worker. Resume the session first.' }, 404);
   }
 
   if (!peerRouted && worker && !worker.active) {
     ctx.registry.updateStatus(id, 'closed');
+    if (session.providerSessionPersistence === 'ephemeral') return c.json(ephemeralSessionResponse(), 410);
     return c.json({ error: 'Worker process has exited' }, 410);
   }
 
@@ -726,6 +734,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     try {
       await recycleWorkerForSessionMcpServers(ctx, ctx.registry.get(id) ?? session, c.req.raw.signal);
     } catch (error) {
+      if (error instanceof ProviderSessionNotResumableError) return c.json(ephemeralSessionResponse(), 410);
       // ADR-006 rule 8: the pool refused to respawn a native id the provider lost.
       const providerSessionGoneOnRecycle = ctx.registry.get(id)
         ? providerSessionUnavailableResponse(ctx.registry.get(id)!) : null;

@@ -69,6 +69,8 @@ export interface CreateSessionInput {
   providerName: string;
   providerBackend?: 'cli' | 'api' | 'local' | 'agent';
   providerInstanceId?: string;
+  providerSessionPersistence?: SessionInfo['providerSessionPersistence'];
+  sessionLabel?: string;
   cwd: string;
   workspace?: SessionWorkspaceState;
   workspaceMode?: LegacyWorkspaceMode;
@@ -374,6 +376,8 @@ export class SessionRegistry {
         input.providerInstanceId,
       ),
       status: 'initializing',
+      providerSessionPersistence: input.providerSessionPersistence ?? 'persistent',
+      sessionLabel: input.sessionLabel,
       origin: 'runtime',
       cwd: input.cwd,
       workspace: normalizeWorkspaceState({
@@ -545,6 +549,7 @@ export class SessionRegistry {
       outputDir?: string;
       artifacts?: SessionArtifact[];
       summary?: string;
+      sessionLabel?: string;
       lastInputPreview?: string;
     },
   ): boolean {
@@ -554,6 +559,7 @@ export class SessionRegistry {
     if (patch.sessionKey !== undefined) {
       session.sessionKey = patch.sessionKey;
     }
+    if (patch.sessionLabel !== undefined) session.sessionLabel = patch.sessionLabel;
     if (Object.prototype.hasOwnProperty.call(patch, 'model')) {
       session.model = patch.model;
     }

@@ -1,5 +1,12 @@
 # Documentation Index
 
+[Provider session retention](specs/SPEC-041-provider-session-retention-and-continuity.md)
+implements ephemeral Codex jobs for Catlas and persistent conversation reuse across
+Bot restarts. [ADR-050](decisions/050-separate-provider-session-persistence-from-product-history.md)
+and [PLAN-052](plans/PLAN-052-codex-session-retention-and-continuity.md) separate
+Runtime and consumer work; the [investigation](research/2026-11-11-codex-session-list-pollution.md)
+records native UI evidence and completed native-turn acceptance. Implemented in worktrees; unpublished.
+
 [Copilot catalog refresh](research/2026-11-02-copilot-catalog-refresh.md) completes the previously
 blocked Copilot scope with GPT-6.1 Terra and the operator-confirmed Fusion Standard mapping.
 

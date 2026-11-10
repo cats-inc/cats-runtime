@@ -1,5 +1,9 @@
 # Implementation Plans
 
+- [PLAN-052: Codex session retention and continuity](PLAN-052-codex-session-retention-and-continuity.md)
+  — implemented, 2026-11-11; Runtime contract, Platform Catlas and Bot continuity
+  passed scoped, integration and Windows native checks. Unpublished; release pins pending.
+
 [PLAN-051: Native Provider Tools and Interactions](PLAN-051-native-provider-tools-and-interactions.md) — in progress (2026-11-02).
 
 - [PLAN-050: Claude Code provider interactions](PLAN-050-claude-provider-interactions.md)

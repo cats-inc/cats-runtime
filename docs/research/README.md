@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-11-11-codex-session-list-pollution](2026-11-11-codex-session-list-pollution.md) | Native Catlas/Bot histories in ChatGPT Desktop | Read-only UI/index attribution, three updated source baselines, ephemeral/name protocol probes and completed Windows native/consumer acceptance |
 | [2026-11-02-copilot-catalog-refresh](2026-11-02-copilot-catalog-refresh.md) | Copilot CLI 1.0.105, Copilot Pro | Successful account read and complete 33-row picker, new Terra, confirmed Fusion Standard/balance mapping, fifteen selectable rows and focused validation |
 | [native-provider-host-protocols-2026-11-02](native-provider-host-protocols-2026-11-02.md) | Muse MSP, Grok ACP, Google ACP | Native Worker MCP/continuity, inherited permission ceilings, private grants, and Google ARM64 page-size blocker |
 | [2026-11-01-seven-cli-catalog-refresh](2026-11-01-seven-cli-catalog-refresh.md) | Seven requested CLI scopes | Six refreshed; Codex Terra and Cursor DeepSeek added, Copilot feature 403 retained, three consumer surfaces validated |

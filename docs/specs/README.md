@@ -1,5 +1,9 @@
 # Feature Specifications
 
+- [SPEC-041: Provider session retention and continuity](SPEC-041-provider-session-retention-and-continuity.md)
+  — implemented, 2026-11-11; ephemeral Codex jobs, persistent Bot restart continuity,
+  recognizable names and capability/lifecycle gates. Windows native acceptance passed; unpublished.
+
 [SPEC-040: Native Provider Tools and Interactions](SPEC-040-native-provider-tools-and-interactions.md) — approved, implementation in progress (2026-11-02).
 
 - [SPEC-039: Provider session capabilities and interactions](SPEC-039-provider-session-capabilities-and-interactions.md)

@@ -7,6 +7,7 @@ import { resolveProviderTarget } from '../providerCatalog.js';
 import { resolvePiResumeTarget } from '../../backends/cli/pi/resume.js';
 import type { RuntimeWakeupTriggerOutcome } from '../types.js';
 import { providerSessionUnavailableResponse } from './providerSessionUnavailable.js';
+import { ProviderSessionNotResumableError } from './providerSessionPersistence.js';
 
 export interface EnsureSessionAwakeResult {
   sessionId: string;
@@ -90,6 +91,7 @@ export async function ensureSessionAwake(
   }
 
   session = normalizeStoredSessionModel(options, session) ?? session;
+  if (session.providerSessionPersistence === 'ephemeral') throw new ProviderSessionNotResumableError();
 
   if (session.providerBackend !== 'cli') {
     options.runtime.spawn(session.id, session.providerName, {

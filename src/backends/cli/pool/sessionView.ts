@@ -147,6 +147,7 @@ export function sessionControlMode(
 ): SessionControlMode {
   const activity = sessionActivity(session, options);
   if (options.attached) return 'full';
+  if (session.providerSessionPersistence === 'ephemeral') return 'observe_only';
   if (activity === 'interactive' || activity === 'tearing_down') return 'observe_only';
 
   const resumeStrategy = sessionResumeStrategy(
@@ -199,7 +200,9 @@ export function toSessionView(
     workspaceKey: sessionWorkspaceKey(workspaceKeyPath),
     activity: sessionActivity(session, options),
     ownership: sessionOwnership(session.providerName, session.providerBackend),
-    resumeStrategy: sessionResumeStrategy(session.providerName, session.providerBackend),
+    providerSessionPersistence: session.providerSessionPersistence ?? 'persistent',
+    resumeStrategy: session.providerSessionPersistence === 'ephemeral'
+      ? 'none' : sessionResumeStrategy(session.providerName, session.providerBackend),
     controlMode: sessionControlMode(session, options),
     attached,
     controls: sessionControls(session, { ...options, attached }),

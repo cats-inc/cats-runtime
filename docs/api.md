@@ -2941,6 +2941,10 @@ action-scoped lifecycle coordination without relying on a single global
 
 - `sessionKey`: caller-visible logical session identity for explicit reuse
 - `reusePolicy`: one of `create_new`, `prefer_existing`, or `require_existing`
+- `providerSessionPersistence`: `persistent` (default) or `ephemeral`; immutable
+  for the session, including reuse by `sessionKey`
+- `sessionLabel`: nonempty plain text, trimmed, at most 160 Unicode code points,
+  without C0/DEL controls; optional native-name seed rather than session identity
 - `instructions`: session bootstrap instructions persisted by the runtime
 - `skills`: runtime-managed skill manifest with explicit `requestedSkills`
   where each entry may be either:
@@ -2959,6 +2963,33 @@ action-scoped lifecycle coordination without relying on a single global
 - legacy compatibility fields `workspaceMode` and `workspaceIsolation`
 - `mcpServers`: session MCP servers the provider CLI should connect to
   (see [Session MCP servers](#session-mcp-servers))
+
+### Provider-native history retention
+
+[SPEC-041](specs/SPEC-041-provider-session-retention-and-continuity.md) separates
+provider-native history from Runtime receipts. Selected native Codex CLI targets
+advertise `continuity.providerSessionPersistence: ["persistent", "ephemeral"]`.
+Other targets do not advertise ephemeral support. Unsupported explicit ephemeral
+creation returns `400 provider_session_persistence_unsupported` before execution;
+a caller must check both the selected target's capability and create readback.
+Session reads include the admitted policy; old records default to persistent.
+
+An ephemeral job may use multiple turns in its original live worker. Native
+bootstrap must confirm `thread.ephemeral === true` before model content is sent.
+Close, cancel, process loss or Runtime restart ends that identity permanently:
+resume, fork, wake and worker replacement are forbidden, and inactive sends return
+`410 provider_session_not_resumable`. A changed MCP set that needs replacement is
+also refused before the live worker is killed. Peer routing is unsupported for
+ephemeral jobs because its delivery contract cannot guarantee retention. Existing
+Runtime history and metering remain readable; this is not a data-erasure API.
+
+Native labels are best effort and independent of persistence. Codex seeds an
+unnamed persistent thread at bootstrap and preserves a name returned by native
+resume. A resume request can seed missing Runtime `sessionLabel` metadata; an
+already-live worker applies it only on a later native bootstrap. Name failures
+never replay a message or create another thread. Existing instruction delivery
+is unchanged; names are not prompt instructions. No existing native records are
+renamed, archived or deleted in bulk.
 
 ### Session MCP servers
 

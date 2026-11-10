@@ -1,4 +1,5 @@
 import { bindManagedNativeIdentity, hasManagedPluginExposure } from '../skills/managedPlugins.js';
+import { ProviderSessionNotResumableError, providerSessionSpawnOptions } from './providerSessionPersistence.js';
 import { RuntimeSkillError } from '../skills/errors.js';
 import { randomUUID } from 'node:crypto';
 import { InteractionError, type InteractionHost, type InteractionSnapshot } from '../interactions/types.js';
@@ -457,6 +458,12 @@ export class RuntimeSessionManager {
     providerBackend?: BackendKind,
   ): ExecutionHandle | undefined {
     this.replacements.delete(sessionId);
+    opts = providerSessionSpawnOptions(this.getSessionBinding?.(sessionId), opts);
+    if (opts.providerSessionPersistence === 'ephemeral'
+      && !this.getCapabilities(providerName, providerInstanceId, providerBackend)
+        .providerSessionPersistence?.includes('ephemeral')) {
+      throw new Error('This provider target does not support ephemeral sessions.');
+    }
     const interactionHost = opts.interactionHost ?? this.interactionHosts.get(sessionId);
     const executionPolicy = opts.executionPolicy ?? this.executionPolicies.get(sessionId);
     this.assertSessionControlAdmission(sessionId, interactionHost, executionPolicy, opts.resumeSessionId, providerName);
@@ -1103,6 +1110,9 @@ export class RuntimeSessionManager {
     sessionId: string, providerName: string, opts: ProviderSpawnOptions,
     providerInstanceId?: string, providerBackend?: BackendKind, signal?: AbortSignal,
   ): Promise<ExecutionHandle | undefined> {
+    if (this.getSessionBinding?.(sessionId)?.providerSessionPersistence === 'ephemeral') {
+      throw new ProviderSessionNotResumableError();
+    }
     const worker = this.pool.get(sessionId);
     this.kill(sessionId);
     const ticket = Symbol();
