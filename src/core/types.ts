@@ -729,7 +729,7 @@ export interface SessionBranchOperationResult {
 export interface SessionBranchDecision extends SessionBranchOperationResult {
   warnings: string[];
   error?: {
-    status: 400 | 409 | 500 | 501;
+    status: 400 | 409 | 410 | 500 | 501;
     kind: SessionBranchErrorKind;
     message: string;
   };
@@ -745,6 +745,8 @@ export type SessionBranchErrorKind =
   | 'provider_not_implemented'
   | 'provider_unsupported'
   | 'missing_provider_session'
+  /** ADR-006 rule 8: the provider can no longer resume the parent's native session. */
+  | 'provider_session_unavailable'
   | 'target_incompatible'
   | 'capability_unavailable';
 

@@ -101,8 +101,37 @@ describe('session branching route', () => {
       });
 
       expect(response.status).toBe(410);
-      expect(await response.json()).toMatchObject({ code: 'provider_session_unavailable' });
+      expect(await response.json()).toMatchObject({
+        code: 'provider_session_unavailable',
+        branch: { capabilityTruth: { nativeFork: { available: false, errorKind: 'provider_session_unavailable' } } },
+      });
       expect(pool.spawn).not.toHaveBeenCalled();
+
+      // The session view stops advertising a native fork.
+      const view = await (await app.request(`/sessions/${parent.id}`)).json() as {
+        branching?: { capabilities?: { nativeFork?: Record<string, unknown> } };
+      };
+      expect(view.branching?.capabilities?.nativeFork).toMatchObject({
+        available: false, errorKind: 'provider_session_unavailable',
+      });
+
+      // The default mode falls back to a context transplant, which needs no native id.
+      const auto = await app.request(`/sessions/${parent.id}/fork`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const autoBody = await auto.json() as {
+        id: string;
+        lineage: { branchMode: string };
+        branch: { resolvedMode: string; fallbackApplied: boolean };
+      };
+      expect(auto.status, JSON.stringify(autoBody)).toBe(201);
+      expect(autoBody.branch).toMatchObject({ resolvedMode: 'context_transplant', fallbackApplied: true });
+      expect(autoBody.lineage.branchMode).toBe('context_transplant');
+      const childSpawn = vi.mocked(pool.spawn).mock.calls.at(-1);
+      expect(childSpawn?.[2]).not.toHaveProperty('resumeSessionId');
+      expect(registry.get(autoBody.id)?.providerSessionUnavailable).toBeUndefined();
     } finally {
       cleanup();
     }

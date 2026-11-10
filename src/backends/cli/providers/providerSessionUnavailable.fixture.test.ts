@@ -10,6 +10,7 @@ import type { StreamEvent } from './types.js';
 // ADR-006 rule 8: each provider's own "this native session cannot be resumed"
 // answer, captured live without a model turn, becomes `provider_session_unavailable`.
 const captures = new URL('../../../../tests/fixtures/provider-captures/', import.meta.url);
+const staleId = '11111111-2222-4333-8444-555555555555';
 const hostedPolicy = {
   interactionHost: { version: 1 as const, kinds: ['command_approval' as const], timeoutMs: 60_000 },
   executionPolicy: { version: 1 as const, mode: 'provider' as const,
@@ -26,8 +27,15 @@ function events(parsed: StreamEvent | StreamEvent[] | null): StreamEvent[] {
 }
 
 describe('provider session unavailable classification', () => {
-  it('classifies the Grok streaming-json answer to a resume id it no longer has', () => {
+  function grokTurn(resumeSessionId?: string): GrokProvider {
     const provider = new GrokProvider();
+    provider.prepareEphemeralTurn({ message: 'probe' });
+    provider.buildSpawnArgs({ cwd: '/repo', ...(resumeSessionId ? { resumeSessionId } : {}) });
+    return provider;
+  }
+
+  it('classifies the Grok streaming-json answer to a resume id it no longer has', () => {
+    const provider = grokTurn(staleId);
     expect(events(provider.parseStreamLine(capture('grok-1.0.77/resume-missing.error.redacted.ndjson'))))
       .toMatchObject([{
         type: 'error',
@@ -36,15 +44,33 @@ describe('provider session unavailable classification', () => {
       }]);
   });
 
+  it('keeps the Grok sentence generic without a resume id or after turn output', () => {
+    for (const provider of [grokTurn(), (() => {
+      const resumed = grokTurn(staleId);
+      resumed.parseStreamLine(JSON.stringify({ type: 'text', data: 'partial answer' }));
+      return resumed;
+    })()]) {
+      const [event] = events(provider.parseStreamLine(capture('grok-1.0.77/resume-missing.error.redacted.ndjson')));
+      expect(event).toMatchObject({ type: 'error' });
+      expect(event).not.toHaveProperty('code');
+    }
+  });
+
   it('keeps other Grok errors generic', () => {
-    const provider = new GrokProvider();
+    const provider = grokTurn(staleId);
     const [event] = events(provider.parseStreamLine(capture('grok-1.0.0/auth-missing.error.redacted.ndjson')));
     expect(event).toMatchObject({ type: 'error' });
     expect(event).not.toHaveProperty('code');
   });
 
-  it('classifies the Claude result frame for a conversation it does not have, without its stale id', () => {
+  function claudeSpawn(resumeSessionId?: string): ClaudeProvider {
     const provider = new ClaudeProvider();
+    provider.buildSpawnArgs({ cwd: '/repo', ...(resumeSessionId ? { resumeSessionId } : {}) });
+    return provider;
+  }
+
+  it('classifies the Claude result frame for a conversation it does not have, without its stale id', () => {
+    const provider = claudeSpawn(staleId);
     const parsed = events(provider.parseStreamLine(capture('claude-2.1.322/resume-missing.error.redacted.ndjson')));
     expect(parsed).toMatchObject([{
       type: 'error',
@@ -56,10 +82,21 @@ describe('provider session unavailable classification', () => {
   });
 
   it('keeps a Claude error result that is not a missing conversation as a result', () => {
-    const provider = new ClaudeProvider();
     const frame = JSON.parse(capture('claude-2.1.322/resume-missing.error.redacted.ndjson')) as Record<string, unknown>;
-    const parsed = events(provider.parseStreamLine(JSON.stringify({ ...frame, errors: ['Some other failure'] })));
-    expect(parsed).toMatchObject([{ type: 'result' }]);
+    // Another failure, a spawn without --resume, a turn already run, or prior output.
+    const cases: Array<[ClaudeProvider, Record<string, unknown>]> = [
+      [claudeSpawn(staleId), { ...frame, errors: ['Some other failure'] }],
+      [claudeSpawn(), frame],
+      [claudeSpawn(staleId), { ...frame, num_turns: 1 }],
+      [(() => {
+        const provider = claudeSpawn(staleId);
+        provider.parseStreamLine(JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'hi' }] } }));
+        return provider;
+      })(), frame],
+    ];
+    for (const [provider, line] of cases) {
+      expect(events(provider.parseStreamLine(JSON.stringify(line)))).toMatchObject([{ type: 'result' }]);
+    }
   });
 
   it('classifies the Codex thread/resume rejection for a thread without a rollout', () => {
@@ -107,6 +144,22 @@ describe('provider session unavailable classification', () => {
       code: 'provider_session_unavailable',
     }]);
     expect(provider.isSessionFailed()).toBe(true);
+  });
+
+  it('leaves an uncaptured hosted session/load rejection generic', () => {
+    const provider = new HostedAcpProvider('grok');
+    provider.configureExecution({ localWorkspaceCwd: '/workspace', sessionMcpToken: () => 'fixture-secret' });
+    provider.buildSpawnArgs({ cwd: '/workspace', resumeSessionId: staleId, ...hostedPolicy });
+    const init = JSON.parse(provider.buildInitialization()!);
+    // Without session/resume capability the adapter loads instead.
+    provider.parseStreamLine(JSON.stringify({ id: init.id, result: { protocolVersion: 1,
+      agentCapabilities: { loadSession: true } } }));
+    const load = JSON.parse(provider.getPendingControlMessages()!);
+    expect(load.method).toBe('session/load');
+    const reply = { ...JSON.parse(capture('grok-1.0.77/acp-resume-missing.error.redacted.ndjson')), id: load.id };
+    const [event] = events(provider.parseStreamLine(JSON.stringify(reply)));
+    expect(event).toMatchObject({ type: 'error' });
+    expect(event).not.toHaveProperty('code');
   });
 
   it('keeps other hosted ACP resume rejections generic', () => {

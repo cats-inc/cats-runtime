@@ -26,15 +26,26 @@ export function isProviderSessionUnavailableEvent(
   return event.type === 'error' && event.code === PROVIDER_SESSION_UNAVAILABLE;
 }
 
+const PROVIDER_SESSION_UNAVAILABLE_MESSAGE = 'The provider can no longer resume this session\'s native session. '
+  + 'Create a new session; this one keeps its history but cannot run again.';
+
+/** Thrown by the worker pool instead of spawning a session marked unavailable. */
+export class ProviderSessionUnavailableError extends Error {
+  readonly code = PROVIDER_SESSION_UNAVAILABLE;
+
+  constructor() {
+    super(PROVIDER_SESSION_UNAVAILABLE_MESSAGE);
+    this.name = 'ProviderSessionUnavailableError';
+  }
+}
+
 /** The 410 body `POST /sessions/:id/messages`, `/resume` and native `/fork` answer. */
 export function providerSessionUnavailableResponse(
   session: Pick<SessionInfo, 'providerSessionUnavailable'>,
 ): { error: string; code: typeof PROVIDER_SESSION_UNAVAILABLE } | null {
-  const marker = session.providerSessionUnavailable;
-  if (!marker) return null;
-  return {
-    error: 'The provider can no longer resume this session\'s native session. '
-      + 'Create a new session; this one keeps its history but cannot run again.',
-    code: PROVIDER_SESSION_UNAVAILABLE,
-  };
+  return session.providerSessionUnavailable ? providerSessionUnavailableBody() : null;
+}
+
+export function providerSessionUnavailableBody(): { error: string; code: typeof PROVIDER_SESSION_UNAVAILABLE } {
+  return { error: PROVIDER_SESSION_UNAVAILABLE_MESSAGE, code: PROVIDER_SESSION_UNAVAILABLE };
 }

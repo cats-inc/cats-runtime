@@ -114,18 +114,30 @@ session went back to `ready`.
 
 The amended contract:
 
-- An adapter that recognizes its CLI's own "this native session cannot be
-  resumed" answer emits the stream `error` event with
-  `code: "provider_session_unavailable"`, keeping the provider's sentence in
-  `text`. The run inspection records the same value as `lastRun.errorCode`.
+- An adapter classifies its CLI's own "this native session cannot be resumed"
+  answer only on a spawn that passed a resume id and before any assistant or
+  tool output. It emits the stream `error` event with
+  `code: "provider_session_unavailable"`. `text` is the provider's sentence, or
+  for hosted ACP a Runtime-written summary of the JSON-RPC rejection. When the
+  answer arrives during a turn, the run records `lastRun.errorCode`.
 - Runtime then persists `providerSessionUnavailable` (observed time, the stale
-  native id, the provider's sentence) on the session record, sets the session
-  to `closed`, and stops the worker. The marker survives a Runtime restart.
+  native id, that text) on the session record, sets the session to `closed`,
+  and stops the worker. The marker survives a Runtime restart and a duplicate
+  row merge.
+- The worker pool refuses to spawn a marked session at all, which covers
+  resume, MCP recycle, wakeup and native fork in one place.
 - From then on `POST /sessions/:id/messages`, `POST /sessions/:id/resume` and
-  a native `POST /sessions/:id/fork` refuse with HTTP 410 and
-  `{ "error": …, "code": "provider_session_unavailable" }`, and a scheduled
-  wakeup fails without spawning. Session controls report `canSend: false` and
-  `canResume: false`. History stays readable.
+  an explicit native `POST /sessions/:id/fork` refuse with HTTP 410 and
+  `{ "error": …, "code": "provider_session_unavailable" }`. The default fork
+  mode falls back to a context transplant. Session controls report
+  `canSend: false` and `canResume: false`, and `sessionKey` reuse skips the
+  session. History stays readable.
+- Some answers arrive at spawn time, not in a turn: Claude Code exits on
+  startup, and hosted ACP rejects `session/resume` during initialization, both
+  after `POST /sessions/:id/resume` has already returned. They produce no
+  stream error and no `lastRun.errorCode`; the next send or resume gets the 410.
+- `POST /sessions/:id/reset` clears the marker together with the stale native
+  id. Nothing stale is left to spawn, so the never-respawn rule still holds.
 - The caller that owns the product transcript creates a new Runtime session
   (`POST /sessions`) with the same `cwd` and supplies its own handoff context.
 
@@ -158,9 +170,9 @@ Classified answers, each captured live without a model turn:
 - Codex 0.167.0 app-server: `thread/resume` rejected with JSON-RPC -32600
   `no rollout found for thread id <id>`.
 
-Other providers stay unclassified until a capture shows their answer; their
-resume failures remain ordinary errors. The captures live under
-`tests/fixtures/provider-captures/`.
+Other providers and methods, including hosted ACP `session/load`, stay
+unclassified until a capture shows their answer; their resume failures remain
+ordinary errors. The captures live under `tests/fixtures/provider-captures/`.
 
 Pi's existing in-place recovery (`recoverPiUnknownSession` in
 `src/http/routes/messages.ts`) still replaces the native session behind the

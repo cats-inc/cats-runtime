@@ -319,6 +319,7 @@ interface BranchCapabilityInput {
     | 'providerBackend'
     | 'providerInstanceId'
     | 'providerSessionId'
+    | 'providerSessionUnavailable'
     | 'workspaceMode'
     | 'cwd'
     | 'model'
@@ -459,6 +460,10 @@ export function buildSessionBranchCapabilityTruth(
   ) {
     errorKind = 'provider_not_implemented';
     reason = 'Cursor native session forking will be enabled after Cursor execution support lands.';
+  } else if (input.parentSession.providerSessionUnavailable) {
+    // ADR-006 rule 8: a native fork would spawn the native id the provider no longer has.
+    errorKind = 'provider_session_unavailable';
+    reason = 'The provider can no longer resume this session’s native session';
   } else if (
     (input.parentSession.providerBackend || 'cli') === 'cli'
     && !input.parentSession.providerSessionId
@@ -494,6 +499,7 @@ export function buildSessionSelfBranchCapabilityTruth(
     | 'providerBackend'
     | 'providerInstanceId'
     | 'providerSessionId'
+    | 'providerSessionUnavailable'
     | 'workspaceMode'
     | 'cwd'
     | 'model'
@@ -512,9 +518,12 @@ export function buildSessionSelfBranchCapabilityTruth(
   });
 }
 
-function toBranchErrorStatus(errorKind: SessionBranchErrorKind | undefined): 400 | 409 | 500 | 501 {
+function toBranchErrorStatus(errorKind: SessionBranchErrorKind | undefined): 400 | 409 | 410 | 500 | 501 {
   if (!errorKind) {
     return 500;
+  }
+  if (errorKind === 'provider_session_unavailable') {
+    return 410;
   }
   if (errorKind === 'provider_not_implemented' || errorKind === 'provider_unsupported') {
     return 501;

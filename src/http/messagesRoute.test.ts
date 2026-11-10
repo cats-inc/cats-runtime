@@ -122,7 +122,7 @@ function makeApp(
   });
   registry.updateStatus(session.id, 'ready');
 
-  return { app, registry, session, worker, pool };
+  return { app, registry, session, worker };
 }
 
 describe('message route transcript persistence', () => {
@@ -1170,72 +1170,8 @@ describe('message route session MCP servers (SPEC-035)', () => {
   });
 });
 
+// The typed path runs end to end through the real worker pool in providerSessionUnavailable.test.ts.
 describe('message route provider session unavailable (ADR-006 rule 8)', () => {
-  const stale = 'No saved copy of session 11111111-2222-4333-8444-555555555555 was found remotely.';
-
-  it('streams the typed error, keeps the session closed and answers 410 to every later send or resume', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-provider-session-gone-'));
-    const sessionBaseDir = join(root, 'sessions');
-    mkdirSync(sessionBaseDir, { recursive: true });
-    try {
-      let turns = 0;
-      const { app, registry, session, pool } = makeApp(sessionBaseDir, async function* () {
-        turns += 1;
-        // The pool's worker listener marks the session before any consumer reads the event.
-        registry.markProviderSessionUnavailable('session-1', stale);
-        yield { type: 'error', text: stale, code: 'provider_session_unavailable' };
-      });
-      registry.setProviderSessionId(session.id, '11111111-2222-4333-8444-555555555555');
-
-      const first = await app.request(`/sessions/${session.id}/messages`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', accept: 'application/x-ndjson' },
-        body: JSON.stringify({ message: 'hello' }),
-      });
-      expect(first.status).toBe(200);
-      expect(parseNdjson(await first.text())).toEqual([
-        { type: 'error', text: stale, code: 'provider_session_unavailable' },
-      ]);
-      // An in-stream error no longer puts the session back to ready.
-      expect(registry.get(session.id)).toMatchObject({
-        status: 'closed',
-        providerSessionUnavailable: {
-          providerSessionId: '11111111-2222-4333-8444-555555555555',
-          reason: stale,
-        },
-      });
-
-      const view = await (await app.request(`/sessions/${session.id}`)).json();
-      expect(view.controls).toMatchObject({ canSend: false, canResume: false });
-      const observed = await (await app.request(`/sessions/${session.id}/observe`)).json();
-      expect(observed.session.inspection.lastRun).toMatchObject({
-        status: 'failed', error: stale, errorCode: 'provider_session_unavailable',
-      });
-
-      for (const accept of ['application/x-ndjson', 'text/event-stream']) {
-        const again = await app.request(`/sessions/${session.id}/messages`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', accept },
-          body: JSON.stringify({ message: 'hello again' }),
-        });
-        expect(again.status).toBe(410);
-        expect(await again.json()).toMatchObject({ code: 'provider_session_unavailable', error: expect.any(String) });
-      }
-      const resumed = await app.request(`/sessions/${session.id}/resume`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      expect(resumed.status).toBe(410);
-      expect(await resumed.json()).toMatchObject({ code: 'provider_session_unavailable' });
-      // Nothing spawned the stale native id again, and no further turn reached the worker.
-      expect(pool.spawn).not.toHaveBeenCalled();
-      expect(turns).toBe(1);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-
   it('keeps an untyped provider error recoverable', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-provider-session-gone-'));
     const sessionBaseDir = join(root, 'sessions');

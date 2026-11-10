@@ -182,7 +182,7 @@ export class HostedAcpProvider implements Provider {
       this.requests.delete(input.id);
       const result = record(input.result);
       if (input.error && hostedResumeMissing(this.name, method, input.error)) {
-        return this.fail(`${this.name} has no saved session to ${method === 'session/load' ? 'load' : 'resume'}; no action was retried. Continue in a new session.`, true);
+        return this.fail(`${this.name} has no saved session to resume; no action was retried. Continue in a new session.`, true);
       }
       if (input.error || !result) return this.fail(`${this.name} rejected ${method}; no action was retried. Check the native provider sign-in and settings.`);
       if (method === 'initialize') {
@@ -346,10 +346,11 @@ export class HostedAcpProvider implements Provider {
 /**
  * Grok 1.0.77 `agent stdio` answers `session/resume` for a session it has no local
  * directory for with JSON-RPC -32603 `Path not found.` and `data.code: FS_NOT_FOUND`
- * (capture: grok-1.0.77/acp-resume-missing.error.redacted.ndjson). Other hosted
- * providers and other rejections stay generic until a capture shows their shape.
+ * (capture: grok-1.0.77/acp-resume-missing.error.redacted.ndjson). `session/load`,
+ * other hosted providers and other rejections stay generic until a capture shows
+ * their shape.
  */
 export function hostedResumeMissing(provider: string, method: string, error: unknown): boolean {
-  if (provider !== 'grok' || (method !== 'session/resume' && method !== 'session/load')) return false;
+  if (provider !== 'grok' || method !== 'session/resume') return false;
   return record(record(error)?.data)?.code === 'FS_NOT_FOUND';
 }

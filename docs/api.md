@@ -197,10 +197,12 @@ This stricter behavior requires a Runtime minor boundary; see
 ### Provider session unavailable
 
 A Runtime session runs on a provider-native session (a Claude conversation, a
-Codex thread, a Grok session) that the provider CLI may expire or lose. When an
+Codex thread, a Grok session) that the provider CLI may expire or lose. An
 adapter recognizes the CLI's own answer that the native session cannot be
-resumed, the stream's `error` event carries a machine-readable code; `text`
-stays the provider's sentence:
+resumed only on a spawn that passed a resume id, before any assistant or tool
+output. When that answer arrives during a turn, the stream's `error` event
+carries a machine-readable code; `text` is the provider's sentence (for hosted
+ACP, a Runtime-written summary of the JSON-RPC rejection):
 
 ```json
 { "type": "error", "text": "No saved copy of session … was found remotely. …", "code": "provider_session_unavailable" }
@@ -209,26 +211,41 @@ stays the provider's sentence:
 Runtime then:
 
 - records `providerSessionUnavailable` (`observedAt`, the stale
-  `providerSessionId`, the provider's `reason`) on the session, persisted across
-  restarts, and reports the run as `lastRun.status: "failed"` with
-  `lastRun.errorCode: "provider_session_unavailable"`;
-- sets the session `status` to `closed`, stops its worker and never spawns the
-  stale native id again; `controls.canSend` and `controls.canResume` are `false`;
-- answers `POST /sessions/:id/messages`, `POST /sessions/:id/resume` and a
-  `native_fork` `POST /sessions/:id/fork` with HTTP 410:
+  `providerSessionId`, the same `reason` text) on the session, persisted across
+  restarts; a turn that saw the answer also reports `lastRun.status: "failed"`
+  with `lastRun.errorCode: "provider_session_unavailable"`;
+- sets the session `status` to `closed`, stops its worker, and the worker pool
+  refuses every later spawn of the session (resume, MCP recycle, wakeup, fork),
+  so the stale native id never reaches the CLI again; `controls.canSend` and
+  `controls.canResume` are `false`;
+- answers `POST /sessions/:id/messages`, `POST /sessions/:id/resume` and an
+  explicit `native_fork` `POST /sessions/:id/fork` with HTTP 410. The default
+  fork mode falls back to `context_transplant`, and the session's branching
+  capabilities report `nativeFork.errorKind: "provider_session_unavailable"`.
 
 ```json
 { "error": "The provider can no longer resume this session's native session. Create a new session; this one keeps its history but cannot run again.", "code": "provider_session_unavailable" }
 ```
 
+Some answers arrive at spawn time rather than in a turn: Claude Code exits on
+startup when `POST /sessions/:id/resume` starts it with an id it does not have,
+and hosted ACP rejects `session/resume` during initialization. No stream carries
+that error and no run records `errorCode`; the session is marked once the answer
+arrives, and the next send or resume answers 410 with the code.
+
 Runtime does not start a fresh provider session in place and does not inject
 context. The caller that owns the transcript creates a new session with
-`POST /sessions` (same `cwd`) and supplies its own handoff. History, inspection
-and deletion of the old session keep working. Recognized answers: Grok
-streaming JSON and hosted ACP, Claude Code, and Codex app-server. Other
-providers' resume failures stay ordinary `error` events without a code. A 410
-without this code is the older "Worker process has exited" answer, after which
-the session can still be resumed. See
+`POST /sessions` (same `cwd`) and supplies its own handoff. `sessionKey` reuse
+skips a marked session, so `prefer_existing` creates a new one and
+`require_existing` reports that none exists. History, inspection and deletion of
+the old session keep working. `POST /sessions/:id/reset` clears the marker
+together with the stale native id; with no native id left, nothing stale can be
+spawned, and later resume gives its ordinary answer. Recognized answers: Grok
+streaming JSON, Grok hosted ACP `session/resume`, Claude Code, and Codex
+app-server `thread/resume`. Other providers and methods (including hosted
+`session/load`) stay ordinary `error` events without a code. A 410 without this
+code is the older "Worker process has exited" answer, after which the session
+can still be resumed. See
 [ADR-006 rule 8](decisions/006-agent-backend-and-shared-runtime-contracts.md).
 
 ## Cached usage snapshot

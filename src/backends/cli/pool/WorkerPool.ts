@@ -37,7 +37,10 @@ import { JunieProvider } from '../providers/junie.js';
 import { PiProvider } from '../providers/pi.js';
 import { WorkerProcess, type SpawnResilienceConfig } from './WorkerProcess.js';
 import type { SessionRegistry } from './SessionRegistry.js';
-import { isProviderSessionUnavailableEvent } from '../../../core/runtime/providerSessionUnavailable.js';
+import {
+  isProviderSessionUnavailableEvent,
+  ProviderSessionUnavailableError,
+} from '../../../core/runtime/providerSessionUnavailable.js';
 
 interface ProviderServiceResolvers {
   getAuggieSessions?: (instanceId?: string) => AuggieSessionService;
@@ -316,6 +319,8 @@ export class WorkerPool {
     providerInstanceId?: string,
     launchEnv: Readonly<Record<string, string>> = {},
   ): WorkerProcess {
+    // ADR-006 rule 8: the one place every resume, recycle, wakeup and fork spawn passes.
+    if (this.registry.get(sessionId)?.providerSessionUnavailable) throw new ProviderSessionUnavailableError();
     if ([...this.externalSourceSessions.values()].includes(sessionId)
       || this.workers.get(sessionId)?.processRunning) throw new PoolSourceBusyError();
     if (this.activeCount >= this.config.maxSessions) {

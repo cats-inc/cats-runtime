@@ -587,6 +587,46 @@ describe('SessionRegistry', () => {
     }
   });
 
+  it('keeps the provider-session-unavailable marker when the marked row is the later duplicate', () => {
+    const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-gone-duplicate-'));
+    const row = (id: string, extra: Record<string, unknown> = {}) => ({
+      id,
+      providerSessionId: 'claude-session-gone',
+      providerName: 'claude',
+      providerInstanceId: 'native',
+      status: 'closed',
+      origin: 'runtime',
+      cwd: '/repo',
+      workspaceMode: 'shared',
+      messageCount: 1,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      createdAt: '2026-11-10T00:00:00.000Z',
+      updatedAt: '2026-11-10T00:00:00.000Z',
+      ...extra,
+    });
+    writeFileSync(join(persistDir, 'sessions.json'), JSON.stringify([
+      row('first-unmarked'),
+      row('later-marked', { providerSessionUnavailable: {
+        observedAt: '2026-11-10T01:00:00.000Z',
+        providerSessionId: 'claude-session-gone',
+        reason: 'No conversation found with session ID: claude-session-gone',
+      } }),
+    ], null, 2));
+    try {
+      registry = new SessionRegistry(persistDir, undefined, { claude: 'native' });
+      const sessions = registry.list();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0]).toMatchObject({
+        id: 'first-unmarked',
+        status: 'closed',
+        providerSessionUnavailable: { providerSessionId: 'claude-session-gone' },
+      });
+    } finally {
+      rmSync(persistDir, { recursive: true, force: true });
+    }
+  });
+
   it('normalizes legacy default instance ids to the configured default instance on load', () => {
     const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-load-test-'));
     const persistPath = join(persistDir, 'sessions.json');

@@ -128,6 +128,10 @@ export class GrokProvider implements Provider {
 
   private pendingPrompt: string | null = null;
   private requestedModel: string | null = null;
+  /** This spawn passed `--resume`; only then can a missing native session be reported. */
+  private resumeRequested = false;
+  /** Assistant or tool output already seen in this turn. */
+  private turnOutputObserved = false;
   private readonly pendingTools = new Map<string, PendingGrokTool>();
 
   constructor(
@@ -138,6 +142,7 @@ export class GrokProvider implements Provider {
   prepareEphemeralTurn(turn: TurnInput): void {
     this.pendingPrompt = compileRuntimeTurnPrompt(turn.message, turn);
     this.pendingTools.clear();
+    this.turnOutputObserved = false;
   }
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
@@ -169,6 +174,8 @@ export class GrokProvider implements Provider {
     if (opts.resumeSessionId) {
       args.push('--resume', opts.resumeSessionId);
     }
+    this.resumeRequested = Boolean(opts.resumeSessionId);
+    this.turnOutputObserved = false;
     if (opts.forkSession) {
       if (!opts.resumeSessionId) {
         throw new Error('Grok CLI fork requires a resume session id.');
@@ -272,6 +279,7 @@ export class GrokProvider implements Provider {
     }
 
     if (event.type === 'text' && typeof event.data === 'string' && event.data) {
+      this.turnOutputObserved = true;
       return observeNormalized(this.evolutionObserver, {
         rawEventType: 'text',
         rawSample: event,
@@ -283,10 +291,12 @@ export class GrokProvider implements Provider {
     }
 
     if (event.type === 'tool_call') {
+      this.turnOutputObserved = true;
       return this.parseToolCall(event);
     }
 
     if (event.type === 'tool_call_update') {
+      this.turnOutputObserved = true;
       return this.parseToolCallUpdate(event);
     }
 
@@ -297,7 +307,8 @@ export class GrokProvider implements Provider {
       return observeNormalized(this.evolutionObserver, {
         rawEventType: 'error',
         rawSample: event,
-      }, isGrokResumeMissing(message) ? providerSessionUnavailableEvent(message, event) : {
+      }, this.resumeRequested && !this.turnOutputObserved && isGrokResumeMissing(message)
+        ? providerSessionUnavailableEvent(message, event) : {
         type: 'error',
         text: message,
         raw: event,

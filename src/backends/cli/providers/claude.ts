@@ -71,6 +71,8 @@ export class ClaudeProvider implements Provider {
   /** Models of this turn's main-conversation replies, reported with its result. */
   private turnModels: string[] = [];
   private spawnOpts: ProviderSpawnOptions | null = null;
+  /** Assistant, tool or streaming output seen from this spawn's native conversation. */
+  private conversationOutputObserved = false;
   /** CLI control request ID → Runtime interaction; a handled ID is never answered twice. */
   private readonly interactions = new Map<string, { id: string; resolve(id: string): void }>();
   /** An admitted policy holds the first turn until `initialize` confirms the permission mode. */
@@ -132,6 +134,7 @@ export class ClaudeProvider implements Provider {
       }
     }
     this.spawnOpts = { ...opts };
+    this.conversationOutputObserved = false;
     this.interactions.clear();
     this.capabilityEpoch++;
     this.inventory = emptyClaudeInventory();
@@ -355,6 +358,9 @@ export class ClaudeProvider implements Provider {
     }
 
     this.noteServedModel(event);
+    if (['assistant', 'user', 'stream_event', 'content_block_start', 'content_block_delta'].includes(event.type)) {
+      this.conversationOutputObserved = true;
+    }
 
     if (event.type === 'control_response' && this.admissionRequestId) {
       const response = record((event as unknown as Record<string, unknown>).response);
@@ -469,8 +475,11 @@ export class ClaudeProvider implements Provider {
       }, createClaudeQuotaProgressEvent(snapshot, event.rate_limit_info));
     }
 
-    // A `--resume` id the CLI no longer has fails before any turn (ADR-006 rule 8).
-    const resumeMissing = event.type === 'result' ? claudeResumeMissingError(event) : null;
+    // A `--resume` id the CLI no longer has fails before any turn (ADR-006 rule 8):
+    // only a resumed spawn with no conversation output yet can report it.
+    const resumeMissing = event.type === 'result' && this.spawnOpts?.resumeSessionId
+      && !this.conversationOutputObserved && (event.num_turns === undefined || event.num_turns === 0)
+      ? claudeResumeMissingError(event) : null;
     if (resumeMissing) {
       return observeNormalized(this.evolutionObserver, {
         rawEventType: 'result:error_during_execution',
