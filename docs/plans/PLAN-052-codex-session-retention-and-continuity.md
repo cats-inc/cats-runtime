@@ -181,6 +181,26 @@ verified all 1,513 candidate package files. No mandatory data migration is neede
 
 ## Progress Log
 
+### Archived resume follow-up (2026-11-11)
+
+Installed Windows Desktop 0.15.0 reported Codex JSON-RPC -32600 `session <id>
+is archived`, which the missing-rollout matcher did not classify. The adapter
+now recognizes that exact archived message only on its matching thread/resume
+bootstrap response. It preserves the archive choice and emits the existing
+provider_session_unavailable signal, allowing the owning product's bounded
+handoff instead of retrying the old ID. No public shape, data format, version
+or release pin changed.
+
+Reconstructed error fixtures (not claimed as raw native captures) and real-worker
+HTTP regressions passed 18 tests: archived/start/fork/unrelated/auth-looking
+classification, terminal marking, send/resume 410 and no stale-ID respawn.
+Another 78 existing Codex protocol/persistence and worker-pool tests passed,
+as did Runtime typecheck. The existing Platform rotation consumer suite passed
+18 tests. Its local checkout lacked the UI contracts install, so its bundle
+used the identical pinned public contracts artifact from the clean Bot install;
+isolated workspace tests required execution outside the Windows sandbox.
+Independent review found no remaining issues. Installed profiles were not modified.
+
 | Date | Update |
 | --- | --- |
 | 2026-11-11 | Fresh worktrees, source tracing and zero-turn native probe completed. P1-P5 remain pending; no product source changed. |

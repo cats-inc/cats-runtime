@@ -11,6 +11,12 @@ import type { StreamEvent } from './types.js';
 // answer, captured live without a model turn, becomes `provider_session_unavailable`.
 const captures = new URL('../../../../tests/fixtures/provider-captures/', import.meta.url);
 const staleId = '11111111-2222-4333-8444-555555555555';
+// Reconstructed from the installed Windows Desktop's 2026-11-11 error;
+// this is not claimed as a raw app-server protocol capture.
+const archivedCodexError = {
+  code: -32600,
+  message: `session ${staleId} is archived. Run \`codex unarchive ${staleId}\` to unarchive it first.`,
+};
 const hostedPolicy = {
   interactionHost: { version: 1 as const, kinds: ['command_approval' as const], timeoutMs: 60_000 },
   executionPolicy: { version: 1 as const, mode: 'provider' as const,
@@ -124,6 +130,36 @@ describe('provider session unavailable classification', () => {
     expect(event).toMatchObject({ type: 'error' });
     expect(event).not.toHaveProperty('code');
   });
+
+  it('classifies an archived Codex thread/resume without unarchiving it', () => {
+    const provider = new CodexProvider();
+    provider.buildSpawnArgs({ cwd: '/tmp/test', resumeSessionId: staleId });
+    const bootstrap = provider.buildStdinMessage('hello').trim().split('\n').map(line => JSON.parse(line));
+    const resume = bootstrap.find(message => message.method === 'thread/resume');
+    expect(events(provider.parseStreamLine(JSON.stringify({ id: resume.id, error: archivedCodexError }))))
+      .toMatchObject([{ type: 'error', code: 'provider_session_unavailable',
+        text: expect.stringContaining('is archived') }]);
+    expect(provider.getPendingControlMessages()).toBeNull();
+  });
+
+  it.each(['start', 'fork', 'other_request', 'other_code', 'other_message'])(
+    'keeps an archived-looking Codex error generic for %s', kind => {
+      const provider = new CodexProvider();
+      provider.buildSpawnArgs({ cwd: '/tmp/test',
+        ...(kind !== 'start' ? { resumeSessionId: staleId } : {}),
+        ...(kind === 'fork' ? { forkSession: true } : {}) });
+      const bootstrap = provider.buildStdinMessage('hello').trim().split('\n').map(line => JSON.parse(line));
+      const request = bootstrap.find(message => /^thread\//u.test(message.method));
+      const error = { ...archivedCodexError,
+        ...(kind === 'other_code' ? { code: -32603 } : {}),
+        ...(kind === 'other_message' ? { message: `Permission denied; ${archivedCodexError.message}` } : {}) };
+      const [event] = events(provider.parseStreamLine(JSON.stringify({
+        id: request.id + (kind === 'other_request' ? 10 : 0), error,
+      })));
+      expect(event).toMatchObject({ type: 'error' });
+      expect(event).not.toHaveProperty('code');
+    },
+  );
 
   it('classifies the hosted Grok ACP session/resume answer for a missing session', () => {
     const provider = new HostedAcpProvider('grok');

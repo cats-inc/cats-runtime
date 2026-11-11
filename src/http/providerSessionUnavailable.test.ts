@@ -25,15 +25,26 @@ const captured = readFileSync(new URL(
 ), 'utf8');
 const staleNativeId = '11111111-2222-4333-8444-555555555555';
 
-function fakeGrok(root: string): { script: string; spawnLog: string } {
-  const script = join(root, 'fake-grok.cjs');
+function fakeProvider(root: string, provider: 'grok' | 'codex'): { script: string; spawnLog: string } {
+  const script = join(root, `fake-${provider}.cjs`);
   const spawnLog = join(root, 'spawns.jsonl');
-  // Prints Grok 1.0.77's answer to an unknown --resume id and exits 1, like the CLI.
+  // Grok uses captured stdout; Codex reconstructs the archived error observed
+  // in the installed Windows renderer, answering the actual resume request id.
   writeFileSync(script, [
     "const fs = require('node:fs');",
     `fs.appendFileSync(${JSON.stringify(spawnLog)}, JSON.stringify(process.argv.slice(2)) + '\\n');`,
-    `process.stdout.write(${JSON.stringify(captured)});`,
-    'process.exitCode = 1;',
+    ...(provider === 'grok' ? [
+      `process.stdout.write(${JSON.stringify(captured)});`,
+      'process.exitCode = 1;',
+    ] : [
+      "require('node:readline').createInterface({ input: process.stdin }).on('line', line => {",
+      '  const frame = JSON.parse(line);',
+      "  if (frame.method === 'initialize') process.stdout.write(JSON.stringify({ id: frame.id, result: {} }) + '\\n');",
+      "  if (frame.method === 'thread/resume') process.stdout.write(JSON.stringify({ id: frame.id, error: {",
+      `    code: -32600, message: ${JSON.stringify(`session ${staleNativeId} is archived. Run \`codex unarchive ${staleNativeId}\` to unarchive it first.`)}`,
+      "  } }) + '\\n');",
+      '});',
+    ]),
   ].join('\n'));
   return { script, spawnLog };
 }
@@ -48,19 +59,20 @@ function spawnedArgs(spawnLog: string): string[][] {
 }
 
 describe('provider session unavailable through a real worker pool', () => {
-  it('marks, closes and refuses the session after a captured Grok resume failure', async () => {
+  it.each(['grok', 'codex'] as const)('marks, closes and refuses the session after a %s resume failure', async provider => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-gone-e2e-'));
+    let pool: WorkerPool | undefined;
     try {
-      const { script, spawnLog } = fakeGrok(root);
+      const { script, spawnLog } = fakeProvider(root, provider);
       const workspace = join(root, 'workspace');
       mkdirSync(workspace, { recursive: true });
       const config = loadConfig(createRuntimeTestEnv(root), {
-        providerYaml: `providers: { grok: { instances: { native: { path: ${JSON.stringify(process.execPath)}, `
+        providerYaml: `providers: { ${provider}: { instances: { native: { path: ${JSON.stringify(process.execPath)}, `
           + `runner: direct, launch: { args: [${JSON.stringify(script)}] } } } } }`,
       });
       const registry = new SessionRegistry(join(root, 'data'), config.sessionBaseDir,
         config.providerDefaultInstances, config.providerDefaultTargets);
-      const pool = new WorkerPool(config, registry, {} as never, {} as never, {} as never, {} as never,
+      pool = new WorkerPool(config, registry, {} as never, {} as never, {} as never, {} as never,
         { getCachedAssessment: () => undefined } as never);
       const app = createRuntimeApp({
         config,
@@ -75,9 +87,9 @@ describe('provider session unavailable through a real worker pool', () => {
         providerModelCatalog: {} as ProviderModelCatalogService,
       });
 
-      const session = registry.create({ id: 'session-gone', providerName: 'grok', cwd: workspace });
+      const session = registry.create({ id: 'session-gone', providerName: provider, cwd: workspace });
       registry.setProviderSessionId(session.id, staleNativeId);
-      pool.spawn(session.id, 'grok', { cwd: workspace, resumeSessionId: staleNativeId });
+      pool.spawn(session.id, provider, { cwd: workspace, resumeSessionId: staleNativeId });
       registry.updateStatus(session.id, 'ready');
       const spawn = vi.spyOn(pool, 'spawn');
 
@@ -91,14 +103,16 @@ describe('provider session unavailable through a real worker pool', () => {
       expect(events.at(-1)).toMatchObject({
         type: 'error',
         code: 'provider_session_unavailable',
-        text: expect.stringContaining('No saved copy of session'),
+        text: expect.stringContaining(provider === 'grok' ? 'No saved copy of session' : 'is archived'),
       });
       expect(registry.get(session.id)).toMatchObject({
         status: 'closed',
         providerSessionUnavailable: { providerSessionId: staleNativeId },
       });
       expect(spawnedArgs(spawnLog)).toHaveLength(1);
-      expect(spawnedArgs(spawnLog)[0]).toEqual(expect.arrayContaining(['--resume', staleNativeId]));
+      expect(spawnedArgs(spawnLog)[0]).toEqual(expect.arrayContaining(
+        provider === 'grok' ? ['--resume', staleNativeId] : ['app-server'],
+      ));
 
       const observed = await (await app.request(`/sessions/${session.id}/observe`)).json() as {
         session: { inspection: { lastRun: Record<string, unknown> } };
@@ -128,10 +142,10 @@ describe('provider session unavailable through a real worker pool', () => {
       // The stale id never reached the CLI again.
       expect(spawn).not.toHaveBeenCalled();
       expect(spawnedArgs(spawnLog)).toHaveLength(1);
-      expect(() => pool.spawn(session.id, 'grok', { cwd: workspace, resumeSessionId: staleNativeId }))
+      expect(() => pool!.spawn(session.id, provider, { cwd: workspace, resumeSessionId: staleNativeId }))
         .toThrow('can no longer resume');
-      pool.killAll();
     } finally {
+      pool?.killAll();
       cleanupTempDirWithRetries(root);
     }
   }, 30_000);
