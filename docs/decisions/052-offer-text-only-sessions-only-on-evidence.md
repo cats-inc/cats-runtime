@@ -7,8 +7,8 @@ Accepted, 2026-11-11. The owner chose the recommended options of
 them without changing their intent. Nothing is implemented. An independent security review
 is required before implementation, and no provider is offered until research qualifies it.
 
-Decision 9 was proposed later on 2026-11-11, after Bot chose to let a bot name a separate
-consolidation target on an API backend. It awaits the owner.
+Decision 9 was added later on 2026-11-11, after Bot chose to let a bot name a separate
+consolidation target on an API backend. The owner accepted it the same day.
 
 ## Context
 
@@ -48,7 +48,7 @@ An audit at Runtime `fb50e59a` found:
    sending, because an older Runtime would return an ordinary session.
 8. Research each provider before offering it. API backends and claude are the first
    candidates; codex and grok have no known mechanism.
-9. Proposed: keep credentials out of every process Runtime starts (SPEC-043 R10).
+9. Keep credentials out of every process Runtime starts (SPEC-043 R10).
    - A session with tools can read its process environment, which today holds Runtime's own
      API key and any backend key. With Runtime's key it can also reach every target through
      the loopback API.

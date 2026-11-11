@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Approved by the owner on 2026-11-11 with the recommended answers to its open questions. R10 is a later proposal that awaits the owner. Not implemented. No provider is offered until the research in this spec qualifies it |
+| Status | Approved by the owner on 2026-11-11 with the recommended answers to its open questions. R10 was added later the same day and accepted by the owner. Not implemented. No provider is offered until the research in this spec qualifies it |
 | Owner | Runtime execution, with Bot as the first consumer |
 | Reviewer | Owner; independent read-only review completed on the draft, findings fixed. An independent security review is required before implementation |
 | Date | 2026-11-11 |
@@ -315,7 +315,8 @@ The create readback and the capabilities read state what the guarantees do not c
 
 ### R10. Credentials and child processes
 
-Proposed on 2026-11-11 and awaiting the owner. It is for consumers that run a tool-capable
+Added on 2026-11-11 and accepted by the owner the same day. It is for consumers that run a
+tool-capable
 target and a text-only target in one Runtime, as Bot's separate consolidation target does.
 
 **Why.** A session with tools can read the environment of the process that runs it. Today
@@ -488,12 +489,12 @@ refined three of them, as noted.
 - [x] A violation is never retried automatically on a fresh session; the consumer decides.
       Refined: output is held until the turn ends, so a violated turn delivers nothing (R4).
 
-Added on 2026-11-11 with R10, and awaiting the owner:
+Added on 2026-11-11 with R10, and answered by the owner the same day with the recommended
+options:
 
-- [ ] R10 as written: one environment builder, Runtime's own key and backend credentials
-      removed from every child, and text-only-only instances. Recommended: accept.
-- [ ] Version boundary for R10. Recommended: the next minor line, with release notes, and
-      no opt-out.
+- [x] R10 as written: one environment builder, Runtime's own key and backend credentials
+      removed from every child, and text-only-only instances.
+- [x] Version boundary for R10: the next minor line, with release notes, and no opt-out.
 
 ## Dependencies and references
 
