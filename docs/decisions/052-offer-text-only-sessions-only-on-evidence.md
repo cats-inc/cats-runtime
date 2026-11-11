@@ -7,8 +7,8 @@ Accepted, 2026-11-11. The owner chose the recommended options of
 them without changing their intent. Nothing is implemented. An independent security review
 is required before implementation, and no provider is offered until research qualifies it.
 
-Amended later on 2026-11-11 with decision 9, after Bot chose to let a bot name a separate
-consolidation target on an API backend.
+Decision 9 was proposed later on 2026-11-11, after Bot chose to let a bot name a separate
+consolidation target on an API backend. It awaits the owner.
 
 ## Context
 
@@ -48,10 +48,16 @@ An audit at Runtime `fb50e59a` found:
    sending, because an older Runtime would return an ordinary session.
 8. Research each provider before offering it. API backends and claude are the first
    candidates; codex and grok have no known mechanism.
-9. Keep API-backend credentials out of CLI processes. Runtime passes its environment to
-   every provider CLI it starts, so a conversation's CLI could read a key meant for a
-   text-only target in the same Runtime. Runtime removes the variables that API-backend
-   instances name from each CLI's environment.
+9. Proposed: keep credentials out of every process Runtime starts (SPEC-043 R10).
+   - A session with tools can read its process environment, which today holds Runtime's own
+     API key and any backend key. With Runtime's key it can also reach every target through
+     the loopback API.
+   - One shared builder gives every child its environment. It removes Runtime's own key and
+     every variable a backend instance names in a credential field.
+   - An instance can admit only text-only sessions, so no session with tools runs beside
+     its key.
+   - This changes what existing configurations pass to child processes, so it needs the
+     next minor line.
 
 ## Consequences
 
