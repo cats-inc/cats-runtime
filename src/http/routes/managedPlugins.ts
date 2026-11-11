@@ -1,15 +1,16 @@
 import { Hono } from 'hono';
 import { getRuntimeConfigEnv } from '../../core/config.js';
 import { getRuntimeSessionManager, type AppContext } from '../app.js';
-import { observeManagedPlugin, registerManagedPlugin, renewManagedPlugin, authorizeManagedPluginStop, type PluginDescriptor, type PluginIdentity } from '../../core/skills/managedPlugins.js';
+import { observeManagedPlugin, registerManagedPlugin, renewManagedPlugin, restoreManagedPlugin, authorizeManagedPluginStop, type PluginDescriptor, type PluginIdentity } from '../../core/skills/managedPlugins.js';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 export const managedPluginRoutes = new Hono<{ Variables: { ctx: AppContext } }>();
 export function managedPluginPolicyEnabled(ctx: AppContext): boolean {
   const env = getRuntimeConfigEnv(ctx.config);
-  return env.CATS_PLUGIN_POLICY === 'internal-experiment' && Boolean(env.CATS_RUNTIME_DIR)
-    && resolve(env.CATS_RUNTIME_DIR!) !== resolve(join(homedir(), '.cats', 'runtime'));
+  return Boolean(env.CATS_RUNTIME_DIR) && (env.CATS_PLUGIN_POLICY === 'desktop-preview'
+    || env.CATS_PLUGIN_POLICY === 'internal-experiment'
+      && resolve(env.CATS_RUNTIME_DIR!) !== resolve(join(homedir(), '.cats', 'runtime')));
 }
 export async function stopFencedPluginRuns(ctx: AppContext): Promise<void> {
   const observation = observeManagedPlugin(ctx.config.sessionBaseDir);
@@ -25,7 +26,7 @@ managedPluginRoutes.use('/plugins/*', async (c, next) => {
   const ctx = c.get('ctx') as AppContext;
   const key = ctx.config.apiKey || getRuntimeConfigEnv(ctx.config).CATS_PLUGIN_MANAGEMENT_KEY;
   if (!key || c.req.header('Authorization') !== `Bearer ${key}`) return c.json({ error: 'Configured bearer authentication is required.' }, 401);
-  if (!managedPluginPolicyEnabled(ctx)) return c.json({ error: 'Managed Plugins require an isolated internal experiment profile.' }, 403);
+  if (!managedPluginPolicyEnabled(ctx)) return c.json({ error: 'Managed Plugins require a Desktop preview or isolated internal experiment profile.' }, 403);
   await next();
 });
 managedPluginRoutes.get('/plugins/managed', c => {
@@ -33,7 +34,7 @@ managedPluginRoutes.get('/plugins/managed', c => {
   try { return c.json(observeManagedPlugin(ctx.config.sessionBaseDir)); }
   catch (error) { return c.json({ error: String(error) }, 409); }
 });
-managedPluginRoutes.on(['PUT', 'POST'], ['/plugins/managed', '/plugins/managed/renew', '/plugins/managed/stop'], async c => {
+managedPluginRoutes.on(['PUT', 'POST'], ['/plugins/managed', '/plugins/managed/renew', '/plugins/managed/restore', '/plugins/managed/stop'], async c => {
   const ctx = c.get('ctx') as AppContext;
   try {
     const reader = c.req.raw.body?.getReader();
@@ -48,6 +49,7 @@ managedPluginRoutes.on(['PUT', 'POST'], ['/plugins/managed', '/plugins/managed/r
     const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as PluginDescriptor & { confirmedSessions?: string[]; confirmedRuns?: string[] };
     const root = ctx.config.sessionBaseDir;
     if (c.req.path.endsWith('/renew')) renewManagedPlugin(root, body as PluginIdentity);
+    else if (c.req.path.endsWith('/restore')) restoreManagedPlugin(root, body as PluginIdentity);
     else if (c.req.path.endsWith('/stop')) {
       const state = observeManagedPlugin(root);
       if (state.plugin?.enabled || state.plugin?.hostId !== body.hostId || state.plugin?.generation !== body.generation) return c.json({ error: 'Fence this generation before stopping work.' }, 409);

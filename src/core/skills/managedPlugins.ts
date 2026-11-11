@@ -93,6 +93,8 @@ export function observeManagedPlugin(root: string) {
   const state = read(root);
   return {
     protocol: 1 as const, runtimeId: state.runtimeId,
+    restorable: Boolean(state.plugin?.enabled && !state.plugin.stopRequested && state.plugin.boot !== BOOT
+      && !Object.keys(state.runs).length),
     stopAuthorized: Boolean(state.plugin && !live(state.plugin) && (state.plugin.enabled || state.plugin.stopRequested)),
     plugin: state.plugin ? { ...identityOf(state.plugin), enabled: live(state.plugin), leaseUntil: state.plugin.leaseUntil } : null,
     affectedSessions: Object.keys(state.exposures).sort(),
@@ -119,6 +121,19 @@ export function renewManagedPlugin(root: string, identity: PluginIdentity): void
   mutate(root, state => {
     assertIdentity(state, identity);
     state.plugin!.leaseUntil = Date.now() + PLUGIN_LEASE_MS;
+  });
+}
+/** Resume the owner's still-enabled installation after a clean Runtime restart.
+ * A stopped/expired same-boot generation and orphan lifetimes never get revived. */
+export function restoreManagedPlugin(root: string, identity: PluginIdentity): void {
+  mutate(root, state => {
+    const plugin = state.plugin;
+    if (!plugin?.enabled || plugin.stopRequested || !same(plugin, identity) || Object.keys(state.runs).length
+      || (plugin.boot === BOOT && !live(plugin))) {
+      conflict('This Plugin generation cannot be restored. Verify prior processes or explicitly enable a new generation.');
+    }
+    plugin.boot = BOOT;
+    plugin.leaseUntil = Date.now() + PLUGIN_LEASE_MS;
   });
 }
 export function authorizeManagedPluginStop(root: string): void {

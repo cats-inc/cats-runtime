@@ -64,6 +64,7 @@ export class PoolSourceStopError extends Error {
 }
 
 export class WorkerPool {
+  private closing = false;
   private readonly sessionMcpConnections = new Map<string, Map<string, string>>();
 
   private workers = new Map<string, WorkerProcess>();
@@ -110,6 +111,7 @@ export class WorkerPool {
 
   /** Bounded native operations share worker admission/singletons, without creating a chat session. */
   reserveExternalExecution(id: string, provider: ProviderName, instanceId: string, cancel: () => void): () => void {
+    if (this.closing) throw new Error('Runtime is shutting down');
     if (this.workers.has(id) || this.externalExecutions.has(id)) throw new Error('Execution already reserved');
     if (this.activeCount >= this.config.maxSessions) throw new PoolCapacityError();
     const instance = resolveProviderInstance(this.config, provider, instanceId);
@@ -131,6 +133,7 @@ export class WorkerPool {
     id: string, provider: ProviderName, instanceId: string, cancel: () => void,
     sourceSessionId: string, signal?: AbortSignal,
   ): Promise<() => void> {
+    if (this.closing) throw new Error('Runtime is shutting down');
     if (signal?.aborted) throw new PoolSourceStopError();
     const source = this.workers.get(sourceSessionId);
     const instance = resolveProviderInstance(this.config, provider, instanceId);
@@ -180,6 +183,7 @@ export class WorkerPool {
           if (!finished) { timer = setTimeout(aborted, 10000); timer.unref?.(); }
         });
       }
+      if (this.closing) throw new Error('Runtime is shutting down');
       this.externalSourceSessions.delete(id);
       return release;
     } catch (error) {
@@ -321,6 +325,7 @@ export class WorkerPool {
     providerInstanceId?: string,
     launchEnv: Readonly<Record<string, string>> = {},
   ): WorkerProcess {
+    if (this.closing) throw new Error('Runtime is shutting down');
     // ADR-006 rule 8: the one place every resume, recycle, wakeup and fork spawn passes.
     if (this.registry.get(sessionId)?.providerSessionUnavailable) throw new ProviderSessionUnavailableError();
     opts = providerSessionSpawnOptions(this.registry.get(sessionId), opts);
@@ -509,6 +514,29 @@ export class WorkerPool {
     for (const [id, worker] of this.workers) {
       worker.kill();
     }
+  }
+
+  /** Keep Runtime alive until native close callbacks persist their lifetime receipts. */
+  async killAllAndWait(timeoutMs = 6000): Promise<boolean> {
+    this.closing = true;
+    const workers = [...this.workers.values()].filter(worker => worker.processRunning);
+    if (!workers.length) { this.killAll(); return true; }
+    return new Promise<boolean>((resolve, reject) => {
+      let finished = false;
+      const cleanup = () => {
+        clearTimeout(timer);
+        for (const worker of workers) worker.removeListener('process-stopped', check);
+      };
+      const finish = (stopped: boolean) => {
+        if (finished) return; finished = true;
+        cleanup(); resolve(stopped);
+      };
+      const check = () => { if (workers.every(worker => !worker.processRunning)) finish(true); };
+      const timer = setTimeout(() => finish(false), timeoutMs);
+      for (const worker of workers) worker.on('process-stopped', check);
+      try { this.killAll(); check(); }
+      catch (error) { finished = true; cleanup(); reject(error); }
+    });
   }
 
   status() {

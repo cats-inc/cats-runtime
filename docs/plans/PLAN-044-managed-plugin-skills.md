@@ -2,6 +2,38 @@
 
 User authorization: 2026-09-29, continue Desktop installation/removal and Runtime integration.
 
+## 2026-11-11 Desktop preview extension
+
+The owner requested the next clean preview install to offer Agency in Settings,
+show Cat options only after installation, and deliver selected skills in conversations.
+
+- [x] Add explicit `desktop-preview` host policy alongside isolated experiments.
+- [x] Restore only an unchanged enabled generation after clean restart, without
+  pending lifetimes, an authorized stop, or same-boot expiry; retain all exposure.
+- [x] Drain real native process close callbacks before Runtime exits, with a
+  bounded timeout that retains unresolved receipts. Reject new/pending worker
+  admissions once shutdown begins.
+- [x] Verify both role bodies on successive Codex/Claude requests, ordinary
+  requests without overlays, no shared-cwd skill projection, and independent review.
+
+Runtime compilation and 139 focused tests passed across managed state, HTTP
+policy, provider payloads, owned process lifetime, clean shutdown, and worker
+handoff. Independent review reproduced and closed stop-after-expiry restoration,
+premature shutdown and pending-handoff admission defects; its 30 targeted tests
+passed. Platform also ran three real native Codex ephemeral, read-only turns via
+Cat selection → channel envelope → Runtime skill resolution → provider payload:
+unselected returned `ROLE: none`; the two selected roles returned Code Reviewer
+and UX Researcher with matching work priorities. No tools or user Cats state were
+used; temporary state was removed. This demonstrates instruction delivery and
+role adoption, not a broad model-quality evaluation.
+
+The next Desktop source selection must include this Runtime extension and the
+matching Platform preview installer. Schema remains 1; no version bump or
+publication is included. Native Desktop UI and cross-OS live model acceptance
+remain outside these checks.
+
+## Original pilot
+
 - [x] Durable registry, exposure ledger, generation fencing and bounded leases.
 - [x] Authenticated management API and instruction-only catalog resolution.
 - [x] Re-entry/fork/dispatch admission, durable CLI lifetime receipts and actual process-close evidence.

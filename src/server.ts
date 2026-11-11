@@ -1396,7 +1396,9 @@ export function createRuntimeServer(
         }
         agentBackend.killAll();
         apiBackend.killAll();
-        pool.killAll();
+        if (!await pool.killAllAndWait()) {
+          console.warn('[shutdown] CLI close was not confirmed before the deadline; unresolved process receipts are retained.');
+        }
         registry.flush();
         for (const service of new Set(kiloNativeByInstance.values())) {
           await service.close();

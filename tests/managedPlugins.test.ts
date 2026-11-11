@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -9,10 +9,12 @@ import { loadConfig } from '../src/core/config.js';
 import { assertManagedPluginContext, AGENCY_DIGEST, AGENCY_SKILLS, bindManagedNativeIdentity, finishManagedPluginRun, inheritManagedPluginContext, listManagedPluginSkills, observeManagedPlugin, recordManagedPluginRun, registerManagedPlugin, renewManagedPlugin, type PluginDescriptor } from '../src/core/skills/managedPlugins.js';
 import { buildRuntimeSkillInstructionOverlay, resolveRuntimeSkillManifest } from '../src/core/skills/catalog.js';
 import { hydrateSessionState } from '../src/core/hydration/sessionHydration.js';
-import { managedPluginRoutes, stopFencedPluginRuns } from '../src/http/routes/managedPlugins.js';
+import { managedPluginRoutes, managedPluginPolicyEnabled, stopFencedPluginRuns } from '../src/http/routes/managedPlugins.js';
 import type { AppContext } from '../src/http/app.js';
 import { WorkerPool } from '../src/backends/cli/pool/WorkerPool.js';
 import { SessionRegistry } from '../src/backends/cli/pool/SessionRegistry.js';
+import { CodexProvider } from '../src/backends/cli/providers/codex.js';
+import { ClaudeProvider } from '../src/backends/cli/providers/claude.js';
 
 const skills = Object.keys(AGENCY_SKILLS).map(id => ({ id, markdown: readFileSync(new URL(`./fixtures/managed-plugins/${id.split('/').at(-1)}.md`, import.meta.url), 'utf8') }));
 describe('managed Plugin pilot', () => {
@@ -36,6 +38,39 @@ describe('managed Plugin pilot', () => {
     expect(() => assertManagedPluginContext(root, 'session-a')).toThrow(/new conversation/);
     expect(() => renewManagedPlugin(root, descriptor)).toThrow();
   });
+  for (const providerName of ['codex', 'claude']) for (const selected of skills) {
+    it(`delivers only ${selected.id} to ${providerName} on every turn, without shared-cwd discovery`, () => {
+      registerManagedPlugin(root, descriptor);
+      const resolved = resolveRuntimeSkillManifest({ requestedSkills: [selected.id], strict: true }, {
+        sessionBaseDir: root, sessionId: 'selected-cat', providerName, providerBackend: 'cli', cwd: temporary,
+      })!;
+      const selectedBody = selected.markdown.replace(/^---\n[\s\S]*?\n---\n/, '');
+      const other = skills.find(skill => skill.id !== selected.id)!;
+      function makeProvider() {
+        const provider = providerName === 'codex' ? new CodexProvider() : new ClaudeProvider();
+        provider.buildSpawnArgs({ cwd: temporary });
+        return provider;
+      }
+      function turn(provider: CodexProvider | ClaudeProvider, text: string, withSkill: boolean, first: boolean) {
+        let message = provider.buildStdinMessage(text, { message: text, ...(withSkill ? { skills: resolved } : {}) });
+        if (provider instanceof CodexProvider && first) {
+          provider.parseStreamLine(JSON.stringify({ jsonrpc: '2.0', id: 1,
+            result: { threadId: 'test-thread', sandbox: { type: 'workspaceWrite' }, approvalPolicy: 'never' } }));
+          message = provider.getPendingTurnStart()!;
+        }
+        const parsed = JSON.parse(message);
+        return provider instanceof CodexProvider ? parsed.params.input[0].text : parsed.message.content;
+      }
+      const enabled = makeProvider(); const ordinary = makeProvider();
+      for (const first of [true, false]) {
+        const message = turn(enabled, 'Review this design.', true, first);
+        expect(message).toContain(selectedBody);
+        expect(message).not.toContain(other.id);
+        expect(turn(ordinary, 'Review this design.', false, first)).toBe('Review this design.');
+      }
+      for (const directory of ['.agents', '.agent', '.codex', '.claude']) expect(existsSync(join(temporary, directory))).toBe(false);
+    });
+  }
   it('rejects unreviewed bytes, expired generation resurrection and other profiles', () => {
     expect(() => registerManagedPlugin(root, { ...descriptor, skills: [{ ...skills[0], markdown: 'evil' }, skills[1]] })).toThrow();
     registerManagedPlugin(root, descriptor);
@@ -81,6 +116,60 @@ describe('managed Plugin pilot', () => {
     renewManagedPlugin(root, descriptor);
     writeFileSync(join(root, '.managed-plugins', 'state.json'), '{bad');
     expect(() => listManagedPluginSkills(root)).toThrow(/cannot be verified/);
+  });
+  it('restores only the same still-enabled generation after a clean restart, preserving old session exposure', async () => {
+    registerManagedPlugin(root, descriptor); resolveSkill(root);
+    vi.resetModules();
+    const restarted = await import('../src/core/skills/managedPlugins.js');
+    expect(restarted.observeManagedPlugin(root)).toMatchObject({ restorable: true, plugin: { enabled: false } });
+    expect(() => restarted.assertManagedPluginContext(root, 'session-a')).toThrow();
+    expect(() => restarted.restoreManagedPlugin(root, { ...descriptor, hostId: randomUUID() })).toThrow();
+    expect(() => restarted.restoreManagedPlugin(root, { ...descriptor, generation: 2 })).toThrow();
+    restarted.restoreManagedPlugin(root, descriptor);
+    expect(restarted.observeManagedPlugin(root)).toMatchObject({ restorable: false, plugin: { enabled: true, generation: 1 } });
+    expect(() => restarted.assertManagedPluginContext(root, 'session-a')).not.toThrow();
+    expect(restarted.listManagedPluginSkills(root)).toHaveLength(2);
+    vi.useFakeTimers(); vi.setSystemTime(Date.now() + 31_000);
+    expect(() => restarted.restoreManagedPlugin(root, descriptor)).toThrow(/cannot be restored/);
+  });
+  it('does not resurrect a lease-expired generation whose stop was authorized before restart', async () => {
+    registerManagedPlugin(root, descriptor);
+    vi.useFakeTimers(); vi.setSystemTime(Date.now() + 31_000);
+    const original = await import('../src/core/skills/managedPlugins.js');
+    original.authorizeManagedPluginStop(root);
+    vi.resetModules();
+    const restarted = await import('../src/core/skills/managedPlugins.js');
+    expect(restarted.observeManagedPlugin(root).restorable).toBe(false);
+    expect(() => restarted.restoreManagedPlugin(root, descriptor)).toThrow();
+    expect(restarted.listManagedPluginSkills(root)).toHaveLength(0);
+  });
+  for (const reason of ['disabled', 'orphan'] as const) {
+    it(`does not restore a ${reason} generation after restart`, async () => {
+      registerManagedPlugin(root, descriptor);
+      if (reason === 'disabled') registerManagedPlugin(root, { ...descriptor, generation: 2, enabled: false, skills: [] });
+      else { resolveSkill(root); recordManagedPluginRun(root, 'session-a', 'execution-a'); }
+      vi.resetModules();
+      const restarted = await import('../src/core/skills/managedPlugins.js');
+      expect(restarted.observeManagedPlugin(root).restorable).toBe(false);
+      expect(() => restarted.restoreManagedPlugin(root, { ...descriptor, generation: reason === 'disabled' ? 2 : 1 })).toThrow();
+      expect(restarted.listManagedPluginSkills(root)).toHaveLength(0);
+    });
+  }
+
+  it('allows explicit desktop-preview policy while default hosts remain off', async () => {
+    for (const policy of [undefined, 'desktop-preview']) {
+      const config = loadConfig(createRuntimeTestEnv(temporary, {
+        CATS_PLUGIN_MANAGEMENT_KEY: 'preview-management', ...(policy ? { CATS_PLUGIN_POLICY: policy } : {}),
+      }));
+      const ctx = { config } as AppContext;
+      expect(managedPluginPolicyEnabled(ctx)).toBe(Boolean(policy));
+      const app = new Hono<{ Variables: { ctx: AppContext } }>();
+      app.use('*', async (c, next) => { c.set('ctx', ctx); await next(); }); app.route('/', managedPluginRoutes);
+      const request = { method: 'POST', headers: { Authorization: 'Bearer preview-management', 'Content-Type': 'application/json' }, body: JSON.stringify(descriptor) };
+      // The additive restore endpoint is authenticated, policy checked, and rejects absent state.
+      expect((await app.request('/plugins/managed/restore', request)).status).toBe(policy ? 409 : 403);
+      expect((await app.request('/plugins/managed/restore', { ...request, headers: {} })).status).toBe(401);
+    }
   });
   it('releases a lifetime receipt when direct-launch validation proves no owned process was started', () => {
     const config = loadConfig(createRuntimeTestEnv(temporary), { providerYaml: 'providers: { codex: { instances: { native: {} } } }' });

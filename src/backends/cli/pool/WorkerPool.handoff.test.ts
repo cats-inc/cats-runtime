@@ -37,6 +37,17 @@ async function fixture() {
 
 afterEach(() => { vi.clearAllMocks(); });
 describe('image handoff owns the complete source process lifetime', () => {
+  it('does not admit a pending handoff after Runtime shutdown begins', async () => {
+    const { pool, child, helper, imageInstance } = await fixture();
+    const cancel = vi.fn();
+    const handoff = pool.reserveExternalExecutionFromSession('image-one', 'grok', imageInstance.id, cancel, 'source-chat');
+    const rejected = expect(handoff).rejects.toThrow(/shutting down/);
+    const shutdown = pool.killAllAndWait();
+    expect(cancel).toHaveBeenCalledOnce();
+    child.emit('close', 0); helper.resolve();
+    await rejected; expect(await shutdown).toBe(true);
+    expect(pool.activeCount).toBe(0);
+  });
   it('waits for the child and helper before replacing a worker at a turn boundary', async () => {
     const { config, pool, captured, child, helper, imageInstance } = await fixture();
     const manager = new RuntimeSessionManager(config, pool);
