@@ -38,10 +38,15 @@ resume; sharing one background thread would break Catlas input isolation.
    decide when to replace a missing native conversation and supply the handoff.
    Transport/auth failures do not authorize replacement or replay.
 6. Products supply recognizable labels; the Codex adapter owns thread/name/set.
-   Retain the existing instruction envelope: the current native turn schema has
-   no developerInstructions override, so moving session instructions would change
-   per-turn precedence. That separate change needs its own acceptance. Codex
-   baseInstructions are not replaced.
+   Amendment after installed-profile feedback on 2026-11-11: deliver compiled
+   skill/session/turn instructions as a native developer message through
+   `thread/inject_items`, then await its matching successful acknowledgement
+   before `turn/start`. The user message remains unchanged. Scope each overlay
+   to the next turn, superseding previous Runtime overlays; send an explicit
+   empty boundary after clearing and on a cold resume with no instructions.
+   Do not replace native base instructions or override the selected model,
+   reasoning effort, sandbox or tools. Failed/malformed/missing admission stops
+   the worker with a bounded error, never an in-band fallback.
 
 ## Consequences
 

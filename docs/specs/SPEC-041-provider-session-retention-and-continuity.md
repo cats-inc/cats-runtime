@@ -127,14 +127,15 @@ user changed in the native client. A live worker applies newly seeded metadata o
 its next bootstrap. Name-set replies and unrelated notifications
 must not be mistaken for bootstrap or turn replies.
 
-The implemented slice retains the instruction envelope. Moving session-scoped
-persona/skills to developerInstructions requires separate validation. Do not replace baseInstructions. Preserve skill,
-session and per-turn precedence, updates, empty/cleared values and resume
-behavior. Capability refresh can bootstrap before the first message, so deriving
-session instructions only from the first send is insufficient. The local
-TurnStartParams schema has no developerInstructions field: do not invent a
-turn/start override or silently drop changing turn instructions. Explicit naming
-can ship independently of this instruction-routing change.
+The follow-up repair sends merged skill, session and per-turn instructions via
+`thread/inject_items` as a developer message before the clean user input. Only
+the matching successful object acknowledgement releases `turn/start`; an error,
+malformed acknowledgement or timeout stops the worker. No instruction envelope
+is inserted into the user message. Every overlay applies to the next turn and
+supersedes earlier Runtime overlays. Clearing, including an empty cold-resume
+turn, explicitly ends the old overlay. Inspection may bootstrap before a send;
+the actual send still admits its current instructions. Preserve native base
+instructions, selected model/effort, sandbox, skills and tool permissions.
 
 ### R6. Preserve current missing-session recovery
 

@@ -328,6 +328,51 @@ it('never sends a Codex model turn when the child reports a permission downgrade
   }
 });
 
+for (const behavior of ['accept', 'reject', 'silent'] as const) {
+  it(`gates the real Codex worker turn on ${behavior} instruction admission`, async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'cats-codex-instructions-'));
+    const script = `
+      const fs = require('node:fs');
+      const send = value => process.stdout.write(JSON.stringify(value) + '\\n');
+      require('node:readline').createInterface({ input: process.stdin }).on('line', line => {
+        const msg = JSON.parse(line);
+        if (msg.method === 'initialize') send({ id: msg.id, result: {} });
+        if (msg.method === 'thread/start') send({ id: msg.id, result: {
+          thread: { id: 'fixture' }, approvalPolicy: 'never', sandbox: { type: 'workspaceWrite' } } });
+        if (msg.method === 'thread/inject_items') {
+          fs.writeFileSync('injected', msg.params.items[0].role);
+          send({ id: 900, result: {} });
+          if (${JSON.stringify(behavior)} === 'accept') setTimeout(() => send({ id: msg.id, result: {} }), 30);
+          if (${JSON.stringify(behavior)} === 'reject') send({ id: msg.id, error: { message: 'unsupported' } });
+        }
+        if (msg.method === 'turn/start') {
+          fs.writeFileSync('turn', msg.params.input[0].text);
+          send({ method: 'turn/completed', params: { threadId: 'fixture', turn: { id: 'turn' } } });
+        }
+      });
+    `;
+    const worker = new WorkerProcess(new CodexProvider(), { cwd }, {
+      ...createNodeCommandConfig(), args: ['-e', script],
+    });
+    try {
+      worker.start();
+      const turn = worker.sendMessage({ message: 'Clean user question', instructions: 'Do not echo this persona.' });
+      if (behavior === 'silent') await expect(turn).rejects.toThrow('initialization timed out');
+      else {
+        const events = await turn;
+        expect(events.at(-1)?.type).toBe(behavior === 'accept' ? 'result' : 'error');
+      }
+      expect(existsSync(join(cwd, 'injected'))).toBe(true);
+      expect(existsSync(join(cwd, 'turn'))).toBe(behavior === 'accept');
+    } finally {
+      if (worker.processRunning) {
+        const exit = once(worker, 'exit'); worker.kill(); await exit;
+      }
+      cleanupTempDirWithRetries(cwd);
+    }
+  }, 20_000);
+}
+
 function createNodeCommandConfig(): ProviderCommandConfig {
   return {
     path: process.execPath,

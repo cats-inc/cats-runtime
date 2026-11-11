@@ -169,9 +169,9 @@ acceptance must use the new Runtime candidate.
   Desktop/Bot was installed or updated; macOS/Linux and native failure/cancel
   acceptance are not claimed. Failure/cancel behavior has scoped fixtures.
 
-The implementation retains the instruction envelope because the native per-turn
-schema cannot express an equivalent developerInstructions override. Naming ships
-independently; the separate image runner and old-history cleanup are out of scope.
+The original slice retained the instruction envelope; the native instruction
+delivery follow-up below supersedes that choice after additional acceptance.
+The separate image runner and old-history cleanup remain out of scope.
 No version bump or publication is part of this implementation; the owner separately
 authorized commit, PR and squash auto-merge through `cnr`.
 Before shipping, commit/merge Runtime and refresh the consumers' exact source and
@@ -180,6 +180,33 @@ remains unchanged; local integration used `--no-save --package-lock=false` and
 verified all 1,513 candidate package files. No mandatory data migration is needed.
 
 ## Progress Log
+
+### Native instruction delivery follow-up (2026-11-11)
+
+Installed Desktop/Bot feedback showed that naming alone left instruction
+envelopes in native first-message previews. The adapter now admits a scoped
+developer item through `thread/inject_items` before each instructed turn, with
+an explicit clear boundary after clearing or cold resume. Matching ACK, rejection
+and timeout share the worker's bounded protocol admission. Model/effort and
+native base instructions are unchanged. No persisted-data schema changes.
+
+Windows Codex 0.167.0 acceptance used disposable profiles: two ephemeral turns
+obeyed different developer instructions on the same ID with zero SQLite threads;
+a persistent turn followed by a fresh-process resume obeyed updated instructions
+on the same ID, with exactly one saved thread and a clean first user message and
+title. A third cold-resume turn with cleared instructions returned the requested
+ordinary arithmetic answer instead of an earlier marker. Five model turns
+completed. Temporary login copies were deleted in
+`finally` and absence checked. Real user history was untouched. This is headless
+adapter/native acceptance, not an installed app update or macOS/Linux result.
+
+The native probe also established that ephemeral `thread/resume` fails without
+a rollout, and an accepted `collaborationMode.settings.developer_instructions`
+did not affect the model's response in this CLI. Neither path is used by the fix.
+The 227 focused Codex, worker, hosted ACP and Muse protocol tests passed,
+including real child acknowledgement, rejection and ten-second no-ACK timeout.
+Another 13 HTTP persistence/unavailable-session tests and Runtime typecheck
+passed. Independent read-only review closed all findings before delivery.
 
 ### Archived resume follow-up (2026-11-11)
 

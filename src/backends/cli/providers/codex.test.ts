@@ -190,8 +190,8 @@ describe('CodexProvider', () => {
       expect(parsed.params.approvalPolicy).toBe('never');
     });
 
-    it('prefixes instruction overlays into the Codex turn input when provided', () => {
-      provider.buildSpawnArgs(baseOpts);
+    it('delivers instruction overlays through the native developer channel', () => {
+      provider.buildSpawnArgs({ ...baseOpts, model: 'selected-model' });
       provider.buildStdinMessage('First');
       provider.parseStreamLine(JSON.stringify({
         jsonrpc: '2.0',
@@ -205,11 +205,15 @@ describe('CodexProvider', () => {
         instructions: 'Stay terse.',
       });
       const parsed = JSON.parse(msg.trim());
-      expect(parsed.params.input).toEqual([{
-        type: 'text',
-        text: expect.stringContaining('Instructions:\nStay terse.'),
-      }]);
-      expect(parsed.params.input[0].text).toContain('User message:\nSecond message');
+      expect(parsed.method).toBe('thread/inject_items');
+      expect(parsed.params.items[0]).toMatchObject({ role: 'developer',
+        content: [{ type: 'input_text', text: expect.stringContaining('Stay terse.') }] });
+      expect(provider.getPendingTurnStart()).toBeNull();
+      provider.parseStreamLine(JSON.stringify({ id: parsed.id, result: {} }));
+      const turn = JSON.parse(provider.getPendingTurnStart()!);
+      expect(turn.params.input).toEqual([{ type: 'text', text: 'Second message' }]);
+      expect(turn.params).not.toHaveProperty('model');
+      expect(turn.params).not.toHaveProperty('collaborationMode');
     });
   });
 
@@ -952,7 +956,11 @@ describe('CodexProvider', () => {
     };
     const start = (turnId: string, first = false) => {
       const message = first ? provider.getPendingTurnStart() : provider.buildStdinMessage('next request');
-      const request = JSON.parse(message!);
+      let request = JSON.parse(message!);
+      if (request.method === 'thread/inject_items') {
+        provider.parseStreamLine(JSON.stringify({ id: request.id, result: {} }));
+        request = JSON.parse(provider.getPendingTurnStart()!);
+      }
       provider.parseStreamLine(JSON.stringify({ id: request.id, result: { turn: { id: turnId } } }));
       notify('turn/started', { threadId: 'usage-thread', turn: { id: turnId } });
     };
@@ -982,6 +990,8 @@ describe('CodexProvider', () => {
     it('uses bootstrap and idle notifications as checkpoints without charging old usage', () => {
       initialize(true);
       usage('old-turn', counts(100, 10), counts(10000, 1000));
+      const injection = JSON.parse(provider.getPendingTurnStart()!);
+      provider.parseStreamLine(JSON.stringify({ id: injection.id, result: {} }));
       const pending = JSON.parse(provider.getPendingTurnStart()!);
       usage('old-turn', counts(100, 10), counts(10000, 1000));
       provider.parseStreamLine(JSON.stringify({ id: pending.id, result: { turn: { id: 'new-turn' } } }));
