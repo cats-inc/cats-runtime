@@ -1003,3 +1003,10 @@ the only durable memory surface for the Cats suite.
 ---
 
 *Last updated: 2026-04-20*
+
+## Reference media contract 3
+
+The existing image service additionally accepts immutable references and emits image/video receipts.
+See [SPEC-044](specs/SPEC-044-reference-media-generation.md) for source upload, operations,
+limits and compatibility; [ADR-053](decisions/053-extend-media-receipts-with-immutable-references.md)
+keeps provider execution and capacity in Runtime and post/delivery ownership in Platform.

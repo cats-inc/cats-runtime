@@ -1,5 +1,7 @@
 # Feature Specifications
 
+- [SPEC-044: Reference media generation](SPEC-044-reference-media-generation.md) — implemented; host acceptance in progress.
+
 - [SPEC-043: Text-only sessions](SPEC-043-text-only-sessions.md)
   — approved, 2026-11-11; a session with no tools, no MCP and no native memory, admitted
   only when the provider's own report shows it or Runtime sends no tool definitions. No CLI

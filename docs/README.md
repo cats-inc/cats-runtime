@@ -1,5 +1,7 @@
 # Documentation Index
 
+- [Reference media contract 3](specs/SPEC-044-reference-media-generation.md), [plan](plans/PLAN-053-reference-media-generation.md), [native evidence](research/2026-11-11-reference-media-native-evidence.md).
+
 Approved, not implemented: [SPEC-042](specs/SPEC-042-turn-scoped-context.md) adds one-turn
 context to a send ([ADR-051](decisions/051-carry-one-turn-context-in-its-own-send-field.md)),
 and [SPEC-043](specs/SPEC-043-text-only-sessions.md) defines sessions without tools, MCP or

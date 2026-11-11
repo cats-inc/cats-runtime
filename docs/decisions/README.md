@@ -1,5 +1,7 @@
 # Architecture Decision Records (ADR)
 
+- [ADR-053: Immutable reference media](053-extend-media-receipts-with-immutable-references.md) — accepted, 2026-11-11.
+
 - [ADR-052: Offer text-only sessions only on evidence](052-offer-text-only-sessions-only-on-evidence.md)
   — accepted, 2026-11-11; a fail-closed profile with no tools, MCP or native memory,
   admitted per provider on its own report. Not implemented; research comes first.

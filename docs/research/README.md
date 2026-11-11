@@ -1,5 +1,7 @@
 # Research Log
 
+- [2026-11-11 native reference-media evidence](2026-11-11-reference-media-native-evidence.md) — real Paris JPEG and MP4.
+
 > Track external sources and findings that inform decisions.
 
 ## Index

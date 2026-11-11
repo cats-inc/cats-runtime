@@ -1,5 +1,7 @@
 # Implementation Plans
 
+- [PLAN-053: Reference media generation](PLAN-053-reference-media-generation.md) — in progress.
+
 - [PLAN-052: Codex session retention and continuity](PLAN-052-codex-session-retention-and-continuity.md)
   — implemented, 2026-11-11; Runtime contract, Platform Catlas and Bot continuity
   passed scoped, integration and Windows native checks. Unpublished; release pins pending.
