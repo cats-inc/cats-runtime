@@ -1,11 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, readdir, rename, rm, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { MediaSourceStore, MEDIA_MAX_BYTES } from './sources.js';
 import type { ProviderInstanceConfig } from '../../backends/cli/config.js';
 import type { ImageExecution, ImageExecutionResult } from '../../backends/cli/media/imageExecution.js';
 import {
   IMAGE_ID, IMAGE_MAX_BYTES, IMAGE_MAX_PROMPT, ImageError, imageTargetId, parseImageRequest, parseImageTargetId,
-  type ImageJob, type ImageMetadata, type ImageProfile, type ImageProvider, type ImageRequest, type ImageStatus,
+  type ImageJob, type ImageMetadata, type MediaMetadata, type ImageProfile, type ImageProvider, type ImageRequest, type ImageStatus,
 } from './contracts.js';
 
 export interface ImageServiceOptions {
@@ -20,7 +21,7 @@ export interface ImageServiceOptions {
   env: NodeJS.ProcessEnv;
 }
 const STATUSES: ImageStatus[] = ['running', 'succeeded', 'failed', 'cancelling', 'cancelled', 'interrupted'];
-const imageFile = (job: Pick<ImageJob, 'output'>) => job.output?.mimeType === 'image/png' ? 'image.png' : 'image.jpg';
+const imageFile = (job: Pick<ImageJob, 'output'>) => job.output?.mimeType === 'video/mp4' ? 'video.mp4' : job.output?.mimeType === 'image/png' ? 'image.png' : 'image.jpg';
 
 interface SchemaOneReceipt {
   schemaVersion: 1; id: string; instance: string; prompt: string; provider: 'grok'; agentModel: string; status: ImageStatus;
@@ -46,7 +47,8 @@ export class ImageGenerationService {
   private active = new Map<string, { controller: AbortController; done?: Promise<void> }>();
   private tail: Promise<unknown> = Promise.resolve();
   private closing = false;
-  constructor(private readonly options: ImageServiceOptions) {}
+  readonly sources: MediaSourceStore;
+  constructor(private readonly options: ImageServiceOptions) { this.sources = new MediaSourceStore(path.join(options.root, 'sources')); }
   /** The configured view: enabled profiles x supported configured instances. No CLI, sign-in or quota probe. */
   capabilities() {
     const targets: { id: string; provider: ImageProvider; instance: string }[] = [];
@@ -57,16 +59,17 @@ export class ImageGenerationService {
       if (!ids.length) continue;
       for (const target of ids) if (!targets.some((entry) => entry.id === target.id)) targets.push(target);
       profiles.push({ id: profile.id, revision: profile.revision, operation: profile.operation, targetIds: ids.map((target) => target.id),
-        agentConfigs: [{ ...profile.agentConfig }], inputs: { min: 0, max: 0 }, aspectRatio: profile.aspectRatio });
+        agentConfigs: [{ ...profile.agentConfig }], inputs: profile.operation === 'image.generate' ? { min: 0, max: 0 }
+          : { min: 1, max: profile.operation === 'video.generate' ? 1 : 3 }, aspectRatio: profile.aspectRatio });
     }
     const revision = createHash('sha256').update(JSON.stringify({ targets, profiles })).digest('hex').slice(0, 16);
     return { schemaVersion: 2 as const, revision, maxPromptLength: IMAGE_MAX_PROMPT, maxImageBytes: IMAGE_MAX_BYTES,
-      sourceSessionYield: true as const, targets, profiles };
+      sourceSessionYield: true as const, mediaContractVersion: 3 as const, maxSourceBytes: MEDIA_MAX_BYTES, targets, profiles };
   }
   private resolve(input: ImageRequest) {
     const target = parseImageTargetId(input.targetId);
     const profile = this.options.profiles.find((entry) => entry.id === input.profileId);
-    if (!target || !profile || !profile.enabled || profile.provider !== target.provider) throw new ImageError('image_profile_unavailable', 409);
+    if (!target || !profile || !profile.enabled || profile.provider !== target.provider || profile.operation !== input.operation) throw new ImageError('image_profile_unavailable', 409);
     // A request built against another catalog revision or configuration never silently runs this one.
     if (String(profile.revision) !== input.profileRevision || profile.agentConfig.id !== input.agentConfigId) throw new ImageError('image_profile_changed', 409);
     const instance = this.options.targets(target.provider).find((entry) => entry.id === target.instance);
@@ -89,7 +92,7 @@ export class ImageGenerationService {
       if (!validSchemaOne(value as Partial<SchemaOneReceipt>, id)) throw new ImageError('image_state_invalid', 503);
       return this.upgrade(value as SchemaOneReceipt);
     }
-    if (value.schemaVersion !== 2 || value.id !== id || !STATUSES.includes(value.status as ImageStatus)
+    if ((value.schemaVersion !== 2 && value.schemaVersion !== 3) || value.id !== id || !STATUSES.includes(value.status as ImageStatus)
       || (value.sourceSessionId !== undefined && (typeof value.sourceSessionId !== 'string'
         || !value.sourceSessionId || value.sourceSessionId.length > 200 || /[\u0000-\u001f\u007f]/.test(value.sourceSessionId)))) {
       throw new ImageError('image_state_invalid', 503);
@@ -137,7 +140,7 @@ export class ImageGenerationService {
         job.status = 'interrupted'; job.error = 'execution_interrupted'; job.updatedAt = new Date().toISOString();
         await this.write(job);
       }
-      if (job.status === 'failed' && job.error === 'invalid_image_source' && !this.active.has(id)) {
+      if (job.operation === 'image.generate' && job.status === 'failed' && job.error === 'invalid_image_source' && !this.active.has(id)) {
         const input = this.execution(job, path.join(this.folder(id), 'workspace'), new AbortController().signal);
         const recovery = input && this.options.recover?.(input);
         if (recovery) {
@@ -180,6 +183,7 @@ export class ImageGenerationService {
         const sameConfig = previous.agentConfigId === null || (previous.profileId === input.profileId
           && previous.profileRevision === input.profileRevision && previous.agentConfigId === input.agentConfigId);
         if (previous.targetId !== input.targetId || previous.operation !== input.operation || previous.prompt !== input.prompt || !sameConfig
+          || JSON.stringify(previous.sourceIds) !== JSON.stringify(input.sourceIds) || JSON.stringify(previous.options) !== JSON.stringify(input.options)
           || (previous.sourceSessionId ?? null) !== (input.sourceSessionId ?? null)) {
           throw new ImageError('image_request_conflict', 409);
         }
@@ -188,6 +192,7 @@ export class ImageGenerationService {
       if (this.closing) throw new ImageError('image_service_stopping', 503);
       if (this.active.size) throw new ImageError('image_service_busy', 429);
       const { provider, instance, profile, config } = this.resolve(input);
+      for (const id of input.sourceIds) await this.sources.get(id);
       await mkdir(this.options.root, { recursive: true });
       if ((await readdir(this.options.root)).length >= 500) throw new ImageError('image_storage_limit', 409);
       const folder = this.folder(input.id);
@@ -196,10 +201,10 @@ export class ImageGenerationService {
       const cwd = path.join(folder, 'workspace');
       await mkdir(cwd);
       const now = new Date().toISOString();
-      const job: ImageJob = { schemaVersion: 2, id: input.id, targetId: input.targetId, provider, instance,
+      const job: ImageJob = { schemaVersion: input.contractVersion === 3 ? 3 : 2, id: input.id, targetId: input.targetId, provider, instance,
         profileId: profile.id, profileRevision: String(profile.revision), agentConfigId: profile.agentConfig.id,
         agentModel: profile.agentConfig.model, agentEffort: profile.agentConfig.effort, operation: input.operation,
-        prompt: input.prompt, sourceIds: [], options: {}, status: 'running', createdAt: now, updatedAt: now,
+        prompt: input.prompt, sourceIds: input.sourceIds, options: input.options, status: 'running', createdAt: now, updatedAt: now,
         error: null, warnings: [], executionOutcome: null, output: null,
         ...(input.sourceSessionId ? { sourceSessionId: input.sourceSessionId } : {}) };
       await this.write(job);
@@ -209,13 +214,14 @@ export class ImageGenerationService {
       const active = { controller: new AbortController(), done: undefined as Promise<void> | undefined };
       this.active.set(input.id, active);
       active.done = this.run(job, { id: job.id, prompt: job.prompt, provider, instance, profile, cwd, target: config,
-        env: this.options.env, signal: active.controller.signal,
+        env: this.options.env, signal: active.controller.signal, options: job.options,
         ...(input.sourceSessionId ? { sourceSessionId: input.sourceSessionId } : {}) });
       return job;
     });
   }
   private async run(job: ImageJob, input: ImageExecution): Promise<void> {
     try {
+      input.references = await this.sources.materialize(job.sourceIds, input.cwd);
       const result = await this.options.execute(input);
       if (input.signal.aborted) throw new ImageError('cancelled');
       const saved: ImageJob = { ...job, status: 'succeeded', output: result.metadata, executionOutcome: result.executionOutcome, warnings: result.warnings ?? [] };
@@ -267,14 +273,14 @@ export class ImageGenerationService {
       return { deleted: true as const };
     });
   }
-  async image(id: string): Promise<{ bytes: Buffer; mimeType: ImageMetadata['mimeType'] }> {
+  async image(id: string): Promise<{ bytes: Buffer; mimeType: MediaMetadata['mimeType'] }> {
     const job = await this.get(id);
     if (job.status !== 'succeeded' || !job.output) throw new ImageError('image_not_ready', 409);
     const file = await open(path.join(this.folder(id), imageFile(job)), 'r');
     let bytes: Buffer;
     try {
       const info = await file.stat();
-      if (!info.isFile() || info.size !== job.output.bytes || info.size > IMAGE_MAX_BYTES) throw new ImageError('invalid_image');
+      if (!info.isFile() || info.size !== job.output.bytes || info.size > (job.output.mimeType === 'video/mp4' ? MEDIA_MAX_BYTES : IMAGE_MAX_BYTES)) throw new ImageError('invalid_image');
       bytes = Buffer.alloc(info.size);
       let offset = 0;
       while (offset < bytes.length) {

@@ -10,7 +10,8 @@ export function loadImageProfiles(value: unknown = catalog): ImageProfile[] {
     const profile = entry as ImageProfile;
     const ratio = profile?.aspectRatio as { mode?: unknown; options?: unknown } | undefined;
     if (!profile || typeof profile.id !== 'string' || seen.has(profile.id) || !Number.isInteger(profile.revision) || profile.revision < 1
-      || !IMAGE_PROVIDERS.includes(profile.provider) || profile.operation !== 'image.generate' || typeof profile.enabled !== 'boolean'
+      || !IMAGE_PROVIDERS.includes(profile.provider) || !['image.generate', 'image.edit', 'video.generate'].includes(profile.operation)
+      || (profile.operation !== 'image.generate' && profile.provider !== 'grok') || typeof profile.enabled !== 'boolean'
       || typeof profile.agentConfig?.id !== 'string' || typeof profile.agentConfig.model !== 'string' || typeof profile.agentConfig.effort !== 'string'
       || !(ratio?.mode === 'service' || (ratio?.mode === 'native' && Array.isArray(ratio.options) && ratio.options.length === 1
         && typeof ratio.options[0] === 'string' && /^\d+:\d+$/.test(ratio.options[0])))

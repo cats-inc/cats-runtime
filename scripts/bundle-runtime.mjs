@@ -24,6 +24,8 @@ const result = await build({
     'yaml',
     // Browser automation is optional and large; keep it out of the hot startup bundle.
     'playwright-core',
+    'ffmpeg-static',
+    'ffprobe-static',
   ],
 });
 await writeBundleNotices({ metafile: result.metafile, root, outfile });

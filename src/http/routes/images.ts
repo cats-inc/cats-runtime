@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { RuntimeRouteEnv } from './diagnosticsSupport.js';
 import { ImageError } from '../../core/media/contracts.js';
+import { MEDIA_MAX_BYTES } from '../../core/media/sources.js';
 
 export const imageRoutes = new Hono<RuntimeRouteEnv>();
 imageRoutes.onError((error, c) => c.json(
@@ -14,6 +15,8 @@ imageRoutes.use('/media/images/*', async (c, next) => {
   await next();
 });
 imageRoutes.get('/media/images/capabilities', (c) => c.json(c.get('ctx').images!.capabilities()));
+imageRoutes.put('/media/images/sources/:id', bodyLimit({ maxSize: MEDIA_MAX_BYTES }), async c =>
+  c.json(await c.get('ctx').images!.sources.put(c.req.param('id'), Buffer.from(await c.req.arrayBuffer())), 201));
 imageRoutes.post('/media/images/jobs', bodyLimit({ maxSize: 12000 }), async (c) => {
   let body: unknown;
   try { body = await c.req.json(); } catch { throw new ImageError('invalid_image_request'); }

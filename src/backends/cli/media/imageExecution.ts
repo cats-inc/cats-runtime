@@ -5,10 +5,12 @@ import path from 'node:path';
 import jpeg from 'jpeg-js';
 import { PNG } from 'pngjs';
 import type { ProviderInstanceConfig } from '../config.js';
-import { IMAGE_MAX_BYTES, ImageError, type ImageMetadata, type ImageProfile, type ImageProvider } from '../../../core/media/contracts.js';
+import { IMAGE_MAX_BYTES, ImageError, type ImageMetadata, type MediaMetadata, type ImageProfile, type ImageProvider } from '../../../core/media/contracts.js';
 import type { StreamEvent } from '../../../core/types.js';
 
 export interface ImageExecution {
+  references?: string[];
+  options?: { durationSeconds?: 6 | 10 };
   id: string; prompt: string; provider: ImageProvider; instance: string; profile: ImageProfile;
   cwd: string; target: ProviderInstanceConfig; env: NodeJS.ProcessEnv; signal: AbortSignal;
   observe?: (event: StreamEvent) => void;
@@ -17,7 +19,7 @@ export interface ImageExecution {
   createdAt?: string;
 }
 export interface ImageExecutionResult {
-  bytes: Buffer; metadata: ImageMetadata;
+  bytes: Buffer; metadata: MediaMetadata;
   /** `stopped_after_image`: the runner ended the process once the verified image existed. */
   executionOutcome: 'completed' | 'stopped_after_image';
   /** For example `additional_image_generated` when a runner-bounded CLI saved more than the one image it keeps. */
