@@ -1,18 +1,25 @@
 # ADR-043: Admit managed Plugin skills through a fenced local host boundary
 
-Status: Accepted for the internal Agency pilot (2026-09-29).
+Status: Accepted for the Agency pilot (2026-09-29), extended to packaged Desktop
+preview installation on the owner's request (2026-11-11).
 
 Platform owns package installation, desired state and removal. Runtime accepts an
 authenticated, versioned descriptor for instructions-only skills. Neither side
 executes package hooks. This adds instruction delivery without introducing a
 provider adapter or a second installer.
 
-The pilot is explicitly enabled on both hosts with `CATS_PLUGIN_POLICY=internal-experiment`
-and uses separate data directories. Management requires a bearer key: the normal
+The isolated pilot uses `CATS_PLUGIN_POLICY=internal-experiment`. A Desktop host
+with a verified preview bundle can instead pass `CATS_PLUGIN_POLICY=desktop-preview`
+and explicit data directories, including its ordinary profile. Management requires a bearer key: the normal
 Runtime API key when configured, otherwise `CATS_PLUGIN_MANAGEMENT_KEY`.
 Descriptors identify the Platform profile, package digest and monotonic generation.
 Thirty-second leases fence disconnected hosts. Expired generations cannot be renewed.
-Runtime restart invalidates leases; Platform must explicitly enable a new generation.
+Runtime restart invalidates leases. An authenticated owner may restore the same
+still-enabled generation only after a clean restart with no pending CLI lifetime
+receipts. Disabled/mismatched generations and same-boot expiry are rejected;
+explicit re-enable still creates a new generation. Restore changes no schema and
+preserves all session/native exposure, so existing conversations remain usable
+only when their original generation is valid. A restart never proves process exit.
 
 Before delivery, Runtime atomically persists source exposure independently of the
 session registry. Re-entry, fork and execution admission check this ledger. Removing

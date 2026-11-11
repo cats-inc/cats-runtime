@@ -194,6 +194,21 @@ clean provenance at both ends because content profiles are not negotiated.
 This stricter behavior requires a Runtime minor boundary; see
 [PLAN-041](plans/PLAN-041-preview-skill-content-policy.md).
 
+### Managed Agency Plugin installation
+
+The local authenticated protocol-1 routes are `GET/PUT /plugins/managed` and
+`POST /plugins/managed/{renew,restore,stop}`. They require an explicit Runtime data
+directory plus `internal-experiment` (isolated) or `desktop-preview` host policy.
+The configured Runtime API key takes precedence over the private Plugin
+management key. Default hosts stay disabled.
+
+`restore` is additive: it accepts the exact host/package/digest/generation identity
+when the same enabled installation survived a clean Runtime restart and no CLI
+lifetimes remain pending. `GET` advertises this with `restorable: true`. Disabled,
+mismatched, orphaned and same-boot expired state returns a conflict. Existing
+session exposure is preserved. See [SPEC-034](specs/SPEC-034-managed-plugin-skills.md)
+for descriptor validation and process-stop boundaries.
+
 ### Provider session unavailable
 
 A Runtime session runs on a provider-native session (a Claude conversation, a
