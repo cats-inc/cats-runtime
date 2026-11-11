@@ -230,9 +230,9 @@ send({type:'max_turns_reached'});send({type:'end',sessionId:${JSON.stringify(inp
     app.route('/', imageRoutes);
     const capabilities = await (await app.request('/media/images/capabilities')).json();
     expect(capabilities).toMatchObject({ schemaVersion: 2, maxPromptLength: 2000, targets: [{ id: 'grok/native', provider: 'grok', instance: 'native' }],
-      profiles: [{ id: 'grok-generate', revision: 1, operation: 'image.generate', targetIds: ['grok/native'], inputs: { min: 0, max: 0 },
-        agentConfigs: [{ id: 'grok-4.7-xhigh', model: 'grok-4.7', effort: 'xhigh' }], aspectRatio: { mode: 'native', options: ['1:1'] } }] });
-    expect(capabilities.profiles).toHaveLength(1); // Muse appears only with a configured, supported instance.
+      profiles: expect.arrayContaining([{ id: 'grok-generate', revision: 1, operation: 'image.generate', targetIds: ['grok/native'], inputs: { min: 0, max: 0 },
+        agentConfigs: [{ id: 'grok-4.7-xhigh', model: 'grok-4.7', effort: 'xhigh' }], aspectRatio: { mode: 'native', options: ['1:1'] } }]) });
+    expect(capabilities.profiles).toHaveLength(3); // Muse appears only with a configured, supported instance.
     expect((await app.request('/media/images/jobs', { method: 'POST', body: '{}' })).status).toBe(400);
     expect((await app.request(`/media/images/jobs/${randomUUID()}`)).status).toBe(404);
     const stale = await app.request('/media/images/jobs', { method: 'POST', body: JSON.stringify(request(input, { id: randomUUID(), profileRevision: '2' })) });
@@ -265,7 +265,7 @@ send({type:'max_turns_reached'});send({type:'end',sessionId:${JSON.stringify(inp
       inputs: { min: 0, max: 0 }, aspectRatio: { mode: 'service' } });
     const disabled = new ImageGenerationService({ ...serviceOptions(path.join(root, 'other'), input, async () => generated()),
       profiles: profiles.map((profile) => ({ ...profile, enabled: profile.provider === 'grok' })), targets: (provider: string) => provider === 'grok' ? [input.target] : [museTarget] });
-    expect(disabled.capabilities().profiles.map((profile) => profile.id)).toEqual(['grok-generate']);
+    expect(disabled.capabilities().profiles.map((profile) => profile.id)).toEqual(['grok-generate', 'grok-reference-image', 'grok-reference-video']);
     expect(capabilities.revision).not.toBe(disabled.capabilities().revision);
   });
   it('upgrades a saved schema 1 JPEG once, keeps the original receipt and still serves its bytes', async () => {

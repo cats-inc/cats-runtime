@@ -50,6 +50,44 @@
       "agentConfig": { "id": "cursor-glm-5.3-max", "model": "glm-5p3[reasoning=max]", "effort": "max" },
       "aspectRatio": { "mode": "native", "options": ["1:1"] },
       "evidence": "2026-10-24-cursor-image-runner"
+    },
+    {
+      "id": "grok-reference-image",
+      "revision": 1,
+      "provider": "grok",
+      "operation": "image.edit",
+      "enabled": true,
+      "agentConfig": {
+        "id": "grok-4.7-xhigh",
+        "model": "grok-4.7",
+        "effort": "xhigh"
+      },
+      "aspectRatio": {
+        "mode": "native",
+        "options": [
+          "1:1"
+        ]
+      },
+      "evidence": "2026-11-11-companion-media-poc"
+    },
+    {
+      "id": "grok-reference-video",
+      "revision": 1,
+      "provider": "grok",
+      "operation": "video.generate",
+      "enabled": true,
+      "agentConfig": {
+        "id": "grok-4.7-xhigh",
+        "model": "grok-4.7",
+        "effort": "xhigh"
+      },
+      "aspectRatio": {
+        "mode": "native",
+        "options": [
+          "1:1"
+        ]
+      },
+      "evidence": "2026-11-11-companion-media-poc"
     }
   ]
 }
