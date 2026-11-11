@@ -57,6 +57,8 @@ model's toolset. "Denied" means it is advertised and refused when called.
     (`docs/research/2026-10-28-codex-host-capability-gaps.md`).
 - **Nothing isolates the CLI's own configuration.**
   - The child process inherits Runtime's environment (`backends/cli/pool/WorkerProcess.ts`).
+    Only `CLAUDECODE` and the plugin-management key are removed, so Runtime's own API key
+    and any API-backend key in that environment reach every provider CLI.
   - No adapter passes a setting that limits which settings, memory, plugins or hooks the
     CLI loads.
   - Instance `args` are prepended to every launch and can add plugin or profile
@@ -292,6 +294,19 @@ The create readback and the capabilities read state what the guarantees do not c
 - A text-only session sends no tool definitions, whatever the instance's `tool_profile`.
 - An instance whose payload template adds provider tools is unsupported.
 - The fallback of an unknown profile to `standard` does not apply to text-only sessions.
+- **API-backend credentials stay out of CLI processes.** Added on 2026-11-11 for consumers
+  that run a CLI target and an API-backend target in one Runtime, as Bot's separate
+  consolidation target does.
+  - Runtime removes every variable that an API-backend instance names in `api_key_env` from
+    the environment of each provider CLI it starts, on every launch path (native, WSL and
+    docker). It already removes the plugin-management key the same way.
+  - Otherwise a conversation's CLI, which has tools and reads untrusted input, could read a
+    key meant for the text-only target.
+  - A CLI that signs in through the same variable would lose it. An API-backend instance
+    should therefore use a variable name of its own, and the plan records what changes for
+    existing configurations.
+  - Runtime's own API key reaches CLI processes the same way. Whether to remove it is a
+    separate question, because a CLI-side helper may rely on it.
 
 ### R8. Unchanged services
 
@@ -306,6 +321,9 @@ The create readback and the capabilities read state what the guarantees do not c
 - The stored session record gains one optional field; a record without it is a standard
   session. The plan states whether this needs an upgrade step under the version policy.
 - Delete's stricter `retained` answer applies to text-only sessions only.
+- Removing API-backend credential variables from CLI processes (R7) changes behaviour for a
+  configuration in which a CLI signs in through the same variable. The plan decides whether
+  that needs the next minor line.
 - No version bump or publication is part of this spec.
 
 ## Research required
@@ -339,11 +357,13 @@ Not requirements on Runtime; listed so the owners can decide.
 
 - **Every consumer** must check the capability and the create readback before it sends
   (R1). Against an older Runtime, an unchecked create yields a full-auto session.
-- **Bot consolidation** (SPEC-015 FR-14) runs only on targets that qualify.
-  - Bot ADR-022 decision 6 keeps consolidation on the bot's own provider.
-  - Until research finds a mechanism, bots on codex or grok would have no consolidation.
-  - Allowing a separate consolidation target, for example an API-backend instance in the
-    bot's private Runtime, would remove that limit. That is Bot's decision.
+- **Bot consolidation** (SPEC-015 FR-14 and FR-19) runs only on targets that qualify.
+  - Bot amended ADR-022 decision 6 on 2026-11-11: consolidation uses the bot's own target
+    by default, or a separate consolidation target the owner names for that bot.
+  - A bot on codex or grok can therefore consolidate through an API-backend instance in its
+    private Runtime, once R7 exists. On its own provider it would have no consolidation
+    until research finds a mechanism.
+  - Bot enables a separate target only when R7's credential rule is in place.
 - **Bot SPEC-012 Phase 2** has the same dependency.
 - **Platform's Catlas jobs** keep their current read-only, ephemeral sessions. They may adopt
   the profile later.
@@ -376,6 +396,9 @@ Not requirements on Runtime; listed so the owners can decide.
   - A private directory that cannot be removed answers `retained`, with the path.
 - **API backend.** No tool definitions are sent for any instance profile, and an instance
   with template tools is refused.
+- **Credentials.** With an API-backend instance configured, the environment of a provider
+  CLI started on each launch path does not contain the variable that instance names, and
+  the API backend still authenticates.
 - **Ordinary sessions** behave exactly as before.
 
 ## Alternatives considered
@@ -421,6 +444,11 @@ refined three of them, as noted.
       resumable native conversation in the first place (R5).
 - [x] A violation is never retried automatically on a fresh session; the consumer decides.
       Refined: output is held until the turn ends, so a violated turn delivers nothing (R4).
+
+Added on 2026-11-11 with R7's credential rule:
+
+- [ ] Whether Runtime's own API key should also be kept out of CLI processes. Recommended:
+      decide in the plan, after checking what on the CLI side uses it.
 
 ## Dependencies and references
 

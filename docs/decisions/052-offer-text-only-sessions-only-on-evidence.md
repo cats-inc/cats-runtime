@@ -7,6 +7,9 @@ Accepted, 2026-11-11. The owner chose the recommended options of
 them without changing their intent. Nothing is implemented. An independent security review
 is required before implementation, and no provider is offered until research qualifies it.
 
+Amended later on 2026-11-11 with decision 9, after Bot chose to let a bot name a separate
+consolidation target on an API backend.
+
 ## Context
 
 Consumers need to run a model over text they do not trust. Bot will consolidate memory from
@@ -45,6 +48,10 @@ An audit at Runtime `fb50e59a` found:
    sending, because an older Runtime would return an ordinary session.
 8. Research each provider before offering it. API backends and claude are the first
    candidates; codex and grok have no known mechanism.
+9. Keep API-backend credentials out of CLI processes. Runtime passes its environment to
+   every provider CLI it starts, so a conversation's CLI could read a key meant for a
+   text-only target in the same Runtime. Runtime removes the variables that API-backend
+   instances name from each CLI's environment.
 
 ## Consequences
 
