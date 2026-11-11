@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Approved by the owner on 2026-11-11 with the recommended answers to its open questions. Not implemented. No provider is offered until the research in this spec qualifies it |
+| Status | Approved by the owner on 2026-11-11 with the recommended answers to its open questions. R10 was added later the same day and accepted by the owner. Not implemented. No provider is offered until the research in this spec qualifies it |
 | Owner | Runtime execution, with Bot as the first consumer |
 | Reviewer | Owner; independent read-only review completed on the draft, findings fixed. An independent security review is required before implementation |
 | Date | 2026-11-11 |
@@ -56,7 +56,10 @@ model's toolset. "Denied" means it is advertised and refused when called.
   - codex inherits user and system configuration, where `codex_apps` exposed 279 tools
     (`docs/research/2026-10-28-codex-host-capability-gaps.md`).
 - **Nothing isolates the CLI's own configuration.**
-  - The child process inherits Runtime's environment (`backends/cli/pool/WorkerProcess.ts`).
+  - A native provider CLI inherits Runtime's environment
+    (`backends/cli/pool/WorkerProcess.ts`). Only `CLAUDECODE` and the plugin-management key
+    are removed, so Runtime's own API key and any backend key in that environment reach it
+    (R10).
   - No adapter passes a setting that limits which settings, memory, plugins or hooks the
     CLI loads.
   - Instance `args` are prepended to every launch and can add plugin or profile
@@ -306,7 +309,60 @@ The create readback and the capabilities read state what the guarantees do not c
 - The stored session record gains one optional field; a record without it is a standard
   session. The plan states whether this needs an upgrade step under the version policy.
 - Delete's stricter `retained` answer applies to text-only sessions only.
+- R10 is not additive. It needs the next minor line, with release notes, because it changes
+  what existing configurations pass to their child processes (R10, "What changes").
 - No version bump or publication is part of this spec.
+
+### R10. Credentials and child processes
+
+Added on 2026-11-11 and accepted by the owner the same day. It is for consumers that run a
+tool-capable
+target and a text-only target in one Runtime, as Bot's separate consolidation target does.
+
+**Why.** A session with tools can read the environment of the process that runs it. Today
+that environment holds everything Runtime was started with:
+
+- A native provider CLI inherits Runtime's whole environment
+  (`backends/cli/pool/WorkerProcess.ts`). WSL and docker launches receive the environment
+  Runtime builds for them.
+- Other processes inherit it as well: the junie per-turn launch, the agent backend's ACP
+  agents and terminals, the local tool runtime's `run_shell`, the Kilo and Opencode servers,
+  quota probes, image runners and the Windows Codex host.
+- Runtime's own API key is in that environment, and Runtime has one key for every route
+  (`http/auth.ts`). A process that holds it can create a session on any configured target,
+  including an API-backend one, and read any session's history.
+- An ordinary API-backend session has `run_shell` and defaults to permission mode `skip`.
+  Its shell prints the environment, including that instance's key.
+
+**Rules.**
+
+1. **One builder.** Every process Runtime starts gets its environment from one shared
+   builder. No spawn site passes `process.env` itself.
+2. **What the builder removes.**
+   - Runtime's own API key.
+   - Every variable that a configured API, local or agent backend instance names in a
+     credential field: `api_key_env`, `auth_token_env`, `password_env`, `organization_env`
+     and `project_env`.
+   - The plugin-management key, as today.
+3. **Text-only-only instances.** An instance can be configured to admit only text-only
+   sessions. Creating any other session on it is refused with `session_profile_invalid`, so
+   no session with tools can ever run beside that instance's key.
+4. **Backends keep working.** A backend reads its credential inside the Runtime process, so
+   removing the variable from children does not affect it.
+
+**What changes.**
+
+- A CLI that signs in through a variable that a backend instance also names loses it. The
+  shipped example configuration names vendor variables such as `ANTHROPIC_API_KEY`. Such an
+  instance must name a variable of its own.
+- A helper that a Runtime-started CLI launches, such as a user-configured stdio proxy, no
+  longer inherits Runtime's API key. It must be given the key explicitly.
+- Nothing that Runtime starts itself needs the key in a child: session MCP servers use
+  per-session tokens, and runtime skills do not reference it.
+
+**Limits.** A process that runs as the same OS user can still read files and other
+processes. This rule closes the environment and the loopback API as easy paths; it is not a
+boundary against the user's own account.
 
 ## Research required
 
@@ -339,11 +395,14 @@ Not requirements on Runtime; listed so the owners can decide.
 
 - **Every consumer** must check the capability and the create readback before it sends
   (R1). Against an older Runtime, an unchecked create yields a full-auto session.
-- **Bot consolidation** (SPEC-015 FR-14) runs only on targets that qualify.
-  - Bot ADR-022 decision 6 keeps consolidation on the bot's own provider.
-  - Until research finds a mechanism, bots on codex or grok would have no consolidation.
-  - Allowing a separate consolidation target, for example an API-backend instance in the
-    bot's private Runtime, would remove that limit. That is Bot's decision.
+- **Bot consolidation** (SPEC-015 FR-14 and FR-19) runs only on targets that qualify.
+  - Bot amended ADR-022 decision 6 on 2026-11-11: consolidation uses the bot's own target
+    by default, or a separate consolidation target the owner names for that bot.
+  - A bot on codex or grok can therefore consolidate through an API-backend instance in its
+    private Runtime, once R7 and R10 exist. On its own provider it would have no
+    consolidation until research finds a mechanism.
+  - Bot enables a separate target only when R10 is in place, and marks that instance as
+    admitting only text-only sessions.
 - **Bot SPEC-012 Phase 2** has the same dependency.
 - **Platform's Catlas jobs** keep their current read-only, ephemeral sessions. They may adopt
   the profile later.
@@ -376,6 +435,14 @@ Not requirements on Runtime; listed so the owners can decide.
   - A private directory that cannot be removed answers `retained`, with the path.
 - **API backend.** No tool definitions are sent for any instance profile, and an instance
   with template tools is refused.
+- **Credentials (R10).**
+  - With a backend instance configured, no process Runtime starts has Runtime's own API key
+    or any variable that instance names in a credential field. Covered per spawn site:
+    provider CLIs on native, WSL and docker launches, the junie per-turn launch, ACP agents
+    and their terminals, `run_shell`, the Kilo and Opencode servers, quota probes, image
+    runners and the Windows Codex host.
+  - The backend still authenticates.
+  - A create without the text-only profile on a text-only-only instance is refused.
 - **Ordinary sessions** behave exactly as before.
 
 ## Alternatives considered
@@ -421,6 +488,13 @@ refined three of them, as noted.
       resumable native conversation in the first place (R5).
 - [x] A violation is never retried automatically on a fresh session; the consumer decides.
       Refined: output is held until the turn ends, so a violated turn delivers nothing (R4).
+
+Added on 2026-11-11 with R10, and answered by the owner the same day with the recommended
+options:
+
+- [x] R10 as written: one environment builder, Runtime's own key and backend credentials
+      removed from every child, and text-only-only instances.
+- [x] Version boundary for R10: the next minor line, with release notes, and no opt-out.
 
 ## Dependencies and references
 
