@@ -1,5 +1,10 @@
 # Documentation Index
 
+Drafts, not approved: [SPEC-042](specs/SPEC-042-turn-scoped-context.md) adds one-turn
+context to a send, and [SPEC-043](specs/SPEC-043-text-only-sessions.md) defines sessions
+without tools, MCP or native memory. Both are prerequisites of Cats Bot's memory plan
+(Bot PLAN-014 P0).
+
 [Provider session retention](specs/SPEC-041-provider-session-retention-and-continuity.md)
 implements ephemeral Codex jobs for Catlas and persistent conversation reuse across
 Bot restarts. [ADR-050](decisions/050-separate-provider-session-persistence-from-product-history.md)

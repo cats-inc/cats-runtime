@@ -1,5 +1,12 @@
 # Feature Specifications
 
+- [SPEC-043: Text-only sessions](SPEC-043-text-only-sessions.md)
+  — draft, 2026-11-11; a session with no tools, no MCP and no native memory, admitted only
+  on the provider's own report. No CLI adapter qualifies today; per-provider research comes
+  first. Not approved.
+- [SPEC-042: Turn-scoped context](SPEC-042-turn-scoped-context.md)
+  — draft, 2026-11-11; a `turnContext` send field that is delivered for one execution and
+  not kept as session state, with a capacity check for the composed prompt. Not approved.
 - [SPEC-041: Provider session retention and continuity](SPEC-041-provider-session-retention-and-continuity.md)
   — implemented, 2026-11-11; ephemeral Codex jobs, persistent Bot restart continuity,
   recognizable names and capability/lifecycle gates. Windows native acceptance passed; unpublished.
