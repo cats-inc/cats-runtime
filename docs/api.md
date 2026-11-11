@@ -2966,6 +2966,9 @@ action-scoped lifecycle coordination without relying on a single global
 - `sessionLabel`: nonempty plain text, trimmed, at most 160 Unicode code points,
   without C0/DEL controls; optional native-name seed rather than session identity
 - `instructions`: session bootstrap instructions persisted by the runtime
+  and compiled with skills/per-turn instructions. Codex delivers the compilation
+  as an acknowledged native developer item before the unchanged user message;
+  it does not put persona or handoff text into the first user-message preview.
 - `skills`: runtime-managed skill manifest with explicit `requestedSkills`
   where each entry may be either:
   - a plain string skill id such as `"companion"`

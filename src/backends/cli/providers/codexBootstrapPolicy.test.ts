@@ -53,7 +53,12 @@ describe('Codex effective bootstrap permission checks', () => {
     expect(respond(accepted)).toEqual({ type: 'init', sessionId: 'thread' });
     expect(started(provider)).toBeNull();
     expect(respond(accepted)).toBeNull();
-    const turn = JSON.parse(provider.getPendingTurnStart()!);
+    let turn = JSON.parse(provider.getPendingTurnStart()!);
+    if (options.resumeSessionId) {
+      expect(turn.method).toBe('thread/inject_items');
+      provider.parseStreamLine(JSON.stringify({ id: turn.id, result: {} }));
+      turn = JSON.parse(provider.getPendingTurnStart()!);
+    }
     expect(turn).toMatchObject({ method: 'turn/start', params: { threadId: 'thread',
       approvalPolicy: 'never', input: [{ type: 'text', text: 'Pending work' }] } });
     expect(provider.getPendingTurnStart()).toBeNull();

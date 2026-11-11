@@ -105,6 +105,10 @@ export class CodexProvider implements Provider {
    */
   private _lastRateLimits: Record<string, string | number | boolean> | null = null;
   private _pendingMessage: string | null = null;
+  private _pendingInstructions = '';
+  private _instructionRequestId: number | null = null;
+  private _instructionsAdmitted = false;
+  private _hadInstructionOverlay = false;
   private _spawnOpts: ProviderSpawnOptions | null = null;
   private _permissionMode: PermissionMode = 'skip';
   private _allowedTools: string[] = [];
@@ -163,6 +167,10 @@ export class CodexProvider implements Provider {
     this.threadId = null;
     this._readTurnId = null;
     this._pendingMessage = null;
+    this._pendingInstructions = '';
+    this._instructionRequestId = null;
+    this._instructionsAdmitted = false;
+    this._hadInstructionOverlay = Boolean(opts.resumeSessionId);
     this._interactions.clear();
     this._configurationRequestId = null;
     this._deferredBootstrap = null;
@@ -240,10 +248,7 @@ export class CodexProvider implements Provider {
       turn?.skills,
       turn?.sessionInstructions,
       turn?.instructions,
-    );
-    const effectiveContent = compiledInstructions
-      ? ['Instructions:', compiledInstructions, '', 'User message:', content].join('\n')
-      : content;
+    ) ?? '';
 
     if (this.state === 'uninitialized') {
       if (!this._spawnOpts) {
@@ -279,24 +284,42 @@ export class CodexProvider implements Provider {
       // We need the threadId for turn/start, but since we're pipelining,
       // we'll send turn/start after receiving thread/start response.
       // Store the pending message for later.
-      this._pendingMessage = effectiveContent;
+      this._pendingMessage = content;
+      this._pendingInstructions = compiledInstructions;
       return lines.join('\n') + '\n';
     }
 
     if (this.state === 'initializing') {
       // Still waiting for init — queue message
-      this._pendingMessage = effectiveContent;
+      this._pendingMessage = content;
+      this._pendingInstructions = compiledInstructions;
       return '';
     }
 
     // Ready state — send turn/start directly
-    return this.makeTurnStart(effectiveContent) + '\n';
+    return this.makeTurnStart(content, compiledInstructions) + '\n';
   }
 
-  private makeTurnStart(content: string): string {
+  private makeTurnStart(content: string, instructions: string): string {
     if (!this.threadId) {
       throw new Error('Codex thread is not ready yet');
     }
+
+    if ((instructions || this._hadInstructionOverlay) && !this._instructionsAdmitted) {
+      this._hadInstructionOverlay = true;
+      this._pendingMessage = content;
+      this._pendingInstructions = instructions;
+      this._instructionRequestId = this.nextId;
+      return this.makeRequest('thread/inject_items', {
+        threadId: this.threadId,
+        items: [{ type: 'message', role: 'developer', content: [{ type: 'input_text', text: [
+          'Cats Runtime instruction overlay for the next user turn only.',
+          'This replaces earlier Cats Runtime turn overlays; native base instructions still apply.',
+          instructions || 'There are no additional Cats Runtime instructions for this turn.',
+        ].join('\n\n') }] }],
+      });
+    }
+    this._instructionsAdmitted = false;
 
     const policy = this.resolvePermissionPolicy(this._spawnOpts);
     this._collectingUsage = true;
@@ -317,10 +340,10 @@ export class CodexProvider implements Provider {
 
   /** Returns a pending turn/start message if init completed, or null */
   getPendingTurnStart(): string | null {
-    if (this.state === 'ready' && this._pendingMessage !== null) {
-      const msg = this.makeTurnStart(this._pendingMessage) + '\n';
+    if (this.state === 'ready' && this._pendingMessage !== null && this._instructionRequestId === null) {
+      const content = this._pendingMessage;
       this._pendingMessage = null;
-      return msg;
+      return this.makeTurnStart(content, this._pendingInstructions) + '\n';
     }
     return null;
   }
@@ -332,7 +355,7 @@ export class CodexProvider implements Provider {
     return message;
   }
 
-  isSessionInitializing(): boolean { return this.state === 'initializing'; }
+  isSessionInitializing(): boolean { return this.state === 'initializing' || this._instructionRequestId !== null; }
 
   getPendingControlMessages(): string | null {
     const message = this._pendingControl;
@@ -611,6 +634,14 @@ export class CodexProvider implements Provider {
   }
 
   private handleResponse(msg: JsonRpcResponse): StreamEvent | null {
+    if (this._instructionRequestId !== null && msg.id === this._instructionRequestId) {
+      this._instructionRequestId = null;
+      if (msg.error || !msg.result || typeof msg.result !== 'object' || Array.isArray(msg.result)) {
+        return this.failBootstrap('Codex native instruction delivery failed. No model turn was started.');
+      }
+      this._instructionsAdmitted = true;
+      return null;
+    }
     if (this._nameRequestId !== null && msg.id === this._nameRequestId) {
       // Naming is metadata only. Failure cannot consume a turn or fail bootstrap.
       this._nameRequestId = null;

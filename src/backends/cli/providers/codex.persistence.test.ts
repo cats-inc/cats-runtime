@@ -8,6 +8,72 @@ const response = (id: number, thread: Record<string, unknown>) =>
   JSON.stringify({ jsonrpc: '2.0', id, result: { thread, ...permission } });
 
 describe('Codex native history lifetime and names', () => {
+  it('explicitly clears an earlier overlay on an empty cold-resume turn', () => {
+    const provider = new CodexProvider();
+    provider.buildSpawnArgs({ ...opts, resumeSessionId: 'saved' });
+    const boot = frames(provider.buildStdinMessage('plain'));
+    provider.parseStreamLine(response(boot.at(-1).id, { id: 'saved' }));
+    const inject = frames(provider.getPendingTurnStart()!)[0];
+    expect(inject.params.items[0].content[0].text).toContain('no additional Cats Runtime instructions');
+    provider.parseStreamLine(JSON.stringify({ id: inject.id, result: {} }));
+    expect(frames(provider.getPendingTurnStart()!)[0].params.input[0].text).toBe('plain');
+  });
+
+  it('rejects malformed native instruction acknowledgements', () => {
+    const provider = new CodexProvider();
+    provider.buildSpawnArgs(opts);
+    const boot = frames(provider.buildStdinMessage('plain', { message: 'plain', instructions: 'persona' }));
+    provider.parseStreamLine(response(boot.at(-1).id, { id: 'saved' }));
+    const inject = frames(provider.getPendingTurnStart()!)[0];
+    expect(provider.parseStreamLine(JSON.stringify({ id: inject.id, result: [] }))).toMatchObject({ type: 'error' });
+    expect(provider.getPendingTurnStart()).toBeNull();
+  });
+  it('keeps the first user message clean and replaces then clears ephemeral turn instructions without resume', () => {
+    const provider = new CodexProvider();
+    provider.buildSpawnArgs({ ...opts, providerSessionPersistence: 'ephemeral',
+      modelControls: { 'codex.reasoning_effort': 'high' } });
+    const bootstrap = frames(provider.buildStdinMessage('hello', {
+      message: 'hello', sessionInstructions: 'Persona', instructions: 'First scope',
+    }));
+    provider.parseStreamLine(JSON.stringify({ id: bootstrap.at(-1).id, result: {
+      thread: { id: 'job', ephemeral: true }, ...permission, model: 'effective-model', reasoningEffort: 'low',
+    } }));
+    const inject = frames(provider.getPendingTurnStart()!)[0];
+    expect(inject.method).toBe('thread/inject_items');
+    expect(inject.params.items[0].role).toBe('developer');
+    expect(inject.params.items[0].content[0].text).toContain('Persona\n\nFirst scope');
+    expect(provider.getPendingTurnStart()).toBeNull();
+    provider.parseStreamLine(JSON.stringify({ id: inject.id + 100, result: {} }));
+    expect(provider.getPendingTurnStart()).toBeNull();
+    provider.parseStreamLine(JSON.stringify({ id: inject.id, result: {} }));
+    const first = frames(provider.getPendingTurnStart()!)[0];
+    expect(first.params.input).toEqual([{ type: 'text', text: 'hello' }]);
+    expect(first.params).not.toHaveProperty('model');
+    expect(first.params).not.toHaveProperty('effort');
+    const second = frames(provider.buildStdinMessage('follow up', { message: 'follow up', instructions: 'Second scope' }));
+    expect(second).toHaveLength(1);
+    expect(second[0].method).toBe('thread/inject_items');
+    expect(second[0].params.threadId).toBe('job');
+    expect(second[0].params.items[0].content[0].text).toContain('Second scope');
+    provider.parseStreamLine(JSON.stringify({ id: second[0].id, result: {} }));
+    expect(frames(provider.getPendingTurnStart()!)[0].params.input[0].text).toBe('follow up');
+    const cleared = frames(provider.buildStdinMessage('plain'))[0];
+    expect(cleared.params.items[0].content[0].text).toContain('no additional Cats Runtime instructions');
+    provider.parseStreamLine(JSON.stringify({ id: cleared.id, result: {} }));
+    expect(frames(provider.getPendingTurnStart()!)[0].params.input[0].text).toBe('plain');
+  });
+
+  it('stops before a model turn when native instruction delivery is rejected', () => {
+    const provider = new CodexProvider();
+    provider.buildSpawnArgs(opts);
+    const boot = frames(provider.buildStdinMessage('hello', { message: 'hello', instructions: 'persona' }));
+    provider.parseStreamLine(response(boot.at(-1).id, { id: 'chat' }));
+    const inject = frames(provider.getPendingTurnStart()!)[0];
+    expect(provider.parseStreamLine(JSON.stringify({ id: inject.id, error: { message: 'unsupported' } })))
+      .toMatchObject({ type: 'error', text: expect.stringContaining('instruction delivery failed') });
+    expect(provider.getPendingTurnStart()).toBeNull();
+    expect(() => provider.buildStdinMessage('retry')).toThrow('bootstrap failed');
+  });
   it('admits ephemeral before the first turn and keeps a second turn on the same thread', () => {
     const provider = new CodexProvider();
     provider.buildSpawnArgs({ ...opts, providerSessionPersistence: 'ephemeral' });

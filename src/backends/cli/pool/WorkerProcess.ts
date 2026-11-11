@@ -353,15 +353,18 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
             catch (error) { child.kill('SIGTERM'); this.emit('error', error instanceof Error ? error : new Error(String(error))); return; }
             this._providerSessionId = event.sessionId;
           }
-          // If provider has pending messages after init, send them
-          if (event.type === 'init' && this.provider.getPendingTurnStart) {
-            const pending = this.provider.getPendingTurnStart();
-            if (pending) {
-              child.stdin!.write(pending);
-            }
-          }
           this.emit('event', event);
         }
+      }
+      // Admission acknowledgements can be silent control replies, not init
+      // events. Pump only what the adapter has admitted, and bound each stage.
+      try {
+        const pending = this.provider.getPendingTurnStart?.();
+        if (pending) child.stdin!.write(pending);
+        this.armBootstrapTimeout(child);
+      } catch {
+        this.emit('error', new Error('Provider pending-turn protocol failed.'));
+        this.cancel();
       }
     });
 
