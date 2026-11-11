@@ -102,7 +102,7 @@ global discovery or new native-ID import endpoint is needed for restart recovery
 | Compatible attachment; worker/Runtime restarted; record exists | Resume the same Runtime ID and native thread, with current host/MCP admission. |
 | Legacy closed/failed attachment, no terminal evidence | Probe the saved Runtime ID before replacement; state alone is insufficient evidence of loss. |
 | Timeout, unreachable Runtime, auth/policy error, or ambiguous failure | Preserve attachment and transcript; surface/back off under current product rules. No fresh session. |
-| Confirmed native provider_session_unavailable | Keep old history, replace once with an explicit handoff and notice; never respawn the terminal native ID. |
+| Confirmed native provider_session_unavailable, including Codex's archived thread/resume rejection | Keep old history and the user's archive choice; replace once with an explicit handoff and notice. Never unarchive automatically or respawn the terminal native ID. |
 | Authoritative missing Runtime record | Apply the existing bounded product handoff path; raw native-ID import remains outside this slice. |
 | Reset or incompatible provider/model/policy/config revision | Preserve existing deliberate fresh-session/retarget semantics and conversation isolation. |
 

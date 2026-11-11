@@ -242,7 +242,12 @@ the old session keep working. `POST /sessions/:id/reset` clears the marker
 together with the stale native id; with no native id left, nothing stale can be
 spawned, and later resume gives its ordinary answer. Recognized answers: Grok
 streaming JSON, Grok hosted ACP `session/resume`, Claude Code, and Codex
-app-server `thread/resume`. Other providers and methods (including hosted
+app-server `thread/resume`. Codex's exact JSON-RPC `-32600` archived-session
+rejection is also unavailable: Runtime preserves the user's archive choice and
+never runs `codex unarchive`. The caller continues in a new session from its
+own transcript. Only the matching resume bootstrap response is classified;
+thread/start, thread/fork, unrelated requests and auth/policy errors remain generic.
+Other providers and methods (including hosted
 `session/load`) stay ordinary `error` events without a code. A 410 without this
 code is the older "Worker process has exited" answer, after which the session
 can still be resumed. See

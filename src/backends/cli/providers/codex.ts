@@ -631,9 +631,9 @@ export class CodexProvider implements Provider {
     }
     if (msg.error) {
       const readBootstrapFailed = this.state === 'initializing' && this._readTools !== null;
-      const resumeMissing = msg.id === this._threadBootstrapId
+      const resumeUnavailable = msg.id === this._threadBootstrapId
         && Boolean(this._spawnOpts?.resumeSessionId) && !this._spawnOpts?.forkSession
-        && isCodexResumeMissing(msg.error);
+        && isCodexResumeUnavailable(msg.error);
       if (this.state === 'initializing') {
         this.state = 'failed';
         this._pendingMessage = null;
@@ -641,7 +641,7 @@ export class CodexProvider implements Provider {
       }
       this._readTurnId = null;
 
-      if (resumeMissing) {
+      if (resumeUnavailable) {
         return observeNormalized(this.evolutionObserver, {
           rawEventType: 'jsonrpc:error',
           rawSample: msg,
@@ -1305,11 +1305,15 @@ function normalizeAllowedToken(value: string | null | undefined): string {
 
 /**
  * Codex 0.167.0 app-server answers `thread/resume` for a thread it has no rollout
- * for with JSON-RPC error -32600 `no rollout found for thread id <id>`
- * (capture: codex-0.167.0/thread-resume-missing.error.redacted.ndjson).
+ * for with JSON-RPC error -32600 `no rollout found for thread id <id>`.
+ * An archived thread is also unavailable to resume: keep the user's archive
+ * choice and let the product continue from its own transcript in a new session.
  */
-export function isCodexResumeMissing(error: NonNullable<JsonRpcResponse['error']>): boolean {
-  return typeof error.message === 'string' && /\bno rollout found for thread id\b/iu.test(error.message);
+export function isCodexResumeUnavailable(error: NonNullable<JsonRpcResponse['error']>): boolean {
+  if (typeof error.message !== 'string') return false;
+  return /\bno rollout found for thread id\b/iu.test(error.message)
+    || error.code === -32600
+      && /^session (\S+) is archived\. Run `codex unarchive \1` to unarchive it first\.$/u.test(error.message.trim());
 }
 
 function formatJsonRpcError(error: NonNullable<JsonRpcResponse['error']>): string {
