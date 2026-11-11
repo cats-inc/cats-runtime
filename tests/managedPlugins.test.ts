@@ -59,6 +59,15 @@ describe('managed Plugin pilot', () => {
           message = provider.getPendingTurnStart()!;
         }
         const parsed = JSON.parse(message);
+        if (provider instanceof CodexProvider && withSkill) {
+          expect(parsed.method).toBe('thread/inject_items');
+          expect(parsed.params.items[0].role).toBe('developer');
+          expect(provider.getPendingTurnStart()).toBeNull();
+          provider.parseStreamLine(JSON.stringify({ id: parsed.id, result: {} }));
+          const userTurn = JSON.parse(provider.getPendingTurnStart()!);
+          expect(userTurn.params.input).toEqual([{ type: 'text', text }]);
+          return parsed.params.items[0].content[0].text;
+        }
         return provider instanceof CodexProvider ? parsed.params.input[0].text : parsed.message.content;
       }
       const enabled = makeProvider(); const ordinary = makeProvider();
