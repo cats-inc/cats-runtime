@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-11-11-process-argument-length-probe](2026-11-11-process-argument-length-probe.md) | Process argument length on native Windows | 32,000 characters start and 33,000 fail with ENAMETOOLONG under Node 26; six per-turn adapters pass the composed prompt as an argument; other launch paths unmeasured |
 | [2026-11-11-codex-session-list-pollution](2026-11-11-codex-session-list-pollution.md) | Native Catlas/Bot histories in ChatGPT Desktop | Read-only UI/index attribution, three updated source baselines, ephemeral/name protocol probes and completed Windows native/consumer acceptance |
 | [2026-11-02-copilot-catalog-refresh](2026-11-02-copilot-catalog-refresh.md) | Copilot CLI 1.0.105, Copilot Pro | Successful account read and complete 33-row picker, new Terra, confirmed Fusion Standard/balance mapping, fifteen selectable rows and focused validation |
 | [native-provider-host-protocols-2026-11-02](native-provider-host-protocols-2026-11-02.md) | Muse MSP, Grok ACP, Google ACP | Native Worker MCP/continuity, inherited permission ceilings, private grants, and Google ARM64 page-size blocker |

@@ -1,5 +1,11 @@
 # Architecture Decision Records (ADR)
 
+- [ADR-052: Offer text-only sessions only on evidence](052-offer-text-only-sessions-only-on-evidence.md)
+  — accepted, 2026-11-11; a fail-closed profile with no tools, MCP or native memory,
+  admitted per provider on its own report. Not implemented; research comes first.
+- [ADR-051: Carry one-turn context in its own send field](051-carry-one-turn-context-in-its-own-send-field.md)
+  — accepted, 2026-11-11; `turnContext` beside persisting `instructions`, with a capacity
+  check before anything starts. Not implemented.
 - [ADR-050: Separate provider session persistence from product history](050-separate-provider-session-persistence-from-product-history.md)
   — accepted, 2026-11-11; ephemeral internal jobs, persistent conversation identity
   and product-owned labels. Existing history remains intact.

@@ -4,13 +4,13 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Draft, 2026-11-11. Not approved; not implemented. Per-provider support depends on the research in this spec |
+| Status | Approved by the owner on 2026-11-11 with the recommended answers to its open questions. Not implemented. No provider is offered until the research in this spec qualifies it |
 | Owner | Runtime execution, with Bot as the first consumer |
-| Reviewer | Owner; independent security review before implementation |
+| Reviewer | Owner; independent read-only review completed on the draft, findings fixed. An independent security review is required before implementation |
 | Date | 2026-11-11 |
 | Baseline | Runtime fb50e59ab2244bd2c45ae93fa11345cb7507011c |
-| Decision | To be recorded as an ADR at approval |
-| Delivery | A plan follows approval; its first phase is the research below |
+| Decision | [ADR-052](../decisions/052-offer-text-only-sessions-only-on-evidence.md) |
+| Delivery | A plan follows; its first phase is the research below. None is authorized yet |
 | Requested by | Bot [SPEC-015](https://github.com/cats-inc/cats-bot/blob/main/docs/specs/SPEC-015-bot-memory-layers-recall-and-consolidation.md) FR-14 and [SPEC-012](https://github.com/cats-inc/cats-bot/blob/main/docs/specs/SPEC-012-boss-cat-status-board-and-contact-notes.md) FR-13 |
 
 ## Summary
@@ -21,8 +21,8 @@ context source is loaded. Consumers need it to run a model over text they do not
 needs it to consolidate memory from conversation transcripts and, later, for the status
 answers of SPEC-012.
 
-**No CLI adapter can do this today.** Every adapter either leaves tools in the model's
-toolset and refuses them at approval time, or cannot restrict them at all. This spec
+**No CLI adapter can do this today.** Every adapter leaves at least some tools available to
+the model, refuses them only at approval time, or cannot restrict them at all. This spec
 therefore defines the contract, a fail-closed admission, and the evidence a provider needs
 before Runtime may offer it. It does not promise that any particular provider will qualify.
 
@@ -31,13 +31,14 @@ before Runtime may offer it. It does not promise that any particular provider wi
 An audit at the baseline; file references are to `src/`. "Removed" means a tool is not in the
 model's toolset. "Denied" means it is advertised and refused when called.
 
-- **Tools are denied or unrestricted, never removed.**
+- **No adapter can remove all tools.**
   - **claude** selects a permission mode and an optional allow list; it passes no flag that
     empties the toolset (`backends/cli/providers/claude.ts`).
   - **codex** starts a thread with a sandbox and an approval policy
     (`codex.ts`, `codexPolicy.ts`). Its built-in tools are not exposed to Runtime
     (`codexInventory.ts`).
-  - **grok (per-turn)** passes `--tools <list>` and refuses an empty list.
+  - **grok (per-turn)** passes `--tools <list>`, which removes unlisted tools, and refuses
+    an empty list.
     - The adapter's own comment explains why: in live probes, plan, deny and
       disallowed-tools modes still executed tools.
     - Research `2026-08-08-grok-cli-install-tier-probe.md` found a non-empty allow list to
@@ -67,19 +68,30 @@ model's toolset. "Denied" means it is advertised and refused when called.
 - **The private directory exists, with a catch.** A session created without `cwd` runs in an
   empty `<sessionBaseDir>/<sessionId>`. A read-write sandbox forces permission mode `skip`,
   which is full-auto (`core/workspace/sessionWorkspace.ts`).
-- **What a provider reports before the first turn differs.**
-  - claude answers `mcp_status` without a turn, but emits its `system/init` tool list only
-    after the first user message.
+- **Create and send ignore unknown fields.** An older Runtime that receives a new create
+  field returns an ordinary session. In a private directory, that session is full-auto.
+- **A send can change a session.** `POST /sessions/:id/messages` accepts `mcpServers`,
+  `skills`, `context`, `outputDir`, routing and strategy fields
+  (`http/routes/messages.ts`). Create also accepts `browserIntegration`, which adds a browser
+  MCP server on claude.
+- **What a provider reports differs.**
+  - claude answers `mcp_status` without a turn. Its `system/init` arrives only after the
+    first user message and lists tools, MCP servers, skills, plugins, agents, slash commands
+    and memory paths. It does not list hooks.
   - codex reports MCP servers without a turn and does not report built-in tools.
   - Per-turn adapters put the prompt in the launch itself, so there is no moment before the
     first turn.
+- **Output is streamed as it arrives.** Each event is written to the client when it is
+  observed, and partial text is flushed to history on an error (`http/routes/messages.ts`).
 - **Ephemeral native sessions are verified for Codex only** (SPEC-041).
-- **Delete is already broad.**
+- **Delete is broad, with two gaps.**
   - `DELETE /sessions/:id` removes the sandbox, the Runtime transcript, and provider files
-    or native sessions for most adapters.
-  - It answers `retained`, with the paths, when removal was incomplete
-    (`http/routes/sessions.ts`).
-  - Whether metering, receipts and diagnostics hold prompt text has not been audited.
+    or native sessions for most adapters. It answers `retained`, with the paths, when file
+    removal was incomplete (`http/routes/sessions.ts`).
+  - It can still answer `deleted` when removing the sandbox directory failed.
+  - Native cleanup needs a known provider session id.
+  - Whether metering, receipts, diagnostics and provider-evolution raw samples
+    (`core/compatibility/providerEvolution.ts`) hold prompt text has not been audited.
 - **API backends can omit tools.**
   - An instance with `tool_profile` `none` or `chat` sends none
     (`core/tools/LocalToolRuntime.ts`).
@@ -97,12 +109,13 @@ model's toolset. "Denied" means it is advertised and refused when called.
 
 ## Goals
 
-- A consumer can run model turns over untrusted text and know that no tool executed and that
-  the session loaded no context beyond what the consumer sent.
+- A consumer can run model turns over untrusted text and know that no tool was available to
+  the model and that the session loaded no context beyond what the consumer sent.
 - Fail closed. A target that cannot establish this refuses the session before any content is
   sent. It is never downgraded to a restricted-but-tooled session.
-- The session can be deleted together with its content.
-- Runtime reports honestly how the guarantee was established and what remains outside it.
+- The session leaves no resumable native conversation, and can be deleted together with its
+  content.
+- Runtime reports honestly how each guarantee was established and what remains outside it.
 
 ## Non-goals
 
@@ -121,74 +134,108 @@ model's toolset. "Denied" means it is advertised and refused when called.
 - Session create gains an optional `sessionProfile`. Its only new value is `"text_only"`;
   omission keeps today's behaviour.
 - The choice is immutable. It appears in session reads, spawn options and stored records.
-- A text-only create accepts `provider`, `instance`, `model` and model selection,
-  `instructions`, `sessionLabel` and `providerSessionPersistence`.
-- It refuses, with a 400 and `code: "session_profile_invalid"`, any of: `cwd`, workspace
-  kind, access, mode or isolation, `permissionMode`, `allowedTools`, `executionPolicy`,
-  `interactionHost`, `mcpServers`, `skills`, `outputDir`, a session key for reuse, and peer
-  routing.
+- **A closed list for create.** A text-only create accepts only `provider`, `instance`,
+  `model`, `modelSelection`, `instructions`, `sessionLabel`, `group` and `correlation`. Any
+  other field is a 400 with `code: "session_profile_invalid"`. That includes the workspace
+  fields, permission fields, `executionPolicy`, `interactionHost`, `mcpServers`, `skills`,
+  `browserIntegration`, `providerSessionPersistence`, `context`, `outputDir`, strategy
+  fields, and `sessionKey` with `reusePolicy`.
+- **A closed list for sends.** A send to a text-only session accepts only `message`,
+  `instructions` and `turnContext` (SPEC-042). Any other field is the same 400.
+- **A closed list of routes.** A text-only session answers reads (the session, the list,
+  capabilities, history, observe, stream and lineage), `messages`, `close`, `cancel` and
+  `DELETE`. Every other session route refuses it with `code: "session_profile_invalid"`:
+  resume, fork in either direction, reset, compact and its follow-through, maintenance
+  follow-through, workspace cleanup, interaction responses, wakeups and discovery. The MCP
+  facade's equivalent tools follow the same lists.
 - A target that cannot offer the profile answers 400 with
   `code: "session_profile_unsupported"` before any provider process starts.
 - An instance with configured `args` is unsupported, as the quota probe already treats it,
   because such arguments can re-enable tools or plugins.
+- **The consumer's part.** An older Runtime ignores the field and returns an ordinary
+  session. A consumer must therefore:
+  - read the `textOnly` capability (R6) before it creates;
+  - confirm that the create readback says `sessionProfile: "text_only"` before it sends
+    anything;
+  - delete the session without sending if the readback is absent.
 
-### R2. Guarantees
+### R2. Guarantees and how each is established
+
+Each guarantee names its evidence class:
+
+- **Reported**: the provider's own report for this session shows it, and Runtime checks the
+  report in every session.
+- **Constructed**: Runtime controls it itself.
+- **Launch evidence**: captured fixtures show that the adapter's launch has this effect, for
+  something the provider does not report. It is not checked per session.
 
 For the life of a text-only session:
 
-1. **No tool can execute.** That covers built-in tools (file, command, web, memory,
-   subagent, browser), MCP tools, Runtime dynamic tools and provider-side connectors.
+1. **No tool is available to the model.** That covers built-in tools (file, command, web,
+   memory, subagent, browser), MCP tools, Runtime dynamic tools and provider-side
+   connectors. *Reported*, or *constructed* for API backends (R7).
 2. **No MCP server is attached**, from the session, from user, project or system
-   configuration, from account connectors, or from plugins.
+   configuration, from account connectors, or from plugins. *Reported*, or *constructed* for
+   API backends.
 3. **The workspace is private and empty.** Runtime creates `<sessionBaseDir>/<sessionId>`,
    writes nothing into it, and removes it on delete. The caller cannot choose it.
-4. **Runtime adds no skills, hydration metadata or workspace substrate.**
+   *Constructed.*
+4. **Runtime adds no skills, hydration metadata or workspace substrate.** *Constructed.*
 5. **No provider-native memory or instruction file is loaded**, at project or user level,
-   and the provider's automatic memory is neither read nor written.
-6. **No plugins, hooks, native skills, custom commands or subagents are loaded.**
-7. **No continuation.** The session does not resume a previous native session and cannot be
-   forked, woken, peer-routed or reused by session key.
-8. **The only inputs are the session `instructions` and each send's message, `instructions`
-   and `turnContext`** (SPEC-042).
+   and the provider's automatic memory is neither read nor written. *Reported* where the
+   provider reports loaded memory; otherwise *launch evidence*.
+6. **No plugins, native skills, custom commands or subagents are loaded.** *Reported* where
+   the provider lists them; otherwise *launch evidence*.
+7. **No hooks run.** *Launch evidence*; no provider reports them.
+8. **No continuation.** The session does not resume a previous native session, and the
+   routes of R1 refuse every way to continue it elsewhere. *Constructed.*
+9. **No resumable native conversation is left behind** (R5). *Reported* or *launch
+   evidence*, plus a check of the provider's store.
+10. **The only inputs are the session `instructions` and each send's `message`,
+    `instructions` and `turnContext`.** *Constructed.*
+
+An item whose evidence a target lacks makes that target unsupported. It is never reported as
+unknown.
 
 The profile overrides the legacy derivations that would otherwise apply: the
 sandbox-to-`skip` rule does not run, and no adapter passes a flag that approves tools.
 
 ### R3. Reported, not guaranteed
 
-The create readback and the capabilities read state what the guarantee does not cover:
+The create readback and the capabilities read state what the guarantees do not cover:
 
 - the provider's built-in system prompt;
 - organization-managed settings that a user-level launch cannot disable;
 - the inherited process environment, which the CLI can read and the model cannot;
 - provider-side retention of the conversation.
 
-An item of R2 whose state Runtime cannot establish is not reported as unknown. It makes the
-target unsupported (R4).
-
 ### R4. Admission and verification
 
-- A target is offered only with one of these mechanisms:
-  - `provider_report`: the provider's own report for this session shows an empty toolset,
-    no MCP server and no loaded memory, and Runtime checks it in every session;
+- A target is offered only with one of these mechanisms for guarantees 1 and 2:
+  - `provider_report`: the provider's own report for this session shows an empty toolset and
+    no MCP server;
   - `not_sent`: Runtime builds the provider request itself and sends no tool definitions
     (API backends, R7).
 - Refusing tools at approval time is not a mechanism. Denial has failed in probes, and some
   CLIs run read tools without asking.
-- Launch switches without a provider report are not a mechanism either. They are how an
-  adapter asks for the profile; the report is how Runtime knows it was honoured.
+- Launch switches alone are not a mechanism for guarantees 1 and 2. They are how an adapter
+  asks for the profile; the report is how Runtime knows it was honoured.
 - **Checks during the session:**
   - Whatever the provider can report without a turn is checked before the first send.
-  - The provider's first report in a turn is checked before any other event of that turn is
+  - The provider's first report in a turn is checked before anything else of that turn is
     accepted.
   - Any tool event, MCP status change, approval request, question or elicitation is a
     violation.
-- **On a violation**, Runtime does all of the following:
-  - kills the worker and discards the turn's output;
+- **Output is held, not streamed.** Runtime releases a turn's text to the client and to its
+  history only once the provider's terminal result arrives without a violation. Progress and
+  keep-alive events still flow.
+- **On a violation**, Runtime:
+  - kills the worker;
+  - releases none of the turn's text and writes none of it to history;
   - fails the turn with `code: "text_only_violation"`;
   - marks the session terminal.
-
-  A consumer must treat the turn as not having happened.
+- A violation is detected after the fact. A tool event means the tool already ran. The
+  guarantee rests on admission; the checks report a breach, they do not prevent one.
 - **Known limits by adapter class**, to be settled by the research below:
   - **claude**: MCP can be checked before the first send. The built-in tool list arrives
     only once the first user message has been sent, so the prompt reaches the provider
@@ -200,24 +247,32 @@ target unsupported (R4).
     their stream reports the toolset first and a zero-tool launch exists.
 - Support is granted per adapter by evidence, never by CLI version (ADR-035).
 
-### R5. Persistence and deletion
+### R5. No native conversation, and deletion
 
-- `providerSessionPersistence` defaults to `ephemeral` where the target supports it. An
-  explicit value follows SPEC-041's rules.
-- The lifecycle follows SPEC-041 R2: turns may continue in the live worker; after close,
-  cancellation, worker loss or a Runtime restart the session cannot run again and answers
-  410.
-- `DELETE /sessions/:id` removes:
+- **No resumable native conversation.** A target qualifies only if the provider keeps no
+  resumable native session for a text-only session: an ephemeral native session, or a launch
+  that does not persist one. After the first turn Runtime checks the provider's store for
+  the private directory and treats a native session file there as a violation.
+- A text-only create does not accept `providerSessionPersistence`. SPEC-041's default for
+  other sessions is unchanged.
+- **Stored record.** Runtime stores no resumable provider session id for a text-only
+  session. An older binary that reads the record finds a closed session with nothing to
+  resume.
+- **Lifecycle.** Turns may continue in the live worker. Once the worker ends, through close,
+  cancellation, loss, a violation or a Runtime restart, the session is terminal and answers
+  410, as SPEC-041's ephemeral sessions do.
+- **Delete.** `DELETE /sessions/:id` removes:
   - the private directory;
   - the Runtime transcript, including recorded instructions and turn context;
   - the registry entry with its previews, summary and label;
   - run inspection and receipts for the session;
-  - provider-native files or native sessions attributable to it.
-
-  It keeps the existing `deleted` and `retained` answers.
+  - any provider-native file found for the private directory, which only a violation can
+    leave behind.
+- For a text-only session, `deleted` means all of that is gone. A failure to remove the
+  private directory answers `retained`, which today it does not.
 - **Content-free residue.** After `deleted`, no prompt or response text of the session
-  remains in Runtime-owned storage, including diagnostics and logs. Metering keeps counts,
-  identifiers and times.
+  remains in Runtime-owned storage, including diagnostics, logs and provider-evolution raw
+  samples. Metering keeps counts, identifiers and times.
 - Runtime does not delete on close. The consumer deletes, and can find leftovers after a
   crash because session reads show the profile.
 - This remains a statement about the stores named here, not a data-erasure promise.
@@ -226,8 +281,9 @@ target unsupported (R4).
 
 - The target capability read (the `continuity` block of `GET /providers/config` and
   `GET /providers/:provider/tools`) gains, only where the profile is offered,
-  `textOnly: { version: 1, mechanism: "provider_report" | "not_sent", persistence: "ephemeral" | "delete" }`.
-- The create readback repeats the admitted profile and mechanism, and lists R3's items.
+  `textOnly: { version: 1, mechanism: "provider_report" | "not_sent" }`.
+- The create readback repeats the admitted profile and mechanism, names the evidence class
+  of each guarantee, and lists R3's items.
 - `GET /sessions/:id/capabilities` for a text-only session reports an empty inventory with
   its source.
 
@@ -239,8 +295,8 @@ target unsupported (R4).
 
 ### R8. Unchanged services
 
-- Metering, guardrails, timeouts, cancellation, streaming and usage records work as for any
-  session.
+- Metering, guardrails, timeouts, cancellation and usage records work as for any session.
+  Streaming differs as R4 states.
 - A text-only session counts against the session limit.
 
 ### R9. Compatibility
@@ -249,6 +305,7 @@ target unsupported (R4).
   current minor line.
 - The stored session record gains one optional field; a record without it is a standard
   session. The plan states whether this needs an upgrade step under the version policy.
+- Delete's stricter `retained` answer applies to text-only sessions only.
 - No version bump or publication is part of this spec.
 
 ## Research required
@@ -259,24 +316,29 @@ the user's real profile.
 
 1. **claude**
    - With the quota probe's switches, does a completed model turn report an empty toolset,
-     no MCP server and no memory paths, and does a prompt that asks for a tool produce none?
+     no MCP server, no skills, plugins or agents and no memory paths, and does a prompt that
+     asks for a tool produce none?
    - Does `system/init` always arrive before any tool execution in the first turn?
-   - Is user-level memory loaded under safe mode?
+   - Is user-level memory loaded under safe mode, and do hooks run?
+   - Is a native session file written with the no-persistence switch?
    - Does authentication behave as in a normal launch?
 2. **codex**
    - Can a thread be started with no tools, and can Runtime read the effective toolset?
    - What can the read-only sandbox read outside the working directory?
    - Can user-level instruction files be left out?
 3. **grok**: is there any launch with an empty toolset that the CLI honours and reports?
-4. **Other adapters a product can select**: the same three questions, recorded as supported
-   or unsupported with the evidence.
-5. **Runtime's own stores**: which of metering, receipts, inspection, diagnostics and logs
-   hold prompt or response text, for R5's residue requirement.
+4. **Other adapters a product can select**: the same questions, recorded as supported or
+   unsupported with the evidence.
+5. **Runtime's own stores**: which of metering, receipts, inspection, diagnostics, logs and
+   provider-evolution raw samples hold prompt or response text, for R5's residue
+   requirement.
 
 ## Consequences for consumers
 
 Not requirements on Runtime; listed so the owners can decide.
 
+- **Every consumer** must check the capability and the create readback before it sends
+  (R1). Against an older Runtime, an unchecked create yields a full-auto session.
 - **Bot consolidation** (SPEC-015 FR-14) runs only on targets that qualify.
   - Bot ADR-022 decision 6 keeps consolidation on the bot's own provider.
   - Until research finds a mechanism, bots on codex or grok would have no consolidation.
@@ -289,24 +351,29 @@ Not requirements on Runtime; listed so the owners can decide.
 ## Acceptance
 
 - **Refusals.**
-  - An unsupported target, an instance with `args`, and each excluded create field answer
-    with the typed 400.
-  - No provider process starts for any of them.
+  - An unsupported target and an instance with `args` answer with the typed 400.
+  - Each field outside the create and send lists, and each route outside the route list,
+    answers with the typed 400.
+  - No provider process starts for a refused create.
 - **A qualifying target.**
   - A turn whose prompt asks for file, command, web and MCP tools completes with text only.
-  - The readback and capabilities show the mechanism and an empty inventory.
-- **Violation.** A fixture in which the provider reports a tool, or emits a tool event, ends
-  with `text_only_violation`, a killed worker, a terminal session and no delivered output.
+  - The readback and capabilities show the mechanism, the evidence classes and an empty
+    inventory.
+- **Violation.** A fixture in which the provider reports a tool, or emits a tool event
+  after some text, ends with `text_only_violation`, a killed worker and a terminal session.
+  The client received none of the turn's text, and history holds none.
 - **Isolation.** In an isolated home that holds user-level memory, project memory, a
   configured MCP server, a plugin and a hook, none appears in the provider's report or
   affects the turn.
+- **No native conversation.** After a completed turn the provider's store holds no session
+  for the private directory.
 - **Lifecycle.**
-  - Resume, fork, wake, peer routing and session-key reuse are refused.
   - A Runtime restart leaves the session terminal.
+  - A stored text-only record holds no resumable provider session id.
 - **Deletion.**
   - After `deleted`, a canary placed in the instructions, the turn context, the message and
     the reply is found nowhere under the Runtime directory or the isolated provider home.
-  - `retained` names what is left.
+  - A private directory that cannot be removed answers `retained`, with the path.
 - **API backend.** No tool definitions are sent for any instance profile, and an instance
   with template tools is refused.
 - **Ordinary sessions** behave exactly as before.
@@ -320,10 +387,14 @@ Not requirements on Runtime; listed so the owners can decide.
 - **A read-only sandbox in an empty directory**, as today's internal jobs use.
   - Tools still exist, the account's MCP connectors still load, and how far such a sandbox
     reads is unverified.
+- **Keep a native conversation and delete it at the end.**
+  - More providers could qualify.
+  - A crash leaves untrusted text in a native session that a later tooled resume, or an
+    older binary's discovery, could pick up.
 - **A stateless completion endpoint** instead of a session profile.
   - It is simpler for single calls.
-  - It would duplicate streaming, cancellation, metering and deletion, and consolidation
-    needs several turns.
+  - It would duplicate cancellation, metering and deletion, and consolidation needs several
+    turns.
 - **Operating-system sandboxing of the CLI process.**
   - It is the strongest boundary.
   - It is specific to each platform and much larger than this change. It can be added later
@@ -335,17 +406,21 @@ Not requirements on Runtime; listed so the owners can decide.
 
 ## Open questions
 
-Each has a recommended default.
+All were answered on 2026-11-11 with the recommended options. The review of the draft
+refined three of them, as noted.
 
-- [ ] Field name and value. Recommended: `sessionProfile: "text_only"`.
-- [ ] Admitted mechanisms. Recommended: `provider_report` and `not_sent` only.
-- [ ] User-level native instruction files. Recommended: must not be loaded (R2 item 5),
-      because SPEC-012 FR-13 needs it. Reporting them instead is rejected.
-- [ ] First targets. Recommended: API backends, then claude if its research passes; codex
-      and grok after their research.
-- [ ] Delete on close. Recommended: no; the consumer deletes.
-- [ ] Whether a failed violation check may be retried on a fresh session automatically.
-      Recommended: no; the consumer decides.
+- [x] Field name and value: `sessionProfile: "text_only"`.
+- [x] Admitted mechanisms: `provider_report` and `not_sent` only, for tools and MCP.
+      Refined: launch evidence is accepted for what no provider reports, such as hooks (R2).
+- [x] User-level native instruction files must not be loaded (R2 item 5). User-level memory
+      can hold text from the owner's other conversations. Reporting them instead is
+      rejected.
+- [x] First targets: API backends, then claude if its research passes; codex and grok after
+      their research.
+- [x] No delete on close; the consumer deletes. Refined: a qualifying target keeps no
+      resumable native conversation in the first place (R5).
+- [x] A violation is never retried automatically on a fresh session; the consumer decides.
+      Refined: output is held until the turn ends, so a violated turn delivers nothing (R4).
 
 ## Dependencies and references
 

@@ -4,13 +4,13 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Draft, 2026-11-11. Not approved; not implemented |
+| Status | Approved by the owner on 2026-11-11 with the recommended answers to its open questions. Not implemented |
 | Owner | Runtime execution, with Bot and Platform consumer owners |
-| Reviewer | Owner; independent review before implementation |
+| Reviewer | Owner; independent read-only review completed on the draft, findings fixed |
 | Date | 2026-11-11 |
 | Baseline | Runtime fb50e59ab2244bd2c45ae93fa11345cb7507011c |
-| Decision | To be recorded as an ADR at approval |
-| Delivery | A plan follows approval |
+| Decision | [ADR-051](../decisions/051-carry-one-turn-context-in-its-own-send-field.md) |
+| Delivery | A plan follows; none is authorized yet |
 | Requested by | Bot [SPEC-015](https://github.com/cats-inc/cats-bot/blob/main/docs/specs/SPEC-015-bot-memory-layers-recall-and-consolidation.md) FR-6, FR-8 and FR-10, and [PLAN-014](https://github.com/cats-inc/cats-bot/blob/main/docs/plans/PLAN-014-bot-state-database-and-memory.md) P0 |
 
 ## Summary
@@ -30,10 +30,15 @@ Read at the baseline; file references are to `src/`.
 - **A send's `instructions` persists.** `POST /sessions/:id/messages` delivers the field as
   the top instruction layer and stores it as the session's instructions
   (`http/routes/messages.ts`; `docs/api.md` describes the order for message turns).
-- **Every turn re-sends the instruction layers.** Each adapter composes skills, session
-  instructions and turn instructions into the turn's prompt (`compileRuntimeTurnPrompt` in
-  `backends/cli/providers/prompt.ts`; inline envelopes in `codex.ts` and `pi.ts`; the API
-  and agent backend managers; `core/peers/PeerExecutionClient.ts`).
+- **Every turn re-sends the instruction layers.**
+  - CLI adapters compose skills, session instructions and turn instructions into the turn's
+    prompt (`compileRuntimeTurnPrompt` in `backends/cli/providers/prompt.ts`; inline
+    envelopes in `codex.ts` and `pi.ts`).
+  - API backends put the layers into the system prompt and rebuild the conversation from
+    Runtime's history on every turn (`backends/api/runtime/ApiBackendManager.ts`,
+    `backends/api/history.ts`).
+  - The agent backend's ACP adapter prepends the turn's instructions to the message itself
+    (`backends/agent/adapters/acp/AcpAdapter.ts`).
 - **An identical adjacent layer is dropped** (`mergeRuntimeInstructionLayers` in
   `core/skills/catalog.ts`). A turn-only text that happens to equal the session instructions
   would vanish if it went through that merge.
@@ -43,13 +48,21 @@ Read at the baseline; file references are to `src/`.
   Runtime gets no error.
 - **`context` is taken.** The existing `context` field is invocation metadata
   (`SessionInvocationContext`), not text for the provider.
+- **Session metadata is written early.** The route stores a send's `instructions` before it
+  checks whether the session is busy, has a worker, or is stopped by a guardrail.
 - **No size check exists.**
-  - The grok, antigravity and cursor adapters pass the whole composed prompt as a process
-    argument.
-  - Measured on Windows with Node 26: a 32,000-character argument starts, and a
-    33,000-character one fails with `ENAMETOOLONG`.
-  - The copilot adapter writes prompts over 2,000 characters to a temp file and tells the
-    model to read it, which needs a read tool.
+  - The grok, antigravity, cursor, muse, goose and cline per-turn adapters pass the whole
+    composed prompt as a process argument.
+  - How that argument travels also depends on the instance's runtime mode: native, WSL or
+    docker (`backends/cli/runtime/runtime.ts`).
+  - Measured on Windows with Node 26, native mode: a 32,000-character argument starts, and a
+    33,000-character one fails with `ENAMETOOLONG`
+    ([probe](../research/2026-11-11-process-argument-length-probe.md)).
+  - The copilot and auggie adapters write long prompts to a temp file, tell the model to
+    read it, and remove the file afterwards. That path needs a read tool.
+- **Other entry points do not carry instructions.** The ACP facade's `session/prompt`
+  forwards only the message and routing (`acp/server.ts`). Peers advertise providers and
+  targets, not features (`core/peers/PeerCapabilitySnapshotService.ts`).
 - **Consumers already work around this.**
   - Bot keeps its tool guidance out of turn instructions because Runtime persists them
     (`cats-bot/src/core/desktopControl/tools.ts`).
@@ -75,6 +88,7 @@ Read at the baseline; file references are to `src/`.
   that the Codex turn schema has none.
 - Moving session instructions out of the per-turn prompt.
 - Summarizing, truncating or interpreting the context. It is the consumer's text.
+- Carrying the field through the ACP facade or to peers (R6).
 - Removing the argument-length limit of every adapter. R4 makes the limit visible; lifting
   it is per-adapter follow-up work.
 
@@ -82,15 +96,17 @@ Read at the baseline; file references are to `src/`.
 
 ### R1. The field
 
-- `turnContext` is an optional string on every entry point that starts a turn with consumer
-  text: `POST /sessions/:id/messages` in both stream forms, the MCP `send_message` tool, and
-  peer-routed execution (R6). Wakeups send no consumer text and are unchanged.
+- `turnContext` is an optional string on `POST /sessions/:id/messages`, in both stream
+  forms, and on the MCP `send_message` tool. Wakeups send no consumer text and are
+  unchanged.
 - It is trimmed; empty means absent. A non-string value is a 400 with
   `code: "turn_context_invalid"`.
 - It may hold at most 100,000 Unicode code points. A longer value is a 400 with
   `code: "turn_context_too_large"` and the limit.
 - It applies to the execution that the send starts, including that execution's spawn
   retries, and to nothing else.
+- A send may carry both `instructions` and `turnContext`. `instructions` persists as today;
+  `turnContext` does not.
 
 ### R2. Not session state
 
@@ -107,7 +123,7 @@ Read at the baseline; file references are to `src/`.
 
 ### R3. Composition
 
-The composed prompt gains one section between the instructions and the message:
+CLI adapters gain one section between the instructions and the message:
 
 ```text
 Instructions:
@@ -121,32 +137,38 @@ User message:
 ```
 
 - The instructions section is omitted when there are no instruction layers, as today.
-- Without `turnContext` the composed prompt is byte-for-byte what it is today.
 - `turnContext` does not pass through `mergeRuntimeInstructionLayers`; it is never
   deduplicated against an instruction layer.
-- One shared composer produces the envelope. The inline copies in `codex.ts` and `pi.ts` use
-  it, and the API and agent backends deliver the same three parts in the same order within
-  that turn's user content.
+- One shared composer produces the envelope, and the inline copies in `codex.ts` and
+  `pi.ts` use it.
+- **API backends** keep instructions in the system prompt. The context is placed before that
+  turn's user text under the same heading. The conversation is rebuilt from history on every
+  turn, so each earlier turn is rebuilt with the context it was sent.
+- **The agent backend's ACP adapter** uses the same three parts in the same order where it
+  prepends instructions today.
+- On every backend, a send without `turnContext` produces exactly what it produces today.
 - Runtime does not fence or escape the text. A consumer that sends untrusted material fences
   it itself.
 
 ### R4. Capacity
 
-- Before a turn starts, Runtime measures the composed prompt against the limit the target's
-  adapter declares for its transport. Over the limit, the send is a 400 with
-  `code: "turn_input_too_large"`, the measured size and the limit.
-- The check runs before any session metadata is changed and before any process starts. A
-  refused send leaves the session exactly as it was.
+- The launch path decides how a prompt travels and what limit applies. A launch path is the
+  adapter, the instance's runtime mode (native, WSL or docker) and the platform.
+- Each adapter provides a side-effect-free measure: given a turn's input and the launch
+  path, it returns the size of what would be launched, in the unit that path limits, and the
+  limit, or none.
+- The route calls the measure before it writes any session metadata and before any process
+  starts. Over the limit, the send is a 400 with `code: "turn_input_too_large"`, the
+  measured size and the limit. The session is left exactly as it was, including its
+  instructions when the refused send carried some.
+- The refusal uses the actual arguments, with no safety margin. A send that starts today is
+  never refused.
 - The limit covers the whole composed prompt, because instructions, context and message
   share one transport.
-- An adapter that passes the prompt as a process argument declares a limit per platform.
-  - On Windows it must leave headroom under the measured 32,000 characters for the other
-    arguments.
-  - Limits for macOS and Linux are measured in the plan, not assumed.
-- An adapter whose transport has no practical limit (stdin or a protocol frame) declares
-  none.
-- The copilot adapter's temp-file path stays as it is and declares no limit. It depends on a
-  read tool, so it cannot serve a session without tools (SPEC-043).
+- A launch path with no practical limit (stdin or a protocol frame) declares none.
+- The copilot and auggie temp-file paths stay as they are and declare no limit. They depend
+  on a read tool, so they cannot serve a session without tools (SPEC-043).
+- Limits for launch paths other than native Windows are measured in the plan, not assumed.
 - Follow-up, outside this spec: move argument-passing adapters to stdin or a prompt file
   where the CLI supports one without a tool.
 
@@ -154,29 +176,36 @@ User message:
 
 - The target capability read (the `continuity` block of `GET /providers/config` and
   `GET /providers/:provider/tools`) gains
-  `turnContext: { version: 1, maxTurnInputChars: number | null }`. `null` means the adapter
-  declares no limit.
-- A consumer checks this before sending `turnContext`. An older Runtime has no such block
-  and would drop the field silently.
+  `turnContext: { version: 1, maxTurnInputChars: number | null }`.
+  - `maxTurnInputChars` counts UTF-16 code units of the composed prompt. It is a
+    conservative planning figure for that target's launch path; `null` means no declared
+    limit.
+  - A send above the figure is still accepted when the actual launch fits (R4).
+- A consumer checks this block before sending `turnContext`. An older Runtime has no such
+  block and would drop the field silently.
 - When a turn's context was delivered, the terminal `result` event and the run inspection
   (`inspection.lastRun`) carry `turnContextChars`. Consumers and tests can assert delivery
   from it.
 
-### R6. Peers
+### R6. Entry points that do not carry it
 
-- A peer-routed turn forwards `turnContext` with the turn.
-- A peer that does not advertise the capability cannot receive it. The send fails with the
-  existing typed peer-routing error; the context is never dropped silently.
+- **ACP facade.** `session/prompt` does not carry `turnContext`, as it does not carry
+  `instructions` today.
+- **Peers.** A send that asks for peer routing and carries `turnContext` is refused with a
+  400 and `code: "turn_context_unsupported"`. Peers do not advertise features, so Runtime
+  cannot know that a peer would deliver it. The context is never dropped silently.
 
 ### R7. Diagnostics and privacy
 
 - Logs, metrics and error payloads carry the context's length, never its text.
-- Runtime history is the only Runtime-owned place that stores the text (R2).
+- Runtime history stores the text (R2). Adapters that put a long prompt in a temp file hold
+  it there until the turn ends and must keep removing the file, as they do today.
 
 ### R8. Compatibility
 
-- The field, the capability block, `turnContextChars` and the three error codes are additive
-  within the current minor line. Existing requests and stored records are unchanged.
+- The field, the capability block, `turnContextChars`, the optional history field and the
+  four error codes are additive within the current minor line. Existing requests and stored
+  records are unchanged.
 - R4 turns a spawn failure into a typed refusal for prompts that could not have started. It
   does not refuse anything that works today.
 - No version bump or publication is part of this spec.
@@ -195,22 +224,27 @@ Not requirements on Runtime; listed so the owners can plan.
 
 ## Acceptance
 
-- **Delivery.** A send with `turnContext` reaches the provider with the three sections in
-  order. The next send without it carries the original session instructions and no context.
-  Covered per transport: persistent stdin (claude), protocol (codex, hosted ACP, muse MSP),
-  per-turn argument (grok), API backend.
+- **Delivery.** A send with `turnContext` reaches the provider with the parts in order. The
+  next send without it carries the original session instructions and no context. Covered per
+  transport: persistent stdin (claude), protocol (codex, hosted ACP, muse MSP), per-turn
+  argument (grok), API backend, agent ACP adapter.
+- **API replay.** On an API backend, a later turn's rebuilt conversation contains each
+  earlier turn's context exactly once, in that turn.
 - **No session change.** Session reads, inspection, `lastInputPreview`, resume and fork show
   no trace of a delivered context. Runtime history shows it on that turn only.
 - **No deduplication.** A context equal to the session instructions is still delivered.
-- **Unchanged without the field.** Composed prompts for existing fixtures are byte-identical.
-- **Capacity.** An over-limit send on an argument-passing adapter returns
-  `turn_input_too_large`, starts no process, and leaves `session.instructions` untouched even
-  when the send also carried `instructions`.
-- **Capability.** The block is present with the adapter's limit, and `turnContextChars`
+- **Unchanged without the field.** Composed prompts and API requests for existing fixtures
+  are identical.
+- **Capacity.**
+  - An over-limit send on an argument-passing launch path returns `turn_input_too_large`
+    and starts no process.
+  - `session.instructions` is untouched even when that send carried `instructions`.
+  - A send just under the actual limit starts.
+- **Capability.** The block is present with the target's figure, and `turnContextChars`
   appears on `result` and `lastRun` only when a context was delivered.
-- **Peers.** A capable peer receives it; an incapable peer makes the send fail with a typed
-  error.
-- **Privacy.** No log line or error body contains a canary placed in the context.
+- **Refusals.** A peer-routed send with a context returns `turn_context_unsupported`.
+- **Privacy.** No log line or error body contains a canary placed in the context, and no
+  temp prompt file outlives its turn.
 
 ## Alternatives considered
 
@@ -230,17 +264,16 @@ Not requirements on Runtime; listed so the owners can plan.
 
 ## Open questions
 
-Each has a recommended default.
+All were answered on 2026-11-11 with the recommended options:
 
-- [ ] Field name. Recommended: `turnContext`. `context` is already invocation metadata.
-- [ ] Whether history stores the text or only its length and a digest. Recommended: the
-      text, as for `instructions`, since history is the audit record and is deleted with the
-      session.
-- [ ] Maximum length. Recommended: 100,000 code points, well above Bot's 48,000-character
-      handoff ceiling.
-- [ ] Section heading. Recommended: `Context for this turn:`.
-- [ ] Whether to refuse `turnContext` on a target with no declared capacity instead of
-      trusting it. Recommended: no; refuse only what is known to be undeliverable.
+- [x] Field name: `turnContext`. `context` is already invocation metadata.
+- [x] History stores the text, as for `instructions`. History is the audit record and is
+      deleted with the session.
+- [x] Maximum length: 100,000 code points, well above Bot's 48,000-character handoff
+      ceiling.
+- [x] Section heading: `Context for this turn:`.
+- [x] A target with no declared capacity accepts `turnContext`. Runtime refuses only what is
+      known to be undeliverable.
 
 ## Dependencies and references
 
@@ -249,6 +282,7 @@ Each has a recommended default.
   (capability reads), [SPEC-035](SPEC-035-session-mcp-servers.md).
 - [ADR-012](../decisions/012-separate-evidence-memory-and-retrieval-layers.md) (evidence is
   Runtime's; memory is the product's).
+- [Process argument length probe](../research/2026-11-11-process-argument-length-probe.md).
 - Bot [ADR-022](https://github.com/cats-inc/cats-bot/blob/main/docs/decisions/022-give-each-bot-layered-memory-it-consolidates-while-asleep.md)
   and its [agent memory architecture survey](https://github.com/cats-inc/cats-bot/blob/main/docs/research/2026-11-11-agent-memory-architecture-survey.md).
 - [SPEC-043](SPEC-043-text-only-sessions.md), the second prerequisite from the same plan.
