@@ -875,6 +875,18 @@ selection/repair without launching provider work.
 | `POST /setup-operations` | Admit host work with `{expectedRevision, target, operationId?}`; returns `{operationId}` |
 | `DELETE /setup-operations/:operationId` | Release a completed host operation; returns `204` |
 
+OpenClaw selection targets accept an optional write-only `authToken` with an `endpoint`
+patch, or on its own: a non-empty string replaces the locally saved Gateway token, omission
+preserves it, and `null` explicitly clears it (including inherited values). Runtime persists
+`auth_token` in the private, atomically replaced provider configuration and applies the
+change live. POSIX files use mode `0600`. Environment-based authentication takes precedence
+and is not editable through this patch; externally configured auth headers/passwords also
+remain managed outside the form. Changing the Gateway URL origin requires explicitly
+replacing or clearing the saved token, and managed authentication cannot follow an edited
+origin. Selection/read models never return the value. `GET /setup-state` connection entries
+advertise `tokenConfigured` and `tokenEditable` booleans; hosts must require the latter's
+presence before accepting credential edits, rather than guessing support from a version.
+
 Hosts may supply a UUID `operationId` before admission so a lost response can
 still be released. Repeating admission for the same active ID/target is
 idempotent; reusing it for another target or after release returns a conflict.

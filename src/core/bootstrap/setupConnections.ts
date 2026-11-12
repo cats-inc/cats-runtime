@@ -10,6 +10,8 @@ export interface SetupConnection extends SelectedProviderTarget {
   endpoint: string;
   editable: boolean;
   source?: string;
+  tokenConfigured?: boolean;
+  tokenEditable?: boolean;
 }
 
 /** Expose only editable endpoint values, never resolved credentials or secret URLs. */
@@ -18,20 +20,27 @@ export function readSetupConnections(config: RuntimeConfig): SetupConnection[] {
   return configuredTargets(config).flatMap((target): SetupConnection[] => {
     const remote = target.remoteInstance;
     if (!remote || !['ollama', 'openclaw', 'openclaw_gateway'].includes(remote.transport ?? '')) return [];
+    const gateway = ['openclaw', 'openclaw_gateway'].includes(remote.transport ?? '');
+    const managedAuth = Boolean((remote.authTokenEnv && env[remote.authTokenEnv])
+      || (remote.passwordEnv && env[remote.passwordEnv])
+      || Object.keys(remote.headers ?? {}).some((name) => ['authorization', 'x-openclaw-token'].includes(name.toLowerCase())));
+    const identity = { ...selectedTarget(target), ...(gateway ? {
+      tokenConfigured: Boolean(remote.authToken || managedAuth), tokenEditable: !managedAuth,
+    } : {}) };
     const variable = remote.urlEnv && env[remote.urlEnv] ? remote.urlEnv
       : remote.baseUrlEnv && env[remote.baseUrlEnv] ? remote.baseUrlEnv : null;
-    if (variable) return [{ ...selectedTarget(target), endpoint: '', editable: false, source: `Managed by ${variable}` }];
+    if (variable) return [{ ...identity, endpoint: '', editable: false, source: `Managed by ${variable}` }];
     const endpoint = resolveRemoteEndpoint(remote, env) ?? '';
     if (endpoint) {
       try {
         const url = new URL(endpoint);
         if (url.username || url.password || url.search || url.hash) {
-          return [{ ...selectedTarget(target), endpoint: '', editable: false, source: 'Managed in Runtime configuration (contains private URL fields)' }];
+          return [{ ...identity, endpoint: '', editable: false, source: 'Managed in Runtime configuration (contains private URL fields)' }];
         }
-      } catch { return [{ ...selectedTarget(target), endpoint: '', editable: false, source: 'Repair this URL in Runtime configuration' }]; }
+      } catch { return [{ ...identity, endpoint: '', editable: false, source: 'Repair this URL in Runtime configuration' }]; }
     }
     const reference = remote.urlEnv || remote.baseUrlEnv;
-    return [{ ...selectedTarget(target), endpoint, editable: true,
+    return [{ ...identity, endpoint, editable: true,
       ...(reference ? { source: `${reference} overrides this fallback URL when set` } : {}) }];
   });
 }

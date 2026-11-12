@@ -739,7 +739,8 @@ Keep `.env` for runtime-wide values and secrets:
 - `AUGGIE_MAX_TURNS=50`
 - `PWSH_PATH=...`
 - `OPENCLAW_URL=ws://127.0.0.1:18789/ws`
-- `OPENCLAW_TOKEN=`
+- `OPENCLAW_TOKEN=` (advanced environment-managed deployments; Desktop users can instead
+  save the Gateway token in Settings → Runtime → AI tools → OpenClaw without editing dotenv)
 - `AGENT_SDK_URL=http://127.0.0.1:8082`
 - `AGENT_SDK_TOKEN=`
 

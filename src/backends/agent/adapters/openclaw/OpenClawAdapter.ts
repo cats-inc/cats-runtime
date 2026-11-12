@@ -138,7 +138,7 @@ function resolveHeaders(
   const headers: Record<string, string> = {
     ...(instance.headers || {}),
   };
-  const authToken = instance.authTokenEnv ? env[instance.authTokenEnv] : undefined;
+  const authToken = (instance.authTokenEnv ? env[instance.authTokenEnv] : undefined) || instance.authToken;
   if (authToken && !headers.authorization && !headers['x-openclaw-token']) {
     headers.authorization = `Bearer ${authToken}`;
   }
@@ -190,6 +190,7 @@ function buildInspection(
           kind: 'auth_token',
           configured: Boolean(
             (instance.authTokenEnv && env[instance.authTokenEnv])
+            || instance.authToken
             || headers?.authorization
             || headers?.['x-openclaw-token'],
           ),
@@ -222,7 +223,7 @@ function resolveAuth(
   instance: RemoteProviderInstanceConfig,
   env: NodeJS.ProcessEnv,
 ): { token?: string; password?: string } | undefined {
-  const authToken = instance.authTokenEnv ? env[instance.authTokenEnv] : undefined;
+  const authToken = (instance.authTokenEnv ? env[instance.authTokenEnv] : undefined) || instance.authToken;
   const password = instance.passwordEnv ? env[instance.passwordEnv] : undefined;
   if (!authToken && !password) {
     return undefined;

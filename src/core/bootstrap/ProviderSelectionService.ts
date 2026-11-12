@@ -19,6 +19,8 @@ export interface ProviderSelectionEntry extends SelectedProviderTarget {
   configuration?: Record<string, unknown>;
   /** Narrow endpoint edit; preserves authentication and other instance fields. */
   endpoint?: string;
+  /** Omitted preserves the saved token; null clears it. Never returned in snapshots. */
+  authToken?: string | null;
 }
 
 export interface ProviderSelectionSnapshot {
@@ -153,10 +155,16 @@ export function parseSelectionTargets(input: unknown): ProviderSelectionEntry[] 
     if (entry.endpoint !== undefined && typeof entry.endpoint !== 'string') {
       throw new ProviderSelectionError('Endpoint must be a URL string');
     }
+    if (entry.authToken !== undefined && entry.authToken !== null
+      && (typeof entry.authToken !== 'string' || !entry.authToken.trim()
+        || entry.authToken.length > 4096 || /[\x00-\x20\x7f]/u.test(entry.authToken))) {
+      throw new ProviderSelectionError('Gateway token must be a non-empty token without whitespace');
+    }
     const target: ProviderSelectionEntry = {
       provider: entry.provider, backend: entry.backend as BackendKind, instance: entry.instance,
       ...(entry.configuration ? { configuration: entry.configuration as Record<string, unknown> } : {}),
       ...(typeof entry.endpoint === 'string' ? { endpoint: entry.endpoint } : {}),
+      ...(entry.authToken !== undefined ? { authToken: entry.authToken as string | null } : {}),
     };
     const key = providerSelectionKey(target);
     if (seen.has(key)) throw new ProviderSelectionError('Duplicate selected target');
@@ -312,7 +320,7 @@ export class ProviderSelectionService {
     const currentKeys = new Set(configuredTargets(this.options.config).map((target) =>
       providerSelectionKey(selectedTarget(target))));
     for (const target of desired) {
-      if (target.endpoint !== undefined) {
+      if (target.endpoint !== undefined || target.authToken !== undefined) {
         if (target.configuration !== undefined) throw new ProviderSelectionError('Choose either endpoint or full configuration');
         const current = configuredTargets(this.options.config).find((value) => providerSelectionKey(selectedTarget(value)) === providerSelectionKey(target));
         const template = templateFor(target);
@@ -322,14 +330,35 @@ export class ProviderSelectionService {
         }
         const env = getRuntimeConfigEnv(this.options.config);
         const remote = current?.remoteInstance;
-        if ((remote?.urlEnv && env[remote.urlEnv]) || (remote?.baseUrlEnv && env[remote.baseUrlEnv])) {
+        const tokenEnv = remote?.authTokenEnv
+          ?? (typeof template?.auth_token_env === 'string' ? template.auth_token_env : undefined);
+        const managedAuth = Boolean((tokenEnv && env[tokenEnv]) || (remote?.passwordEnv && env[remote.passwordEnv])
+          || Object.keys(remote?.headers ?? {}).some((name) => ['authorization', 'x-openclaw-token'].includes(name.toLowerCase())));
+        if (target.endpoint !== undefined && ((remote?.urlEnv && env[remote.urlEnv]) || (remote?.baseUrlEnv && env[remote.baseUrlEnv]))) {
           throw new ProviderSelectionError('This endpoint is managed by an environment variable');
         }
-        let url: URL;
-        try { url = new URL(target.endpoint); } catch { throw new ProviderSelectionError('Enter a valid endpoint URL'); }
-        const protocols = transport === 'ollama' ? ['http:', 'https:'] : ['ws:', 'wss:'];
-        if (!protocols.includes(url.protocol) || url.username || url.password || url.search || url.hash) {
-          throw new ProviderSelectionError('Use a service URL without embedded credentials or query parameters');
+        if (target.endpoint !== undefined) {
+          let url: URL;
+          try { url = new URL(target.endpoint); } catch { throw new ProviderSelectionError('Enter a valid endpoint URL'); }
+          const protocols = transport === 'ollama' ? ['http:', 'https:'] : ['ws:', 'wss:'];
+          if (!protocols.includes(url.protocol) || url.username || url.password || url.search || url.hash) {
+            throw new ProviderSelectionError('Use a service URL without embedded credentials or query parameters');
+          }
+          if (current && ['openclaw', 'openclaw_gateway'].includes(String(transport)) && (remote?.authToken || managedAuth)) {
+            let previousOrigin: string | undefined;
+            try { previousOrigin = new URL(remote?.url ?? '').origin; } catch { /* No saved address. */ }
+            if (previousOrigin !== url.origin && (managedAuth || target.authToken === undefined)) {
+              throw new ProviderSelectionError('The Gateway address changed. Enter a token for this Gateway or explicitly clear the saved token.');
+            }
+          }
+        }
+        if (target.authToken !== undefined) {
+          if (!['openclaw', 'openclaw_gateway'].includes(String(transport))) {
+            throw new ProviderSelectionError('Only OpenClaw supports Gateway token editing');
+          }
+          if (managedAuth) {
+            throw new ProviderSelectionError('Gateway authentication is managed outside this form');
+          }
         }
         const providerPath = ['backends', target.backend, 'providers', target.provider];
         const path = current && !document.hasIn([...providerPath, 'instances'])
@@ -338,7 +367,8 @@ export class ProviderSelectionService {
         const endpointPath = document.hasIn([...path, 'connect']) ? [...path, 'connect'] : path;
         const field = transport === 'ollama' ? 'base_url' : 'url';
         if (field === 'base_url') document.deleteIn([...endpointPath, 'baseUrl']);
-        document.setIn([...endpointPath, field], target.endpoint);
+        if (target.endpoint !== undefined) document.setIn([...endpointPath, field], target.endpoint);
+        if (target.authToken !== undefined) document.setIn([...endpointPath, 'auth_token'], target.authToken);
         continue;
       }
       if (currentKeys.has(providerSelectionKey(target)) && target.configuration === undefined) continue;

@@ -6,6 +6,7 @@ import { parse } from 'yaml';
 import { loadConfig } from '../config.js';
 import { listProviderCatalog } from '../providerCatalog.js';
 import { ProviderSelectionService } from './ProviderSelectionService.js';
+import { readSetupConnections } from './setupConnections.js';
 import { BootstrapService } from './BootstrapService.js';
 import { ProviderModelCatalogService } from '../models/providerModelCatalog.js';
 import type { ProviderCompatibilityService } from '../compatibility/ProviderCompatibilityService.js';
@@ -94,6 +95,49 @@ describe('saving over a provider configuration it could not read', () => {
 });
 
 describe('provider intent and resource scope', () => {
+  it('saves, replaces, preserves and clears a Gateway token without returning it, including after restart', () => {
+    const f = fixture();
+    const save = (patch: Record<string, unknown>) => f.selection.save([{ ...openclaw, ...patch }], f.selection.getSnapshot().revision);
+    const snapshot = save({ endpoint: 'ws://127.0.0.1:18789', authToken: 'first-test-token' });
+    expect(JSON.stringify(snapshot)).not.toContain('first-test-token');
+    expect(readSetupConnections(f.config)[0]).toMatchObject({ tokenConfigured: true, tokenEditable: true });
+    expect(JSON.stringify(readSetupConnections(f.config))).not.toContain('first-test-token');
+    const restarted = loadConfig(createRuntimeTestEnv(f.root));
+    expect(listProviderCatalog(restarted).openclaw?.instances[0]?.remoteInstance?.authToken).toBe('first-test-token');
+    save({ endpoint: 'ws://127.0.0.1:18789/ws' });
+    expect(listProviderCatalog(f.config).openclaw?.instances[0]?.remoteInstance?.authToken).toBe('first-test-token');
+    const before = readFileSync(f.paths.configPath, 'utf8');
+    expect(() => save({ endpoint: 'ws://other.invalid:18789' })).toThrow('Gateway address changed');
+    expect(readFileSync(f.paths.configPath, 'utf8')).toBe(before);
+    save({ endpoint: 'ws://other.invalid:18789', authToken: 'replacement-test-token' });
+    expect(readFileSync(f.paths.configPath, 'utf8')).not.toContain('first-test-token');
+    save({ authToken: null });
+    expect(readSetupConnections(f.config)[0]?.tokenConfigured).toBe(false);
+    expect(listProviderCatalog(loadConfig(createRuntimeTestEnv(f.root))).openclaw?.instances[0]?.remoteInstance?.authToken).toBeUndefined();
+    expect(readFileSync(f.paths.configPath, 'utf8')).not.toContain('replacement-test-token');
+    if (process.platform !== 'win32') expect(statSync(f.paths.configPath).mode & 0o777).toBe(0o600);
+  });
+
+  it('clears an inherited token and rejects invalid tokens before changing disk', () => {
+    const f = fixture("backends: {agent: {providers: {openclaw: {transport: openclaw_gateway, auth_token: inherited-test-token, instances: {gateway: {url: 'ws://localhost:18789'}}}}}}\n");
+    for (const authToken of ['', 123, {}, 'bad\ntoken', 'x'.repeat(4097)]) {
+      const before = readFileSync(f.paths.configPath, 'utf8');
+      expect(() => f.selection.save([{ ...openclaw, authToken }], f.selection.getSnapshot().revision)).toThrow('Gateway token');
+      expect(readFileSync(f.paths.configPath, 'utf8')).toBe(before);
+    }
+    f.selection.save([{ ...openclaw, authToken: null }], f.selection.getSnapshot().revision);
+    expect(readSetupConnections(f.config)[0]?.tokenConfigured).toBe(false);
+  });
+
+  it('does not silently override token edits with environment authentication for a newly selected Gateway', () => {
+    const f = fixture();
+    const config = loadConfig({ ...createRuntimeTestEnv(f.root), OPENCLAW_TOKEN: 'managed-test-token' });
+    const selection = new ProviderSelectionService({ ...f, config });
+    expect(() => selection.save([{ ...openclaw, endpoint: 'ws://localhost:18789', authToken: 'ignored-test-token' }], 'missing'))
+      .toThrow('managed outside');
+    expect(existsSync(f.paths.configPath)).toBe(false);
+  });
+
   it.each(['url', 'base_url', 'connect'])('edits an endpoint without replacing auth or transport settings (%s)', (shape) => {
     const connection = shape === 'connect' ? "connect: {base_url: 'http://old.invalid:11434', headers: {X-Test: preserved}}"
       : `${shape}: 'http://old.invalid:11434'`;

@@ -46,6 +46,13 @@ File-backed providers still discover sessions from the host process, so their
 discovery paths are resolved as host filesystem paths rather than
 environment-relative guest paths.
 
+Gateway connection edits use the revision-checked provider-selection boundary. Hosts send
+OpenClaw tokens as write-only patches; Runtime stores them with their private instance
+configuration, atomically activates the change and uses it for Gateway authentication after
+restart. Public setup/diagnostic models expose capability and configured-status booleans,
+never the credential. Empty UI input preserves the value, explicit null clears inherited
+tokens, and changing the Gateway authority cannot silently forward an old credential.
+
 When no valid `providers.yaml` exists, the runtime enters **bootstrap mode**.
 In this mode the runtime starts a provider-first setup surface instead of the
 session-centric dashboard, and normal session/execution routes are blocked
