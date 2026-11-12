@@ -313,6 +313,25 @@ function createRetrySocketFactory(scenario: ConnectRetryScenario) {
 }
 
 describe('OpenClawAdapter', () => {
+  it('uses a locally saved token in the Gateway connect handshake without exposing it in inspection', async () => {
+    const frames: Array<Record<string, unknown>> = [];
+    const adapter = new OpenClawAdapter({ env: {}, webSocketFactory: () => {
+      const socket = new FakeOpenClawSocket();
+      const send = socket.send.bind(socket);
+      socket.send = (data) => { frames.push(JSON.parse(String(data))); send(data); };
+      return socket as unknown as WebSocket;
+    } });
+    const instance = { ...createInstance(), authToken: 'saved-test-token' };
+    const events = [];
+    for await (const event of adapter.invoke({ sessionId: 'token-test', sessionKey: 'token-test',
+      providerName: 'openclaw', instance, turn: { message: 'Check token' }, signal: new AbortController().signal })) {
+      events.push(event);
+    }
+    expect(events.some((event) => event.type === 'result')).toBe(true);
+    expect(frames.find((frame) => frame.method === 'connect')?.params).toMatchObject({ auth: { token: 'saved-test-token' } });
+    expect(JSON.stringify(adapter.inspect(instance))).not.toContain('saved-test-token');
+  });
+
   it('returns an unavailable probe result when the gateway closes before open without crashing the process', async () => {
     const adapter = new OpenClawAdapter({
       webSocketFactory: () => new FailingOpenClawSocket() as unknown as WebSocket,

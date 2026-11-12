@@ -83,6 +83,8 @@ export interface RemoteProviderInstanceConfig {
   systemPrompt?: string;
   apiKeyEnv?: string;
   authTokenEnv?: string;
+  /** Locally saved Gateway credential; never project into public read models. */
+  authToken?: string;
   passwordEnv?: string;
   baseUrl?: string;
   baseUrlEnv?: string;
@@ -1989,6 +1991,8 @@ function parseRemoteBackends(
             || readString(providerConnect?.apiKeyEnv)
             || readString(providerDoc.api_key_env)
             || readString(providerDoc.apiKeyEnv),
+          authToken: readString([instanceConnect?.auth_token, instanceDoc.auth_token,
+            providerConnect?.auth_token, providerDoc.auth_token].find((value) => value !== undefined)),
           authTokenEnv: readString(instanceConnect?.auth_token_env)
             || readString(instanceConnect?.authTokenEnv)
             || readString(instanceDoc.auth_token_env)
