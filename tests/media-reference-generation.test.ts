@@ -8,7 +8,7 @@ import path from 'node:path';
 import jpeg from 'jpeg-js';
 import { Hono } from 'hono';
 import { ImageGenerationService } from '../src/core/media/ImageGenerationService.js';
-import { MediaSourceStore, inspectVideo } from '../src/core/media/sources.js';
+import { MediaSourceStore, inspectVideo, resolveMediaTools } from '../src/core/media/sources.js';
 import { parseImageRequest } from '../src/core/media/contracts.js';
 import { loadImageProfiles } from '../src/core/media/profiles.js';
 import { validateImage, type ImageExecution } from '../src/backends/cli/media/imageExecution.js';
@@ -26,6 +26,43 @@ const request = (sourceIds: string[]) => ({ contractVersion: 3, id: randomUUID()
   profileRevision: '1', agentConfigId: 'grok-4.7-xhigh', operation: 'image.edit', prompt: 'same cat in Paris', sourceIds, options: {} });
 
 describe('reference media contract 3', () => {
+  it('starts without FFmpeg: images still work and a video source answers media_decoder_unavailable', async () => {
+    const missing = () => { throw Object.assign(new Error('Cannot find package'), { code: 'ERR_MODULE_NOT_FOUND' }); };
+    expect(resolveMediaTools(missing)).toEqual({ ffmpeg: null, ffprobe: null });
+    // A package without its downloaded binary counts as missing too.
+    expect(resolveMediaTools((name) => name === 'ffprobe-static' ? { path: '/no/such/ffprobe' } : '/no/such/ffmpeg'))
+      .toEqual({ ffmpeg: null, ffprobe: null });
+    const root = await fixture();
+    const sources = new MediaSourceStore(path.join(root, 'sources'), () => ({ ffmpeg: null, ffprobe: null }));
+    const image = await sources.put(randomUUID(), Buffer.from(picture()));
+    expect(image.kind).toBe('image');
+    const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypmp42'), Buffer.alloc(32)]);
+    await expect(sources.put(randomUUID(), mp4)).rejects.toMatchObject({ code: 'media_decoder_unavailable', status: 503 });
+    // ffprobe-static would exit the process on a platform it has no binary for, so it is never loaded there.
+    let loaded = 0;
+    expect(resolveMediaTools(() => { loaded++; return '/bin/ffmpeg'; }, 'freebsd')).toEqual({ ffmpeg: null, ffprobe: null });
+    expect(loaded).toBe(0);
+    // A bare command (FFMPEG_BIN=ffmpeg) is looked up on PATH when it runs.
+    expect(resolveMediaTools((name) => name === 'ffprobe-static' ? { path: 'ffprobe' } : 'ffmpeg', 'linux'))
+      .toEqual({ ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' });
+  });
+  it('offers and accepts no video generation without a decoder, before any provider run', async () => {
+    const root = await fixture(); let executions = 0;
+    const service = new ImageGenerationService({ root: path.join(root, 'receipts'), profiles: loadImageProfiles(), env: createRuntimeTestEnv(root),
+      supports: () => true, mediaTools: () => ({ ffmpeg: null, ffprobe: null }),
+      targets: () => [{ id: 'native', providerName: 'grok' as const, grokSessionsDir: root, commandConfig: { path: process.execPath, runner: 'direct' as const, runtime: { mode: 'native' as const } } }],
+      execute: async () => { executions++; throw new Error('must not run'); } });
+    const capabilities = service.capabilities();
+    expect(capabilities.profiles.some((profile) => profile.operation === 'video.generate')).toBe(false);
+    expect(capabilities.profiles.some((profile) => profile.operation === 'image.edit')).toBe(true);
+    const video = loadImageProfiles().find((profile) => profile.operation === 'video.generate')!;
+    const image = await service.sources.put(randomUUID(), Buffer.from(picture()));
+    await expect(service.submit({ ...request([image.id]), profileId: video.id, profileRevision: String(video.revision),
+      agentConfigId: video.agentConfig.id, operation: 'video.generate', options: { durationSeconds: 6 } }))
+      .rejects.toMatchObject({ code: 'media_decoder_unavailable', status: 503 });
+    expect(executions).toBe(0);
+    await service.close();
+  });
   it('uploads immutable bytes, passes exact references, completes once and recovers without another execution', async () => {
     const root = await fixture(); let executions = 0; let release!: () => void;
     const wait = new Promise<void>(resolve => { release = resolve; });

@@ -26,6 +26,14 @@ Decode locally without network protocols, bound time and bytes, and retain exact
 source/output hashes. These packages add binary distribution/notice obligations
 to release preparation; this implementation authorizes no release or version bump.
 
+Amendment (2026-11-12): the two packages are optional dependencies, resolved on
+first use. A host that does not ship them still starts and serves images and image
+references; a video source answers `media_decoder_unavailable` (503). Cats Desktop
+packages Runtime without them, because its Windows bundle does not carry Runtime's
+optional packages and shipping FFmpeg needs per-OS and per-architecture binaries
+and GPL-3.0 obligations for `ffmpeg-static`. Shipping them in Desktop is a separate
+release decision.
+
 No rewrite of existing receipts is needed. Schema-1 to schema-2 upgrade remains
 unchanged. New contract-3 receipts are read by new consumers only; do not downgrade
 a profile containing active v3 work to an older Runtime. Existing consumers are

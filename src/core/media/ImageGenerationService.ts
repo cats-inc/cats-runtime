@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, readdir, rename, rm, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { MediaSourceStore, MEDIA_MAX_BYTES } from './sources.js';
+import { MediaSourceStore, MEDIA_MAX_BYTES, mediaTools, type MediaTools } from './sources.js';
 import type { ProviderInstanceConfig } from '../../backends/cli/config.js';
 import type { ImageExecution, ImageExecutionResult } from '../../backends/cli/media/imageExecution.js';
 import {
@@ -19,6 +19,8 @@ export interface ImageServiceOptions {
   /** Collection-only recovery of a completed attempt that failed source validation. Never runs a CLI. */
   recover?: (input: ImageExecution) => Promise<ImageExecutionResult> | null;
   env: NodeJS.ProcessEnv;
+  /** The local decoders, resolved on first use; a host without them offers no video work. */
+  mediaTools?: () => MediaTools;
 }
 const STATUSES: ImageStatus[] = ['running', 'succeeded', 'failed', 'cancelling', 'cancelled', 'interrupted'];
 const imageFile = (job: Pick<ImageJob, 'output'>) => job.output?.mimeType === 'video/mp4' ? 'video.mp4' : job.output?.mimeType === 'image/png' ? 'image.png' : 'image.jpg';
@@ -48,12 +50,20 @@ export class ImageGenerationService {
   private tail: Promise<unknown> = Promise.resolve();
   private closing = false;
   readonly sources: MediaSourceStore;
-  constructor(private readonly options: ImageServiceOptions) { this.sources = new MediaSourceStore(path.join(options.root, 'sources')); }
+  constructor(private readonly options: ImageServiceOptions) {
+    this.sources = new MediaSourceStore(path.join(options.root, 'sources'), options.mediaTools ?? mediaTools);
+  }
+  /** A generated video is checked locally before it is accepted, so video work needs both decoders. */
+  private videoDecodable(): boolean {
+    const tools = (this.options.mediaTools ?? mediaTools)();
+    return Boolean(tools.ffmpeg && tools.ffprobe);
+  }
   /** The configured view: enabled profiles x supported configured instances. No CLI, sign-in or quota probe. */
   capabilities() {
     const targets: { id: string; provider: ImageProvider; instance: string }[] = [];
     const profiles = [];
-    for (const profile of this.options.profiles.filter((entry) => entry.enabled)) {
+    const video = this.videoDecodable();
+    for (const profile of this.options.profiles.filter((entry) => entry.enabled && (video || entry.operation !== 'video.generate'))) {
       const ids = this.options.targets(profile.provider).filter((target) => this.options.supports(profile.provider, target))
         .map((target) => ({ id: imageTargetId(profile.provider, target.id), provider: profile.provider, instance: target.id }));
       if (!ids.length) continue;
@@ -70,6 +80,8 @@ export class ImageGenerationService {
     const target = parseImageTargetId(input.targetId);
     const profile = this.options.profiles.find((entry) => entry.id === input.profileId);
     if (!target || !profile || !profile.enabled || profile.provider !== target.provider || profile.operation !== input.operation) throw new ImageError('image_profile_unavailable', 409);
+    // Refused before any provider run: without a decoder the generated video could not be accepted.
+    if (profile.operation === 'video.generate' && !this.videoDecodable()) throw new ImageError('media_decoder_unavailable', 503);
     // A request built against another catalog revision or configuration never silently runs this one.
     if (String(profile.revision) !== input.profileRevision || profile.agentConfig.id !== input.agentConfigId) throw new ImageError('image_profile_changed', 409);
     const instance = this.options.targets(target.provider).find((entry) => entry.id === target.instance);

@@ -20,3 +20,7 @@
 No version bump, provider-catalog refresh, publication or release is authorized.
 Before a later release, verify FFmpeg/FFprobe binary packaging, notices and target
 OS installations. Existing active v3 work must be drained before a downgrade.
+- 2026-11-12: FFmpeg/FFprobe became optional and are loaded on first use, after
+  Desktop's Windows bundle failed to start Runtime with a top-level `ffprobe-static`
+  import. Hosts without them answer video sources with `media_decoder_unavailable`;
+  Desktop does not ship them yet (ADR-053 amendment).
