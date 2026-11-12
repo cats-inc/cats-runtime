@@ -28,6 +28,8 @@ const generated = (): ImageExecutionResult => { const bytes = picture(); return 
 const request = (input: ImageExecution, fields: Record<string, unknown> = {}) => ({ id: input.id, targetId: 'grok/native', profileId: 'grok-generate',
   profileRevision: '1', agentConfigId: 'grok-4.7-xhigh', operation: 'image.generate', prompt: input.prompt, sourceIds: [], options: {}, ...fields });
 const serviceOptions = (root: string, input: ImageExecution, execute: (input: ImageExecution) => Promise<ImageExecutionResult>) => ({
+  // The decoders are installed here, as on a host that ships them; a host without them is tested in media-reference-generation.
+  mediaTools: () => ({ ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' }),
   root, profiles, targets: (provider: string) => provider === 'grok' ? [input.target] : [], supports: () => true,
   recover: (job: ImageExecution) => recoverGrokImage(job), env: input.env, execute });
 async function fixture() {

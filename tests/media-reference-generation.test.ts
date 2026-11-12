@@ -38,6 +38,30 @@ describe('reference media contract 3', () => {
     expect(image.kind).toBe('image');
     const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypmp42'), Buffer.alloc(32)]);
     await expect(sources.put(randomUUID(), mp4)).rejects.toMatchObject({ code: 'media_decoder_unavailable', status: 503 });
+    // ffprobe-static would exit the process on a platform it has no binary for, so it is never loaded there.
+    let loaded = 0;
+    expect(resolveMediaTools(() => { loaded++; return '/bin/ffmpeg'; }, 'freebsd')).toEqual({ ffmpeg: null, ffprobe: null });
+    expect(loaded).toBe(0);
+    // A bare command (FFMPEG_BIN=ffmpeg) is looked up on PATH when it runs.
+    expect(resolveMediaTools((name) => name === 'ffprobe-static' ? { path: 'ffprobe' } : 'ffmpeg', 'linux'))
+      .toEqual({ ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' });
+  });
+  it('offers and accepts no video generation without a decoder, before any provider run', async () => {
+    const root = await fixture(); let executions = 0;
+    const service = new ImageGenerationService({ root: path.join(root, 'receipts'), profiles: loadImageProfiles(), env: createRuntimeTestEnv(root),
+      supports: () => true, mediaTools: () => ({ ffmpeg: null, ffprobe: null }),
+      targets: () => [{ id: 'native', providerName: 'grok' as const, grokSessionsDir: root, commandConfig: { path: process.execPath, runner: 'direct' as const, runtime: { mode: 'native' as const } } }],
+      execute: async () => { executions++; throw new Error('must not run'); } });
+    const capabilities = service.capabilities();
+    expect(capabilities.profiles.some((profile) => profile.operation === 'video.generate')).toBe(false);
+    expect(capabilities.profiles.some((profile) => profile.operation === 'image.edit')).toBe(true);
+    const video = loadImageProfiles().find((profile) => profile.operation === 'video.generate')!;
+    const image = await service.sources.put(randomUUID(), Buffer.from(picture()));
+    await expect(service.submit({ ...request([image.id]), profileId: video.id, profileRevision: String(video.revision),
+      agentConfigId: video.agentConfig.id, operation: 'video.generate', options: { durationSeconds: 6 } }))
+      .rejects.toMatchObject({ code: 'media_decoder_unavailable', status: 503 });
+    expect(executions).toBe(0);
+    await service.close();
   });
   it('uploads immutable bytes, passes exact references, completes once and recovers without another execution', async () => {
     const root = await fixture(); let executions = 0; let release!: () => void;

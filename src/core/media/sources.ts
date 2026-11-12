@@ -15,11 +15,20 @@ import { validateImage, stopProcessTree } from '../../backends/cli/media/imageEx
  */
 export interface MediaTools { ffmpeg: string | null; ffprobe: string | null }
 
-export function resolveMediaTools(load: (name: string) => unknown = createRequire(import.meta.url)): MediaTools {
+/** ffprobe-static exits the process on a platform it has no binary for, so it is never loaded there. */
+const DECODER_PLATFORMS = new Set<NodeJS.Platform>(['darwin', 'linux', 'win32']);
+
+export function resolveMediaTools(
+  load: (name: string) => unknown = createRequire(import.meta.url),
+  platform: NodeJS.Platform = process.platform,
+): MediaTools {
+  if (!DECODER_PLATFORMS.has(platform)) return { ffmpeg: null, ffprobe: null };
   const binary = (name: string, pick: (loaded: unknown) => unknown): string | null => {
     try {
       const value = pick(load(name));
-      return typeof value === 'string' && value && existsSync(value) ? value : null;
+      if (typeof value !== 'string' || !value) return null;
+      // A bare command (FFMPEG_BIN=ffmpeg) is looked up on PATH when it runs; a path must exist.
+      return !/[\\/]/.test(value) || existsSync(value) ? value : null;
     } catch {
       return null;
     }
