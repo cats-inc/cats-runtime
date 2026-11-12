@@ -8,7 +8,7 @@ import path from 'node:path';
 import jpeg from 'jpeg-js';
 import { Hono } from 'hono';
 import { ImageGenerationService } from '../src/core/media/ImageGenerationService.js';
-import { MediaSourceStore, inspectVideo } from '../src/core/media/sources.js';
+import { MediaSourceStore, inspectVideo, resolveMediaTools } from '../src/core/media/sources.js';
 import { parseImageRequest } from '../src/core/media/contracts.js';
 import { loadImageProfiles } from '../src/core/media/profiles.js';
 import { validateImage, type ImageExecution } from '../src/backends/cli/media/imageExecution.js';
@@ -26,6 +26,19 @@ const request = (sourceIds: string[]) => ({ contractVersion: 3, id: randomUUID()
   profileRevision: '1', agentConfigId: 'grok-4.7-xhigh', operation: 'image.edit', prompt: 'same cat in Paris', sourceIds, options: {} });
 
 describe('reference media contract 3', () => {
+  it('starts without FFmpeg: images still work and a video source answers media_decoder_unavailable', async () => {
+    const missing = () => { throw Object.assign(new Error('Cannot find package'), { code: 'ERR_MODULE_NOT_FOUND' }); };
+    expect(resolveMediaTools(missing)).toEqual({ ffmpeg: null, ffprobe: null });
+    // A package without its downloaded binary counts as missing too.
+    expect(resolveMediaTools((name) => name === 'ffprobe-static' ? { path: '/no/such/ffprobe' } : '/no/such/ffmpeg'))
+      .toEqual({ ffmpeg: null, ffprobe: null });
+    const root = await fixture();
+    const sources = new MediaSourceStore(path.join(root, 'sources'), () => ({ ffmpeg: null, ffprobe: null }));
+    const image = await sources.put(randomUUID(), Buffer.from(picture()));
+    expect(image.kind).toBe('image');
+    const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypmp42'), Buffer.alloc(32)]);
+    await expect(sources.put(randomUUID(), mp4)).rejects.toMatchObject({ code: 'media_decoder_unavailable', status: 503 });
+  });
   it('uploads immutable bytes, passes exact references, completes once and recovers without another execution', async () => {
     const root = await fixture(); let executions = 0; let release!: () => void;
     const wait = new Promise<void>(resolve => { release = resolve; });
