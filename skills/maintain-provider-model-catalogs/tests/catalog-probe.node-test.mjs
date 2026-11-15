@@ -25,6 +25,7 @@ import {
   claudeChangelogSignals,
   parseAgyModels,
   parseAuggieModelList,
+  parseKimiProviderList,
   parseClineProviderBlock,
   parseCodexDebugModels,
   parseCursorListModels,
@@ -136,6 +137,21 @@ test('kiro, auggie and devin JSON projections', () => {
     registryAvailable: false,
     defaultModelId: 'a',
   });
+
+  assert.deepEqual(parseKimiProviderList(JSON.stringify({
+    providers: { 'managed:kimi-code': { type: 'kimi', apiKey: 'secret', oauth: { key: 'secret' } } },
+    models: {
+      'kimi-code/k3': { provider: 'managed:kimi-code', model: 'k3', maxContextSize: 1048576, displayName: 'K3',
+        supportEfforts: ['low', 'high', 'max'], defaultEffort: 'high' },
+      'kimi-code/fast': { provider: 'managed:kimi-code', model: 'fast', displayName: 'Fast' },
+      'custom/model': { provider: 'custom', model: 'm', displayName: 'Mine' },
+    },
+  })), [
+    { id: 'kimi-code/k3', label: 'K3', evidence: { model: 'k3', maxContextSize: 1048576,
+      supportEfforts: ['low', 'high', 'max'], defaultEffort: 'high' } },
+    { id: 'kimi-code/fast', label: 'Fast', evidence: { model: 'fast' } },
+  ]);
+  assert.throws(() => parseKimiProviderList('{"providers": {}}'), (error) => error instanceof SourceFailure && error.reason === 'parse');
 
   assert.deepEqual(parseDevinModelsList(JSON.stringify({
     families: [{ family_uid: 'ex', family_label: 'Ex', variants: [

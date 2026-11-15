@@ -197,6 +197,7 @@ export interface CliRuntimeConfig {
   goosePath: string;
   juniePath: string;
   piPath: string;
+  kimiPath: string;
   kiloServerHost: string;
   kiloServerPort: number;
   kiloServerStartupTimeoutMs: number;
@@ -477,6 +478,7 @@ export function loadConfig(
     kiloPath: configured.providerCommands.kilo.path,
     opencodePath: configured.providerCommands.opencode.path,
     piPath: configured.providerCommands.pi.path,
+    kimiPath: configured.providerCommands.kimi.path,
     goosePath: configured.providerCommands.goose.path,
     juniePath: configured.providerCommands.junie.path,
     kiloServerHost: configured.kiloServerHost,
@@ -702,6 +704,7 @@ function buildLegacyRuntimeShape(
     kilo: 'native',
     goose: 'native',
     pi: 'native',
+    kimi: 'native',
     junie: 'native',
     kiro: 'native',
     grok: 'native',
@@ -858,6 +861,13 @@ function buildLegacyRuntimeShape(
         piSessionsDir: env.PI_SESSIONS_DIR || defaultPiSessionsDir(),
       },
     },
+    kimi: {
+      native: {
+        id: 'native',
+        providerName: 'kimi',
+        commandConfig: providerCommands.kimi,
+      },
+    },
     goose: {
       native: {
         id: 'native',
@@ -923,6 +933,7 @@ function buildLegacyProviderCommands(
   const kiloPath = env.KILO_PATH || 'kilo';
   const opencodePath = env.OPENCODE_PATH || 'opencode';
   const piPath = env.PI_PATH || 'pi';
+  const kimiPath = env.KIMI_PATH || 'kimi';
   const goosePath = env.GOOSE_PATH || 'goose';
   const juniePath = env.JUNIE_PATH || 'junie';
 
@@ -1009,6 +1020,12 @@ function buildLegacyProviderCommands(
       'PI',
       piPath,
       defaultProviderRuntimeMode('pi'),
+      env,
+    ),
+    kimi: readProviderCommandConfig(
+      'KIMI',
+      kimiPath,
+      defaultProviderRuntimeMode('kimi'),
       env,
     ),
     goose: readProviderCommandConfig(
@@ -1799,6 +1816,7 @@ function cloneProviderCommands(
     kilo: cloneProviderCommandConfig(commands.kilo),
     opencode: cloneProviderCommandConfig(commands.opencode),
     pi: cloneProviderCommandConfig(commands.pi),
+    kimi: cloneProviderCommandConfig(commands.kimi),
     goose: cloneProviderCommandConfig(commands.goose),
     junie: cloneProviderCommandConfig(commands.junie),
   };
@@ -1822,6 +1840,7 @@ function cloneProviderInstances(
     kilo: cloneInstanceMap(instances.kilo),
     opencode: cloneInstanceMap(instances.opencode),
     pi: cloneInstanceMap(instances.pi),
+    kimi: cloneInstanceMap(instances.kimi),
     goose: cloneInstanceMap(instances.goose),
     junie: cloneInstanceMap(instances.junie),
   };

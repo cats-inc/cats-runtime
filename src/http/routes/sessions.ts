@@ -78,6 +78,7 @@ import {
   getGooseNative,
   getKiloNative,
   getKiroNative,
+  getKimiNative,
   getOpencodeNative,
   getAuggieSessions,
   getClaudeProjectsDir,
@@ -453,6 +454,10 @@ async function listManualDiscoverySessions(
       });
     case 'goose':
       return getGooseNative(ctx, target.instanceId).listAllSessions();
+    case 'kimi':
+      return getKimiNative(ctx, target.instanceId).listAllSessions({
+        startIfNeeded: true,
+      });
   }
 }
 
@@ -2052,6 +2057,7 @@ function tracksNativeSessionState(session: SessionInfo): boolean {
     && (session.providerName === 'cursor'
       || session.providerName === 'goose'
       || session.providerName === 'kiro'
+      || session.providerName === 'kimi'
       || session.providerName === 'kilo'
       || session.providerName === 'opencode'),
   );
@@ -2078,6 +2084,26 @@ async function deleteNativeSessionState(
       const kiroNative = getKiroNative(ctx, session.providerInstanceId);
       await kiroNative.deleteSession(session.providerSessionId);
       const remaining = await kiroNative.listSessions(
+        session.cwd,
+        { startIfNeeded: false },
+      );
+      return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
+    }
+
+    if (session.providerName === 'kimi') {
+      // Kimi's own ACP delete keeps its index, file history and journal consistent.
+      const kimiNative = getKimiNative(ctx, session.providerInstanceId);
+      try {
+        await kimiNative.deleteSession(session.providerSessionId);
+      } catch (error) {
+        // An uninstalled or failing kimi leaves the session in its store; the
+        // check below then retains the Runtime session instead of losing it.
+        console.warn(
+          `[sessions] Kimi could not delete native session '${session.providerSessionId}': `
+          + `${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      const remaining = await kimiNative.listSessions(
         session.cwd,
         { startIfNeeded: false },
       );

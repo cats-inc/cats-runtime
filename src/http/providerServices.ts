@@ -4,6 +4,7 @@ import {
 } from '../backends/cli/config.js';
 import type { ProviderName } from '../backends/cli/providers/types.js';
 import { resolveFileBackedProviderPath } from '../backends/cli/providerPaths.js';
+import { KimiNativeSessionService } from '../backends/cli/kimi/KimiNativeSessionService.js';
 import type { AppContext } from './app.js';
 
 export function getCursorNative(ctx: AppContext, instanceId?: string) {
@@ -34,6 +35,16 @@ export function getKiroNative(ctx: AppContext, instanceId?: string) {
     ctx.resolveKiroNative,
     ctx.kiroNative,
   );
+}
+
+export function getKimiNative(ctx: AppContext, instanceId?: string): KimiNativeSessionService {
+  if (ctx.resolveKimiNative) return ctx.resolveKimiNative(instanceId);
+  const defaultInstanceId = getProviderDefaultInstanceId(ctx.config, 'kimi');
+  if (ctx.kimiNative && (!instanceId || instanceId === defaultInstanceId)) return ctx.kimiNative;
+  // Hand-built contexts without a resolver read the configured instance directly.
+  return new KimiNativeSessionService({
+    commandConfig: resolveProviderInstance(ctx.config, 'kimi', instanceId).commandConfig,
+  });
 }
 
 export function getKiloNative(ctx: AppContext, instanceId?: string) {

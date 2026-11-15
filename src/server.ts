@@ -51,6 +51,8 @@ import {
 } from './backends/cli/discovery/wslDiscovery.js';
 import { CursorNativeSessionService } from './backends/cli/cursor/CursorNativeSessionService.js';
 import { KiroNativeSessionService } from './backends/cli/kiro/KiroNativeSessionService.js';
+import { KimiNativeSessionService } from './backends/cli/kimi/KimiNativeSessionService.js';
+import { getKimiNative } from './http/providerServices.js';
 import { KiloNativeSessionService } from './backends/cli/kilo/KiloNativeSessionService.js';
 import { OpencodeNativeSessionService } from './backends/cli/opencode/OpencodeNativeSessionService.js';
 import { createRuntimeAdapter } from './backends/cli/runtime/runtime.js';
@@ -319,6 +321,8 @@ export function createDiscoveryController(
       ctx.resolveKiroNative,
       ctx.kiroNative,
     );
+  const resolveKimiNative = (instanceId?: string): KimiNativeSessionService =>
+    getKimiNative(ctx, instanceId);
   const resolveKiloNative = (instanceId?: string): KiloNativeSessionService =>
     resolveContextService(
       ctx.config,
@@ -537,7 +541,7 @@ export function createDiscoveryController(
   const dockerDiscoveryPolicy = ctx.config.dockerDiscoveryPolicy ?? 'if_running';
 
   const shouldSkipBackgroundDockerDiscovery = (
-    provider: 'cursor' | 'goose' | 'kiro' | 'kilo' | 'opencode',
+    provider: 'cursor' | 'goose' | 'kiro' | 'kilo' | 'opencode' | 'kimi',
     instanceId: string,
   ): boolean => {
     if (dockerDiscoveryPolicy !== 'manual_only') {
@@ -549,7 +553,7 @@ export function createDiscoveryController(
   };
 
   const shouldSkipBackgroundWslDiscovery = (
-    provider: 'cursor' | 'goose' | 'kiro' | 'kilo' | 'opencode',
+    provider: 'cursor' | 'goose' | 'kiro' | 'kilo' | 'opencode' | 'kimi',
     instanceId: string,
   ): boolean => {
     if (
@@ -570,7 +574,7 @@ export function createDiscoveryController(
   };
 
   const startNativeDiscovery = (
-    name: 'cursor' | 'goose' | 'kiro' | 'kilo' | 'opencode',
+    name: 'cursor' | 'goose' | 'kiro' | 'kilo' | 'opencode' | 'kimi',
     instanceId: string,
     listAllSessions: () => Promise<Array<{
       providerSessionId: string;
@@ -590,7 +594,9 @@ export function createDiscoveryController(
           ? 'Kiro'
           : name === 'kilo'
             ? 'Kilo'
-            : 'OpenCode';
+            : name === 'kimi'
+              ? 'Kimi'
+              : 'OpenCode';
     const discoveryLabel = instanceId === getProviderDefaultInstanceId(ctx.config, name)
       ? name
       : `${name}@${instanceId}`;
@@ -766,6 +772,16 @@ export function createDiscoveryController(
         if (timer) timers.push(timer);
       }
 
+      // Natively the store is read from disk; WSL and Docker run `kimi session list`.
+      for (const instance of listProviderInstances(ctx.config, 'kimi')) {
+        const timer = startNativeDiscovery(
+          'kimi',
+          instance.id,
+          () => resolveKimiNative(instance.id).listAllSessions({ startIfNeeded: false }),
+        );
+        if (timer) timers.push(timer);
+      }
+
       for (const instance of listProviderInstances(ctx.config, 'opencode')) {
         const timer = startNativeDiscovery(
           'opencode',
@@ -844,6 +860,12 @@ export function createRuntimeServer(
       }),
     ]),
   );
+  const kimiNativeByInstance = new Map(
+    listProviderInstances(config, 'kimi').map((instance) => [
+      instance.id,
+      new KimiNativeSessionService({ commandConfig: instance.commandConfig }),
+    ]),
+  );
   const gooseNativeByInstance = new Map(
     listProviderInstances(config, 'goose').map((instance) => [
       instance.id,
@@ -889,6 +911,8 @@ export function createRuntimeServer(
     resolveServiceForInstance(config, 'kiro', instanceId, kiroNativeByInstance);
   const resolveKiloNative = (instanceId?: string): KiloNativeSessionService =>
     resolveServiceForInstance(config, 'kilo', instanceId, kiloNativeByInstance);
+  const resolveKimiNative = (instanceId?: string): KimiNativeSessionService =>
+    resolveServiceForInstance(config, 'kimi', instanceId, kimiNativeByInstance);
   const resolveOpencodeNative = (instanceId?: string): OpencodeNativeSessionService =>
     resolveServiceForInstance(config, 'opencode', instanceId, opencodeNativeByInstance);
 
@@ -924,6 +948,12 @@ export function createRuntimeServer(
     () => new GooseNativeSessionService({
       command: config.goosePath,
     }),
+  );
+  const kimiNative = getDefaultService(
+    config,
+    'kimi',
+    kimiNativeByInstance,
+    () => new KimiNativeSessionService({ commandConfig: config.providerCommands.kimi }),
   );
   const kiloNative = getDefaultService(
     config,
@@ -1051,6 +1081,7 @@ export function createRuntimeServer(
     cursorNative,
     gooseNative,
     kiroNative,
+    kimiNative,
     kiloNative,
     auggieSessions,
     opencodeNative,
@@ -1071,6 +1102,7 @@ export function createRuntimeServer(
     resolveCursorNative,
     resolveGooseNative,
     resolveKiroNative,
+    resolveKimiNative,
     resolveKiloNative,
     resolveAuggieSessions,
     resolveOpencodeNative,
@@ -1206,6 +1238,9 @@ export function createRuntimeServer(
     }));
     reconcileServices('kiro', kiroNativeByInstance, (instance) => new KiroNativeSessionService({
       commandConfig: instance.commandConfig, sessionsDir: instance.kiroSessionsDir || config.kiroSessionsDir,
+    }));
+    reconcileServices('kimi', kimiNativeByInstance, (instance) => new KimiNativeSessionService({
+      commandConfig: instance.commandConfig,
     }));
     reconcileServices('goose', gooseNativeByInstance, (instance) => new GooseNativeSessionService({
       command: instance.commandConfig.path,

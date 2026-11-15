@@ -384,7 +384,7 @@ describe('runtime server', () => {
       expect(html).toContain('window.__CATS_RUNTIME_PROXY_MODE__');
       expect(html).toContain('<option value="">Loading providers...</option>');
       expect(html).toContain(
-        "const PROVIDER_ORDER = ['codex', 'claude', 'antigravity', 'grok', 'muse', 'cursor', 'copilot', 'opencode', 'kilo', 'cline', 'auggie', 'pi', 'kiro', 'junie', 'devin', 'goose', 'ollama', 'openclaw'];",
+        "const PROVIDER_ORDER = ['codex', 'claude', 'antigravity', 'grok', 'muse', 'cursor', 'copilot', 'opencode', 'kilo', 'cline', 'auggie', 'pi', 'kimi', 'kiro', 'junie', 'devin', 'goose', 'ollama', 'openclaw'];",
       );
       expect(html).toContain('--grok: #e5e7eb;');
       expect(html).toContain('.provider-badge[data-p="grok"]');

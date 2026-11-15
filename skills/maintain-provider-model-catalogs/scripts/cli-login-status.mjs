@@ -4,7 +4,7 @@
 // Read-only: it never logs in, sends a prompt, opens a session or prints a credential. Where a CLI
 // has an account-scoped read (a model list), the check reaches its server; otherwise it runs the
 // CLI's own status command or only checks that its credential file holds a refresh token.
-// Cline, Junie, Pi and Goose are never launched.
+// Cline, Junie, Pi, Kimi and Goose are never launched.
 
 import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
@@ -136,6 +136,31 @@ function museBinary(ctx) {
   return null;
 }
 
+/**
+ * Kimi Code keeps each OAuth sign-in in `<KIMI_CODE_HOME>/credentials/<name>.json` (logout deletes
+ * it; `credentials/mcp/` holds MCP server sign-ins, not the CLI's). An Open Platform API key lives
+ * in config.toml as `api_key = "..."` or `api_key_env = "<VAR>"`. KIMI_MODEL_API_KEY is the one
+ * shell variable Kimi reads directly (environment-bootstrap 4108ac8).
+ */
+function kimiCredential(ctx) {
+  if (hasText(ctx.env.KIMI_MODEL_API_KEY)) return ['local', 'KIMI_MODEL_API_KEY is set'];
+  const kimiHome = ctx.env.KIMI_CODE_HOME || join(ctx.home, '.kimi-code');
+  const credentialsDir = join(kimiHome, 'credentials');
+  const signedIn = ctx.listFiles(credentialsDir)
+    .filter((file) => file.name.endsWith('.json'))
+    .filter((file) => hasText(parseJson(ctx.readText(join(credentialsDir, file.name)))?.refresh_token));
+  if (signedIn.length > 0) return ['local', `credentials/${signedIn[0].name} holds a refresh token`];
+  const config = ctx.readText(join(kimiHome, 'config.toml')) ?? '';
+  if (/^\s*[a-z_]*api_key\s*=\s*["'][^"']+/im.test(config)) return ['local', 'config.toml holds a provider API key'];
+  const variable = /^\s*api_key_env\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']/im.exec(config)?.[1];
+  if (variable) {
+    return hasText(ctx.env[variable])
+      ? ['local', `config.toml api_key_env names ${variable}, which is set`]
+      : ['unknown', `config.toml api_key_env names ${variable}, which this shell does not set`];
+  }
+  return ['signed-out', 'no OAuth credential and no config.toml API key (run kimi login)'];
+}
+
 /** Catalog CLIs in the skill's order, keyed by their probe provider names. */
 export const CHECKS = [
   {
@@ -256,6 +281,15 @@ export const CHECKS = [
         ? ['local', 'auth.json holds an openai-codex refresh token']
         : ['signed-out', 'auth.json has no openai-codex sign-in (/login in pi)'];
     }),
+  },
+  {
+    // Never executed: each launch of the 160 MB binary takes seconds and can apply a staged update.
+    provider: 'kimi',
+    method: '`<KIMI_CODE_HOME>/credentials/*.json` refresh token or a config.toml API key, never launched',
+    check: async (ctx) => {
+      const installDir = ctx.env.KIMI_INSTALL_DIR || join(ctx.home, '.kimi-code');
+      return ifInstalled(ctx, 'kimi', [join(installDir, 'bin')], () => kimiCredential(ctx));
+    },
   },
   {
     provider: 'goose',

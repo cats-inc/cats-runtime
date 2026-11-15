@@ -1,0 +1,11 @@
+{"type":"metadata","protocol_version":"1.5","created_at":1794766550126}
+{"type":"turn.prompt","agentId":"main","input":[{"type":"text","text":"USE_TOOL please read hello.txt"}],"origin":{"kind":"user"},"promptId":"msg_01M7G6RDAXGW9KRDPXMZVQH7KR","turnId":0,"time":1794766550411}
+{"type":"llm.request","agentId":"main","kind":"loop","provider":"openai","model":"mock-model","modelAlias":"__kimi_env_model__","thinkingEffort":"on","time":1794766550527}
+{"type":"usage.record","agentId":"main","model":"__kimi_env_model__","usage":{"inputOther":150,"output":20,"inputCacheCreation":0},"usageScope":"turn","time":1794766550633}
+{"type":"llm.request","agentId":"main","kind":"loop","provider":"openai","model":"mock-model","modelAlias":"__kimi_env_model__","thinkingEffort":"on","time":1794766550800}
+{"type":"usage.record","agentId":"main","model":"__kimi_env_model__","usage":{"inputOther":120,"output":7,"inputCacheCreation":0},"usageScope":"turn","time":1794766550826}
+{"type":"turn.ended","agentId":"main","turnId":0,"reason":"completed","durationMs":453,"time":1794766550860}
+{"type":"turn.prompt","agentId":"main","input":[{"type":"text","text":"MULTILINE now"}],"origin":{"kind":"user"},"promptId":"msg_01M7G6RJBF5NE89A0W99P1JQW5","turnId":1,"time":1794766555531}
+{"type":"llm.request","agentId":"main","kind":"loop","provider":"openai","model":"mock-model","modelAlias":"__kimi_env_model__","thinkingEffort":"on","time":1794766555622}
+{"type":"usage.record","agentId":"main","model":"__kimi_env_model__","usage":{"inputOther":120,"output":7,"inputCacheCreation":0},"usageScope":"turn","time":1794766555723}
+{"type":"turn.ended","agentId":"main","turnId":1,"reason":"completed","durationMs":210,"time":1794766555739}

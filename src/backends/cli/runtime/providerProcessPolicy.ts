@@ -15,6 +15,10 @@ export function getProviderProcessPolicy(providerName: string, args: string[], c
     case 'muse':
       // Muse's installed launcher documents this per-process opt-out.
       return { args, env: { MUSE_NO_AUTO_UPDATE: '1' } };
+    case 'kimi':
+      // Kimi Code 2.5.3 isAutoUpdateDisabledByEnv: no check, background install,
+      // prompt or staged binary swap at startup for this process.
+      return { args, env: { KIMI_CODE_NO_AUTO_UPDATE: '1' } };
     case 'junie':
       // https://junie.jetbrains.com/docs/parameters.html
       // The documented flag belongs to Junie, not node/npx or an ACP bridge.

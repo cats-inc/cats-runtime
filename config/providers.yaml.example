@@ -69,6 +69,10 @@ routing:
       default_target:
         backend: cli
         instance: native
+    kimi:
+      default_target:
+        backend: cli
+        instance: native
     auggie:
       default_target:
         backend: cli
@@ -236,6 +240,17 @@ backends:
             # Pi stores session files under this directory.
             # Session resume uses --session <path> to continue a previous conversation.
             sessions_dir: ~/.pi/agent/sessions
+
+      kimi:
+        instances:
+          native:
+            environment: native
+            # The official installer writes ~/.kimi-code/bin/kimi(.exe); Runtime
+            # falls back to that path when kimi is not on PATH.
+            command: kimi
+            runner: auto
+            # Kimi keeps sessions under $KIMI_CODE_HOME (default ~/.kimi-code);
+            # Runtime reads a session's wire journal there for usage after a turn.
 
       auggie:
         instances:

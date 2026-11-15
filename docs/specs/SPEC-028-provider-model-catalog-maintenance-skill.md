@@ -48,7 +48,7 @@ The repository owner approved two maintenance groups for Cats Desktop and Runtim
 
 | Group | CLI providers | Maintained and selectable catalog |
 |---|---|---|
-| Full catalog | Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie CLI, Kiro CLI, Auggie CLI, GitHub Copilot CLI, Pi (`openai-codex` channel), Goose CLI (`chatgpt_codex` channel), Cursor Agent CLI, Devin CLI, OpenCode (`opencode-go` channel), Kilo Code CLI (`kilo` gateway list), Cline (`cline-pass` channel) | Complete evidenced CLI model lists and all applicable effort/options, plus custom model-string input |
+| Full catalog | Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie CLI, Kiro CLI, Auggie CLI, GitHub Copilot CLI, Pi (`openai-codex` channel), Kimi Code CLI (managed `kimi-code` aliases), Goose CLI (`chatgpt_codex` channel), Cursor Agent CLI, Devin CLI, OpenCode (`opencode-go` channel), Kilo Code CLI (`kilo` gateway list), Cline (`cline-pass` channel) | Complete evidenced CLI model lists and all applicable effort/options, plus custom model-string input |
 | Shortlist | None since 2026-10-14 | At most six explicitly selected models per CLI, plus a custom-input action |
 
 **2026-09-26 amendment:** the owner moved Junie CLI from the shortlist group to the
@@ -120,6 +120,15 @@ whose scope the owner set to the `kilo` gateway list (`kilo models kilo`) instea
 an explicit change of the scope basis the Kilo reference otherwise forbids, in the picker's
 Recommended-then-gateway order. Other providers of these hosts remain custom input. The shortlist
 group keeps its rules for a future choice but has no members.
+
+**2026-11-16 Kimi Code addition:** the owner asked for complete Kimi Code CLI support, and Kimi
+joined the full-catalog group as the seventeenth CLI. Its scope is the managed `kimi-code`
+aliases that `kimi login` writes and `kimi provider list --json` lists, with exact `displayName`
+labels, no default row and no effort control, because print mode cannot set effort per turn
+([the Kimi Code provider note](../research/2026-11-16-kimi-code-cli-provider.md),
+[ADR-054](../decisions/054-drive-kimi-code-through-print-mode-stream-json.md)). Full rather than
+shortlist was the default chosen during that port: the list has six entries. User-added Kimi
+providers remain custom input. Membership of the other groups is unchanged.
 
 **2026-09-29 basis amendment:** a scope records its routing channel or account plan as
 `basis` only with evidence, as defined in the

@@ -63,10 +63,10 @@ async function checkOne(provider, context) {
   return result;
 }
 
-test('lists the sixteen catalog CLIs in the skill order', () => {
+test('lists the seventeen catalog CLIs in the skill order', () => {
   assert.deepEqual(CHECKS.map((entry) => entry.provider), [
     'codex', 'claude', 'antigravity', 'grok', 'muse', 'junie', 'kiro', 'auggie',
-    'copilot', 'pi', 'goose', 'cursor', 'devin', 'opencode', 'kilo', 'cline',
+    'copilot', 'pi', 'kimi', 'goose', 'cursor', 'devin', 'opencode', 'kilo', 'cline',
   ]);
   for (const entry of CHECKS) assert.ok(entry.method, `${entry.provider} documents its method`);
 });
@@ -239,9 +239,36 @@ test('checks Cline, Junie, Pi and Goose credential files without launching them'
   assert.equal((await checkOne('junie', fakeContext({ installed: ['junie'], platform: 'linux', env: { JUNIE_API_KEY: 'k' } }))).state, 'local');
 });
 
+test('checks Kimi credentials and config.toml keys without launching kimi', async () => {
+  const kimiHome = join(HOME, '.kimi-code');
+  const credentials = join(kimiHome, 'credentials');
+  const config = join(kimiHome, 'config.toml');
+  const kimi = (options) => checkOne('kimi', fakeContext({ installed: ['kimi'], ...options }));
+
+  const oauth = await kimi({
+    dirs: { [credentials]: [{ name: 'mcp', size: 0 }, { name: 'kimi-code-env-1.json', size: 900 }] },
+    files: { [join(credentials, 'kimi-code-env-1.json')]: '{"access_token": "a", "refresh_token": "r"}' },
+  });
+  assert.deepEqual([oauth.state, oauth.detail], ['local', 'credentials/kimi-code-env-1.json holds a refresh token']);
+  const toml = (...lines) => `${lines.join('\n')}\n`;
+  const apiKey = await kimi({ files: { [config]: toml('[providers.moonshot]', 'type = "kimi"', 'api_key = "sk-x"') } });
+  assert.deepEqual([apiKey.state, apiKey.detail], ['local', 'config.toml holds a provider API key']);
+  assert.equal((await kimi({ env: { KIMI_MODEL_API_KEY: 'k' } })).state, 'local');
+  const unset = await kimi({ files: { [config]: toml('[providers.moonshot]', 'api_key_env = "MOONSHOT_KEY"') } });
+  assert.deepEqual([unset.state, unset.detail], ['unknown', 'config.toml api_key_env names MOONSHOT_KEY, which this shell does not set']);
+  assert.equal((await kimi({ env: { MOONSHOT_KEY: 'k' }, files: { [config]: toml('api_key_env = "MOONSHOT_KEY"') } })).state, 'local');
+  const signedOut = await kimi({ dirs: { [credentials]: [{ name: 'old.json', size: 2 }] }, files: { [join(credentials, 'old.json')]: '{}' } });
+  assert.equal(signedOut.state, 'signed-out');
+  const moved = await checkOne('kimi', fakeContext({ installed: ['kimi'], env: { KIMI_CODE_HOME: join(HOME, 'alt') },
+    dirs: { [join(HOME, 'alt', 'credentials')]: [{ name: 'a.json', size: 9 }] },
+    files: { [join(HOME, 'alt', 'credentials', 'a.json')]: '{"refresh_token": "r"}' } }));
+  assert.equal(moved.state, 'local');
+  assert.equal((await checkOne('kimi', fakeContext())).state, 'not-installed');
+});
+
 test('reports missing CLIs, timeouts and failing checks without stopping the run', async () => {
   const none = await checkLoginStatus(fakeContext());
-  assert.equal(none.length, 16);
+  assert.equal(none.length, 17);
   assert.ok(none.every((result) => result.state === 'not-installed' && result.detail === ''), JSON.stringify(none));
 
   const context = fakeContext({
@@ -255,7 +282,7 @@ test('reports missing CLIs, timeouts and failing checks without stopping the run
 
 test('selects CLIs like the catalog probe and rejects unknown names', () => {
   assert.deepEqual(selectChecks({ providers: 'grok, codex' }).map((entry) => entry.provider), ['codex', 'grok']);
-  assert.equal(selectChecks({ skip: 'muse,cursor' }).length, 14);
+  assert.equal(selectChecks({ skip: 'muse,cursor' }).length, 15);
   assert.throws(() => selectChecks({ providers: 'codex,nope' }), /Unknown provider nope\. Known: codex, claude/);
 });
 

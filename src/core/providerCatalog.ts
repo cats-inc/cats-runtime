@@ -21,6 +21,7 @@ const PROVIDER_ORDER = [
   'kilo',
   'goose',
   'pi',
+  'kimi',
   'auggie',
   'junie',
   'kiro',

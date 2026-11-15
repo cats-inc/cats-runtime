@@ -165,7 +165,7 @@ describe('model catalog upgrade recovery', () => {
 describe('provider setup interactions', () => {
   it('orders selection rows, configured targets and provider choices consistently', () => {
     const providers = ['codex', 'claude', 'antigravity', 'grok', 'muse', 'cursor',
-      'copilot', 'opencode', 'kilo', 'cline', 'auggie', 'pi', 'kiro', 'junie', 'devin', 'goose',
+      'copilot', 'opencode', 'kilo', 'cline', 'auggie', 'pi', 'kimi', 'kiro', 'junie', 'devin', 'goose',
       'ollama', 'openclaw'];
     const shuffled = providers.slice().reverse().map((provider) => ({
       provider, backend: 'cli', instance: 'native', familyLabel: provider, binaryName: provider,

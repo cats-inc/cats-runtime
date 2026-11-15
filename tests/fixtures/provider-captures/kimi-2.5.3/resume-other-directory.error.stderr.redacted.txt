@@ -1,0 +1,5 @@
+Session "session_d5158bc9-1b26-4813-b1ab-338d7317269c" was created under a different directory.
+  cd "<redacted-workdir>" && kimi -r session_d5158bc9-1b26-4813-b1ab-338d7317269c
+
+error: failed to run prompt: Session "session_d5158bc9-1b26-4813-b1ab-338d7317269c" was created under a different directory.
+See log: <redacted-kimi-home>\logs\kimi-code.log

@@ -2518,7 +2518,7 @@ Other `branching` query values are ignored.
 covers two kinds of target and imports whatever it finds into the embedded
 registry:
 
-- the configured `cursor`, `goose`, `kiro`, `kilo`, and `opencode` CLI instances
+- the configured `cursor`, `goose`, `kiro`, `kimi`, `kilo`, and `opencode` CLI instances
   whose runtime mode is currently `wsl` or `docker`
 - every configured provider whose default target is agent-backed, asked over
   ACP whether it can enumerate its own sessions
@@ -5024,13 +5024,15 @@ GET  /cursor/sessions
 POST /cursor/sessions/discover
 GET  /kiro/sessions
 POST /kiro/sessions/discover
+GET  /kimi/sessions
+POST /kimi/sessions/discover
 GET  /kilo/sessions
 POST /kilo/sessions/discover
 GET  /opencode/sessions
 POST /opencode/sessions/discover
 ```
 
-The provider-native endpoints for Auggie, Cursor, Kilo, Kiro, OpenCode, and
+The provider-native endpoints for Auggie, Cursor, Kilo, Kimi, Kiro, OpenCode, and
 Codex accept an optional `instance` query/body field so callers can target a
 specific configured provider instance. `"default"` is accepted as an alias for
 each provider's configured default instance. Unknown instance IDs return `400`.

@@ -36,6 +36,7 @@ import { OpencodeProvider } from '../providers/opencode.js';
 import { GooseProvider } from '../providers/goose.js';
 import { JunieProvider } from '../providers/junie.js';
 import { PiProvider } from '../providers/pi.js';
+import { KimiProvider } from '../providers/kimi.js';
 import { WorkerProcess, type SpawnResilienceConfig } from './WorkerProcess.js';
 import type { SessionRegistry } from './SessionRegistry.js';
 import {
@@ -280,6 +281,11 @@ export class WorkerPool {
           provider: new PiProvider({
             instructionsFile: instance.piInstructionsFile,
           }),
+          commandConfig: instance.commandConfig,
+        };
+      case 'kimi':
+        return {
+          provider: new KimiProvider(instance.commandConfig),
           commandConfig: instance.commandConfig,
         };
       case 'goose':

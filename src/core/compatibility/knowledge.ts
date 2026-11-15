@@ -15,6 +15,10 @@ import {
   MUSE_EXEC_JSON_BASE_ARGS,
   MUSE_EXEC_JSON_PROFILE_ID,
 } from '../../backends/cli/providers/muse.js';
+import {
+  KIMI_STREAM_JSON_BASE_ARGS,
+  KIMI_STREAM_JSON_PROFILE_ID,
+} from '../../backends/cli/providers/kimi.js';
 import type {
   ProviderCompatibilityKnowledge,
   ProviderCompatibilityProfile,
@@ -400,6 +404,37 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       helpTokens: ['--mode'],
       liveProbeArgs: buildLiveHelpArgs(PI_RPC_ARGS),
       liveProbeTokens: ['--mode'],
+    },
+  ),
+  kimi: buildKnowledge(
+    'kimi',
+    'Kimi Code CLI',
+    {
+      id: KIMI_STREAM_JSON_PROFILE_ID,
+      label: 'Kimi Code CLI print stream-json',
+      provider: 'kimi',
+      protocolFamily: 'stream-json',
+      parserId: 'kimi-stream-json',
+      spawnBaseArgs: [...KIMI_STREAM_JSON_BASE_ARGS],
+      // 2.5.3 is the fixture-recorded baseline; other versions use the same
+      // best-known adapter (ADR-035).
+      minVersionMajor: 2,
+      allowUnknownVersion: true,
+      helpTokens: ['--prompt', '--output-format', 'stream-json', '--session', '--model'],
+      liveProbeArgs: ['--help'],
+      liveProbeTokens: ['--prompt', 'stream-json', '--session'],
+    },
+    {
+      id: 'kimi-cli-stream-json-best-fit',
+      label: 'Kimi Code CLI print stream-json best-fit',
+      provider: 'kimi',
+      protocolFamily: 'stream-json',
+      parserId: 'kimi-stream-json',
+      spawnBaseArgs: [...KIMI_STREAM_JSON_BASE_ARGS],
+      allowUnknownVersion: true,
+      helpTokens: ['--prompt', '--output-format'],
+      liveProbeArgs: ['--help'],
+      liveProbeTokens: ['--prompt', '--output-format'],
     },
   ),
   auggie: buildKnowledge(

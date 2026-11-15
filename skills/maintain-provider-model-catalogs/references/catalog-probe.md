@@ -58,7 +58,7 @@ seconds and writes nothing, so run it before a probe or a capture to sort out `y
 actions first:
 
 ```text
-npm run catalog:logins                             # all sixteen
+npm run catalog:logins                             # all seventeen
 npm run catalog:logins -- --providers grok,muse    # only these
 npm run catalog:logins -- --skip cursor            # CLIs this machine does not use
 node skills/maintain-provider-model-catalogs/scripts/cli-login-status.mjs --json   # JSON only

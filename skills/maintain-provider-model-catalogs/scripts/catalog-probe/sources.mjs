@@ -186,6 +186,28 @@ export function parseAuggieModelList(output) {
   return { rows, registryAvailable: document.registryAvailable ?? null, defaultModelId: str(document.defaultModelId) };
 }
 
+/**
+ * `kimi provider list --json`: the managed kimi-code aliases `kimi login` wrote into config.toml.
+ * Only model fields are read; provider entries hold credentials and are never copied.
+ */
+export function parseKimiProviderList(output, provider = 'managed:kimi-code') {
+  const document = parseJson(output, '`kimi provider list --json`');
+  const models = document?.models;
+  if (!models || typeof models !== 'object' || Array.isArray(models)) {
+    throw new SourceFailure('error', 'parse', '`kimi provider list --json` has no models object.');
+  }
+  return Object.entries(models).filter(([, row]) => row?.provider === provider).map(([alias, row]) => withEvidence(
+    { id: alias, label: str(row.displayName) },
+    {
+      model: str(row.model),
+      maxContextSize: num(row.maxContextSize),
+      // Recorded in notes: print mode has no per-invocation effort flag.
+      supportEfforts: Array.isArray(row.supportEfforts) ? row.supportEfforts : null,
+      defaultEffort: str(row.defaultEffort),
+    },
+  ));
+}
+
 export function parseDevinModelsList(output) {
   const families = requireArray(parseJson(output, '`devin models list`').families, '`devin models list`');
   const rows = [];
@@ -715,6 +737,28 @@ export const SOURCES = [
         sourceEvidence: compactEvidence({ defaultModelId }),
         ...(registryAvailable === false
           ? { status: 'degraded', reason: 'non-account-source', message: 'Auggie reported registryAvailable: false; the list may be a local fallback.' }
+          : {}),
+      };
+    },
+  },
+  {
+    ...SCOPE('kimi'),
+    sourceClass: 'machine-readable',
+    command: 'kimi provider list --json (managed:kimi-code aliases)',
+    coverage: { membership: 'complete', label: true },
+    async probe(ctx) {
+      const installDir = ctx.env().KIMI_INSTALL_DIR || join(ctx.home, '.kimi-code');
+      const executable = locate(ctx, 'kimi', [join(installDir, 'bin')]);
+      // A launch can apply a staged self-update; this opt-out applies to the probe process only.
+      const env = { ...ctx.env(), KIMI_CODE_NO_AUTO_UPDATE: '1' };
+      const result = await runOrFail(ctx, executable, ['provider', 'list', '--json'], { what: '`kimi provider list --json`', env });
+      const models = parseKimiProviderList(result.stdout);
+      return {
+        cliVersion: await versionFromFlag(ctx, executable, ['--version'], env),
+        versionSource: '--version',
+        models,
+        ...(models.length === 0
+          ? { status: 'degraded', reason: 'not-authenticated', message: 'No managed:kimi-code aliases; run kimi login first.' }
           : {}),
       };
     },

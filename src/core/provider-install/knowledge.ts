@@ -81,6 +81,33 @@ function createGrokBinPathHints(): Partial<Record<ProviderExecutionPlatform, Pro
   };
 }
 
+function createKimiBinPathHints(): Partial<Record<ProviderExecutionPlatform, ProviderPathHint>> {
+  return {
+    windows: {
+      expectedPath: '~/.kimi-code/bin/kimi.exe',
+      directoryHint: '~/.kimi-code/bin',
+      exportCommand: 'setx PATH "%USERPROFILE%\\.kimi-code\\bin;%PATH%"',
+      reloadHint: 'Open a new terminal window after installing Kimi Code CLI.',
+    },
+    macos: {
+      expectedPath: '~/.kimi-code/bin/kimi',
+      directoryHint: '~/.kimi-code/bin',
+      exportCommand: 'export PATH="$HOME/.kimi-code/bin:$PATH"',
+      shellRcPath: '~/.zshrc',
+      persistenceEntry: '.kimi-code/bin',
+      reloadHint: 'Run source ~/.zshrc or source ~/.bashrc before invoking kimi.',
+    },
+    linux: {
+      expectedPath: '~/.kimi-code/bin/kimi',
+      directoryHint: '~/.kimi-code/bin',
+      exportCommand: 'export PATH="$HOME/.kimi-code/bin:$PATH"',
+      shellRcPath: '~/.bashrc',
+      persistenceEntry: '.kimi-code/bin',
+      reloadHint: 'Run source ~/.bashrc before invoking kimi.',
+    },
+  };
+}
+
 // muse is the one native CLI whose Windows and POSIX install directories do
 // not match: the official install.ps1 writes a muse.cmd shim plus a PowerShell
 // launcher into %LOCALAPPDATA%\Programs\muse, while install.sh drops a single
@@ -667,6 +694,62 @@ const INSTALL_KNOWLEDGE: Record<ProviderName, ProviderInstallKnowledge> = {
     '@earendil-works/pi-coding-agent',
     'Complete the Pi Coding Agent CLI authentication flow after install.',
   ),
+  kimi: {
+    provider: 'kimi',
+    familyLabel: 'Kimi Code CLI',
+    installPack: 'native-cli',
+    binaryName: 'kimi',
+    defaultDocsUrl: 'https://moonshotai.github.io/kimi-code/',
+    check: {
+      versionArgs: ['--version'],
+      helpArgs: ['--help'],
+      // kimi is a ~160 MB Node single-executable application. Each launch took
+      // about 5s on Kimi Code 2.5.3 here and 9-30s on cold Windows hosts
+      // (environment-bootstrap 4108ac8), and the version and help probes run
+      // concurrently, so the default 10s budget fails a healthy install.
+      minProbeTimeoutMs: 45_000,
+      // Windows needs Git Bash, but not as a prerequisite check: a missing
+      // prerequisite marks the provider unavailable, while Kimi finds bash.exe
+      // without git on PATH (Program Files, KIMI_SHELL_PATH). Desktop installs
+      // Git as its own setup prerequisite and warns when Git Bash is missing.
+      prerequisites: createNativeInstallerPrerequisites('Kimi Code CLI'),
+      // The official installers write only this path (KIMI_INSTALL_DIR moves
+      // it). A `kimi` found elsewhere can be the archived Python kimi-cli,
+      // which the installer renames to kimi-legacy.
+      expectedPaths: {
+        windows: '~/.kimi-code/bin/kimi.exe',
+        macos: '~/.kimi-code/bin/kimi',
+        linux: '~/.kimi-code/bin/kimi',
+      },
+      pathHints: createKimiBinPathHints(),
+    },
+    auth: {
+      requiredAfterInstall: true,
+      envVars: [],
+      interactive: true,
+      docsUrl: 'https://moonshotai.github.io/kimi-code/',
+      hint: 'Run kimi login to sign in with a Kimi Code account. The global installer defaults '
+        + 'to the global region; mainland China accounts use kimi login --region mainland-cn.',
+      errorPatterns: [...GENERIC_AUTH_ERROR_PATTERNS, 'provider.auth_error'],
+    },
+    platforms: createNativeInstall(
+      'kimi-code',
+      'irm https://code.kimi.ai/kimi-code/install.ps1 | iex',
+      'curl -fsSL https://code.kimi.ai/kimi-code/install.sh | bash',
+      {
+        docsUrl: 'https://moonshotai.github.io/kimi-code/',
+        notes: [
+          'The official installer places kimi in ~/.kimi-code/bin and adds it to PATH '
+            + '(KIMI_INSTALL_DIR moves it; KIMI_NO_MODIFY_PATH leaves PATH alone).',
+        ],
+        windowsNotes: [
+          'The official installer places kimi in %USERPROFILE%\\.kimi-code\\bin\\kimi.exe and adds '
+            + 'that directory to the user PATH.',
+          'Kimi Code CLI needs Git for Windows: it runs shell tools through Git Bash.',
+        ],
+      },
+    ),
+  },
   muse: {
     provider: 'muse',
     familyLabel: 'Meta Muse CLI',
