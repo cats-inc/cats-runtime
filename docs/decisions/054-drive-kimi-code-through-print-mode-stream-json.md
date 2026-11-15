@@ -59,14 +59,32 @@ has `kimi acp`, an ACP server over stdio.
    `kimi acp` for operators who configure an agent/ACP instance. The cli/native target stays on
    print mode, which matches its Pi, Goose and Junie neighbours and is the path whose output was
    captured.
+10. **Native sessions managed like Kiro's.** `KimiNativeSessionService` lists, reads and deletes
+    the sessions in Kimi's store, whether Cats or the user created them:
+    - Listing: natively it reads `sessions/<workdir key>/<session>/state.json` and the main-agent
+      `wire.jsonl` (user turns, first prompt and model, cached by size and mtime). Inside WSL or
+      Docker it runs `kimi session list --all --json` and reads each journal through the shell.
+    - Transcripts: user input and assistant text from the journal's `agent.message.appended`
+      records, with Cats' compiled-prompt wrapper removed.
+    - Deletion: through Kimi's own ACP `session/delete`. That removes the directory, the index
+      entry and the file history, and journals the deletion in `session_index.jsonl`; removing
+      the directory alone would leave those behind. `kimi acp` needs no sign-in and no
+      matching workspace for this, and starting it does not register its cwd as a project.
+    - Failures: an id Kimi no longer knows counts as deleted. If kimi cannot delete the
+      session and it is still in the store, the Runtime session is retained.
+    - Background discovery polls native instances; WSL and Docker instances use manual
+      discovery like Cursor, Goose, Kiro, Kilo and OpenCode. `/kimi/sessions` and
+      `/kimi/sessions/discover` match the other native providers.
+    - All of these read the same Kimi home as turns: `KIMI_CODE_HOME`, else `~/.kimi-code`.
 
 ## Consequences
 
 - Kimi appears in every Runtime provider list between Pi and Kiro, including the Playground,
   dashboard and provider setup page.
-- No Kimi session discovery: sessions that Kimi created outside Cats are not listed or deleted by
-  Runtime. Kimi keeps them under `sessions/<workdir key>/<session>/state.json`; a scanner can be
-  added later from that layout or `kimi session list --json`.
+- The Runtime dashboard lists, opens and deletes Kimi sessions. Deleting a Cats conversation
+  that used Kimi also deletes Kimi's own transcript, and that cannot be undone.
+- The journal format is private: the transcript reader accepts `state.json` version 2 and wire
+  protocol 1.x, and refuses anything else.
 - A Desktop decision session that requires a read-only execution policy cannot use Kimi.
 - Kimi is a seventh per-turn adapter that passes the composed prompt as an argument, so the
   native Windows limit of about 32,000 characters measured on 2026-11-11 applies to its prompt.

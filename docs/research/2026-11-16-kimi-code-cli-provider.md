@@ -51,6 +51,19 @@ two-turn wire journal excerpt). Local paths are redacted; session ids come from 
   (`id`, `cwd`, timestamps, `lastTurnReason`) and `agents/main/wire.jsonl` (protocol 1.5:
   `turn.prompt`, `llm.request` with `model` and `modelAlias`, `usage.record` with `inputOther`,
   `inputCacheRead`, `inputCacheCreation` and `output`). A failed turn still leaves its session.
+  `agent.message.appended` records carry the visible transcript: user input
+  (`meta.source: input`), assistant text and tool results. Injected reminders are
+  `context.append_message` records only.
+- `kimi session list --all --json` lists `id`, `workDir`, `sessionDir`, timestamps, `archived` and
+  `lastTurnReason` for every workspace. `kimi session` has no delete subcommand.
+- `kimi acp` (2.6 s to `initialize`) advertises `sessionCapabilities` list, resume, close,
+  delete, fork and additionalDirectories without a sign-in.
+  - `session/list` filters by its `cwd` parameter.
+  - `session/delete` returned `{}` from a different working directory and removed the session.
+    It removed the directory and appended `{"sessionId":"…","deleted":true}` to
+    `session_index.jsonl`, and the session was gone from `kimi session list`.
+  - Kimi's own delete (`ISessionManager.delete`) also removes the index entry and the file history.
+  - Starting `kimi acp` in a directory did not add it to `projects.json`.
 - `kimi --version` and `kimi --help` take about 5 seconds each here; environment-bootstrap
   reports 9-30 seconds on cold Windows hosts.
 
@@ -61,11 +74,25 @@ context, efforts low/high/max, default max), K2.7 Code Highspeed (262144, no eff
 default high), K3-256k (262144), K3.1 Pro (1M) and K3.1 Pro Highspeed 2x Usage Cost (1M). The
 `/model` picker was not captured, so no picker order or default marker is claimed.
 
+## Session management acceptance
+
+An isolated source Runtime used a copied throwaway `KIMI_CODE_HOME` holding the captured
+sessions, with the dashboard driven by headless Chromium and checked against `kimi session list
+--all --json`:
+- Background discovery listed all six of Kimi's sessions with their first prompts, including
+  Chinese ones, and user-turn counts.
+- A Cats-created session that ran one turn merged with its discovered copy.
+- Opening a session showed its transcript.
+- Deleting one discovered and one Cats-created session through the dashboard removed both from
+  Runtime and from Kimi's own list, and appended two `deleted` lines to `session_index.jsonl`.
+  Neither came back after further polls.
+
 ## Not verified
 
 - A turn on a real Kimi Code plan, and therefore the managed provider's real text, tool and
   usage records.
-- macOS, Linux, WSL and Docker runs; `kimi acp` sessions.
+- macOS, Linux, WSL and Docker runs (the WSL/Docker session store path is tested with a fake
+  shell runner only); `kimi acp` prompt sessions.
 - Long-running tool steps beyond the 30-minute turn limit, and subagent usage.
 
 ## Scripts

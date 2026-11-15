@@ -1275,7 +1275,7 @@ function apiKey() {
 
   function providerSupportsResume(provider) {
     const p = (provider || 'claude').toLowerCase();
-    return p === 'auggie' || p === 'claude' || p === 'copilot' || p === 'cursor' || p === 'kiro' || p === 'kilo';
+    return p === 'auggie' || p === 'claude' || p === 'copilot' || p === 'cursor' || p === 'kiro' || p === 'kimi' || p === 'kilo';
   }
 
   function sessionControls(session) {
@@ -1452,6 +1452,7 @@ function manualSessionDiscoveryTargets() {
     entry.providerName === 'cursor'
     || entry.providerName === 'goose'
     || entry.providerName === 'kiro'
+    || entry.providerName === 'kimi'
     || entry.providerName === 'kilo'
     || entry.providerName === 'opencode'
   ) && (

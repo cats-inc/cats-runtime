@@ -1,0 +1,60 @@
+[
+  {
+    "id": "session_40d3a7c9-b49e-4df6-875b-c62d6f616fe3",
+    "workDir": "C:\\work\\kimi-project",
+    "sessionDir": "C:/home/.kimi-code/sessions/wd_work_4bc2d6c3509e/session_40d3a7c9-b49e-4df6-875b-c62d6f616fe3",
+    "createdAt": 1794766577275,
+    "updatedAt": 1794766578435,
+    "archived": false,
+    "metadata": {},
+    "lastTurnReason": "completed"
+  },
+  {
+    "id": "session_19bdbe87-189b-4104-a65d-eb231bcd4742",
+    "workDir": "C:\\work\\kimi-project",
+    "sessionDir": "C:/home/.kimi-code/sessions/wd_work_4bc2d6c3509e/session_19bdbe87-189b-4104-a65d-eb231bcd4742",
+    "createdAt": 1794766559212,
+    "updatedAt": 1794766559855,
+    "archived": false,
+    "metadata": {},
+    "lastTurnReason": "failed"
+  },
+  {
+    "id": "session_1f05d96e-47c2-40ca-a357-c0a3cf66f97c",
+    "workDir": "C:\\work\\kimi-project",
+    "sessionDir": "C:/home/.kimi-code/sessions/wd_work_4bc2d6c3509e/session_1f05d96e-47c2-40ca-a357-c0a3cf66f97c",
+    "createdAt": 1794766550006,
+    "updatedAt": 1794766555757,
+    "archived": false,
+    "metadata": {}
+  },
+  {
+    "id": "session_fa195927-b5f0-4153-8d67-7ec66cce8a9c",
+    "workDir": "C:\\work\\kimi-project",
+    "sessionDir": "C:/home/.kimi-code/sessions/wd_work_4bc2d6c3509e/session_fa195927-b5f0-4153-8d67-7ec66cce8a9c",
+    "createdAt": 1794766517816,
+    "updatedAt": 1794766518680,
+    "archived": false,
+    "metadata": {},
+    "lastTurnReason": "completed"
+  },
+  {
+    "id": "session_d5158bc9-1b26-4813-b1ab-338d7317269c",
+    "workDir": "C:\\work\\kimi-project",
+    "sessionDir": "C:/home/.kimi-code/sessions/wd_work_4bc2d6c3509e/session_d5158bc9-1b26-4813-b1ab-338d7317269c",
+    "createdAt": 1794766496389,
+    "updatedAt": 1794766503363,
+    "archived": false,
+    "metadata": {}
+  },
+  {
+    "id": "session_e2582112-778b-4af1-b02a-9f6f27f27822",
+    "workDir": "C:\\work\\kimi-project",
+    "sessionDir": "C:/home/.kimi-code/sessions/wd_work_4bc2d6c3509e/session_e2582112-778b-4af1-b02a-9f6f27f27822",
+    "createdAt": 1794766481230,
+    "updatedAt": 1794766482620,
+    "archived": false,
+    "metadata": {},
+    "lastTurnReason": "completed"
+  }
+]

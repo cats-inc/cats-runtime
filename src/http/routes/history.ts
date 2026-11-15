@@ -21,6 +21,7 @@ import {
   getCursorNative,
   getKiloNative,
   getKiroNative,
+  getKimiNative,
   getOpencodeNative,
 } from '../providerServices.js';
 import { buildSessionProviderTargetSummary } from '../sessionProviderTarget.js';
@@ -45,6 +46,7 @@ interface HistoryTranscriptMetadata {
   parser:
     | 'cursor_native'
     | 'kiro_native'
+    | 'kimi_native'
     | 'kilo_native'
     | 'auggie_native'
     | 'opencode_native'
@@ -332,6 +334,37 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
       }));
     } catch (err) {
       return c.json({ error: `Failed to load Kiro history: ${err}` }, 500);
+    }
+  }
+
+  if (session.providerName === 'kimi') {
+    if (!session.providerSessionId) {
+      return c.json(buildHistoryResponse(ctx, session, [], {
+        ownership: 'provider',
+        source: 'none',
+        parser: 'kimi_native',
+      }));
+    }
+
+    try {
+      const messages = await getKimiNative(
+        ctx,
+        session.providerInstanceId,
+      ).loadHistory(session.providerSessionId);
+      return c.json(buildHistoryResponse(ctx, session, messages, {
+        ownership: 'provider',
+        source: 'service',
+        parser: 'kimi_native',
+        sources: [
+          buildTranscriptSource(undefined, messages.length, {
+            ownership: 'provider',
+            source: 'service',
+            parser: 'kimi_native',
+          }),
+        ],
+      }));
+    } catch (err) {
+      return c.json({ error: `Failed to load Kimi history: ${err}` }, 500);
     }
   }
 

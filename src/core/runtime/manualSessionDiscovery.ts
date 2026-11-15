@@ -16,6 +16,7 @@ const MANUAL_SESSION_DISCOVERY_PROVIDERS = [
   'kiro',
   'opencode',
   'kilo',
+  'kimi',
 ] as const;
 
 export type ManualSessionDiscoveryProviderName =
