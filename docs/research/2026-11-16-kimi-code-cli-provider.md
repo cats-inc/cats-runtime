@@ -87,6 +87,66 @@ sessions, with the dashboard driven by headless Chromium and checked against `ki
   Runtime and from Kimi's own list, and appended two `deleted` lines to `session_index.jsonl`.
   Neither came back after further polls.
 
+## Computer use and `kimi acp` (Kimi Code 2.6.0, later on 2026-11-16)
+
+The installed CLI had updated itself to 2.6.0, and the operator account now had a Kimi Code plan.
+Real turns used the default model (`kimi-for-coding`, "K2.8 Preview"); `kimi-for-coding-highspeed`
+answered `-32000 Authentication required: Your current subscription does not have access to
+kimi-for-coding-highspeed` (captured). Every probe session was deleted through `session/delete`.
+Decision: [ADR-054 decision 11](../decisions/054-drive-kimi-code-through-print-mode-stream-json.md).
+
+- **How Kimi does computer use.** The user installs the marketplace plugin `kimi-cu-win` 0.3.13
+  from the TUI (`/plugins`) into `~/.kimi-code/plugins/managed/kimi-cu-win`, recorded in
+  `plugins/installed.json`. Its `kimi.plugin.json` declares MCP server `win`
+  (`runtime/node-repl.exe`, tools `js`, `js_reset`, `js_add_node_module_dir`,
+  `toolTimeoutMs: 660000`) and the skill `kimi-cu`; the model runs `await import("@kimi/cu")` in a
+  `js` cell to list windows, capture screenshots and UIA text, and send input. The plugin needs
+  the separately installed native runtime `%LOCALAPPDATA%\Kimi Computer Use\kimi-cu.exe` (0.3.0
+  or later) and Node.js 24.15 or later on the host PATH. Plugins load at session start, so a
+  session that was open during installation needs `/new` or `/reload`; the operator's own TUI
+  sessions show exactly that. In the session tools the plugin appears as
+  `mcp__plugin-kimi-cu-win_win__js`.
+- **Kimi desktop is a separate install.** The Kimi desktop app (3.2.27) runs its own kimi-code
+  home under `%APPDATA%\kimi-desktop\daimon-share\daimon\runtime\kimi-code\home` with its own copy
+  of the plugin. Installing computer use there does not install it for the CLI.
+- **Print mode loads the plugin and never asks.** A `kimi -p` turn in an empty directory recorded
+  `permission.set_mode: auto`, `mcp.tools_discovered` for `plugin-kimi-cu-win:win` and the three
+  `js` tools in `llm.tools_snapshot`. The bundle has no environment variable or flag that disables
+  plugins for one process (only marketplace and MCP timeout variables).
+- **`kimi acp` loads plugins and asks.** `initialize` advertises `loadSession`,
+  `sessionCapabilities` list/resume/close/delete/fork/additionalDirectories and
+  `mcpCapabilities` `http` and `sse`. `session/new` returns `configOptions` `model`, `thinking`
+  and `mode`, plus `modes`, with `default` ("Manual approvals; tools execute normally"), `plan`,
+  `auto` ("Auto-approve safe operations") and `yolo` ("Auto-approve everything"). Installed plugin
+  skills arrive in `available_commands_update` as `skill:kimi-cu-win:kimi-cu`. In `default`, a
+  `js` call sends `session/request_permission` with `approve_once`/`allow_once`,
+  `approve_always`/`allow_always` ("Approve for this session") and `reject`/`reject_once`; the
+  tool runs only after the answer. The request names the tool but has no `rawInput`; the
+  arguments arrive before it as the cumulative JSON text of `tool_call_update` frames with status
+  `in_progress`. Captures: `tests/fixtures/provider-captures/kimi-2.6.0/`.
+- **Session controls.** `session/set_config_option` for `mode` and `model` returns the updated
+  options (and `current_mode_update`/`config_option_update` notifications); an unknown mode is
+  -32602 `Unknown modeId`, an alias missing from config.toml -32603 with `details`. Mode and model
+  persist with the session across `session/resume` from a new process. `session/resume` of an
+  unknown id is -32602 `Invalid params: Unknown sessionId: <id>`. Resuming from another working
+  directory succeeded without a check, so Runtime keeps sending the session's own cwd.
+- **Session MCP.** An HTTP server with an `Authorization` header in `session/new` was attempted
+  (`mcp.server_failed` for the unreachable fixture URL); the bearer value appeared nowhere under
+  `~/.kimi-code` (sessions, logs, JSON and TOML files).
+- **Images.** A `js` cell that emitted a PNG returned, in the completed `tool_call_update`, a
+  text block with `kimi-file://f_mcp_<sha256>` and the saved path under the session's `media/`
+  directory; no image bytes cross ACP.
+- **Project registry.** Starting sessions in a directory through `kimi acp` or `kimi -p` adds it
+  to `projects.json` and leaves an empty `sessions/wd_<dir>_<hash>/` after the session is deleted.
+- **End to end through Runtime.** The worktree's Runtime from source, with an isolated
+  `CATS_RUNTIME_DIR`, a `kimi` native instance with `protocol: hosted`, the full provider policy
+  and an interaction host: the `js` call surfaced as a `tool_approval` titled
+  `mcp__plugin-kimi-cu-win_win__js` whose message showed `{"code":"nodeRepl.write('cats-e2e-ok')",
+  "title":"probe"}` and offered only "Approve once". Accepting it through
+  `POST /sessions/:id/interactions/:id/responses` resolved the card and finished the turn; the
+  capability snapshot reported `computer_use: available` and the verified provider policy, and
+  deleting the Runtime session removed Kimi's session. No desktop input was sent in any probe.
+
 ## Not verified
 
 - A turn on a real Kimi Code plan, and therefore the managed provider's real text, tool and

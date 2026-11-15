@@ -285,7 +285,7 @@ export class WorkerPool {
         };
       case 'kimi':
         return {
-          provider: new KimiProvider(instance.commandConfig),
+          provider: instance.commandConfig.protocol === 'hosted' ? new HostedAcpProvider('kimi') : new KimiProvider(instance.commandConfig),
           commandConfig: instance.commandConfig,
         };
       case 'goose':

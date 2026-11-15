@@ -1613,7 +1613,7 @@ function buildCommandConfigFromFile(
     `${provider}.instances.${instanceId}.launch.singleton`,
   );
   const protocol = raw.protocol;
-  if (protocol !== undefined && (protocol !== 'hosted' || !['muse', 'grok', 'antigravity'].includes(provider) || runtime.mode !== 'native')) {
+  if (protocol !== undefined && (protocol !== 'hosted' || !['muse', 'grok', 'antigravity', 'kimi'].includes(provider) || runtime.mode !== 'native')) {
     throw new Error(`${provider}.instances.${instanceId}.protocol requires a supported native hosted target.`);
   }
 

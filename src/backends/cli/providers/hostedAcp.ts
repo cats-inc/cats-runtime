@@ -8,6 +8,13 @@ import { providerSessionUnavailableEvent } from '../../../core/runtime/providerS
 import { compileRuntimeTurnPrompt } from './prompt.js';
 import { ACP_INTERACTION_KINDS, GROK_INTERACTION_KINDS, acpReply, mapAcpPermission, mapGrokInput } from './hostedAcpInteractions.js';
 import { sameHostedWorkspace } from './hostedWorkspace.js';
+import { defaultKimiComputerUseHost, kimiComputerUseDependency, type KimiComputerUseHost } from '../kimi/computerUse.js';
+
+/** Kimi's streamed tool arguments are kept only until their permission request; bounded per call and per turn. */
+const MAX_KIMI_TOOL_ARGS = 64 * 1024;
+const MAX_KIMI_TRACKED_TOOLS = 256;
+/** Kimi ACP "Default: Manual approvals; tools execute normally." Every other mode approves without asking. */
+const KIMI_APPROVAL_MODE = 'default';
 
 export const ACP_ADMISSIBLE_CEILINGS: Array<{ access: ExecutionAccess; network: boolean }> = [
   { access: 'full-access', network: true },
@@ -27,7 +34,7 @@ const emptyInventory = (): SessionToolInventory => ({ state: 'not_observed', obs
   coverage: 'top-level-mcp', pages: 0, servers: [], dynamicTools: [], builtins: 'not_exposed_by_provider',
   reason: 'native_protocol_does_not_expose_tool_inventory' });
 
-/** Native Grok ACP and Google's official Antigravity ACP, hosted by the CLI worker lifecycle. */
+/** Native Grok ACP, Google's official Antigravity ACP and `kimi acp`, hosted by the CLI worker lifecycle. */
 export class HostedAcpProvider implements Provider {
   readonly sessionMcpTransport = 'stdin' as const;
   readonly capabilities: ProviderCapabilities = { resume: true, fork: false, permissions: true,
@@ -49,8 +56,14 @@ export class HostedAcpProvider implements Provider {
   private tools = new Map<string, { name: string; completed: boolean }>();
   private permissions = new Map<string | number, { toolId: string; interactionId: string; answered: boolean }>();
   private completedPermissions = new Set<string | number>();
+  /** Kimi: command names from `available_commands_update`; installed plugin skills appear there. */
+  private commands: string[] | null = null;
+  /** Kimi: the latest streamed argument text per tool call, since its permission request carries no input. */
+  private toolArgs = new Map<string, string>();
+  private kimiRequested = new Set<string>();
 
-  constructor(readonly name: 'grok' | 'antigravity') {
+  constructor(readonly name: 'grok' | 'antigravity' | 'kimi',
+    private readonly kimiHost: KimiComputerUseHost = defaultKimiComputerUseHost()) {
     if (name === 'grok') this.capabilities.interactions = { version: 1, kinds: GROK_INTERACTION_KINDS };
     // Native credential persistence is not yet verified for Google's executable.
     if (name === 'antigravity') this.capabilities.sessionMcpServers = false;
@@ -75,10 +88,12 @@ export class HostedAcpProvider implements Provider {
     this.state = 'uninitialized'; this.sessionId = undefined; this.promptId = undefined;
     this.pendingPrompt = null; this.pendingControl = null; this.requests.clear(); this.tools.clear();
     this.permissions.clear(); this.completedPermissions.clear(); this.builtinTools = []; this.inventory = emptyInventory();
-    this.supportsMcpInventory = false;
+    this.supportsMcpInventory = false; this.commands = null; this.toolArgs.clear(); this.kimiRequested.clear();
     this.policy = { source: policy.mode, requested: structuredClone(policy), status: 'not_observed',
       coverage: 'local-process-only', configurationSources: ['native-provider-configuration'] };
     if (this.name === 'antigravity') return process.platform === 'linux' ? ['--uid='] : [];
+    // The model and approval mode are session config options, set after session/new or session/resume.
+    if (this.name === 'kimi') return ['acp'];
     const effort = options.modelControls?.['grok.reasoning_effort'];
     return ['agent', '--no-leader', ...(options.model ? ['--model', options.model] : []),
       ...(typeof effort === 'string' ? ['--reasoning-effort', effort] : []), 'stdio'];
@@ -86,6 +101,10 @@ export class HostedAcpProvider implements Provider {
 
   composeLaunchArgs(configuredArgs: readonly string[], spawnArgs: readonly string[]): string[] {
     if (configuredArgs.some(arg => /^(?:agent|stdio|--leader|--output-format|--resume|--continue|--fork|--session-id|--prompt|-p)(?:=|$)/u.test(arg))) {
+      throw new Error('Configured arguments conflict with the hosted ACP lifecycle.');
+    }
+    // Kimi's own mode flags would approve tool calls before the host could ask.
+    if (this.name === 'kimi' && configuredArgs.some(arg => /^(?:acp|-y|--yolo|--auto|--plan|-S|--session|-c)(?:=|$)/u.test(arg))) {
       throw new Error('Configured arguments conflict with the hosted ACP lifecycle.');
     }
     if (this.name !== 'grok') return [...configuredArgs, ...spawnArgs];
@@ -132,7 +151,7 @@ export class HostedAcpProvider implements Provider {
   }
   private startTurn(prompt: string): string {
     if (this.promptId) throw new Error('Hosted ACP already has an active turn.');
-    this.tools.clear(); this.permissions.clear(); this.completedPermissions.clear();
+    this.tools.clear(); this.permissions.clear(); this.completedPermissions.clear(); this.toolArgs.clear();
     return this.request('session/prompt', { sessionId: this.sessionId, prompt: [{ type: 'text', text: prompt }] });
   }
   private mcpServers(): Record<string, unknown>[] {
@@ -152,7 +171,8 @@ export class HostedAcpProvider implements Provider {
     this.state = 'ready';
     // This verifies only the unrestricted admission ceiling. ACP does not report an effective
     // approval policy, so no observed approval/reviewer or narrower sandbox is invented.
-    this.policy = { ...this.policy, status: 'verified', reason: 'unrestricted_ceiling_native_approval_rules_inherited' };
+    this.policy = { ...this.policy, status: 'verified', reason: this.name === 'kimi'
+      ? 'unrestricted_ceiling_kimi_default_approval_mode' : 'unrestricted_ceiling_native_approval_rules_inherited' };
     return { type: 'init', sessionId: this.sessionId,
       mcpServers: (this.options.mcpServers ?? []).map(server => ({ name: server.name, status: 'unknown' })) };
   }
@@ -164,6 +184,29 @@ export class HostedAcpProvider implements Provider {
     this.pendingControl = this.request('session/set_config_option', { sessionId: this.sessionId,
       configId: 'reasoning_effort', value: effort });
     return null;
+  }
+
+  /**
+   * Kimi keeps its permission mode and model per session, including across resume, and a
+   * user's config can start a session in a mode that approves without asking. Each value is
+   * set through session/set_config_option and confirmed from the returned options before a
+   * prompt is admitted; an unconfirmed value fails the session instead of being retried.
+   */
+  private kimiConfigured(result: Record<string, unknown>): StreamEvent | null {
+    const current = (id: string) => Array.isArray(result.configOptions)
+      ? result.configOptions.map(record).find(option => option?.id === id)?.currentValue : undefined;
+    const wanted: Array<[string, string]> = [['mode', KIMI_APPROVAL_MODE], ...this.options.model ? [['model', this.options.model] as [string, string]] : []];
+    for (const [configId, value] of wanted) {
+      if (current(configId) === value) continue;
+      if (this.kimiRequested.has(configId)) {
+        return this.fail(configId === 'mode' ? 'Kimi did not confirm its Default approval mode; no prompt was sent.'
+          : 'Kimi did not confirm the requested model; no prompt was sent.');
+      }
+      this.kimiRequested.add(configId);
+      this.pendingControl = this.request('session/set_config_option', { sessionId: this.sessionId, configId, value });
+      return null;
+    }
+    return this.ready();
   }
 
   private effortMatches(result: Record<string, unknown>, effort: unknown): boolean {
@@ -211,6 +254,7 @@ export class HostedAcpProvider implements Provider {
         this.sessionId ??= String(result.sessionId);
         const cwd = record(result._meta)?.currentWorkingDirectory;
         if (cwd !== undefined && !sameHostedWorkspace(this.options.cwd, cwd)) return this.fail('Native ACP returned a different workspace.');
+        if (this.name === 'kimi') return this.kimiConfigured(result);
         if (this.options.model && record(result.models)?.currentModelId !== this.options.model) {
           this.pendingControl = this.request('session/set_model', { sessionId: this.sessionId, modelId: this.options.model });
           return null;
@@ -219,6 +263,7 @@ export class HostedAcpProvider implements Provider {
       }
       if (method === 'session/set_model') return this.configured(result);
       if (method === 'session/set_config_option') {
+        if (this.name === 'kimi') return this.kimiConfigured(result);
         return this.effortMatches(result, this.options.modelControls?.['grok.reasoning_effort']) ? this.ready()
           : this.fail('Grok did not confirm the requested reasoning effort; no prompt was sent.');
       }
@@ -236,9 +281,14 @@ export class HostedAcpProvider implements Provider {
     if (update.sessionUpdate === 'available_commands_update') {
       const tools = record(update._meta)?.tools;
       if (this.name === 'grok' && Array.isArray(tools)) this.builtinTools = tools.filter((tool): tool is string => typeof tool === 'string' && tool.length <= 256).slice(0, 512);
+      if (this.name === 'kimi' && Array.isArray(update.availableCommands)) {
+        this.commands = update.availableCommands.slice(0, 512).map(record)
+          .flatMap(command => typeof command?.name === 'string' && command.name.length <= 256 ? [command.name] : []);
+      }
       return null;
     }
     if (this.state !== 'ready' || !this.promptId) return null; // Load-history notifications never become a new answer.
+    if (this.name === 'kimi') this.trackKimiArguments(update);
     const content = record(update.content);
     if (content?.type === 'text' && typeof content.text === 'string') {
       if (update.sessionUpdate === 'agent_message_chunk') return { type: 'text', text: content.text };
@@ -255,6 +305,32 @@ export class HostedAcpProvider implements Provider {
       text: textContent(update.content), isError: update.status === 'failed' };
     return previous ? null : { type: 'tool_use', toolId: update.toolCallId, toolName: name,
       ...(record(update.rawInput) ? { toolArgs: record(update.rawInput) } : {}) };
+  }
+
+  /**
+   * Kimi 2.6.0 streams a tool call's arguments as the cumulative JSON text of its in-progress
+   * updates and sends `session/request_permission` with only the tool name. The last text seen
+   * becomes the permission's input, so the owner sees what is about to run (for computer use,
+   * the JavaScript cell) instead of approving blind.
+   */
+  private trackKimiArguments(update: Record<string, unknown>): void {
+    if (typeof update.toolCallId !== 'string' || !['tool_call', 'tool_call_update'].includes(String(update.sessionUpdate))) return;
+    if (update.status === 'completed' || update.status === 'failed') { this.toolArgs.delete(update.toolCallId); return; }
+    const text = textContent(update.content);
+    if (!text || text.length > MAX_KIMI_TOOL_ARGS) return;
+    if (!this.toolArgs.has(update.toolCallId) && this.toolArgs.size >= MAX_KIMI_TRACKED_TOOLS) return;
+    this.toolArgs.set(update.toolCallId, text);
+  }
+
+  private kimiPermissionParams(params: Record<string, unknown>): Record<string, unknown> {
+    const tool = record(params.toolCall);
+    if (!tool || tool.rawInput !== undefined || typeof tool.toolCallId !== 'string') return params;
+    const text = this.toolArgs.get(tool.toolCallId);
+    if (!text) return params;
+    try {
+      const rawInput = record(JSON.parse(text));
+      return rawInput ? { ...params, toolCall: { ...tool, rawInput } } : params;
+    } catch { return params; }
   }
 
   buildAutoResponse(line: string): string | null {
@@ -286,7 +362,8 @@ export class HostedAcpProvider implements Provider {
     const id = input.id;
     if (this.permissions.has(id) || this.completedPermissions.has(id)) return null;
     const extension = input.method !== 'session/request_permission';
-    const mapped = extension ? mapGrokInput(params, input.method === '_x.ai/exit_plan_mode') : mapAcpPermission(params, this.options.cwd);
+    const mapped = extension ? mapGrokInput(params, input.method === '_x.ai/exit_plan_mode')
+      : mapAcpPermission(this.name === 'kimi' ? this.kimiPermissionParams(params) : params, this.options.cwd);
     const reply = (result: Record<string, unknown>) => acpReply(id, extension ? { result } : result);
     const fallback = () => reply(mapped.result({ action: 'cancel' }));
     if (!context.interactions || !this.options.interactionHost?.kinds.includes(mapped.prompt.kind)
@@ -333,7 +410,13 @@ export class HostedAcpProvider implements Provider {
     }
     return { interactions: { version: 1, supported: [...this.capabilities.interactions!.kinds], host: structuredClone(this.options.interactionHost!) },
       policy: structuredClone(this.policy), inventory: { ...structuredClone(this.inventory),
-        ...(this.builtinTools.length ? { builtins: 'observed', builtinTools: [...this.builtinTools] } : {}) }, dependencies: [] };
+        ...(this.builtinTools.length ? { builtins: 'observed', builtinTools: [...this.builtinTools] } : {}) },
+      dependencies: this.name === 'kimi' ? [await kimiComputerUseDependency(this.commands, this.kimiHost)] : [] };
+  }
+
+  /** A pending permission or a started tool keeps the turn alive while the native agent is silent. */
+  isAwaitingNativeWork(): boolean {
+    return Boolean(this.promptId) && (this.permissions.size > 0 || [...this.tools.values()].some(tool => !tool.completed));
   }
 
   classifyLaunchFailure(input: ProviderLaunchFailureInput): RuntimeProviderRefusal | null {
@@ -346,11 +429,17 @@ export class HostedAcpProvider implements Provider {
 /**
  * Grok 1.0.77 `agent stdio` answers `session/resume` for a session it has no local
  * directory for with JSON-RPC -32603 `Path not found.` and `data.code: FS_NOT_FOUND`
- * (capture: grok-1.0.77/acp-resume-missing.error.redacted.ndjson). `session/load`,
- * other hosted providers and other rejections stay generic until a capture shows
- * their shape.
+ * (capture: grok-1.0.77/acp-resume-missing.error.redacted.ndjson). Kimi 2.6.0
+ * `kimi acp` answers -32602 `Invalid params: Unknown sessionId: <id>` (capture:
+ * kimi-2.6.0/acp-resume-missing.error.redacted.ndjson). `session/load`, other hosted
+ * providers and other rejections stay generic until a capture shows their shape.
  */
 export function hostedResumeMissing(provider: string, method: string, error: unknown): boolean {
-  if (provider !== 'grok' || method !== 'session/resume') return false;
+  if (method !== 'session/resume') return false;
+  if (provider === 'kimi') {
+    const failure = record(error);
+    return failure?.code === -32602 && typeof failure.message === 'string' && /Unknown sessionId/u.test(failure.message);
+  }
+  if (provider !== 'grok') return false;
   return record(record(error)?.data)?.code === 'FS_NOT_FOUND';
 }

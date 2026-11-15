@@ -133,7 +133,7 @@ with a negotiated `interactionHost` and an on-request policy, the requests it se
 as `tool_approval`, but some tools run without one (`tabs_context_mcp` did, 2026-10-28)
 and the extension's own site prompts stay in the browser.
 
-### Hosted Muse, Grok and official Antigravity ACP
+### Hosted Muse, Grok, Kimi and official Antigravity ACP
 
 Set `protocol: hosted` on a native CLI instance under
 `backends.cli.providers.<provider>.instances.<instance>` to select the new
@@ -154,6 +154,16 @@ All three require an interaction host and this policy on create/resume:
 ```json
 { "version": 1, "mode": "provider", "constraints": { "maxAccess": "full-access", "network": true } }
 ```
+
+Kimi Code's hosted target (`protocol: hosted` on a `kimi` instance) runs `kimi acp`
+under the same policy. Runtime sets the session's Kimi `mode` to `default` (manual
+approvals) and the requested model through `session/set_config_option`, and sends a
+prompt only after Kimi confirms both. Its approval cards include the arguments Kimi
+streamed for the call, so a computer-use card shows the JavaScript cell. The session
+capability snapshot's `computer_use` dependency reports whether Kimi loaded its
+computer-use plugin, whether the Windows runtime `kimi-cu.exe` is installed and whether
+`node` on PATH is 24.15 or later. A `kimi` instance without `protocol: hosted` stays on
+print mode, which runs installed plugins without asking ([ADR-054](decisions/054-drive-kimi-code-through-print-mode-stream-json.md) decision 11).
 
 Explicit overrides, narrower ceilings, legacy tool allowlists and read-only
 workspaces are rejected. Native permission settings/reviewers remain in force;

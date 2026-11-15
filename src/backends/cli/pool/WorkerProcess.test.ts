@@ -217,10 +217,34 @@ describe('WorkerProcess PowerShell helpers', () => {
       vi.useRealTimers();
     }
   });
+
+  it('keeps a silent turn alive while the provider awaits an approval or a running tool', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    let awaiting = true;
+    const worker = new WorkerProcess(createClockedProvider(() => awaiting), { cwd: process.cwd() }, createNodeCommandConfig(),
+      { retries: 1, timeoutMs: 30_000, idleTimeoutMs: 120_000 });
+    const stream = worker.streamMessage('ignored');
+    try {
+      expect((await stream.next()).value).toMatchObject({ type: 'init' });
+      let settled = false;
+      const result = stream.next();
+      void result.then(() => { settled = true; }, () => { settled = true; });
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(settled).toBe(false);
+      awaiting = false;
+      const failure = expect(result).rejects.toThrow('stopped responding after the initial response for 120000ms.');
+      await vi.advanceTimersByTimeAsync(120_000);
+      await failure;
+    } finally {
+      worker.cancel();
+      vi.useRealTimers();
+    }
+  });
 });
 
-function createClockedProvider(): Provider {
+function createClockedProvider(awaiting?: () => boolean): Provider {
   return {
+    ...(awaiting ? { isAwaitingNativeWork: awaiting } : {}),
     name: 'antigravity', ephemeral: true,
     capabilities: { resume: true, fork: false, permissions: false },
     buildSpawnArgs: () => ['-e',

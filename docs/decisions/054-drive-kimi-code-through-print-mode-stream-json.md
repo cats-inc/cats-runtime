@@ -1,7 +1,8 @@
 # ADR-054: Drive Kimi Code through print-mode stream-json
 
 Date: 2026-11-16
-Status: Accepted; no turn on a real Kimi Code plan has run yet
+Status: Accepted. Amended 2026-11-16 (decision 11): a hosted `kimi acp` target carries Kimi's
+own computer use with a per-call approval; real-plan turns ran on Kimi Code 2.6.0 for that path.
 Evidence: [Kimi Code CLI provider](../research/2026-11-16-kimi-code-cli-provider.md).
 
 ## Context
@@ -77,6 +78,33 @@ has `kimi acp`, an ACP server over stdio.
       `/kimi/sessions/discover` match the other native providers.
     - All of these read the same Kimi home as turns: `KIMI_CODE_HOME`, else `~/.kimi-code`.
 
+11. **Hosted `kimi acp` for approvals and computer use (amendment, 2026-11-16).** Kimi's computer
+    use is its own marketplace plugin (`kimi-cu-win` on Windows): an MCP server plus a skill that
+    Kimi loads at session start from the user's Kimi home. Print mode loads it too and approves
+    every call without asking, and Kimi has no switch that turns plugins off for one process.
+    Hosts that want the owner to approve each desktop action therefore select a native instance
+    with `protocol: hosted` (ADR-049), which runs `kimi acp` through `HostedAcpProvider`:
+    - Admission is ADR-049's: an interaction host and the provider policy with a full machine and
+      network ceiling. Kimi has no sandbox, so no narrower ceiling is offered.
+    - After `session/new` or `session/resume`, Runtime sets the session config option `mode` to
+      `default` ("Manual approvals"), and `model` to the requested alias, and admits a prompt only
+      after Kimi returns both values. A user's config can start sessions in `auto` or `yolo`,
+      which approve without asking; a mode Kimi does not confirm fails the session.
+    - `session/request_permission` becomes the existing ACP approval card with only Kimi's
+      `allow_once` choice. Kimi's request names the tool but carries no input, so the card shows
+      the arguments Kimi streamed for that call just before it: for computer use, the JavaScript
+      cell about to run.
+    - Session MCP travels in `session/new`/`session/resume` headers. Kimi kept the bearer value
+      out of its session store and logs.
+    - `Unknown sessionId` (-32602) on `session/resume` is `provider_session_unavailable`.
+    - The capability snapshot's `computer_use` dependency reports whether the session loaded the
+      plugin (its `skill:kimi-cu…` command), whether the Windows runtime `kimi-cu.exe` is
+      installed, and whether `node` on PATH is 24.15 or later, with the matching repair step.
+      Runtime never installs or configures the plugin; the owner runs `/plugins` in Kimi.
+    - While a permission is unanswered or a started tool has not finished, the worker's turn
+      inactivity timer re-arms instead of failing the turn. This applies to every provider with
+      an interaction store and to hosted ACP tools.
+
 ## Consequences
 
 - Kimi appears in every Runtime provider list between Pi and Kiro, including the Playground,
@@ -94,3 +122,7 @@ has `kimi acp`, an ACP server over stdio.
 - Until an account with a Kimi Code plan runs a turn, successful output is known from the shipped
   writer source and from Kimi 2.5.3 driven against a local OpenAI-compatible stub, not from Moonshot's
   service.
+- A print-mode target runs any plugin the user installed, including computer use, without asking.
+  Hosts that cannot accept that select the hosted target (decision 11).
+- The hosted target has no wire-journal usage readback yet, and Kimi's per-session `thinking`
+  option is not offered as a model control.

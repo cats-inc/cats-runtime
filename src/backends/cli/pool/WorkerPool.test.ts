@@ -67,7 +67,7 @@ describe('WorkerPool', () => {
   });
 
   it('resolves hosted capabilities per target and excludes hosted protocols from bounded raw media', () => {
-    for (const provider of ['grok', 'muse', 'antigravity'] as const) {
+    for (const provider of ['grok', 'muse', 'antigravity', 'kimi'] as const) {
       const config = loadConfig({ HOME: '/tmp/cats-runtime-workerpool-test', USERPROFILE: '' }, {
         providerYaml: `providers: { ${provider}: { instances: { native: {}, hosted: { protocol: hosted } } } }`,
       });
@@ -77,6 +77,7 @@ describe('WorkerPool', () => {
       expect(pool.getCapabilities(provider, 'native').interactions).toBeUndefined();
       expect(pool.getCapabilities(provider, 'hosted').interactions?.version).toBe(1);
       expect(pool.getCapabilities(provider, 'hosted').sessionMcpServers).toBe(provider !== 'antigravity');
+      if (provider === 'kimi') continue;
       const hosted = resolveProviderInstance(config, provider, 'hosted');
       expect(({ grok: supportsGrokImage, muse: supportsMuseImage, antigravity: supportsAntigravityImage })[provider](hosted)).toBe(false);
     }
