@@ -50,6 +50,9 @@ describe('hosted Kimi ACP', () => {
   it('starts `kimi acp` only under an unrestricted provider policy and refuses approval-changing flags', () => {
     const { provider, args } = create();
     expect(args).toEqual(['acp']);
+    // A cold Kimi launch took 9-30 s on Windows hosts; other hosted adapters keep the worker's 10 s.
+    expect(provider.sessionInitializationTimeoutMs).toBe(45_000);
+    expect(new HostedAcpProvider('grok').sessionInitializationTimeoutMs).toBeUndefined();
     expect(provider.composeLaunchArgs(['--add-dir', '/extra'], args)).toEqual(['--add-dir', '/extra', 'acp']);
     for (const flag of ['--yolo', '-y', '--auto', '--plan', 'acp', '--session=abc', '-c']) {
       expect(() => provider.composeLaunchArgs([flag], args)).toThrow('conflict');
@@ -112,12 +115,12 @@ describe('hosted Kimi ACP', () => {
     expect(event).not.toHaveProperty('code');
   });
 
-  it('keeps the plan error generic', () => {
+  it('passes on Kimi\'s own words when a plan does not include the model, without a session code', () => {
     const { provider } = boot();
     const turn = parse(provider.buildStdinMessage('fixture'));
     const failure = { ...parse(capture('acp-prompt-plan-required.error.redacted.ndjson')), id: turn.id };
     const [event] = events(provider.parseStreamLine(JSON.stringify(failure)));
-    expect(event).toMatchObject({ type: 'error' });
+    expect(event).toMatchObject({ type: 'error', text: expect.stringContaining('Kimi said: Authentication required: Your current subscription') });
     expect(event).not.toHaveProperty('code');
   });
 
@@ -160,6 +163,28 @@ describe('hosted Kimi ACP', () => {
     expect(parse((await bare.buildServerResponse(permission, { signal: new AbortController().signal,
       interactions: { request: vi.fn(), resolve: vi.fn(), unavailable } }))!).result).toEqual({ outcome: { outcome: 'cancelled' } });
     expect(unavailable).toHaveBeenCalledWith('tool_approval', 'no_supported_one_action_permission');
+  });
+
+  it('asks before Bash and Write too, as command and file approvals from the kind Kimi gave the call', async () => {
+    const { provider } = boot(); const context = host();
+    provider.buildStdinMessage('fixture');
+    for (const line of capture('acp-bash-write-permission.success.redacted.ndjson').split('\n')) {
+      const frame = parse(line);
+      if (frame.method === 'session/request_permission') {
+        expect(frame.params.toolCall.kind).toBeUndefined();
+        await provider.buildServerResponse(line, context);
+        const card = context.interactions.request.mock.calls.at(-1)![0];
+        parse(card.response({ action: 'accept' }));
+      } else {
+        await provider.buildServerResponse(line, context);
+        provider.parseStreamLine(line);
+      }
+    }
+    const [bash, write] = context.interactions.request.mock.calls.map(call => call[0].prompt);
+    expect(bash).toMatchObject({ kind: 'command_approval', title: 'Bash', command: 'echo cats-probe' });
+    expect(write).toMatchObject({ kind: 'file_approval', title: 'Write' });
+    expect(write!.message).toContain('probe.txt');
+    expect(context.interactions.resolve).toHaveBeenCalledTimes(2);
   });
 
   it('forces Default mode on a resumed session too', () => {
