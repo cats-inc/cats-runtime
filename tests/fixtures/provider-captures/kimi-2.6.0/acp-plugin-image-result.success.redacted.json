@@ -1,0 +1,41 @@
+{
+  "jsonrpc": "2.0",
+  "method": "session/update",
+  "params": {
+    "sessionId": "session_fixture",
+    "update": {
+      "sessionUpdate": "tool_call_update",
+      "toolCallId": "2:tool_fixture",
+      "status": "completed",
+      "content": [
+        {
+          "type": "content",
+          "content": {
+            "type": "text",
+            "text": "[{\"type\":\"text\",\"text\":\"image-sent\"},{\"type\":\"image_url\",\"imageUrl\":{\"url\":\"kimi-file://f_mcp_<sha256>\"}},{\"type\":\"text\",\"text\":\"\\n<mcp-result-extras>\\n{\\\"_meta\\\":{\\\"kimi/nodeReplExecutionDurationMs\\\":22,\\\"kimi/nodeReplSession\\\":{\\\"generation\\\":1,\\\"resourceDir\\\":\\\"<home>\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\kimi-node-repl-session-<id>\\\",\\\"sessionId\\\":\\\"<repl-session>\\\"}}}\\n</mcp-result-extras>\"},{\"type\":\"text\",\"text\":\"Original attachment saved at: \\\"<home>/.kimi-code/sessions/wd_workspace_<hash>/session_fixture/media/f_mcp_<sha256>.png\\\"\\nAttachment reference: \\\"kimi-file://f_mcp_<sha256>\\\"\\nSession-relative attachment: \\\"media/f_mcp_<sha256>.png\\\"\\nMIME: \\\"image/png\\\"; size: 70 bytes. Pass the attachment reference to Read or ReadMediaFile in the current session. For other binary formats, Read reports the resolved local path for a converter.\"}]"
+          }
+        }
+      ],
+      "rawOutput": [
+        {
+          "type": "text",
+          "text": "image-sent"
+        },
+        {
+          "type": "image_url",
+          "imageUrl": {
+            "url": "kimi-file://f_mcp_<sha256>"
+          }
+        },
+        {
+          "type": "text",
+          "text": "\n<mcp-result-extras>\n{\"_meta\":{\"kimi/nodeReplExecutionDurationMs\":22,\"kimi/nodeReplSession\":{\"generation\":1,\"resourceDir\":\"<home>\\\\AppData\\\\Local\\\\Temp\\\\kimi-node-repl-session-<id>\",\"sessionId\":\"<repl-session>\"}}}\n</mcp-result-extras>"
+        },
+        {
+          "type": "text",
+          "text": "Original attachment saved at: \"<home>/.kimi-code/sessions/wd_workspace_<hash>/session_fixture/media/f_mcp_<sha256>.png\"\nAttachment reference: \"kimi-file://f_mcp_<sha256>\"\nSession-relative attachment: \"media/f_mcp_<sha256>.png\"\nMIME: \"image/png\"; size: 70 bytes. Pass the attachment reference to Read or ReadMediaFile in the current session. For other binary formats, Read reports the resolved local path for a converter."
+        }
+      ]
+    }
+  }
+}

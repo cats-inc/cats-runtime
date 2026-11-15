@@ -251,6 +251,9 @@ backends:
             runner: auto
             # Kimi keeps sessions under $KIMI_CODE_HOME (default ~/.kimi-code);
             # Runtime reads a session's wire journal there for usage after a turn.
+            # Print mode approves every tool, including installed plugins such as
+            # Kimi Computer Use. `protocol: hosted` runs `kimi acp` instead and asks
+            # the host to approve each call (ADR-054 decision 11).
 
       auggie:
         instances:

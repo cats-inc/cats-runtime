@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":6,"error":{"code":-32000,"message":"Authentication required: Your current subscription does not have access to kimi-for-coding-highspeed. Upgrade to higher-tier Kimi Code plans. Upgrade: https://www.kimi.com/code?from=server_highspeed_error#pricing"}}

@@ -61,7 +61,7 @@ function loadConfigWithoutProviderFile(env: NodeJS.ProcessEnv = {}, providerYaml
 
 describe('config platform defaults', () => {
   it('opts native provider tools in per target without replacing legacy defaults', () => {
-    for (const provider of ['muse', 'grok', 'antigravity'] as const) {
+    for (const provider of ['muse', 'grok', 'antigravity', 'kimi'] as const) {
       const config = loadConfigWithoutProviderFile({}, `providers: { ${provider}: { instances: { native: { protocol: hosted } } } }`);
       const target = resolveProviderInstance(config, provider);
       expect(target.commandConfig.protocol).toBe('hosted');
