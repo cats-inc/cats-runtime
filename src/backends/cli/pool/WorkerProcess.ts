@@ -552,11 +552,6 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         if (!sawEvent || sawTerminalEvent || !this.process || this.process.exitCode !== null) {
           return;
         }
-        // An owner deciding on an approval card, or a long native tool, is not an unresponsive provider.
-        if (this.interactions?.waiting || this.provider.isAwaitingNativeWork?.()) {
-          armTurnInactivityTimeout();
-          return;
-        }
         error = this.buildProviderRefusalError({
           category: 'true_timeout',
           message: `${formatProviderDisplayName(this.provider.name)} stopped responding after the initial response for ${currentAttemptIdleTimeoutMs}ms.`,

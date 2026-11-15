@@ -13,8 +13,18 @@ import { defaultKimiComputerUseHost, kimiComputerUseDependency, type KimiCompute
 /** Kimi's streamed tool arguments are kept only until their permission request; bounded per call and per turn. */
 const MAX_KIMI_TOOL_ARGS = 64 * 1024;
 const MAX_KIMI_TRACKED_TOOLS = 256;
-/** Kimi ACP "Default: Manual approvals; tools execute normally." Every other mode approves without asking. */
+/** Kimi ACP "Default: Manual approvals; tools execute normally." `auto` and `yolo` approve without asking. */
 const KIMI_APPROVAL_MODE = 'default';
+/** Modes a live session may move to: Plan is "Read-only planning; no tool execution". */
+const KIMI_ASKING_MODES = new Set([KIMI_APPROVAL_MODE, 'plan']);
+
+/** A mode change after admission, from either of Kimi's notifications, to a mode that would stop asking. */
+function kimiLeftApprovalMode(update: Record<string, unknown>): boolean {
+  const mode = update.sessionUpdate === 'current_mode_update' ? update.currentModeId
+    : update.sessionUpdate === 'config_option_update' && Array.isArray(update.configOptions)
+      ? update.configOptions.map(record).find(option => option?.id === 'mode')?.currentValue : undefined;
+  return mode !== undefined && !KIMI_ASKING_MODES.has(String(mode));
+}
 
 export const ACP_ADMISSIBLE_CEILINGS: Array<{ access: ExecutionAccess; network: boolean }> = [
   { access: 'full-access', network: true },
@@ -59,7 +69,7 @@ export class HostedAcpProvider implements Provider {
   /** Kimi: command names from `available_commands_update`; installed plugin skills appear there. */
   private commands: string[] | null = null;
   /** Kimi: the latest streamed argument text per tool call, since its permission request carries no input. */
-  private toolArgs = new Map<string, string>();
+  private toolArgs = new Map<string, string | { length: number }>();
   private kimiRequested = new Set<string>();
 
   constructor(readonly name: 'grok' | 'antigravity' | 'kimi',
@@ -287,6 +297,9 @@ export class HostedAcpProvider implements Provider {
       }
       return null;
     }
+    if (this.name === 'kimi' && this.state === 'ready' && kimiLeftApprovalMode(update)) {
+      return this.fail('Kimi left its Default approval mode; the session was stopped so that no tool runs without approval.');
+    }
     if (this.state !== 'ready' || !this.promptId) return null; // Load-history notifications never become a new answer.
     if (this.name === 'kimi') this.trackKimiArguments(update);
     const content = record(update.content);
@@ -317,20 +330,30 @@ export class HostedAcpProvider implements Provider {
     if (typeof update.toolCallId !== 'string' || !['tool_call', 'tool_call_update'].includes(String(update.sessionUpdate))) return;
     if (update.status === 'completed' || update.status === 'failed') { this.toolArgs.delete(update.toolCallId); return; }
     const text = textContent(update.content);
-    if (!text || text.length > MAX_KIMI_TOOL_ARGS) return;
+    if (!text) return;
+    // An oversized argument is remembered only as its size, so no shorter, stale prefix survives.
+    if (text.length > MAX_KIMI_TOOL_ARGS) { this.toolArgs.set(update.toolCallId, { length: text.length }); return; }
     if (!this.toolArgs.has(update.toolCallId) && this.toolArgs.size >= MAX_KIMI_TRACKED_TOOLS) return;
     this.toolArgs.set(update.toolCallId, text);
   }
 
+  /**
+   * The input an owner approves. When Kimi's streamed arguments cannot be shown (missing,
+   * oversized or not a JSON object) the card says so instead of silently showing only the tool
+   * name, so a cell that hides its code is never approved as if it had none.
+   */
   private kimiPermissionParams(params: Record<string, unknown>): Record<string, unknown> {
     const tool = record(params.toolCall);
     if (!tool || tool.rawInput !== undefined || typeof tool.toolCallId !== 'string') return params;
-    const text = this.toolArgs.get(tool.toolCallId);
-    if (!text) return params;
-    try {
-      const rawInput = record(JSON.parse(text));
-      return rawInput ? { ...params, toolCall: { ...tool, rawInput } } : params;
-    } catch { return params; }
+    const tracked = this.toolArgs.get(tool.toolCallId);
+    let rawInput: Record<string, unknown> | undefined;
+    if (typeof tracked === 'string') {
+      try { rawInput = record(JSON.parse(tracked)); } catch { rawInput = undefined; }
+    }
+    rawInput ??= { notShown: typeof tracked === 'object'
+      ? `Kimi sent ${tracked.length} characters of input, more than Cats shows. Decline unless you expected this call.`
+      : 'Kimi did not send this call\'s input in a form Cats can show. Decline unless you expected this call.' };
+    return { ...params, toolCall: { ...tool, rawInput } };
   }
 
   buildAutoResponse(line: string): string | null {
@@ -412,11 +435,6 @@ export class HostedAcpProvider implements Provider {
       policy: structuredClone(this.policy), inventory: { ...structuredClone(this.inventory),
         ...(this.builtinTools.length ? { builtins: 'observed', builtinTools: [...this.builtinTools] } : {}) },
       dependencies: this.name === 'kimi' ? [await kimiComputerUseDependency(this.commands, this.kimiHost)] : [] };
-  }
-
-  /** A pending permission or a started tool keeps the turn alive while the native agent is silent. */
-  isAwaitingNativeWork(): boolean {
-    return Boolean(this.promptId) && (this.permissions.size > 0 || [...this.tools.values()].some(tool => !tool.completed));
   }
 
   classifyLaunchFailure(input: ProviderLaunchFailureInput): RuntimeProviderRefusal | null {

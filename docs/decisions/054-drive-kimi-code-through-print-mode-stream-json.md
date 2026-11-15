@@ -90,10 +90,17 @@ has `kimi acp`, an ACP server over stdio.
       `default` ("Manual approvals"), and `model` to the requested alias, and admits a prompt only
       after Kimi returns both values. A user's config can start sessions in `auto` or `yolo`,
       which approve without asking; a mode Kimi does not confirm fails the session.
+    - If a live session reports a move to a mode other than `default` or `plan` (`plan` runs no
+      tools), Runtime stops the session rather than let calls run without asking.
     - `session/request_permission` becomes the existing ACP approval card with only Kimi's
       `allow_once` choice. Kimi's request names the tool but carries no input, so the card shows
       the arguments Kimi streamed for that call just before it: for computer use, the JavaScript
-      cell about to run.
+      cell about to run. When those arguments are missing, over 64 KiB or not a JSON object, the
+      card says the input cannot be shown instead of showing only the tool name. Kimi sends no
+      ACP tool `kind`, so its requests arrive as `tool_approval`; the shell and edit tools'
+      requests were not captured.
+    - Permission rules the user configured in Kimi itself still apply, as native rules do for the
+      other hosted providers.
     - Session MCP travels in `session/new`/`session/resume` headers. Kimi kept the bearer value
       out of its session store and logs.
     - `Unknown sessionId` (-32602) on `session/resume` is `provider_session_unavailable`.
@@ -101,9 +108,9 @@ has `kimi acp`, an ACP server over stdio.
       plugin (its `skill:kimi-cu…` command), whether the Windows runtime `kimi-cu.exe` is
       installed, and whether `node` on PATH is 24.15 or later, with the matching repair step.
       Runtime never installs or configures the plugin; the owner runs `/plugins` in Kimi.
-    - While a permission is unanswered or a started tool has not finished, the worker's turn
-      inactivity timer re-arms instead of failing the turn. This applies to every provider with
-      an interaction store and to hosted ACP tools.
+    - Like the other hosted targets, the persistent worker has no turn inactivity limit, so an
+      approval card can wait for the host's interaction deadline and a long desktop cell is not
+      cut off by Runtime.
 
 ## Consequences
 

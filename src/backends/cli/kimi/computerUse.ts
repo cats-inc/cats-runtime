@@ -20,15 +20,28 @@ export interface KimiComputerUseHost {
   nodeVersion(): Promise<string | null>;
 }
 
+/** How long one `node --version` answer is reused, so a refreshing page does not spawn a process per read. */
+const NODE_VERSION_TTL_MS = 60_000;
+
+/**
+ * Runtime's own environment, which Kimi's child inherits (the instance may add variables the
+ * plugin does not read).
+ */
 export function defaultKimiComputerUseHost(): KimiComputerUseHost {
+  let cached: { at: number; version: Promise<string | null> } | undefined;
   return {
     platform: process.platform,
     env: process.env,
     exists: existsSync,
-    nodeVersion: () => new Promise(resolve => {
-      execFile('node', ['--version'], { timeout: 5000, env: process.env, ...hiddenWindowsSpawnOptions() },
-        (error, stdout) => resolve(error ? null : String(stdout).trim() || null));
-    }),
+    nodeVersion: () => {
+      if (cached && Date.now() - cached.at < NODE_VERSION_TTL_MS) return cached.version;
+      const version = new Promise<string | null>(resolve => {
+        execFile('node', ['--version'], { timeout: 5000, env: process.env, ...hiddenWindowsSpawnOptions() },
+          (error, stdout) => resolve(error ? null : String(stdout).trim() || null));
+      });
+      cached = { at: Date.now(), version };
+      return version;
+    },
   };
 }
 

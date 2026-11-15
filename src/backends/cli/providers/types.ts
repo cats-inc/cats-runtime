@@ -165,12 +165,6 @@ export interface Provider {
   prepareEphemeralTurn?(turn: TurnInput): void;
   /** Override the default first-event timeout for ephemeral providers. */
   resolveFirstEventTimeoutMs?(defaultTimeoutMs: number): number;
-  /**
-   * True while the native agent is legitimately silent: a permission it asked for is
-   * unanswered or a tool it started has not finished. The turn inactivity timer re-arms
-   * instead of failing the turn.
-   */
-  isAwaitingNativeWork?(): boolean;
   beforeTurn?(opts: ProviderSpawnOptions): Promise<void>;
   afterTurn?(opts: ProviderSpawnOptions): Promise<StreamEvent | StreamEvent[] | null>;
 }

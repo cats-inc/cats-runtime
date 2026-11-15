@@ -102,6 +102,16 @@ describe('hosted Kimi ACP', () => {
     expect(events(provider.parseStreamLine(JSON.stringify(missing)))).toMatchObject([{ type: 'error', code: 'provider_session_unavailable' }]);
   });
 
+  it('keeps other invalid-params resume rejections generic', () => {
+    const { provider } = create({ resumeSessionId: 'session_fixture' });
+    reply(provider, parse(provider.buildInitialization()!), json('acp-initialize.success.redacted.json'));
+    const resume = parse(provider.getPendingControlMessages()!);
+    const [event] = events(provider.parseStreamLine(JSON.stringify({ jsonrpc: '2.0', id: resume.id,
+      error: { code: -32602, message: 'Invalid params: Unknown modeId: bogus' } })));
+    expect(event).toMatchObject({ type: 'error' });
+    expect(event).not.toHaveProperty('code');
+  });
+
   it('keeps the plan error generic', () => {
     const { provider } = boot();
     const turn = parse(provider.buildStdinMessage('fixture'));
@@ -122,7 +132,6 @@ describe('hosted Kimi ACP', () => {
         expect(provider.buildAutoResponse(line)).toBeNull();
         await provider.buildServerResponse(line, context);
         card = context.interactions.request.mock.calls[0]![0];
-        expect(provider.isAwaitingNativeWork()).toBe(true);
         expect(parse(card.response({ action: 'accept' })).result).toEqual({ outcome: { outcome: 'selected', optionId: 'approve_once' } });
       } else {
         await provider.buildServerResponse(line, context);
@@ -134,7 +143,6 @@ describe('hosted Kimi ACP', () => {
     expect(card!.prompt.message).toContain("nodeRepl.write('probe-ok')");
     expect(card!.prompt.message).toContain('Scope: this action only');
     expect(context.interactions.resolve).toHaveBeenCalledWith('card');
-    expect(provider.isAwaitingNativeWork()).toBe(false);
   });
 
   it('declines through the reject option and cancels when the host cannot show tool approvals', async () => {
@@ -152,6 +160,62 @@ describe('hosted Kimi ACP', () => {
     expect(parse((await bare.buildServerResponse(permission, { signal: new AbortController().signal,
       interactions: { request: vi.fn(), resolve: vi.fn(), unavailable } }))!).result).toEqual({ outcome: { outcome: 'cancelled' } });
     expect(unavailable).toHaveBeenCalledWith('tool_approval', 'no_supported_one_action_permission');
+  });
+
+  it('forces Default mode on a resumed session too', () => {
+    const { provider } = create({ resumeSessionId: 'session_fixture' });
+    reply(provider, parse(provider.buildStdinMessage('fixture')), json('acp-initialize.success.redacted.json'));
+    const resume = parse(provider.getPendingControlMessages()!);
+    expect(resume.method).toBe('session/resume');
+    const { sessionId: _sessionId, ...resumed } = withOption(sessionNew(), 'mode', 'auto') as Record<string, unknown>;
+    expect(reply(provider, resume, resumed)).toBeNull();
+    expect(parse(provider.getPendingControlMessages()!)).toMatchObject({ method: 'session/set_config_option', params: { configId: 'mode', value: 'default' } });
+    expect(provider.getPendingTurnStart()).toBeNull();
+  });
+
+  it('stops the session when Kimi leaves Default mode for one that approves by itself, but not for Plan', () => {
+    for (const [mode, fails] of [['plan', false], ['auto', true], ['yolo', true]] as const) {
+      const frames = [
+        { sessionUpdate: 'current_mode_update', currentModeId: mode },
+        { sessionUpdate: 'config_option_update', configOptions: withOption(sessionNew(), 'mode', mode).configOptions },
+      ];
+      for (const update of frames) {
+        const fresh = boot().provider;
+        const [event] = events(fresh.parseStreamLine(JSON.stringify({ jsonrpc: '2.0', method: 'session/update',
+          params: { sessionId: 'session_fixture', update } })));
+        if (fails) expect(event).toMatchObject({ type: 'error', text: expect.stringContaining('Default approval mode') });
+        else expect(event).toBeUndefined();
+        expect(fresh.isSessionFailed()).toBe(fails);
+      }
+    }
+  });
+
+  it('keeps each call\'s arguments on its own card and says when they cannot be shown', async () => {
+    const { provider } = boot(); const context = host();
+    provider.buildStdinMessage('fixture');
+    const update = (toolCallId: string, text: string) => JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: {
+      sessionId: 'session_fixture', update: { sessionUpdate: 'tool_call_update', toolCallId, status: 'in_progress',
+        content: [{ type: 'content', content: { type: 'text', text } }] } } });
+    const permission = (id: number, toolCallId: string) => JSON.stringify({ jsonrpc: '2.0', id, method: 'session/request_permission', params: {
+      sessionId: 'session_fixture', options: [
+        { optionId: 'approve_once', name: 'Approve once', kind: 'allow_once' },
+        { optionId: 'approve_always', name: 'Approve for this session', kind: 'allow_always' },
+        { optionId: 'reject', name: 'Reject', kind: 'reject_once' }],
+      toolCall: { toolCallId, title: 'mcp__plugin-kimi-cu-win_win__js', content: [] } } });
+    provider.parseStreamLine(update('a', '{"code":"first()"}'));
+    provider.parseStreamLine(update('b', '{"code":"second()"}'));
+    provider.parseStreamLine(update('c', '{"code":"broken'));
+    provider.parseStreamLine(update('d', '{"code":"short()"}'));
+    provider.parseStreamLine(update('d', `{"code":"${'x'.repeat(70_000)}"}`));
+    for (const [index, id] of ['b', 'a', 'c', 'd', 'e'].entries()) await provider.buildServerResponse(permission(10 + index, id), context);
+    const messages = context.interactions.request.mock.calls.map(call => call[0].prompt.message ?? '');
+    expect(messages[0]).toContain('second()');
+    expect(messages[0]).not.toContain('first()');
+    expect(messages[1]).toContain('first()');
+    expect(messages[2]).toContain('not send this call');
+    expect(messages[3]).toContain('more than Cats shows');
+    expect(messages[3]).not.toContain('short()');
+    expect(messages[4]).toContain('not send this call');
   });
 
   it('reports a tool result with an image as its text reference, never image bytes', () => {
