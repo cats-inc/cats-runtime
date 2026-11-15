@@ -7,8 +7,9 @@
     row with Up/Down, presses "s" (use this session only), opens /status, reads its Version and
     Model lines, and closes /status with Escape. "alias (resolved id)" in the Model line means
     the row sets the alias; a bare id means the row sets that id.
-    Enter is sent only to run the typed /model and /status commands, never inside the picker, so
-    no row is saved as the default. The settings file must keep its SHA-256 after every row.
+    Enter is sent only to run the typed /model and /status commands and, from 2.1.319, on a
+    collapsed "More models" group row whose footer reads "Enter to expand", so no row is saved
+    as the default. An expanded group row is stepped over in the direction of travel. The settings file must keep its SHA-256 after every row.
     The session model is left at the last row; exit the owned CLI with /exit afterwards.
     Does not launch or log in to Claude Code, send prompts, or edit catalogs.
 .PARAMETER UiHelperPath
@@ -62,30 +63,57 @@ function Invoke-SlashCommand([string]$Command, [string]$Opened) {
     return Wait-WindowsUiText $target -ExpectedText $Opened -TimeoutMilliseconds 8000
 }
 
-function Get-Highlight([string]$Text) {
+# From 2.1.319 older models sit under an unnumbered "More models" group row, marked U+25B8
+# (collapsed) or U+25BE (expanded). While it is highlighted its footer names Enter to expand or
+# collapse it; that Enter selects no model.
+$groupRow = '(?m)^[ \t]*' + $mark + '\s[\u25B8\u25BE]\s+\S'
+$groupFooter = '(?m)^[ \t]*Enter to (?<action>expand|collapse)\b[^\r\n]*Esc to cancel'
+$collapsedGroup = '(?ms)^[ \t]*' + $mark + '\s\u25B8\s+\S.*^[ \t]*Enter to expand\b'
+
+function Get-PickerPosition([string]$Text) {
     $start = $Text.LastIndexOf('Select model')
-    if ($start -lt 0 -or $Text.IndexOf($footer, $start) -lt 0) { throw 'Claude model picker is not fully visible.' }
-    $found = [regex]::Matches($Text.Substring($start), '(?m)^[ \t]*' + $mark + '\s(?<index>\d+)\.\s+(?<rest>[^\r\n]+)')
+    if ($start -lt 0) { throw 'Claude model picker is not fully visible.' }
+    $region = $Text.Substring($start)
+    $found = [regex]::Matches($region, '(?m)^[ \t]*' + $mark + '\s(?<index>\d+)\.\s+(?<rest>[^\r\n]+)')
+    $group = [regex]::Match($region, $groupFooter)
+    if ($found.Count -eq 0 -and $group.Success -and [regex]::Matches($region, $groupRow).Count -eq 1) {
+        return [pscustomobject]@{ Index = 0; Match = $null; Expanded = $group.Groups['action'].Value -eq 'collapse' }
+    }
+    if ($region.IndexOf($footer) -lt 0) { throw 'Claude model picker is not fully visible.' }
     if ($found.Count -ne 1) { throw 'Picker highlight is ambiguous.' }
-    return $found[0]
+    return [pscustomobject]@{ Index = [int]$found[0].Groups['index'].Value; Match = $found[0]; Expanded = $false }
 }
 
 try {
     if ((Get-WindowsUiText $target) -notmatch $emptyPrompt) { throw 'Start at an empty Claude Code prompt.' }
     foreach ($row in @($Rows -split ',' | ForEach-Object { [int]$_ })) {
         $null = Invoke-SlashCommand '/model' $footer
+        $key = $null
         for ($step = 0; $step -lt 60; $step++) {
-            $at = [int](Get-Highlight (Get-WindowsUiText $target)).Groups['index'].Value
+            $position = Get-PickerPosition (Get-WindowsUiText $target)
+            if ($position.Index -eq 0) {
+                if (-not $key) { throw 'The picker opened on its More models row.' }
+                if (-not $position.Expanded) {
+                    if ($key -ne 'Down') { throw 'A collapsed More models row was reached moving up.' }
+                    Send-WindowsUiKey $target -Key Enter -ExpectedText $collapsedGroup
+                    $null = Wait-WindowsUiText $target -ExpectedText '(?m)^[ \t]*Enter to collapse\b'
+                    continue
+                }
+                Send-WindowsUiKey $target -Key $key -ExpectedText $groupRow
+                $null = Wait-WindowsUiText $target -ExpectedText ('(?m)^[ \t]*' + $mark + '\s\d+\.\s')
+                continue
+            }
+            $at = $position.Index
             if ($at -eq $row) { break }
             $next = if ($row -gt $at) { $at + 1 } else { $at - 1 }
             $key = if ($row -gt $at) { 'Down' } else { 'Up' }
             Send-WindowsUiKey $target -Key $key -ExpectedText ('(?m)^[ \t]*' + $mark + '\s' + $at + '\.\s')
-            $null = Wait-WindowsUiText $target -ExpectedText ('(?m)^[ \t]*' + $mark + '\s' + $next + '\.\s')
+            $null = Wait-WindowsUiText $target -ExpectedText ('(?m)^[ \t]*' + $mark + '\s(?:' + $next + '\.\s|[\u25B8\u25BE]\s)')
         }
         # Wait for a complete redraw (highlight and footer together) before the one "s" key.
         $ready = '(?s)(?m)^[ \t]*' + $mark + '\s' + $row + '\.\s.*' + $footer
         $screen = Wait-WindowsUiText $target -ExpectedText $ready
-        $highlight = Get-Highlight $screen
+        $highlight = (Get-PickerPosition $screen).Match
         if ([int]$highlight.Groups['index'].Value -ne $row) { throw "Row $row is not highlighted." }
         $label = ($highlight.Groups['rest'].Value.Trim() -split '[ \t]{2,}', 2)[0].TrimEnd([char]0x2714).Trim()
         Send-WindowsUiText $target -Text 's' -ExpectedText $ready

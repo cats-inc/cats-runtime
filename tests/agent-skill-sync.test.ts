@@ -480,4 +480,40 @@ describe('repository-maintenance skill sync', () => {
 
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
   });
+
+  it('runs the Grok model cache projection behavior suite', () => {
+    const result = spawnSync(process.execPath, [
+      '--test',
+      join(
+        REPO_ROOT,
+        'skills',
+        'maintain-provider-model-catalogs',
+        'tests',
+        'project-grok-models-cache.node-test.mjs',
+      ),
+    ], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+  });
+
+  it('runs the Muse model cache projection behavior suite', () => {
+    const result = spawnSync(process.execPath, [
+      '--test',
+      join(
+        REPO_ROOT,
+        'skills',
+        'maintain-provider-model-catalogs',
+        'tests',
+        'project-muse-model-cache.node-test.mjs',
+      ),
+    ], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+  });
 });

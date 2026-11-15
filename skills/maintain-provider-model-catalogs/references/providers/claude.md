@@ -59,6 +59,13 @@ Use this only when the operator asks the agent to collect the picker. Follow
 - A long list scrolls with eight rows visible. Edge rows carry `↑`/`↓` in the highlight column.
   One `… +N models` line counts every row out of view through 2.1.283; from 2.1.284 it counts only
   the rows below the window and disappears at the last row. Read each row while it is highlighted.
+- From 2.1.319 older models sit under an unnumbered `More models` group row (`▸` collapsed, `▾`
+  expanded) below the current ones. While it is highlighted the picker shows no effort line and
+  its footer reads `Enter to expand · Esc to cancel` (or `collapse`); that Enter saves nothing.
+  Expanded rows keep numbering after the current ones (2.1.325: rows 6 to 14). Expand it once
+  before `Capture-ClaudePicker.ps1`, which steps over the expanded row; the row-status reader
+  expands it itself. Flattening the group into the Cats list is an operator decision (made on
+  2026-11-16: picker order).
 - A saved model shows a check mark. Effort is one picker-wide selection that starts at the saved
   effort; a row lacking that level shows another one (for example High instead of xHigh), and a
   Right press there changes the selection for every row. Only an explicit `(default)` suffix,

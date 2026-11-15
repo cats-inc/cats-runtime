@@ -1,0 +1,36 @@
+# Source: agent-operated Muse Code 1.4.20 (muse-bin-1.4.20-R8619.1) /model and /effort pickers,
+#   Windows UI Automation visible text (one picker per screen; no screenshot needed)
+# Observed: 2026-11-16 06:36-06:43 (local time, UTC+8; retained UTF-8 reads 06:42:15-06:42:49), Windows 11 native (RDP session), Windows Terminal
+# Launch: muse-bin-1.4.20-R8619.1.exe --no-session-log --model muse-ember-1.0 from an already trusted folder,
+#   after clearing agent variables. No prompt was submitted.
+# Keys: /model + Enter, Escape; /effort + Enter, Escape; /exit + Enter, twice (the first
+#   read went through a console code page that lost the glyphs; the second wrote UTF-8). Nothing was confirmed.
+# Settings: ~/.config/muse/settings.json and trust.json kept their prelaunch SHA-256 through exit.
+# Reading: four model rows, no contributor rows, no default marker. The highlighted row is the
+#   session model chosen by --model. muse-ember-1.0 (new) offers minimal..max; "current" is the
+#   session effort, not a default. MSP model/list answered bundledCatalog with no rows on this build
+#   although the account was signed in; the CLI-owned cache model-cache.2026-11-16.redacted.json
+#   supplies IDs, variants and limits.
+
+## /model
+Choose model
+
+  muse-wonder-1.0
+⟩ muse-ember-1.0
+  muse-spark-1.3
+  muse-spark-1.2
+
+  ↑↓ move · enter confirm · esc go back
+
+## /effort with muse-ember-1.0 active
+Effort  |  Select Meta reasoning effort
+  filter
+
+  minimal
+  low
+  medium
+  high
+⟩ xhigh                 current
+  max
+
+  ↑↓ move · type to filter · enter confirm · esc go back

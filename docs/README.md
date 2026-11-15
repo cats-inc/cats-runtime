@@ -16,6 +16,10 @@ and [PLAN-052](plans/PLAN-052-codex-session-retention-and-continuity.md) separat
 Runtime and consumer work; the [investigation](research/2026-11-11-codex-session-list-pollution.md)
 records native UI evidence and completed native-turn acceptance. Implemented in worktrees; unpublished.
 
+[Eight CLI catalog refresh](research/2026-11-16-eight-cli-catalog-refresh.md) records the
+2026-11-16 Codex, Claude, Antigravity, Grok, Muse, Cursor, Kimi and Copilot refresh, the Claude
+More models group and Muse 1.4.20's empty MSP model list.
+
 [Copilot catalog refresh](research/2026-11-02-copilot-catalog-refresh.md) completes the previously
 blocked Copilot scope with GPT-6.1 Terra and the operator-confirmed Fusion Standard mapping.
 

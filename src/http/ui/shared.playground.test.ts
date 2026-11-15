@@ -352,7 +352,7 @@ describe('shared playground selection helpers', () => {
       div: { querySelector: () => controls }, catalog, entryId: '' };
     vm.createContext(context);
     vm.runInContext(html.slice(start, end), context);
-    expect(models).toHaveLength(15);
+    expect(models).toHaveLength(16);
     expect(models.filter(model => model.default).map(model => model.id)).toEqual(['gpt-5.6-terra']);
     const input = { provider: 'copilot', selectableProviders: ['copilot'], providerOrder: ['copilot'],
       advancedCatalogs: { copilot: catalog } };
@@ -534,10 +534,10 @@ describe('shared playground selection helpers', () => {
       vm.runInContext('renderAgentModelControls(div, catalog, entryId, "")', context);
       expect(controls.innerHTML).not.toMatch(/default/i);
       const values = [...controls.innerHTML.matchAll(/<option value="([^"]+)"/g)].map((match) => match[1]);
-      if (entry.id.includes('flash') || entry.id.includes('argon') || entry.id.startsWith('claude-')) {
+      if (entry.id.includes('hydrogen')) expect(values).toEqual(['low', 'medium', 'high', 'xhigh']);
+      else if (entry.id.includes('flash') || entry.id.includes('argon') || entry.id.startsWith('claude-')) {
         expect(values).toEqual(['low', 'medium', 'high']);
-      } else if (entry.id.includes('pro')) expect(values).toEqual(['low', 'high']);
-      else expect(values).toEqual([]);
+      } else expect(values).toEqual([]);
       if (values.length) expect(controls.innerHTML).toContain('<option value="low" selected>low</option>');
     }
     expect(catsUI.normalizePlaygroundAgentSelection({

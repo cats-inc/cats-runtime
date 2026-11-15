@@ -4,8 +4,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Claude
-    cli_version: 2.1.316
-    last_updated: 2026-11-01
+    cli_version: 2.1.325
+    last_updated: 2026-11-16
     notes:
       - Model list, every model's effort line and every row's value re-read 2026-10-03 by an
         agent-operated capture of the Claude Code 2.1.288 `/model` picker (Windows UI Automation
@@ -92,6 +92,18 @@ catalogs:
         Evidence:
         docs/research/fixtures/claude-2.1.316/model-picker.agent-capture.2026-11-01.redacted.json.
         Research: docs/research/2026-11-01-seven-cli-catalog-refresh.md."
+      - "Refreshed 2026-11-16 from Claude Code 2.1.325 by an agent-operated /model capture (--safe-mode,
+        the same subscription sign-in), because release notes since 2.1.316 mention the picker and a
+        new Fable. The picker now shows Default, Opus 5.5, Fable 5.2 (new), Sonnet 5.5 and Haiku 5.5,
+        then an unnumbered More models group row (from 2.1.319) whose own footer says Enter expands
+        it; expanded, it holds Fable 5.1, Haiku 4.5, Sonnet 5, Opus 5, Fable 5, Opus 4.8, Opus 4.7,
+        Opus 4.6 and Sonnet 4.6, numbered 6 to 14. The operator chose on 2026-11-16 to flatten the
+        group into one list in picker order. Fable 5.2 offers Low to Max with (default) Medium and
+        sets `fable` (claude-fable-5-2); the operator chose the full id claude-fable-5-2, as for Fable
+        5.1. Every other row keeps its label, effort range, (default) level and /status value; only
+        Fable 5.1's description changed. Settings hash remained unchanged. Evidence:
+        docs/research/fixtures/claude-2.1.325/model-picker.agent-capture.2026-11-16.redacted.json.
+        Research: docs/research/2026-11-16-eight-cli-catalog-refresh.md."
     models:
       - default: true
         id: opus
@@ -136,19 +148,15 @@ catalogs:
               - reasoning_intensity
             default: medium
       - default: false
-        id: fable
-        label: Fable 5.1
-        capabilityTags:
-          - tool_use
-          - reasoning
+        id: claude-fable-5-2
+        label: Fable 5.2
         notes:
           - "Picker description: For your toughest challenges"
-          - Executes `claude-fable-5-1`, the value the picker row set on 2.1.282; the operator chose it over the `fable` alias. On 2.1.288 the row sets `fable` (claude-fable-5-1); the operator kept `claude-fable-5-1` on 2026-10-03.
+          - "New on 2.1.325 (the 2.1.321 release notes add Claude Fable 5.2 as the default Fable model). The row sets the `fable` alias, which /status resolves to claude-fable-5-2. As for Fable 5.1 (operator decision of 2026-10-03, applied again on 2026-11-16), the entry runs the full id so its label always matches the model that runs."
         source_names:
-          - Fable
-          - Fable 5.1
+          - Fable 5.2
         execution:
-          model: claude-fable-5-1
+          model: claude-fable-5-2
         controls:
           - key: claude.reasoning_effort
             label: Reasoning effort
@@ -158,22 +166,18 @@ catalogs:
             values:
               - value: low
                 label: Low
-                description: Quick, straightforward implementation with minimal overhead
               - value: medium
                 label: Medium
-                description: Balanced approach with standard implementation and testing
               - value: high
                 label: High
-                description: Comprehensive implementation with extensive testing and documentation
               - value: xhigh
                 label: xHigh
-                description: Deeper reasoning than high, just below maximum (on supported models)
               - value: max
                 label: Max
                 description: May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
             semanticTags:
               - reasoning_intensity
-            default: high
+            default: medium
       - default: false
         id: sonnet
         label: Sonnet 5.5
@@ -253,6 +257,46 @@ catalogs:
             semanticTags:
               - reasoning_intensity
             default: medium
+      - default: false
+        id: fable
+        label: Fable 5.1
+        capabilityTags:
+          - tool_use
+          - reasoning
+        notes:
+          - "Picker description: Most capable for your hardest and longest-running tasks (2.1.325; it read For your toughest challenges through 2.1.316)"
+          - Executes `claude-fable-5-1`, the value the picker row set on 2.1.282; the operator chose it over the `fable` alias. On 2.1.288 the row sets `fable` (claude-fable-5-1); the operator kept `claude-fable-5-1` on 2026-10-03.
+          - On 2.1.325 this row sits under More models and sets `claude-fable-5-1`; the `fable` alias moved to claude-fable-5-2, which the Fable 5.2 entry runs.
+        source_names:
+          - Fable
+          - Fable 5.1
+        execution:
+          model: claude-fable-5-1
+        controls:
+          - key: claude.reasoning_effort
+            label: Reasoning effort
+            description: Controls Claude Code effort for supported models.
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: Low
+                description: Quick, straightforward implementation with minimal overhead
+              - value: medium
+                label: Medium
+                description: Balanced approach with standard implementation and testing
+              - value: high
+                label: High
+                description: Comprehensive implementation with extensive testing and documentation
+              - value: xhigh
+                label: xHigh
+                description: Deeper reasoning than high, just below maximum (on supported models)
+              - value: max
+                label: Max
+                description: May use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks.
+            semanticTags:
+              - reasoning_intensity
+            default: high
       - default: false
         id: claude-haiku-4-5-20251001
         label: Haiku 4.5
@@ -482,8 +526,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Codex
-    cli_version: 0.166.0
-    last_updated: 2026-11-01
+    cli_version: 0.167.2
+    last_updated: 2026-11-16
     notes:
       - Complete visible model list and every per-model reasoning/advanced menu captured on 2026-10-01
         Asia/Taipei (2026-09-30 UTC) from Codex CLI 0.159.2 in Windows Terminal using UI Automation
@@ -529,6 +573,13 @@ catalogs:
         docs/research/fixtures/codex-0.166.0/model-list-2026-11-01.probe.redacted.json and
         docs/research/fixtures/codex-0.166.0/terra-picker.2026-11-01.redacted.txt. Research:
         docs/research/2026-11-01-seven-cli-catalog-refresh.md."
+      - "Re-read 2026-11-16 from Codex CLI 0.167.2 without a picker capture. Complete `codex debug
+        models` lists the same eight visible rows in the same order (plus the hidden gpt-reserve and
+        codex-auto-review), with the same labels, effort levels, effort defaults and context windows
+        (500000 for GPT-6.1-Sol and GPT-6.1 Terra, 272000 for the others). Picker-only fields (model
+        (default) marker, descriptions) keep their earlier provenance. Evidence:
+        docs/research/fixtures/codex-0.167.2/model-list-2026-11-16.probe.redacted.json. Research:
+        docs/research/2026-11-16-eight-cli-catalog-refresh.md."
     models:
       - default: false
         id: gpt-6.1-sol
@@ -839,8 +890,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Antigravity
-    cli_version: 1.4.12
-    last_updated: 2026-11-01
+    cli_version: 1.5.9
+    last_updated: 2026-11-16
     notes:
       - Complete operator-supplied /model picker and all per-model effort screens on Antigravity CLI
         1.2.3, observed 2026-09-16; account scope is the operator's CLI.
@@ -870,6 +921,19 @@ catalogs:
         slider was recaptured. Evidence:
         docs/research/fixtures/antigravity-1.4.12/model-list-2026-11-01.probe.redacted.json. Research:
         docs/research/2026-11-01-seven-cli-catalog-refresh.md."
+      - "Refreshed 2026-11-16 from agy 1.5.9 (the same Google AI Pro sign-in) by an agent-operated
+        /model capture. The picker shows eight rows: Gemini 4 Argon, Gemini 4 Hydrogen (new; a
+        low/medium/high/xhigh slider), Orchestrator (Argon) (new; no slider, enter Select), Gemini
+        3.8 Flash, Claude Opus 5.5, Claude Sonnet 5.5, GPT-OSS 120B (Medium) and Gemini 4 Carbon,
+        which reads Unavailable (Ultra plan subscribers) and has no `agy models` id, so it is not
+        added. `agy models` lists gemini-4-hydrogen-low/-medium/-high/-xhigh and
+        gemini-pro-orchestrator-g1-pro (Orchestrator (Argon)); a second read after the capture listed
+        the same 18 ids. The two new rows are added in picker order; the other five rows, sliders and
+        ids are unchanged. No model or effort default marker appeared. Listed and selectable is not an
+        execution check; no prompt was sent. Evidence:
+        docs/research/fixtures/antigravity-1.5.9/model-picker.agent-capture.2026-11-16.redacted.txt and
+        docs/research/fixtures/antigravity-1.5.9/model-list-2026-11-16.probe.redacted.json. Research:
+        docs/research/2026-11-16-eight-cli-catalog-refresh.md."
     models:
       - id: gemini-4-argon-low
         label: Gemini 4 Argon
@@ -899,6 +963,44 @@ catalogs:
                 label: high
             semanticTags:
               - reasoning
+      - id: gemini-4-hydrogen-low
+        label: Gemini 4 Hydrogen
+        execution:
+          model: gemini-4-hydrogen-low
+          variants:
+            - when:
+                antigravity.effort: low
+              model: gemini-4-hydrogen-low
+            - when:
+                antigravity.effort: medium
+              model: gemini-4-hydrogen-medium
+            - when:
+                antigravity.effort: high
+              model: gemini-4-hydrogen-high
+            - when:
+                antigravity.effort: xhigh
+              model: gemini-4-hydrogen-xhigh
+        controls:
+          - key: antigravity.effort
+            label: Effort
+            kind: enum
+            scope: session_default
+            values:
+              - value: low
+                label: low
+              - value: medium
+                label: medium
+              - value: high
+                label: high
+              - value: xhigh
+                label: xhigh
+            semanticTags:
+              - reasoning
+      - id: gemini-pro-orchestrator-g1-pro
+        label: Orchestrator (Argon)
+        execution:
+          model: gemini-pro-orchestrator-g1-pro
+        controls: []
       - id: gemini-3.8-flash-low
         label: Gemini 3.8 Flash
         capabilityTags:
@@ -1006,8 +1108,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Grok
-    cli_version: 1.0.70
-    last_updated: 2026-11-01
+    cli_version: 1.0.77
+    last_updated: 2026-11-16
     notes:
       - "Complete four-model /model list and per-model effort menus captured 2026-09-25 from Grok
         Build 1.0.41 by operating the CLI menus. UI Automation text was checked against window
@@ -1048,6 +1150,14 @@ catalogs:
         docs/research/fixtures/grok-1.0.70/model-list-2026-11-01.probe.redacted.json and
         docs/research/fixtures/grok-1.0.70/models-cache.2026-11-01.redacted.json. Research:
         docs/research/2026-11-01-seven-cli-catalog-refresh.md."
+      - "Re-read 2026-11-16 from Grok Build 1.0.77 without a picker traversal. Complete `grok models`
+        lists the same four models, and the CLI-owned account cache (fetched by that call) gives the
+        same labels, per-model effort tokens, labels and descriptions, and context_window 256000 with
+        context_windows [256000, 500000]. The first-value/no-default policy is retained; the cache's
+        High default is not a Cats default. Evidence:
+        docs/research/fixtures/grok-1.0.77/model-list-2026-11-16.probe.redacted.json and
+        docs/research/fixtures/grok-1.0.77/models-cache.2026-11-16.redacted.json. Research:
+        docs/research/2026-11-16-eight-cli-catalog-refresh.md."
     models:
       - id: grok-4.7
         label: Grok 4.7
@@ -1178,8 +1288,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Muse
-    cli_version: 1.4.14-R7309.1
-    last_updated: 2026-11-01
+    cli_version: 1.4.20-R8619.1
+    last_updated: 2026-11-16
     notes:
       - "Model list re-read 2026-09-26 on Muse Code 1.4.0 (muse-bin-1.4.0-R4161.1): MSP `model/list`
         over `muse serve --no-session-log` (providerId `meta`, profileId `tbh`, source
@@ -1243,6 +1353,18 @@ catalogs:
         is not a curated default. Evidence:
         docs/research/fixtures/muse-1.4.14-R7309.1/model-list-2026-11-01.probe.redacted.json. Research:
         docs/research/2026-11-01-seven-cli-catalog-refresh.md."
+      - "Refreshed 2026-11-16 from Muse Code 1.4.20 (muse-bin-1.4.20-R8619.1) by an agent-operated
+        /model and /effort capture. On this machine and date MSP `model/list` answered from
+        bundledCatalog with no rows after the operator signed in again (an experimental account/read
+        returned state accountLogin with credentialRequired true), so the account list comes from the
+        CLI-owned model cache the signed-in CLI wrote (source provider_catalog) and the picker. The picker lists four rows: muse-wonder-1.0, muse-ember-1.0 (new; released 2026-10-01),
+        muse-spark-1.3 and muse-spark-1.2, matching the cache's visible rows; hidden contributor, image
+        and asset rows stay out. muse-ember-1.0's /effort shows minimal through max with no default
+        marker; the cache gives the same variants and 1007997/128000 limits. The other three rows'
+        variants and limits are unchanged. The cache's is_default (muse-wonder-1.0) is not projected.
+        Evidence: docs/research/fixtures/muse-1.4.20-R8619.1/model-picker.agent-capture.2026-11-16.redacted.txt
+        and docs/research/fixtures/muse-1.4.20-R8619.1/model-cache.2026-11-16.redacted.json. Research:
+        docs/research/2026-11-16-eight-cli-catalog-refresh.md."
     models:
       - id: muse-wonder-1.0
         label: muse-wonder-1.0
@@ -1255,6 +1377,44 @@ catalogs:
           - muse-wonder-1.0
         execution:
           model: muse-wonder-1.0
+        controls:
+          - key: muse.reasoning_effort
+            label: Reasoning effort
+            description: Controls Meta Muse CLI reasoning effort.
+            kind: enum
+            scope: both
+            values:
+              - value: minimal
+                label: minimal
+                description: Minimal reasoning budget.
+              - value: low
+                label: low
+                description: Quick responses with lighter reasoning.
+              - value: medium
+                label: medium
+                description: Balances speed and reasoning depth.
+              - value: high
+                label: high
+                description: Greater reasoning depth for complex problems.
+              - value: xhigh
+                label: xhigh
+                description: Extra high reasoning depth.
+              - value: max
+                label: max
+                description: Maximum reasoning depth.
+            semanticTags:
+              - reasoning_intensity
+      - id: muse-ember-1.0
+        label: muse-ember-1.0
+        limits:
+          contextWindowTokens: 1007997
+          maxOutputTokens: 128000
+        notes:
+          - releaseDate 2026-10-01; the catalog carries no description for this row. Effort values (minimal through max, no default marker) were read from the 1.4.20 /effort picker with muse-ember-1.0 active; their descriptions reuse this scope's wording for the same tokens.
+        source_names:
+          - muse-ember-1.0
+        execution:
+          model: muse-ember-1.0
         controls:
           - key: muse.reasoning_effort
             label: Reasoning effort
@@ -1359,8 +1519,8 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Cursor
-    cli_version: 2026.10.22-27dcf5f
-    last_updated: 2026-11-01
+    cli_version: 2026.11.13-eacade1
+    last_updated: 2026-11-16
     notes:
       - "The complete Cursor CLI 2026.10.01-e373342 model picker, replacing the 2026-09-18 shortlist at the operator's request on 2026-10-14: the 44 families of the account-resolved parameterizedModels reply in its order, without gemini-2.5-flash, which the CLI excludes. Captured with scripts/capture-cursor-parameterized-models.mjs, a process-local read of the reply `cursor-agent --list-models` already fetches; no installed file, credential or inference was involved. Evidence: docs/research/fixtures/cursor-2026.10.01-e373342/parameterized-models.redacted.json and docs/research/2026-10-14-shortlists-to-full.md."
       - "Each family's parameters are controls (cursor.context, cursor.effort, cursor.reasoning, cursor.reasoning_effort, cursor.thinking, cursor.fast) whose combinations select the server's exact variantStringRepresentation, passed as one --model argument. Enum values use the picker's display names; thinking and fast are the picker's on/off switches, here Off and On. A parameter with one value is fixed and not shown, as in the picker."
@@ -1382,6 +1542,16 @@ catalogs:
         unlisted combination is offered. Evidence:
         docs/research/fixtures/cursor-2026.10.22-27dcf5f/parameterized-models-2026-11-01.redacted.json.
         Research: docs/research/2026-11-01-seven-cli-catalog-refresh.md."
+      - "Refreshed 2026-11-16 from Cursor CLI 2026.11.13-eacade1 on native Windows 11, the same account.
+        The complete account-resolved parameterized reply has 47 CLI-filtered families (gemini-2.5-flash
+        still excluded), projected losslessly to 50 entries. New: Gemini 4 Carbon (reasoning effort
+        Low/Medium/High, default Medium), Gemini 4 Hydrogen (Low/Medium/High/Extra High, default High) and
+        Claude Fable 5.2 (context 300K/1M, effort Low to Max, Fast; default 300K, High, Fast off), in
+        server order. Gemini 3.7 Flash and Gemini 3.6 Flash are absent from the reply; the operator
+        confirmed removing them on 2026-11-16, and their variant strings stay reachable as custom
+        input. Every other entry, executable variant, control and default is unchanged. Evidence:
+        docs/research/fixtures/cursor-2026.11.13-eacade1/parameterized-models-2026-11-16.redacted.json.
+        Research: docs/research/2026-11-16-eight-cli-catalog-refresh.md."
     models:
       - id: default[]
         label: Auto
@@ -2274,6 +2444,65 @@ catalogs:
               - value: "true"
                 label: On
             default: "false"
+      - id: gemini-4-carbon[reasoning_effort=medium]
+        label: Gemini 4 Carbon
+        execution:
+          model: gemini-4-carbon[reasoning_effort=medium]
+          variants:
+            - when:
+                cursor.reasoning_effort: medium
+              model: gemini-4-carbon[reasoning_effort=medium]
+            - when:
+                cursor.reasoning_effort: low
+              model: gemini-4-carbon[reasoning_effort=low]
+            - when:
+                cursor.reasoning_effort: high
+              model: gemini-4-carbon[reasoning_effort=high]
+        controls:
+          - key: cursor.reasoning_effort
+            label: Effort
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: Low
+              - value: medium
+                label: Medium
+              - value: high
+                label: High
+            default: medium
+      - id: gemini-4-hydrogen[reasoning_effort=high]
+        label: Gemini 4 Hydrogen
+        execution:
+          model: gemini-4-hydrogen[reasoning_effort=high]
+          variants:
+            - when:
+                cursor.reasoning_effort: high
+              model: gemini-4-hydrogen[reasoning_effort=high]
+            - when:
+                cursor.reasoning_effort: low
+              model: gemini-4-hydrogen[reasoning_effort=low]
+            - when:
+                cursor.reasoning_effort: medium
+              model: gemini-4-hydrogen[reasoning_effort=medium]
+            - when:
+                cursor.reasoning_effort: xhigh
+              model: gemini-4-hydrogen[reasoning_effort=xhigh]
+        controls:
+          - key: cursor.reasoning_effort
+            label: Effort
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: Low
+              - value: medium
+                label: Medium
+              - value: high
+                label: High
+              - value: xhigh
+                label: Extra High
+            default: high
       - id: gemini-4-argon[reasoning_effort=medium]
         label: Gemini 4 Argon
         execution:
@@ -2660,6 +2889,148 @@ catalogs:
                 label: High
               - value: extra-high
                 label: Extra High
+      - id: claude-fable-5-2[context=300k,effort=high,fast=false]
+        label: Claude Fable 5.2
+        execution:
+          model: claude-fable-5-2[context=300k,effort=high,fast=false]
+          variants:
+            - when:
+                cursor.context: 300k
+                cursor.effort: high
+                cursor.fast: "false"
+              model: claude-fable-5-2[context=300k,effort=high,fast=false]
+            - when:
+                cursor.context: 300k
+                cursor.effort: low
+                cursor.fast: "false"
+              model: claude-fable-5-2[context=300k,effort=low,fast=false]
+            - when:
+                cursor.context: 300k
+                cursor.effort: low
+                cursor.fast: "true"
+              model: claude-fable-5-2[context=300k,effort=low,fast=true]
+            - when:
+                cursor.context: 300k
+                cursor.effort: medium
+                cursor.fast: "false"
+              model: claude-fable-5-2[context=300k,effort=medium,fast=false]
+            - when:
+                cursor.context: 300k
+                cursor.effort: medium
+                cursor.fast: "true"
+              model: claude-fable-5-2[context=300k,effort=medium,fast=true]
+            - when:
+                cursor.context: 300k
+                cursor.effort: high
+                cursor.fast: "true"
+              model: claude-fable-5-2[context=300k,effort=high,fast=true]
+            - when:
+                cursor.context: 300k
+                cursor.effort: xhigh
+                cursor.fast: "false"
+              model: claude-fable-5-2[context=300k,effort=xhigh,fast=false]
+            - when:
+                cursor.context: 300k
+                cursor.effort: xhigh
+                cursor.fast: "true"
+              model: claude-fable-5-2[context=300k,effort=xhigh,fast=true]
+            - when:
+                cursor.context: 300k
+                cursor.effort: max
+                cursor.fast: "false"
+              model: claude-fable-5-2[context=300k,effort=max,fast=false]
+            - when:
+                cursor.context: 300k
+                cursor.effort: max
+                cursor.fast: "true"
+              model: claude-fable-5-2[context=300k,effort=max,fast=true]
+            - when:
+                cursor.context: 1m
+                cursor.effort: low
+                cursor.fast: "false"
+              model: claude-fable-5-2[context=1m,effort=low,fast=false]
+            - when:
+                cursor.context: 1m
+                cursor.effort: low
+                cursor.fast: "true"
+              model: claude-fable-5-2[context=1m,effort=low,fast=true]
+            - when:
+                cursor.context: 1m
+                cursor.effort: medium
+                cursor.fast: "false"
+              model: claude-fable-5-2[context=1m,effort=medium,fast=false]
+            - when:
+                cursor.context: 1m
+                cursor.effort: medium
+                cursor.fast: "true"
+              model: claude-fable-5-2[context=1m,effort=medium,fast=true]
+            - when:
+                cursor.context: 1m
+                cursor.effort: high
+                cursor.fast: "false"
+              model: claude-fable-5-2[context=1m,effort=high,fast=false]
+            - when:
+                cursor.context: 1m
+                cursor.effort: high
+                cursor.fast: "true"
+              model: claude-fable-5-2[context=1m,effort=high,fast=true]
+            - when:
+                cursor.context: 1m
+                cursor.effort: xhigh
+                cursor.fast: "false"
+              model: claude-fable-5-2[context=1m,effort=xhigh,fast=false]
+            - when:
+                cursor.context: 1m
+                cursor.effort: xhigh
+                cursor.fast: "true"
+              model: claude-fable-5-2[context=1m,effort=xhigh,fast=true]
+            - when:
+                cursor.context: 1m
+                cursor.effort: max
+                cursor.fast: "false"
+              model: claude-fable-5-2[context=1m,effort=max,fast=false]
+            - when:
+                cursor.context: 1m
+                cursor.effort: max
+                cursor.fast: "true"
+              model: claude-fable-5-2[context=1m,effort=max,fast=true]
+        controls:
+          - key: cursor.context
+            label: Context
+            kind: enum
+            scope: both
+            values:
+              - value: 300k
+                label: 300K
+              - value: 1m
+                label: 1M
+            default: 300k
+          - key: cursor.effort
+            label: Effort
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: Low
+              - value: medium
+                label: Medium
+              - value: high
+                label: High
+              - value: xhigh
+                label: Extra High
+              - value: max
+                label: Max
+            default: high
+          - key: cursor.fast
+            label: Fast
+            kind: enum
+            scope: both
+            values:
+              - value: "false"
+                label: Off
+              - value: "true"
+                label: On
+            default: "false"
       - id: claude-fable-5-1[thinking=true,context=300k,effort=high]
         label: Claude Fable 5.1
         execution:
@@ -3018,33 +3389,6 @@ catalogs:
               model: gemini-3.8-flash[reasoning_effort=medium]
         controls:
           - key: cursor.reasoning_effort
-            label: Effort
-            kind: enum
-            scope: both
-            values:
-              - value: low
-                label: Low
-              - value: medium
-                label: Medium
-              - value: high
-                label: High
-            default: high
-      - id: gemini-3.7-flash[effort=high]
-        label: Gemini 3.7 Flash
-        execution:
-          model: gemini-3.7-flash[effort=high]
-          variants:
-            - when:
-                cursor.effort: high
-              model: gemini-3.7-flash[effort=high]
-            - when:
-                cursor.effort: low
-              model: gemini-3.7-flash[effort=low]
-            - when:
-                cursor.effort: medium
-              model: gemini-3.7-flash[effort=medium]
-        controls:
-          - key: cursor.effort
             label: Effort
             kind: enum
             scope: both
@@ -4469,38 +4813,6 @@ catalogs:
               - value: "true"
                 label: On
             default: "false"
-      - id: gemini-3.6-flash[effort=high]
-        label: Gemini 3.6 Flash
-        execution:
-          model: gemini-3.6-flash[effort=high]
-          variants:
-            - when:
-                cursor.effort: high
-              model: gemini-3.6-flash[effort=high]
-            - when:
-                cursor.effort: minimal
-              model: gemini-3.6-flash[effort=minimal]
-            - when:
-                cursor.effort: low
-              model: gemini-3.6-flash[effort=low]
-            - when:
-                cursor.effort: medium
-              model: gemini-3.6-flash[effort=medium]
-        controls:
-          - key: cursor.effort
-            label: Effort
-            kind: enum
-            scope: both
-            values:
-              - value: minimal
-                label: Minimal
-              - value: low
-                label: Low
-              - value: medium
-                label: Medium
-              - value: high
-                label: High
-            default: high
       - id: gemini-3.1-pro[]
         label: Gemini 3.1 Pro
         execution:
@@ -4979,12 +5291,13 @@ catalogs:
     backend: cli
     selection_mode: full
     source_cli: Copilot
-    cli_version: 1.0.105
-    last_updated: 2026-11-02
+    cli_version: 1.0.110
+    last_updated: 2026-11-16
     basis:
       plan:
         label: Copilot Pro
     notes:
+      - "Refreshed 2026-11-16 from Copilot CLI 1.0.110 on Windows native, the same Copilot Pro sign-in: complete 30-row recommended-group picker walked in both directions with every selectable reasoning/tier range cycled (window maximized so every group is visible). Sixteen rows are selectable and fourteen are plan-unavailable. New Gemini 4 Hydrogen (gemini-4-hydrogen, also in models.list) follows GPT-6.1 Terra in New models, with Low/Medium/High reasoning and one Context figure (983K). The other fifteen rows keep their labels, order, reasoning ranges, Context figures and the GPT-5.6 Terra default. The auto row still displays Copilot Fusion with only Standard available, so its label stays although models.list names it Auto. The 1.0.91 Category column is no longer shown. Evidence: docs/research/fixtures/copilot-1.0.110/model-list-2026-11-16.probe.redacted.json and model-picker.agent-capture.2026-11-16.redacted.json; research: docs/research/2026-11-16-eight-cli-catalog-refresh.md."
       - "Refreshed 2026-11-02 from Copilot CLI 1.0.105 on Windows native, Copilot Pro: complete 33-row recommended-group picker walked in both directions and every selectable reasoning/tier range cycled. Fifteen rows are selectable and eighteen are plan-unavailable. New GPT-6.1 Terra follows Claude Sonnet 5.5, with Low/Medium/High/Extra High/Max reasoning and 272K/1M context. All previous model rows, reasoning/context values and the GPT-5.6 Terra default remain unchanged. Auto now displays Copilot Fusion; this account can select only Standard, with High/Max explicitly plan-unavailable. The operator confirmed Standard maps to --auto-tier balance and approved removing the old Efficiency/Intelligence choices. No control default is inferred. Evidence: docs/research/fixtures/copilot-1.0.105/model-list-2026-11-02.probe.redacted.json and model-picker.agent-capture.2026-11-02.redacted.json; research: docs/research/2026-11-02-copilot-catalog-refresh.md."
       - "Complete /model picker for a Copilot Pro account: 18 selectable rows (Auto plus 17 models). First captured 2026-09-27 (UTC+8) from GitHub Copilot CLI 1.0.88 on Windows native by operating the picker; the 2026-10-03 capture of 1.0.91 added Claude Sonnet 5.5 and moved gemini-3.6-flash, gemini-3.5-flash and kimi-k2.7-code to Unavailable models. Rows follow the 2026-09-27 recommended grouping in arrival order; Claude Sonnet 5.5 follows Claude Sonnet 5. Evidence: docs/research/fixtures/copilot-1.0.91/model-picker.agent-capture.redacted.txt, docs/research/fixtures/copilot-1.0.91/model-list.probe.redacted.json, docs/research/fixtures/copilot-1.0.88/model-picker.agent-capture.redacted.txt and docs/research/2026-09-27-copilot-picker-full-catalog.md."
       - "On 2026-10-03 the operator confirmed removing gemini-3.6-flash, gemini-3.5-flash and kimi-k2.7-code, which the 1.0.91 picker listed under Unavailable models (Your plan doesn't include this model). They remain reachable as custom model strings on plans that include them."
@@ -5237,6 +5550,28 @@ catalogs:
                 label: 272K
               - value: long_context
                 label: 1M
+      - id: gemini-4-hydrogen
+        label: Gemini 4 Hydrogen
+        notes:
+          - "2026-11-16 /model picker (1.0.110, New models group, after GPT-6.1 Terra) and account models.list agree on the model ID and reasoning tokens. Picker Context shows one figure, 983K (machine contextMax 983040), so there is no context control."
+          - "Picker arrival reasoning Medium is session state, not a default. No model or control default marker was present."
+        source_names:
+          - gemini-4-hydrogen
+          - Gemini 4 Hydrogen
+        execution:
+          model: gemini-4-hydrogen
+        controls:
+          - key: copilot.reasoning_effort
+            label: Reasoning
+            kind: enum
+            scope: both
+            values:
+              - value: low
+                label: Low
+              - value: medium
+                label: Medium
+              - value: high
+                label: High
       - id: gpt-5.6-luna
         label: GPT-5.6 Luna
         notes:

@@ -17,6 +17,9 @@ import { JunieProvider } from '../src/backends/cli/providers/junie.js';
 import { KiroProvider } from '../src/backends/cli/providers/kiro.js';
 import { AuggieProvider } from '../src/backends/cli/providers/auggie.js';
 import { CopilotProvider } from '../src/backends/cli/providers/copilot.js';
+import { AntigravityProvider } from '../src/backends/cli/providers/antigravity.js';
+import { ClaudeProvider } from '../src/backends/cli/providers/claude.js';
+import { MuseProvider } from '../src/backends/cli/providers/muse.js';
 import { createRuntimeTestEnv, createRuntimeTestPaths, ensureRuntimeTestDirs } from './support/runtimeTestPaths.js';
 import { cleanupTempDirWithRetries } from './tempCleanup.js';
 
@@ -63,9 +66,41 @@ describe('factory and executable catalog projections', () => {
     expect(high('grok-4.6')).toMatchObject({ description: expect.stringContaining('Higher implementation') });
     expect(high('grok-4.5')).toMatchObject({ description: expect.stringContaining('Highest implementation') });
     const muse = knowledge(snapshot.document.catalogs.find(s => s.provider === 'muse')!);
-    expect(muse.catalog.entries.map(e => e.controls?.[0].values?.length)).toEqual([6, 6, 5]);
+    expect(muse.catalog.entries.map(e => e.controls?.[0].values?.length)).toEqual([6, 6, 6, 5]);
     expect(muse.catalog.entries.every(e => !e.default && !e.controlDefaults)).toBe(true);
     expect(muse.catalog.controls.flatMap(c => c.values ?? []).every(v => typeof v !== 'object' || !v.label.includes('(default)'))).toBe(true);
+  });
+
+  it('sends the 2026-11-16 Antigravity, Claude and Muse additions as their exact model and effort', () => {
+    const full = (provider: string) => knowledge(snapshot.document.catalogs.find(s =>
+      s.provider === provider && s.backend === 'cli' && s.selection_mode === 'full')!);
+    const select = (provider: string, entryId: string, controls?: Record<string, string>) =>
+      resolveProviderSelection(full(provider), { entryId, entryMode: 'explicit', ...(controls ? { controls } : {}) });
+    const tail = (args: string[]) => args.slice(args.indexOf('--model'));
+
+    const agy = (entryId: string, controls?: Record<string, string>) => {
+      const selected = select('antigravity', entryId, controls);
+      const provider = new AntigravityProvider();
+      provider.prepareEphemeralTurn({ message: 'Say hi' });
+      return tail(provider.buildSpawnArgs({ cwd: '/tmp', model: selected.execution.model,
+        modelControls: selected.resolution.controls }));
+    };
+    expect(agy('gemini-4-hydrogen-low')[1]).toBe('gemini-4-hydrogen-low');
+    expect(agy('gemini-4-hydrogen-low', { 'antigravity.effort': 'xhigh' })[1]).toBe('gemini-4-hydrogen-xhigh');
+    expect(agy('gemini-pro-orchestrator-g1-pro')[1]).toBe('gemini-pro-orchestrator-g1-pro');
+
+    const fable = select('claude', 'claude-fable-5-2');
+    expect(tail(new ClaudeProvider().buildSpawnArgs({ cwd: '/tmp', model: fable.execution.model,
+      modelControls: fable.resolution.controls })).slice(0, 4)).toEqual(['--model', 'claude-fable-5-2', '--effort', 'medium']);
+    expect(select('claude', 'fable').execution.model).toBe('claude-fable-5-1');
+
+    const ember = select('muse', 'muse-ember-1.0', { 'muse.reasoning_effort': 'max' });
+    const muse = new MuseProvider();
+    muse.prepareEphemeralTurn({ message: 'Say hi' });
+    const museArgs = muse.buildSpawnArgs({ cwd: '/tmp', model: ember.execution.model, modelControls: ember.resolution.controls });
+    expect(museArgs.slice(museArgs.indexOf('--model'), museArgs.indexOf('--model') + 2)).toEqual(['--model', 'muse-ember-1.0']);
+    expect(museArgs.slice(museArgs.indexOf('--reasoning-effort'), museArgs.indexOf('--reasoning-effort') + 2))
+      .toEqual(['--reasoning-effort', 'max']);
   });
 
   it('starts Junie effort at each model\'s first picker value and emits it as --effort', () => {
@@ -224,7 +259,7 @@ describe('factory and executable catalog projections', () => {
 
   it('lists the Copilot Pro picker with Terra as default and first-value effort, context and tier', () => {
     const copilot = knowledge(snapshot.document.catalogs.find(s => s.provider === 'copilot' && s.backend === 'cli')!);
-    expect(copilot.catalog.entries).toHaveLength(15);
+    expect(copilot.catalog.entries).toHaveLength(16);
     expect(copilot.catalog.entries.slice(0, 4).map(e => e.id)).toEqual(['auto', 'gpt-5.6-terra', 'grok-4.7', 'mai-code-1.1-flash']);
     expect(copilot.catalog.entries.filter(e => e.default).map(e => e.id)).toEqual(['gpt-5.6-terra']);
     // Plan-unavailable picker rows (Pro+ only) are omitted.
@@ -239,6 +274,9 @@ describe('factory and executable catalog projections', () => {
     };
     expect(spawn('gpt-5.6-terra')).toEqual(['--model', 'gpt-5.6-terra', '--effort', 'none', '--context', 'default']);
     expect(spawn('gemini-3.8-flash')).toEqual(['--model', 'gemini-3.8-flash', '--effort', 'low', '--context', 'default']);
+    // One Context figure (983K) means no context control.
+    expect(spawn('gemini-4-hydrogen', { 'copilot.reasoning_effort': 'high' }))
+      .toEqual(['--model', 'gemini-4-hydrogen', '--effort', 'high']);
     expect(spawn('grok-4.7', { 'copilot.reasoning_effort': 'xhigh', 'copilot.context': 'long_context' }))
       .toEqual(['--model', 'grok-4.7', '--effort', 'xhigh', '--context', 'long_context']);
     expect(spawn('claude-sonnet-5.5', { 'copilot.reasoning_effort': 'max', 'copilot.context': 'long_context' }))
