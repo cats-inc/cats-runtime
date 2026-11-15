@@ -132,9 +132,9 @@ has `kimi acp`, an ACP server over stdio.
 - `KIMI_SHELL_PATH` is both Kimi's own bash override and Runtime's `<PREFIX>_SHELL_PATH` runner
   shell variable. It matters to Runtime only with an explicit `KIMI_RUNNER` of cmd, pwsh or
   powershell.
-- Until an account with a Kimi Code plan runs a turn, successful output is known from the shipped
-  writer source and from Kimi 2.5.3 driven against a local OpenAI-compatible stub, not from Moonshot's
-  service.
+- Print-mode output is known from the shipped writer source and Kimi 2.5.3 driven against a local
+  OpenAI-compatible stub. On 2026-11-16, real-plan turns also ran on Kimi 2.6.0, through the hosted
+  target and one print-mode turn, but no print-mode fixture was re-captured from them.
 - A print-mode target runs any plugin the user installed, including computer use, without asking.
   Hosts that cannot accept that select the hosted target (decision 11).
 - The hosted target has no wire-journal usage readback yet, and Kimi's per-session `thinking`

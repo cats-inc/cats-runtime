@@ -113,6 +113,9 @@ Decision: [ADR-054 decision 11](../decisions/054-drive-kimi-code-through-print-m
   `permission.set_mode: auto`, `mcp.tools_discovered` for `plugin-kimi-cu-win:win` and the three
   `js` tools in `llm.tools_snapshot`. The bundle has no environment variable or flag that disables
   plugins for one process (only marketplace and MCP timeout variables).
+  A later `kimi -p` turn asked to call `mcp__plugin-kimi-cu-win_win__js` with a harmless
+  `nodeRepl.write` cell: stdout showed the tool call, the tool result and the answer with no
+  approval step.
 - **`kimi acp` loads plugins and asks.** `initialize` advertises `loadSession`,
   `sessionCapabilities` list/resume/close/delete/fork/additionalDirectories and
   `mcpCapabilities` `http` and `sse`. `session/new` returns `configOptions` `model`, `thinking`
@@ -156,10 +159,12 @@ Decision: [ADR-054 decision 11](../decisions/054-drive-kimi-code-through-print-m
 
 ## Not verified
 
-- A turn on a real Kimi Code plan, and therefore the managed provider's real text, tool and
-  usage records.
+- Print-mode stdout and usage records from a real plan as fixtures (real-plan turns ran on 2.6.0,
+  but the 2.5.3 print fixtures were not re-captured); the hosted target's usage readback.
 - macOS, Linux, WSL and Docker runs (the WSL/Docker session store path is tested with a fake
-  shell runner only); `kimi acp` prompt sessions.
+  shell runner only), and `kimi acp` outside Windows.
+- ACP `auto` mode with the computer-use plugin, a computer-use input action (only observation and
+  `nodeRepl.write` cells ran), and a cold start on a slow host.
 - Long-running tool steps beyond the 30-minute turn limit, and subagent usage.
 
 ## Scripts
