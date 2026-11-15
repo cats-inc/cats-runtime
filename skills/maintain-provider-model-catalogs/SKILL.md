@@ -17,8 +17,9 @@ provider-specific model options or expanding the operator's scope.
 The operator-approved policy is recorded in the 2026-09-17 amendment to
 `docs/specs/SPEC-028-provider-model-catalog-maintenance-skill.md` in cats-runtime:
 
-- **Full catalogs:** all sixteen CLIs: Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie, Kiro,
-  Auggie, GitHub Copilot, Pi (its `openai-codex` channel only), Goose (its `chatgpt_codex` channel
+- **Full catalogs:** all seventeen CLIs: Codex, Claude, Antigravity (`agy`), Grok, Muse, Junie, Kiro,
+  Auggie, GitHub Copilot, Pi (its `openai-codex` channel only), Kimi Code (its managed `kimi-code`
+  aliases, added 2026-11-16), Goose (its `chatgpt_codex` channel
   only), Cursor Agent, Devin (without the fusion family and legacy `MODEL_*` UIDs), OpenCode (its
   `opencode-go` channel only), Kilo Code (its `kilo` gateway list) and Cline (its `cline-pass`
   channel only). Maintain the complete evidenced CLI model lists and applicable effort/options;
@@ -49,6 +50,8 @@ Goose uses provider-qualified IDs with raw-ID labels plus a per-model thinking-e
 as its native model suffix;
 Pi uses bare model-id labels with its channel in the scope basis, plus a separate per-model
 thinking control and CLI argument.
+Kimi Code uses its managed alias keys as ids and `--model` values with the exact displayName labels,
+and no effort control.
 No scheduled refresh cadence or automated refresh job has been specified. The operator runs the
 read-only [catalog probe](./references/catalog-probe.md) on demand; it validates and never edits.
 
@@ -278,6 +281,10 @@ authorizes that external mutation.
   global help is not a menu, and MSP `isDefault` must not be copied into curated YAML.
 - [OpenCode](./references/providers/opencode.md): the `opencode-go` channel from the verbose
   listing, the picker's order and Recent behavior, and the Variant control.
+
+- [Kimi Code](./references/providers/kimi.md): the managed `kimi-code` aliases from
+  `kimi provider list --json`, exact displayName labels, no effort control because print mode has
+  no per-invocation effort, no default row, and a sign-in check that never launches kimi.
 
 - [Pi](./references/providers/pi.md): the full `openai-codex` channel read from the installed
   package, the channel as scope basis with bare labels, per-model thinking levels with the

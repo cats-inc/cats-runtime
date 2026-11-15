@@ -81,6 +81,11 @@ describe('resolveAcpProviderProfile', () => {
       expected: { id: 'pi-acp', tier: 2 },
     },
     {
+      label: 'Kimi Code',
+      instance: createInstance('kimi', ['acp']),
+      expected: { id: 'kimi-acp', tier: 2 },
+    },
+    {
       label: 'Auggie',
       instance: createInstance('npx', ['-y', '@augmentcode/auggie@latest', '--acp']),
       expected: { id: 'auggie-acp', tier: 2 },

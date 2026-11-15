@@ -233,7 +233,7 @@ use. The runtime activates the saved config in the same process.
 
 Setup provider rows, configured target lists, and Playground provider menus use
 this display order: Codex, Claude, Antigravity, Grok, Muse, Cursor, Copilot,
-OpenCode, Kilo, Cline, Auggie, Pi, Kiro, Junie, Devin, Goose. Ollama and OpenClaw
+OpenCode, Kilo, Cline, Auggie, Pi, Kimi Code, Kiro, Junie, Devin, Goose. Ollama and OpenClaw
 follow these providers. Availability does not reorder the menus; preset routing
 still falls back to a usable configured target when necessary.
 

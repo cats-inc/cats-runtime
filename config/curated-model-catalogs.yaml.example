@@ -12757,6 +12757,85 @@ catalogs:
               - value: max
                 label: max
             default: medium
+  - provider: kimi
+    backend: cli
+    selection_mode: full
+    source_cli: Kimi Code
+    cli_version: 2.5.3
+    last_updated: 2026-11-16
+    notes:
+      - "The managed kimi-code model aliases of Kimi Code CLI 2.5.3, read 2026-11-16 on native Windows 11 with `kimi provider list --json` (machine-readable). `kimi login` writes them into config.toml from the account's managed provider; the operator account was signed in with region global but had no Kimi Code plan (prompts failed with provider.auth_error), so entitlement for paid plans is unverified. Rows keep the enumeration's order; ids and execution values are the alias keys `-m/--model` accepts; labels are the exact displayName values; limits are maxContextSize."
+      - "No row is a default. config.toml's default_model (kimi-code/kimi-for-coding here) is the user's current choice, which /model changes, not an account default; a turn without a model uses it, and the UI initializes the first row, which is the same alias here. The /model picker itself was not captured."
+      - "No effort control. The aliases list supportEfforts low, high and max with defaultEffort max (K2.8 Preview) or high (K3 family), and K2.7 Code Highspeed lists none, but print mode has no per-invocation effort flag: Kimi resolves a turn's effort from config.toml [thinking] or the model's defaultEffort. KIMI_MODEL_THINKING_EFFORT applies only together with KIMI_MODEL_NAME and KIMI_MODEL_API_KEY, which replace the managed provider."
+      - "Custom input remains available for aliases a user adds with kimi provider add or config.toml."
+      - "Evidence: docs/research/fixtures/kimi-2.5.3/model-list.provider-list.redacted.json and docs/research/2026-11-16-kimi-code-cli-provider.md."
+    models:
+      - id: kimi-code/kimi-for-coding
+        label: K2.8 Preview
+        limits:
+          contextWindowTokens: 1048576
+        notes:
+          - "Capabilities: thinking, always_thinking, image_in, video_in, tool_use, dynamically_loaded_tools. supportEfforts low, high, max; defaultEffort max."
+        source_names:
+          - kimi-code/kimi-for-coding
+          - K2.8 Preview
+        execution:
+          model: kimi-code/kimi-for-coding
+      - id: kimi-code/kimi-for-coding-highspeed
+        label: K2.7 Code Highspeed
+        limits:
+          contextWindowTokens: 262144
+        notes:
+          - "Capabilities: thinking, always_thinking, image_in, video_in, tool_use. No supportEfforts."
+        source_names:
+          - kimi-code/kimi-for-coding-highspeed
+          - K2.7 Code Highspeed
+        execution:
+          model: kimi-code/kimi-for-coding-highspeed
+      - id: kimi-code/k3
+        label: K3
+        limits:
+          contextWindowTokens: 1048576
+        notes:
+          - "Capabilities: thinking, always_thinking, image_in, video_in, tool_use, dynamically_loaded_tools. supportEfforts low, high, max; defaultEffort high."
+        source_names:
+          - kimi-code/k3
+          - K3
+        execution:
+          model: kimi-code/k3
+      - id: kimi-code/k3-256k
+        label: K3-256k
+        limits:
+          contextWindowTokens: 262144
+        notes:
+          - "Capabilities: thinking, always_thinking, image_in, tool_use, dynamically_loaded_tools. supportEfforts low, high, max; defaultEffort high."
+        source_names:
+          - kimi-code/k3-256k
+          - K3-256k
+        execution:
+          model: kimi-code/k3-256k
+      - id: kimi-code/k3.1-pro
+        label: K3.1 Pro
+        limits:
+          contextWindowTokens: 1048576
+        notes:
+          - "Capabilities: thinking, always_thinking, image_in, video_in, tool_use, dynamically_loaded_tools. supportEfforts low, high, max; defaultEffort high."
+        source_names:
+          - kimi-code/k3.1-pro
+          - K3.1 Pro
+        execution:
+          model: kimi-code/k3.1-pro
+      - id: kimi-code/k3.1-pro-highspeed
+        label: K3.1 Pro Highspeed 2x Usage Cost
+        limits:
+          contextWindowTokens: 1048576
+        notes:
+          - "Capabilities: thinking, always_thinking, image_in, video_in, tool_use, dynamically_loaded_tools. supportEfforts low, high, max; defaultEffort high."
+        source_names:
+          - kimi-code/k3.1-pro-highspeed
+          - K3.1 Pro Highspeed 2x Usage Cost
+        execution:
+          model: kimi-code/k3.1-pro-highspeed
   - provider: auggie
     backend: cli
     selection_mode: full

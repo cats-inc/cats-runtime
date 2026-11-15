@@ -32,6 +32,7 @@ export const KNOWN_PROVIDERS = [
   'kilo',
   'goose',
   'pi',
+  'kimi',
   'auggie',
   'junie',
   'kiro',

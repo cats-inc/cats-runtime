@@ -40,6 +40,7 @@
     --kilo: #fb7185;
     --opencode: #c084fc;
     --pi: #a8a29e;
+    --kimi: #facc15;
     --goose: #a3e635;
     --junie: #fbbf24;
     --ollama: #94a3b8;
@@ -187,6 +188,7 @@
   .project-header[data-provider="kilo"] { border-left-color: var(--kilo); }
   .project-header[data-provider="opencode"] { border-left-color: var(--opencode); }
   .project-header[data-provider="pi"] { border-left-color: var(--pi); }
+  .project-header[data-provider="kimi"] { border-left-color: var(--kimi); }
   .project-header[data-provider="goose"] { border-left-color: var(--goose); }
   .project-header[data-provider="junie"] { border-left-color: var(--junie); }
   .project-header[data-provider="ollama"] { border-left-color: var(--ollama); }
@@ -208,6 +210,7 @@
       var(--opencode),
       var(--kilo),
       var(--pi),
+      var(--kimi),
       var(--goose),
       var(--junie),
       var(--ollama),
@@ -234,6 +237,7 @@
   .provider-badge[data-p="kilo"] { background: rgba(251,113,133,0.18); color: var(--kilo); }
   .provider-badge[data-p="goose"] { background: rgba(163,230,53,0.18); color: var(--goose); }
   .provider-badge[data-p="pi"] { background: rgba(168,162,158,0.18); color: var(--pi); }
+  .provider-badge[data-p="kimi"] { background: rgba(250,204,21,0.18); color: var(--kimi); }
   .provider-badge[data-p="auggie"] { background: rgba(34,211,238,0.18); color: var(--auggie); }
   .provider-badge[data-p="junie"] { background: rgba(251,191,36,0.18); color: var(--junie); }
   .provider-badge[data-p="kiro"] { background: rgba(45,212,191,0.18); color: var(--kiro); }
@@ -1232,7 +1236,7 @@ if (PLATFORM_RUNTIME_PROXY && !INJECTED_RUNTIME_API_BASE) {
 const API_BASE = INJECTED_RUNTIME_API_BASE
   ? INJECTED_RUNTIME_API_BASE.replace(/\/+$/, '')
   : window.location.origin;
-const PROVIDER_ORDER = ['codex', 'claude', 'antigravity', 'grok', 'muse', 'cursor', 'copilot', 'opencode', 'kilo', 'cline', 'auggie', 'pi', 'kiro', 'junie', 'devin', 'goose', 'ollama', 'openclaw'];
+const PROVIDER_ORDER = ['codex', 'claude', 'antigravity', 'grok', 'muse', 'cursor', 'copilot', 'opencode', 'kilo', 'cline', 'auggie', 'pi', 'kimi', 'kiro', 'junie', 'devin', 'goose', 'ollama', 'openclaw'];
 const CLI_RUNTIME_ORDER = ['native', 'wsl', 'docker'];
 let currentSessionId = null;
 let isStreaming = false;

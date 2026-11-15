@@ -33,6 +33,7 @@ import { MuseProvider } from '../../backends/cli/providers/muse.js';
 import { CursorProvider } from '../../backends/cli/providers/cursor.js';
 import { GooseProvider } from '../../backends/cli/providers/goose.js';
 import { JunieProvider } from '../../backends/cli/providers/junie.js';
+import { KimiProvider } from '../../backends/cli/providers/kimi.js';
 import { KiloProvider } from '../../backends/cli/providers/kilo.js';
 import { OpencodeProvider } from '../../backends/cli/providers/opencode.js';
 import { PiProvider } from '../../backends/cli/providers/pi.js';
@@ -72,6 +73,7 @@ const SUPPORTED_CLI_PROBE_PROVIDERS = new Set<ProviderName>([
   'copilot',
   'cursor',
   'pi',
+  'kimi',
   'goose',
   'antigravity',
   'grok',
@@ -560,6 +562,10 @@ function createProbeProvider(
           new GooseNativeSessionService({ command: instance.commandConfig.path }),
           observer,
         ),
+      };
+    case 'kimi':
+      return {
+        provider: new KimiProvider(instance.commandConfig, { evolutionObserver: observer }),
       };
     case 'junie':
       return {

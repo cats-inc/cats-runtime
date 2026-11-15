@@ -137,6 +137,18 @@ const PI_ACP_PROFILE: AcpProviderProfile = {
   },
 };
 
+const KIMI_ACP_PROFILE: AcpProviderProfile = {
+  id: 'kimi-acp',
+  label: 'Kimi Code ACP',
+  family: 'kimi',
+  tier: 2,
+  summary: 'Tier 2 Kimi Code ACP target served by the kimi acp stdio subcommand '
+    + '(Kimi Code CLI 2.5.3 help); no session was run through it.',
+  probe: {
+    helpArgs: ['--help'],
+  },
+};
+
 const AUGGIE_ACP_PROFILE: AcpProviderProfile = {
   id: 'auggie-acp',
   label: 'Auggie ACP',
@@ -359,6 +371,14 @@ export function resolveAcpProviderProfile(
     || argNames.has('pi-acp')
   ) {
     return PI_ACP_PROFILE;
+  }
+
+  if (
+    commandName === 'kimi-acp'
+    || (commandName === 'kimi' && hasAcpSubcommand)
+    || argNames.has('kimi-acp')
+  ) {
+    return KIMI_ACP_PROFILE;
   }
 
   if (

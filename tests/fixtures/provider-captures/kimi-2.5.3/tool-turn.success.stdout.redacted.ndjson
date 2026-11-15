@@ -1,0 +1,5 @@
+{"role":"meta","type":"system.version","version":"2.5.3"}
+{"role":"assistant","content":"Reading the file.","tool_calls":[{"type":"function","id":"call_mock_1","function":{"name":"Read","arguments":"{\"path\":\"hello.txt\"}"}}]}
+{"role":"tool","tool_call_id":"call_mock_1","content":"1\thello"}
+{"role":"assistant","content":"The file says hello."}
+{"role":"meta","type":"session.resume_hint","session_id":"session_40d3a7c9-b49e-4df6-875b-c62d6f616fe3","command":"kimi -r session_40d3a7c9-b49e-4df6-875b-c62d6f616fe3","content":"To resume this session: kimi -r session_40d3a7c9-b49e-4df6-875b-c62d6f616fe3"}

@@ -40,6 +40,7 @@ export const PROVIDER_BADGE_CSS = `
 .provider-badge[data-p="kilo"]     { background: rgba(251,113,133,0.18); color: var(--kilo, #fb7185); }
 .provider-badge[data-p="goose"]    { background: rgba(163,230,53,0.18);  color: var(--goose, #a3e635); }
 .provider-badge[data-p="pi"]       { background: rgba(168,162,158,0.18); color: var(--pi, #a8a29e); }
+.provider-badge[data-p="kimi"]     { background: rgba(250,204,21,0.18);  color: var(--kimi, #facc15); }
 .provider-badge[data-p="auggie"]   { background: rgba(34,211,238,0.18);  color: var(--auggie, #22d3ee); }
 .provider-badge[data-p="junie"]    { background: rgba(251,191,36,0.18);  color: var(--junie, #fbbf24); }
 .provider-badge[data-p="kiro"]     { background: rgba(45,212,191,0.18);  color: var(--kiro, #2dd4bf); }
