@@ -96,9 +96,15 @@ has `kimi acp`, an ACP server over stdio.
       `allow_once` choice. Kimi's request names the tool but carries no input, so the card shows
       the arguments Kimi streamed for that call just before it: for computer use, the JavaScript
       cell about to run. When those arguments are missing, over 64 KiB or not a JSON object, the
-      card says the input cannot be shown instead of showing only the tool name. Kimi sends no
-      ACP tool `kind`, so its requests arrive as `tool_approval`; the shell and edit tools'
-      requests were not captured.
+      card says the input cannot be shown instead of showing only the tool name. The request has
+      no ACP `kind` either; the one Kimi gave the call when it started is used, so Bash
+      (`execute`) arrives as `command_approval` with its command, Write (`edit`) as
+      `file_approval`, and plugin tools (`other`) as `tool_approval`. In `default` mode Bash and
+      Write asked too, so a shell cannot bypass the computer-use approval.
+    - Session initialization (initialize, session start and the confirmed options) may take
+      45 s, Kimi's install-probe floor, instead of the worker's 10 s: a cold Kimi launch took
+      9-30 s on Windows hosts. A rejected prompt keeps Kimi's own bounded explanation, such as
+      a plan that does not include the chosen model.
     - Permission rules the user configured in Kimi itself still apply, as native rules do for the
       other hosted providers.
     - Session MCP travels in `session/new`/`session/resume` headers. Kimi kept the bearer value

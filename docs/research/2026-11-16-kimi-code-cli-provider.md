@@ -124,6 +124,13 @@ Decision: [ADR-054 decision 11](../decisions/054-drive-kimi-code-through-print-m
   tool runs only after the answer. The request names the tool but has no `rawInput`; the
   arguments arrive before it as the cumulative JSON text of `tool_call_update` frames with status
   `in_progress`. Captures: `tests/fixtures/provider-captures/kimi-2.6.0/`.
+- **Bash and Write ask too.** In `default`, a Bash `echo` and a one-letter Write in a scratch
+  directory each sent `session/request_permission` (title `Bash` / `Write`, no `kind`, no
+  `rawInput`) and ran only after the answer. Their `tool_call` frames carried `kind: execute` and
+  `kind: edit`; plugin tools carry `kind: other`. Capture:
+  `acp-bash-write-permission.success.redacted.ndjson`.
+- **Start-up time.** On this host `initialize` answered in 1.9-2.8 s, `session/new` (which
+  starts the plugin MCP server) in 1.2-1.4 s and the mode change in under 30 ms.
 - **Session controls.** `session/set_config_option` for `mode` and `model` returns the updated
   options (and `current_mode_update`/`config_option_update` notifications); an unknown mode is
   -32602 `Unknown modeId`, an alias missing from config.toml -32603 with `details`. Mode and model

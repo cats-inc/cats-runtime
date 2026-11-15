@@ -69,11 +69,18 @@ export class HostedAcpProvider implements Provider {
   /** Kimi: command names from `available_commands_update`; installed plugin skills appear there. */
   private commands: string[] | null = null;
   /** Kimi: the latest streamed argument text per tool call, since its permission request carries no input. */
-  private toolArgs = new Map<string, string | { length: number }>();
+  private toolArgs = new Map<string, { text?: string; length?: number; kind?: string }>();
   private kimiRequested = new Set<string>();
+
+  /**
+   * Kimi is a ~160 MB single executable whose launch took 9-30 s on cold Windows hosts, so its
+   * initialize, session start and config confirmation get the same 45 s as its install probe.
+   */
+  readonly sessionInitializationTimeoutMs: number | undefined;
 
   constructor(readonly name: 'grok' | 'antigravity' | 'kimi',
     private readonly kimiHost: KimiComputerUseHost = defaultKimiComputerUseHost()) {
+    this.sessionInitializationTimeoutMs = name === 'kimi' ? 45_000 : undefined;
     if (name === 'grok') this.capabilities.interactions = { version: 1, kinds: GROK_INTERACTION_KINDS };
     // Native credential persistence is not yet verified for Google's executable.
     if (name === 'antigravity') this.capabilities.sessionMcpServers = false;
@@ -237,7 +244,12 @@ export class HostedAcpProvider implements Provider {
       if (input.error && hostedResumeMissing(this.name, method, input.error)) {
         return this.fail(`${this.name} has no saved session to resume; no action was retried. Continue in a new session.`, true);
       }
-      if (input.error || !result) return this.fail(`${this.name} rejected ${method}; no action was retried. Check the native provider sign-in and settings.`);
+      if (input.error || !result) {
+        // Kimi words plan and model problems for the user ("Your current subscription does not have access to …").
+        const said = this.name === 'kimi' ? record(input.error)?.message : undefined;
+        const detail = typeof said === 'string' && said.trim() ? ` Kimi said: ${said.trim().slice(0, 300)}` : '';
+        return this.fail(`${this.name} rejected ${method}; no action was retried. Check the native provider sign-in and settings.${detail}`);
+      }
       if (method === 'initialize') {
         const capabilities = record(result.agentCapabilities);
         if (result.protocolVersion !== 1 || !capabilities) return this.fail('Unsupported native ACP handshake.');
@@ -324,17 +336,22 @@ export class HostedAcpProvider implements Provider {
    * Kimi 2.6.0 streams a tool call's arguments as the cumulative JSON text of its in-progress
    * updates and sends `session/request_permission` with only the tool name. The last text seen
    * becomes the permission's input, so the owner sees what is about to run (for computer use,
-   * the JavaScript cell) instead of approving blind.
+   * the JavaScript cell) instead of approving blind. The ACP `kind` Kimi gives the call when it
+   * starts (`execute` for Bash, `edit` for Write) is kept too, so those become command and file
+   * approvals.
    */
   private trackKimiArguments(update: Record<string, unknown>): void {
     if (typeof update.toolCallId !== 'string' || !['tool_call', 'tool_call_update'].includes(String(update.sessionUpdate))) return;
     if (update.status === 'completed' || update.status === 'failed') { this.toolArgs.delete(update.toolCallId); return; }
+    const previous = this.toolArgs.get(update.toolCallId);
+    if (!previous && this.toolArgs.size >= MAX_KIMI_TRACKED_TOOLS) return;
+    const next = { ...previous };
+    if (typeof update.kind === 'string' && update.kind.length <= 64) next.kind = update.kind;
     const text = textContent(update.content);
-    if (!text) return;
     // An oversized argument is remembered only as its size, so no shorter, stale prefix survives.
-    if (text.length > MAX_KIMI_TOOL_ARGS) { this.toolArgs.set(update.toolCallId, { length: text.length }); return; }
-    if (!this.toolArgs.has(update.toolCallId) && this.toolArgs.size >= MAX_KIMI_TRACKED_TOOLS) return;
-    this.toolArgs.set(update.toolCallId, text);
+    if (text.length > MAX_KIMI_TOOL_ARGS) { delete next.text; next.length = text.length; }
+    else if (text) { next.text = text; delete next.length; }
+    this.toolArgs.set(update.toolCallId, next);
   }
 
   /**
@@ -347,13 +364,13 @@ export class HostedAcpProvider implements Provider {
     if (!tool || tool.rawInput !== undefined || typeof tool.toolCallId !== 'string') return params;
     const tracked = this.toolArgs.get(tool.toolCallId);
     let rawInput: Record<string, unknown> | undefined;
-    if (typeof tracked === 'string') {
-      try { rawInput = record(JSON.parse(tracked)); } catch { rawInput = undefined; }
+    if (tracked?.text) {
+      try { rawInput = record(JSON.parse(tracked.text)); } catch { rawInput = undefined; }
     }
-    rawInput ??= { notShown: typeof tracked === 'object'
+    rawInput ??= { notShown: tracked?.length !== undefined
       ? `Kimi sent ${tracked.length} characters of input, more than Cats shows. Decline unless you expected this call.`
       : 'Kimi did not send this call\'s input in a form Cats can show. Decline unless you expected this call.' };
-    return { ...params, toolCall: { ...tool, rawInput } };
+    return { ...params, toolCall: { ...tool, rawInput, ...(tool.kind === undefined && tracked?.kind ? { kind: tracked.kind } : {}) } };
   }
 
   buildAutoResponse(line: string): string | null {

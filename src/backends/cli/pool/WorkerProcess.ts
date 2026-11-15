@@ -72,7 +72,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         await new Promise<void>(resolve => {
           const done = () => { clearTimeout(timer); this.off('event', event); this.off('exit', done); resolve(); };
           const event = (value: StreamEvent) => { if (value.type === 'init' || value.type === 'error') done(); };
-          const timer = setTimeout(done, 10_000);
+          const timer = setTimeout(done, this.sessionInitializationTimeoutMs());
           this.on('event', event); this.on('exit', done);
           if (child) this.armBootstrapTimeout(child);
           child?.stdin?.write(initialization, error => { if (error) done(); });
@@ -85,6 +85,11 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     return this.generation === generation && this.alive ? result : undefined;
   }
 
+  /** How long native session initialization may take before the worker gives up; 10 s unless the adapter needs longer. */
+  private sessionInitializationTimeoutMs(): number {
+    return this.provider.sessionInitializationTimeoutMs ?? 10_000;
+  }
+
   private armBootstrapTimeout(child: ChildProcess): void {
     if (this.bootstrapTimer || !this.provider.isSessionInitializing?.()) return;
     this.bootstrapTimer = setTimeout(() => {
@@ -93,7 +98,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         this.emit('error', new Error('Provider session initialization timed out.'));
         this.cancel();
       }
-    }, 10_000);
+    }, this.sessionInitializationTimeoutMs());
     this.bootstrapTimer.unref?.();
   }
   private process: ChildProcess | null = null;

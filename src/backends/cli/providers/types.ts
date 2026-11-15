@@ -165,6 +165,8 @@ export interface Provider {
   prepareEphemeralTurn?(turn: TurnInput): void;
   /** Override the default first-event timeout for ephemeral providers. */
   resolveFirstEventTimeoutMs?(defaultTimeoutMs: number): number;
+  /** Upper bound for a persistent adapter's native session initialization; the worker defaults to 10 s. */
+  readonly sessionInitializationTimeoutMs?: number;
   beforeTurn?(opts: ProviderSpawnOptions): Promise<void>;
   afterTurn?(opts: ProviderSpawnOptions): Promise<StreamEvent | StreamEvent[] | null>;
 }
