@@ -11,6 +11,9 @@ $mock = Join-Path $scratch 'ui.ps1'
 @'
 $script:mockRow = 2
 $script:mockTop = 1
+# $global:mockGroupAfter puts an unnumbered "More models" group row after that model row
+# (2.1.319+); rows below it exist only while $global:mockGroupExpanded is set.
+$script:mockOnGroup = $false
 $script:mockHashReads = 0
 # Effort is one picker-wide level. A row lacking it shows its highest level below it, and a
 # Right press makes the next level of that row the picker-wide level.
@@ -38,25 +41,36 @@ function Get-WindowsUiText($Target) {
     $mark = [char]0x276F; $nbsp = [char]0xA0; $check = [char]0x2714
     $lines = @("$mark$nbsp/model", '', '  Select model', '  Switch between models.', '')
     # $global:mockVisible simulates a scrolled window: edge arrows, padded numbers, hidden count.
-    $count = $script:mockModels.Count
+    $group = $global:mockGroupAfter
+    $count = if ($group -and -not $global:mockGroupExpanded) { $group } else { $script:mockModels.Count }
     $visible = if ($global:mockVisible) { $global:mockVisible } else { $count }
     if ($script:mockRow -lt $script:mockTop) { $script:mockTop = $script:mockRow }
     if ($script:mockRow -gt $script:mockTop + $visible - 1) { $script:mockTop = $script:mockRow - $visible + 1 }
     $last = [Math]::Min($count, $script:mockTop + $visible - 1)
     for ($i=$script:mockTop - 1; $i -lt $last; $i++) {
         $m = $script:mockModels[$i]
-        $lead = if ($i + 1 -eq $script:mockRow) { "  $mark$nbsp" }
+        $lead = if ($i + 1 -eq $script:mockRow -and -not $script:mockOnGroup) { "  $mark$nbsp" }
             elseif ($i + 1 -eq $script:mockTop -and $script:mockTop -gt 1) { "  $([char]0x2191) " }
             elseif ($i + 1 -eq $last -and $last -lt $count) { "  $([char]0x2193) " }
             else { '    ' }
         $number = if ($global:mockVisible) { "$($i + 1).  " } else { "$($i + 1). " }
         $label = if ($m.Current) { "$($m.Label) $check" } else { $m.Label }
         $lines += "$lead$number$label    $($m.Desc)"
+        if ($group -and $i + 1 -eq $group) {
+            $triangle = if ($global:mockGroupExpanded) { [char]0x25BE } else { [char]0x25B8 }
+            $groupLead = if ($script:mockOnGroup) { "  $mark " } else { '    ' }
+            $lines += "$groupLead$triangle   More models"
+        }
     }
     # 2.1.284 and later count only the rows below the window; earlier builds count every hidden row.
     $hidden = if ($global:mockCountBelowOnly) { $count - $last } else { $count - ($last - $script:mockTop + 1) }
     if ($hidden -gt 0) { $lines += "     $([char]0x2026) +$hidden $(if ($hidden -eq 1) { 'model' } else { 'models' })" }
     $lines += ''
+    if ($script:mockOnGroup) {
+        $action = if ($global:mockGroupExpanded) { 'collapse' } else { 'expand' }
+        $lines += "  Enter to $action $([char]0xB7) Esc to cancel"
+        return ($lines -join "`n")
+    }
     $m = $script:mockModels[$script:mockRow - 1]
     if ($m.Levels.Count -eq 0) {
         $lines += "  $([char]0x25CB) Effort not supported for $($m.Label)"
@@ -78,9 +92,20 @@ function Save-WindowsUiSnapshot { param($Target, $OutputPrefix)
 function Send-WindowsUiKey { param($Target, $Key, $ExpectedText)
     if ((Get-WindowsUiText $Target) -notmatch $ExpectedText) { throw 'Incorrect before-state guard' }
     $m = $script:mockModels[$script:mockRow - 1]
+    $group = $global:mockGroupAfter
     switch ($Key) {
-        Down { $script:mockRow++ }
-        Up { $script:mockRow-- }
+        Down {
+            if ($script:mockOnGroup) {
+                if ($global:mockGroupExpanded) { $script:mockOnGroup = $false; $script:mockRow++ }
+            } elseif ($group -and $script:mockRow -eq $group) { $script:mockOnGroup = $true }
+            else { $script:mockRow++ }
+        }
+        Up {
+            if ($script:mockOnGroup) { $script:mockOnGroup = $false }
+            elseif ($group -and $global:mockGroupExpanded -and $script:mockRow -eq $group + 1) {
+                $script:mockRow = $group; $script:mockOnGroup = $true
+            } else { $script:mockRow-- }
+        }
         # Through 2.1.292 effort wraps at both ends; $global:mockLinear stops at them (2.1.293+).
         Right { if ($m.Levels.Count -gt 0) {
             $at = [array]::IndexOf($m.Levels, (Get-MockLevel $m))
@@ -255,7 +280,51 @@ try {
         throw 'A wrapping effort line was not reported as a cycle'
     }
     Write-Output 'PASS reports a wrapping effort line as a cycle from its starting level'
+
+    # 2.1.319 and later: an unnumbered "More models" group row after row 2 holds row 3.
+    $global:mockGroupAfter = 2
+    $global:mockGroupExpanded = $true
+    foreach ($visible in @($null, 2)) {
+        $global:mockVisible = $visible
+        $global:mockCountBelowOnly = [bool]$visible
+        $output = Join-Path $scratch ('group-expanded-' + [bool]$visible)
+        $null = New-Item -ItemType Directory -Path $output
+        $result = & $subject -UiHelperPath $mock -WindowTitle 'Fixture' -OutputDirectory $output `
+            -ConfigPath 'simulated-config' -ExpectedModelCount 3 -Screenshots None | ConvertFrom-Json
+        if (($result.CapturedModels.Label -join '|') -ne 'Example Default (recommended)|Example Alpha|Example Mini' -or
+            -not $result.CapturedModels[2].Unsupported -or
+            (@($result.CapturedModels[1].EffortCycle | Where-Object Default).Level -join ',') -ne 'High') {
+            throw 'An expanded group row was not stepped over in both directions'
+        }
+    }
+    Write-Output 'PASS steps over an expanded More models row, also in a scrolled list'
+    $global:mockVisible = $null
+    $global:mockCountBelowOnly = $false
+
+    $global:mockGroupExpanded = $false
+    $output = Join-Path $scratch 'group-collapsed'
+    $null = New-Item -ItemType Directory -Path $output
+    $result = & $subject -UiHelperPath $mock -WindowTitle 'Fixture' -OutputDirectory $output `
+        -ConfigPath 'simulated-config' -ExpectedModelCount 2 -Screenshots None | ConvertFrom-Json
+    if (($result.CapturedModels.Label -join '|') -ne 'Example Default (recommended)|Example Alpha' -or
+        (@($result.CapturedModels[0].EffortCycle | Where-Object Default).Level -join ',') -ne 'Medium') {
+        throw 'A collapsed group row after the last model row broke the effort reading'
+    }
+    $output = Join-Path $scratch 'group-collapsed-count'
+    $null = New-Item -ItemType Directory -Path $output
+    $failed = $false
+    try {
+        $null = & $subject -UiHelperPath $mock -WindowTitle 'Fixture' -OutputDirectory $output `
+            -ConfigPath 'simulated-config' -ExpectedModelCount 3 -Screenshots None
+    } catch {
+        if ($_.Exception.Message -notmatch 'differs from expected coverage') {throw}
+        $failed = $true
+    }
+    if (-not $failed) {throw 'Rows hidden in a collapsed group were not reported as missing'}
+    Write-Output 'PASS reads rows above a collapsed More models row and reports the hidden ones'
 } finally {
+    Remove-Variable -Name mockGroupAfter -Scope Global -ErrorAction SilentlyContinue
+    Remove-Variable -Name mockGroupExpanded -Scope Global -ErrorAction SilentlyContinue
     Remove-Variable -Name mockLinear -Scope Global -ErrorAction SilentlyContinue
     Remove-Variable -Name mockStartLevel -Scope Global -ErrorAction SilentlyContinue
     Remove-Variable -Name simulateFinalChange -Scope Global -ErrorAction SilentlyContinue

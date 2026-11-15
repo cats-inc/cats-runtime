@@ -11,7 +11,10 @@
     Right cycle from its starting level). A list longer than the picker's window scrolls: its edge rows carry
     up/down arrows and a "+N models" line counts the rows out of view (2.1.283 and earlier) or
     only the rows below the window (2.1.284 and later), so each row is read while it is
-    highlighted. Effort is one picker-wide selection, so a row that lacks the
+    highlighted. From 2.1.319 older models sit under an unnumbered "More models" group row;
+    expand it (its own footer names Enter) before starting, and the walk steps over it in the
+    direction it was moving. A collapsed group row stops the walk, because this helper never
+    sends Enter. Effort is one picker-wide selection, so a row that lacks the
     starting level (for example xHigh) leaves another level behind; the starting row is cycled
     back at the end. Only arrow keys are sent: Enter saves a default and "s" applies the
     session, so neither is ever used. The picker is left open at its starting row and effort.
@@ -69,6 +72,12 @@ $footerPattern = '(?m)^[ \t]*Enter to set as default\b[^\r\n]*Esc to cancel'
 $rowPattern = '(?m)^[ \t]*(?:[\u276F\u2191\u2193]\s)?(?<index>\d+)\.\s(?<rest>[^\r\n]+)'
 $hiddenPattern = '^\u2026\s\+(?<count>\d+)\s+models?$'
 $highlightPattern = '(?m)^[ \t]*\u276F\s(?<index>\d+)\.\s'
+# From 2.1.319 older models sit under an unnumbered group row ("More models") marked with a
+# U+25B8 (collapsed) or U+25BE (expanded) triangle. While it is highlighted the picker shows no
+# effort line and its footer reads "Enter to expand" or "Enter to collapse" instead.
+$groupLinePattern = '^(?:[\u276F\u2191\u2193]\s)?[\u25B8\u25BE]\s+\S[^\r\n]*$'
+$groupHighlightPattern = '(?m)^[ \t]*\u276F\s[\u25B8\u25BE]\s+\S'
+$groupFooterPattern = '(?m)^[ \t]*Enter to (?<action>expand|collapse)\b[^\r\n]*Esc to cancel'
 $effortPattern = '^(?<glyph>\S)\s+(?<level>.+?) effort(?<default> \(default\))?\s+\u2190/\u2192 to adjust$'
 $unsupportedPattern = '^(?<glyph>\S)\s+Effort not supported\b.*$'
 $captureCount = 0
@@ -79,7 +88,9 @@ function Get-PickerRegion([string]$Text) {
     $start = $Text.LastIndexOf($heading)
     if ($start -lt 0) { throw 'Claude model picker is not visible.' }
     $region = $Text.Substring($start)
-    if ($region -notmatch $footerPattern) { throw 'Picker footer is not visible; the menu may be truncated.' }
+    if ($region -notmatch $footerPattern -and $region -notmatch $groupFooterPattern) {
+        throw 'Picker footer is not visible; the menu may be truncated.'
+    }
     return $region
 }
 
@@ -87,30 +98,47 @@ function Read-Picker([string]$Text) {
     $region = Get-PickerRegion $Text
     $rows = [regex]::Matches($region, $rowPattern)
     if ($rows.Count -eq 0) { throw 'No model rows are visible.' }
-    $highlight = [regex]::Matches($region, $highlightPattern)
-    if ($highlight.Count -ne 1) { throw 'Picker highlight is ambiguous.' }
     $first = [int]$rows[0].Groups['index'].Value
     for ($i=0; $i -lt $rows.Count; $i++) {
         if ([int]$rows[$i].Groups['index'].Value -ne $first + $i) { throw 'Visible model rows are incomplete or out of order.' }
     }
-    $footer = [regex]::Match($region, $footerPattern)
+    $highlight = [regex]::Matches($region, $highlightPattern)
+    $groupFooter = [regex]::Match($region, $groupFooterPattern)
+    $onGroup = $groupFooter.Success -and $highlight.Count -eq 0 -and
+        [regex]::Matches($region, $groupHighlightPattern).Count -eq 1
+    if (-not $onGroup -and ($highlight.Count -ne 1 -or $region -notmatch $footerPattern)) {
+        throw 'Picker highlight is ambiguous.'
+    }
+    $footer = if ($onGroup) { $groupFooter } else { [regex]::Match($region, $footerPattern) }
     $lastRow = $rows[$rows.Count - 1]
     $blockStart = $lastRow.Index + $lastRow.Length
     $block = $region.Substring($blockStart, $footer.Index - $blockStart)
-    $allLines = @($block -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    # A collapsed group row follows the last numbered row; it is a row, not part of the effort block.
+    $allLines = @($block -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -notmatch $groupLinePattern })
     $hiddenLines = @($allLines | Where-Object { $_ -match $hiddenPattern })
     if ($hiddenLines.Count -gt 1) { throw 'Out-of-view row count is ambiguous.' }
     $hidden = if ($hiddenLines.Count -eq 1) { [int][regex]::Match($hiddenLines[0], $hiddenPattern).Groups['count'].Value } else { 0 }
+    # Through 2.1.283 the count covered every row out of view; from 2.1.284 it covers only the
+    # rows below the window. Both totals agree when the first row is visible.
+    $totals = @(($rows.Count + $hidden), ([int]$lastRow.Groups['index'].Value + $hidden))
+    if ($onGroup) {
+        return [pscustomobject]@{
+            Rows = $rows; Totals = $totals; Highlight = 0
+            OnGroup = $true; GroupExpanded = $groupFooter.Groups['action'].Value -eq 'collapse'
+            EffortBlock = ''; EffortLine = ''; EffortDetail = @(); Level = $null
+            IsDefault = $false; Adjustable = $false; Unsupported = $false
+        }
+    }
     $lines = @($allLines | Where-Object { $_ -notmatch $hiddenPattern })
     if ($lines.Count -eq 0) { throw 'No effort line is visible for the highlighted row.' }
     $effort = [regex]::Match($lines[0], $effortPattern)
     $unsupported = [regex]::Match($lines[0], $unsupportedPattern)
-    # Through 2.1.283 the count covered every row out of view; from 2.1.284 it covers only the
-    # rows below the window. Both totals agree when the first row is visible.
     [pscustomobject]@{
         Rows = $rows
-        Totals = @(($rows.Count + $hidden), ([int]$lastRow.Groups['index'].Value + $hidden))
+        Totals = $totals
         Highlight = [int]$highlight[0].Groups['index'].Value
+        OnGroup = $false
+        GroupExpanded = $false
         EffortBlock = ($lines -join "`n")
         EffortLine = $lines[0]
         EffortDetail = @($lines | Select-Object -Skip 1)
@@ -147,13 +175,23 @@ function Wait-PickerChange([string]$PreviousBlock, [int]$PreviousHighlight) {
 }
 
 function Move-Picker([int]$Destination) {
-    for ($step=0; $step -lt 55; $step++) {
+    $key = $null
+    for ($step=0; $step -lt 60; $step++) {
         $state = Read-Picker (Get-WindowsUiText $target)
+        if ($state.OnGroup) {
+            # An expanded group row sits between two numbered rows: step over it in the same
+            # direction. Expanding it needs Enter, which this helper never sends.
+            if (-not $key) { throw 'Start the capture on a model row, not on the More models row.' }
+            if (-not $state.GroupExpanded) { throw 'Expand the More models row before the capture.' }
+            Send-WindowsUiKey $target -Key $key -ExpectedText $groupHighlightPattern
+            $null = Wait-WindowsUiText $target -ExpectedText $highlightPattern
+            continue
+        }
         if ($state.Highlight -eq $Destination) { return $state }
         $next = $state.Highlight + [Math]::Sign($Destination - $state.Highlight)
         $key = if ($Destination -gt $state.Highlight) { 'Down' } else { 'Up' }
         Send-WindowsUiKey $target -Key $key -ExpectedText ('(?m)^[ \t]*\u276F\s' + $state.Highlight + '\.\s')
-        $null = Wait-WindowsUiText $target -ExpectedText ('(?m)^[ \t]*\u276F\s' + $next + '\.\s')
+        $null = Wait-WindowsUiText $target -ExpectedText ('(?m)^[ \t]*\u276F\s(?:' + $next + '\.\s|[\u25B8\u25BE]\s)')
     }
     throw 'Picker navigation exceeded its bound.'
 }

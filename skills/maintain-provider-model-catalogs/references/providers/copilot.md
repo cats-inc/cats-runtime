@@ -59,7 +59,8 @@ enumeration:
   `supportedReasoningEfforts` matched the picker's Reasoning order on every listed 1.0.88 row, but
   the picker remains the per-row evidence.
 
-`models.list` does not include every selectable picker row (1.0.88 omitted all four Gemini rows).
+`models.list` does not include every selectable picker row (1.0.88 omitted all four Gemini rows;
+1.0.110 lists gemini-4-hydrogen but still omits gemini-3.8-flash).
 Absence from that response is not evidence to remove a row, and a missing ID is not guessed: ask the
 operator. A CLI message of the form `Model changed from … to <raw-id> (<effort>) for this session`
 also establishes a mapping, but only after an operator-authorized selection. Record the discrepancy

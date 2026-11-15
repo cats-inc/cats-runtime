@@ -1,0 +1,975 @@
+{
+  "sourceClass": "interactive-picker",
+  "sourceCli": "Copilot",
+  "cliVersion": "1.0.110",
+  "observedDate": "2026-11-16",
+  "observedWindow": "05:57-06:07 UTC+8 (helper steps 05:58:54-06:06:17)",
+  "scope": {
+    "provider": "copilot",
+    "backend": "cli",
+    "platform": "Windows native (RDP session)",
+    "plan": "Copilot Pro"
+  },
+  "capture": {
+    "command": "/model",
+    "terminal": "Windows Terminal, window maximized so the list shows every group",
+    "launch": "copilot --no-auto-update --no-custom-instructions --disable-builtin-mcps from an already trusted folder, after clearing inherited terminal, agent and COPILOT_* variables",
+    "helper": "Capture-CopilotPicker.ps1 -CycleOptions -Screenshots None (one private screenshot of the opened picker checked separately)",
+    "mode": "recommended grouping",
+    "forwardAndReverseComplete": true,
+    "selectionSubmitted": false,
+    "providerInferenceSubmitted": false,
+    "settings": "~/.copilot/config.json and ~/.copilot/settings.json kept their prelaunch SHA-256 through startup, traversal, option cycling and /exit"
+  },
+  "rows": [
+    {
+      "Index": 1,
+      "Group": "",
+      "Label": "Copilot Fusion",
+      "Default": false,
+      "Current": true,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [],
+      "Option": "Standard",
+      "CostTier": null,
+      "Credits": null,
+      "PaneMatched": false
+    },
+    {
+      "Index": 2,
+      "Group": "Recent models",
+      "Label": "GPT-5.6 Terra",
+      "Default": true,
+      "Current": false,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [
+        "272K",
+        "922K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Medium",
+      "Credits": {
+        "Input": 200,
+        "Output": 1200,
+        "CacheRead": 20,
+        "CacheWrite": 250
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 3,
+      "Group": "Recent models",
+      "Label": "Grok 4.7",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [
+        "200K",
+        "500K"
+      ],
+      "Option": "High",
+      "CostTier": "Medium",
+      "Credits": {
+        "Input": 200,
+        "Output": 600,
+        "CacheRead": 50,
+        "CacheWrite": 0
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 4,
+      "Group": "Recent models",
+      "Label": "MAI-Code-1.1-Flash",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [
+        "128K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Low",
+      "Credits": {
+        "Input": 20,
+        "Output": 120,
+        "CacheRead": 2,
+        "CacheWrite": 25
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 5,
+      "Group": "Recommended models",
+      "Label": "GPT-6 Luna",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [
+        "272K",
+        "872K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Low",
+      "Credits": {
+        "Input": 10,
+        "Output": 50,
+        "CacheRead": 1,
+        "CacheWrite": 12.5
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 6,
+      "Group": "Recommended models",
+      "Label": "Claude Sonnet 5.5",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [
+        "200K",
+        "936K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Medium",
+      "Credits": {
+        "Input": 200,
+        "Output": 1000,
+        "CacheRead": 10,
+        "CacheWrite": 250
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 7,
+      "Group": "New models",
+      "Label": "GPT-6.1 Terra",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [
+        "272K",
+        "1M"
+      ],
+      "Option": "Medium",
+      "CostTier": "Low",
+      "Credits": {
+        "Input": 100,
+        "Output": 500,
+        "CacheRead": 5,
+        "CacheWrite": 125
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 8,
+      "Group": "New models",
+      "Label": "Gemini 4 Hydrogen",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [
+        "983K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Medium",
+      "Credits": {
+        "Input": 150,
+        "Output": 750,
+        "CacheRead": 7.5,
+        "CacheWrite": 0
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 9,
+      "Group": "Other models",
+      "Label": "GPT-5.6 Luna",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [
+        "200K",
+        "922K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Low",
+      "Credits": {
+        "Input": 20,
+        "Output": 120,
+        "CacheRead": 2,
+        "CacheWrite": 25
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 10,
+      "Group": "Other models",
+      "Label": "GPT-5.3-Codex",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [
+        "272K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Medium",
+      "Credits": {
+        "Input": 175,
+        "Output": 1400,
+        "CacheRead": 17.5,
+        "CacheWrite": 0
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 11,
+      "Group": "Other models",
+      "Label": "Claude Sonnet 5",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [
+        "200K",
+        "936K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Medium",
+      "Credits": {
+        "Input": 200,
+        "Output": 1000,
+        "CacheRead": 20,
+        "CacheWrite": 250
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 12,
+      "Group": "Other models",
+      "Label": "Claude Haiku 5.5",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [
+        "100K",
+        "936K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Low",
+      "Credits": {
+        "Input": 10,
+        "Output": 50,
+        "CacheRead": 1,
+        "CacheWrite": 12.5
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 13,
+      "Group": "Other models",
+      "Label": "Claude Haiku 4.5",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [
+        "128K"
+      ],
+      "Option": null,
+      "CostTier": "Low",
+      "Credits": {
+        "Input": 100,
+        "Output": 500,
+        "CacheRead": 10,
+        "CacheWrite": 125
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 14,
+      "Group": "Other models",
+      "Label": "Gemini 3.8 Flash",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [
+        "200K",
+        "983K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Low",
+      "Credits": {
+        "Input": 75,
+        "Output": 375,
+        "CacheRead": 7.5,
+        "CacheWrite": 0
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 15,
+      "Group": "Other models",
+      "Label": "Grok 4.6",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [
+        "200K",
+        "500K"
+      ],
+      "Option": "Medium",
+      "CostTier": "Medium",
+      "Credits": {
+        "Input": 200,
+        "Output": 600,
+        "CacheRead": 50,
+        "CacheWrite": 0
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 16,
+      "Group": "Other models",
+      "Label": "Kimi K3",
+      "Default": false,
+      "Current": false,
+      "Unavailable": false,
+      "Category": null,
+      "Context": [
+        "918K"
+      ],
+      "Option": "High",
+      "CostTier": "Medium",
+      "Credits": {
+        "Input": 300,
+        "Output": 1500,
+        "CacheRead": 30,
+        "CacheWrite": 0
+      },
+      "PaneMatched": true
+    },
+    {
+      "Index": 17,
+      "Group": "Unavailable models",
+      "Label": "gpt-6.1-sol",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 18,
+      "Group": "Unavailable models",
+      "Label": "gpt-6-sol",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 19,
+      "Group": "Unavailable models",
+      "Label": "gpt-6-astra",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 20,
+      "Group": "Unavailable models",
+      "Label": "gpt-5.6-sol",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 21,
+      "Group": "Unavailable models",
+      "Label": "claude-fable-5.2",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 22,
+      "Group": "Unavailable models",
+      "Label": "claude-fable-5.1",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 23,
+      "Group": "Unavailable models",
+      "Label": "claude-fable-5",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 24,
+      "Group": "Unavailable models",
+      "Label": "claude-opus-5.5",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 25,
+      "Group": "Unavailable models",
+      "Label": "claude-opus-5",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 26,
+      "Group": "Unavailable models",
+      "Label": "claude-opus-4.8",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 27,
+      "Group": "Unavailable models",
+      "Label": "claude-opus-4.8-fast",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 28,
+      "Group": "Unavailable models",
+      "Label": "claude-sonnet-4.6",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 29,
+      "Group": "Unavailable models",
+      "Label": "gemini-4-carbon",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    },
+    {
+      "Index": 30,
+      "Group": "Unavailable models",
+      "Label": "gemini-4-argon",
+      "Default": false,
+      "Current": false,
+      "Unavailable": true,
+      "Category": null,
+      "Context": [],
+      "Option": null,
+      "CostTier": null,
+      "Credits": {},
+      "PaneMatched": true
+    }
+  ],
+  "options": [
+    {
+      "Index": 1,
+      "Label": "Copilot Fusion",
+      "Arrival": "Standard",
+      "Left": [
+        "Standard"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Standard"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Standard"
+      ]
+    },
+    {
+      "Index": 2,
+      "Label": "GPT-5.6 Terra",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low",
+        "None"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "None",
+        "Low",
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ]
+    },
+    {
+      "Index": 3,
+      "Label": "Grok 4.7",
+      "Arrival": "High",
+      "Left": [
+        "High",
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "High",
+        "Extra High"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High",
+        "Extra High"
+      ]
+    },
+    {
+      "Index": 4,
+      "Label": "MAI-Code-1.1-Flash",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High"
+      ]
+    },
+    {
+      "Index": 5,
+      "Label": "GPT-6 Luna",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low",
+        "None"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "None",
+        "Low",
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ]
+    },
+    {
+      "Index": 6,
+      "Label": "Claude Sonnet 5.5",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ]
+    },
+    {
+      "Index": 7,
+      "Label": "GPT-6.1 Terra",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ]
+    },
+    {
+      "Index": 8,
+      "Label": "Gemini 4 Hydrogen",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High"
+      ]
+    },
+    {
+      "Index": 9,
+      "Label": "GPT-5.6 Luna",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low",
+        "None"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "None",
+        "Low",
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ]
+    },
+    {
+      "Index": 10,
+      "Label": "GPT-5.3-Codex",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High",
+        "Extra High"
+      ]
+    },
+    {
+      "Index": 11,
+      "Label": "Claude Sonnet 5",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ]
+    },
+    {
+      "Index": 12,
+      "Label": "Claude Haiku 5.5",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High",
+        "Extra High",
+        "Max"
+      ]
+    },
+    {
+      "Index": 14,
+      "Label": "Gemini 3.8 Flash",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High"
+      ]
+    },
+    {
+      "Index": 15,
+      "Label": "Grok 4.6",
+      "Arrival": "Medium",
+      "Left": [
+        "Medium",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "Medium",
+        "High",
+        "Extra High"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "Medium",
+        "High",
+        "Extra High"
+      ]
+    },
+    {
+      "Index": 16,
+      "Label": "Kimi K3",
+      "Arrival": "High",
+      "Left": [
+        "High",
+        "Low"
+      ],
+      "LeftEnd": "edge",
+      "Right": [
+        "High",
+        "Max"
+      ],
+      "RightEnd": "edge",
+      "Shape": "linear",
+      "Order": [
+        "Low",
+        "High",
+        "Max"
+      ]
+    }
+  ],
+  "summary": {
+    "Rows": 30,
+    "Available": 16,
+    "Unavailable": [
+      "gpt-6.1-sol",
+      "gpt-6-sol",
+      "gpt-6-astra",
+      "gpt-5.6-sol",
+      "claude-fable-5.2",
+      "claude-fable-5.1",
+      "claude-fable-5",
+      "claude-opus-5.5",
+      "claude-opus-5",
+      "claude-opus-4.8",
+      "claude-opus-4.8-fast",
+      "claude-sonnet-4.6",
+      "gemini-4-carbon",
+      "gemini-4-argon"
+    ],
+    "Default": [
+      "GPT-5.6 Terra"
+    ],
+    "Current": [
+      "Copilot Fusion"
+    ],
+    "ContextRows": [
+      "GPT-5.6 Terra",
+      "Grok 4.7",
+      "GPT-6 Luna",
+      "Claude Sonnet 5.5",
+      "GPT-6.1 Terra",
+      "GPT-5.6 Luna",
+      "Claude Sonnet 5",
+      "Claude Haiku 5.5",
+      "Gemini 3.8 Flash",
+      "Grok 4.6"
+    ],
+    "PaneUnmatched": [
+      "Copilot Fusion"
+    ],
+    "Cycled": 15,
+    "Irregular": [],
+    "Steps": 231,
+    "Screenshots": 0,
+    "ConfigUnchanged": true
+  },
+  "manualFusionPane": {
+    "note": "The helper does not match the Copilot Fusion detail pane (PaneUnmatched). This is its visible text on opening, read with UI Automation while Copilot Fusion was highlighted.",
+    "lines": [
+      "Copilot Fusion chooses models and workflows based on your task. Learn more",
+      "Optimize for",
+      "Standard — Prioritizes versatile models for efficient everyday coding.",
+      "High — Prioritizes capable models for challenging tasks and deeper reasoning. Unavailable: This tier is not available for the user's Copilot plan.",
+      "Max — Prioritizes the most capable models for the most demanding tasks and complex reasoning. Unavailable: This tier is not available for the user's Copilot plan."
+    ]
+  },
+  "changes": [
+    "Gemini 4 Hydrogen is new, second in the New models group after GPT-6.1 Terra: Reasoning Low, Medium, High (linear, no default marker); one Context figure (983K), so no context toggle; not marked (default).",
+    "The 15 other selectable rows keep the catalog labels, order, Reasoning ranges, Context figures and model default (GPT-5.6 Terra). The Category column of 1.0.91 is no longer shown.",
+    "Copilot Fusion is still the picker label of the auto row (models.list says Auto), with Standard as its only available tier."
+  ]
+}

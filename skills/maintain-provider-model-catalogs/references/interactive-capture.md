@@ -128,6 +128,16 @@ are never sent, and the picker is left open at its starting row and effort. `Key
 row's label, current marker, description, effort steps with explicit `(default)` markers, `Shape`
 and `Order`.
 
+From 2.1.319 an unnumbered `More models` group row holds the older models. Expand it before the
+helper starts: highlight it, check that the footer reads `Enter to expand`, send that one Enter and
+move back to a numbered row. The helper then steps over the expanded row in the direction it is
+moving; it never sends Enter, so a collapsed group stops the count check. Count the numbered rows
+of the expanded list for `-ExpectedModelCount`.
+
+Read the JSON result from a UTF-8 console (`[Console]::OutputEncoding` set to UTF-8) or rebuild its
+strings from the saved UTF-8 step files: on 2026-11-16 a redirect through the Big5 console code page
+replaced the effort glyphs with `?`.
+
 Exercise traversal, config-change and evidence-directory guards without launching a CLI:
 
 ```powershell
@@ -145,8 +155,9 @@ powershell.exe -NoProfile -File skills/maintain-provider-model-catalogs/scripts/
 ```
 
 For each row it opens `/model`, highlights the row, presses `s` (this session only), reads the
-`/status` Version and Model lines and closes `/status` with Escape. Enter only runs the typed
-commands; it is never sent inside the picker. Before `s` it waits for the highlight and footer to
+`/status` Version and Model lines and closes `/status` with Escape. Enter runs the typed commands
+and, moving down onto a collapsed `More models` row whose footer reads `Enter to expand`, expands
+it; it is never sent on a model row. An expanded group row is stepped over. Before `s` it waits for the highlight and footer to
 render together, because a guard read during a redraw once missed the highlight. The settings
 file must keep its SHA-256 after every row. The session is left on the last row; exit with
 `/exit`. Exercise it without a desktop or CLI:
@@ -270,6 +281,9 @@ semantics and takes the same platform helper path. It does not launch Copilot or
    `--no-remote-export` is also absent from its help, so do not pass those older flags.
 2. **Open the picker.** Type `/model`, wait for the command list and send one guarded Enter; that
    Enter runs the command and selects nothing. The picker must be on `group: recommended`.
+   From 1.0.110 the detail pane sits above the list, so a default-size window shows only the
+   Copilot Fusion row; maximize the owned window (UI Automation `WindowPattern`) first so every
+   group header is on screen. The Category column is gone in 1.0.110.
    Wait for the complete highlighted row as well as the footer: the footer can render first,
    causing an immediate helper start to stop safely without sending input.
 3. **Capture.** Pass the settings file, normally `~/.copilot/config.json`:

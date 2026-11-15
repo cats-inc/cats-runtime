@@ -8,6 +8,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-11-16-eight-cli-catalog-refresh](2026-11-16-eight-cli-catalog-refresh.md) | Eight requested CLI scopes | Seven refreshed (Kimi unchanged): Claude Fable 5.2 and flattened More models, agy Hydrogen and Orchestrator, Muse ember via the CLI cache, Cursor +3/-2, Copilot Hydrogen; Claude helpers handle the group row |
 | [2026-11-16-kimi-code-cli-provider](2026-11-16-kimi-code-cli-provider.md) | Kimi Code CLI 2.5.3 print mode; 2.6.0 `kimi acp` and computer use | stream-json contract, failures and session store captured against a local stub and a plan-less account; six managed model aliases; 2.6.0 plugin loading, ACP approvals, session controls and an end-to-end hosted turn on a real plan |
 | [2026-11-11-process-argument-length-probe](2026-11-11-process-argument-length-probe.md) | Process argument length on native Windows | 32,000 characters start and 33,000 fail with ENAMETOOLONG under Node 26; six per-turn adapters pass the composed prompt as an argument; other launch paths unmeasured |
 | [2026-11-11-codex-session-list-pollution](2026-11-11-codex-session-list-pollution.md) | Native Catlas/Bot histories in ChatGPT Desktop | Read-only UI/index attribution, three updated source baselines, ephemeral/name protocol probes and completed Windows native/consumer acceptance |

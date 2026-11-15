@@ -22,6 +22,13 @@ is `docs/research/2026-09-17-grok-model-picker-refresh.md` in cats-runtime.
   `context_window` is the one a session gets without a choice. `/session-info` in a fresh session
   shows it as `Context: <used> / <window> tokens` without a prompt. A catalog limit follows what
   `--model` alone gets; another window needs its own control and binding.
+- Project the cache with
+  `node skills/maintain-provider-model-catalogs/scripts/project-grok-models-cache.mjs --observed-on <date> --output <fixture>`
+  (default `--cache ~/.grok/models_cache.json`; run `grok models` or the probe first so it is
+  current). It copies only id, name, description, context windows and efforts, so the API keys,
+  endpoints, headers and account identity stored beside each entry never reach the fixture. The
+  cache's effort `default` becomes `rawDefault`, which is not a Cats default. Offline test:
+  `node --test skills/maintain-provider-model-catalogs/tests/project-grok-models-cache.node-test.mjs`.
 - Only the TUI can choose a window on 1.0.62, so Cats has no window control. Checked without a
   prompt: `grok --help` has no window flag; `-m "grok-4.7 500k"` is refused as `unknown model id`
   and the session falls back to the default window; ACP `session/new` offers only the `model` and

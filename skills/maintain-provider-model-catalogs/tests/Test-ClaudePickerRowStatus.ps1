@@ -16,6 +16,11 @@ $script:mockHistory = @()
 $script:mockSession = 2
 $script:mockHighlight = 2
 $script:mockSPressed = 0
+# $global:mockGroupAfter adds an unnumbered "More models" group row after that row (2.1.319+). The
+# picker opens it collapsed unless the session row is inside it.
+$script:mockOnGroup = $false
+$script:mockExpanded = $false
+$script:mockGroupEnters = 0
 $script:mockRows = @(
     @{ Label='Default (recommended)'; Desc='Example One'; Status='Default (Example One)' }
     @{ Label='Example Alpha'; Desc='Example Two'; Status='alpha (example-alpha-1)' }
@@ -33,13 +38,25 @@ function Get-WindowsUiText($Target) {
         'picker' {
             $lines += "$mark$nbsp/model"
             $lines += @('', '  Select model', '  Switch between models.', '')
-            for ($i=0; $i -lt $script:mockRows.Count; $i++) {
+            $group = $global:mockGroupAfter
+            $shown = if ($group -and -not $script:mockExpanded) { $group } else { $script:mockRows.Count }
+            for ($i=0; $i -lt $shown; $i++) {
                 $r = $script:mockRows[$i]
-                $lead = if ($i + 1 -eq $script:mockHighlight) { "  $mark$nbsp" } else { '    ' }
+                $lead = if ($i + 1 -eq $script:mockHighlight -and -not $script:mockOnGroup) { "  $mark$nbsp" } else { '    ' }
                 $label = if ($i + 1 -eq $script:mockSession) { "$($r.Label) $check" } else { $r.Label }
                 $lines += "$lead$($i + 1).  $label    $($r.Desc)"
+                if ($group -and $i + 1 -eq $group) {
+                    $triangle = if ($script:mockExpanded) { [char]0x25BE } else { [char]0x25B8 }
+                    $groupLead = if ($script:mockOnGroup) { "  $mark " } else { '    ' }
+                    $lines += "$groupLead$triangle   More models"
+                }
             }
-            $lines += @('', "  Enter to set as default $([char]0xB7) s to use this session only $([char]0xB7) Esc to cancel")
+            if ($script:mockOnGroup) {
+                $action = if ($script:mockExpanded) { 'collapse' } else { 'expand' }
+                $lines += @('', "  Enter to $action $([char]0xB7) Esc to cancel")
+            } else {
+                $lines += @('', "  Enter to set as default $([char]0xB7) s to use this session only $([char]0xB7) Esc to cancel")
+            }
         }
         'status' {
             $lines += "$mark$nbsp/status"
@@ -54,6 +71,7 @@ function Send-WindowsUiText { param($Target, $Text, $ExpectedText)
     if ((Get-WindowsUiText $Target) -notmatch $ExpectedText) { throw 'Incorrect before-state guard' }
     if ($script:mockMode -eq 'prompt') { $script:mockTyped += $Text; return }
     if ($script:mockMode -eq 'picker' -and $Text -eq 's') {
+        if ($script:mockOnGroup) { throw 's was sent on the More models row' }
         $script:mockSession = $script:mockHighlight
         $script:mockSPressed++
         $script:mockHistory += @("$([char]0x276F)$([char]0xA0)/model",
@@ -67,13 +85,33 @@ function Send-WindowsUiKey { param($Target, $Key, $ExpectedText)
     if ((Get-WindowsUiText $Target) -notmatch $ExpectedText) { throw 'Incorrect before-state guard' }
     switch ("$($script:mockMode):$Key") {
         'prompt:Enter' {
-            if ($script:mockTyped -eq '/model') { $script:mockMode = 'picker'; $script:mockHighlight = $script:mockSession }
+            if ($script:mockTyped -eq '/model') {
+                $script:mockMode = 'picker'; $script:mockHighlight = $script:mockSession; $script:mockOnGroup = $false
+                $script:mockExpanded = [bool]($global:mockGroupAfter -and $script:mockSession -gt $global:mockGroupAfter)
+            }
             elseif ($script:mockTyped -eq '/status') { $script:mockMode = 'status' }
             else { throw "Unexpected command $($script:mockTyped)" }
             $script:mockTyped = ''
         }
-        'picker:Up' { $script:mockHighlight-- }
-        'picker:Down' { $script:mockHighlight++ }
+        'picker:Up' {
+            $group = $global:mockGroupAfter
+            if ($script:mockOnGroup) { $script:mockOnGroup = $false }
+            elseif ($group -and $script:mockExpanded -and $script:mockHighlight -eq $group + 1) {
+                $script:mockHighlight = $group; $script:mockOnGroup = $true
+            } else { $script:mockHighlight-- }
+        }
+        'picker:Down' {
+            $group = $global:mockGroupAfter
+            if ($script:mockOnGroup) {
+                if ($script:mockExpanded) { $script:mockOnGroup = $false; $script:mockHighlight++ }
+            } elseif ($group -and $script:mockHighlight -eq $group) { $script:mockOnGroup = $true }
+            else { $script:mockHighlight++ }
+        }
+        'picker:Enter' {
+            if (-not $script:mockOnGroup) { throw 'Reader sent Enter on a model row' }
+            $script:mockExpanded = -not $script:mockExpanded
+            $global:mockGroupEnters++
+        }
         'status:Escape' {
             $script:mockHistory += @("$([char]0x276F)$([char]0xA0)/status", "  $([char]0x23BF)  Status dialog dismissed", '')
             $script:mockMode = 'prompt'
@@ -126,6 +164,18 @@ try {
     Write-Output 'PASS stops when the settings file changes'
     $global:mockConfigChangeAfterS = $false
 
+    $global:mockGroupAfter = 2
+    $global:mockGroupEnters = 0
+    $result = & $subject -UiHelperPath $mock -WindowTitle 'Fixture' -Rows '3,1,2' `
+        -OutputFile (Join-Path $scratch 'group.json') -ConfigPath 'simulated-config' | ConvertFrom-Json
+    if (($result.Rows.StatusModel -join '|') -ne 'example-beta-2|Default (Example One)|alpha (example-alpha-1)' -or
+        ($result.Rows.Label -join '|') -ne 'Example Beta|Default (recommended)|Example Alpha' -or
+        $global:mockGroupEnters -ne 1) {
+        throw 'A row under the More models group was not reached or the group was not expanded once'
+    }
+    Write-Output 'PASS expands a collapsed More models row and steps over an expanded one'
+    $global:mockGroupAfter = $null
+
     $global:mockStartInPicker = $true
     $failed = $false
     try {
@@ -140,6 +190,8 @@ try {
 } finally {
     Remove-Variable -Name mockConfigChangeAfterS -Scope Global -ErrorAction SilentlyContinue
     Remove-Variable -Name mockStartInPicker -Scope Global -ErrorAction SilentlyContinue
+    Remove-Variable -Name mockGroupAfter -Scope Global -ErrorAction SilentlyContinue
+    Remove-Variable -Name mockGroupEnters -Scope Global -ErrorAction SilentlyContinue
     $resolved = [IO.Path]::GetFullPath($scratch)
     if (-not $resolved.StartsWith($scratchRoot + [IO.Path]::DirectorySeparatorChar) -or
         (Split-Path -Leaf $resolved) -notlike 'claude-row-status-test-*') {throw 'Unsafe fixture cleanup path'}

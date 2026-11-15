@@ -131,8 +131,8 @@ Membership values:
 
 - **complete:** the source lists what the picker offers. An extra row is a new candidate in a
   full scope; a missing entry is absent.
-- **partial:** the source is known to differ from the picker and can omit its rows: Copilot omits
-  every Gemini row.
+- **partial:** the source is known to differ from the picker and can omit its rows: Copilot omitted
+  every Gemini row through 1.0.105 and still omits Gemini 3.8 Flash on 1.0.110.
 - **superset:** static data that can list more than the picker. Extra rows are notes only.
 - **family:** only model families, not the parameterized variant. Cursor's legacy slug
   `gpt-5.6-sol-high-fast` proves the `gpt-5.6-sol` family is listed, not that the catalog's
@@ -174,7 +174,7 @@ runs stay clean:
       "provider": "copilot",
       "kind": "absent-from-source",
       "subject": "gemini-3.8-flash",
-      "reason": "models.list omits every Gemini picker row; ...",
+      "reason": "models.list omits this Gemini picker row; ...",
       "evidence": "docs/research/2026-09-27-copilot-picker-full-catalog.md",
       "acknowledgedOn": "2026-10-02"
     }

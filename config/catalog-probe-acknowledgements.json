@@ -5,7 +5,7 @@
       "provider": "copilot",
       "kind": "absent-from-source",
       "subject": "gemini-3.8-flash",
-      "reason": "models.list omits every Gemini picker row; the picker offered it and the operator confirmed the ID. Only a picker capture can show its withdrawal",
+      "reason": "models.list omits this Gemini picker row (every Gemini row through 1.0.105; 1.0.110 lists gemini-4-hydrogen but not this one); the picker offered it and the operator confirmed the ID. Only a picker capture can show its withdrawal",
       "evidence": "docs/research/2026-09-27-copilot-picker-full-catalog.md",
       "acknowledgedOn": "2026-10-02"
     },
@@ -26,6 +26,16 @@
       "reason": "cursor-agent --list-models prints legacy slugs: Auto as auto, the Claude 4.x families as claude-4.6-sonnet and the like, and it omits Claude Haiku 4.5 and both GLM 5.3 families. The parameterized picker reply captured with capture-cursor-parameterized-models.mjs lists all of them; rerun that capture to check these rows",
       "evidence": "docs/research/2026-10-14-shortlists-to-full.md",
       "acknowledgedOn": "2026-10-14"
+    },
+    {
+      "provider": "copilot",
+      "kind": "field-drift",
+      "subject": "auto",
+      "field": "label",
+      "observed": "Auto",
+      "reason": "models.list names the auto row Auto, while the /model picker (1.0.105 and 1.0.110) labels it Copilot Fusion; the catalog follows the picker label. A different models.list label reopens this",
+      "evidence": "docs/research/2026-11-16-eight-cli-catalog-refresh.md",
+      "acknowledgedOn": "2026-11-16"
     }
   ]
 }
