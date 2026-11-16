@@ -162,17 +162,41 @@ only known fields, so `basisId` would be dropped on almost every path.
 
 ## Phase 4: Maintenance skill (after Phase 1)
 
-- [ ] Probe (`skills/maintain-provider-model-catalogs/scripts/`): `scopeKey`, `sameScope` and
+- [x] Probe (`skills/maintain-provider-model-catalogs/scripts/`): `scopeKey`, `sameScope` and
       the scope lookups in `catalog-probe.mjs`, `compare.mjs`, `handoff.mjs`, `evidence.mjs`
-      and `catalog-scope-entries.mjs` carry the basis id.
-  - [ ] The probe compares against the detected basis, otherwise the first, and marks findings
+      and `catalog-scope-entries.mjs` carry the basis id. The shared rules are in the new
+      `catalog-probe/basis.mjs`; a report key of a non-first basis ends in `#<id>`.
+  - [x] The probe compares against the detected basis, otherwise the first, and marks findings
         `basis-unconfirmed` (scenario 9); `--basis <id>` overrides both.
-  - [ ] Snapshot rows, the handoff and `config/catalog-probe-acknowledgements.json` entries
-        carry an optional basis id.
-- [ ] References: the basis fields in `references/catalog-surfaces.md`, and the SPEC-045 FR-8
+        - The sign-in marker (Kimi's `region` file, read with the same reader as
+          `catalog:logins`) is read for every target, not only multi-basis ones. A marker that
+          names a region, plan or channel the catalog records but no basis covers reports
+          `basis-not-captured`; a marker on a CLI whose scopes record no such id changes nothing.
+        - An unconfirmed basis makes the comparison inconclusive, so model findings are
+          informational and nothing counts as confirmed; an operator finding asks to confirm the
+          sign-in and validate with `--basis`. Bases on different channels never make it
+          unconfirmed, because the chosen scope's channel decides what the source lists.
+        - `--basis` takes `<provider>=<id>`, a bare `<id>` with one provider, and `first`. An
+          unknown id fails before any CLI starts. In `validate`, a recorded basis the catalog no
+          longer has is reported as `basis-missing`, never replaced by the first.
+  - [x] Snapshot rows, the handoff and `config/catalog-probe-acknowledgements.json` entries
+        carry an optional basis id. The snapshot keeps the request and the raw marker, so
+        `validate` re-matches them; evidence fixtures record `basisId` and the marker as
+        `signIn`, and a `#<id>` scope gets its own default file name.
+  - [x] `catalog-scope-entries.mjs --write` needs `--basis` once a CLI has several bases, and
+        refuses to write rows listed under a requested or detected sign-in into another basis.
+- [x] References: the basis fields in `references/catalog-surfaces.md`, and the SPEC-045 FR-8
       rules in `SKILL.md` (a refresh names its basis and never edits another; a new basis
       needs evidence of its plan, region or channel; an identical list is noted, not added).
-- [ ] Node tests for each changed script; sync the skill mirrors after merge.
+      `references/catalog-probe.md` gains a catalog bases section and the acknowledgement
+      `basisId`; the Kimi reference notes the probe's use of the marker.
+- [x] Node tests for each changed script. Checked on 2026-11-16: a real
+      `probe --providers kimi` stayed clean (6/6) and recorded `region global`; a real probe of
+      Pi, Copilot, OpenCode, Kilo, Cline and Goose (all with a channel or plan basis), and two
+      earlier snapshots of Claude, Codex, Antigravity, Grok and Muse, gave the same verdicts,
+      findings and counts with the old and the new scripts.
+- [ ] Sync the skill mirrors after merge (`Sync-WorkspaceSkills.ps1`), which also carries the
+      Phase 2 skill changes.
 
 ## Phase 5: Kimi region data (after Phases 2 and 3 merge)
 

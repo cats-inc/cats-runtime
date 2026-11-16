@@ -76,6 +76,25 @@ Read [catalog surfaces](./references/catalog-surfaces.md) for current fields and
 - Existing sessions keep their resolved wire bindings. Reload changes menus and future selections;
   it does not silently change resumed sessions.
 
+### Catalog bases
+
+A CLI can carry several captured lists, one scope ("basis") per channel, region or plan
+(cats-runtime SPEC-045 FR-8). Fields are in [catalog surfaces](./references/catalog-surfaces.md).
+
+- A refresh names the basis it updates and never edits another basis of the same CLI. Evidence
+  taken on one sign-in updates only the basis that sign-in matches; `catalog-scope-entries.mjs
+  --write` needs `--basis` once a CLI has several.
+- A new basis needs a complete capture plus evidence of the sign-in's plan, region or channel:
+  for Kimi the `region` marker, for a plan the CLI's own statement or the owner's confirmation.
+  Adding one is its own owner-authorized change.
+- A captured list identical to an existing basis is not added; that basis's notes record the
+  matching capture and its plan or region.
+- Before a CLI gets its second basis, its existing scope must record the plan, region or channel
+  it was captured on. If that is unknown, ask the owner before adding anything.
+- The probe compares against the basis the sign-in marker matches, else the first, and says so;
+  read [catalog bases](./references/catalog-probe.md#catalog-bases) before acting on a
+  `basis-*` finding.
+
 ## Route the request
 
 - **Refresh**: collect evidence and edit only the provider scope the operator authorized.

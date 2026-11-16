@@ -6,6 +6,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { redactVisibleText } from '../normalize-picker-paste.mjs';
+import { targetKey, targetOfKey } from './basis.mjs';
 
 const MEMBERSHIP_MEANING = {
   complete: 'The command lists what the picker offers; an absent row still needs picker confirmation before removal.',
@@ -23,13 +24,17 @@ const ACCOUNT_SCOPE = {
 const STILL_PICKER = 'A model (default) marker, picker descriptions, picker order, and every field not listed under '
   + 'authoritativeFor still need picker evidence.';
 
-function scopeKey({ provider, backend, transport }) {
-  return `${provider}/${backend}${transport ? `/${transport}` : ''}`;
+const scopeKey = targetKey;
+
+/** The `#<id>` basis of each `--scope` part, or null; a report key names its basis this way. */
+export function selectorBases(selector) {
+  return selector.split(',').map((part) => part.trim()).filter(Boolean)
+    .map((part) => (part.includes('#') ? part.slice(part.indexOf('#') + 1) || null : null));
 }
 
-/** Finds snapshot sources by `provider`, `provider/backend` or the full scope key. */
+/** Finds snapshot sources by `provider`, `provider/backend` or the full scope key (`#<id>` allowed). */
 export function selectSnapshotSources(snapshot, selector) {
-  const wanted = selector.split(',').map((part) => part.trim()).filter(Boolean);
+  const wanted = selector.split(',').map((part) => targetOfKey(part.trim())).filter(Boolean);
   if (wanted.length === 0) throw new Error('--scope needs at least one provider or scope key.');
   return wanted.map((name) => {
     const matches = (snapshot.sources ?? []).filter((source) => {
@@ -63,8 +68,12 @@ export function evidenceDirectoryName(source) {
   return source.versionKind === 'build' ? `${source.provider}-build-${source.cliVersion}` : `${source.provider}-${source.cliVersion}`;
 }
 
-/** Builds the fixture document. `ids` keeps only those rows and fails on any it cannot find. */
-export function buildEvidence({ snapshot, source, ids = null }) {
+/**
+ * Builds the fixture document. `ids` keeps only those rows and fails on any it cannot find.
+ * `basisId` names the catalog basis the rows are evidence for; the CLI's non-secret sign-in
+ * marker, when the probe read one, is recorded as the plan or region evidence (SPEC-045 FR-8).
+ */
+export function buildEvidence({ snapshot, source, ids = null, basisId = null }) {
   const key = scopeKey(source);
   if (source.status === 'unavailable' || source.status === 'error') {
     throw new Error(`${key} has no listed rows to record (${source.status}: ${source.reason ?? 'unknown'}).`);
@@ -94,6 +103,9 @@ export function buildEvidence({ snapshot, source, ids = null }) {
     observedAt: snapshot.createdAt ?? null,
     host: { platform: snapshot.host?.platform ?? null, arch: snapshot.host?.arch ?? null },
     accountScope: ACCOUNT_SCOPE[source.sourceClass] ?? 'Not recorded.',
+    ...(basisId ? { basisId } : {}),
+    ...(source.basis?.marker ? { signIn: source.basis.marker } : {}),
+    ...(source.basis?.requested !== undefined ? { requestedBasis: source.basis.requested } : {}),
     status: source.status,
     ...(source.reason ? { reason: source.reason } : {}),
     ...(source.message ? { message: redactDeep(source.message, kinds) } : {}),

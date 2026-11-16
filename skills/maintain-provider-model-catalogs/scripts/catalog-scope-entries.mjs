@@ -7,6 +7,7 @@
 //   node catalog-scope-entries.mjs --snapshot <snapshot.json> --provider cline --label <id>=<label>
 //   node catalog-scope-entries.mjs --snapshot <snapshot.json> --provider devin [--effort-order ascending]
 //   node catalog-scope-entries.mjs --cursor <parameterized-models.json> --provider cursor
+//   add --basis <id> (or first) to name the catalog basis a CLI with several bases updates
 //
 // Values come from the evidence; the rules below only say how each CLI's picker shapes them.
 // Entries that already exist keep their capabilityTags and source_names, and a changed label is
@@ -14,6 +15,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { parse, stringify } from 'yaml';
+import { chooseBasis, targetScopes } from './catalog-probe/basis.mjs';
 
 // OpenCode and Kilo offer Default (no variant) before the model's variants.
 const DEFAULT_VARIANT = { value: 'default', label: 'Default' };
@@ -328,10 +330,46 @@ function scopeMatches(scope, { provider, backend, transport }) {
   return scope.provider === provider && scope.backend === backend && (scope.transport ?? null) === (transport ?? null);
 }
 
-/** Replaces the `models:` list of one scope, leaving the rest of the file's text untouched. */
-export function spliceScopeModels(text, target, entries) {
+/**
+ * The scope a write replaces (SPEC-045 FR-8): the target's only scope, or the basis `--basis`
+ * names. A refresh never edits another basis, so rows the probe listed under a requested or
+ * detected sign-in cannot be written into a different basis. Returns its index among the
+ * target's scopes, in file order.
+ */
+export function selectWriteScope(catalogs, target, basis, source = null) {
+  const scopes = targetScopes(catalogs, target);
+  if (scopes.length === 0) throw new Error(`No ${target.provider}/${target.backend} scope found`);
+  const names = scopes.map((scope) => scope.basis?.id ?? 'first').join(', ');
+  let index = 0;
+  if (basis === undefined) {
+    if (scopes.length > 1) {
+      throw new Error(`${target.provider} has ${scopes.length} catalog bases (${names}); pass --basis <id> to name the one this evidence updates.`);
+    }
+  } else {
+    index = scopes.findIndex((scope) => scope.basis?.id === basis);
+    if (index < 0 && basis === 'first') index = 0;
+    if (index < 0) throw new Error(`${target.provider} has no basis "${basis}". Known: ${names}.`);
+  }
+  if (source?.basis) {
+    const listed = chooseBasis(scopes, { requested: source.basis.requested, marker: source.basis.marker });
+    if (listed.basis?.mismatch) {
+      throw new Error(`The snapshot's ${target.provider} sign-in is not a captured basis; ask the owner before adding one.`);
+    }
+    if (['requested', 'detected'].includes(listed.basis?.how) && listed.scope !== scopes[index]) {
+      throw new Error(`The snapshot listed ${target.provider} for basis ${listed.scope.basis?.id ?? 'first'}; it cannot update basis ${scopes[index].basis?.id ?? 'first'}.`);
+    }
+  }
+  return index;
+}
+
+/**
+ * Replaces the `models:` list of one scope, leaving the rest of the file's text untouched.
+ * `occurrence` picks among a target's scopes in file order, the first by default.
+ */
+export function spliceScopeModels(text, target, entries, occurrence = 0) {
   const lines = text.split('\n');
   const starts = lines.flatMap((line, index) => (/^  - provider: /.test(line) ? [index] : []));
+  let seen = 0;
   for (const [n, start] of starts.entries()) {
     const end = starts[n + 1] ?? lines.findIndex((line, index) => index > start && /^\S/.test(line));
     const stop = end < 0 ? lines.length : end;
@@ -339,6 +377,7 @@ export function spliceScopeModels(text, target, entries) {
     const field = (name) => head.find((line) => line.startsWith(`    ${name}: `))?.slice(`    ${name}: `.length).trim()
       ?? (name === 'provider' ? lines[start].slice('  - provider: '.length).trim() : undefined);
     if (!scopeMatches({ provider: field('provider'), backend: field('backend'), transport: field('transport') }, target)) continue;
+    if (seen++ !== occurrence) continue;
     const modelsAt = head.findIndex((line) => line === '    models:');
     if (modelsAt < 0) throw new Error('The scope has no models list');
     let listEnd = modelsAt + 1;
@@ -369,6 +408,8 @@ export function main(argv) {
   const target = TARGETS[provider];
   if (!target) throw new Error(`--provider must be one of ${Object.keys(TARGETS).join(', ')}`);
   const yamlPath = argValues(argv, '--write')[0];
+  const basis = argValues(argv, '--basis')[0];
+  let source = null;
   let entries;
   if (provider === 'cursor') {
     const input = argValues(argv, '--cursor')[0];
@@ -379,7 +420,7 @@ export function main(argv) {
     const snapshotPath = argValues(argv, '--snapshot')[0];
     if (!snapshotPath) throw new Error('--snapshot <snapshot.json> is required');
     const snapshot = JSON.parse(readFileSync(snapshotPath, 'utf8'));
-    const source = (snapshot.sources ?? []).find((candidate) => scopeMatches(
+    source = (snapshot.sources ?? []).find((candidate) => scopeMatches(
       { provider: candidate.provider, backend: candidate.backend, transport: candidate.transport }, target));
     if (!source || source.status !== 'ok') throw new Error(`The snapshot has no conclusive ${provider} source`);
     const rows = source.models ?? [];
@@ -418,8 +459,10 @@ export function main(argv) {
   }
   if (!yamlPath) return stringify(entries, { indent: 2, lineWidth: 0, aliasDuplicateObjects: false });
   const text = readFileSync(yamlPath, 'utf8');
-  const existing = (parse(text).catalogs ?? []).find((scope) => scopeMatches(scope, target))?.models ?? [];
-  writeFileSync(yamlPath, spliceScopeModels(text, target, mergeExisting(entries, existing)));
+  const catalogs = parse(text).catalogs ?? [];
+  const occurrence = selectWriteScope(catalogs, target, basis, source);
+  const existing = targetScopes(catalogs, target)[occurrence]?.models ?? [];
+  writeFileSync(yamlPath, spliceScopeModels(text, target, mergeExisting(entries, existing), occurrence));
   return `${entries.length} ${provider} entries written to ${yamlPath}\n`;
 }
 
