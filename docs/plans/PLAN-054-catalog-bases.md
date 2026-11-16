@@ -125,39 +125,45 @@ overrides and fixtures.
 Platform keeps its own copies of these types, and every parse, clone and compare helper copies
 only known fields, so `basisId` would be dropped on almost every path.
 
-- [ ] Types (`src/shared/providerSelection.ts`, `src/shared/providerCatalog.ts`):
-  - [ ] `ProviderModelSelection` and `ProviderModelResolution` gain `basisId`.
+Delivered by cats-platform#496 (merged 2026-11-16). Owner decisions made during this phase are
+in SPEC-045 FR-4 and FR-5 and Platform SPEC-013 "Catalog bases".
+
+- [x] Types (`src/shared/providerSelection.ts`, `src/shared/providerCatalog.ts`):
+  - [x] `ProviderModelSelection` and `ProviderModelResolution` gain `basisId`.
         `ProviderCatalogBasis` gains `id`, `region` and `plan.id`. The advanced catalog gains
         `basisId`, `bases` and `capture`.
-  - [ ] Keep `basisId` in the clone, parse, serialize, equal and equivalent helpers,
+  - [x] Keep `basisId` in the clone, parse, serialize, equal and equivalent helpers,
         `createExplicitProviderModelSelection`, `classifyCatalogSelection`,
         `resolveCatalogTargetSelection` and the workspace serializer
         (`useWorkspaceExecutionTargetState.ts`). `sessionReuse.ts` counts a change of basis as
-        a retarget.
-  - [ ] `readCatalogBasis` keeps a region-only basis; the normalizer keeps `bases` and
+        a retarget through the equivalence helper, unchanged.
+  - [x] `readCatalogBasis` keeps a region-only basis; the normalizer keeps `bases` and
         `capture`.
-- [ ] Reads and caches:
-  - [ ] The Runtime client, Platform route (`requestRouter.ts`, `src/server/routes/providers.ts`)
+- [x] Reads and caches:
+  - [x] The Runtime client, Platform route (`requestRouter.ts`, `src/server/routes/providers.ts`)
         and renderer client (`providerCatalogClient.ts`) pass `basis` through. Server and
         renderer caches and both label registries key by basis. `catalog_basis_unknown` reaches
-        the client instead of the generic lookup failure.
-  - [ ] Read Runtime `catalogCapabilities` (`GET /providers/catalogs`), which Platform does not
+        the client instead of the generic lookup failure, and a retired basis is evicted from
+        the server cache.
+  - [x] Read Runtime `catalogCapabilities` (`GET /providers/catalogs`), which Platform does not
         read today, and send `basisId` only when `catalogBases` is advertised.
-  - [ ] The local host projection (`src/platform/runtime/localCatalogProjection.ts`) keeps the
+  - [x] The local host projection (`src/platform/runtime/localCatalogProjection.ts`) keeps the
         basis id so informational labels of two bases do not overwrite each other.
-- [ ] Desktop UI (`src/design/components/ProviderModelFields.tsx` and its hooks):
-  - [ ] A "List basis" select before Model when there are two or more bases; a new selection
+- [x] Desktop UI (`src/design/components/ProviderModelFields.tsx` and its hooks):
+  - [x] A "List basis" select before Model when there are two or more bases; a new selection
         starts on the detected basis, otherwise the first.
-  - [ ] An unmappable saved basis keeps its value as a disabled option with a notice, like an
+  - [x] An unmappable saved basis keeps its value as a disabled option with a notice, like an
         unmappable entry (`savedSelectionAttention.ts` gains the kind).
-  - [ ] `CatalogBasisInfo` shows the region and the capture's CLI version and date; a
+  - [x] `CatalogBasisInfo` shows the region and the capture's CLI version and date; a
         non-blocking mismatch hint.
-  - [ ] New `en` and `zh-TW` strings: "List basis" (「清單依據」), region and freshness text,
+  - [x] New `en` and `zh-TW` strings: "List basis" (「清單依據」), region and freshness text,
         and the hint.
-- [ ] Tests: `tests/provider-model-basis-info.test.tsx`, `provider-model-fields.test.tsx`,
-      `provider-selection.test.js`, `provider-catalog-client.test.tsx`,
-      `provider-model-label-registry.test.tsx` and `local-catalog-projection.test.js`. The frozen
-      fixture `tests/fixtures/catalogs-v2.json` changes only for fields these tests need.
+- [x] Tests: 22 new cases in `tests/provider-selection-bases.test.js`,
+      `provider-model-catalog-bases.test.tsx`, `catalog-bases-renderer.test.tsx`,
+      `runtime-client-catalog-bases.test.js`, `provider-routes.test.js` and
+      `cat-selection-repair.test.js`. The frozen fixture `tests/fixtures/catalogs-v2.json` is
+      unchanged. A live check of the Platform Runtime client against an isolated Runtime with two
+      Kimi bases passed. The real Desktop UI was not run.
 - [ ] Packaging: the next Desktop release's `runtime_ref` must include Phases 1, 2 and 5.
 
 ## Phase 4: Maintenance skill (after Phase 1)
