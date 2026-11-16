@@ -20,6 +20,7 @@ import type {
 import { buildProcessSpawnConfig, type ProcessSpawnConfig } from '../runtime/runtime.js';
 import { startWindowsCodexHost, windowsCodexHostPath, type ManagedCodexHost } from '../runtime/windowsCodexHost.js';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
+import { killWindowsProcessTree } from '../../../core/process/windowsProcessTree.js';
 import { appendStderrLines } from '../stderrLines.js';
 import { InteractionStore } from '../../../core/interactions/InteractionStore.js';
 import type { StandingGrants } from '../../../core/interactions/standingGrants.js';
@@ -123,6 +124,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   private lastLaunchSummary = '';
   private ownedProcessStarted = false;
   private readonly ownedGenerations = new Set<number>();
+  /** Children that are Windows shell proxies, which `terminate` ends with the CLI they started. */
+  private readonly shellProxies = new WeakSet<ChildProcess>();
   get startupHasOwnedProcess(): boolean { return this.ownedProcessStarted; }
   private spawnResilience: SpawnResilienceConfig;
 
@@ -268,7 +271,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
             if (this.codeModeHost !== host) return;
             this.codeModeHost = null;
             this.emit('error', new Error('Codex Code Mode host exited during the session.'));
-            this.process?.kill('SIGTERM');
+            if (this.process) this.terminate(this.process);
           });
         }).finally(() => {
           if (this.starting === starting) this.starting = null;
@@ -304,6 +307,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       env,
       ...hiddenWindowsSpawnOptions(),
     });
+    if (spawnConfig.windowsShellProxy) this.shellProxies.add(child);
     this.process = child;
     const control = new WorkerControlChannel((line, done) => {
       if (this.process !== child || child.killed || child.exitCode !== null || !child.stdin || child.stdin.destroyed) {
@@ -317,7 +321,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       if (this.process !== child || !controller || controller.signal.aborted) return;
       controller.abort();
       this.emit('error', new Error('Provider input stream closed during the active turn.'));
-      child.kill('SIGTERM');
+      this.terminate(child);
     });
 
     // Read stdout line-by-line (NDJSON)
@@ -362,7 +366,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
           this.launchResponseObserved = true;
           if (isSessionIdentityEvent(event) && event.sessionId) {
             try { this.emit('native-session', event.sessionId); }
-            catch (error) { child.kill('SIGTERM'); this.emit('error', error instanceof Error ? error : new Error(String(error))); return; }
+            catch (error) { this.terminate(child); this.emit('error', error instanceof Error ? error : new Error(String(error))); return; }
             this._providerSessionId = event.sessionId;
           }
           this.emit('event', event);
@@ -454,7 +458,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     } catch {
       controller.abort();
       this.emit('error', new Error('Provider server-request response failed.'));
-      child.kill('SIGTERM');
+      this.terminate(child);
       return;
     }
     void Promise.resolve(response)
@@ -464,7 +468,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         if (!isCurrent()) return;
         controller.abort();
         this.emit('error', new Error('Provider server-request response failed.'));
-        child.kill('SIGTERM');
+        this.terminate(child);
       });
   }
 
@@ -762,8 +766,9 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
 
     if (this.process && this.process.exitCode === null) {
       const child = this.process;
+      // The EOF lets a CLI shut down; a shell proxy cannot exit before the CLI it waits for.
       child.stdin?.end();
-      child.kill('SIGTERM');
+      this.terminate(child);
 
       setTimeout(() => {
         if (child.exitCode === null) {
@@ -771,6 +776,16 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         }
       }, 5000);
     }
+  }
+
+  /**
+   * Stops a provider process with SIGTERM. A Windows shell proxy (cmd.exe or PowerShell running a
+   * `.cmd` shim) goes together with the CLI it started: killed alone, it would leave that CLI
+   * running, holding its working folder.
+   */
+  private terminate(child: ChildProcess): void {
+    if (this.shellProxies.has(child)) killWindowsProcessTree(child);
+    else child.kill('SIGTERM');
   }
 
   kill(): void {
@@ -839,7 +854,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     }
 
     const processRef = this.process;
-    processRef.kill('SIGTERM');
+    this.terminate(processRef);
 
     setTimeout(() => {
       if (processRef.exitCode === null) {

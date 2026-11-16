@@ -3895,14 +3895,19 @@ managed-plugin runs. While it waits, close and reset report the session as
 working folder in use until it has exited, so the wait lets a delete that follows
 remove a sandbox.
 
+On Windows, a CLI behind a `.cmd` or `.bat` shim that the Runtime cannot resolve
+to the program behind it runs through a shell proxy (cmd.exe or PowerShell).
+Stopping such a session, also after a provider error, ends the proxy together
+with every process under it (`taskkill /T /F`); killed alone, the proxy would
+leave the CLI running.
+
 Sandbox removal retries transient Windows errors for about 5 seconds. When it
 still fails, the delete answers `deleted` with `workspaceCleaned: false` and the
 Runtime logs the path. These processes can still outlive the wait:
 
-- a CLI launched through a `.cmd` shim that ignores its closed input: the
-  Runtime kills `cmd.exe`, not the CLI it started;
-- on Windows, processes a CLI that is not a Node program started itself (a
-  shell tool, for example): they survive the CLI, whose exit ends the wait;
+- on Windows, processes started by a CLI that the Runtime runs directly and
+  that is not a Node program (a shell tool, for example): they survive the CLI,
+  whose exit ends the wait;
 - processes a provider adapter starts per turn itself;
 - a process still exiting when a close or delete finds the session no longer
   active: neither waits then.
