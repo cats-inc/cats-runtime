@@ -560,6 +560,16 @@ export class WorkerPool {
   }
 
   /**
+   * Waits, without killing anything, for the processes of a session's worker to stop, as `kill`
+   * does. A worker no longer alive can still have one exiting: one whose stop outlasted its wait,
+   * or whose output another process still holds open.
+   */
+  waitForStopped(sessionId: string, timeoutMs = WORKER_STOP_WAIT_MS): Promise<boolean> {
+    const worker = this.workers.get(sessionId);
+    return worker ? this.waitForStop(worker, timeoutMs) : Promise.resolve(true);
+  }
+
+  /**
    * Settles true once the worker's process has stopped, or false after `timeoutMs`. One wait per
    * worker at a time: a second caller joins it, and waits on alone if its own deadline is later.
    */

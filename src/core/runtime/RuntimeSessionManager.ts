@@ -908,6 +908,19 @@ export class RuntimeSessionManager {
     }
   }
 
+  /** Whether a process the session's CLI worker started is still running, active or not. */
+  isProcessRunning(sessionId: string): boolean {
+    return this.pool.get(sessionId)?.processRunning === true;
+  }
+
+  /**
+   * Settles once the processes of the session's CLI worker have stopped (true), or after at most
+   * 6 seconds (false). It stops nothing itself; `close` does.
+   */
+  waitForProcessStop(sessionId: string): Promise<boolean> {
+    return this.pool.waitForStopped(sessionId);
+  }
+
   markClosed(sessionId: string): void {
     this.endWorkspaceExecution(sessionId, 'unknown', true);
     this.detachExecutionHandle(sessionId);

@@ -165,6 +165,7 @@ export class JunieProvider implements Provider {
       env,
       ...hiddenWindowsSpawnOptions(),
     });
+    opts.trackProcess?.(child);
     // A launch failure ends Junie before it reads the task; the exit path reports it.
     child.stdin?.on('error', () => {});
     child.stdin?.end(this.buildStdinMessage(turn.message, turn));

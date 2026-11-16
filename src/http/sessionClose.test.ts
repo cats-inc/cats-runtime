@@ -1,10 +1,11 @@
 import { withSelectedCliProviders } from '../../tests/support/selectedCliFixture.js';
 import { EventEmitter } from 'node:events';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRuntimeApp as createApp, getRuntimeSessionManager, type AppContext } from './app.js';
+import { waitForStoppingProcess } from './routes/sessions.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
@@ -185,6 +186,77 @@ describe('session close route', () => {
   afterEach(() => {
     wakeup.close();
     rmSync(rootDir, { recursive: true, force: true });
+  });
+
+  describe('a CLI process still exiting once the session is no longer active', () => {
+    /** The worker is gone as far as the session goes, but a process it started has not exited. */
+    function stillStopping(id: string) {
+      attachedWorkers.set(id, { alive: false, processRunning: true } as { alive: boolean });
+      let stop!: () => void;
+      // Callers share one wait, as they do the pool's.
+      const stopped = new Promise<boolean>((done) => {
+        stop = () => { attachedWorkers.delete(id); done(true); };
+      });
+      const waitForStopped = vi.fn(() => stopped);
+      Object.assign(pool, { waitForStopped });
+      return { waitForStopped, stop: () => stop() };
+    }
+
+    it('holds a close until it has stopped, reporting the session as closing', async () => {
+      const session = registry.create({ id: 'session-still-stopping', providerName: 'claude', cwd: 'C:/repo' });
+      registry.updateStatus(session.id, 'ready');
+      const { waitForStopped, stop } = stillStopping(session.id);
+      let answered = false;
+      const close = app.request(`/sessions/${session.id}/close`, { method: 'POST' })
+        .then((res) => { answered = true; return res; });
+      await vi.waitFor(() => expect(waitForStopped).toHaveBeenCalledWith(session.id));
+      expect(registry.get(session.id)?.status).toBe('closing');
+      expect((await app.request(`/sessions/${session.id}`, { method: 'DELETE' })).status).toBe(409);
+      expect(answered).toBe(false);
+      expect(pool.kill).not.toHaveBeenCalled();
+      stop();
+      expect((await close).status).toBe(200);
+      expect(registry.get(session.id)?.status).toBe('closed');
+    });
+
+    it('removes a sandbox only once it has stopped', async () => {
+      const sandbox = join(sessionBaseDir, 'session-sandbox-still-stopping');
+      mkdirSync(sandbox, { recursive: true });
+      const session = registry.create({ id: 'session-sandbox-still-stopping', providerName: 'claude', cwd: sandbox,
+        workspace: { kind: 'sandbox', access: 'read_write', runtimeCwd: sandbox } });
+      registry.updateStatus(session.id, 'closed');
+      const { waitForStopped, stop } = stillStopping(session.id);
+      const deletion = app.request(`/sessions/${session.id}`, { method: 'DELETE' });
+      await vi.waitFor(() => expect(waitForStopped).toHaveBeenCalledWith(session.id));
+      expect(existsSync(sandbox)).toBe(true);
+      stop();
+      const res = await deletion;
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual(expect.objectContaining({ status: 'deleted', workspaceCleaned: true }));
+      expect(existsSync(sandbox)).toBe(false);
+    });
+
+    it('never leaves a session closing when two waits overlap', async () => {
+      const session = registry.create({ id: 'session-overlapping-waits', providerName: 'claude', cwd: 'C:/repo' });
+      registry.updateStatus(session.id, 'ready');
+      const { stop } = stillStopping(session.id);
+      const first = waitForStoppingProcess(ctx, session.id);
+      const second = waitForStoppingProcess(ctx, session.id);
+      expect(registry.get(session.id)?.status).toBe('closing');
+      stop();
+      await Promise.all([first, second]);
+      expect(registry.get(session.id)?.status).toBe('ready');
+    });
+
+    it('closes and deletes a session at once when nothing is still running', async () => {
+      const session = registry.create({ id: 'session-nothing-running', providerName: 'claude', cwd: 'C:/repo' });
+      registry.updateStatus(session.id, 'closed');
+      const waitForStopped = vi.fn();
+      Object.assign(pool, { waitForStopped });
+      expect((await app.request(`/sessions/${session.id}/close`, { method: 'POST' })).status).toBe(200);
+      expect((await app.request(`/sessions/${session.id}`, { method: 'DELETE' })).status).toBe(200);
+      expect(waitForStopped).not.toHaveBeenCalled();
+    });
   });
 
   it('returns closed when the worker is already gone', async () => {

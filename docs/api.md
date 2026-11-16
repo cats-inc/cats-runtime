@@ -3887,13 +3887,20 @@ so hosts can record additive pre-maintenance trigger context even when the
 operation is only a soft close.
 
 Closing a CLI session returns once the provider process the Runtime started for
-it has stopped, waiting at most 6 seconds. This applies to
+it has stopped, waiting at most 6 seconds. For Kimi Code and Junie, which start
+a process per turn, that is the process of a turn still running. This applies to
 `POST /sessions/{id}/close`, `POST /sessions/{id}/reset`, the close that
 `DELETE /sessions/{id}` performs for an active session, and the stop of fenced
 managed-plugin runs. While it waits, close and reset report the session as
 `closing`, so a concurrent delete answers 409. On Windows a process keeps its
 working folder in use until it has exited, so the wait lets a delete that follows
 remove a sandbox.
+
+A session that is no longer active can still have such a process exiting, for
+example one whose stop outlasted that wait. Close, reset, delete and
+`POST /sessions/{id}/workspace/cleanup` then wait for it the same way before
+going on, without stopping anything themselves, and report the session as
+`closing` meanwhile.
 
 On Windows, stopping a CLI session, also after a provider error, ends the CLI
 together with every process under it at that moment (`taskkill /T /F`). Windows
@@ -3912,12 +3919,8 @@ taskkill cannot run, only the CLI's own process is killed and its input closed.
 
 Sandbox removal retries transient Windows errors for about 5 seconds. When it
 still fails, the delete answers `deleted` with `workspaceCleaned: false` and the
-Runtime logs the path. These processes can still outlive the wait:
-
-- the process a provider adapter starts per turn itself (Kimi Code, Junie):
-  the wait does not cover it;
-- a process still exiting when a close or delete finds the session no longer
-  active: neither waits then.
+Runtime logs the path. A process can still outlive the wait: one the CLI had left
+behind before the stop, or one that takes longer than 6 seconds to stop.
 
 `POST /sessions/{id}/workspace/cleanup` is a bounded retained-worktree recovery
 primitive for closed worktree-backed sessions whose most recent cleanup attempt

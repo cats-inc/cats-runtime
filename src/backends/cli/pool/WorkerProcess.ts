@@ -20,7 +20,7 @@ import type {
 import { buildProcessSpawnConfig, type ProcessSpawnConfig } from '../runtime/runtime.js';
 import { startWindowsCodexHost, windowsCodexHostPath, type ManagedCodexHost } from '../runtime/windowsCodexHost.js';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
-import { killWindowsProcessTree } from '../../../core/process/processTree.js';
+import { killWindowsProcessTree, stopCliProcess } from '../../../core/process/processTree.js';
 import { appendStderrLines } from '../stderrLines.js';
 import { InteractionStore } from '../../../core/interactions/InteractionStore.js';
 import type { StandingGrants } from '../../../core/interactions/standingGrants.js';
@@ -128,6 +128,10 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   private readonly windowsTrees = new WeakSet<ChildProcess>();
   /** Children `terminate` has handed to taskkill. */
   private readonly treeKilled = new WeakSet<ChildProcess>();
+  /** Processes `streamTurn` providers started for their turns, until each has closed. */
+  private readonly turnProcesses = new Set<ChildProcess>();
+  /** Turn processes the worker has stopped itself. */
+  private readonly stoppedTurns = new WeakSet<ChildProcess>();
   get startupHasOwnedProcess(): boolean { return this.ownedProcessStarted; }
   private spawnResilience: SpawnResilienceConfig;
 
@@ -163,12 +167,39 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
 
   /** Actual child/startup ownership, including an ephemeral worker already marked for shutdown. */
   get processRunning(): boolean {
-    return this.ownedGenerations.size > 0;
+    return this.ownedGenerations.size > 0 || this.turnProcesses.size > 0;
   }
 
   private ownedStopped(generation: number): void {
     this.ownedGenerations.delete(generation);
     this.emit('process-stopped');
+  }
+
+  /**
+   * A process a `streamTurn` provider started for its turn (`ProviderTurnOptions.trackProcess`):
+   * the worker counts as running until it has closed. One started after the turn was stopped,
+   * while the provider was still preparing it, is stopped at once.
+   */
+  private trackTurnProcess(child: ChildProcess, turn: AbortSignal): void {
+    this.turnProcesses.add(child);
+    child.once('close', () => {
+      this.turnProcesses.delete(child);
+      this.emit('process-stopped');
+    });
+    if (turn.aborted) this.stopTurnProcess(child);
+  }
+
+  /**
+   * Stops a turn process as `cancel` stops the worker's own: killed outright after 5 s if it
+   * ignores the stop, so it cannot keep the worker running, and its session busy, for good.
+   */
+  private stopTurnProcess(child: ChildProcess): void {
+    if (this.stoppedTurns.has(child)) return;
+    this.stoppedTurns.add(child);
+    stopCliProcess(child);
+    setTimeout(() => {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    }, 5000).unref?.();
   }
 
   start(): void {
@@ -522,6 +553,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         for await (const event of this.provider.streamTurn(turn, {
           ...this.spawnOpts,
           signal: controller.signal,
+          trackProcess: (child) => this.trackTurnProcess(child, controller.signal),
         })) {
           if (isSessionIdentityEvent(event) && event.sessionId) {
             this._providerSessionId = event.sessionId;
@@ -767,6 +799,9 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     this.startupController?.abort();
     this.stopCodeModeHost();
     this.activeTurnController?.abort();
+    // A provider stops its own turn process on that abort; this covers one that has not listened
+    // yet, and one that ignores the stop.
+    for (const child of this.turnProcesses) this.stopTurnProcess(child);
 
     if (this.process && this.process.exitCode === null) {
       const child = this.process;

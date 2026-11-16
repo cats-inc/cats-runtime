@@ -2,6 +2,7 @@ import type {
   ProviderModelResolution,
   ProviderModelSelection,
 } from './models/providerSelectionResolution.js';
+import type { ChildProcess } from 'node:child_process';
 import type { SessionMcpServerLaunch } from './sessionMcpServers.js';
 import type { GrantCategory, InteractionHost, InteractionKind } from './interactions/types.js';
 import type { ExecutionAccess, SessionExecutionPolicy } from './interactions/policy.js';
@@ -1699,6 +1700,12 @@ export interface ProviderSpawnOptions {
 
 export interface ProviderTurnOptions extends ProviderSpawnOptions {
   signal?: AbortSignal;
+  /**
+   * For a provider that starts its own process for the turn: call it with that process right
+   * after spawning it. The worker then counts as running until the process has closed, so a close
+   * waits for it, and stopping the worker stops it.
+   */
+  trackProcess?: (child: ChildProcess) => void;
 }
 
 export interface ProviderMessage {
