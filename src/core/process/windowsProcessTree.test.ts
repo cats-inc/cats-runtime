@@ -80,7 +80,8 @@ describe('killWindowsProcessTree', () => {
       const pidFile = join(this.dir, 'pids');
       const script = join(this.dir, 'stubborn.cjs');
       writeFileSync(script, [
-        `const tool = require('child_process').spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'],`
+        // The folder as an argument names the tool as this fixture's in its command line.
+        `const tool = require('child_process').spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)', ${JSON.stringify(this.dir)}],`
           + " { detached: true, stdio: 'ignore', windowsHide: true });",
         `require('fs').writeFileSync(${JSON.stringify(pidFile)}, process.pid + ' ' + tool.pid);`,
         "process.stdin.resume(); process.stdin.on('end', () => {}); setInterval(() => {}, 1000);",
@@ -94,12 +95,23 @@ describe('killWindowsProcessTree', () => {
       return { proxy: this.proxy, cliPid: this.pids[0]!, toolPid: this.pids[1]! };
     }
 
-    /** Also when an assertion exposes a regression, or the CLI never reported its pids. */
+    /**
+     * Also when an assertion exposes a regression, or the CLI never reported its pids. Only a
+     * process whose command line names this fixture's folder is killed, so a reused PID is not.
+     */
     reap() {
       for (const pid of [this.proxy?.pid ?? 0, ...this.pids]) {
-        if (pid > 0 && alive(pid)) spawnSync('taskkill.exe', ['/pid', String(pid), '/t', '/f'], { stdio: 'ignore', windowsHide: true });
+        if (pid > 0 && alive(pid) && this.owns(pid)) {
+          spawnSync('taskkill.exe', ['/pid', String(pid), '/t', '/f'], { stdio: 'ignore', windowsHide: true });
+        }
       }
       rmSync(this.dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
+
+    private owns(pid: number): boolean {
+      const query = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+        `(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}").CommandLine`], { encoding: 'utf8', windowsHide: true });
+      return (query.stdout ?? '').includes(this.dir);
     }
   }
 

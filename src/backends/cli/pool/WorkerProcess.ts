@@ -330,7 +330,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     const rl = createInterface({ input: child.stdout! });
     const secrets = new SessionSecretRedactor(Object.values(this.launchEnv));
     rl.on('line', (line) => {
-      if (this.process !== child || child.exitCode !== null) return;
+      // A proxy being ended with its tree is as good as gone, as a directly run CLI is at once.
+      if (this.process !== child || child.exitCode !== null || this.treeKilled.has(child)) return;
       line = secrets.line(line);
       if (control.consume(line)) return;
       // Handle auto-response (e.g. Codex approval requests)

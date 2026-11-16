@@ -81,12 +81,20 @@ describe('stopping a worker whose process is a Windows shell proxy', () => {
     });
   }
 
-  it('ends the tree on an error path too, and writes nothing more while taskkill runs', async () => {
+  it('ends the tree on an error path too, and neither writes to nor hears from the CLI while taskkill runs', async () => {
     const { cli } = launch(true);
     let writes = '';
     cli.stdin.on('data', (chunk) => { writes += String(chunk); });
     const { WorkerProcess } = await import('./WorkerProcess.js');
-    const worker = new WorkerProcess({ ...provider, buildStdinMessage: () => 'begin\n' }, { cwd: process.cwd() }, commandConfig);
+    const worker = new WorkerProcess({
+      ...provider,
+      buildStdinMessage: () => 'begin\n',
+      // Any line asks for an automatic answer, and is also an event of its own.
+      buildAutoResponse: () => 'auto-answer\n',
+      parseStreamLine: (line) => ({ type: 'text', text: line }),
+    }, { cwd: process.cwd() }, commandConfig);
+    const events: unknown[] = [];
+    worker.on('event', (event) => { events.push(event); });
     worker.start();
     const turn = worker.sendMessage('hello');
     const failed = expect(turn).rejects.toThrow('Provider input stream closed during the active turn.');
@@ -95,6 +103,11 @@ describe('stopping a worker whose process is a Windows shell proxy', () => {
     await failed;
     expect(spawnMock.mock.calls.map(([command]) => command)).toContain('taskkill.exe');
     expect(cli.kill).not.toHaveBeenCalled();
+    // The CLI is still alive until taskkill has run: what it says now goes nowhere.
+    cli.stdout.write('still talking\n');
+    await new Promise<void>((done) => setImmediate(done));
+    expect(writes).not.toContain('auto-answer');
+    expect(events).toEqual([]);
     cli.exitCode = 0;
     cli.emit('close', 0, null);
   });
