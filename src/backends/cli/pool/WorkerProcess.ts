@@ -20,7 +20,7 @@ import type {
 import { buildProcessSpawnConfig, type ProcessSpawnConfig } from '../runtime/runtime.js';
 import { startWindowsCodexHost, windowsCodexHostPath, type ManagedCodexHost } from '../runtime/windowsCodexHost.js';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
-import { killWindowsProcessTree } from '../../../core/process/windowsProcessTree.js';
+import { killWindowsProcessTree } from '../../../core/process/processTree.js';
 import { appendStderrLines } from '../stderrLines.js';
 import { InteractionStore } from '../../../core/interactions/InteractionStore.js';
 import type { StandingGrants } from '../../../core/interactions/standingGrants.js';
@@ -794,7 +794,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     }
     // taskkill takes a moment and leaves child.killed false; nothing more is written meanwhile.
     this.treeKilled.add(child);
-    killWindowsProcessTree(child);
+    void killWindowsProcessTree(child);
   }
 
   /** Killed, or being ended with its process tree. */

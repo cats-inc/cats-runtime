@@ -23,6 +23,7 @@ import type {
 import type { ErrorStreamEvent, InitStreamEvent, ResultStreamEvent } from '../../../core/types.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
+import { killWindowsProcessTree } from '../../../core/process/processTree.js';
 import { appendStderrLines } from '../stderrLines.js';
 import { providerSessionUnavailableEvent } from '../../../core/runtime/providerSessionUnavailable.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
@@ -299,10 +300,7 @@ function terminateKimi(child: ChildProcess): void {
   if (child.exitCode !== null || child.signalCode !== null || child.pid === undefined) return;
   if (process.platform === 'win32') {
     // Kimi runs shell tools as its own children; end the whole tree.
-    const killer = spawn('taskkill.exe', ['/pid', String(child.pid), '/t', '/f'], {
-      stdio: 'ignore', windowsHide: true,
-    });
-    killer.on('error', () => { child.kill(); });
+    void killWindowsProcessTree(child);
     return;
   }
   child.kill('SIGTERM');

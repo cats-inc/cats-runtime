@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import type { ProviderCommandConfig } from '../config.js';
 import { buildProcessSpawnConfig } from '../runtime/runtime.js';
+import { killProcessTree } from '../../../core/process/processTree.js';
 
 export type CodexQuotaStatus = 'updated' | 'auth_required' | 'unsupported' | 'unavailable' | 'timeout' | 'error';
 export interface CodexQuotaResult {
@@ -75,18 +76,7 @@ export async function readCodexQuota(
         signal?.removeEventListener('abort', abort);
         // EOF lets app-server clean up. Reap an unresponsive CLI tree, including npm shims.
         child.stdin.end();
-        killTimer = setTimeout(() => {
-          if (!child.pid) return;
-          if (process.platform === 'win32') {
-            const killer = spawn('taskkill.exe', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore', windowsHide: true });
-            killer.on('error', () => child.kill());
-            killer.on('exit', (code) => { if (code !== 0) child.kill(); });
-            const killerTimeout = setTimeout(() => { child.kill(); killer.kill(); }, 1000);
-            killer.on('close', () => clearTimeout(killerTimeout));
-          } else {
-            try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); }
-          }
-        }, 500);
+        killTimer = setTimeout(() => { void killProcessTree(child); }, 500);
       };
       signal?.addEventListener('abort', abort, { once: true });
       if (signal?.aborted) abort();

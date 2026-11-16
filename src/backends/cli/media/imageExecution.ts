@@ -1,4 +1,3 @@
-import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstat, open, readdir, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -91,18 +90,6 @@ export async function readStableImage(file: string, signal: AbortSignal): Promis
     if (before.size !== after.size || before.mtimeMs !== after.mtimeMs || signal.aborted) throw new ImageError('invalid_image');
     return bytes;
   } finally { await handle.close(); }
-}
-
-/** Ends the whole process tree; the runner owns its child, so nothing it started outlives it. */
-export function stopProcessTree(child: ChildProcess) {
-  // After exit the PID may already belong to another process; never signal it then.
-  if (!child.pid || child.exitCode !== null || child.signalCode !== null) return;
-  if (process.platform === 'win32') {
-    const killer = spawn('taskkill.exe', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true, stdio: 'ignore' });
-    killer.on('error', () => child.kill());
-    const killTimer = setTimeout(() => { child.kill(); killer.kill(); }, 2000);
-    killer.on('close', () => { clearTimeout(killTimer); child.kill(); });
-  } else { try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); } }
 }
 
 export function classifyImageFailure(text: string): string {

@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { killWindowsProcessTree, TASKKILL_TIMEOUT_MS } from './windowsProcessTree.js';
+import { killProcessTree, killWindowsProcessTree, TASKKILL_TIMEOUT_MS } from './processTree.js';
 
 function fakeChild(overrides: Partial<{ pid: number | undefined; exitCode: number | null }> = {}) {
   return Object.assign(new EventEmitter(), {
@@ -18,26 +18,36 @@ function fakeKiller() {
   return Object.assign(new EventEmitter(), { kill: vi.fn(() => true) }) as unknown as ChildProcess & { kill: ReturnType<typeof vi.fn> };
 }
 
-describe('killWindowsProcessTree', () => {
+describe('process tree kill', () => {
   afterEach(() => { vi.useRealTimers(); });
 
-  it('ends the whole tree with taskkill and leaves the process to it when taskkill succeeds', () => {
+  /** Whether a promise has settled by the time the queued callbacks have run. */
+  async function settled(promise: Promise<void>): Promise<boolean> {
+    let done = false;
+    void promise.then(() => { done = true; });
+    await Promise.resolve();
+    return done;
+  }
+
+  it('ends the whole tree with taskkill and leaves the process to it when taskkill succeeds', async () => {
     const child = fakeChild();
     const killer = fakeKiller();
     const run = vi.fn(() => killer);
-    killWindowsProcessTree(child, run);
+    const stopped = killWindowsProcessTree(child, run);
     expect(run).toHaveBeenCalledWith('taskkill.exe', ['/pid', '4321', '/t', '/f'],
       expect.objectContaining({ stdio: 'ignore', windowsHide: true }));
+    expect(await settled(stopped)).toBe(false);
     killer.emit('exit', 0);
+    expect(await settled(stopped)).toBe(true);
     expect(child.kill).not.toHaveBeenCalled();
   });
 
-  it('kills the process alone when taskkill fails, cannot start or hangs', () => {
+  it('kills the process alone when taskkill fails, cannot start or hangs, and settles then', async () => {
     vi.useFakeTimers();
     for (const failure of ['exit', 'error', 'throw', 'hang'] as const) {
       const child = fakeChild();
       const killer = fakeKiller();
-      killWindowsProcessTree(child, () => {
+      const stopped = killWindowsProcessTree(child, () => {
         if (failure === 'throw') throw new Error('no taskkill');
         return killer;
       });
@@ -46,6 +56,7 @@ describe('killWindowsProcessTree', () => {
       if (failure === 'hang') vi.advanceTimersByTime(TASKKILL_TIMEOUT_MS);
       expect(child.kill, failure).toHaveBeenCalledOnce();
       if (failure === 'hang') expect(killer.kill).toHaveBeenCalledOnce();
+      expect(await settled(stopped), failure).toBe(true);
     }
   });
 
@@ -60,11 +71,47 @@ describe('killWindowsProcessTree', () => {
     expect(child.kill).toHaveBeenCalledOnce();
   });
 
-  it('does nothing for a process that has no pid or has already exited', () => {
+  it('does nothing for a process that has no pid or has already exited', async () => {
     const run = vi.fn();
-    killWindowsProcessTree(fakeChild({ pid: undefined }), run);
-    killWindowsProcessTree(fakeChild({ exitCode: 0 }), run);
+    expect(await settled(killWindowsProcessTree(fakeChild({ pid: undefined }), run))).toBe(true);
+    expect(await settled(killWindowsProcessTree(fakeChild({ exitCode: 0 }), run))).toBe(true);
     expect(run).not.toHaveBeenCalled();
+  });
+
+  describe('killProcessTree', () => {
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('uses taskkill on Windows', async () => {
+      const child = fakeChild();
+      const killer = fakeKiller();
+      const run = vi.fn(() => killer);
+      const stopped = killProcessTree(child, 'win32', run);
+      expect(run).toHaveBeenCalledWith('taskkill.exe', ['/pid', '4321', '/t', '/f'], expect.anything());
+      killer.emit('exit', 0);
+      expect(await settled(stopped)).toBe(true);
+    });
+
+    it('sends SIGKILL to the process group elsewhere, also once its leader has exited', async () => {
+      const signal = vi.spyOn(process, 'kill').mockImplementation(() => true);
+      const run = vi.fn();
+      for (const exitCode of [null, 0]) {
+        const child = fakeChild({ exitCode });
+        expect(await settled(killProcessTree(child, 'linux', run))).toBe(true);
+        expect(child.kill).not.toHaveBeenCalled();
+      }
+      expect(signal.mock.calls).toEqual([[-4321, 'SIGKILL'], [-4321, 'SIGKILL']]);
+      expect(run).not.toHaveBeenCalled();
+    });
+
+    it('kills the process alone when its group cannot be signalled, and skips one with no pid', async () => {
+      vi.spyOn(process, 'kill').mockImplementation(() => { throw Object.assign(new Error('ESRCH'), { code: 'ESRCH' }); });
+      const child = fakeChild();
+      await killProcessTree(child, 'darwin');
+      expect(child.kill).toHaveBeenCalledWith('SIGKILL');
+      const unstarted = fakeChild({ pid: undefined });
+      await killProcessTree(unstarted, 'linux');
+      expect(unstarted.kill).not.toHaveBeenCalled();
+    });
   });
 
   /**
@@ -137,7 +184,7 @@ describe('killWindowsProcessTree', () => {
     try {
       const { proxy, cliPid, toolPid } = await cli.start();
       const closed = once(proxy, 'close');
-      killWindowsProcessTree(proxy);
+      await killWindowsProcessTree(proxy);
       await closed;
       await vi.waitFor(() => {
         expect(alive(cliPid)).toBe(false);

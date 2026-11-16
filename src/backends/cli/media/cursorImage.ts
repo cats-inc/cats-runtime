@@ -5,9 +5,10 @@ import { StringDecoder } from 'node:string_decoder';
 import { buildProcessSpawnConfig } from '../runtime/runtime.js';
 import type { ProviderInstanceConfig } from '../config.js';
 import { ImageError } from '../../../core/media/contracts.js';
+import { killProcessTree } from '../../../core/process/processTree.js';
 import {
   IMAGE_PROCESS_DEADLINE_MS, IMAGE_PROCESS_OUTPUT_LIMIT, classifyImageFailure, containedImageFile,
-  readStableImage, stopProcessTree, validateImage, type ImageExecution, type ImageExecutionResult,
+  readStableImage, validateImage, type ImageExecution, type ImageExecutionResult,
 } from './imageExecution.js';
 
 const record = (value: unknown): Record<string, unknown> | null => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
@@ -68,7 +69,7 @@ export async function executeCursorImage(input: ImageExecution, spawnProcess: ty
     let discovery: string | null = null;
     let collecting: Promise<void> | null = null; let collected: ImageExecutionResult | null = null;
     const decoder = new StringDecoder('utf8');
-    const stop = (code: string) => { if (failure || collected) return; failure = code; stopProcessTree(child); };
+    const stop = (code: string) => { if (failure || collected) return; failure = code; void killProcessTree(child); };
     const abort = () => stop('cancelled');
     const timer = setTimeout(() => stop('generation_timeout'), IMAGE_PROCESS_DEADLINE_MS);
     input.signal.addEventListener('abort', abort, { once: true });
@@ -124,7 +125,7 @@ export async function executeCursorImage(input: ImageExecution, spawnProcess: ty
             if (failure || input.signal.aborted) return;
             collected = { ...image, executionOutcome: completed ? 'completed' : 'stopped_after_image',
               warnings: image.metadata.width !== image.metadata.height ? ['ratio_differs_from_request'] : [] };
-            stopProcessTree(child);
+            void killProcessTree(child);
           }).catch((error) => stop(error instanceof ImageError ? error.code : 'invalid_image_source'));
         } else stop('image_tool_limit');
       }
