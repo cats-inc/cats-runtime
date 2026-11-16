@@ -4530,7 +4530,8 @@ providers:
 
       const chosen = await create({ modelSelection: { basisId: 'plan-b', entryId: 'only-b', entryMode: 'explicit' } });
       expect(chosen.status).toBe(201);
-      expect(await chosen.json()).toMatchObject({ model: 'only-b',
+      const chosenBody = await chosen.json() as Record<string, any>;
+      expect(chosenBody).toMatchObject({ model: 'only-b',
         modelSelection: { basisId: 'plan-b', entryId: 'only-b' },
         modelResolution: { basisId: 'plan-b', entryId: 'only-b', model: 'only-b' } });
 
@@ -4543,6 +4544,17 @@ providers:
 
       const missing = await create({ modelSelection: { basisId: 'missing', entryId: 'gpt-5.4', entryMode: 'explicit' } });
       expect(missing.status).toBe(400);
+      expect(await missing.json()).toMatchObject({ code: 'catalog_basis_unknown' });
+      const forked = await runtime.app.request(`/sessions/${chosenBody.id}/fork`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ modelSelection: { basisId: 'missing', entryId: 'gpt-5.4', entryMode: 'explicit' } }),
+      });
+      expect(forked.status).toBe(400);
+      expect(await forked.json()).toMatchObject({ code: 'catalog_basis_unknown' });
+      // Other rejected selections keep a plain 400.
+      const unlisted = await create({ modelSelection: { basisId: 'plan-b', entryId: 'not-listed', entryMode: 'explicit' } });
+      expect(unlisted.status).toBe(400);
+      expect((await unlisted.json() as Record<string, unknown>).code).toBeUndefined();
 
       // Reuse compares the basis: the same row in another basis is a different selection.
       const keyed = { sessionKey: 'basis-reuse', reusePolicy: 'require_existing' };

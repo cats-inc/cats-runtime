@@ -13098,7 +13098,12 @@ catalogs:
     source_cli: Kimi Code
     cli_version: 2.5.3
     last_updated: 2026-11-16
+    basis:
+      region:
+        id: global
+        label: global (kimi.ai)
     notes:
+      - "Region basis (SPEC-045 FR-9): this list was read signed in to region global, which `<KIMI_CODE_HOME>/region` held and `kimi login --region` spells `global` (kimi.ai); the label follows that help text (SPEC-045 owner decision 2). A mainland-cn (kimi.com) sign-in can list other aliases and is not captured. As the first basis it has no id, so saved selections are unchanged. Evidence: docs/research/fixtures/kimi-2.5.3/model-list.probe.redacted.json (a 2026-11-16 probe that matched the same six rows and recorded signIn region global)."
       - "The managed kimi-code model aliases of Kimi Code CLI 2.5.3, read 2026-11-16 on native Windows 11 with `kimi provider list --json` (machine-readable). `kimi login` writes them into config.toml from the account's managed provider; the operator account was signed in with region global but had no Kimi Code plan (prompts failed with provider.auth_error), so entitlement for paid plans is unverified. Rows keep the enumeration's order; ids and execution values are the alias keys `-m/--model` accepts; labels are the exact displayName values; limits are maxContextSize."
       - "No row is a default. config.toml's default_model (kimi-code/kimi-for-coding here) is the user's current choice, which /model changes, not an account default; a turn without a model uses it, and the UI initializes the first row, which is the same alias here. The /model picker itself was not captured."
       - "No effort control. The aliases list supportEfforts low, high and max with defaultEffort max (K2.8 Preview) or high (K3 family), and K2.7 Code Highspeed lists none, but print mode has no per-invocation effort flag: Kimi resolves a turn's effort from config.toml [thinking] or the model's defaultEffort. KIMI_MODEL_THINKING_EFFORT applies only together with KIMI_MODEL_NAME and KIMI_MODEL_API_KEY, which replace the managed provider."

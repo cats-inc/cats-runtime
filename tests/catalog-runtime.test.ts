@@ -292,8 +292,9 @@ describe('factory and executable catalog projections', () => {
 
   it('detects the Kimi region basis from the region marker alone (SPEC-045 FR-6, scenario 7)', () => {
     const factoryKimi = snapshot.document.catalogs.find(s => s.provider === 'kimi' && s.backend === 'cli')!;
-    const global: CatalogScope = { ...structuredClone(factoryKimi),
-      basis: { region: { id: 'global', label: 'global (kimi.ai)' } } };
+    // SPEC-045 FR-9: the factory scope records the global region as its id-less first basis.
+    expect(factoryKimi.basis).toEqual({ region: { id: 'global', label: 'global (kimi.ai)' } });
+    const global: CatalogScope = structuredClone(factoryKimi);
     const mainland: CatalogScope = { ...structuredClone(factoryKimi),
       basis: { id: 'mainland-cn', region: { id: 'mainland-cn', label: 'mainland-cn (kimi.com)' } } };
     const current = createCatalogSnapshot(factory.source, JSON.stringify({ schema_version: 2, catalogs: [global, mainland] }));
@@ -307,11 +308,16 @@ describe('factory and executable catalog projections', () => {
           commandConfig: { path: 'kimi', runner: 'direct', runtime: { mode: 'native' } } } } as ProviderTargetDescriptor;
       const detect = createCatalogBasisDetector({ KIMI_CODE_HOME: kimiHome });
       expect(detect(kimiTarget)).toEqual({ region: 'global' });
-      const build = (basisId?: string) => buildProviderAdvancedKnowledge(kimiTarget, {
+      const build = (basisId?: string, from = current) => buildProviderAdvancedKnowledge(kimiTarget, {
         provider: 'kimi', backend: 'cli', instance: 'fixture', source: 'static', cache: null,
-        catalogRevision: current.catalogRevision, defaultModel: null,
+        catalogRevision: from.catalogRevision, defaultModel: null,
         models: factoryKimi.models.map(({ id, label }) => ({ id, label })), warnings: [],
-      }, { snapshot: current, basisId, detectBasis: () => detect(kimiTarget) }).catalog;
+      }, { snapshot: from, basisId, detectBasis: () => detect(kimiTarget) }).catalog;
+      // The factory alone has one basis: it shows the region but offers no basis select.
+      const factoryOnly = build(undefined, snapshot);
+      expect(factoryOnly.basis).toEqual({ region: { id: 'global', label: 'global (kimi.ai)' } });
+      expect(factoryOnly.bases).toBeUndefined();
+      expect(factoryOnly.capture).toEqual({ cliVersion: factoryKimi.cli_version, lastUpdated: factoryKimi.last_updated });
       expect(build().bases?.map(b => [b.id, b.label, b.detected]))
         .toEqual([[undefined, 'global (kimi.ai)', true], ['mainland-cn', 'mainland-cn (kimi.com)', false]]);
       expect(build('mainland-cn').bases?.map(b => b.detected)).toEqual([true, false]);

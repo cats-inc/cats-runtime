@@ -1,7 +1,8 @@
 # ADR-056: Offer one basis selector over captured catalog bases
 
 Date: 2026-11-16
-Status: Accepted 2026-11-16; not implemented. The owner chose the proposed defaults for every
+Status: Accepted 2026-11-16; implemented 2026-11-16 by
+[PLAN-054](../plans/PLAN-054-catalog-bases.md) (real Desktop UI not run), unpublished. The owner chose the proposed defaults for every
 open question in SPEC-045 and deferred capturing any new basis. It amends the scope identity of
 [ADR-040](./040-use-data-driven-provider-catalogs-and-local-overrides.md) and the basis rules of
 [SPEC-031](../specs/SPEC-031-provider-catalog-data-and-local-overrides.md#amendment-2026-09-29-catalog-basis).

@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Approved 2026-11-16 with the proposed defaults; not implemented |
+| Status | Approved 2026-11-16 with the proposed defaults; implemented 2026-11-16 by PLAN-054 (real Desktop UI not run), unpublished |
 | Owner | Runtime catalog workstream; Platform owns its consumers |
 | Reviewer | User |
 | Decision | [ADR-056](../decisions/056-offer-one-basis-selector-over-captured-catalog-bases.md) |

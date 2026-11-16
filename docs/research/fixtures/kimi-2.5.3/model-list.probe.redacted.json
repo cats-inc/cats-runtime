@@ -1,0 +1,118 @@
+{
+  "kind": "cats-catalog-probe-evidence",
+  "schemaVersion": 1,
+  "provider": "kimi",
+  "backend": "cli",
+  "transport": null,
+  "command": "kimi provider list --json (managed:kimi-code aliases)",
+  "sourceClass": "machine-readable",
+  "cliVersion": "2.5.3",
+  "versionSource": "--version",
+  "observedAt": "2026-11-16T14:40:44.202Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "accountScope": "The CLI's existing sign-in on the probing machine. No identity is recorded.",
+  "signIn": {
+    "region": "global"
+  },
+  "status": "ok",
+  "completeness": {
+    "membership": "complete",
+    "meaning": "The command lists what the picker offers; an absent row still needs picker confirmation before removal."
+  },
+  "authoritativeFor": {
+    "ids": true,
+    "label": true,
+    "efforts": false,
+    "effortDefault": false
+  },
+  "stillNeedsPicker": "A model (default) marker, picker descriptions, picker order, and every field not listed under authoritativeFor still need picker evidence.",
+  "selection": "all 6 rows",
+  "models": [
+    {
+      "id": "kimi-code/kimi-for-coding",
+      "label": "K2.8 Preview",
+      "evidence": {
+        "model": "kimi-for-coding",
+        "maxContextSize": 1048576,
+        "supportEfforts": [
+          "low",
+          "high",
+          "max"
+        ],
+        "defaultEffort": "max"
+      }
+    },
+    {
+      "id": "kimi-code/kimi-for-coding-highspeed",
+      "label": "K2.7 Code Highspeed",
+      "evidence": {
+        "model": "kimi-for-coding-highspeed",
+        "maxContextSize": 262144
+      }
+    },
+    {
+      "id": "kimi-code/k3",
+      "label": "K3",
+      "evidence": {
+        "model": "k3",
+        "maxContextSize": 1048576,
+        "supportEfforts": [
+          "low",
+          "high",
+          "max"
+        ],
+        "defaultEffort": "high"
+      }
+    },
+    {
+      "id": "kimi-code/k3-256k",
+      "label": "K3-256k",
+      "evidence": {
+        "model": "k3-256k",
+        "maxContextSize": 262144,
+        "supportEfforts": [
+          "low",
+          "high",
+          "max"
+        ],
+        "defaultEffort": "high"
+      }
+    },
+    {
+      "id": "kimi-code/k3.1-pro",
+      "label": "K3.1 Pro",
+      "evidence": {
+        "model": "k3.1-pro",
+        "maxContextSize": 1048576,
+        "supportEfforts": [
+          "low",
+          "high",
+          "max"
+        ],
+        "defaultEffort": "high"
+      }
+    },
+    {
+      "id": "kimi-code/k3.1-pro-highspeed",
+      "label": "K3.1 Pro Highspeed 2x Usage Cost",
+      "evidence": {
+        "model": "k3.1-pro-highspeed",
+        "maxContextSize": 1048576,
+        "supportEfforts": [
+          "low",
+          "high",
+          "max"
+        ],
+        "defaultEffort": "high"
+      }
+    }
+  ],
+  "redaction": {
+    "method": "Projected public model fields only; no raw output, account identifier, price, endpoint or login text. String values passed through the skill redaction helper.",
+    "redactions": [],
+    "reviewBeforeCommit": "Check names, paths and provider-specific identifiers by hand; the helper catches only common shapes."
+  }
+}
