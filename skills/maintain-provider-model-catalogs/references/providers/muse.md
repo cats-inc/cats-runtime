@@ -47,6 +47,10 @@ day it was written; it is the list at the CLI's last account read, not a live an
 check reports `ready, local credentials` instead of asking for a sign-in. Without a matching cache
 the scope stays `degraded` as before. Rerun the probe later before signing in again.
 
+The owner kept this fallback on 2026-11-16: the cache is the CLI's model list, not a credential
+(ADR-038). Its rows carry a `credential_generation` value, which is never copied. The same
+directory holds a `.credential` file; the reader lists the directory but opens only `.json` files.
+
 **`isDefault` is not automatically the curated default.** Meta ships `-contributor` variants of each
 model whose own description says the session may be used for product improvement, and the catalog's
 `isDefault` has pointed at one of them. Projecting that into curated YAML opts every runtime turn

@@ -133,8 +133,9 @@ Illustrative Kimi data, if a mainland capture differs:
 
 - Detection reads only CLI output or non-secret local markers. It never reads a credential file,
   uses a token or API key, or calls a provider API (ADR-038). The owner decided on
-  2026-11-16 that `catalog:logins` sign-in checks follow the same rule and report `unknown`
-  where only a credential file could tell; see the skill's catalog probe reference.
+  2026-11-16 that `catalog:logins` sign-in checks never open a credential file or use a key's
+  value either. Whether a credential file exists or a key variable is set may count; a CLI whose
+  sign-in only a file's content shows is `unknown`. See the skill's catalog probe reference.
 - A detection source is added for one CLI at a time, with evidence in that provider's reference.
   Initial source: Kimi, the `region` file in `KIMI_CODE_HOME` (default `~/.kimi-code`), matched
   against `basis.region.id`. Every other target reports no detected basis until a source is

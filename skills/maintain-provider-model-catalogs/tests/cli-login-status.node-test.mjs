@@ -20,14 +20,17 @@ const APPDATA = join(HOME, 'AppData', 'Roaming');
 
 /**
  * Stands in for createContext: `runs` maps "<command> <args>" to one result or a queue of
- * results, and every launch is recorded so a test can prove a CLI was never started.
+ * results. Every launch and every opened file is recorded, so a test can prove a CLI was never
+ * started and a credential file was never opened.
  */
 function fakeContext({ installed = [], runs = {}, files = {}, dirs = {}, env = {}, platform = 'win32', packageDirs = {}, muse, copilot } = {}) {
   const calls = [];
+  const opened = [];
   const pending = Object.fromEntries(Object.entries(runs).map(([key, value]) => [key, Array.isArray(value) ? [...value] : [value]]));
   const answer = (value) => (value instanceof Error ? Promise.reject(value) : Promise.resolve(value));
   return {
     calls,
+    opened,
     env: { LOCALAPPDATA, APPDATA, ...env },
     home: HOME,
     platform,
@@ -42,7 +45,10 @@ function fakeContext({ installed = [], runs = {}, files = {}, dirs = {}, env = {
       const result = { exitCode: 0, stdout: '', stderr: '', timedOut: false, ...next };
       return { ...result, text: `${result.stdout}\n${result.stderr}` };
     },
-    readText: (path) => files[path] ?? null,
+    readText: (path) => {
+      opened.push(path);
+      return files[path] ?? null;
+    },
     listFiles: (dir) => dirs[dir] ?? [],
     realpath: (path) => path,
     cleanEnv: () => ({}),
@@ -222,65 +228,55 @@ test('requires the scope channel in OpenCode and Kilo stored credentials', async
   assert.equal((await checkOne('kilo', context)).state, 'local');
 });
 
-test('checks Cline, Junie, Pi and Goose credential files without launching them', async () => {
-  const goose = join(APPDATA, 'Block', 'goose', 'config', 'chatgpt_codex', 'tokens.json');
-  const junie = join(HOME, '.junie', 'dpapi_credentials');
+test('checks Junie, Pi, Kimi, Goose and Cline by file presence and set variables, never opening a file', async () => {
+  const kimiHome = join(HOME, '.kimi-code');
+  const gooseDir = join(APPDATA, 'Block', 'goose', 'config', 'chatgpt_codex');
   const signedIn = fakeContext({
-    installed: ['cline', 'junie', 'pi', 'goose'],
+    installed: ['junie', 'pi', 'kimi', 'goose', 'cline'],
+    // Contents exist only to prove they are never opened.
     files: {
-      [join(HOME, '.pi', 'agent', 'auth.json')]: '{"openai-codex": {"refresh": "r", "expires": 1}}',
-      [goose]: '{"refresh_token": "r", "expires_at": "2026-01-01T00:00:00Z"}',
-      [join(HOME, '.cline', 'data', 'settings', 'providers.json')]: '{"providers": {"cline-pass": {"settings": {"auth": {"refreshToken": "r", "expiresAt": 1}}}}}',
+      [join(HOME, '.pi', 'agent', 'auth.json')]: '{"openai-codex": {"refresh": "r"}}',
+      [join(gooseDir, 'tokens.json')]: '{"refresh_token": "r"}',
+      [join(HOME, '.cline', 'data', 'settings', 'providers.json')]: '{"providers": {"cline-pass": {}}}',
+      [join(kimiHome, 'credentials', 'kimi-code.json')]: '{"refresh_token": "r"}',
     },
-    dirs: { [junie]: [{ name: 'a.dpapi', size: 352 }, { name: 'empty.dpapi', size: 0 }, { name: 'note.txt', size: 9 }] },
+    dirs: {
+      [join(HOME, '.junie', 'dpapi_credentials')]: [{ name: 'a.dpapi', size: 352 }, { name: 'empty.dpapi', size: 0 }, { name: 'note.txt', size: 9 }],
+      [join(HOME, '.pi', 'agent')]: [{ name: 'auth.json', size: 120 }],
+      [join(kimiHome, 'credentials')]: [{ name: 'mcp', size: 0 }, { name: 'kimi-code.json', size: 900 }],
+      [gooseDir]: [{ name: 'tokens.json', size: 300 }],
+      [join(HOME, '.cline', 'data', 'settings')]: [{ name: 'providers.json', size: 800 }],
+    },
   });
-  const results = await checkLoginStatus(signedIn, selectChecks({ providers: 'cline,junie,pi,goose' }));
-  assert.deepEqual(results.map(({ provider, state }) => [provider, state]), [
-    ['junie', 'local'], ['pi', 'local'], ['goose', 'local'], ['cline', 'local'],
+  const results = await checkLoginStatus(signedIn, selectChecks({ providers: 'junie,pi,kimi,goose,cline' }));
+  assert.deepEqual(results.map(({ provider, state, detail }) => [provider, state, detail]), [
+    ['junie', 'local', '1 DPAPI credential files; expiry cannot be read without starting Junie'],
+    ['pi', 'unknown', 'auth.json is present; only its content, which Cats never reads, shows an openai-codex sign-in'],
+    ['kimi', 'local', 'credentials/kimi-code.json is present'],
+    ['goose', 'local', 'chatgpt_codex/tokens.json is present'],
+    ['cline', 'unknown', 'providers.json is present; only its content, which Cats never reads, shows a cline-pass sign-in'],
   ]);
-  assert.match(results[0].detail, /^1 DPAPI credential files/);
-  assert.doesNotMatch(results.map((result) => result.detail).join('\n'), /"r"|\br\b/, 'no token value is shown');
+  assert.deepEqual(signedIn.opened, [], 'no credential file was opened');
 
   const signedOut = fakeContext({
-    installed: ['cline', 'junie', 'pi', 'goose'],
-    files: {
-      [join(HOME, '.pi', 'agent', 'auth.json')]: '{"anthropic": {"refresh": "r"}}',
-      [join(HOME, '.cline', 'data', 'settings', 'providers.json')]: '{"providers": {"cline": {"settings": {"auth": {"refreshToken": "r"}}}}}',
-    },
+    installed: ['junie', 'pi', 'kimi', 'goose', 'cline'],
+    files: { [join(kimiHome, 'config.toml')]: 'api_key = "sk-x"' },
+    dirs: { [join(kimiHome, 'credentials')]: [{ name: 'mcp', size: 0 }, { name: 'empty.json', size: 0 }] },
   });
-  const outcomes = await checkLoginStatus(signedOut, selectChecks({ providers: 'cline,junie,pi,goose' }));
-  assert.deepEqual(outcomes.map((result) => result.state), ['signed-out', 'signed-out', 'signed-out', 'signed-out']);
+  const outcomes = await checkLoginStatus(signedOut, selectChecks({ providers: 'junie,pi,kimi,goose,cline' }));
+  assert.deepEqual(outcomes.map((result) => result.state), Array(5).fill('signed-out'));
+  assert.deepEqual(signedOut.opened, [], 'config.toml, which can hold API keys, was not opened either');
   assert.deepEqual([...signedIn.calls, ...signedOut.calls], [], 'none of them was launched');
 
-  const linux = fakeContext({ installed: ['junie', 'goose'], platform: 'linux', files: { [join(HOME, '.config', 'goose', 'chatgpt_codex', 'tokens.json')]: '{"refresh_token": "r"}' } });
-  assert.deepEqual((await checkLoginStatus(linux, selectChecks({ providers: 'junie,goose' }))).map((result) => result.state), ['unknown', 'local']);
-  assert.equal((await checkOne('junie', fakeContext({ installed: ['junie'], platform: 'linux', env: { JUNIE_API_KEY: 'k' } }))).state, 'local');
-});
-
-test('checks Kimi credentials and config.toml keys without launching kimi', async () => {
-  const kimiHome = join(HOME, '.kimi-code');
-  const credentials = join(kimiHome, 'credentials');
-  const config = join(kimiHome, 'config.toml');
-  const kimi = (options) => checkOne('kimi', fakeContext({ installed: ['kimi'], ...options }));
-
-  const oauth = await kimi({
-    dirs: { [credentials]: [{ name: 'mcp', size: 0 }, { name: 'kimi-code-env-1.json', size: 900 }] },
-    files: { [join(credentials, 'kimi-code-env-1.json')]: '{"access_token": "a", "refresh_token": "r"}' },
-  });
-  assert.deepEqual([oauth.state, oauth.detail], ['local', 'credentials/kimi-code-env-1.json holds a refresh token']);
-  const toml = (...lines) => `${lines.join('\n')}\n`;
-  const apiKey = await kimi({ files: { [config]: toml('[providers.moonshot]', 'type = "kimi"', 'api_key = "sk-x"') } });
-  assert.deepEqual([apiKey.state, apiKey.detail], ['local', 'config.toml holds a provider API key']);
-  assert.equal((await kimi({ env: { KIMI_MODEL_API_KEY: 'k' } })).state, 'local');
-  const unset = await kimi({ files: { [config]: toml('[providers.moonshot]', 'api_key_env = "MOONSHOT_KEY"') } });
-  assert.deepEqual([unset.state, unset.detail], ['unknown', 'config.toml api_key_env names MOONSHOT_KEY, which this shell does not set']);
-  assert.equal((await kimi({ env: { MOONSHOT_KEY: 'k' }, files: { [config]: toml('api_key_env = "MOONSHOT_KEY"') } })).state, 'local');
-  const signedOut = await kimi({ dirs: { [credentials]: [{ name: 'old.json', size: 2 }] }, files: { [join(credentials, 'old.json')]: '{}' } });
-  assert.equal(signedOut.state, 'signed-out');
-  const moved = await checkOne('kimi', fakeContext({ installed: ['kimi'], env: { KIMI_CODE_HOME: join(HOME, 'alt') },
-    dirs: { [join(HOME, 'alt', 'credentials')]: [{ name: 'a.json', size: 9 }] },
-    files: { [join(HOME, 'alt', 'credentials', 'a.json')]: '{"refresh_token": "r"}' } }));
-  assert.equal(moved.state, 'local');
+  // Only whether a key variable is set counts; its value is never shown.
+  const keys = fakeContext({ installed: ['junie', 'kimi'], platform: 'linux', env: { JUNIE_API_KEY: 'secret-k', KIMI_MODEL_API_KEY: 'secret-k' } });
+  const keyed = await checkLoginStatus(keys, selectChecks({ providers: 'junie,kimi' }));
+  assert.deepEqual(keyed.map(({ state, detail }) => [state, detail]), [['local', 'JUNIE_API_KEY is set'], ['local', 'KIMI_MODEL_API_KEY is set']]);
+  assert.equal((await checkOne('junie', fakeContext({ installed: ['junie'], platform: 'linux' }))).state, 'unknown');
+  const linuxGoose = fakeContext({ installed: ['goose'], platform: 'linux', dirs: { [join(HOME, '.config', 'goose', 'chatgpt_codex')]: [{ name: 'tokens.json', size: 9 }] } });
+  assert.equal((await checkOne('goose', linuxGoose)).state, 'local');
+  const moved = fakeContext({ installed: ['kimi'], env: { KIMI_CODE_HOME: join(HOME, 'alt') }, dirs: { [join(HOME, 'alt', 'credentials')]: [{ name: 'a.json', size: 9 }] } });
+  assert.equal((await checkOne('kimi', moved)).state, 'local');
   assert.equal((await checkOne('kimi', fakeContext())).state, 'not-installed');
 });
 

@@ -284,7 +284,8 @@ authorizes that external mutation.
 
 - [Kimi Code](./references/providers/kimi.md): the managed `kimi-code` aliases from
   `kimi provider list --json`, exact displayName labels, no effort control because print mode has
-  no per-invocation effort, no default row, and a sign-in check that never launches kimi.
+  no per-invocation effort, no default row, and a sign-in check that never launches kimi or
+  opens its credentials.
 
 - [Pi](./references/providers/pi.md): the full `openai-codex` channel read from the installed
   package, the channel as scope basis with bare labels, per-model thinking levels with the
