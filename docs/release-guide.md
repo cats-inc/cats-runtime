@@ -49,27 +49,192 @@ fallbacks or overwrite unrecognized data to make startup appear successful.
 
 ## Prepare and publish
 
-### Pending release notes — next Runtime minor, 0.7.0 (unreleased, not bumped)
+### Release notes — 0.7.0 on npm (2026-11-17)
 
+- npm `@cats-inc/cats-runtime` moves from 0.6.2 to 0.7.0. It carries everything
+  merged since npm 0.6.2 (2026-10-30), #204 to #243. The lost provider session
+  change below alters HTTP behavior for existing calls, so this is the next 0.x
+  minor.
 - **Lost provider sessions are reported, not retried** ([ADR-006 rule 8](decisions/006-agent-backend-and-shared-runtime-contracts.md#2026-11-11-amendment-report-a-lost-provider-session-instead-of-replacing-it)).
   When Grok (streaming JSON or hosted ACP), Claude Code or Codex answers that the
   session's native session cannot be resumed, the session is marked
   `provider_session_unavailable` and closes for good; a turn that saw the answer
-  streams an `error` event with that `code` and records `errorCode`. The marker
-  persists across restarts, the worker pool refuses to spawn the session, and
-  messages, resume and explicit native fork answer HTTP 410 with the code. The
-  default fork falls back to a context transplant, `sessionKey` reuse skips the
-  session, and reset clears the marker with the stale id. Callers continue in a
-  new session with their own handoff. See
-  [Provider session unavailable](api.md#provider-session-unavailable).
+  streams an `error` event with that `code` and records `errorCode` (#214). A
+  Codex thread the user archived (#218), a Kimi session that is missing or was
+  created under another directory (#224), and hosted Kimi's `Unknown sessionId`
+  (#225) are reported the same way. The marker persists across restarts, the
+  worker pool refuses to spawn the session, and messages, resume and explicit
+  native fork answer HTTP 410 with the code. The default fork falls back to a
+  context transplant, `sessionKey` reuse skips the session, and reset clears the
+  marker with the stale id. Callers continue in a new session with their own
+  handoff. See [Provider session unavailable](api.md#provider-session-unavailable).
 - **Compatibility boundary.** A send that used to leave the session `ready` after
   this in-stream error now closes it, and the next send or resume answers 410
   instead of 200 or 400. A caller that treated 410 as "resume and retry" would
   now get a second 410. The additive fields (`code`, `errorCode`,
   `providerSessionUnavailable`) need no data migration; existing sessions load
   unchanged. This HTTP behavior change requires the next 0.x **minor**, 0.7.0.
-  The Cats Bot and Cats Desktop consumers are being updated against this
-  contract.
+  Cats Desktop (cats-platform#398) and Cats Bot (cats-bot#139) continue such a
+  conversation in a new session.
+- **Kimi Code CLI** ([ADR-054](decisions/054-drive-kimi-code-through-print-mode-stream-json.md)).
+  - A new `kimi` CLI provider, ordered after Pi and before Kiro, runs
+    `kimi --output-format stream-json --prompt` for each turn and resumes with
+    `--session` (#224). Print mode runs in Kimi's `auto` permission mode and has no
+    effort control. A turn is limited to 30 minutes by default
+    (`CATS_KIMI_TURN_TIMEOUT_MS`), usage and served models come from the session's
+    `wire.jsonl`, and processes Cats starts get `KIMI_CODE_NO_AUTO_UPDATE=1`. The
+    catalog lists the six managed `kimi-code` aliases with no default row. Runtime
+    lists Kimi's native sessions (`/kimi/sessions`), reads their transcripts and
+    deletes them through Kimi's own ACP `session/delete`.
+  - A `kimi` instance with `protocol: hosted` runs `kimi acp`, so each tool call,
+    including the `kimi-cu-win` computer-use plugin, Bash and Write, asks the host
+    first (#225, #226). Runtime admits a prompt only after Kimi confirms the
+    `default` approval mode and the requested model, and stops a session that
+    moves to any mode other than `default` or `plan`. Kimi's session start-up may
+    take 45 s, and its own plan errors are kept. Provider selection offers this
+    target as the `kimi/cli/hosted` template; print mode stays Kimi's default
+    instance (#232).
+  - Real-plan turns ran on Windows with Kimi Code 2.6.0. macOS, Linux, WSL and
+    Docker runs are not verified; the WSL and Docker session store is tested with
+    a fake shell runner.
+- **One-time approvals** ([ADR-055](decisions/055-let-the-owner-grant-computer-use-shell-and-file-approvals-once.md), #230, #232).
+  An `accept` answer may carry `standingGrant` (`{until:'session'}` or
+  `{until:'time', durationMs}`, 1 minute to 24 hours) for computer use, shell
+  commands or file writes. Only a send with `standingGrants: true` on
+  `POST /sessions/:id/messages` uses a grant; Runtime then answers a matching
+  prompt with its one-action choice, and hosts see it `resolved` with reason
+  `standing_grant`. Hosted ACP tags `execute`, `edit` and Kimi's computer-use
+  tools, and targets advertise their categories in `interactions.standingGrants`.
+  Codex, Claude Code and Muse prompts stay per call. Grants live in memory and end
+  on revoke, expiry, session removal or Runtime restart.
+  `DELETE /sessions/:id/interactions/grants` revokes them, and
+  `GET /interactions/grants` lists every session that holds one.
+- **Hosted native tools for Muse, Grok and Antigravity** ([ADR-049](decisions/049-use-native-control-protocols-for-hosted-provider-tools.md), #208).
+  An explicit `protocol: hosted` CLI target runs Muse MSP, Grok ACP or
+  Antigravity's separate ACP executable with native file and command tools and
+  live approvals, under an explicitly admitted full machine and network ceiling.
+  Session MCP stays disabled for Antigravity, and its native acceptance is not
+  claimed. Existing targets and bounded media execution keep their contracts.
+- **Catalog bases** ([SPEC-045](specs/SPEC-045-catalog-bases-per-channel-region-and-plan.md),
+  [ADR-056](decisions/056-offer-one-basis-selector-over-captured-catalog-bases.md), #234, #235, #243).
+  A CLI can carry several captured model lists, one per channel, region or plan,
+  inside catalog schema 2 (`basis.id`, `basis.region`, `plan.id`).
+  `GET /providers/:provider/models/advanced?basis=<id>` returns `basisId`,
+  `bases[]` and `capture`; the MCP `providerAdvancedModels` tool takes `basis`;
+  `catalogCapabilities.catalogBases` is `true`; and `modelSelection` and
+  `modelResolution` carry `basisId`. An unknown basis answers 400
+  `catalog_basis_unknown` on the advanced read, `POST /sessions` and fork, and is
+  never switched. For a Kimi target with several bases, Runtime marks the one its
+  non-secret region marker matches as `detected` without applying it to a
+  request. Playground gains a "List basis" select for targets with two or more
+  bases, and shows the basis information icon it used to drop. Kimi's scope
+  records the `global (kimi.ai)` region as its only basis, so saved selections are
+  unchanged.
+- **Media from immutable references** ([ADR-053](decisions/053-extend-media-receipts-with-immutable-references.md),
+  [SPEC-044](specs/SPEC-044-reference-media-generation.md), #221, #222). Media
+  contract 3 uploads immutable sources and generates images and short videos from
+  them through Grok `image_edit` and `image_to_video`; a video source supplies its
+  middle frame. Contract 2 requests and receipts are unchanged. FFmpeg and FFprobe
+  are optional and loaded on first use. Without them Runtime still starts and
+  serves images and image references; video generation profiles are left out of
+  capabilities, and a video source answers 503 `media_decoder_unavailable`.
+- **Session close and Windows processes** (#211, #237, #239 to #242).
+  - Close, reset and delete wait, bounded at 6 s, for the provider process to
+    stop, including Kimi Code and Junie per-turn processes and a worker that is no
+    longer active. Meanwhile the session reads `closing` and a concurrent delete
+    answers 409. Sandbox removal retries transient Windows errors; a removal that
+    still fails answers `deleted` with `workspaceCleaned: false`.
+  - On Windows, every CLI Runtime starts, including a `.cmd` shell proxy and the
+    per-turn Kimi Code and Junie processes, is ended with its process tree
+    (`taskkill /T /F`). Image runs, Kimi turns and the quota readers share one
+    process-tree helper.
+  - Legacy ephemeral CLI workers separate the first-event budget (30 s) from
+    provider silence after initialization (120 s, reset on progress), set with
+    the new `CATS_RUNTIME_MESSAGE_IDLE_TIMEOUT_MS`. Explicit timeout overrides keep
+    their behavior.
+- **Codex** (#215, #220). `POST /sessions` accepts
+  `providerSessionPersistence: ephemeral` on targets that advertise it, so
+  internal jobs leave no saved Codex thread; an ephemeral session cannot be
+  resumed, forked or respawned. Unnamed persistent threads get a recognizable name
+  from `sessionLabel`, and native user names are kept. Turn instructions reach
+  Codex as acknowledged native developer items instead of a prefix on the user
+  message.
+- **Managed plugins** (#219). The `desktop-preview` host policy lets Desktop
+  preview install Agency Agents into an ordinary profile, and a still-enabled
+  generation is restored after a clean restart. Shutdown drains native
+  process-close callbacks within a bounded timeout, so normal exits no longer
+  leave false orphan receipts. Managed-plugin schema 1 is unchanged.
+- **Setup and discovery** (#212, #213, #223). OpenClaw selection targets accept a
+  write-only `authToken`, saved as `auth_token` in the private provider
+  configuration; reads report only `tokenConfigured` and `tokenEditable`. A save
+  over an unreadable `providers.yaml` first keeps an owner-only
+  `providers.yaml.invalid-<timestamp>-<id>.bak` (the newest five are kept) and
+  answers 409 if it cannot. Grok discovery waits for the worker's exact native id,
+  so a fresh Grok session's next message no longer fails with 409
+  `skill_content_profile_conflict`.
+- **Catalogs** (#207, #209, #228). Codex adds GPT-6.1 Terra. Copilot adds GPT-6.1
+  Terra and Gemini 4 Hydrogen, and shows Auto as Copilot Fusion with the `balance`
+  tier. Claude adds Fable 5.2 as `claude-fable-5-2` and flattens the picker's
+  "More models" group in picker order. Antigravity adds Gemini 4 Hydrogen and
+  Orchestrator (Argon). Muse adds `muse-ember-1.0`. Cursor adds DeepSeek V4.1
+  Flash 1017, Gemini 4 Carbon, Gemini 4 Hydrogen and Claude Fable 5.2, and removes
+  Gemini 3.7 Flash and Gemini 3.6 Flash. Kimi's six aliases arrive with #224.
+- **Repository tooling, not in the package** (#228, #229, #231, #235, #236). The
+  maintenance skill's catalog probe compares one named basis, falls back to Muse's
+  account cache when MSP serves another list, and checks CLI sign-ins without
+  opening credential files.
+- **CI and documentation only** (#204 to #206, #210, #216, #217, #227, #233,
+  #238, and direct documentation commits). `release-preflight` reuses a merged
+  pull request's run or an earlier green run of the same tree, and
+  `npm-publish.yml` skips its test gate when that preflight passed on the commit
+  on main. SPEC-042 (turn-scoped context) and SPEC-043 (text-only sessions,
+  including its R10 credential rule) are specifications; nothing in them is
+  implemented in this release.
+- **Other compatibility.** Everything else is additive or a fix. Callers that do
+  not send the new fields (`basis`, `basisId`, `standingGrant`, `standingGrants`,
+  `providerSessionPersistence`, `authToken`) or contract 3 requests keep their
+  behavior. Changes existing calls can see: close, reset and delete take up to
+  6 s while a process stops, with a `closing`/409 window for a concurrent delete;
+  silence within a legacy ephemeral CLI turn defaults to 120 s instead of the
+  30 s startup budget; and a provider selection save answers 409 when it cannot
+  back up an unreadable `providers.yaml`. Catalog schema 2, existing catalogs,
+  overrides, saved selections, configuration files and stored sessions load
+  unchanged. No new migration is required, and the existing validated upgrades,
+  backups and recovery remain in force. Before a downgrade, drain active contract
+  3 media work; an older Runtime also rejects an override that uses `basis.id`,
+  `region` or `plan.id`.
+- **Optional FFmpeg packages.** npm installs the optional `ffmpeg-static` 5.3.0
+  (license GPL-3.0-or-later; its install script downloads FFmpeg) and
+  `ffprobe-static` 3.1.0 (package license field MIT; about 350 MB of prebuilt
+  FFprobe binaries for darwin arm64/x64, linux ia32/x64 and win32 ia32/x64). The
+  Runtime tarball contains no FFmpeg or FFprobe file (1,553 files, 10.6 MB
+  unpacked, in #243's `npm pack --dry-run`), and Desktop ships neither package
+  (ADR-053). Decoding is verified only in repository installs, whose own
+  `allowScripts` permits `ffmpeg-static`'s script: Linux x64 in CI, where the MP4
+  decode test passes, and Windows in #221's native evidence. In a consumer-style
+  install on 2026-11-17 with npm 12.2.1 (`engines` requires npm 12 or newer), npm
+  blocked that script because the installing project had not allowed it, so
+  FFmpeg stays absent until the installer allows it. That install ran on Linux
+  arm64, for which `ffprobe-static` 3.1.0 has no FFprobe binary. Either case
+  leaves video unavailable, as above, while images and image references keep
+  working. macOS and other consumer installs are not checked.
+- **cats-one.** cats-one's `^0.6.2` range excludes 0.7.0, so the launcher keeps
+  resolving 0.6.2 until a cats-one release raises it. No cats-one, Platform,
+  Desktop or Bot release is selected here.
+- **Exact source.** The workflow publishes from `main` at the merged commit of
+  this change, which adds only the version fields and this section to main at
+  selection, `42fcb9c43426b9b4a7334117056efd8c9be43862`. Its last code change is
+  `f5bc6bfb2da2df2209afcd5a0f63162ff407a5ad` (#243).
+- **Checks.** Each code PR passed its focused suites and the required
+  `release-preflight` check before merge; the PR descriptions record their
+  review, native evidence and limits. `npm-publish.yml` reuses a passing
+  `release-preflight` run on the exact main commit or runs `npm run release:check`
+  itself, then builds fresh artifacts through `prepack` and publishes through the
+  npm trusted publisher with provenance. An installed npm consumer upgrade from
+  0.6.2 is not exercised beyond those gates.
+- **Selected distribution.** npm `@cats-inc/cats-runtime@0.7.0` with explicit
+  `latest`. There is no Runtime GitHub Release or Git tag. Publication results:
+  the npm registry entry and the `npm-publish.yml` run.
 
 ### Release notes — 0.6.2 on npm (2026-10-30)
 
