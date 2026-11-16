@@ -13,6 +13,7 @@ import { StandingGrants } from '../../../core/interactions/standingGrants.js';
 // ADR-055 at the process boundary, with Kimi Code 2.6.0's captured `kimi acp` frames.
 const captures = new URL('../../../../tests/fixtures/provider-captures/kimi-2.6.0/', import.meta.url);
 const capture = (name: string) => readFileSync(fileURLToPath(new URL(name, captures)), 'utf8').trim();
+const NL = String.fromCharCode(10);
 const children: Array<EventEmitter> = [];
 afterEach(() => { children.splice(0).forEach(child => child.emit('close', 0)); vi.restoreAllMocks(); });
 
@@ -73,6 +74,21 @@ describe('standing grants at the worker boundary (ADR-055)', () => {
       answer: { action: 'accept', choice: 'approve_once', standingGrant: { until: 'time', durationMs: 30 * 60_000 } } });
     expect((await f.read()).find(frame => frame.id === 0)).toMatchObject({ result: { outcome: { outcome: 'selected', optionId: 'approve_once' } } });
     expect(grants.list()).toMatchObject([{ category: 'computer_use', until: 'time' }]);
+    f.reply(f.prompt.id, { stopReason: 'end_turn' });
+    await f.turn;
+  });
+});
+
+describe('standing grants without a card event (ADR-055 review)', () => {
+  it('emits no pending interaction while answering from a grant', async () => {
+    const grants = new StandingGrants(); grants.add('computer_use', { until: 'session' });
+    const f = await fixture(true, grants);
+    const kinds: string[] = [];
+    f.worker.on('event', (event: { metadata?: { kind?: string } }) => { if (event.metadata?.kind) kinds.push(event.metadata.kind); });
+    f.child.stdout.write(permissionFrames().join(NL) + NL);
+    expect((await f.read()).find(frame => frame.id === 0)).toMatchObject({ result: { outcome: { optionId: 'approve_once' } } });
+    expect(kinds).toContain('interaction_updated');
+    expect(kinds).not.toContain('interaction_requested');
     f.reply(f.prompt.id, { stopReason: 'end_turn' });
     await f.turn;
   });

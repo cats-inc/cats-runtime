@@ -33,12 +33,13 @@ The owner decided on 2026-11-16:
      is persisted and a revoke takes effect at once.
 2. **Categories come from the adapter.** A prompt can carry `grantCategory`: `computer_use`, `command`
    or `file`.
-   - The adapter sets it only when the prompt's first choice approves that one action.
+   - The adapter sets it only when the prompt offers exactly one one-action approve choice.
    - Categories are separate, so a computer-use grant never approves a shell command, and prompts
      without a category stay per call.
    - Hosted ACP tags `execute` as `command` and `edit` as `file`.
-   - Kimi's `kimi-cu-win` plugin tools are tagged `computer_use`.
-   - The target advertises the categories it tags in `interactions.standingGrants`.
+   - Kimi's `kimi-cu-win` plugin tools are tagged `computer_use`, by tool name and only on a Kimi target.
+   - The target advertises the categories it tags in `interactions.standingGrants`. Runtime uses a grant only for
+     an advertised category.
 3. **The card creates the grant.** A response may add `standingGrant`, either `{ until: 'session' }` or
    `{ until: 'time', durationMs }` (1 minute to 24 hours).
    - It is accepted only with `accept`, only with the prompt's one-action choice, and only on a
@@ -47,7 +48,8 @@ The owner decided on 2026-11-16:
 4. **The host decides per send.** `POST /sessions/:id/messages` uses grants only with
    `standingGrants: true`.
    - Without it, matching prompts become cards as before.
-   - A host sets it only for turns its owner started. Wakeups, MCP, ACP and peer sends never set it.
+   - A host sets it only for turns its owner started. Wakeups, ACP and peer sends never set it, and the MCP
+     `send_message` tool drops the field, so no MCP client can mark a send.
 5. **An answered prompt is never shown.** While a send may use a grant and its category is granted,
    Runtime answers with the one-action choice after the adapter has recorded the request.
    - The host sees only a `responding` and then a `resolved` receipt with reason `standing_grant`,
@@ -59,6 +61,10 @@ The owner decided on 2026-11-16:
    - The interaction snapshot lists `standingGrants` so hosts can show them.
 
 ## Consequences
+
+- A computer-use grant covers Kimi's `js` cells. Those cells run in KimiCU's kernel, which refuses Node built-ins, so a
+  cell cannot reach the shell or files directly. KimiCU also refuses input to Command Prompt, PowerShell and Windows
+  Terminal windows. Shell and file work still need their own grants or cards.
 
 - An owner-started Kimi session can work on the desktop for as long as the owner chose without further
   clicks, while every other trigger still waits for the owner.

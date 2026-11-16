@@ -189,7 +189,9 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
           ? 'Waiting for your response.' : `Provider interaction: ${interaction.status}.`,
           metadata: { source: 'runtime', kind: interaction.status === 'pending'
             ? 'interaction_requested' : 'interaction_updated', interaction: receipt } });
-      }, Date.now, this.standingGrants ? { grants: this.standingGrants, allowed: () => this.turnUsesStandingGrants } : undefined)
+      }, Date.now, this.standingGrants ? { grants: this.standingGrants,
+        categories: this.provider.capabilities.interactions?.standingGrants?.categories ?? [],
+        allowed: () => this.turnUsesStandingGrants } : undefined)
       : undefined;
     this.startupController?.abort();
     this.startupController = null;
@@ -411,6 +413,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       this.activeTurnController?.abort();
       this.process = null;
       this.isBusy = false;
+      this.turnUsesStandingGrants = false;
       this.emit('exit', code, signal);
     });
   }

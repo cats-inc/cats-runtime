@@ -60,13 +60,13 @@ const KIMI_COMPUTER_USE_TOOL = /^mcp__plugin-kimi-cu(?:-win)?_/u;
  * ADR-055: the standing-grant category of an ACP permission, or none. A grant always answers with
  * the one-action choice below, so it never selects ACP's allow_always or persists a native rule.
  */
-export function acpGrantCategory(tool: Record<string, unknown>): GrantCategory | undefined {
-  if (typeof tool.title === 'string' && KIMI_COMPUTER_USE_TOOL.test(tool.title)) return 'computer_use';
+export function acpGrantCategory(tool: Record<string, unknown>, provider?: string): GrantCategory | undefined {
+  if (provider === 'kimi' && typeof tool.title === 'string' && KIMI_COMPUTER_USE_TOOL.test(tool.title)) return 'computer_use';
   return tool.kind === 'execute' ? 'command' : tool.kind === 'edit' ? 'file' : undefined;
 }
 
 /** ACP's allow_always can persist a global rule. Only a one-action grant is offered. */
-export function mapAcpPermission(params: Record<string, unknown>, cwd: string): {
+export function mapAcpPermission(params: Record<string, unknown>, cwd: string, provider?: string): {
   prompt: InteractionPrompt;
   toolId: string;
   result(answer: InteractionAnswer): Record<string, unknown>;
@@ -94,7 +94,8 @@ export function mapAcpPermission(params: Record<string, unknown>, cwd: string): 
         tool.rawInput !== undefined ? `Input:\n${interactionInputSummary(tool.rawInput)}` : '',
         'Scope: this action only'].filter(Boolean).join('\n'),
       choices: allow.map(option => ({ id: String(option!.optionId), label: String(option!.name).slice(0, 256) })),
-      ...(allow.length && acpGrantCategory(tool) ? { grantCategory: acpGrantCategory(tool) } : {}) },
+      // Only one one-action choice can be the grant's answer; anything else stays per call.
+      ...(allow.length === 1 && acpGrantCategory(tool, provider) ? { grantCategory: acpGrantCategory(tool, provider) } : {}) },
     result: answer => {
       if (answer.action === 'cancel') return { outcome: { outcome: 'cancelled' } };
       const option = answer.action === 'accept'

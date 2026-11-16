@@ -78,7 +78,7 @@ export function validateAnswer(prompt: InteractionPrompt, answer: InteractionAns
   }
   // A standing grant approves later calls with the prompt's one-action choice; only a categorized prompt offers it.
   if (answer.standingGrant !== undefined && (!prompt.grantCategory || !prompt.choices?.length
-    || (answer.choice ?? prompt.choices[0]!.id) !== prompt.choices[0]!.id)) invalid();
+    || answer.choice !== prompt.choices[0]!.id)) invalid();
   const choices = prompt.choices ?? [];
   if (choices.length && !choices.some(choice => choice.id === answer.choice)) invalid();
   if (!choices.length && answer.choice !== undefined) invalid();

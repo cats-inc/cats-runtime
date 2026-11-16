@@ -405,7 +405,7 @@ export class HostedAcpProvider implements Provider {
     if (this.permissions.has(id) || this.completedPermissions.has(id)) return null;
     const extension = input.method !== 'session/request_permission';
     const mapped = extension ? mapGrokInput(params, input.method === '_x.ai/exit_plan_mode')
-      : mapAcpPermission(this.name === 'kimi' ? this.kimiPermissionParams(params) : params, this.options.cwd);
+      : mapAcpPermission(this.name === 'kimi' ? this.kimiPermissionParams(params) : params, this.options.cwd, this.name);
     const reply = (result: Record<string, unknown>) => acpReply(id, extension ? { result } : result);
     const fallback = () => reply(mapped.result({ action: 'cancel' }));
     if (!context.interactions || !this.options.interactionHost?.kinds.includes(mapped.prompt.kind)

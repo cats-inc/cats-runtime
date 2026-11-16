@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import {
   InteractionError, type InteractionAnswer, type InteractionHost, type InteractionKind, type InteractionPrompt,
-  type InteractionSnapshot, type InteractionStatus, type ProviderInteraction,
+  type InteractionSnapshot, type InteractionStatus, type ProviderInteraction, type GrantCategory,
 } from './types.js';
 import { parseInteractionResponse, validateAnswer } from './validation.js';
 import type { StandingGrants } from './standingGrants.js';
@@ -9,6 +9,8 @@ import type { StandingGrants } from './standingGrants.js';
 /** ADR-055: the session's grants, and whether the turn running now may use them (the host decides per send). */
 export interface InteractionStanding {
   grants: StandingGrants;
+  /** The categories this target advertises; a prompt tagged with any other one stays a card. */
+  categories: readonly GrantCategory[];
   allowed(): boolean;
 }
 
@@ -82,7 +84,8 @@ export class InteractionStore {
     const created = this.now();
     const category = input.prompt.grantCategory;
     const choice = input.prompt.choices?.[0]?.id;
-    if (category && choice && this.standing?.allowed() && this.standing.grants.covers(category)) {
+    if (category && choice && this.standing?.categories.includes(category) && this.standing.allowed()
+      && this.standing.grants.covers(category)) {
       return this.answerFromGrant(input, choice, created);
     }
     const deadline = Math.min(created + this.host.timeoutMs, input.deadlineMs ?? Infinity);
@@ -117,11 +120,16 @@ export class InteractionStore {
       status: 'responding', kind: input.prompt.kind, decision: 'accept', reason: 'standing_grant',
     };
     const entry: Entry = { view, abortDelivery: input.abortDelivery };
+    const abort = () => this.finish(entry, 'interrupted', 'execution_ended');
+    input.signal.addEventListener('abort', abort, { once: true });
+    entry.cleanup = () => input.signal.removeEventListener('abort', abort);
     this.entries.set(view.interactionId, entry);
     this.prune();
     this.changed(structuredClone(view));
     void Promise.resolve().then(async () => {
+      // The turn may have ended, or the provider superseded the request, before this microtask.
       if (input.signal.aborted) { this.finish(entry, 'interrupted', 'execution_ended'); return; }
+      if (entry.view.status !== 'responding') return;
       try {
         await input.respond({ action: 'accept', choice });
         this.finish(entry, 'resolved', 'standing_grant');

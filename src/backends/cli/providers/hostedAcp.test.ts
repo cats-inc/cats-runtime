@@ -152,6 +152,17 @@ describe('native hosted ACP', () => {
     expect(JSON.stringify(snapshot)).not.toContain('fixture-secret');
   });
 
+  it('tags shell and file approvals for standing grants, but not Kimi tool names outside Kimi or several one-action choices (ADR-055)', () => {
+    const tool = (kind: string, title = 'Run fixture') => ({ ...permission, toolCall: { ...permission.toolCall, kind, title } });
+    expect(mapAcpPermission(tool('execute'), '/workspace', 'grok').prompt.grantCategory).toBe('command');
+    expect(mapAcpPermission(tool('edit'), '/workspace', 'antigravity').prompt.grantCategory).toBe('file');
+    expect(mapAcpPermission(tool('other'), '/workspace', 'grok').prompt.grantCategory).toBeUndefined();
+    expect(mapAcpPermission(tool('execute', 'mcp__plugin-kimi-cu-win_win__js'), '/workspace', 'grok').prompt.grantCategory).toBe('command');
+    expect(mapAcpPermission(tool('other', 'mcp__plugin-kimi-cu-win_win__js'), '/workspace', 'kimi').prompt.grantCategory).toBe('computer_use');
+    const twoOnce = { ...tool('execute'), options: [{ optionId: 'a', name: 'Once', kind: 'allow_once' }, { optionId: 'b', name: 'Once here', kind: 'allow_once' }] };
+    expect(mapAcpPermission(twoOnce, '/workspace', 'grok').prompt.grantCategory).toBeUndefined();
+  });
+
   it('keeps native questions and plan review interactive instead of auto-approving plans', async () => {
     const { provider } = boot(); provider.buildStdinMessage('fixture'); const context = host();
     await provider.buildServerResponse(JSON.stringify({ id: 8, method: '_x.ai/ask_user_question', params: {
