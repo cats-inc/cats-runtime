@@ -26,6 +26,11 @@ export interface ProcessSpawnConfig extends ShellInvocation {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   windowsVerbatimArguments?: boolean;
+  /**
+   * Windows only: `command` is a shell (cmd.exe or PowerShell) that runs the CLI as its child.
+   * Killing the shell alone leaves that CLI running, so stopping it must end the whole tree.
+   */
+  windowsShellProxy?: true;
 }
 
 interface RuntimePayloadFile {
@@ -673,6 +678,7 @@ function buildPowerShellSpawnConfig(
     shell: false,
     cwd,
     env: buildPowerShellExecEnv(commandPath, args),
+    windowsShellProxy: true,
   };
 }
 
@@ -694,6 +700,7 @@ function buildWindowsCmdSpawnConfig(
     shell: false,
     cwd,
     windowsVerbatimArguments: true,
+    windowsShellProxy: true,
   };
 }
 
