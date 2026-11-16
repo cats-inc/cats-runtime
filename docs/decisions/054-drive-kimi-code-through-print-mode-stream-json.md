@@ -120,9 +120,10 @@ has `kimi acp`, an ACP server over stdio.
       cut off by Runtime.
     - A host adds this target by key, `kimi/cli/hosted`, through provider selection. Runtime owns
       its template (the `kimi` command, `runner: auto`, `runtime: native`, `protocol: hosted`). The
-      template is not an entry in the provider universe, so setup and install rows stay one per
-      provider. A provider's implicit default is never a hosted instance while another instance
-      exists, so adding the asking target never moves a caller that names no instance.
+      template is not an entry in the provider universe, so the universe and `nativeSetupTargets`
+      stay one per provider; Runtime's own setup page lists the selected hosted target as a row
+      of its own. Kimi's legacy default instance is `native`, so adding the asking target never
+      moves a caller that names no instance.
 
 ## Consequences
 

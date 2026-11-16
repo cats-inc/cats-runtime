@@ -1387,14 +1387,10 @@ function applyFileBasedProviderConfig(
 
       const configuredDefaultInstance = readString(providerDoc.default_instance)
         || readString(providerDoc.defaultInstance);
-      // An implicit default is never a hosted instance while another exists: adding an asking
-      // target must not move a caller that names no instance (ADR-054 decision 11).
-      const implicitDefault = Object.keys(nextInstances).find((id) => nextInstances[id]!.commandConfig.protocol !== 'hosted')
-        ?? Object.keys(nextInstances)[0];
       const defaultInstance = configuredDefaultInstance
         || (providerDefaultInstances[provider] && nextInstances[providerDefaultInstances[provider]]
           ? providerDefaultInstances[provider]
-          : implicitDefault);
+          : Object.keys(nextInstances)[0]);
       if (configuredDefaultInstance && !nextInstances[defaultInstance]) {
         throw new Error(
           `Provider '${provider}' default instance '${defaultInstance}' is not defined in '${filePath}'`,

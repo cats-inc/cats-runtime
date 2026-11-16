@@ -233,7 +233,7 @@ routing: {providers: {claude: {default_target: {backend: CLI, instance: ' ', ins
     const native = { provider: 'kimi', backend: 'cli', instance: 'native' } as const;
     const hosted = { provider: 'kimi', backend: 'cli', instance: 'hosted' } as const;
     const f = fixture();
-    // Listed before the native target on purpose: order must not make the asking target the default.
+    // Listed first on purpose: Kimi's legacy default instance, native, stays the default whatever the order.
     f.selection.save([hosted, native], f.selection.getSnapshot().revision);
     const written = parse(readFileSync(f.configPath, 'utf8')) as { backends: { cli: { providers: { kimi: { instances: Record<string, Record<string, unknown>> } } } } };
     expect(written.backends.cli.providers.kimi.instances.hosted).toEqual({ command: 'kimi', runner: 'auto', runtime: 'native', protocol: 'hosted' });
