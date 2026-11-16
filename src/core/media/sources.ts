@@ -5,7 +5,8 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { ImageError, IMAGE_ID, type MediaMetadata } from './contracts.js';
-import { validateImage, stopProcessTree } from '../../backends/cli/media/imageExecution.js';
+import { validateImage } from '../../backends/cli/media/imageExecution.js';
+import { killProcessTree } from '../process/processTree.js';
 
 /**
  * FFmpeg and FFprobe decode video sources only. They are optional dependencies, resolved on
@@ -59,7 +60,7 @@ function run(command: string, args: string[], signal?: AbortSignal): Promise<str
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
     let output = ''; let error = ''; let failed = false;
-    const stop = () => { failed = true; stopProcessTree(child); };
+    const stop = () => { failed = true; void killProcessTree(child); };
     const timer = setTimeout(stop, 30_000);
     signal?.addEventListener('abort', stop, { once: true });
     if (signal?.aborted) stop();

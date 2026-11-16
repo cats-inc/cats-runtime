@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ProviderCommandConfig } from '../config.js';
 import { buildProcessSpawnConfig, type ProcessSpawnConfig } from '../runtime/runtime.js';
+import { killProcessTree } from '../../../core/process/processTree.js';
 import type { QuotaCollectionResult } from '../../../core/usage/QuotaRefreshService.js';
 
 const TUI_ARGS = ['--no-session-log', '--disable-write', '--disable-shell', '--trust-workspace'];
@@ -75,14 +76,7 @@ export async function runMuseQuotaTui(config: ProcessSpawnConfig, signal?: Abort
       result = value;
       clearTimeout(timer); clearTimeout(inputTimer); signal?.removeEventListener('abort', abort);
       // Kill before EOF can make the wrapper exit and orphan the console agent.
-      if (child.pid && process.platform === 'win32') killerDone = new Promise(done => {
-        const killer = spawn('taskkill.exe', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore', windowsHide: true });
-        const reap = setTimeout(() => { child.kill(); killer.kill(); }, 1000);
-        killer.on('error', () => { child.kill(); });
-        killer.on('exit', code => { if (code !== 0) child.kill(); });
-        killer.on('close', () => { clearTimeout(reap); done(); });
-      });
-      else if (child.pid) { try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); } }
+      killerDone = killProcessTree(child);
       // On Windows taskkill must still see the live wrapper to discover its tree.
       // Keep stdin open: taskkill closes the pipes when it reaps the processes.
       if (process.platform !== 'win32') child.stdin.end();

@@ -7,9 +7,10 @@ import { buildProcessSpawnConfig } from '../runtime/runtime.js';
 import { resolveHostFilesystemPath } from '../hostPaths.js';
 import type { ProviderInstanceConfig } from '../config.js';
 import { ImageError } from '../../../core/media/contracts.js';
+import { killProcessTree } from '../../../core/process/processTree.js';
 import type { StreamEvent } from '../../../core/types.js';
 import {
-  IMAGE_PROCESS_DEADLINE_MS, IMAGE_PROCESS_OUTPUT_LIMIT, classifyImageFailure, containedImageFile, readStableImage, stopProcessTree,
+  IMAGE_PROCESS_DEADLINE_MS, IMAGE_PROCESS_OUTPUT_LIMIT, classifyImageFailure, containedImageFile, readStableImage,
   validateImage, type ImageExecution, type ImageExecutionResult,
 } from './imageExecution.js';
 
@@ -167,7 +168,7 @@ export async function executeMuseImage(input: ImageExecution, spawnProcess: type
     const stop = (code: string) => {
       if (failure || fileName) return;
       failure = code;
-      stopProcessTree(child);
+      void killProcessTree(child);
     };
     const abort = () => { if (!fileName) stop('cancelled'); };
     const timer = setTimeout(() => stop('generation_timeout'), IMAGE_PROCESS_DEADLINE_MS);
@@ -187,7 +188,7 @@ export async function executeMuseImage(input: ImageExecution, spawnProcess: type
         if (!saved || saved[1] !== event.toolId) { stop('invalid_image_source'); return; }
         // Muse may keep the turn open long after the tool returns; the file is the result, so end the run here.
         fileName = `${saved[1]}.${saved[2]}`;
-        stopProcessTree(child);
+        void killProcessTree(child);
       }
       if (event.type === 'error') errorText += event.text.slice(0, 16000);
     };

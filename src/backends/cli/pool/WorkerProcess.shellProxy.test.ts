@@ -31,7 +31,7 @@ const commandConfig: ProviderCommandConfig = { path: 'claude.cmd', runner: 'auto
 
 /**
  * A `.cmd` shim runs through cmd.exe (or PowerShell) on Windows; the Runtime's process is then that
- * shell, and only a tree kill also ends the CLI it started (see windowsProcessTree.test.ts).
+ * shell, and only a tree kill also ends the CLI it started (see processTree.test.ts).
  */
 describe('stopping a worker whose process is a Windows shell proxy', () => {
   afterEach(() => {

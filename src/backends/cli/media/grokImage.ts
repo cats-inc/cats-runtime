@@ -7,9 +7,10 @@ import { buildProcessSpawnConfig } from '../runtime/runtime.js';
 import { resolveHostFilesystemPath } from '../hostPaths.js';
 import type { ProviderInstanceConfig } from '../config.js';
 import { ImageError } from '../../../core/media/contracts.js';
+import { killProcessTree } from '../../../core/process/processTree.js';
 import { inspectVideo, MEDIA_MAX_BYTES } from '../../../core/media/sources.js';
 import {
-  IMAGE_PROCESS_DEADLINE_MS, IMAGE_PROCESS_OUTPUT_LIMIT, classifyImageFailure, containedImageFile, readStableImage, stopProcessTree,
+  IMAGE_PROCESS_DEADLINE_MS, IMAGE_PROCESS_OUTPUT_LIMIT, classifyImageFailure, containedImageFile, readStableImage,
   validateImage, type ImageExecution, type ImageExecutionResult,
 } from './imageExecution.js';
 
@@ -144,7 +145,7 @@ export async function executeGrokImage(input: ImageExecution, spawnProcess: type
     const stop = (code: string) => {
       if (failure) return;
       failure = code;
-      stopProcessTree(child);
+      void killProcessTree(child);
     };
     const abort = () => stop('cancelled');
     const timer = setTimeout(() => stop('generation_timeout'), IMAGE_PROCESS_DEADLINE_MS);

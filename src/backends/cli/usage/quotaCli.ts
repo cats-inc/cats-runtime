@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import type { ProviderCommandConfig } from '../config.js';
 import type { ProviderName } from '../providers/types.js';
 import { buildProcessSpawnConfig } from '../runtime/runtime.js';
+import { killProcessTree } from '../../../core/process/processTree.js';
 import type { QuotaCollectionResult } from '../../../core/usage/QuotaRefreshService.js';
 
 export const quotaRecord = (value: unknown): Record<string, unknown> | undefined =>
@@ -48,18 +49,7 @@ export async function runQuotaCli(
         clearTimeout(timer);
         signal?.removeEventListener('abort', abort);
         child.stdin.end();
-        killTimer = setTimeout(() => {
-          if (!child.pid) return;
-          if (process.platform === 'win32') {
-            const killer = spawn('taskkill.exe', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore', windowsHide: true });
-            killer.on('error', () => child.kill());
-            killer.on('exit', (code) => { if (code !== 0) child.kill(); });
-            const killerTimeout = setTimeout(() => { child.kill(); killer.kill(); }, 1000);
-            killer.on('close', () => clearTimeout(killerTimeout));
-          } else {
-            try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); }
-          }
-        }, 500);
+        killTimer = setTimeout(() => { void killProcessTree(child); }, 500);
       };
       const send: Send = (value) => {
         if (finished) return;

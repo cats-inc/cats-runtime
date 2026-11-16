@@ -4,8 +4,9 @@ import { StringDecoder } from 'node:string_decoder';
 import { buildProcessSpawnConfig } from '../runtime/runtime.js';
 import type { ProviderInstanceConfig } from '../config.js';
 import { ImageError } from '../../../core/media/contracts.js';
+import { killProcessTree } from '../../../core/process/processTree.js';
 import {
-  IMAGE_PROCESS_DEADLINE_MS, IMAGE_PROCESS_OUTPUT_LIMIT, classifyImageFailure, firstStableImage, stopProcessTree, validateImage,
+  IMAGE_PROCESS_DEADLINE_MS, IMAGE_PROCESS_OUTPUT_LIMIT, classifyImageFailure, firstStableImage, validateImage,
   type ImageExecution, type ImageExecutionResult,
 } from './imageExecution.js';
 
@@ -62,7 +63,7 @@ export async function executeCodexImage(input: ImageExecution, spawnProcess: typ
     const stop = (code: string) => {
       if (failure || collected) return;
       failure = code; watch.abort();
-      stopProcessTree(child);
+      void killProcessTree(child);
     };
     const abort = () => stop('cancelled');
     const timer = setTimeout(() => stop('generation_timeout'), IMAGE_PROCESS_DEADLINE_MS);
@@ -76,7 +77,7 @@ export async function executeCodexImage(input: ImageExecution, spawnProcess: typ
         collected = { bytes: image.bytes, metadata, executionOutcome: completed ? 'completed' : 'stopped_after_image',
           ...(image.others ? { warnings: ['additional_image_generated'] } : {}) };
         watch.abort();
-        stopProcessTree(child);
+        void killProcessTree(child);
       }).catch((error) => stop(error instanceof ImageError ? error.code : 'invalid_image_source'));
     };
     const line = (text: string) => {
