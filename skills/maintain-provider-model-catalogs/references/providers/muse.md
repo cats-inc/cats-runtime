@@ -26,13 +26,12 @@ require picker observation.
 
 Two judgements are specific to this provider.
 
-**muse-bin 1.4.20 served no account list over MSP on the capture machine.** On 2026-11-16
-`model/list` answered `source: bundledCatalog` with no rows, before and after the operator signed
-in again, while an `experimentalApi` `account/read` answered `state: accountLogin` with
-`credentialRequired: true`. Why `serve` did not load the account catalog is unknown; the probe and
-`catalog:logins` then report Muse as needing a sign-in, although the TUI picker listed the
-account's rows. The signed-in CLI still
-writes its own account cache, `<museHome>/model-catalog/<provider>__<profile>.json`
+**MSP can answer without the account list for a while.** On 2026-11-16 muse-bin 1.4.20
+answered `model/list` with `source: bundledCatalog` and no rows for at least an hour (05:40 to
+06:43 UTC+8), before and after the operator signed in again, while an `experimentalApi`
+`account/read` answered `state: accountLogin` with `credentialRequired: true`. At 08:52 the same
+build answered `providerCatalog` with the account's four rows. The cause is unknown; signing in
+again did not end it. The signed-in CLI also writes its own account cache, `<museHome>/model-catalog/<provider>__<profile>.json`
 (`museHome` is in the MSP `initialize` reply; `source: provider_catalog`). Project it with
 `node skills/maintain-provider-model-catalogs/scripts/project-muse-model-cache.mjs --cache <file> --observed-on <date> --output <fixture>`,
 which keeps id, label, visibility, release date, limits and effort tiers and drops costs and
@@ -40,6 +39,13 @@ profile identifiers. Only `visibility: visible` rows are picker rows; confirm th
 a new row's effort menu with the `/model` and `/effort` pickers (`--model <id>` on the versioned
 binary selects the row for `/effort` without saving it). Offline test:
 `node --test skills/maintain-provider-model-catalogs/tests/project-muse-model-cache.node-test.mjs`.
+
+The [catalog probe](../catalog-probe.md) and `catalog:logins` use that cache only when MSP answers
+from another source. The probe then reports the scope from the cache for the provider and profile
+the MSP reply names, as source class `cli-account-cache`, with a note naming the cache file and the
+day it was written; it is the list at the CLI's last account read, not a live answer. The sign-in
+check reports `ready, local credentials` instead of asking for a sign-in. Without a matching cache
+the scope stays `degraded` as before. Rerun the probe later before signing in again.
 
 **`isDefault` is not automatically the curated default.** Meta ships `-contributor` variants of each
 model whose own description says the session may be used for product improvement, and the catalog's

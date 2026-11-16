@@ -131,6 +131,10 @@ helper fixes and Muse diagnostics) 145, Catalog update 53. Provider inference us
 - No commit, push, PR, release, personal override or installed Desktop/Bot update.
 - The probe and `catalog:logins` still report Muse 1.4.20 as needing a sign-in. Teaching their
   Muse source to read the CLI cache is a separate probe change.
+  Follow-up the same day: at 08:52 UTC+8 MSP answered `providerCatalog` again and the probe
+  confirmed this scope 4/4, so the empty list was temporary, cause unknown. The owner then chose
+  to add the cache fallback anyway; the probe and sign-in check use it only when MSP answers from
+  another source.
 - Workspace skill mirrors are refreshed after the change merges.
 - Left on the machine for the operator: the agy `trustedWorkspaces` entry and the Claude
   `~/.claude.json` project entry for the two empty capture folders, and the empty CLI sessions

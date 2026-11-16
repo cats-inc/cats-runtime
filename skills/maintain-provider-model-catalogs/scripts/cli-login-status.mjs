@@ -12,7 +12,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { cleanEnv, findExecutable, launchSpec, npmPackageDir, runCommand } from './catalog-probe/process.mjs';
-import { museModelList } from './catalog-probe/sources.mjs';
+import { museModelList, readMuseAccountCache } from './catalog-probe/sources.mjs';
 import { listCopilotModels } from './list-copilot-models.mjs';
 import { redactVisibleText, stripTerminalPresentation } from './normalize-picker-paste.mjs';
 
@@ -208,14 +208,23 @@ export const CHECKS = [
   },
   {
     provider: 'muse',
-    method: 'MSP `model/list` answers from providerCatalog',
+    method: 'MSP `model/list` answers from providerCatalog, else the CLI account cache matches its profile',
     async check(ctx) {
       const binary = museBinary(ctx);
       if (!binary) return ctx.find('muse') ? ['unknown', 'no muse-bin named by .muse-version'] : ['not-installed', ''];
       try {
         const reply = await ctx.museModelList({ binary, env: ctx.cleanEnv(), timeoutMs: ctx.timeoutMs });
         if (reply?.source === 'providerCatalog') return ['verified', `model/list answered for the account (${reply.models?.length ?? 0} models)`];
-        return ['unknown', `model/list answered from ${reply?.source ?? 'an unknown source'}, not the account; muse login may be needed`];
+        // muse-bin 1.4.20 answered from bundledCatalog while signed in; the account cache it
+        // wrote at sign-in shows the sign-in without asking the server.
+        const cached = readMuseAccountCache(
+          { museHome: reply?.museHome, providerId: reply?.providerId, profileId: reply?.profileId },
+          { list: (dir) => ctx.listFiles(dir).map((entry) => entry.name), read: (path) => ctx.readText(path), modified: () => null },
+        );
+        if (cached) {
+          return ['local', `model/list answered from ${reply?.source ?? 'an unknown source'}; the CLI account cache lists ${cached.cache.rows.length} models`];
+        }
+        return ['unknown', `model/list answered from ${reply?.source ?? 'an unknown source'}, not the account, and no account cache matched; muse login may be needed`];
       } catch (error) {
         return [error?.reason === 'not-authenticated' ? 'signed-out' : 'unknown', firstLine(error?.message ?? error)];
       }
