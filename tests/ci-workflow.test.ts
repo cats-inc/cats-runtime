@@ -8,9 +8,10 @@ import { parse } from 'yaml';
 // The release preflight skips its steps, never the required job, for documentation
 // (docs/ and root agent instruction files that still exist) and for code that
 // already passed: the same fingerprint earlier, or the merged pull request's run on
-// the same tree. npm publication skips release:check only when the preflight passed
-// on the commit on main. These tests run the workflows' own shell steps against
-// local repositories and a stubbed gh.
+// the same tree. npm publication skips release:check only when the preflight on the
+// commit on main ran that gate or skipped it as already tested, never as
+// documentation only. These tests run the workflows' own shell steps against local
+// repositories and a stubbed gh.
 interface Step {
   id?: string; name?: string; if?: string; run?: string; uses?: string;
   with?: Record<string, unknown>; env?: Record<string, string>;
@@ -106,6 +107,7 @@ function stubGh(bin: string): void {
     'case "$2" in',
     '  */pulls) [ -n "${STUB_PULLS:-}" ] || exit 1; printf \'%s\\n\' "$STUB_PULLS" ;;',
     '  */actions/workflows/*) [ -n "${STUB_PASSED:-}" ] || exit 1; printf \'%s\\n\' "$STUB_PASSED" ;;',
+    '  */actions/runs/*/jobs) [ -n "${STUB_STEPS:-}" ] || exit 1; printf \'%s\\n\' "$STUB_STEPS" ;;',
     '  *) exit 1 ;;',
     'esac',
   ].join('\n') + '\n', { mode: 0o755 });
@@ -186,6 +188,10 @@ describe('CI workflows', () => {
       repo.write('CODEX.md', 'edited codex rules\n');
       repo.write('GEMINI.md', 'new gemini rules\n');
     }), 'docs/ with edited and added root agent files is documentation').toBe('code=false');
+    expect(after(() => repo.write('docs/使用說明.md', '說明\n')), 'a non-ASCII docs/ path is documentation')
+      .toBe('code=false');
+    expect(after(() => repo.write('src/說明.ts', 'code\n')), 'a non-ASCII path outside docs/ is code')
+      .toBe('code=true');
     expect(after(() => repo.remove('CLAUDE.md')), 'a deleted root CLAUDE.md is code').toBe('code=true');
     expect(after(() => repo.move('CODEX.md', 'docs/CODEX.md')), 'a renamed root agent file is code').toBe('code=true');
     expect(after(() => repo.move('src/code.ts', 'docs/code.ts')), 'code moved into docs/ is code').toBe('code=true');
@@ -209,7 +215,7 @@ describe('CI workflows', () => {
     expect(detect({ EVENT: 'workflow_dispatch' }), 'a manual run runs every check').toBe('code=true');
   }, 60_000);
 
-  it('fingerprints every tracked file outside docs/ and the root agent files only by mode and path', () => {
+  it('fingerprints every tracked file outside docs/ and the root agent files only by mode, type and path', () => {
     const repo = agentFilesRepo();
     const fingerprint = () => runStep(stepRun('fingerprint'), repo.work, {});
     const base = fingerprint();
@@ -220,6 +226,7 @@ describe('CI workflows', () => {
     };
     expect(after(() => repo.write('AGENTS.md', 'edited rules\n')), 'root agent file content').toBe(base);
     expect(after(() => repo.write('docs/guide.md', 'edited guide\n')), 'docs/ content').toBe(base);
+    expect(after(() => repo.write('docs/使用說明.md', '說明\n')), 'a non-ASCII docs/ path').toBe(base);
     expect(after(() => repo.write('GEMINI.md', 'new gemini rules\n')), 'an added root agent file').not.toBe(base);
     expect(after(() => repo.remove('CLAUDE.md')), 'a deleted root agent file').not.toBe(base);
     expect(after(() => repo.write('sub/AGENTS.md', 'edited nested rules\n')), 'a nested AGENTS.md').not.toBe(base);
@@ -263,16 +270,21 @@ describe('CI workflows', () => {
     expect(job.if, 'a failed detection still runs the required job').toBe('${{ !cancelled() }}');
     expect(job.name).toBeUndefined();
     expect(job.strategy).toBeUndefined();
+    expect(job.env, 'a skip counts only from a changes job that succeeded').toEqual({
+      SKIP: "${{ needs.changes.result == 'success' && needs.changes.outputs.skip || '' }}",
+    });
     const byName = (name: string) => preflightSteps.find((step) => step.name === name);
-    expect(byName('Documentation-only change')?.if).toBe("needs.changes.outputs.skip == 'docs'");
-    expect(byName('Already tested')?.if).toBe("needs.changes.outputs.skip == 'tested'");
+    expect(byName('Documentation-only change')?.if).toBe("env.SKIP == 'docs'");
+    expect(byName('Already tested')?.if).toBe("env.SKIP == 'tested'");
     expect(byName('Run release preflight')?.run).toBe('npm run release:check');
     const notices = new Set(['Documentation-only change', 'Already tested']);
     for (const step of preflightSteps.filter((candidate) => !notices.has(candidate.name ?? ''))) {
-      expect(step.if, `${step.name} runs only without a skip`).toMatch(/^needs\.changes\.outputs\.skip == ''/);
+      expect(step.if, `${step.name} runs only without a skip`).toMatch(/^env\.SKIP == ''/);
       expect(step.if, `${step.name} keeps the implicit success()`).not.toMatch(/always\(\)|failure\(\)/);
     }
-    const recorded = "needs.changes.outputs.skip == '' && needs.changes.outputs.fingerprint != ''";
+    expect(preflightSteps.some((step) => /needs\.changes\.outputs\.skip/.test(step.if ?? '')),
+      'steps read the skip only through env.SKIP').toBe(false);
+    const recorded = "env.SKIP == '' && needs.changes.outputs.fingerprint != ''";
     expect(byName('Record this code as tested')?.if).toBe(recorded);
     const save = byName('Save the tested marker');
     expect(save?.if).toBe(recorded);
@@ -281,7 +293,7 @@ describe('CI workflows', () => {
     expect(preflightSteps.indexOf(save as Step), 'the marker is saved last').toBe(preflightSteps.length - 1);
   });
 
-  it('skips release:check in npm publication only after the preflight passed on the commit on main', () => {
+  it('skips release:check in npm publication only after the preflight ran or reused the gate on the commit on main', () => {
     expect(publish.permissions.actions).toBe('read');
     const steps = publish.jobs.publish.steps as Step[];
     const gate = steps.find((step) => step.name === 'Run release gate');
@@ -289,18 +301,34 @@ describe('CI workflows', () => {
     expect(steps.find((step) => step.name === 'Install dependencies')?.if).toBeUndefined();
     const check = steps.find((step) => step.id === 'ci');
     expect(check?.if, 'the lookup itself always runs').toBeUndefined();
+    // The lookup names the preflight's gate and tested-skip steps, never its docs notice.
+    const preflightNames = preflightSteps.map((step) => step.name);
+    for (const name of ['Run release preflight', 'Already tested']) {
+      expect(preflightNames).toContain(name);
+      expect(check?.run).toContain(name);
+    }
+    expect(check?.run).not.toContain('Documentation-only change');
     const root = tempRoot('cats-publish-check-');
     const bin = join(root, 'bin');
     stubGh(bin);
     const sha = 'a'.repeat(40);
-    const lookup = (passed: string) => runStep(check?.run ?? '', root, {
+    const lookup = (run: string, passedSteps: string[]) => runStep(check?.run ?? '', root, {
       PATH: `${bin}${delimiter}${process.env.PATH}`, GITHUB_REPOSITORY: 'cats-inc/cats-runtime', GITHUB_SHA: sha,
-      STUB_PASSED: passed, STUB_LOG: join(root, 'gh.log'),
+      STUB_PASSED: run, STUB_STEPS: passedSteps.join('\n'), STUB_LOG: join(root, 'gh.log'),
     });
-    expect(lookup('1')).toBe('tested=true');
-    expect(readFileSync(join(root, 'gh.log'), 'utf8')).toContain(
+    expect(lookup('4242', ['Set up job', 'Checkout', 'Install dependencies', 'Run release preflight']),
+      'the preflight ran the gate').toBe('tested=true');
+    const log = readFileSync(join(root, 'gh.log'), 'utf8');
+    expect(log).toContain(
       `actions/workflows/release-preflight.yml/runs?head_sha=${sha}&event=push&branch=main&status=success`);
-    expect(lookup('0'), 'without a passing main run the gate runs as before').toBe('tested=false');
-    expect(lookup(''), 'a failed lookup runs the gate').toBe('tested=false');
+    expect(log).toContain('repos/cats-inc/cats-runtime/actions/runs/4242/jobs');
+    expect(lookup('4242', ['Set up job', 'Already tested']), 'the same code already passed').toBe('tested=true');
+    expect(lookup('4242', ['Set up job', 'Documentation-only change']),
+      'a documentation-only skip proves nothing about the code').toBe('tested=false');
+    expect(lookup('4242', ['Run release preflight checks']), 'step names match exactly').toBe('tested=false');
+    expect(lookup('4242', []), 'a failed jobs lookup runs the gate').toBe('tested=false');
+    expect(lookup('', ['Run release preflight']), 'without a passing main run the gate runs as before')
+      .toBe('tested=false');
+    expect(lookup('not-a-run', ['Run release preflight']), 'an unexpected run id runs the gate').toBe('tested=false');
   }, 30_000);
 });

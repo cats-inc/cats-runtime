@@ -15,11 +15,12 @@ jobs:
   # GEMINI.md that was added or modified and so still exists; deleting,
   # renaming or retyping one, or changing a nested AGENTS.md, is code. Code
   # that already passed also skips: the fingerprint covers every tracked file
-  # outside docs/, and those four files only by mode and path, so a rebase that
-  # only brings in documentation from main reuses the earlier green run. A pull request's cache is scoped to that
-  # request, so a push to main instead reuses its merged pull request's run when
-  # that run tested the same tree. The required release-preflight job still runs
-  # and passes, so branch protection is satisfied; only its steps are skipped.
+  # outside docs/, and those four files only by mode, type and path, so a rebase
+  # that only brings in documentation from main reuses the earlier green run. A
+  # pull request's cache is scoped to that request, so a push to main instead
+  # reuses its merged pull request's run when that run tested the same tree. The
+  # required release-preflight job still runs and passes, so branch protection
+  # is satisfied; only its steps are skipped.
   # Any other path, a manual run or a failed detection runs every step.
   # tests/docs-boundary.test.ts keeps tests and scripts from reading docs/ or
   # those four files.
@@ -54,16 +55,18 @@ jobs:
             *) base= ;;
           esac
           code=true
-          if [ -n "$base" ] && git rev-parse --verify --quiet "$base^{commit}" > /dev/null; then
-            # Without rename detection a move also lists its old path as
-            # deleted, so moving code into docs/ or renaming a root agent file
-            # is code.
-            changed=$(git diff --name-status --no-renames "$base" HEAD)
+          # Without rename detection a move lists both paths, so moving code
+          # into docs/ or renaming a root agent file is code. code_changed lists
+          # changes outside docs/ and the four root agent files; agents_removed
+          # lists those four when deleted or changed in type, since one counts
+          # as documentation only while it still exists. Nested copies are
+          # code. Any git failure keeps code=true.
+          if [ -n "$base" ] && git rev-parse --verify --quiet "$base^{commit}" > /dev/null &&
+            changed=$(git diff --no-renames --name-only "$base" HEAD) &&
+            code_changed=$(git diff --no-renames --name-only "$base" HEAD -- . ':(top,exclude)docs/' ':(top,exclude)AGENTS.md' ':(top,exclude)CLAUDE.md' ':(top,exclude)CODEX.md' ':(top,exclude)GEMINI.md') &&
+            agents_removed=$(git diff --no-renames --name-only --diff-filter=am "$base" HEAD -- ':(top)AGENTS.md' ':(top)CLAUDE.md' ':(top)CODEX.md' ':(top)GEMINI.md'); then
             printf 'Changed files:\n%s\n' "$changed"
-            # Code is any change outside docs/ except a root agent instruction
-            # file that was added or modified and so still exists at HEAD.
-            code_paths=$(awk -F '\t' '$2 !~ /^docs\// && !($1 ~ /^[AM]$/ && $2 ~ /^(AGENTS|CLAUDE|CODEX|GEMINI)\.md$/)' <<< "$changed")
-            if [ -n "$changed" ] && [ -z "$code_paths" ]; then code=false; fi
+            if [ -n "$changed" ] && [ -z "$code_changed" ] && [ -z "$agents_removed" ]; then code=false; fi
           fi
           echo "code=$code" | tee -a "$GITHUB_OUTPUT"
 
@@ -71,11 +74,15 @@ jobs:
         id: fingerprint
         run: |
           set -euo pipefail
-          # Mode, blob and path of every tracked file outside docs/. The root
-          # agent instruction files keep their mode and path but not their
-          # content. For a pull request this is the merge result that the tests
-          # would exercise.
-          fingerprint=$(git ls-tree -r --full-tree HEAD | awk -F '\t' '$2 ~ /^docs\// { next } $2 ~ /^(AGENTS|CLAUDE|CODEX|GEMINI)\.md$/ { split($1, meta, " "); print meta[1] "\t" $2; next } { print }' | sha256sum | cut -d ' ' -f 1)
+          # Mode, blob and path of every tracked file outside docs/. For a pull
+          # request this is the merge result that the tests would exercise. The
+          # root agent instructions keep their mode, type and path but not their
+          # blob, so editing one keeps the fingerprint while adding, removing or
+          # retyping one changes it. Unquoted paths keep non-ASCII docs/ out.
+          fingerprint=$(git -c core.quotePath=false ls-tree -r --full-tree HEAD | awk -F '\t' '
+            $2 ~ /^docs\// { next }
+            $2 ~ /^(AGENTS|CLAUDE|CODEX|GEMINI)\.md$/ { sub(/ [^ ]+$/, " agent-instructions", $1); print $1 "\t" $2; next }
+            { print }' | sha256sum | cut -d ' ' -f 1)
           echo "fingerprint=$fingerprint" | tee -a "$GITHUB_OUTPUT"
 
       - name: Look for an earlier green run of this exact code
@@ -137,21 +144,25 @@ jobs:
     needs: changes
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
+    # A skip counts only from a changes job that succeeded; any other result
+    # runs every step. npm-publish.yml relies on these step names.
+    env:
+      SKIP: ${{ needs.changes.result == 'success' && needs.changes.outputs.skip || '' }}
     steps:
       - name: Documentation-only change
-        if: needs.changes.outputs.skip == 'docs'
+        if: env.SKIP == 'docs'
         run: echo "Only documentation changed; install and the release preflight are skipped."
 
       - name: Already tested
-        if: needs.changes.outputs.skip == 'tested'
+        if: env.SKIP == 'tested'
         run: echo "This exact code already passed; install and the release preflight are skipped."
 
       - name: Checkout
-        if: needs.changes.outputs.skip == ''
+        if: env.SKIP == ''
         uses: actions/checkout@v7
 
       - name: Setup Node.js
-        if: needs.changes.outputs.skip == ''
+        if: env.SKIP == ''
         uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -159,17 +170,17 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        if: needs.changes.outputs.skip == ''
+        if: env.SKIP == ''
         run: npm ci
 
       - name: Run release preflight
-        if: needs.changes.outputs.skip == ''
+        if: env.SKIP == ''
         run: npm run release:check
 
-      # Reached only when every step above passed. A failed detection leaves no
-      # fingerprint, so nothing is recorded.
+      # Reached only when every step above passed. A failed fingerprint leaves
+      # none, so nothing is recorded.
       - name: Record this code as tested
-        if: needs.changes.outputs.skip == '' && needs.changes.outputs.fingerprint != ''
+        if: env.SKIP == '' && needs.changes.outputs.fingerprint != ''
         env:
           FINGERPRINT: ${{ needs.changes.outputs.fingerprint }}
         run: |
@@ -177,7 +188,7 @@ jobs:
           echo "$FINGERPRINT $GITHUB_RUN_ID" > .ci-green/marker
 
       - name: Save the tested marker
-        if: needs.changes.outputs.skip == '' && needs.changes.outputs.fingerprint != ''
+        if: env.SKIP == '' && needs.changes.outputs.fingerprint != ''
         uses: actions/cache/save@v4
         with:
           path: .ci-green

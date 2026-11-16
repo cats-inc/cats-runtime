@@ -72,12 +72,13 @@ still exists. Deleting, renaming or changing the type of one of those four files
 code, and so is any nested `AGENTS.md`. The comparison does not detect renames, so
 moving a file into `docs/` also counts as code. For documentation, the required
 `release-preflight` job still runs, but it skips install and `release:check` and
-passes, so the pull request still merges with the check name unchanged. Any other
-path, a manual run or a failed detection runs the full gate.
+passes, so the pull request still merges with the check name unchanged. A skip counts
+only when the `changes` job succeeded. Any other path, a manual run or a failed
+detection runs the full gate.
 
 The job also skips code that already passed. It fingerprints the mode, blob and path
-of every tracked file outside `docs/`, keeping the four root agent files by mode and
-path only, so their content does not count. A full gate that passes saves an
+of every tracked file outside `docs/`, keeping the four root agent files by mode,
+type and path only, so their content does not count. A full gate that passes saves an
 `actions/cache` entry named `ci-green-v1-<fingerprint>`. A later run with the same
 fingerprint that can see that entry skips the gate, for example a pull request
 updated with a rebase that only brings in documentation. An entry saved by a pull
@@ -96,12 +97,14 @@ hold:
   previous `main` and has the pushed commit's tree;
 - the preflight passed on that head as a `pull_request` run.
 
-Any other push, or any failed lookup, runs the full gate. `npm-publish.yml` likewise
-skips `release:check` when the preflight run passed on the dispatched commit on
-`main`, and runs it otherwise. A preflight run whose steps were skipped also counts
-as passed. `tests/ci-workflow.test.ts` runs the detection, fingerprint, skip and
-merge steps against local repositories with a stubbed `gh`, and checks how the
-steps are gated.
+Any other push, or any failed lookup, runs the full gate. `npm-publish.yml` skips
+`release:check` only when the preflight passed on the dispatched commit on `main`
+and its `release-preflight` job either ran the gate (`Run release preflight`) or
+skipped it as already tested (`Already tested`). A documentation-only skip says
+nothing about the code, so publication then runs the gate itself, as it does after
+any failed lookup. `tests/ci-workflow.test.ts` runs the detection, fingerprint,
+skip, merge and publication lookup steps against local repositories with a stubbed
+`gh`, and checks how the steps are gated.
 
 Tests and scripts must therefore not read repository documentation, and may only
 check that a root agent instruction file exists. Executable inputs live under
