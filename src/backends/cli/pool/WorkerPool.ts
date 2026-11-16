@@ -53,6 +53,9 @@ interface ProviderServiceResolvers {
   getOpencodeNative?: (instanceId?: string) => OpencodeNativeSessionService;
 }
 
+/** How long `kill` waits for a worker's process to stop: past WorkerProcess's 5 s forced kill. */
+export const WORKER_STOP_WAIT_MS = 6000;
+
 /** All `maxSessions` worker slots are taken, including idle chat workers; distinct from a held singleton. */
 export class PoolCapacityError extends Error {
   constructor() { super('Max sessions reached'); this.name = 'PoolCapacityError'; }
@@ -535,11 +538,40 @@ export class WorkerPool {
     }
   }
 
-  kill(sessionId: string): void {
+  /**
+   * Kills a session's worker. The returned promise settles once its process has stopped (true), or
+   * after `timeoutMs` (false); it never rejects, and a failure to kill still throws here. Until a
+   * Windows process has exited it holds its working folder, so a caller about to remove that folder
+   * (a sandbox on delete) awaits this. WorkerProcess forces the kill after 5 s.
+   */
+  kill(sessionId: string, timeoutMs = WORKER_STOP_WAIT_MS): Promise<boolean> {
     const worker = this.workers.get(sessionId);
-    if (worker) {
+    if (!worker) return Promise.resolve(true);
+    let settle: (stopped: boolean) => void = () => {};
+    const stopped = new Promise<boolean>(resolve => { settle = resolve; });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const check = () => {
+      if (worker.processRunning) return;
+      clearTimeout(timer);
+      worker.removeListener('process-stopped', check);
+      settle(true);
+    };
+    worker.on('process-stopped', check);
+    try {
       worker.kill();
+    } catch (error) {
+      worker.removeListener('process-stopped', check);
+      throw error;
     }
+    check();
+    if (worker.processRunning) {
+      timer = setTimeout(() => {
+        worker.removeListener('process-stopped', check);
+        settle(false);
+      }, timeoutMs);
+      timer.unref?.();
+    }
+    return stopped;
   }
 
   killAll(): void {
@@ -550,7 +582,7 @@ export class WorkerPool {
   }
 
   /** Keep Runtime alive until native close callbacks persist their lifetime receipts. */
-  async killAllAndWait(timeoutMs = 6000): Promise<boolean> {
+  async killAllAndWait(timeoutMs = WORKER_STOP_WAIT_MS): Promise<boolean> {
     this.closing = true;
     const workers = [...this.workers.values()].filter(worker => worker.processRunning);
     if (!workers.length) { this.killAll(); return true; }

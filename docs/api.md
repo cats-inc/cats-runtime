@@ -3886,6 +3886,14 @@ follow-up fetch.
 so hosts can record additive pre-maintenance trigger context even when the
 operation is only a soft close.
 
+Closing a CLI session, by `POST /sessions/{id}/close` or by the close a delete
+performs first, returns once the provider process has stopped, waiting at most
+about 6 seconds (the worker forces the kill after 5). Until a process has exited,
+Windows keeps its working folder in use, so a delete that follows can now remove
+a sandbox. Sandbox removal itself retries the transient Windows errors. A sandbox
+that still cannot be removed is logged with its path; the delete still answers
+`deleted`.
+
 `POST /sessions/{id}/workspace/cleanup` is a bounded retained-worktree recovery
 primitive for closed worktree-backed sessions whose most recent cleanup attempt
 ended with `status: "retained"`. It accepts the same optional `maintenance`

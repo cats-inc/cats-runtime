@@ -66,9 +66,17 @@ describe('image handoff owns the complete source process lifetime', () => {
     const manager = new RuntimeSessionManager(config, pool); const spawn = vi.spyOn(pool, 'spawn');
     const replacement = manager.replace('source-chat', 'grok', { cwd: tmpdir() }, imageInstance.id, 'cli');
     const rejected = expect(replacement).rejects.toMatchObject({ code: 'session_replacement_cancelled' });
+    const session = { id: 'source-chat', providerName: 'codex', providerBackend: 'cli' } as never;
+    let closing: Promise<void> | undefined;
     if (operation === 'dropSession') manager.dropSession('source-chat');
-    else await manager[operation]({ id: 'source-chat', providerName: 'codex', providerBackend: 'cli' } as never);
-    child.emit('close', 0); helper.resolve(); await rejected;
+    else if (operation === 'cancel') await manager.cancel(session);
+    else {
+      // Close waits for the source process to stop, so the child exits while it waits, as a real one does.
+      const kill = vi.spyOn(pool, 'kill');
+      closing = manager.close(session);
+      await vi.waitFor(() => expect(kill).toHaveBeenCalled());
+    }
+    child.emit('close', 0); helper.resolve(); await closing; await rejected;
     expect(spawn).not.toHaveBeenCalled();
   });
 

@@ -897,7 +897,9 @@ export class RuntimeSessionManager {
         break;
       case 'cli':
       default:
-        this.pool.kill(session.id);
+        // Until the CLI has exited, Windows keeps its working folder in use: a delete right after
+        // this close (or a close and then a delete) must find the sandbox free to remove.
+        await this.pool.kill(session.id);
         break;
     }
 

@@ -4346,6 +4346,11 @@ sessionRoutes.delete('/sessions/:id', guardSessionDeletion, async (c) => {
       workspaceMode: session.workspaceMode,
       workspaceIsolation: session.workspaceIsolation,
     })).workspaceCleaned;
+    // The session is deleted either way; nothing else removes its sandbox later, so say where it is.
+    if (!workspaceCleaned) {
+      console.warn(`[sessions] Could not remove the sandbox of deleted session '${id}': `
+        + `${join(ctx.config.sessionBaseDir, id)}`);
+    }
   }
 
 
