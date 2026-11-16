@@ -3895,25 +3895,27 @@ managed-plugin runs. While it waits, close and reset report the session as
 working folder in use until it has exited, so the wait lets a delete that follows
 remove a sandbox.
 
-On Windows, a CLI behind a `.cmd` or `.bat` shim that the Runtime cannot resolve
-to the program behind it runs through a shell proxy (cmd.exe or PowerShell).
-Stopping such a session, also after a provider error, ends the proxy together
-with the processes under it at that moment (`taskkill /T /F`); killed alone, the
-proxy would leave the CLI running. For a persistent session the CLI's input
-stays open until then, so it cannot exit first and leave what it started
-outside the tree; a per-turn CLI already had its input closed with the turn. A
-process the CLI had already left behind before the stop is not reached. While
-taskkill runs, the CLI's further output is ignored and nothing more is written to
-it. When taskkill cannot run, only the proxy is killed and its input closed.
+On Windows, stopping a CLI session, also after a provider error, ends the CLI
+together with every process under it at that moment (`taskkill /T /F`). Windows
+does not end a process's children with it. Killed alone, a CLI that is not a
+Node program would leave the tools it started running in its working folder, and
+a shell proxy would leave the CLI behind it running: a CLI behind a `.cmd` or
+`.bat` shim that the Runtime cannot resolve to the program behind it runs through
+cmd.exe or PowerShell. Kimi Code and Junie, which start a process per turn, are
+stopped the same way. For a persistent
+session the CLI's input stays open until then, so it cannot exit first and leave
+what it started outside the tree; a per-turn CLI already had its input closed
+with the turn. A process the CLI had already left behind before the stop, one
+whose parent has exited, is not reached. While taskkill runs, the CLI's further
+output, stderr included, is ignored and nothing more is written to it. When
+taskkill cannot run, only the CLI's own process is killed and its input closed.
 
 Sandbox removal retries transient Windows errors for about 5 seconds. When it
 still fails, the delete answers `deleted` with `workspaceCleaned: false` and the
 Runtime logs the path. These processes can still outlive the wait:
 
-- on Windows, processes started by a CLI that the Runtime runs directly and
-  that is not a Node program (a shell tool, for example): they survive the CLI,
-  whose exit ends the wait;
-- processes a provider adapter starts per turn itself;
+- the process a provider adapter starts per turn itself (Kimi Code, Junie):
+  the wait does not cover it;
 - a process still exiting when a close or delete finds the session no longer
   active: neither waits then.
 

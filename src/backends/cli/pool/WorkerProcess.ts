@@ -124,9 +124,9 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   private lastLaunchSummary = '';
   private ownedProcessStarted = false;
   private readonly ownedGenerations = new Set<number>();
-  /** Children that are Windows shell proxies, which `terminate` ends with the CLI they started. */
-  private readonly shellProxies = new WeakSet<ChildProcess>();
-  /** Shell proxies `terminate` has handed to taskkill. */
+  /** Children started on Windows, which `terminate` ends with every process under them. */
+  private readonly windowsTrees = new WeakSet<ChildProcess>();
+  /** Children `terminate` has handed to taskkill. */
   private readonly treeKilled = new WeakSet<ChildProcess>();
   get startupHasOwnedProcess(): boolean { return this.ownedProcessStarted; }
   private spawnResilience: SpawnResilienceConfig;
@@ -309,7 +309,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       env,
       ...hiddenWindowsSpawnOptions(),
     });
-    if (spawnConfig.windowsShellProxy) this.shellProxies.add(child);
+    if (process.platform === 'win32') this.windowsTrees.add(child);
     this.process = child;
     const control = new WorkerControlChannel((line, done) => {
       if (this.process !== child || this.stopping(child) || child.exitCode !== null || !child.stdin || child.stdin.destroyed) {
@@ -330,7 +330,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     const rl = createInterface({ input: child.stdout! });
     const secrets = new SessionSecretRedactor(Object.values(this.launchEnv));
     rl.on('line', (line) => {
-      // A proxy being ended with its tree is as good as gone, as a directly run CLI is at once.
+      // A CLI being ended with its tree is as good as gone, as one killed at once would be.
       if (this.process !== child || child.exitCode !== null || this.treeKilled.has(child)) return;
       line = secrets.line(line);
       if (control.consume(line)) return;
@@ -389,7 +389,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
 
     // Drain stderr to prevent buffer deadlock
     child.stderr?.on('data', (chunk: Buffer) => {
-      if (this.process !== child) return;
+      // While taskkill runs the CLI is still alive; like its output, what it reports goes nowhere.
+      if (this.process !== child || this.treeKilled.has(child)) return;
       const text = secrets.chunk(chunk.toString('utf-8')).trim();
       if (text) {
         this.captureStderr(text);
@@ -769,9 +770,9 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
 
     if (this.process && this.process.exitCode === null) {
       const child = this.process;
-      // The EOF lets a CLI shut down. Behind a shell proxy it could let the CLI exit before taskkill
-      // has walked the tree, orphaning what the CLI started; taskkill closes the pipes itself.
-      if (!this.shellProxies.has(child)) child.stdin?.end();
+      // The EOF lets a CLI shut down. On Windows it could let the CLI exit before taskkill has
+      // walked the tree, orphaning what the CLI started; taskkill closes the pipes itself.
+      if (!this.windowsTrees.has(child)) child.stdin?.end();
       this.terminate(child);
 
       setTimeout(() => {
@@ -783,12 +784,13 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   }
 
   /**
-   * Stops a provider process with SIGTERM. A Windows shell proxy (cmd.exe or PowerShell running a
-   * `.cmd` shim) goes together with the CLI it started: killed alone, it would leave that CLI
-   * running, holding its working folder.
+   * Stops a provider process with SIGTERM, or on Windows together with every process under it.
+   * Windows does not end a process's children with it: killed alone, a shell proxy (cmd.exe or
+   * PowerShell running a `.cmd` shim) would leave the CLI behind it running, and a CLI that is not
+   * a Node program its tools, all holding the working folder.
    */
   private terminate(child: ChildProcess): void {
-    if (!this.shellProxies.has(child)) {
+    if (!this.windowsTrees.has(child)) {
       child.kill('SIGTERM');
       return;
     }

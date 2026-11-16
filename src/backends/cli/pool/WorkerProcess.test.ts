@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ProviderCommandConfig } from '../config.js';
@@ -326,6 +327,62 @@ it('never sends a Codex model turn when the child reports a permission downgrade
     try { expect(existsSync(join(cwd, 'unexpected-turn'))).toBe(false); }
     finally { cleanupTempDirWithRetries(cwd); }
   }
+});
+
+describe('stopping a CLI that is not a Node program (Windows)', () => {
+  const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+
+  /**
+   * PowerShell, run directly, stands in for such a CLI: it ignores its input and has started a
+   * tool, which inherits its output. Windows does not end the tool with it, and Node does not
+   * either, as it would for the children of a Node CLI.
+   */
+  it('ends the tool the CLI started, so its stop is not held up by the tool', async () => {
+    if (process.platform !== 'win32') return;
+    const dir = mkdtempSync(join(tmpdir(), 'cats-runtime-native-cli-'));
+    const pidFile = join(dir, 'pids');
+    // Single quotes only, so the script reaches PowerShell as one argument. The tool's command
+    // line names the folder, so cleanup below can tell it from a process that reused its PID.
+    const script = [
+      '$psi = New-Object System.Diagnostics.ProcessStartInfo',
+      '$psi.FileName = (Get-Process -Id $PID).Path',
+      `$psi.Arguments = '-NoProfile -NonInteractive -Command Start-Sleep -Seconds 600 # ${dir}'`,
+      '$psi.UseShellExecute = $false',
+      '$psi.CreateNoWindow = $true',
+      '$tool = [System.Diagnostics.Process]::Start($psi)',
+      `Set-Content -LiteralPath '${pidFile}' -Value ([string]$PID + ' ' + [string]$tool.Id)`,
+      'Start-Sleep -Seconds 600',
+    ].join('; ');
+    const provider: Provider = {
+      name: 'antigravity',
+      capabilities: { resume: true, fork: false, permissions: false },
+      ephemeral: false,
+      buildSpawnArgs: () => ['-NoProfile', '-NonInteractive', '-Command', script],
+      buildStdinMessage: () => '',
+      parseStreamLine: () => null,
+    };
+    const powershell = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+    const worker = new WorkerProcess(provider, { cwd: dir }, { path: powershell, runner: 'direct', runtime: { mode: 'native' } });
+    worker.on('error', () => undefined);
+    let pids: number[] = [];
+    try {
+      worker.start();
+      await vi.waitFor(() => expect(existsSync(pidFile) && readFileSync(pidFile, 'utf8').trim()).toMatch(/^\d+ \d+$/), { timeout: 15_000 });
+      pids = readFileSync(pidFile, 'utf8').trim().split(' ').map(Number);
+      const stopped = once(worker, 'process-stopped');
+      worker.kill();
+      await Promise.race([stopped, new Promise((_, fail) => setTimeout(() => fail(new Error('the stop is held up')), 5_000))]);
+      await vi.waitFor(() => expect(pids.map(alive)).toEqual([false, false]), { timeout: 5_000 });
+    } finally {
+      for (const pid of pids) {
+        if (!alive(pid)) continue;
+        const query = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+          `(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}").CommandLine`], { encoding: 'utf8', windowsHide: true });
+        if ((query.stdout ?? '').includes(dir)) spawnSync('taskkill.exe', ['/pid', String(pid), '/t', '/f'], { stdio: 'ignore', windowsHide: true });
+      }
+      await cleanupTempDirWithRetries(dir);
+    }
+  }, 40_000);
 });
 
 for (const behavior of ['accept', 'reject', 'silent'] as const) {

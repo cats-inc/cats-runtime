@@ -108,8 +108,15 @@ describe('WorkerProcess Windows spawn options', () => {
   });
 });
 
+const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')!;
+/** On Windows the CLI is ended with its process tree instead (WorkerProcess.processTree.test.ts). */
+function onPlatform(platform: NodeJS.Platform) {
+  Object.defineProperty(process, 'platform', { ...platformDescriptor, value: platform });
+}
+
 describe('WorkerProcess asynchronous provider replies', () => {
   afterEach(() => {
+    Object.defineProperty(process, 'platform', platformDescriptor);
     spawnMock.mockReset();
     vi.resetModules();
   });
@@ -259,6 +266,7 @@ describe('WorkerProcess asynchronous provider replies', () => {
   });
 
   it('fails the turn on an unexpected asynchronous response failure without unhandled rejection', async () => {
+    onPlatform('linux');
     const child = createMockChildProcess();
     child.kill = vi.fn();
     spawnMock.mockReturnValue(child);
@@ -280,6 +288,7 @@ describe('WorkerProcess asynchronous provider replies', () => {
   });
 
   it('handles a closed input pipe during an active asynchronous reply without an unhandled stream error', async () => {
+    onPlatform('linux');
     const child = createMockChildProcess();
     child.kill = vi.fn();
     spawnMock.mockReturnValue(child);

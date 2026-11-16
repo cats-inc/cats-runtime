@@ -7,7 +7,16 @@ vi.mock('../runtime/windowsCodexHost.js', () => ({ windowsCodexHostPath: () => u
 import { WorkerProcess } from './WorkerProcess.js';
 import { MuseMspProvider } from '../providers/museMsp.js';
 const children: Array<EventEmitter> = [];
-afterEach(() => { children.splice(0).forEach(child => child.emit('close', 0)); vi.restoreAllMocks(); });
+const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')!;
+/** On Windows the CLI is ended with its process tree instead (WorkerProcess.processTree.test.ts). */
+function onPlatform(platform: NodeJS.Platform) {
+  Object.defineProperty(process, 'platform', { ...platformDescriptor, value: platform });
+}
+
+afterEach(() => {
+  Object.defineProperty(process, 'platform', platformDescriptor);
+  children.splice(0).forEach(child => child.emit('close', 0)); vi.restoreAllMocks();
+});
 
 async function fixture() {
   const child = Object.assign(new EventEmitter(), { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(),
@@ -58,6 +67,7 @@ describe('hosted protocol process boundary', () => {
       idempotencyKey: 'late', answer: { action: 'accept' } })).rejects.toMatchObject({ code: 'interaction_conflict' });
   });
   it('terminates a child that queued a prompt instead of admitting it', async () => {
+    onPlatform('linux');
     const { worker, child, turn, read, reply } = await fixture();
     const request = (await read())[0];
     reply(request.id, { commandId: request.params.commandId, disposition: 'queued', status: 'accepted', turnId: 'foreign' });

@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import os from 'node:os';
 import { join } from 'node:path';
@@ -23,7 +23,7 @@ import type {
 import type { ErrorStreamEvent, InitStreamEvent, ResultStreamEvent } from '../../../core/types.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
-import { killWindowsProcessTree } from '../../../core/process/processTree.js';
+import { stopCliProcess } from '../../../core/process/processTree.js';
 import { appendStderrLines } from '../stderrLines.js';
 import { providerSessionUnavailableEvent } from '../../../core/runtime/providerSessionUnavailable.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
@@ -145,13 +145,13 @@ export class KimiProvider implements Provider {
           text: `Kimi Code did not finish within ${turnTimeoutMs}ms. Set ${KIMI_TURN_TIMEOUT_ENV}=0 `
             + 'to disable the limit or raise it for longer tasks.',
         } satisfies ErrorStreamEvent);
-        terminateKimi(child);
+        stopCliProcess(child);
       }, turnTimeoutMs)
       : undefined;
 
     const abortHandler = () => {
       finished = true;
-      terminateKimi(child);
+      stopCliProcess(child);
       wake();
     };
     opts.signal?.addEventListener('abort', abortHandler, { once: true });
@@ -210,7 +210,7 @@ export class KimiProvider implements Provider {
       finished = true;
       if (turnTimer) clearTimeout(turnTimer);
       opts.signal?.removeEventListener('abort', abortHandler);
-      terminateKimi(child);
+      stopCliProcess(child);
     }
   }
 
@@ -294,16 +294,6 @@ export function buildKimiExitError(
       : `Kimi Code exited with code ${code} before completing the turn`
         + (details.length ? `. stderr: ${details.join(' | ')}` : '.'),
   };
-}
-
-function terminateKimi(child: ChildProcess): void {
-  if (child.exitCode !== null || child.signalCode !== null || child.pid === undefined) return;
-  if (process.platform === 'win32') {
-    // Kimi runs shell tools as its own children; end the whole tree.
-    void killWindowsProcessTree(child);
-    return;
-  }
-  child.kill('SIGTERM');
 }
 
 function resolveKimiTurnTimeoutMs(): number {
