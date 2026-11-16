@@ -16,7 +16,10 @@ with `KIMI_CODE_NO_AUTO_UPDATE=1` so the launch cannot apply a staged self-updat
 npm run catalog:probe -- --providers kimi
 ```
 
-- The `providers` block holds `apiKey` and `oauth.key`. The parser,
+- The `providers` block holds `apiKey` and `oauth.key`. Per the 2.5.3 code, the managed sign-in
+  writes an empty `apiKey` and a storage reference name in `oauth.key`, but a provider a user added
+  with an API key prints that key. The owner kept this output as the source on 2026-11-16, since
+  no other machine-readable list exists and config.toml would expose the same keys. The parser,
   `parseKimiProviderList` in [`sources.mjs`](../../scripts/catalog-probe/sources.mjs), copies
   model fields only. Redact both keys in any saved evidence.
 - Keep rows whose `provider` is `managed:kimi-code`, in the enumeration's order. The id and
@@ -42,6 +45,8 @@ npm run catalog:probe -- --providers kimi
 ## Sign-in check
 
 `npm run catalog:logins -- --providers kimi` never launches kimi, whose 160 MB single executable
-takes seconds per start. A refresh token in `<KIMI_CODE_HOME>/credentials/*.json`, an `api_key` in
-config.toml, a set `api_key_env` variable or `KIMI_MODEL_API_KEY` counts as signed in; a
-credential file proves a sign-in, not a plan.
+takes seconds per start, and Kimi 2.5.3 has no status command. A non-empty
+`<KIMI_CODE_HOME>/credentials/*.json` or a set `KIMI_MODEL_API_KEY` counts as signed in. Only
+presence is checked: the credential files, and config.toml, which can hold the API keys of
+providers a user added, are never opened (ADR-038; owner decision 2026-11-16). A credential file
+proves a sign-in, not a plan.

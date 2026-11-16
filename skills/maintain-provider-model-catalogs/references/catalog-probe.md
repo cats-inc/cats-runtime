@@ -67,12 +67,21 @@ node skills/maintain-provider-model-catalogs/scripts/cli-login-status.mjs --json
 `npm run` prints its own banner first, so pipe JSON from the `node` form or add `--silent`.
 
 It prints one line per CLI with one of five states: `ready, verified online` (an account-scoped
-read reached the server), `ready, local credentials` (a status command or credential file shows a
-sign-in, but no server was asked, so a revoked sign-in shows up only on first use), `signed out or
-expired`, `not installed` and `unknown` (with the first output line). Exit codes: `0` no sign-in
+read reached the server), `ready, local credentials` (a status command or a present credential
+file shows a sign-in, but no server was asked, so a revoked sign-in shows up only on first use),
+`signed out or expired`, `not installed` and `unknown` (with the first output line, or why the
+sign-in cannot be told). Exit codes: `0` no sign-in
 needed, `2` at least one CLI is signed out or expired, `1` the tool failed. Every check runs at
 once from one empty temporary directory, with the probe's cleaned environment and `--timeout`
-(default 60 s), and no check logs in, sends a prompt, opens a session or shows a credential.
+(default 60 s), and no check logs in, sends a prompt, opens a session or opens a credential.
+
+No check opens a CLI's credential file, or a config file that can hold keys, or uses the value of
+a key variable, because Cats never reads CLI credentials
+([ADR-038](../../../docs/decisions/038-separate-execution-usage-from-provider-account-quota.md)).
+By the owner's 2026-11-16 decision, whether a credential file exists or a key variable is set may
+count; where only a file's content would show the sign-in, the CLI is reported as `unknown`. The
+same review kept the Muse account cache and Kimi's `kimi provider list --json` output as sources;
+see [Muse](./providers/muse.md) and [Kimi Code](./providers/kimi.md).
 
 | CLI | Check | Reaches the server |
 |---|---|---|
@@ -84,13 +93,14 @@ once from one empty temporary directory, with the probe's cleaned environment an
 | codex, kiro, cursor, devin | `codex login status`, `kiro-cli whoami`, `cursor-agent status`, `devin auth status` | no |
 | claude | `claude auth status` JSON `loggedIn` | no |
 | opencode, kilo | `auth list` names the scope's channel credential (OpenCode Go, Kilo Gateway) | no |
-| pi, goose, cline | a refresh token in the `openai-codex`, `chatgpt_codex` or `cline-pass` credential file; never launched | no |
-| junie | DPAPI credential files are present (Windows only); never launched because of the Defender block in [Junie](./providers/junie.md) | no |
+| junie | DPAPI credential files are present (Windows only) or `JUNIE_API_KEY` is set; never launched because of the Defender block in [Junie](./providers/junie.md) | no |
+| kimi | a non-empty `<KIMI_CODE_HOME>/credentials/*.json` is present or `KIMI_MODEL_API_KEY` is set; never launched, because each start of the 160 MB executable takes seconds | no |
+| goose | `chatgpt_codex/tokens.json` is present; never launched | no |
+| pi, cline | `unknown` while `~/.pi/agent/auth.json` or `~/.cline/data/settings/providers.json` is present, because each holds every provider and only its content shows the `openai-codex` or `cline-pass` sign-in; `signed out` when it is absent. Never launched; Cline's informational flags have started npm updates | no |
 
-Access-token expiry times in credential files are not read, because the CLIs renew them with the
-stored refresh token: on 2026-10-19 Grok's had passed six days earlier, and the first
-`grok models` call said "not authenticated" while the next one was signed in. Verified on native
-Windows 11 on 2026-10-19 with all sixteen signed in; the signed-out branches are covered only by
+A CLI can renew an expired access token on first use: on 2026-10-19 Grok's had expired six days
+earlier, and the first `grok models` call said "not authenticated" while the next one was signed
+in. Verified on native Windows 11 on 2026-10-19 with all sixteen signed in; the signed-out branches are covered only by
 synthetic tests in `tests/cli-login-status.node-test.mjs`, so an unfamiliar signed-out message is
 reported as `unknown` with its first line, never as ready. OpenCode and Kilo are matched by the
 channel's display name in `auth list`; if an update renames it, the check reports `signed out`

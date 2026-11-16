@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 // Answers one question per catalog CLI: can it be used right now, or does it need a sign-in?
-// Read-only: it never logs in, sends a prompt, opens a session or prints a credential. Where a CLI
-// has an account-scoped read (a model list), the check reaches its server; otherwise it runs the
-// CLI's own status command or only checks that its credential file holds a refresh token.
-// Cline, Junie, Pi, Kimi and Goose are never launched.
+// Read-only: it never logs in, sends a prompt, opens a session, opens a credential file or reads a
+// key's value (ADR-038). Where a CLI has an account-scoped read (a model list), the check reaches
+// its server; otherwise it runs the CLI's own status command. Junie, Pi, Kimi, Goose and Cline are
+// never launched: their checks see only whether a credential file exists or a key variable is set.
 
 import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
@@ -45,7 +45,6 @@ function parseJson(text) {
   }
 }
 
-const hasText = (value) => typeof value === 'string' && value.length > 0;
 const loggedIn = (text) => /logged in/i.test(text) && !/not logged in/i.test(text);
 
 /** The real environment. Tests pass their own object with the same members. */
@@ -115,9 +114,36 @@ function judge(ctx, result, ok, state = 'local') {
 
 const failed = (result) => result.missing || result.timedOut || result.error || result.exitCode !== 0;
 
-/** Checks that only read a credential file still report a CLI that is not installed. */
+/**
+ * Junie, Pi, Kimi, Goose and Cline are never launched, and only their credential files or a key
+ * variable show a sign-in. Cats never opens a CLI credential or reads a key's value (ADR-038). By
+ * the owner's 2026-11-16 decision a check may still see whether a credential file exists or a key
+ * variable is set; where only the content would tell, the CLI is unknown.
+ */
 function ifInstalled(ctx, name, extraDirs, check) {
   return ctx.find(name, extraDirs) ? check() : ['not-installed', ''];
+}
+
+const isSet = (value) => typeof value === 'string' && value.length > 0;
+
+/** Whether a non-empty file exists, from the directory listing; the file is never opened. */
+function hasFile(ctx, dir, name) {
+  return ctx.listFiles(dir).some((file) => file.name === name && file.size > 0);
+}
+
+/**
+ * Kimi Code keeps each OAuth sign-in in `<KIMI_CODE_HOME>/credentials/<name>.json`, and logout
+ * deletes it; `credentials/mcp/` holds MCP server sign-ins, not the CLI's. KIMI_MODEL_API_KEY is
+ * the one shell variable Kimi reads directly (environment-bootstrap 4108ac8). config.toml, which
+ * can hold API keys of providers a user added, is never opened; those are outside the catalog.
+ */
+function kimiSignIn(ctx) {
+  if (isSet(ctx.env.KIMI_MODEL_API_KEY)) return ['local', 'KIMI_MODEL_API_KEY is set'];
+  const kimiHome = ctx.env.KIMI_CODE_HOME || join(ctx.home, '.kimi-code');
+  const files = ctx.listFiles(join(kimiHome, 'credentials')).filter((file) => file.name.endsWith('.json') && file.size > 0);
+  return files.length > 0
+    ? ['local', `credentials/${files[0].name} is present`]
+    : ['signed-out', 'no Kimi Code OAuth credential file (run kimi login)'];
 }
 
 // The versioned binary named by .muse-version, never the self-updating launcher.
@@ -134,31 +160,6 @@ function museBinary(ctx) {
     if (binary) return join(dir, binary);
   }
   return null;
-}
-
-/**
- * Kimi Code keeps each OAuth sign-in in `<KIMI_CODE_HOME>/credentials/<name>.json` (logout deletes
- * it; `credentials/mcp/` holds MCP server sign-ins, not the CLI's). An Open Platform API key lives
- * in config.toml as `api_key = "..."` or `api_key_env = "<VAR>"`. KIMI_MODEL_API_KEY is the one
- * shell variable Kimi reads directly (environment-bootstrap 4108ac8).
- */
-function kimiCredential(ctx) {
-  if (hasText(ctx.env.KIMI_MODEL_API_KEY)) return ['local', 'KIMI_MODEL_API_KEY is set'];
-  const kimiHome = ctx.env.KIMI_CODE_HOME || join(ctx.home, '.kimi-code');
-  const credentialsDir = join(kimiHome, 'credentials');
-  const signedIn = ctx.listFiles(credentialsDir)
-    .filter((file) => file.name.endsWith('.json'))
-    .filter((file) => hasText(parseJson(ctx.readText(join(credentialsDir, file.name)))?.refresh_token));
-  if (signedIn.length > 0) return ['local', `credentials/${signedIn[0].name} holds a refresh token`];
-  const config = ctx.readText(join(kimiHome, 'config.toml')) ?? '';
-  if (/^\s*[a-z_]*api_key\s*=\s*["'][^"']+/im.test(config)) return ['local', 'config.toml holds a provider API key'];
-  const variable = /^\s*api_key_env\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']/im.exec(config)?.[1];
-  if (variable) {
-    return hasText(ctx.env[variable])
-      ? ['local', `config.toml api_key_env names ${variable}, which is set`]
-      : ['unknown', `config.toml api_key_env names ${variable}, which this shell does not set`];
-  }
-  return ['signed-out', 'no OAuth credential and no config.toml API key (run kimi login)'];
 }
 
 /** Catalog CLIs in the skill's order, keyed by their probe provider names. */
@@ -231,12 +232,12 @@ export const CHECKS = [
     },
   },
   {
-    // Defender has blocked an agent-launched Junie while it reads these, so only check presence.
+    // Never executed: Defender has blocked an agent-launched Junie.
     provider: 'junie',
-    method: 'DPAPI credential files (Windows), never launched',
+    method: 'DPAPI credential files are present (Windows), never opened or launched',
     check: async (ctx) => ifInstalled(ctx, 'junie', [join(ctx.home, '.local', 'bin')], () => {
-      // The token variable named in src/core/provider-install/knowledge.ts.
-      if (hasText(ctx.env.JUNIE_API_KEY)) return ['local', 'JUNIE_API_KEY is set'];
+      // The token variable named in src/core/provider-install/knowledge.ts; only whether it is set.
+      if (isSet(ctx.env.JUNIE_API_KEY)) return ['local', 'JUNIE_API_KEY is set'];
       if (ctx.platform !== 'win32') return ['unknown', 'Junie credential storage is known only on Windows'];
       const files = ctx.listFiles(join(ctx.home, '.junie', 'dpapi_credentials')).filter((file) => file.name.endsWith('.dpapi') && file.size > 0);
       return files.length > 0
@@ -282,35 +283,32 @@ export const CHECKS = [
     },
   },
   {
+    // auth.json holds every Pi provider, so only its content would show the openai-codex sign-in.
     provider: 'pi',
-    method: '`~/.pi/agent/auth.json` openai-codex refresh token, never launched',
-    check: async (ctx) => ifInstalled(ctx, 'pi', [], () => {
-      const auth = parseJson(ctx.readText(join(ctx.home, '.pi', 'agent', 'auth.json')))?.['openai-codex'];
-      return hasText(auth?.refresh)
-        ? ['local', 'auth.json holds an openai-codex refresh token']
-        : ['signed-out', 'auth.json has no openai-codex sign-in (/login in pi)'];
-    }),
+    method: '`~/.pi/agent/auth.json` is present, never opened or launched',
+    check: async (ctx) => ifInstalled(ctx, 'pi', [], () => (hasFile(ctx, join(ctx.home, '.pi', 'agent'), 'auth.json')
+      ? ['unknown', 'auth.json is present; only its content, which Cats never reads, shows an openai-codex sign-in']
+      : ['signed-out', 'no auth.json (/login in pi)'])),
   },
   {
     // Never executed: each launch of the 160 MB binary takes seconds and can apply a staged update.
     provider: 'kimi',
-    method: '`<KIMI_CODE_HOME>/credentials/*.json` refresh token or a config.toml API key, never launched',
+    method: 'a `<KIMI_CODE_HOME>/credentials/*.json` file is present or KIMI_MODEL_API_KEY is set, never opened or launched',
     check: async (ctx) => {
       const installDir = ctx.env.KIMI_INSTALL_DIR || join(ctx.home, '.kimi-code');
-      return ifInstalled(ctx, 'kimi', [join(installDir, 'bin')], () => kimiCredential(ctx));
+      return ifInstalled(ctx, 'kimi', [join(installDir, 'bin')], () => kimiSignIn(ctx));
     },
   },
   {
     provider: 'goose',
-    method: '`chatgpt_codex/tokens.json` refresh token, never launched',
+    method: '`chatgpt_codex/tokens.json` is present, never opened or launched',
     check: async (ctx) => ifInstalled(ctx, 'goose', [join(ctx.home, '.local', 'bin')], () => {
       const configDir = ctx.platform === 'win32'
         ? join(ctx.env.APPDATA ?? join(ctx.home, 'AppData', 'Roaming'), 'Block', 'goose', 'config')
         : join(ctx.home, '.config', 'goose');
-      const tokens = parseJson(ctx.readText(join(configDir, 'chatgpt_codex', 'tokens.json')));
-      return hasText(tokens?.refresh_token)
-        ? ['local', 'chatgpt_codex/tokens.json holds a refresh token']
-        : ['signed-out', 'no chatgpt_codex token (sign in again with goose configure)'];
+      return hasFile(ctx, join(configDir, 'chatgpt_codex'), 'tokens.json')
+        ? ['local', 'chatgpt_codex/tokens.json is present']
+        : ['signed-out', 'no chatgpt_codex token file (sign in again with goose configure)'];
     }),
   },
   {
@@ -338,15 +336,13 @@ export const CHECKS = [
     check: async (ctx) => channelCredential(ctx, 'kilo', 'Kilo Gateway'),
   },
   {
-    // Never executed: Cline's informational flags have started npm updates.
+    // Never executed: Cline's informational flags have started npm updates. providers.json holds
+    // every Cline provider, so only its content would show the cline-pass sign-in.
     provider: 'cline',
-    method: '`~/.cline/data/settings/providers.json` cline-pass refresh token, never launched',
-    check: async (ctx) => ifInstalled(ctx, 'cline', [], () => {
-      const pass = parseJson(ctx.readText(join(ctx.home, '.cline', 'data', 'settings', 'providers.json')))?.providers?.['cline-pass'];
-      return hasText(pass?.settings?.auth?.refreshToken)
-        ? ['local', 'providers.json holds a cline-pass refresh token']
-        : ['signed-out', 'providers.json has no cline-pass sign-in (cline auth)'];
-    }),
+    method: '`~/.cline/data/settings/providers.json` is present, never opened or launched',
+    check: async (ctx) => ifInstalled(ctx, 'cline', [], () => (hasFile(ctx, join(ctx.home, '.cline', 'data', 'settings'), 'providers.json')
+      ? ['unknown', 'providers.json is present; only its content, which Cats never reads, shows a cline-pass sign-in']
+      : ['signed-out', 'no providers.json (cline auth)'])),
   },
 ];
 
@@ -396,7 +392,7 @@ export function renderStatus(results) {
     ...results.map((result) => `  ${result.provider.padEnd(nameWidth)}${STATES[result.state].padEnd(stateWidth)}${result.detail}`.trimEnd()),
     '',
     `"${STATES.verified}": an account-scoped read reached the server just now.`,
-    `"${STATES.local}": a status command or credential file shows a sign-in, but no server was asked;`,
+    `"${STATES.local}": a status command or a present credential file shows a sign-in, but no server was asked;`,
     '  a revoked sign-in shows up only on first use.',
   ].join('\n');
 }
@@ -410,7 +406,8 @@ function usage() {
     '',
     'Reports for each catalog CLI whether it can be used now: ready (verified online or from local',
     'credentials), signed out or expired, not installed, or unknown. It never logs in, sends a prompt',
-    'or prints a credential; Cline, Junie, Pi and Goose are only checked through their credential files.',
+    'or opens a credential; Junie, Pi, Kimi, Goose and Cline are checked only by whether a credential',
+    'file exists or a key variable is set.',
     `--timeout bounds each CLI (default ${DEFAULT_TIMEOUT_MS} ms). --json prints the results as JSON.`,
     'Exit codes: 0 nothing needs a sign-in, 2 at least one CLI is signed out or expired, 1 the tool failed.',
   ].join('\n');
