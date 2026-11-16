@@ -269,20 +269,38 @@ describe('kill waits for the worker process to stop (its working folder is busy 
 
   it('settles only once the process has stopped', async () => {
     const { pool, worker, stop } = running();
+    const listeners = worker.listenerCount('process-stopped');
     worker.kill = vi.fn(() => { setTimeout(stop, 20); });
     let settled = false;
     const killed = pool.kill('session-1').then((stopped) => { settled = true; return stopped; });
+    expect(worker.listenerCount('process-stopped')).toBe(listeners + 1);
     await new Promise((resolve) => setTimeout(resolve, 5));
     expect(worker.kill).toHaveBeenCalledOnce();
     expect(settled).toBe(false);
     await expect(killed).resolves.toBe(true);
-    expect(worker.listenerCount('process-stopped')).toBeLessThanOrEqual(1);
+    expect(worker.listenerCount('process-stopped')).toBe(listeners);
   });
 
-  it('gives up after the bound without rejecting, and settles at once with nothing running', async () => {
+  it('kills again but shares one wait when a worker is already being stopped', async () => {
+    const { pool, worker, stop } = running();
+    const listeners = worker.listenerCount('process-stopped');
+    worker.kill = vi.fn();
+    const first = pool.kill('session-1');
+    const second = pool.kill('session-1');
+    expect(second).toBe(first);
+    expect(worker.kill).toHaveBeenCalledTimes(2);
+    expect(worker.listenerCount('process-stopped')).toBe(listeners + 1);
+    stop();
+    await expect(first).resolves.toBe(true);
+    expect(worker.listenerCount('process-stopped')).toBe(listeners);
+  });
+
+  it('gives up after the bound without rejecting or leaving a listener, and settles at once with nothing running', async () => {
     const { pool, worker } = running();
+    const listeners = worker.listenerCount('process-stopped');
     worker.kill = vi.fn();
     await expect(pool.kill('session-1', 20)).resolves.toBe(false);
+    expect(worker.listenerCount('process-stopped')).toBe(listeners);
     await expect(pool.kill('no-such-session')).resolves.toBe(true);
     (worker as unknown as { ownedGenerations: Set<number> }).ownedGenerations.clear();
     await expect(pool.kill('session-1', 60_000)).resolves.toBe(true);

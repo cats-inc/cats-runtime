@@ -88,6 +88,23 @@ describe('sessionWorkspace', () => {
     },
   );
 
+  it('removes a sandbox with what a session wrote in it', async () => {
+    const { repoDir, sessionBaseDir } = createGitWorkspace();
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'sandbox-cleanup', sessionBaseDir, cwd: repoDir,
+      workspaceKind: 'sandbox', workspaceAccess: 'read_only', permissionMode: 'skip',
+    });
+    mkdirSync(join(prepared.cwd, 'nested'), { recursive: true });
+    writeFileSync(join(prepared.cwd, 'nested', 'left-by-the-cli.txt'), 'x', 'utf8');
+    const cleanup = await cleanupSessionWorkspace({
+      sessionId: 'sandbox-cleanup', sessionBaseDir, workspace: prepared.workspace,
+    });
+    expect(cleanup).toEqual(expect.objectContaining({
+      status: 'completed', workspaceCleaned: true, reasonCodes: ['sandbox_workspace_removed'],
+    }));
+    expect(existsSync(prepared.cwd)).toBe(false);
+  });
+
   it('prepares a deterministic worktree-backed runtime cwd', async () => {
     const { repoDir, sessionBaseDir } = createGitWorkspace();
     const sourceCwd = join(repoDir, 'subdir');

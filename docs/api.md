@@ -3886,13 +3886,23 @@ follow-up fetch.
 so hosts can record additive pre-maintenance trigger context even when the
 operation is only a soft close.
 
-Closing a CLI session, by `POST /sessions/{id}/close` or by the close a delete
-performs first, returns once the provider process has stopped, waiting at most
-about 6 seconds (the worker forces the kill after 5). Until a process has exited,
-Windows keeps its working folder in use, so a delete that follows can now remove
-a sandbox. Sandbox removal itself retries the transient Windows errors. A sandbox
-that still cannot be removed is logged with its path; the delete still answers
-`deleted`.
+Closing a CLI session returns once the provider process the Runtime started for
+it has stopped, waiting at most 6 seconds. This applies to
+`POST /sessions/{id}/close`, `POST /sessions/{id}/reset`, the close that
+`DELETE /sessions/{id}` performs for an active session, and the stop of fenced
+managed-plugin runs. While it waits, close and reset report the session as
+`closing`, so a concurrent delete answers 409. On Windows a process keeps its
+working folder in use until it has exited, so the wait lets a delete that follows
+remove a sandbox.
+
+Sandbox removal retries transient Windows errors for about 5 seconds. When it
+still fails, the delete answers `deleted` with `workspaceCleaned: false` and the
+Runtime logs the path. These processes can still outlive the wait:
+
+- a CLI launched through a `.cmd` shim that ignores its closed input: the
+  Runtime kills `cmd.exe`, not the CLI it started;
+- processes a provider adapter starts per turn itself;
+- a process still exiting when a delete finds the session no longer active.
 
 `POST /sessions/{id}/workspace/cleanup` is a bounded retained-worktree recovery
 primitive for closed worktree-backed sessions whose most recent cleanup attempt
