@@ -9,7 +9,7 @@
 | Reviewer | User |
 | Decision | [ADR-056](../decisions/056-offer-one-basis-selector-over-captured-catalog-bases.md) |
 | Amends | [SPEC-031](./SPEC-031-provider-catalog-data-and-local-overrides.md) FR-2.4, FR-4, FR-8, FR-9; [SPEC-028](./SPEC-028-provider-model-catalog-maintenance-skill.md) basis amendment |
-| Plan | To be written after approval |
+| Plan | [PLAN-054](../plans/PLAN-054-catalog-bases.md) |
 
 ## Summary and goals
 
