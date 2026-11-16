@@ -24,6 +24,7 @@ import type {
   WorkspaceIsolationMode,
   WorkspaceMode,
 } from '../types.js';
+import { removeRuntimeTempEntry } from '../runtimeTempDirs.js';
 import {
   deriveWorkspaceIsolationMode,
   resolveLegacyWorkspaceRequest,
@@ -230,27 +231,16 @@ export async function cleanupSessionWorkspace(
   }
 
   if (workspace?.kind === 'sandbox') {
-    const sandboxDir = join(input.sessionBaseDir, input.sessionId);
-    try {
-      await rm(sandboxDir, { recursive: true, force: true });
-      return {
-        status: 'completed',
-        workspaceCleaned: true,
-        worktreeDetached: false,
-        mergedPathCount: 0,
-        reasonCodes: ['sandbox_workspace_removed'],
-        nextWorkspaceIsolation: undefined,
-      };
-    } catch {
-      return {
-        status: 'retained',
-        workspaceCleaned: false,
-        worktreeDetached: false,
-        mergedPathCount: 0,
-        reasonCodes: ['sandbox_workspace_cleanup_failed'],
-        nextWorkspaceIsolation: undefined,
-      };
-    }
+    // Retried: on Windows a provider CLI that just exited can hold the folder for a moment.
+    const removed = await removeRuntimeTempEntry(join(input.sessionBaseDir, input.sessionId));
+    return {
+      status: removed ? 'completed' : 'retained',
+      workspaceCleaned: removed,
+      worktreeDetached: false,
+      mergedPathCount: 0,
+      reasonCodes: [removed ? 'sandbox_workspace_removed' : 'sandbox_workspace_cleanup_failed'],
+      nextWorkspaceIsolation: undefined,
+    };
   }
 
   return {

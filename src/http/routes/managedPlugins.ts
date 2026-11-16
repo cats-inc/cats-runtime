@@ -16,11 +16,9 @@ export async function stopFencedPluginRuns(ctx: AppContext): Promise<void> {
   const observation = observeManagedPlugin(ctx.config.sessionBaseDir);
   if (!observation.stopAuthorized) return;
   const runtime = getRuntimeSessionManager(ctx);
-  for (const run of observation.pendingRuns) {
-    if (run.orphaned) continue;
-    const session = ctx.registry.get(run.sessionId);
-    if (session) await runtime.close(session);
-  }
+  // A close waits for its process to stop, so the fenced runs are stopped together, not one after another.
+  const sessions = observation.pendingRuns.filter(run => !run.orphaned).map(run => ctx.registry.get(run.sessionId));
+  await Promise.all(sessions.map(session => session ? runtime.close(session) : undefined));
 }
 managedPluginRoutes.use('/plugins/*', async (c, next) => {
   const ctx = c.get('ctx') as AppContext;

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -251,6 +251,81 @@ describe('WorkerPool', () => {
   });
 });
 
+
+describe('kill waits for the worker process to stop (its working folder is busy until then on Windows)', () => {
+  function running() {
+    const cwd = path.join(tmpdir(), 'cats-runtime-workerpool-kill');
+    const config = loadConfig({ HOME: cwd, USERPROFILE: '' }, { providerYaml: 'providers: { grok: { instances: { native: {} } } }' });
+    const registry = new SessionRegistry(undefined, undefined, config.providerDefaultInstances, config.providerDefaultTargets);
+    const pool = new WorkerPool(config, registry, {} as never, {} as never, {} as never, {} as never,
+      { getCachedAssessment: () => undefined } as never);
+    const worker = pool.spawn('session-1', 'grok', { cwd });
+    // A pure worker-state fixture: a provider process counts as running until the stub stops it.
+    const owned = (worker as unknown as { ownedGenerations: Set<number> }).ownedGenerations;
+    owned.add(1);
+    const stop = () => { owned.delete(1); worker.emit('process-stopped'); };
+    return { pool, worker, stop };
+  }
+
+  it('settles only once the process has stopped', async () => {
+    const { pool, worker, stop } = running();
+    const listeners = worker.listenerCount('process-stopped');
+    worker.kill = vi.fn(() => { setTimeout(stop, 20); });
+    let settled = false;
+    const killed = pool.kill('session-1').then((stopped) => { settled = true; return stopped; });
+    expect(worker.listenerCount('process-stopped')).toBe(listeners + 1);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(worker.kill).toHaveBeenCalledOnce();
+    expect(settled).toBe(false);
+    await expect(killed).resolves.toBe(true);
+    expect(worker.listenerCount('process-stopped')).toBe(listeners);
+  });
+
+  it('kills again but shares one wait when a worker is already being stopped', async () => {
+    const { pool, worker, stop } = running();
+    const listeners = worker.listenerCount('process-stopped');
+    worker.kill = vi.fn();
+    const first = pool.kill('session-1');
+    const second = pool.kill('session-1');
+    expect(worker.kill).toHaveBeenCalledTimes(2);
+    expect(worker.listenerCount('process-stopped')).toBe(listeners + 1);
+    stop();
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+    expect(worker.listenerCount('process-stopped')).toBe(listeners);
+  });
+
+  it('lets a later caller wait out its own deadline after a shorter shared wait ends', async () => {
+    const { pool, worker, stop } = running();
+    const listeners = worker.listenerCount('process-stopped');
+    worker.kill = vi.fn();
+    const short = pool.kill('session-1', 20);
+    const long = pool.kill('session-1', 60_000);
+    await expect(short).resolves.toBe(false);
+    expect(worker.listenerCount('process-stopped')).toBe(listeners + 1);
+    stop();
+    await expect(long).resolves.toBe(true);
+    expect(worker.listenerCount('process-stopped')).toBe(listeners);
+  });
+
+  it('gives up after the bound without rejecting or leaving a listener, and settles at once with nothing running', async () => {
+    const { pool, worker } = running();
+    const listeners = worker.listenerCount('process-stopped');
+    worker.kill = vi.fn();
+    await expect(pool.kill('session-1', 20)).resolves.toBe(false);
+    expect(worker.listenerCount('process-stopped')).toBe(listeners);
+    await expect(pool.kill('no-such-session')).resolves.toBe(true);
+    (worker as unknown as { ownedGenerations: Set<number> }).ownedGenerations.clear();
+    await expect(pool.kill('session-1', 60_000)).resolves.toBe(true);
+  });
+
+  it('still throws a failure to kill to its caller, and leaves no listener behind', () => {
+    const { pool, worker } = running();
+    const before = worker.listenerCount('process-stopped');
+    worker.kill = vi.fn(() => { throw new Error('kill failed'); });
+    expect(() => pool.kill('session-1')).toThrow('kill failed');
+    expect(worker.listenerCount('process-stopped')).toBe(before);
+  });
+});
 
 describe('standing grant holders (ADR-055)', () => {
   it('lists only sessions that hold an unexpired grant, and forgets removed sessions', () => {

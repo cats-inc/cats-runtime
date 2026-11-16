@@ -53,6 +53,12 @@ interface ProviderServiceResolvers {
   getOpencodeNative?: (instanceId?: string) => OpencodeNativeSessionService;
 }
 
+/**
+ * How long `kill` waits for a worker's process to stop: past the 5 s after which WorkerProcess
+ * follows SIGTERM with SIGKILL (both end the process at once on Windows).
+ */
+export const WORKER_STOP_WAIT_MS = 6000;
+
 /** All `maxSessions` worker slots are taken, including idle chat workers; distinct from a held singleton. */
 export class PoolCapacityError extends Error {
   constructor() { super('Max sessions reached'); this.name = 'PoolCapacityError'; }
@@ -71,6 +77,8 @@ export class WorkerPool {
   private readonly sessionMcpConnections = new Map<string, Map<string, string>>();
 
   private workers = new Map<string, WorkerProcess>();
+  /** Workers `kill` is waiting on, so a repeated kill shares that wait instead of adding another. */
+  private readonly stopping = new Map<WorkerProcess, Promise<boolean>>();
   /** ADR-055: owner grants per Runtime session, memory-only, kept across that session's workers. */
   private readonly standingGrants = new Map<string, StandingGrants>();
   private externalExecutions = new Map<string, { provider: string; cancel: () => void }>();
@@ -535,11 +543,50 @@ export class WorkerPool {
     }
   }
 
-  kill(sessionId: string): void {
+  /**
+   * Kills a session's worker. The returned promise settles once its process has stopped (true), or
+   * after `timeoutMs` (false); it never rejects, and a failure to kill still throws here. Until a
+   * Windows process has exited it holds its working folder, so a caller about to remove that folder
+   * (a sandbox on delete) awaits this. Killing a worker already being stopped kills it again and
+   * joins the wait in progress, so repeated closes add no listeners; a caller whose own deadline
+   * is later then waits out the rest of it.
+   */
+  kill(sessionId: string, timeoutMs = WORKER_STOP_WAIT_MS): Promise<boolean> {
     const worker = this.workers.get(sessionId);
-    if (worker) {
-      worker.kill();
-    }
+    if (!worker) return Promise.resolve(true);
+    // 'process-stopped' is never emitted from within kill(); the wait reads processRunning first anyway.
+    worker.kill();
+    return this.waitForStop(worker, timeoutMs);
+  }
+
+  /**
+   * Settles true once the worker's process has stopped, or false after `timeoutMs`. One wait per
+   * worker at a time: a second caller joins it, and waits on alone if its own deadline is later.
+   */
+  private waitForStop(worker: WorkerProcess, timeoutMs: number): Promise<boolean> {
+    if (!worker.processRunning) return Promise.resolve(true);
+    if (timeoutMs <= 0) return Promise.resolve(false);
+    const deadline = Date.now() + timeoutMs;
+    const pending = this.stopping.get(worker);
+    // The pending wait's own cleanup was registered first, so it has left the map when this runs.
+    if (pending) return pending.then(stopped => stopped || this.waitForStop(worker, deadline - Date.now()));
+    const stopped = new Promise<boolean>(resolve => {
+      const check = () => {
+        if (worker.processRunning) return;
+        clearTimeout(timer);
+        worker.removeListener('process-stopped', check);
+        resolve(true);
+      };
+      const timer = setTimeout(() => {
+        worker.removeListener('process-stopped', check);
+        resolve(false);
+      }, timeoutMs);
+      timer.unref?.();
+      worker.on('process-stopped', check);
+    });
+    this.stopping.set(worker, stopped);
+    void stopped.then(() => { if (this.stopping.get(worker) === stopped) this.stopping.delete(worker); });
+    return stopped;
   }
 
   killAll(): void {
@@ -550,7 +597,7 @@ export class WorkerPool {
   }
 
   /** Keep Runtime alive until native close callbacks persist their lifetime receipts. */
-  async killAllAndWait(timeoutMs = 6000): Promise<boolean> {
+  async killAllAndWait(timeoutMs = WORKER_STOP_WAIT_MS): Promise<boolean> {
     this.closing = true;
     const workers = [...this.workers.values()].filter(worker => worker.processRunning);
     if (!workers.length) { this.killAll(); return true; }

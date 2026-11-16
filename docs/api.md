@@ -3886,6 +3886,27 @@ follow-up fetch.
 so hosts can record additive pre-maintenance trigger context even when the
 operation is only a soft close.
 
+Closing a CLI session returns once the provider process the Runtime started for
+it has stopped, waiting at most 6 seconds. This applies to
+`POST /sessions/{id}/close`, `POST /sessions/{id}/reset`, the close that
+`DELETE /sessions/{id}` performs for an active session, and the stop of fenced
+managed-plugin runs. While it waits, close and reset report the session as
+`closing`, so a concurrent delete answers 409. On Windows a process keeps its
+working folder in use until it has exited, so the wait lets a delete that follows
+remove a sandbox.
+
+Sandbox removal retries transient Windows errors for about 5 seconds. When it
+still fails, the delete answers `deleted` with `workspaceCleaned: false` and the
+Runtime logs the path. These processes can still outlive the wait:
+
+- a CLI launched through a `.cmd` shim that ignores its closed input: the
+  Runtime kills `cmd.exe`, not the CLI it started;
+- on Windows, processes a CLI that is not a Node program started itself (a
+  shell tool, for example): they survive the CLI, whose exit ends the wait;
+- processes a provider adapter starts per turn itself;
+- a process still exiting when a close or delete finds the session no longer
+  active: neither waits then.
+
 `POST /sessions/{id}/workspace/cleanup` is a bounded retained-worktree recovery
 primitive for closed worktree-backed sessions whose most recent cleanup attempt
 ended with `status: "retained"`. It accepts the same optional `maintenance`
