@@ -206,6 +206,25 @@ const guardSessionDeletion = createMiddleware<SessionRouteEnv>(async (c, next) =
   }
 });
 
+/**
+ * A session that is no longer active can still have a CLI process exiting: one whose stop outlasted
+ * its wait, or the process of a turn. Until it has exited, Windows keeps the working folder in use,
+ * so this waits for it, at most 6 seconds, before a folder is removed. Meanwhile the session reads
+ * as closing, so a concurrent delete answers 409; its status is restored afterwards. A call that
+ * overlaps another finds it closing already and leaves the restore to that one.
+ */
+export async function waitForStoppingProcess(ctx: AppContext, id: string): Promise<void> {
+  const runtime = getRuntimeSessionManager(ctx);
+  if (!runtime.isProcessRunning(id)) return;
+  const status = ctx.registry.get(id)?.status;
+  ctx.registry.updateStatus(id, 'closing');
+  try {
+    await runtime.waitForProcessStop(id);
+  } finally {
+    if (status && status !== 'closing') ctx.registry.updateStatus(id, status);
+  }
+}
+
 function assertCurrentDeletionSession(ctx: AppContext, session: SessionInfo): void {
   if (ctx.registry.get(session.id) !== session) {
     throw new SessionDeletionConflict('session_delete_conflict', 'Session registry changed during deletion; refresh session state before retrying');
@@ -3597,6 +3616,7 @@ sessionRoutes.post('/sessions/:id/close', async (c) => {
 
   const worker = runtime.get(id);
   if (!worker?.active) {
+    await waitForStoppingProcess(ctx, id);
     ctx.registry.updateStatus(id, 'closed');
     runtime.markClosed(id);
     recordSessionLifecycle(ctx, id, {
@@ -3726,6 +3746,8 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
     ctx.registry.updateStatus(id, 'closing');
     await runtime.close(session, 'reset');
     workerDetached = !runtime.isAttached(id);
+  } else {
+    await waitForStoppingProcess(ctx, id);
   }
 
   ctx.registry.updateStatus(id, 'closed');
@@ -3885,6 +3907,7 @@ sessionRoutes.post('/sessions/:id/workspace/cleanup', async (c) => {
     );
   }
 
+  await waitForStoppingProcess(ctx, id);
   let cleanupResult: Awaited<ReturnType<typeof executeRetainedWorktreeCleanup>>;
   try {
     cleanupResult = await executeRetainedWorktreeCleanup(ctx, session, {
@@ -4293,6 +4316,8 @@ sessionRoutes.delete('/sessions/:id', guardSessionDeletion, async (c) => {
     } catch (err) {
       return c.json({ error: `Failed to close session before delete: ${err}` }, 500);
     }
+  } else {
+    await waitForStoppingProcess(ctx, id);
   }
 
   if (session.workspaceIsolation?.mode === 'worktree') {

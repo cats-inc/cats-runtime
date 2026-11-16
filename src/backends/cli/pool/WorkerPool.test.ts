@@ -325,6 +325,20 @@ describe('kill waits for the worker process to stop (its working folder is busy 
     expect(() => pool.kill('session-1')).toThrow('kill failed');
     expect(worker.listenerCount('process-stopped')).toBe(before);
   });
+
+  it('waits for a worker no longer alive without killing it, and at once for a session it has no worker for', async () => {
+    const { pool, worker, stop } = running();
+    worker.kill = vi.fn();
+    Object.defineProperty(worker, 'alive', { value: false });
+    let settled = false;
+    const waited = pool.waitForStopped('session-1').then((stopped) => { settled = true; return stopped; });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(settled).toBe(false);
+    stop();
+    await expect(waited).resolves.toBe(true);
+    expect(worker.kill).not.toHaveBeenCalled();
+    await expect(pool.waitForStopped('no-such-session')).resolves.toBe(true);
+  });
 });
 
 describe('standing grant holders (ADR-055)', () => {

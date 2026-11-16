@@ -110,6 +110,7 @@ export class KimiProvider implements Provider {
       env,
       ...hiddenWindowsSpawnOptions(),
     });
+    opts.trackProcess?.(child);
 
     const parseState = createKimiParseState();
     const queue: StreamEvent[] = [];
