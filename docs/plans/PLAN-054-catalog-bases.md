@@ -203,6 +203,10 @@ only known fields, so `basisId` would be dropped on almost every path.
 - [ ] Add `basis: { region: { id: global, label: global (kimi.ai) } }` to the Kimi scope
       (SPEC-045 FR-9), regenerate the JSON and pin it in `tests/catalog-runtime.test.ts`.
 - [ ] Record the region in `references/providers/kimi.md`.
+- [ ] `POST /sessions` with an unknown `basisId` returns 400 with `code: catalog_basis_unknown`
+      (SPEC-045 FR-5). Document it in `docs/api.md` and add a test in
+      `tests/catalog-runtime.test.ts`. Desktop already maps the code; its read-back stays for
+      older Runtimes.
 - [ ] It must ship in the same Runtime release as Playground and Desktop region display, so it
       waits for Phases 2 and 3.
 

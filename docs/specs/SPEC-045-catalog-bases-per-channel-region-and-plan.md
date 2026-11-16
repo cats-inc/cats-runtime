@@ -112,6 +112,12 @@ Illustrative Kimi data, if a mainland capture differs:
 - Runtime only reports which basis is detected (FR-5, FR-6). Playground and Desktop use it when
   they initialise a new selection, and then send that `basisId` explicitly. Other callers, such as
   Bot, MCP and plain HTTP clients, get the first basis unless they send `basisId`.
+  - Desktop applies detection only in the picker. A default it creates without the picker, such
+    as a workspace execution target or a draft, starts on the first basis. (Owner decision
+    2026-11-16, made during Phase 3 implementation.)
+  - Desktop names the first basis by omitting `basisId`, even when that basis has an id, so
+    selections saved before and after the basis was named stay the same selection. (Owner
+    decision 2026-11-16, made during Phase 3 implementation.)
 - `entryId` and controls are validated within the resolved basis.
 - A plain model string, which SPEC-031 FR-4 resolves through the catalog, is looked up in the
   selection's basis when `basisId` is given. Otherwise the bases are searched in data order and the
@@ -138,6 +144,13 @@ Illustrative Kimi data, if a mainland capture differs:
   basis, because two bases may list the same id with different labels.
 - `catalogCapabilities` gains `catalogBases: true`. Desktop sends `basisId` only to a Runtime that
   advertises it.
+  - A selection with a `basisId` for a Runtime that does not advertise it becomes the saved-choice
+    attention. Desktop never strips the `basisId` to run the first basis, because a Runtime
+    without bases ignores it. When the capability read itself fails, Desktop sends the selection
+    as it is. (Owner decision 2026-11-16, made during Phase 3 implementation.)
+- `POST /sessions` with an unknown `basisId` answers 400 with `code: catalog_basis_unknown`, like
+  the advanced read. Until Phase 5 adds the code, Desktop reads that basis back to tell an unknown
+  basis from other 400s. (Owner decision 2026-11-16, made during Phase 3 implementation.)
 - The local read-only host projection carries the same fields.
 
 ## FR-6: Detecting the local sign-in
