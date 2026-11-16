@@ -3,7 +3,7 @@
 - [PLAN-054: Catalog bases per channel, region and plan](PLAN-054-catalog-bases.md)
   — implemented, 2026-11-16; SPEC-045 in five phases: Runtime contract, Runtime detection and
   Playground, Platform, maintenance skill, then the Kimi region data (#234, #235,
-  cats-platform#496, #236 and Phase 5). Scoped tests and a live Runtime, client and probe check
+  cats-platform#496, #236 and #243). Scoped tests and a live Runtime, client and probe check
   passed; the real Desktop UI was not run. Unpublished; the next Desktop release must pin a
   Runtime with Phases 1, 2 and 5.
 

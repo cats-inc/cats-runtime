@@ -222,7 +222,9 @@ in SPEC-045 FR-4 and FR-5 and Platform SPEC-013 "Catalog bases".
       finding. Its rows and `signIn` are in
       `docs/research/fixtures/kimi-2.5.3/model-list.probe.redacted.json`. Playground and Desktop
       showing the Kimi region with the real factory data were not run.
-- [ ] Sync the skill mirrors after merge (`Sync-WorkspaceSkills.ps1`) for the Kimi reference.
+- [x] Sync the skill mirrors after merge (`Sync-WorkspaceSkills.ps1`) for the Kimi reference.
+      Done on 2026-11-17 after #243; the repository's own mirror was refreshed with
+      `Sync-AgentSkills.ps1`.
 
 ## Out of scope
 
