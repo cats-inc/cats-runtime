@@ -109,6 +109,7 @@ describe('OpencodeNativeSessionService', () => {
         cwd: 'C:\\Users\\tester\\repo',
         env: { OPENCODE_DISABLE_AUTOUPDATE: 'true' },
         windowsVerbatimArguments: true,
+        windowsShellProxy: true,
       });
     } finally {
       if (platformDescriptor) {
