@@ -77,26 +77,48 @@ overrides and fixtures.
 
 ## Phase 2: Runtime detection, Playground and sign-in report (after Phase 1)
 
-- [ ] Detection: a per-provider detector that reads only CLI output or non-secret markers
+- [x] Detection: a per-provider detector that reads only CLI output or non-secret markers
       (ADR-038). Initial source: Kimi's `region` file in `KIMI_CODE_HOME`, matched against
       `basis.region.id`. It marks at most one `bases[].detected`. Test that detection still
       reports `global` when `credentials/` cannot be read (scenario 7).
-- [ ] Playground (`src/http/ui/shared.ts`, `pages/playground.html`):
-  - [ ] Fix `normalizeAdvancedCatalog`, which drops `basis` today, so the live page never shows
-        the information icon. Keep `basis`, `basisId`, `bases` and `capture`, and update the
-        pinned shape in `tests/ui-shared.test.ts`. The dashboard (`index.html`) shares the
-        normalizer.
-  - [ ] Key `PROVIDER_ADVANCED_CATALOGS` by provider and basis, and fetch with `basis`.
-  - [ ] A "List basis" select before the Model select, shown only for two or more bases. A new
-        agent starts on the detected basis, otherwise the first; there is no added option.
-  - [ ] `describeCatalogBasis` includes the region; the tooltip adds the CLI version and capture
+      Done in `src/backends/cli/kimi/catalogBasis.ts` and
+      `src/core/models/catalogBasisDetection.ts`: only a local native Kimi instance is read, and
+      only for a target with two or more bases; several matches mark none. The scenario 7 test
+      puts a file where `credentials/` belongs; a second test records that the region file is
+      the only path read.
+- [x] Playground (`src/http/ui/shared.ts`, `pages/playground.html`):
+  - [x] Fix `normalizeAdvancedCatalog`, which drops `basis` today, so the live page never shows
+        the information icon. Keep `basis`, `basisId`, `bases` and `capture`. The dashboard
+        (`index.html`) shares the normalizer. The fields are added only when the Runtime sends
+        them, so the pinned shape in `tests/ui-shared.test.ts` did not change.
+  - [x] Key the advanced catalogs by provider and basis, and fetch with `basis`. The first basis
+        stays in `PROVIDER_ADVANCED_CATALOGS`; `PROVIDER_BASIS_CATALOGS` holds the others,
+        fetched together on load so changing the select needs no wait.
+  - [x] A "List basis" select before the Model select, shown only for two or more bases. A new
+        agent starts on the detected basis when its list loaded, otherwise the first; there is
+        no added option. A selection without `basisId` stays on the first basis even when that
+        basis has an id. A basis whose list failed to load stays as a disabled option. Changing
+        the basis keeps the entry and controls when the new list has the entry, otherwise takes
+        that list's default. A saved `basisId` that is not listed, or whose list did not load,
+        stays selected as a disabled option (an unlisted one labeled `<id> (unavailable)`) with
+        a notice, and the card sends the saved selection back unchanged, so Runtime answers
+        `catalog_basis_unknown` if the basis is gone. It is never turned into a plain string
+        that Runtime would look up in another basis. Each provider's basis lists are replaced
+        only after all of them are fetched again.
+        Checked live on 2026-11-16 with headless Chromium against an isolated Runtime with a
+        two-basis Kimi override and a `region` file reading `mainland-cn`, including a reload whose
+        `?basis=mainland-cn` fetch failed and the next one that succeeded.
+  - [x] `describeCatalogBasis` includes the region; the tooltip adds the CLI version and capture
         date from `capture`; a non-blocking hint when the chosen basis differs from the detected
         one.
-  - [ ] `readAgentModelState` sends `basisId`.
-  - [ ] Run `npm run build:ui` and commit the regenerated output. Update
+  - [x] `readAgentModelState` sends `basisId`.
+  - [x] Run `npm run build:ui` and commit the regenerated output. Update
         `src/http/ui/shared.playground.test.ts` and the markup pins in
         `tests/runtime-server.test.ts`.
-- [ ] `npm run catalog:logins` prints the detected basis id where one is found.
+- [x] `npm run catalog:logins` prints the detected basis where one is found: a signed-in Kimi
+      result ends with `detected basis: region <token>`, read from the same marker after the
+      presence check. The token, rather than a basis id, is printed because the first Kimi basis
+      has no id.
 
 ## Phase 3: Platform (cats-platform; after Phase 1, display after Phase 2)
 

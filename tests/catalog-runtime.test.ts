@@ -20,6 +20,8 @@ import { CopilotProvider } from '../src/backends/cli/providers/copilot.js';
 import { AntigravityProvider } from '../src/backends/cli/providers/antigravity.js';
 import { ClaudeProvider } from '../src/backends/cli/providers/claude.js';
 import { MuseProvider } from '../src/backends/cli/providers/muse.js';
+import { detectKimiSignInRegion } from '../src/backends/cli/kimi/catalogBasis.js';
+import { createCatalogBasisDetector, findDetectedBasisIndex } from '../src/core/models/catalogBasisDetection.js';
 import { createRuntimeTestEnv, createRuntimeTestPaths, ensureRuntimeTestDirs } from './support/runtimeTestPaths.js';
 import { cleanupTempDirWithRetries } from './tempCleanup.js';
 
@@ -286,6 +288,66 @@ describe('factory and executable catalog projections', () => {
       return new CopilotProvider().buildSpawnArgs({ cwd: '/tmp', model: selected.execution.model, modelControls: selected.resolution.controls });
     };
     expect(spawn(proPlus, 'pro-plus')).toEqual(spawn(pro));
+  });
+
+  it('detects the Kimi region basis from the region marker alone (SPEC-045 FR-6, scenario 7)', () => {
+    const factoryKimi = snapshot.document.catalogs.find(s => s.provider === 'kimi' && s.backend === 'cli')!;
+    const global: CatalogScope = { ...structuredClone(factoryKimi),
+      basis: { region: { id: 'global', label: 'global (kimi.ai)' } } };
+    const mainland: CatalogScope = { ...structuredClone(factoryKimi),
+      basis: { id: 'mainland-cn', region: { id: 'mainland-cn', label: 'mainland-cn (kimi.com)' } } };
+    const current = createCatalogSnapshot(factory.source, JSON.stringify({ schema_version: 2, catalogs: [global, mainland] }));
+    const kimiHome = mkdtempSync(join(tmpdir(), 'cats-kimi-home-'));
+    try {
+      writeFileSync(join(kimiHome, 'region'), 'global\n');
+      // A file where credentials/ belongs: any attempt to list or read sign-ins would fail.
+      writeFileSync(join(kimiHome, 'credentials'), 'not a directory');
+      const kimiTarget = { providerName: 'kimi', backend: 'cli', instanceId: 'fixture', defaultTarget: true,
+        cliInstance: { id: 'fixture', providerName: 'kimi',
+          commandConfig: { path: 'kimi', runner: 'direct', runtime: { mode: 'native' } } } } as ProviderTargetDescriptor;
+      const detect = createCatalogBasisDetector({ KIMI_CODE_HOME: kimiHome });
+      expect(detect(kimiTarget)).toEqual({ region: 'global' });
+      const build = (basisId?: string) => buildProviderAdvancedKnowledge(kimiTarget, {
+        provider: 'kimi', backend: 'cli', instance: 'fixture', source: 'static', cache: null,
+        catalogRevision: current.catalogRevision, defaultModel: null,
+        models: factoryKimi.models.map(({ id, label }) => ({ id, label })), warnings: [],
+      }, { snapshot: current, basisId, detectBasis: () => detect(kimiTarget) }).catalog;
+      expect(build().bases?.map(b => [b.id, b.label, b.detected]))
+        .toEqual([[undefined, 'global (kimi.ai)', true], ['mainland-cn', 'mainland-cn (kimi.com)', false]]);
+      expect(build('mainland-cn').bases?.map(b => b.detected)).toEqual([true, false]);
+      writeFileSync(join(kimiHome, 'region'), 'mainland-cn');
+      expect(build().bases?.map(b => b.detected)).toEqual([false, true]);
+      // WSL, Docker and remote targets sign in somewhere else, so nothing local is read.
+      const wsl = structuredClone(kimiTarget);
+      wsl.cliInstance!.commandConfig.runtime = { mode: 'wsl', distro: 'Ubuntu' } as never;
+      expect(detect(wsl)).toBeNull();
+      expect(detect({ ...kimiTarget, providerName: 'copilot' })).toBeNull();
+    } finally {
+      cleanupTempDirWithRetries(kimiHome);
+    }
+  });
+
+  it('reads only the region marker and marks a basis only when exactly one matches', () => {
+    const reads: string[] = [];
+    const reader = (text: string | Error) => (path: string) => {
+      reads.push(path);
+      if (text instanceof Error) throw text;
+      return text;
+    };
+    expect(detectKimiSignInRegion(join('home', 'kimi'), reader(' mainland-cn \r\n'))).toBe('mainland-cn');
+    expect(reads).toEqual([join('home', 'kimi', 'region')]);
+    expect(detectKimiSignInRegion('h', reader('{"token":"x"}'))).toBeNull();
+    expect(detectKimiSignInRegion('h', reader(new Error('ENOENT')))).toBeNull();
+    const scope = (basis: CatalogScope['basis']) => ({ basis }) as CatalogScope;
+    const plans = [
+      scope({ region: { id: 'global', label: 'global' }, plan: { id: 'free', label: 'Free' } }),
+      scope({ id: 'pro', region: { id: 'global', label: 'global' }, plan: { id: 'pro', label: 'Pro' } }),
+    ];
+    expect(findDetectedBasisIndex(plans, { region: 'global' })).toBe(-1);
+    expect(findDetectedBasisIndex(plans, { region: 'global', plan: 'pro' })).toBe(1);
+    expect(findDetectedBasisIndex(plans, { region: 'mainland-cn' })).toBe(-1);
+    expect(findDetectedBasisIndex(plans, {})).toBe(-1);
+    expect(findDetectedBasisIndex(plans, null)).toBe(-1);
   });
 
   it('lists the Copilot Pro picker with Terra as default and first-value effort, context and tier', () => {

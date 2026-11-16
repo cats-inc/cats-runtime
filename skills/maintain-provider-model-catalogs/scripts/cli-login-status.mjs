@@ -136,14 +136,21 @@ function hasFile(ctx, dir, name) {
  * deletes it; `credentials/mcp/` holds MCP server sign-ins, not the CLI's. KIMI_MODEL_API_KEY is
  * the one shell variable Kimi reads directly (environment-bootstrap 4108ac8). config.toml, which
  * can hold API keys of providers a user added, is never opened; those are outside the catalog.
+ * The one file read is the non-secret `region` marker, the sign-in's region token that Runtime
+ * matches against `basis.region.id` to detect a catalog basis (SPEC-045 FR-6).
  */
 function kimiSignIn(ctx) {
   if (isSet(ctx.env.KIMI_MODEL_API_KEY)) return ['local', 'KIMI_MODEL_API_KEY is set'];
   const kimiHome = ctx.env.KIMI_CODE_HOME || join(ctx.home, '.kimi-code');
   const files = ctx.listFiles(join(kimiHome, 'credentials')).filter((file) => file.name.endsWith('.json') && file.size > 0);
-  return files.length > 0
-    ? ['local', `credentials/${files[0].name} is present`]
-    : ['signed-out', 'no Kimi Code OAuth credential file (run kimi login)'];
+  if (files.length === 0) return ['signed-out', 'no Kimi Code OAuth credential file (run kimi login)'];
+  const region = kimiRegion(ctx, kimiHome);
+  return ['local', `credentials/${files[0].name} is present${region ? `; detected basis: region ${region}` : ''}`];
+}
+
+function kimiRegion(ctx, kimiHome) {
+  const region = ctx.readText(join(kimiHome, 'region'))?.trim() ?? '';
+  return /^[a-z0-9][a-z0-9._-]*$/.test(region) ? region : null;
 }
 
 // The versioned binary named by .muse-version, never the self-updating launcher.

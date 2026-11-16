@@ -17,6 +17,7 @@ import {
   resolveProviderTarget,
   type ProviderTargetDescriptor,
 } from '../providerCatalog.js';
+import { createCatalogBasisDetector, type CatalogBasisDetector } from './catalogBasisDetection.js';
 import {
   buildProviderAdvancedKnowledge,
   type ProviderAdvancedKnowledgeContext,
@@ -120,6 +121,8 @@ interface ProviderModelCatalogServiceOptions {
   kiloModelDiscoveryRunner?: KiloModelDiscoveryRunner;
   cursorModelDiscoveryRunner?: CursorModelDiscoveryRunner;
   remoteDiscoveryTimeoutMs?: number;
+  /** Reads a target's sign-in markers for `bases[].detected` (SPEC-045 FR-6); tests replace it. */
+  detectCatalogBasis?: CatalogBasisDetector;
 }
 
 interface ProviderModelCatalogRequestOptions {
@@ -521,6 +524,7 @@ export class ProviderModelCatalogService {
   private readonly dynamicCache = new Map<string, CachedDynamicModels>();
   private readonly persistedSnapshots = new Map<string, CachedDynamicModels>();
   private readonly refreshBackoff = new Map<string, RefreshBackoffState>();
+  private readonly detectCatalogBasis: CatalogBasisDetector;
 
   constructor(
     private readonly config: CliRuntimeConfig,
@@ -532,6 +536,7 @@ export class ProviderModelCatalogService {
     this.remoteDiscoveryTimeoutMs = options.remoteDiscoveryTimeoutMs
       ?? DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS;
     this.storageFile = resolveProviderModelCatalogStorageFile(config);
+    this.detectCatalogBasis = options.detectCatalogBasis ?? createCatalogBasisDetector(this.env);
     this.catalogStore = new CatalogStore({
       packageRoot: resolveRuntimePackageRoot(this.env),
       runtimeRoot: this.env.CATS_RUNTIME_DIR ? resolveRuntimeRoot(this.env)
@@ -600,7 +605,7 @@ export class ProviderModelCatalogService {
     const catalog = await this.getCatalogForTarget(target, options);
     if (activation !== this.catalogStore.status().activationId) throw new Error('Provider catalog changed');
     return buildProviderAdvancedKnowledge(target, catalog, {
-      snapshot, basisId: options.basisId,
+      snapshot, basisId: options.basisId, detectBasis: () => this.detectCatalogBasis(target),
     });
   }
 
@@ -611,6 +616,7 @@ export class ProviderModelCatalogService {
     const catalog = this.getImmediateCatalogForTarget(target, options.basisId);
     return buildProviderAdvancedKnowledge(target, catalog, {
       snapshot: this.catalogStore.current(), basisId: options.basisId,
+      detectBasis: () => this.detectCatalogBasis(target),
     });
   }
 

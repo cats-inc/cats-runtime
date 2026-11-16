@@ -77,7 +77,8 @@ describe.each(['cursor', 'opencode', 'kilo', 'devin', 'cline'])('%s full catalog
       renderAgentRoutingSelectOptions: (_select: unknown, choices: typeof renderedChoices) => {
         renderedChoices = choices;
       },
-      syncAgentPresetField() {}, syncAgentBasisField() {}, renderAgentModelChoice() {}, refreshAgentCardSummary() {},
+      syncAgentPresetField() {}, syncAgentBasisField() {}, renderAgentBasisField: () => '',
+      renderAgentModelChoice() {}, refreshAgentCardSummary() {},
       getAgentDefaultEntryId: () => models.find(entry=>entry.default)?.id ?? models[0]?.id,
       getDefaultModel: () => models[0]?.id, applyAgentModelControlValues() {},
     }) as (div: unknown, options: unknown) => void;
@@ -148,7 +149,8 @@ describe('shared playground selection helpers', () => {
         // displayed first value. Exercise it before any user effort change.
         const readStart = html.indexOf('function readAgentModelControlValues(');
         const readEnd = html.indexOf('\nfunction syncAgentPresetField(', readStart);
-        const formContext = { getProviderAdvancedCatalog: () => catalog, form: {
+        const formContext = { getProviderAdvancedCatalog: () => catalog, readAgentBasisId: () => '',
+          readAgentUnmappedSelection: () => null, form: {
           querySelector: (selector: string) => ({ value: ({ '.agent-provider': 'muse',
             '.agent-entry-choice': entry.id } as Record<string, string>)[selector] || '' }),
           querySelectorAll: () => [{
@@ -432,10 +434,161 @@ describe('shared playground selection helpers', () => {
     expect(tooltips.at(-1)).toBe('Models listed for the openai-codex channel. Enter a custom model to use another channel.');
     sync(div, { basis: { plan: { label: 'Copilot Pro' } } });
     expect(tooltips.at(-1)).toBe('Models listed for a Copilot Pro account. Other plans can offer different models.');
+    sync(div, { basis: { plan: { label: 'Copilot Pro' } }, capture: { cliVersion: '1.0.70', lastUpdated: '2026-11-16' } });
+    expect(tooltips.at(-1)).toBe('Models listed for a Copilot Pro account. Other plans can offer different models. '
+      + 'Captured from CLI 1.0.70 on 2026-11-16.');
+    // Decision 5: without a basis the icon stays hidden, capture or not.
+    sync(div, { capture: { cliVersion: '1.0.70' } });
+    expect(classes.has('hidden')).toBe(true);
     sync(div, { entries: [] });
     expect(classes.has('hidden')).toBe(true);
     expect(attributes['aria-label']).toBe('Model list basis');
     expect(tooltips.at(-1)).toBe('');
+  });
+
+  it('keeps catalog bases, starts new agents on the detected basis and never switches a saved one (SPEC-045)', () => {
+    const catsUI = createCatsUI();
+    const bases = [
+      { label: 'global (kimi.ai)', region: { id: 'global', label: 'global (kimi.ai)' }, detected: false },
+      { id: 'mainland-cn', label: 'mainland-cn (kimi.com)', region: { id: 'mainland-cn', label: 'mainland-cn (kimi.com)' },
+        cliVersion: '2.5.3', lastUpdated: '2026-11-16', detected: true },
+    ];
+    const catalogOf = (basis: Record<string, unknown>, entries: string[], extra: Record<string, unknown> = {}) => ({
+      provider: 'kimi', backend: 'cli', instance: 'native', catalogRevision: 'rev-1', source: 'static', cache: null,
+      entries: entries.map(id => ({ id, label: id })), controls: [], presets: [],
+      defaultSelection: { entryId: entries[0], entryMode: 'explicit', ...(extra.basisId ? { basisId: extra.basisId } : {}) },
+      support: { tier: 'entry_only' }, warnings: [], basis, bases, capture: { cliVersion: '2.5.3' }, ...extra,
+    });
+    const global = catsUI.normalizeAdvancedCatalog(catalogOf(bases[0].region ? { region: bases[0].region } : {}, ['kimi-code/k3', 'kimi-code/shared']));
+    const mainland = catsUI.normalizeAdvancedCatalog(catalogOf({ id: 'mainland-cn', region: bases[1].region },
+      ['kimi-code/cn-only', 'kimi-code/shared'], { basisId: 'mainland-cn' }));
+    expect(global.bases).toEqual(bases);
+    expect(global.basis).toEqual({ region: bases[0].region });
+    expect(global.capture).toEqual({ cliVersion: '2.5.3' });
+    expect(mainland.basisId).toBe('mainland-cn');
+    // A single-basis catalog keeps today's shape: no basis keys appear from nothing.
+    const plain = catsUI.normalizeAdvancedCatalog({ entries: [], bases: [bases[0]] });
+    expect(Object.keys(plain)).not.toEqual(expect.arrayContaining(['basis', 'basisId', 'bases', 'capture']));
+
+    const input = { provider: 'kimi', selectableProviders: ['kimi'], providerOrder: ['kimi'],
+      advancedCatalogs: { kimi: global }, basisCatalogs: { kimi: { 'mainland-cn': mainland } } };
+    const select = (extra: Record<string, unknown>) => catsUI.normalizePlaygroundAgentSelection({ ...input, ...extra });
+    expect(select({}).modelSelection).toMatchObject({ basisId: 'mainland-cn', entryId: 'kimi-code/cn-only' });
+    expect(select({ modelSelection: { entryId: 'kimi-code/k3', entryMode: 'explicit' } }).modelSelection)
+      .toEqual({ catalogRevision: 'rev-1', entryMode: 'explicit', entryId: 'kimi-code/k3' });
+    expect(select({ modelSelection: { basisId: 'mainland-cn', entryId: 'kimi-code/shared', entryMode: 'explicit' } })
+      .modelSelection).toMatchObject({ basisId: 'mainland-cn', entryId: 'kimi-code/shared' });
+    expect(select({ model: 'kimi-code/shared' }).modelSelection).toMatchObject({ entryId: 'kimi-code/shared' });
+    expect(select({ model: 'kimi-code/shared' }).modelSelection.basisId).toBeUndefined();
+    expect(select({ model: 'kimi-code/cn-only' }).modelSelection).toMatchObject({ basisId: 'mainland-cn' });
+    // A saved basis this Runtime no longer lists, or whose list did not load, stays the saved
+    // structured selection: never a plain string that Runtime would look up in another basis.
+    const retired = { basisId: 'retired', entryId: 'kimi-code/k3', entryMode: 'explicit', controls: { a: 'b' } };
+    expect(select({ modelSelection: retired })).toEqual({ provider: 'kimi', model: '', modelSelection: retired });
+    const unloaded = { basisId: 'mainland-cn', entryId: 'kimi-code/shared', entryMode: 'explicit' };
+    expect(select({ basisCatalogs: {}, modelSelection: unloaded })).toEqual({ provider: 'kimi', model: '', modelSelection: unloaded });
+    // A new agent whose detected list did not load starts on the first basis.
+    expect(select({ basisCatalogs: {} }).modelSelection).toEqual({ catalogRevision: 'rev-1', entryMode: 'explicit', entryId: 'kimi-code/k3' });
+
+    expect(catsUI.describeCatalogBasis({ region: bases[1].region }, { cliVersion: '2.5.3', lastUpdated: '2026-11-16' })).toEqual({
+      label: 'mainland-cn (kimi.com)',
+      hint: 'Models listed for a CLI signed in to the mainland-cn (kimi.com) region. Other regions can offer different models. '
+        + 'Captured from CLI 2.5.3 on 2026-11-16.',
+    });
+    expect(catsUI.describeCatalogBasis({}, { cliVersion: '2.5.3' })).toBeNull();
+    expect(catsUI.describeCatalogBasisMismatch(global, 'mainland-cn')).toBe('');
+    expect(catsUI.describeCatalogBasisMismatch(global, '')).toMatch(/another plan or region than the CLI sign-in/);
+    expect(catsUI.describeCatalogBasisMismatch({ ...global, bases: bases.map(b => ({ ...b, detected: false })) }, '')).toBe('');
+
+    // The card's select: Runtime labels in data order, the detected basis for a new card, and
+    // the hint only when the chosen list differs from the detected one.
+    const html = readFileSync(new URL('./pages/playground.html', import.meta.url), 'utf8');
+    const start = html.indexOf('function renderAgentBasisField(div,provider,requestedBasisId)');
+    const end = html.indexOf('\n}\n', start) + 2;
+    const classes = { group: new Set(['hidden']), hint: new Set(['hidden']), entry: new Set<string>() };
+    const classList = (set: Set<string>) => ({ toggle: (name: string, on: boolean) => { if (on) set.add(name); else set.delete(name); },
+      add: (name: string) => set.add(name), contains: (name: string) => set.has(name) });
+    const basisSelect = { innerHTML: '', value: '', dataset: {} as Record<string, string> };
+    const hint = { textContent: '', classList: classList(classes.hint) };
+    const elements: Record<string, unknown> = { '.agent-basis-group': { classList: classList(classes.group) },
+      '.agent-basis-choice': basisSelect, '.agent-basis-hint': hint, '.agent-entry-group': { classList: classList(classes.entry) } };
+    const catalogs: Record<string, unknown> = { kimi: global, copilot: { entries: [] } };
+    const loaded: Record<string, boolean> = { 'mainland-cn': true };
+    const render = vm.runInNewContext(`(${html.slice(start, end)})`, {
+      window: { CatsUI: catsUI }, escapeHtml: String, PROVIDER_ADVANCED_CATALOGS: catalogs,
+      getProviderAdvancedCatalog: (_provider: string, basisId: string) => (!basisId || loaded[basisId] ? {} : null),
+    }) as (div: unknown, provider: string, basisId: string | null) => string;
+    const card = { querySelector: (selector: string) => elements[selector] ?? null };
+    expect(render(card, 'kimi', null)).toBe('mainland-cn');
+    expect(basisSelect.innerHTML).toBe('<option value="">global (kimi.ai)</option><option value="mainland-cn">mainland-cn (kimi.com)</option>');
+    expect(classes.group.has('hidden')).toBe(false);
+    expect(classes.entry.has('col-span-2')).toBe(true);
+    expect(classes.hint.has('hidden')).toBe(true);
+    expect(render(card, 'kimi', '')).toBe('');
+    expect(classes.hint.has('hidden')).toBe(false);
+    expect(hint.textContent).toMatch(/another plan or region/);
+    // A custom model (no selection) keeps the card's current list.
+    expect(render(card, 'kimi', null)).toBe('');
+    // A saved basis that is not listed stays selected as a disabled option, with a notice.
+    expect(render(card, 'kimi', 'retired')).toBe('retired');
+    expect(basisSelect.innerHTML).toBe('<option value="">global (kimi.ai)</option><option value="mainland-cn">mainland-cn (kimi.com)</option>'
+      + '<option value="retired" disabled>retired (unavailable)</option>');
+    expect(hint.textContent).toMatch(/not available from the Runtime/);
+    loaded['mainland-cn'] = false;
+    render(card, 'kimi', '');
+    expect(basisSelect.innerHTML).toContain('<option value="mainland-cn" disabled>');
+    // A new card does not start on a detected list that did not load; a saved one keeps it.
+    basisSelect.dataset = {};
+    expect(render(card, 'kimi', null)).toBe('');
+    expect(render(card, 'kimi', 'mainland-cn')).toBe('mainland-cn');
+    expect(basisSelect.innerHTML).not.toContain('(unavailable)');
+    expect(hint.textContent).toMatch(/not available from the Runtime/);
+    loaded['mainland-cn'] = true;
+    // A first basis with an id: a selection without basisId stays on it, not on the detected one.
+    catalogs.copilot2 = { entries: [], bases: [
+      { id: 'free', label: 'Free', detected: false }, { id: 'pro', label: 'Pro', detected: true }] };
+    loaded.pro = true;
+    expect(render(card, 'copilot2', '')).toBe('free');
+    expect(render(card, 'copilot2', null)).toBe('free');
+    basisSelect.dataset = {};
+    expect(render(card, 'copilot2', null)).toBe('pro');
+    expect(render(card, 'copilot', null)).toBe('');
+    expect(classes.group.has('hidden')).toBe(true);
+    expect(classes.entry.has('col-span-2')).toBe(false);
+    expect(basisSelect.innerHTML).toBe('');
+
+    // The form serializer sends the chosen basis with the entry.
+    const readStart = html.indexOf('function readAgentModelControlValues(');
+    const readEnd = html.indexOf('\nfunction syncAgentPresetField(', readStart);
+    const values: Record<string, string> = { '.agent-provider': 'kimi', '.agent-entry-choice': 'kimi-code/shared',
+      '.agent-basis-choice': 'mainland-cn' };
+    const unmappedStart = html.indexOf('function readAgentUnmappedSelection(div,basisId,entryId)');
+    const unmappedEnd = html.indexOf('\n}\n', unmappedStart) + 2;
+    let mainlandLoaded = true;
+    const formContext = {
+      getProviderAdvancedCatalog: (_provider: string, basisId?: string) =>
+        (basisId === 'mainland-cn' ? (mainlandLoaded ? mainland : null) : global),
+      readAgentBasisId: () => values['.agent-basis-choice'],
+      form: { dataset: {} as Record<string, string>,
+        querySelector: (selector: string) => ({ value: values[selector] || '' }), querySelectorAll: () => [] },
+    };
+    const readForm = () => vm.runInNewContext(
+      `${html.slice(unmappedStart, unmappedEnd)}\n${html.slice(readStart, readEnd)}\nreadAgentModelState(form)`, formContext);
+    expect(readForm().modelSelection).toEqual({ entryMode: 'explicit', entryId: 'kimi-code/shared',
+      catalogRevision: 'rev-1', basisId: 'mainland-cn' });
+    // A reload that loses the card's list keeps the structured choice in that basis.
+    mainlandLoaded = false;
+    expect(readForm()).toEqual({ model: '', modelSelection: { entryMode: 'explicit', entryId: 'kimi-code/shared',
+      basisId: 'mainland-cn', catalogRevision: 'rev-1' } });
+    mainlandLoaded = true;
+    // A card showing an unavailable saved basis sends that saved selection back unchanged.
+    values['.agent-basis-choice'] = 'retired';
+    values['.agent-entry-choice'] = 'kimi-code/k3';
+    formContext.form.dataset.unmappedBasisSelection = JSON.stringify(retired);
+    expect(readForm()).toEqual({ model: '', modelSelection: retired });
+    // Once another basis is chosen, the card reads its own list again.
+    values['.agent-basis-choice'] = '';
+    expect(readForm().modelSelection).toEqual({ entryMode: 'explicit', entryId: 'kimi-code/k3', catalogRevision: 'rev-1' });
   });
 
   it('initializes Pi at the first openai-codex row with medium thinking and keeps provider/model input', () => {

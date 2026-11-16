@@ -257,7 +257,7 @@ export const SHARED_UI_SCRIPT = `
     if (!rawCatalog || typeof rawCatalog !== 'object' || Array.isArray(rawCatalog)) {
       return null;
     }
-    return {
+    var normalized = {
       provider: typeof rawCatalog.provider === 'string' ? rawCatalog.provider : '',
       catalogRevision: rawCatalog.catalogRevision,
       catalogActivationId: rawCatalog.catalogActivationId,
@@ -277,6 +277,65 @@ export const SHARED_UI_SCRIPT = `
         : { tier: 'read_only' },
       warnings: Array.isArray(rawCatalog.warnings) ? cloneJson(rawCatalog.warnings) : [],
     };
+    // What the list was captured against (SPEC-045), kept only when the catalog reports it.
+    if (rawCatalog.basis && typeof rawCatalog.basis === 'object' && !Array.isArray(rawCatalog.basis)) {
+      normalized.basis = cloneJson(rawCatalog.basis);
+    }
+    if (typeof rawCatalog.basisId === 'string' && rawCatalog.basisId) {
+      normalized.basisId = rawCatalog.basisId;
+    }
+    if (Array.isArray(rawCatalog.bases) && rawCatalog.bases.length > 1) {
+      normalized.bases = cloneJson(rawCatalog.bases);
+    }
+    if (rawCatalog.capture && typeof rawCatalog.capture === 'object' && !Array.isArray(rawCatalog.capture)) {
+      normalized.capture = cloneJson(rawCatalog.capture);
+    }
+    return normalized;
+  }
+
+  function listAdvancedCatalogBases(catalog) {
+    return catalog && Array.isArray(catalog.bases) && catalog.bases.length > 1 ? catalog.bases : [];
+  }
+
+  // The basis the local CLI sign-in matches, by its select value ('' for an id-less first basis).
+  function getDetectedCatalogBasisId(catalog) {
+    var bases = listAdvancedCatalogBases(catalog);
+    for (var i = 0; i < bases.length; i++) {
+      if (bases[i] && bases[i].detected === true) {
+        return typeof bases[i].id === 'string' ? bases[i].id : '';
+      }
+    }
+    return null;
+  }
+
+  // A target's catalog for one basis: '' or absent is the first basis, which the plain request
+  // returns; any other id comes from the per-basis catalogs a page fetched with basis=<id>.
+  function selectAdvancedCatalogBasis(firstCatalog, basisCatalogs, basisId) {
+    if (!basisId) return firstCatalog || null;
+    var bases = listAdvancedCatalogBases(firstCatalog);
+    if (bases.length === 0) {
+      return firstCatalog && firstCatalog.basis && firstCatalog.basis.id === basisId ? firstCatalog : null;
+    }
+    if (bases[0] && bases[0].id === basisId) return firstCatalog;
+    var listed = false;
+    for (var i = 0; i < bases.length; i++) {
+      if (bases[i] && bases[i].id === basisId) listed = true;
+    }
+    var catalog = listed && basisCatalogs && typeof basisCatalogs === 'object' ? basisCatalogs[basisId] : null;
+    return catalog ? normalizeAdvancedCatalog(catalog) : null;
+  }
+
+  // A plain model string belongs to the first basis, in data order, that lists it (SPEC-045 FR-4).
+  function findPlainModelBasisId(firstCatalog, basisCatalogs, model) {
+    var bases = listAdvancedCatalogBases(firstCatalog);
+    for (var i = 0; i < bases.length; i++) {
+      var id = bases[i] && typeof bases[i].id === 'string' ? bases[i].id : '';
+      if (i > 0 && !id) continue;
+      if (findAdvancedCatalogEntry(selectAdvancedCatalogBasis(firstCatalog, basisCatalogs, id), model)) {
+        return id;
+      }
+    }
+    return '';
   }
 
   function findAdvancedCatalogEntry(catalog, entryId) {
@@ -900,7 +959,11 @@ export const SHARED_UI_SCRIPT = `
     var advancedCatalogs = options.advancedCatalogs && typeof options.advancedCatalogs === 'object'
       ? options.advancedCatalogs
       : {};
-    var catalog = normalizeAdvancedCatalog(advancedCatalogs[provider]);
+    var firstCatalog = normalizeAdvancedCatalog(advancedCatalogs[provider]);
+    var basisCatalogs = options.basisCatalogs && typeof options.basisCatalogs === 'object'
+      && options.basisCatalogs[provider] && typeof options.basisCatalogs[provider] === 'object'
+      ? options.basisCatalogs[provider]
+      : {};
     var model = providerChanged
       ? ''
       : (typeof options.model === 'string' ? options.model : '');
@@ -909,12 +972,31 @@ export const SHARED_UI_SCRIPT = `
       : (options.modelSelection && typeof options.modelSelection === 'object'
         ? cloneJson(options.modelSelection)
         : null);
-    if (!catalog) {
+    if (!firstCatalog) {
       return {
         provider: provider,
         model: model,
         modelSelection: incomingSelection,
       };
+    }
+
+    // SPEC-045: a saved selection keeps its basis (none means the first), a plain model string
+    // takes the first basis listing it, and a new selection starts on the detected basis.
+    var basisId = '';
+    if (incomingSelection && typeof incomingSelection.basisId === 'string' && incomingSelection.basisId) {
+      basisId = incomingSelection.basisId;
+    } else if (!incomingSelection && model) {
+      basisId = findPlainModelBasisId(firstCatalog, basisCatalogs, model);
+    } else if (!incomingSelection) {
+      var detectedBasisId = getDetectedCatalogBasisId(firstCatalog) || '';
+      basisId = selectAdvancedCatalogBasis(firstCatalog, basisCatalogs, detectedBasisId) ? detectedBasisId : '';
+    }
+    var catalog = selectAdvancedCatalogBasis(firstCatalog, basisCatalogs, basisId);
+    if (!catalog) {
+      // Only a saved basis gets here: one this Runtime no longer lists, or whose list did not
+      // load. It stays the saved structured selection, never a plain string that Runtime would
+      // look up in another basis; Runtime rejects it if the basis is gone.
+      return { provider: provider, model: '', modelSelection: incomingSelection };
     }
 
     var entries = listAdvancedCatalogEntries(catalog);
@@ -962,6 +1044,9 @@ export const SHARED_UI_SCRIPT = `
       entryMode: 'explicit',
       entryId: entryId,
     };
+    if (basisId) {
+      nextSelection.basisId = basisId;
+    }
     if (presetId) {
       nextSelection.presetId = presetId;
     }
@@ -1036,15 +1121,29 @@ export const SHARED_UI_SCRIPT = `
     return isDefault ? plainLabel + ' (default)' : plainLabel;
   }
 
-  // Read-only text for a catalog's recorded basis; null when the catalog records none.
-  function describeCatalogBasis(basis) {
+  // Read-only text for a catalog's recorded basis and its capture; null when no basis is recorded.
+  function describeCatalogBasis(basis, capture) {
     var channel = basis && basis.channel && basis.channel.label ? String(basis.channel.label) : '';
+    var region = basis && basis.region && basis.region.label ? String(basis.region.label) : '';
     var plan = basis && basis.plan && basis.plan.label ? String(basis.plan.label) : '';
-    if (!channel && !plan) return null;
+    if (!channel && !region && !plan) return null;
     var hints = [];
     if (channel) hints.push('Models listed for the ' + channel + ' channel. Enter a custom model to use another channel.');
+    if (region) hints.push('Models listed for a CLI signed in to the ' + region + ' region. Other regions can offer different models.');
     if (plan) hints.push('Models listed for a ' + plan + ' account. Other plans can offer different models.');
-    return { label: [channel, plan].filter(Boolean).join(' · '), hint: hints.join(' ') };
+    var version = capture && typeof capture.cliVersion === 'string' ? capture.cliVersion : '';
+    var date = capture && typeof capture.lastUpdated === 'string' ? capture.lastUpdated : '';
+    if (version && date) hints.push('Captured from CLI ' + version + ' on ' + date + '.');
+    else if (version) hints.push('Captured from CLI ' + version + '.');
+    else if (date) hints.push('Captured on ' + date + '.');
+    return { label: [channel, region, plan].filter(Boolean).join(' · '), hint: hints.join(' ') };
+  }
+
+  // FR-7: a non-blocking note when the chosen list is not the one the CLI sign-in matches.
+  function describeCatalogBasisMismatch(firstCatalog, basisId) {
+    var detected = getDetectedCatalogBasisId(firstCatalog);
+    if (detected === null || detected === (basisId || '')) return '';
+    return 'This list is for another plan or region than the CLI sign-in on the Runtime host, so some models may fail.';
   }
 
   function closeRuntimeSurfaceMenus() {
@@ -1330,6 +1429,10 @@ export const SHARED_UI_SCRIPT = `
     getAdvancedEntryControlDefaults: getAdvancedEntryControlDefaults,
     formatAdvancedDefaultLabel: formatAdvancedDefaultLabel,
     describeCatalogBasis: describeCatalogBasis,
+    describeCatalogBasisMismatch: describeCatalogBasisMismatch,
+    listAdvancedCatalogBases: listAdvancedCatalogBases,
+    getDetectedCatalogBasisId: getDetectedCatalogBasisId,
+    selectAdvancedCatalogBasis: selectAdvancedCatalogBasis,
     listApplicableEnumControlOptions: listApplicableEnumControlOptions,
     listStoredAdvancedControls: listStoredAdvancedControls,
     setRuntimeTooltip: setRuntimeTooltip,

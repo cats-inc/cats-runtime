@@ -3,6 +3,7 @@ import { findCatalogScope, listCatalogScopes } from '../../catalogs/resolver.js'
 import type { CatalogControl, CatalogModel, CatalogScope, CatalogSnapshot } from '../../catalogs/types.js';
 import type { ProviderTargetDescriptor } from '../providerCatalog.js';
 import type { ProviderModelCatalogResult } from './providerModelCatalog.js';
+import { findDetectedBasisIndex, type CatalogBasisMarker } from './catalogBasisDetection.js';
 import type {
   ProviderAdvancedCatalogBasisOption, ProviderAdvancedCatalogControl, ProviderAdvancedCatalogEntry,
   ProviderAdvancedCatalogResult, ProviderAdvancedCatalogSupportTier, ProviderAdvancedControlValue,
@@ -22,6 +23,8 @@ export interface ProviderAdvancedKnowledgeBuildOptions {
   snapshot?: CatalogSnapshot;
   /** The basis to build; absent means the target's first basis (SPEC-045). */
   basisId?: string;
+  /** Reads the local sign-in markers; called only for a target with two or more bases. */
+  detectBasis?: () => CatalogBasisMarker | null;
 }
 
 /** The channel, region and plan labels of a basis, joined the same way for every client. */
@@ -37,7 +40,7 @@ function captureOf(scope: CatalogScope): { cliVersion?: string; lastUpdated?: st
   };
 }
 
-function basisOption(scope: CatalogScope): ProviderAdvancedCatalogBasisOption {
+function basisOption(scope: CatalogScope, detected: boolean): ProviderAdvancedCatalogBasisOption {
   const basis = scope.basis;
   return {
     ...(basis?.id ? { id: basis.id } : {}),
@@ -46,7 +49,7 @@ function basisOption(scope: CatalogScope): ProviderAdvancedCatalogBasisOption {
     ...(basis?.region ? { region: { ...basis.region } } : {}),
     ...(basis?.plan ? { plan: { ...basis.plan } } : {}),
     ...captureOf(scope),
-    detected: false,
+    detected,
   };
 }
 
@@ -69,6 +72,8 @@ export function buildProviderAdvancedKnowledge(
 ): ProviderAdvancedKnowledgeContext {
   const scope = findCatalogScope(options.snapshot, target, options.basisId);
   const bases = listCatalogScopes(options.snapshot, target);
+  const detectedIndex = bases.length > 1
+    ? findDetectedBasisIndex(bases, options.detectBasis?.() ?? null) : -1;
   const modelsById = Object.fromEntries((scope?.models ?? []).map(model => [model.id, model]));
   const entryDefaults: ProviderAdvancedKnowledgeContext['entryDefaults'] = {};
   const combined = new Map<string, ProviderAdvancedCatalogControl>();
@@ -128,7 +133,8 @@ export function buildProviderAdvancedKnowledge(
     },
     ...(scope?.basis ? { basis: structuredClone(scope.basis) } : {}),
     ...(scope && bases.length > 1 && scope.basis?.id ? { basisId: scope.basis.id } : {}),
-    ...(bases.length > 1 ? { bases: bases.map(basisOption) } : {}),
+    ...(bases.length > 1
+      ? { bases: bases.map((basis, index) => basisOption(basis, index === detectedIndex)) } : {}),
     ...(scope ? { capture: captureOf(scope) } : {}),
     warnings: [...modelCatalog.warnings],
   };

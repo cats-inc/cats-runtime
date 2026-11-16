@@ -588,6 +588,10 @@ describe('runtime server', () => {
       expect(html).toContain('<div class="agent-card-details hidden space-y-3">');
       expect(html).toContain('<div class="agent-entry-group"><div class="flex items-center gap-1"><label class="block text-xs text-slate-400">Model</label><button type="button" class="agent-basis-info hidden');
       expect(html).toContain('aria-label="Model list basis">i</button></div><select class="agent-entry-choice');
+      // SPEC-045 FR-7: one "List basis" select before Model, hidden for a single-basis target.
+      expect(html).toContain('<div class="agent-basis-group hidden"><label class="block text-xs text-slate-400">List basis</label><select class="agent-basis-choice');
+      expect(html.indexOf('<div class="agent-basis-group hidden">')).toBeLessThan(html.indexOf('<div class="agent-entry-group">'));
+      expect(html).toContain('<p class="agent-basis-hint hidden');
       expect(html).toContain('<div class="agent-mode-group"><label class="block text-xs text-slate-400">Mode</label><select class="agent-preset-choice');
       expect(html).toContain('title="Browse directory" aria-label="Browse directory"');
       expect(html).toContain('>Stakeholder</span>');

@@ -241,8 +241,8 @@ export function buildKimiArgs(opts: ProviderSpawnOptions, prompt: string | null)
   return args;
 }
 
-export function resolveKimiHome(configured?: string): string {
-  return configured?.trim() || process.env.KIMI_CODE_HOME?.trim() || join(os.homedir(), '.kimi-code');
+export function resolveKimiHome(configured?: string, env: NodeJS.ProcessEnv = process.env): string {
+  return configured?.trim() || env.KIMI_CODE_HOME?.trim() || join(os.homedir(), '.kimi-code');
 }
 
 /** `<home>/sessions/<workdir key>/<session id>/agents/main/wire.jsonl`. */

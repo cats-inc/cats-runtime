@@ -408,6 +408,7 @@ const AVAILABLE_TAGS = ['orchestrator','pm','researcher','designer','architect',
 const ROLE_LABELS = { orchestrator:'CEO',pm:'PM',researcher:'Researcher',designer:'Designer',architect:'Architect',coder:'Coder',tester:'Tester',reviewer:'Reviewer',security:'Security',qa:'QA',tech_writer:'Tech Writer',marketer:'Marketer' };
 const PROVIDER_MODELS = {};
 const PROVIDER_ADVANCED_CATALOGS = {};
+const PROVIDER_BASIS_CATALOGS = {};
 const PROVIDERS = ['codex','claude','antigravity','grok','muse','cursor','copilot','opencode','kilo','cline','auggie','pi','kimi','kiro','junie','devin','goose','ollama','openclaw'];
 const PROVIDER_AVAILABILITY = {};
 let SELECTABLE_PROVIDERS = [...PROVIDERS];
@@ -449,6 +450,7 @@ function normalizeAgentSelectionState(provider,model='',modelSelection=null,opti
       providerOrder:PROVIDERS,
       providerAvailability:PROVIDER_AVAILABILITY,
       advancedCatalogs:PROVIDER_ADVANCED_CATALOGS,
+      basisCatalogs:PROVIDER_BASIS_CATALOGS,
       allowLegacyModel,
       preferAvailableProvider:options.preferAvailableProvider===true,
       preserveRequestedProvider:options.preserveRequestedProvider===true,
@@ -1085,7 +1087,7 @@ function renderAgentSummaryChip(label) {
 }
 function getAgentCardSummaryModelLabel(div) {
   const provider = div.querySelector('.agent-provider')?.value || '';
-  const catalog = getProviderAdvancedCatalog(provider);
+  const catalog = getAgentCardCatalog(div);
   const entryId = div.querySelector('.agent-entry-choice')?.value || '';
   const selectedLabel = div.querySelector('.agent-entry-choice')?.selectedOptions?.[0]?.textContent?.trim() || '';
   if (catalog && entryId) {
@@ -1327,7 +1329,32 @@ function updateAgentButtons(){
   setAgentSetupButtonDisabled(presetBtn,!ready);
   setAgentSetupButtonDisabled(starterBtn,!ready);
 }
-function getProviderAdvancedCatalog(provider){return PROVIDER_ADVANCED_CATALOGS[provider]||null;}
+// SPEC-045: the plain request returns a target's first basis; PROVIDER_BASIS_CATALOGS holds the
+// others by basis id. '' (or absent) selects the first basis.
+function getProviderAdvancedCatalog(provider,basisId=''){
+  const first=PROVIDER_ADVANCED_CATALOGS[provider]||null;
+  if(!basisId||!first) return first;
+  const bases=window.CatsUI.listAdvancedCatalogBases(first);
+  if(bases.length===0) return first.basis?.id===basisId?first:null;
+  if(bases[0]?.id===basisId) return first;
+  if(!bases.some(basis=>basis?.id===basisId)) return null;
+  return PROVIDER_BASIS_CATALOGS[provider]?.[basisId]||null;
+}
+// A saved selection whose basis is unavailable, kept as is while the card still shows it.
+function readAgentUnmappedSelection(div,basisId,entryId){
+  try{
+    const saved=JSON.parse(div.dataset?.unmappedBasisSelection||'null');
+    return saved&&saved.basisId===basisId&&saved.entryId===entryId?saved:null;
+  }catch{return null;}
+}
+function readAgentBasisId(div){
+  const group=div.querySelector('.agent-basis-group');
+  const select=div.querySelector('.agent-basis-choice');
+  return group&&select&&!group.classList.contains('hidden')?select.value||'':'';
+}
+function getAgentCardCatalog(div){
+  return getProviderAdvancedCatalog(div.querySelector('.agent-provider')?.value||'',readAgentBasisId(div));
+}
 function listAgentCatalogEntries(catalog){
   return window.CatsUI?.listAdvancedCatalogEntries
     ? window.CatsUI.listAdvancedCatalogEntries(catalog)
@@ -1382,7 +1409,7 @@ function renderAgentProviderSelectOptions(selectEl,selectedProvider=''){
   );
 }
 function resolveAgentInitialRouting(provider,model='',modelSelection=null){
-  const catalog=getProviderAdvancedCatalog(provider);
+  const catalog=getProviderAdvancedCatalog(provider,modelSelection?.basisId||'');
   const entries=listAgentCatalogEntries(catalog);
   if(!catalog||entries.length===0){
     return { entryId:'', presetId:'' };
@@ -1444,9 +1471,26 @@ function readAgentModelState(div){
     return { model:div.querySelector('.agent-custom-model')?.value.trim()||'', modelSelection:null };
   }
   const presetId=div.querySelector('.agent-preset-choice')?.value||'';
-  const catalog=getProviderAdvancedCatalog(provider);
+  const basisId=readAgentBasisId(div);
+  const unmapped=readAgentUnmappedSelection(div,basisId,entryId);
+  if(unmapped) return { model:'', modelSelection:unmapped };
+  const catalog=getProviderAdvancedCatalog(provider,basisId);
+  if(!catalog&&basisId&&entryId){
+    // The card's basis lost its list (a reload failed or the basis was retired). Keep the
+    // structured choice, never a plain string that Runtime would look up in another basis.
+    const kept={ entryMode:'explicit', entryId, basisId };
+    const revision=getProviderAdvancedCatalog(provider)?.catalogRevision;
+    if(revision) kept.catalogRevision=revision;
+    if(presetId) kept.presetId=presetId;
+    const keptControls=readAgentModelControlValues(div);
+    if(Object.keys(keptControls).length>0) kept.controls=keptControls;
+    return { model:'', modelSelection:kept };
+  }
   if(catalog&&entryId){
     const modelSelection={ entryMode:'explicit', entryId, catalogRevision:catalog.catalogRevision };
+    if(basisId){
+      modelSelection.basisId=basisId;
+    }
     if(presetId){
       modelSelection.presetId=presetId;
     }
@@ -1565,7 +1609,7 @@ function applyAgentModelControlValues(div,controlValues){
 }
 function renderAgentModelChoice(div){
   const provider=div.querySelector('.agent-provider')?.value||'';
-  const catalog=getProviderAdvancedCatalog(provider);
+  const catalog=getAgentCardCatalog(div);
   const entryEl=div.querySelector('.agent-entry-choice');
   const entryGroup=div.querySelector('.agent-entry-group');
   const presetEl=div.querySelector('.agent-preset-choice');
@@ -1614,10 +1658,62 @@ function renderAgentModelChoice(div){
 function syncAgentBasisField(div,catalog){
   const info=div.querySelector('.agent-basis-info');
   if(!info)return;
-  const basis=window.CatsUI.describeCatalogBasis(catalog?.basis);
+  const basis=window.CatsUI.describeCatalogBasis(catalog?.basis,catalog?.capture);
   info.classList.toggle('hidden',!basis);
   info.setAttribute('aria-label',basis?`Model list basis: ${basis.label}`:'Model list basis');
   window.CatsUI.setRuntimeTooltip(info,basis?basis.hint:'');
+}
+// SPEC-045 FR-7: one "List basis" select before Model, only for a target with two or more
+// bases, with the Runtime's labels in data order. requestedBasisId is the selection's basis
+// ('' for the first basis), or null for a custom model, which keeps the card's current choice
+// or, on a fresh card, takes the detected basis, else the first. A requested basis that is not
+// listed or whose list did not load stays selected as a disabled option and is never swapped.
+// Returns the chosen select value ('' for an id-less first basis).
+function renderAgentBasisField(div,provider,requestedBasisId){
+  const group=div.querySelector('.agent-basis-group');
+  const select=div.querySelector('.agent-basis-choice');
+  const hint=div.querySelector('.agent-basis-hint');
+  if(!group||!select)return'';
+  const first=PROVIDER_ADVANCED_CATALOGS[provider]||null;
+  const bases=window.CatsUI.listAdvancedCatalogBases(first);
+  const values=bases.map(basis=>typeof basis?.id==='string'?basis.id:'');
+  const loaded=values.map((value,index)=>index===0||Boolean(getProviderAdvancedCatalog(provider,value)));
+  const unavailable=typeof requestedBasisId==='string'&&requestedBasisId!==''
+    &&!getProviderAdvancedCatalog(provider,requestedBasisId);
+  const shown=bases.length>1||unavailable;
+  group.classList.toggle('hidden',!shown);
+  div.querySelector('.agent-entry-group')?.classList.toggle('col-span-2',shown);
+  if(!shown){
+    select.innerHTML='';
+    delete select.dataset.provider;
+    if(hint){hint.textContent='';hint.classList.add('hidden');}
+    return'';
+  }
+  const usable=value=>values.includes(value)&&loaded[values.indexOf(value)];
+  let value;
+  if(requestedBasisId===''){
+    value=values[0]??'';
+  }else if(requestedBasisId!==null){
+    value=requestedBasisId;
+  }else if(select.dataset.provider===provider&&usable(select.value)){
+    value=select.value;
+  }else{
+    const detected=window.CatsUI.getDetectedCatalogBasisId(first);
+    value=detected!==null&&usable(detected)?detected:(values[0]??'');
+  }
+  select.dataset.provider=provider;
+  const options=bases.map((basis,index)=>
+    `<option value="${escapeHtml(values[index])}"${loaded[index]?'':' disabled'}>${escapeHtml(basis?.label||values[index])}</option>`);
+  if(unavailable&&!values.includes(value)){
+    options.push(`<option value="${escapeHtml(value)}" disabled>${escapeHtml(value)} (unavailable)</option>`);
+  }
+  select.innerHTML=options.join('');
+  select.value=value;
+  const note=unavailable
+    ? 'This saved list basis is not available from the Runtime. The agent keeps its saved model and list, and the Runtime rejects the list if it no longer exists.'
+    : window.CatsUI.describeCatalogBasisMismatch(first,value);
+  if(hint){hint.textContent=note;hint.classList.toggle('hidden',!note);}
+  return value;
 }
 
 // A card rendered before provider catalogs load has Custom as its only option. Keep an
@@ -1650,13 +1746,21 @@ function syncAgentModelField(div,options={}){
     { allowLegacyModel:false },
   );
   const provider=renderAgentProviderSelectOptions(providerEl,normalizedState.provider);
-  const catalog=getProviderAdvancedCatalog(provider);
+  const basisId=renderAgentBasisField(div,provider,
+    normalizedState.modelSelection?(normalizedState.modelSelection.basisId||''):null);
+  const catalog=getProviderAdvancedCatalog(provider,basisId);
   syncAgentBasisField(div,catalog);
+  // A saved selection whose basis is unavailable keeps its entry, and is sent back unchanged.
+  const unmapped=basisId&&!catalog&&normalizedState.modelSelection?.entryId?normalizedState.modelSelection:null;
+  if(unmapped) div.dataset.unmappedBasisSelection=JSON.stringify(unmapped);
+  else delete div.dataset.unmappedBasisSelection;
   const entries=listAgentCatalogEntries(catalog);
   const basicModels=PROVIDER_MODELS[provider]||[];
   const providerCatalogPending=!providerOptionsReady&&(providerOptionsLoading||providerOptionsRequestId===0);
 
-  const choices=entries.length>0
+  const choices=unmapped
+    ? [{value:unmapped.entryId,label:unmapped.entryId}]
+    : entries.length>0
     ? entries.map(entry=>({value:entry.id,label:window.CatsUI.formatAdvancedDefaultLabel(entry.label||entry.id,entry.default)}))
     : basicModels.map(entry=>({value:entry.value,label:entry.label||entry.value}));
   const requested=normalizedState.modelSelection?.entryId||normalizedState.model||'';
@@ -1725,7 +1829,7 @@ function addAgent(name='',provider='',model='',tags=[],modelSelection=null,optio
   const div=document.createElement('div'); div.id=`agent-${id}`;
   div.className='agent-card bg-slate-700/50 rounded-lg p-3 border border-slate-600';
   div.dataset.expanded='false';
-  div.innerHTML=`<div class="flex items-start gap-3"><button type="button" class="agent-card-toggle" aria-expanded="false" onclick="toggleAgentCard(${id})"><div class="agent-card-name-row"><span class="agent-summary-name agent-card-name">${escapeHtml(name)}</span><svg class="agent-card-chevron h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></div><div class="agent-summary-meta agent-card-summary-row"></div><div class="agent-summary-tags agent-card-summary-row"></div></button><button onclick="removeAgent(${id})" class="agent-remove hover:bg-slate-800/70 hover:text-red-400" title="Remove agent" aria-label="Remove agent"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg></button></div><div class="agent-card-details hidden space-y-3"><div><label class="block text-xs text-slate-400 mb-1">Name</label><input type="text" value="${escapeHtml(name)}" placeholder="Agent name" class="agent-name w-full bg-transparent border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none" /></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-slate-400">Provider</label><select class="agent-provider w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none">${listSelectableProviders().map(p=>`<option value="${p}" ${p===provider?'selected':''}>${p}</option>`).join('')}</select></div><div class="agent-entry-group"><div class="flex items-center gap-1"><label class="block text-xs text-slate-400">Model</label><button type="button" class="agent-basis-info hidden inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-slate-500 text-[9px] font-semibold leading-none text-slate-400 hover:text-slate-200 focus:outline-none focus-visible:ring-1 focus-visible:ring-slate-400" aria-label="Model list basis">i</button></div><select class="agent-entry-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select></div></div><div class="agent-custom-model-group hidden"><label class="block text-xs text-slate-400">Custom model</label><input type="text" aria-label="Custom model" class="agent-custom-model w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" placeholder="Enter model string" /></div><div class="agent-mode-group"><label class="block text-xs text-slate-400">Mode</label><select class="agent-preset-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select><div class="agent-preset-static-label runtime-input hidden !py-2 text-xs text-slate-500"></div></div><div class="agent-model-controls space-y-2"></div><p class="agent-model-hint text-[11px] leading-4 text-slate-500"></p><div><label class="block text-xs text-slate-400 mb-1">Tags</label><div class="flex flex-wrap gap-x-3 gap-y-1 agent-tags">${buildTagCheckboxes(id,tags)}</div></div></div>`;
+  div.innerHTML=`<div class="flex items-start gap-3"><button type="button" class="agent-card-toggle" aria-expanded="false" onclick="toggleAgentCard(${id})"><div class="agent-card-name-row"><span class="agent-summary-name agent-card-name">${escapeHtml(name)}</span><svg class="agent-card-chevron h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></div><div class="agent-summary-meta agent-card-summary-row"></div><div class="agent-summary-tags agent-card-summary-row"></div></button><button onclick="removeAgent(${id})" class="agent-remove hover:bg-slate-800/70 hover:text-red-400" title="Remove agent" aria-label="Remove agent"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg></button></div><div class="agent-card-details hidden space-y-3"><div><label class="block text-xs text-slate-400 mb-1">Name</label><input type="text" value="${escapeHtml(name)}" placeholder="Agent name" class="agent-name w-full bg-transparent border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none" /></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-slate-400">Provider</label><select class="agent-provider w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none">${listSelectableProviders().map(p=>`<option value="${p}" ${p===provider?'selected':''}>${p}</option>`).join('')}</select></div><div class="agent-basis-group hidden"><label class="block text-xs text-slate-400">List basis</label><select class="agent-basis-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" aria-label="List basis"></select></div><div class="agent-entry-group"><div class="flex items-center gap-1"><label class="block text-xs text-slate-400">Model</label><button type="button" class="agent-basis-info hidden inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-slate-500 text-[9px] font-semibold leading-none text-slate-400 hover:text-slate-200 focus:outline-none focus-visible:ring-1 focus-visible:ring-slate-400" aria-label="Model list basis">i</button></div><select class="agent-entry-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select></div></div><p class="agent-basis-hint hidden text-[11px] leading-4 text-amber-300/80"></p><div class="agent-custom-model-group hidden"><label class="block text-xs text-slate-400">Custom model</label><input type="text" aria-label="Custom model" class="agent-custom-model w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" placeholder="Enter model string" /></div><div class="agent-mode-group"><label class="block text-xs text-slate-400">Mode</label><select class="agent-preset-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select><div class="agent-preset-static-label runtime-input hidden !py-2 text-xs text-slate-500"></div></div><div class="agent-model-controls space-y-2"></div><p class="agent-model-hint text-[11px] leading-4 text-slate-500"></p><div><label class="block text-xs text-slate-400 mb-1">Tags</label><div class="flex flex-wrap gap-x-3 gap-y-1 agent-tags">${buildTagCheckboxes(id,tags)}</div></div></div>`;
   list.appendChild(div);
   syncAgentModelField(div,{preserve:false,provider,model,modelSelection});
   const pSel=div.querySelector('.agent-provider'), entrySel=div.querySelector('.agent-entry-choice'), presetSel=div.querySelector('.agent-preset-choice');
@@ -1733,11 +1837,28 @@ function addAgent(name='',provider='',model='',tags=[],modelSelection=null,optio
   pSel.addEventListener('change',()=>{
     syncAgentModelField(div,{preserve:false,preserveRequestedProvider:true});
   });
+  // Changing the basis reloads Model from that list: the current entry and its controls stay
+  // when the new list has it, otherwise the list's own default is chosen.
+  div.querySelector('.agent-basis-choice').addEventListener('change',e=>{
+    const basisId=e.target.value||'';
+    const provider=pSel.value||'';
+    const current=readAgentModelState(div).modelSelection;
+    if(!current){
+      // A custom model string does not depend on the list.
+      syncAgentModelField(div,{preserve:true});
+    }else{
+      const catalog=getProviderAdvancedCatalog(provider,basisId);
+      const keep=listAgentCatalogEntries(catalog).some(entry=>entry?.id===current.entryId);
+      const modelSelection=keep?{...current}:{};
+      if(basisId) modelSelection.basisId=basisId; else delete modelSelection.basisId;
+      syncAgentModelField(div,{preserve:false,provider,model:'',modelSelection});
+    }
+    validateStartChat();
+  });
   entrySel.addEventListener('change',()=>{
     if(entrySel.value==='__custom_model__') div.dataset.customModelChosen='true';
     else delete div.dataset.customModelChosen;
-    const providerName=div.querySelector('.agent-provider')?.value||'';
-    syncAgentPresetField(div,getProviderAdvancedCatalog(providerName),entrySel.value||'','',false);
+    syncAgentPresetField(div,getAgentCardCatalog(div),entrySel.value||'','',false);
     renderAgentModelChoice(div);
     refreshAgentCardSummary(div);
     validateStartChat();
@@ -1982,6 +2103,9 @@ async function loadProviderOptions() {
     Object.keys(PROVIDER_ADVANCED_CATALOGS).forEach(name=>{
       if(!configuredProviders.includes(name)) delete PROVIDER_ADVANCED_CATALOGS[name];
     });
+    Object.keys(PROVIDER_BASIS_CATALOGS).forEach(name=>{
+      if(!configuredProviders.includes(name)) delete PROVIDER_BASIS_CATALOGS[name];
+    });
     Object.keys(PROVIDER_AVAILABILITY).forEach(name=>delete PROVIDER_AVAILABILITY[name]);
     Object.entries(providerState.providerAvailability || {}).forEach(([providerName, status]) => {
       if (providerName && typeof status === 'string' && status) {
@@ -2001,6 +2125,23 @@ async function loadProviderOptions() {
             : advancedData;
           if(requestId!==providerOptionsRequestId) return;
           if (normalized) {
+            // SPEC-045: fetch every further basis now, so changing "List basis" needs no wait.
+            const basisIds = (window.CatsUI.listAdvancedCatalogBases(normalized) || []).slice(1)
+              .map((basis) => (typeof basis?.id === 'string' ? basis.id : ''))
+              .filter(Boolean);
+            const basisCatalogs = {};
+            await Promise.all(basisIds.map(async (basisId) => {
+              try {
+                const basisRes = await fetch(`/providers/${name}/models/advanced?basis=${encodeURIComponent(basisId)}`, { headers });
+                if (!basisRes.ok) return;
+                const basisCatalog = window.CatsUI.normalizeAdvancedCatalog(await basisRes.json());
+                if (basisCatalog) basisCatalogs[basisId] = basisCatalog;
+              } catch {}
+            }));
+            if(requestId!==providerOptionsRequestId) return;
+            // Swapped in only once this provider's lists are all back.
+            if (basisIds.length) PROVIDER_BASIS_CATALOGS[name] = basisCatalogs;
+            else delete PROVIDER_BASIS_CATALOGS[name];
             PROVIDER_ADVANCED_CATALOGS[name] = normalized;
             const entries = Array.isArray(normalized.entries) ? normalized.entries : [];
             {
@@ -2016,6 +2157,7 @@ async function loadProviderOptions() {
       } catch {}
       if(requestId!==providerOptionsRequestId) return;
       delete PROVIDER_ADVANCED_CATALOGS[name];
+      delete PROVIDER_BASIS_CATALOGS[name];
       try {
         const mRes = await fetch(`/providers/${name}/models`, { headers });
         if (mRes.ok) {
