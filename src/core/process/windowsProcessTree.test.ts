@@ -1,5 +1,6 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { EventEmitter, once } from 'node:events';
+import { PassThrough } from 'node:stream';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -48,6 +49,17 @@ describe('killWindowsProcessTree', () => {
     }
   });
 
+  it('closes the input of a process it has to kill alone', () => {
+    const stdin = new PassThrough();
+    const child = Object.assign(fakeChild(), { stdin });
+    const killer = fakeKiller();
+    killWindowsProcessTree(child, () => killer);
+    expect(stdin.writableEnded).toBe(false);
+    killer.emit('exit', 1);
+    expect(stdin.writableEnded).toBe(true);
+    expect(child.kill).toHaveBeenCalledOnce();
+  });
+
   it('does nothing for a process that has no pid or has already exited', () => {
     const run = vi.fn();
     killWindowsProcessTree(fakeChild({ pid: undefined }), run);
@@ -55,58 +67,72 @@ describe('killWindowsProcessTree', () => {
     expect(run).not.toHaveBeenCalled();
   });
 
-  /** A CLI that ignores its closed input, behind a batch shim like npm's, run through a cmd.exe proxy. */
-  async function stubbornCliBehindProxy(dir: string) {
-    const pidFile = join(dir, 'cli.pid');
-    const script = join(dir, 'stubborn.cjs');
-    writeFileSync(script, `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\n`
-      + 'process.stdin.resume(); process.stdin.on("end", () => {}); setInterval(() => {}, 1000);\n');
-    const shim = join(dir, 'stubborn.cmd');
-    writeFileSync(shim, `@"${process.execPath}" "${script}" %*\r\n`);
-    const proxy = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${shim}"`],
-      { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true, windowsVerbatimArguments: true });
-    await vi.waitFor(() => expect(existsSync(pidFile)).toBe(true), { timeout: 10_000 });
-    return { proxy, cliPid: Number(readFileSync(pidFile, 'utf8')) };
+  /**
+   * A CLI that ignores its closed input and has started a detached tool process of its own, behind a
+   * batch shim like npm's, run through a cmd.exe proxy. Everything it starts is reaped afterwards.
+   */
+  class StubbornCli {
+    readonly dir = mkdtempSync(join(tmpdir(), 'cats-runtime-process-tree-'));
+    proxy: ChildProcess | undefined;
+    pids: number[] = [];
+
+    async start() {
+      const pidFile = join(this.dir, 'pids');
+      const script = join(this.dir, 'stubborn.cjs');
+      writeFileSync(script, [
+        `const tool = require('child_process').spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'],`
+          + " { detached: true, stdio: 'ignore', windowsHide: true });",
+        `require('fs').writeFileSync(${JSON.stringify(pidFile)}, process.pid + ' ' + tool.pid);`,
+        "process.stdin.resume(); process.stdin.on('end', () => {}); setInterval(() => {}, 1000);",
+      ].join('\n'));
+      const shim = join(this.dir, 'stubborn.cmd');
+      writeFileSync(shim, `@"${process.execPath}" "${script}" %*\r\n`);
+      this.proxy = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${shim}"`],
+        { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true, windowsVerbatimArguments: true });
+      await vi.waitFor(() => expect(existsSync(pidFile)).toBe(true), { timeout: 10_000 });
+      this.pids = readFileSync(pidFile, 'utf8').trim().split(' ').map(Number);
+      return { proxy: this.proxy, cliPid: this.pids[0]!, toolPid: this.pids[1]! };
+    }
+
+    /** Also when an assertion exposes a regression, or the CLI never reported its pids. */
+    reap() {
+      for (const pid of [this.proxy?.pid ?? 0, ...this.pids]) {
+        if (pid > 0 && alive(pid)) spawnSync('taskkill.exe', ['/pid', String(pid), '/t', '/f'], { stdio: 'ignore', windowsHide: true });
+      }
+      rmSync(this.dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
   }
 
   const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 
-  /** Reaps only this fixture's CLI, also when an assertion exposes a regression. */
-  function reap(pid: number, dir: string) {
-    if (pid > 0 && alive(pid)) spawn('taskkill.exe', ['/pid', String(pid), '/t', '/f'], { stdio: 'ignore', windowsHide: true });
-    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
-  }
-
   it('control: killing only the cmd.exe proxy leaves its CLI running (Windows)', async () => {
     if (process.platform !== 'win32') return;
-    const dir = mkdtempSync(join(tmpdir(), 'cats-runtime-process-tree-'));
-    let cliPid = 0;
+    const cli = new StubbornCli();
     try {
-      const started = await stubbornCliBehindProxy(dir);
-      cliPid = started.cliPid;
-      started.proxy.stdin?.end();
-      started.proxy.kill('SIGTERM');
+      const { proxy, cliPid } = await cli.start();
+      proxy.stdin?.end();
+      proxy.kill('SIGTERM');
       await new Promise((resolve) => setTimeout(resolve, 500));
       expect(alive(cliPid)).toBe(true);
     } finally {
-      reap(cliPid, dir);
+      cli.reap();
     }
   }, 20_000);
 
-  it('ends a CLI that a cmd.exe proxy started, not just the proxy (Windows)', async () => {
+  it('ends the CLI a cmd.exe proxy started, and what that CLI started, while the input stays open (Windows)', async () => {
     if (process.platform !== 'win32') return;
-    const dir = mkdtempSync(join(tmpdir(), 'cats-runtime-process-tree-'));
-    let cliPid = 0;
+    const cli = new StubbornCli();
     try {
-      const { proxy, cliPid: pid } = await stubbornCliBehindProxy(dir);
-      cliPid = pid;
+      const { proxy, cliPid, toolPid } = await cli.start();
       const closed = once(proxy, 'close');
-      proxy.stdin?.end();
       killWindowsProcessTree(proxy);
       await closed;
-      await vi.waitFor(() => expect(alive(cliPid)).toBe(false), { timeout: 5_000 });
+      await vi.waitFor(() => {
+        expect(alive(cliPid)).toBe(false);
+        expect(alive(toolPid)).toBe(false);
+      }, { timeout: 5_000 });
     } finally {
-      reap(cliPid, dir);
+      cli.reap();
     }
   }, 20_000);
 });

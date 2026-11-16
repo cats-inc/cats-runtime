@@ -126,6 +126,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   private readonly ownedGenerations = new Set<number>();
   /** Children that are Windows shell proxies, which `terminate` ends with the CLI they started. */
   private readonly shellProxies = new WeakSet<ChildProcess>();
+  /** Shell proxies `terminate` has handed to taskkill. */
+  private readonly treeKilled = new WeakSet<ChildProcess>();
   get startupHasOwnedProcess(): boolean { return this.ownedProcessStarted; }
   private spawnResilience: SpawnResilienceConfig;
 
@@ -310,7 +312,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     if (spawnConfig.windowsShellProxy) this.shellProxies.add(child);
     this.process = child;
     const control = new WorkerControlChannel((line, done) => {
-      if (this.process !== child || child.killed || child.exitCode !== null || !child.stdin || child.stdin.destroyed) {
+      if (this.process !== child || this.stopping(child) || child.exitCode !== null || !child.stdin || child.stdin.destroyed) {
         done(new Error('Worker unavailable')); return;
       }
       child.stdin.write(line, done);
@@ -427,7 +429,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     const handler = this.provider.buildServerResponse;
     if (!handler || !controller || controller.signal.aborted) return;
     const isCurrent = () => this.process === child && child.exitCode === null
-      && !child.killed && this.activeTurnController === controller && !controller.signal.aborted
+      && !this.stopping(child) && this.activeTurnController === controller && !controller.signal.aborted
       && Boolean(child.stdin && !child.stdin.destroyed && !child.stdin.writableEnded);
     // Invoke before parsing the next wire frame: a resolution immediately followed
     // by turn completion must close its card before the turn controller aborts.
@@ -766,8 +768,9 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
 
     if (this.process && this.process.exitCode === null) {
       const child = this.process;
-      // The EOF lets a CLI shut down; a shell proxy cannot exit before the CLI it waits for.
-      child.stdin?.end();
+      // The EOF lets a CLI shut down. Behind a shell proxy it could let the CLI exit before taskkill
+      // has walked the tree, orphaning what the CLI started; taskkill closes the pipes itself.
+      if (!this.shellProxies.has(child)) child.stdin?.end();
       this.terminate(child);
 
       setTimeout(() => {
@@ -784,8 +787,18 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
    * running, holding its working folder.
    */
   private terminate(child: ChildProcess): void {
-    if (this.shellProxies.has(child)) killWindowsProcessTree(child);
-    else child.kill('SIGTERM');
+    if (!this.shellProxies.has(child)) {
+      child.kill('SIGTERM');
+      return;
+    }
+    // taskkill takes a moment and leaves child.killed false; nothing more is written meanwhile.
+    this.treeKilled.add(child);
+    killWindowsProcessTree(child);
+  }
+
+  /** Killed, or being ended with its process tree. */
+  private stopping(child: ChildProcess): boolean {
+    return child.killed || this.treeKilled.has(child);
   }
 
   kill(): void {

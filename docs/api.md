@@ -3898,8 +3898,11 @@ remove a sandbox.
 On Windows, a CLI behind a `.cmd` or `.bat` shim that the Runtime cannot resolve
 to the program behind it runs through a shell proxy (cmd.exe or PowerShell).
 Stopping such a session, also after a provider error, ends the proxy together
-with every process under it (`taskkill /T /F`); killed alone, the proxy would
-leave the CLI running.
+with the processes under it at that moment (`taskkill /T /F`); killed alone, the
+proxy would leave the CLI running. The CLI's input stays open until then, so it
+cannot exit first and leave what it started outside the tree. A process the CLI
+had already left behind before the stop is not reached. When taskkill cannot
+run, only the proxy is killed and its input closed.
 
 Sandbox removal retries transient Windows errors for about 5 seconds. When it
 still fails, the delete answers `deleted` with `workspaceCleaned: false` and the
