@@ -34,6 +34,7 @@ import {
   parseKiroListModels,
   parseVerboseChannel,
   parseVersion,
+  museProbeResult,
   projectMuseModelList,
   runSource,
   SOURCES,
@@ -226,6 +227,42 @@ test('MSP model/list keeps the catalog source and per-row variants', () => {
     catalogSource: 'bundledCatalog',
   });
 });
+
+test('a non-account Muse reply falls back to the account cache for the same profile', () => withScratch((root) => {
+  const dir = join(root, 'model-catalog');
+  mkdirSync(dir);
+  const row = (id, visibility, tiers, isDefault = false) => ({
+    model_id: id, display_label: id, visibility, release_date: '2026-10-01', context_limit: 10, output_limit: 5,
+    is_default: isDefault, cost: { input: 1 }, roles: [],
+    reasoning_effort_variants: tiers ? tiers.map((tier) => ({ tier, description: null })) : null,
+  });
+  const cache = (profile, rows, source = 'provider_catalog') => JSON.stringify({
+    schema_version: 3, provider_id: 'p', profile_id: profile, source, rows });
+  writeFileSync(join(dir, 'a__p01.json'), cache('other', [row('wrong-profile', 'visible', ['low'])]));
+  writeFileSync(join(dir, 'b__p02.json'), cache('private', [row('bundled-only', 'visible', ['low'])], 'bundled'));
+  writeFileSync(join(dir, 'c__p03.json'), cache('private', [row('ex-a', 'visible', ['low', 'max']), row('ex-a-contributor', 'hidden', ['low'], true)]));
+  writeFileSync(join(dir, 'd.json'), '{not json');
+  const install = { version: '9.9.9-R1' };
+  const reply = { source: 'bundledCatalog', providerId: 'p', profileId: 'private', museHome: root, models: [] };
+
+  const fromCache = museProbeResult(install, reply);
+  assert.equal(fromCache.status, undefined);
+  assert.deepEqual([fromCache.sourceClass, fromCache.catalogSource, fromCache.cliVersion], ['cli-account-cache', 'accountCache', '9.9.9-R1']);
+  assert.deepEqual(fromCache.models, [
+    { id: 'ex-a', label: 'ex-a', efforts: ['low', 'max'], hidden: false, evidence: { releaseDate: '2026-10-01', contextLimit: 10, outputLimit: 5 } },
+    { id: 'ex-a-contributor', label: 'ex-a-contributor', efforts: ['low'], hidden: true,
+      evidence: { releaseDate: '2026-10-01', contextLimit: 10, outputLimit: 5, cacheIsDefault: true } },
+  ]);
+  assert.match(fromCache.notes[0], /^MSP answered from "bundledCatalog", .*c__p03\.json, source provider_catalog, written \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC\), not from a live server read\.$/);
+  assert.match(museProbeResult(install, reply, { now: Date.now() + 30 * 86400000 }).notes[0], /It is (30|31) days old/);
+
+  const live = museProbeResult(install, { ...reply, source: 'providerCatalog', models: [{ modelId: 'live' }] });
+  assert.deepEqual([live.status, live.sourceClass, live.models.map((model) => model.id)], [undefined, undefined, ['live']]);
+  for (const missing of [{ profileId: 'absent' }, { museHome: undefined }, { providerId: undefined }]) {
+    const degraded = museProbeResult(install, { ...reply, ...missing });
+    assert.deepEqual([degraded.status, degraded.reason, degraded.sourceClass], ['degraded', 'non-account-source', undefined]);
+  }
+}));
 
 test('versions and Claude release-note signals', () => {
   assert.equal(parseVersion('grok 1.0.46 (2765805b9442) [alpha]'), '1.0.46');
