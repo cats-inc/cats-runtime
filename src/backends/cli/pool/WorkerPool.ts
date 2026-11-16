@@ -26,6 +26,7 @@ import { DevinProvider } from '../providers/devin.js';
 import { MuseProvider } from '../providers/muse.js';
 import { MuseMspProvider } from '../providers/museMsp.js';
 import { HostedAcpProvider } from '../providers/hostedAcp.js';
+import { StandingGrants } from '../../../core/interactions/standingGrants.js';
 import { ClaudeProvider } from '../providers/claude.js';
 import { CodexProvider } from '../providers/codex.js';
 import { CopilotProvider } from '../providers/copilot.js';
@@ -69,6 +70,8 @@ export class WorkerPool {
   private readonly sessionMcpConnections = new Map<string, Map<string, string>>();
 
   private workers = new Map<string, WorkerProcess>();
+  /** ADR-055: owner grants per Runtime session, memory-only, kept across that session's workers. */
+  private readonly standingGrants = new Map<string, StandingGrants>();
   private externalExecutions = new Map<string, { provider: string; cancel: () => void }>();
   private externalSourceSessions = new Map<string, string>();
   private workerSingletonResources = new Map<string, string>();
@@ -390,7 +393,8 @@ export class WorkerPool {
         || opts.interactionHost.kinds.some(kind => !provider.capabilities.interactions!.kinds.includes(kind)))) {
         throw new Error('Provider does not support the requested interaction host.');
       }
-      worker = new WorkerProcess(provider, opts, commandConfig, resilience, managed, launchEnv, sessionId);
+      worker = new WorkerProcess(provider, opts, commandConfig, resilience, managed, launchEnv, sessionId,
+        opts.interactionHost && provider.capabilities.interactions?.standingGrants ? this.standingGrantsFor(sessionId) : undefined);
       this.sessionMcpConnections.delete(sessionId);
       worker.on('native-session', nativeId => { this.registry.setProviderSessionId(sessionId, nativeId, !opts.resumeSessionId); });
       if (managed) {
@@ -490,6 +494,21 @@ export class WorkerPool {
 
   private releaseSingletonResource(sessionId: string): void {
     this.workerSingletonResources.delete(sessionId);
+  }
+
+  standingGrantsFor(sessionId: string): StandingGrants {
+    let grants = this.standingGrants.get(sessionId);
+    if (!grants) { grants = new StandingGrants(); this.standingGrants.set(sessionId, grants); }
+    return grants;
+  }
+
+  /** The grants a session holds, without creating an empty record. */
+  existingStandingGrants(sessionId: string): StandingGrants | undefined {
+    return this.standingGrants.get(sessionId);
+  }
+
+  forgetStandingGrants(sessionId: string): void {
+    this.standingGrants.delete(sessionId);
   }
 
   get(sessionId: string): WorkerProcess | undefined {

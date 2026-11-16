@@ -1,9 +1,18 @@
 import { createHash, randomUUID } from 'node:crypto';
 import {
   InteractionError, type InteractionAnswer, type InteractionHost, type InteractionKind, type InteractionPrompt,
-  type InteractionSnapshot, type InteractionStatus, type ProviderInteraction,
+  type InteractionSnapshot, type InteractionStatus, type ProviderInteraction, type GrantCategory,
 } from './types.js';
 import { parseInteractionResponse, validateAnswer } from './validation.js';
+import type { StandingGrants } from './standingGrants.js';
+
+/** ADR-055: the session's grants, and whether the turn running now may use them (the host decides per send). */
+export interface InteractionStanding {
+  grants: StandingGrants;
+  /** The categories this target advertises; a prompt tagged with any other one stays a card. */
+  categories: readonly GrantCategory[];
+  allowed(): boolean;
+}
 
 interface Entry {
   view: ProviderInteraction;
@@ -36,6 +45,7 @@ export class InteractionStore {
     readonly host: InteractionHost,
     private readonly changed: (view: ProviderInteraction) => void = () => undefined,
     private readonly now: () => number = Date.now,
+    private readonly standing?: InteractionStanding,
   ) {}
 
   get waiting(): boolean {
@@ -44,7 +54,8 @@ export class InteractionStore {
 
   snapshot(): InteractionSnapshot {
     return { version: 1, sessionId: this.sessionId, workerGeneration: this.generation,
-      revision: this.revision, interactions: [...this.entries.values()].map(entry => structuredClone(entry.view)) };
+      revision: this.revision, interactions: [...this.entries.values()].map(entry => structuredClone(entry.view)),
+      ...(this.standing ? { standingGrants: this.standing.grants.list() } : {}) };
   }
 
   unavailable(executionId: string, kind: InteractionKind, reason: string): string {
@@ -71,6 +82,12 @@ export class InteractionStore {
       throw new InteractionError('interaction_limit', 'Provider interaction is too large.');
     }
     const created = this.now();
+    const category = input.prompt.grantCategory;
+    const choice = input.prompt.choices?.[0]?.id;
+    if (category && choice && this.standing?.categories.includes(category) && this.standing.allowed()
+      && this.standing.grants.covers(category)) {
+      return this.answerFromGrant(input, choice, created);
+    }
     const deadline = Math.min(created + this.host.timeoutMs, input.deadlineMs ?? Infinity);
     const view: ProviderInteraction = {
       interactionId: randomUUID(), sessionId: this.sessionId, workerGeneration: this.generation,
@@ -90,6 +107,41 @@ export class InteractionStore {
     return view.interactionId;
   }
 
+  /**
+   * ADR-055: a standing grant answers with the prompt's one-action choice and never shows the host a
+   * pending card, so no waiting state, bubble or notice fires. The answer is sent after `register`
+   * returns, because adapters record the request only once it has an id.
+   */
+  private answerFromGrant(input: InteractionRegistration, choice: string, created: number): string {
+    const at = new Date(created).toISOString();
+    const view: ProviderInteraction = {
+      interactionId: randomUUID(), sessionId: this.sessionId, workerGeneration: this.generation,
+      executionId: input.executionId, revision: ++this.revision, createdAt: at, expiresAt: at,
+      status: 'responding', kind: input.prompt.kind, decision: 'accept', reason: 'standing_grant',
+    };
+    const entry: Entry = { view, abortDelivery: input.abortDelivery };
+    const abort = () => this.finish(entry, 'interrupted', 'execution_ended');
+    input.signal.addEventListener('abort', abort, { once: true });
+    entry.cleanup = () => input.signal.removeEventListener('abort', abort);
+    this.entries.set(view.interactionId, entry);
+    this.prune();
+    this.changed(structuredClone(view));
+    void Promise.resolve().then(async () => {
+      // The turn may have ended, or the provider superseded the request, before this microtask.
+      if (input.signal.aborted) { this.finish(entry, 'interrupted', 'execution_ended'); return; }
+      if (entry.view.status !== 'responding') return;
+      try {
+        await input.respond({ action: 'accept', choice });
+        this.finish(entry, 'resolved', 'standing_grant');
+      } catch {
+        const abortDelivery = entry.abortDelivery;
+        this.finish(entry, 'interrupted', 'response_delivery_failed');
+        abortDelivery?.();
+      }
+    });
+    return view.interactionId;
+  }
+
   async respond(id: string, value: unknown): Promise<ProviderInteraction> {
     const input = parseInteractionResponse(value);
     const entry = this.entries.get(id);
@@ -106,7 +158,12 @@ export class InteractionStore {
       throw new InteractionError('interaction_conflict', 'Provider interaction is no longer pending at this revision.');
     }
     validateAnswer(entry.view.prompt, input.answer);
+    if (input.answer.standingGrant && (!this.standing || !this.standing.categories.includes(entry.view.prompt.grantCategory!))) {
+      throw new InteractionError('interaction_unsupported', 'This session does not keep standing grants for this request.');
+    }
     const send = entry.respond!;
+    // The grant is the owner's decision on this card; whether a later turn may use it is the host's per send.
+    if (input.answer.standingGrant) this.standing!.grants.add(entry.view.prompt.grantCategory!, input.answer.standingGrant);
     entry.view = { ...entry.view, status: 'responding', decision: input.answer.action, revision: ++this.revision };
     // Install the latch before notifying or invoking provider code (which may reenter).
     let resolve!: (view: ProviderInteraction) => void;
@@ -179,7 +236,9 @@ export class InteractionStore {
     entry.fallback = undefined;
     entry.abortDelivery = undefined;
     const { prompt: _prompt, ...receipt } = entry.view;
-    entry.view = { ...receipt, status, reason, providerConfirmed, revision: ++this.revision };
+    // A provider confirming a grant-answered request keeps the receipt's standing_grant reason (ADR-055).
+    const kept = receipt.reason === 'standing_grant' && status === 'resolved' ? receipt.reason : reason;
+    entry.view = { ...receipt, status, reason: kept, providerConfirmed, revision: ++this.revision };
     this.changed(structuredClone(entry.view));
     entry.settle?.(structuredClone(entry.view));
     entry.settle = undefined;

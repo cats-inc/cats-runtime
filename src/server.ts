@@ -1003,6 +1003,7 @@ export function createRuntimeServer(
   registry.onRemoved((sessionId) => {
     runtime.mcpServers.remove(sessionId);
     runtime.clearWorkspaceActivity(sessionId);
+    runtime.forgetStandingGrants(sessionId);
   });
   const wakeup = new RuntimeWakeupService({
     persistPath: join(dataDir, 'wakeups.json'),

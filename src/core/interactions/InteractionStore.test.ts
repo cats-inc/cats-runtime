@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { InteractionStore } from './InteractionStore.js';
 import { parseInteractionHost, parseInteractionResponse } from './validation.js';
 import { INTERACTION_KINDS, type InteractionPrompt } from './types.js';
+import { StandingGrants } from './standingGrants.js';
 
 afterEach(() => vi.useRealTimers());
 
@@ -214,5 +215,135 @@ describe('interaction validation', () => {
       expect(() => parseInteractionResponse({ ...base, answer })).toThrow();
     }
     expect(() => parseInteractionResponse({ ...base, answer: { action: 'accept', values: { text: '貓'.repeat(11_000) } } })).toThrow();
+  });
+});
+
+describe('standing grants (ADR-055)', () => {
+  const prompt = (grantCategory: 'computer_use' | 'command' | 'file' = 'computer_use'): InteractionPrompt => ({
+    kind: grantCategory === 'command' ? 'command_approval' : grantCategory === 'file' ? 'file_approval' : 'tool_approval',
+    title: 'mcp__plugin-kimi-cu-win_win__js', grantCategory, choices: [{ id: 'approve_once', label: 'Approve once' }] });
+  function standing(allowed = true, now = () => Date.now(), categories: Array<'computer_use' | 'command' | 'file'> = ['computer_use', 'command', 'file']) {
+    const grants = new StandingGrants(now);
+    let turnAllows = allowed;
+    const changed = vi.fn();
+    const store = new InteractionStore('session-a', { version: 1, kinds: [...INTERACTION_KINDS], timeoutMs: 60_000 }, changed, now,
+      { grants, categories, allowed: () => turnAllows });
+    const register = (p: InteractionPrompt, signal = new AbortController().signal) => {
+      const send = vi.fn(async () => undefined);
+      const id = store.register({ executionId: 'turn', prompt: p, signal, respond: send, fallback: vi.fn(async () => undefined) });
+      return { id, send };
+    };
+    return { grants, store, changed, register, setAllowed: (value: boolean) => { turnAllows = value; } };
+  }
+  const accept = (revision: number, standingGrant?: unknown, key = 'grant-1') => ({ expectedRevision: revision, idempotencyKey: key,
+    answer: { action: 'accept', choice: 'approve_once', ...(standingGrant ? { standingGrant } : {}) } });
+
+  it('adds a grant from the card and then answers that category without a pending card', async () => {
+    const f = standing();
+    const first = f.register(prompt());
+    await f.store.respond(first.id, accept(f.store.snapshot().interactions[0]!.revision, { until: 'session' }));
+    expect(f.store.snapshot().standingGrants).toMatchObject([{ category: 'computer_use', until: 'session' }]);
+    f.changed.mockClear();
+    const second = f.register(prompt());
+    expect(second.send).not.toHaveBeenCalled(); // answered only after register returns
+    await Promise.resolve(); await Promise.resolve();
+    expect(second.send).toHaveBeenCalledWith({ action: 'accept', choice: 'approve_once' });
+    const statuses = f.changed.mock.calls.map(call => call[0].status);
+    expect(statuses).not.toContain('pending');
+    expect(f.store.snapshot().interactions.find(item => item.interactionId === second.id))
+      .toMatchObject({ status: 'resolved', reason: 'standing_grant', decision: 'accept' });
+    expect(f.store.snapshot().interactions.find(item => item.interactionId === second.id)?.prompt).toBeUndefined();
+    f.store.resolve(second.id);
+    expect(f.store.snapshot().interactions.find(item => item.interactionId === second.id))
+      .toMatchObject({ status: 'resolved', reason: 'standing_grant', providerConfirmed: true });
+  });
+
+  it('keeps categories apart: a computer-use grant never approves a command or an uncategorized tool', async () => {
+    const f = standing();
+    f.grants.add('computer_use', { until: 'session' });
+    const command = f.register(prompt('command'));
+    const other = f.register({ kind: 'tool_approval', title: 'other', choices: [{ id: 'approve_once', label: 'Approve once' }] });
+    await Promise.resolve(); await Promise.resolve();
+    expect(command.send).not.toHaveBeenCalled(); expect(other.send).not.toHaveBeenCalled();
+    expect(f.store.snapshot().interactions.filter(item => item.status === 'pending')).toHaveLength(2);
+  });
+
+  it('shows the card when the turn may not use grants (Telegram, heartbeats, schedules)', async () => {
+    const f = standing(false);
+    f.grants.add('computer_use', { until: 'session' });
+    const call = f.register(prompt());
+    await Promise.resolve(); await Promise.resolve();
+    expect(call.send).not.toHaveBeenCalled();
+    expect(f.store.snapshot().interactions[0]).toMatchObject({ status: 'pending' });
+  });
+
+  it('follows each send: a marked turn uses the grant, the next unmarked one on the same store gets the card', async () => {
+    const f = standing();
+    f.grants.add('command', { until: 'session' });
+    const marked = f.register(prompt('command'));
+    await Promise.resolve(); await Promise.resolve();
+    expect(marked.send).toHaveBeenCalledOnce();
+    f.setAllowed(false);
+    const unmarked = f.register(prompt('command'));
+    await Promise.resolve(); await Promise.resolve();
+    expect(unmarked.send).not.toHaveBeenCalled();
+    expect(f.store.snapshot().interactions.find(item => item.interactionId === unmarked.id)).toMatchObject({ status: 'pending' });
+  });
+
+  it('keeps a card for a category the target does not advertise', async () => {
+    const f = standing(true, () => Date.now(), ['command']);
+    f.grants.add('computer_use', { until: 'session' });
+    const call = f.register(prompt('computer_use'));
+    await Promise.resolve(); await Promise.resolve();
+    expect(call.send).not.toHaveBeenCalled();
+  });
+
+  it('ends a timed grant at its deadline and on revoke', async () => {
+    let now = 1_000_000;
+    const f = standing(true, () => now);
+    f.grants.add('command', { until: 'time', durationMs: 30 * 60_000 });
+    expect(f.store.snapshot().standingGrants?.[0]).toMatchObject({ until: 'time', expiresAt: new Date(now + 30 * 60_000).toISOString() });
+    now += 30 * 60_000;
+    expect(f.grants.covers('command')).toBe(false);
+    f.grants.add('file', { until: 'session' });
+    expect(f.grants.revoke()).toBe(true);
+    const call = f.register(prompt('file'));
+    await Promise.resolve();
+    expect(call.send).not.toHaveBeenCalled();
+  });
+
+  it('refuses a standing grant on an uncategorized prompt, with another choice, on decline or out of bounds', async () => {
+    const f = standing();
+    const plain = f.register({ kind: 'tool_approval', title: 'other', choices: [{ id: 'approve_once', label: 'Approve once' }] });
+    await expect(f.store.respond(plain.id, accept(f.store.snapshot().interactions[0]!.revision, { until: 'session' })))
+      .rejects.toMatchObject({ code: 'interaction_invalid' });
+    const two = f.register({ ...prompt(), choices: [{ id: 'approve_once', label: 'Once' }, { id: 'other', label: 'Other' }] });
+    const revision = () => f.store.snapshot().interactions.find(item => item.interactionId === two.id)!.revision;
+    await expect(f.store.respond(two.id, { ...accept(revision(), { until: 'session' }), answer: { action: 'accept', choice: 'other', standingGrant: { until: 'session' } } }))
+      .rejects.toMatchObject({ code: 'interaction_invalid' });
+    await expect(f.store.respond(two.id, { ...accept(revision()), answer: { action: 'decline', standingGrant: { until: 'session' } } }))
+      .rejects.toMatchObject({ code: 'interaction_invalid' });
+    for (const durationMs of [59_999, 24 * 60 * 60_000 + 1, 1.5]) {
+      expect(() => parseInteractionResponse(accept(1, { until: 'time', durationMs }))).toThrow();
+    }
+    expect(() => parseInteractionResponse(accept(1, { until: 'forever' }))).toThrow();
+    expect(f.grants.list()).toEqual([]);
+  });
+
+  it('refuses a standing grant where the session keeps none', async () => {
+    const { store, id } = fixture({ ...prompt(), grantCategory: 'computer_use' });
+    await expect(store.respond(id, accept(store.snapshot().interactions[0]!.revision, { until: 'session' })))
+      .rejects.toMatchObject({ code: 'interaction_unsupported' });
+  });
+
+  it('does not answer for a turn that already ended', async () => {
+    const f = standing();
+    f.grants.add('computer_use', { until: 'session' });
+    const controller = new AbortController();
+    const call = f.register(prompt(), controller.signal);
+    controller.abort();
+    await Promise.resolve(); await Promise.resolve();
+    expect(call.send).not.toHaveBeenCalled();
+    expect(f.store.snapshot().interactions[0]).toMatchObject({ status: 'interrupted', reason: 'execution_ended' });
   });
 });

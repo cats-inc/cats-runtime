@@ -53,6 +53,9 @@ describe('hosted Kimi ACP', () => {
     // A cold Kimi launch took 9-30 s on Windows hosts; other hosted adapters keep the worker's 10 s.
     expect(provider.sessionInitializationTimeoutMs).toBe(45_000);
     expect(new HostedAcpProvider('grok').sessionInitializationTimeoutMs).toBeUndefined();
+    // ADR-055: Kimi's computer use joins shell and file approvals as standing-grant categories.
+    expect(provider.capabilities.interactions?.standingGrants).toEqual({ version: 1, categories: ['computer_use', 'command', 'file'] });
+    expect(new HostedAcpProvider('grok').capabilities.interactions?.standingGrants).toEqual({ version: 1, categories: ['command', 'file'] });
     expect(provider.composeLaunchArgs(['--add-dir', '/extra'], args)).toEqual(['--add-dir', '/extra', 'acp']);
     for (const flag of ['--yolo', '-y', '--auto', '--plan', 'acp', '--session=abc', '-c']) {
       expect(() => provider.composeLaunchArgs([flag], args)).toThrow('conflict');
@@ -141,7 +144,7 @@ describe('hosted Kimi ACP', () => {
         provider.parseStreamLine(line);
       }
     }
-    expect(card!.prompt).toMatchObject({ kind: 'tool_approval', title: 'mcp__plugin-kimi-cu-win_win__js',
+    expect(card!.prompt).toMatchObject({ kind: 'tool_approval', title: 'mcp__plugin-kimi-cu-win_win__js', grantCategory: 'computer_use',
       choices: [{ id: 'approve_once', label: 'Approve once' }] });
     expect(card!.prompt.message).toContain("nodeRepl.write('probe-ok')");
     expect(card!.prompt.message).toContain('Scope: this action only');
@@ -181,8 +184,8 @@ describe('hosted Kimi ACP', () => {
       }
     }
     const [bash, write] = context.interactions.request.mock.calls.map(call => call[0].prompt);
-    expect(bash).toMatchObject({ kind: 'command_approval', title: 'Bash', command: 'echo cats-probe' });
-    expect(write).toMatchObject({ kind: 'file_approval', title: 'Write' });
+    expect(bash).toMatchObject({ kind: 'command_approval', title: 'Bash', command: 'echo cats-probe', grantCategory: 'command' });
+    expect(write).toMatchObject({ kind: 'file_approval', title: 'Write', grantCategory: 'file' });
     expect(write!.message).toContain('probe.txt');
     expect(context.interactions.resolve).toHaveBeenCalledTimes(2);
   });

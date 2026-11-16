@@ -81,7 +81,9 @@ export class HostedAcpProvider implements Provider {
   constructor(readonly name: 'grok' | 'antigravity' | 'kimi',
     private readonly kimiHost: KimiComputerUseHost = defaultKimiComputerUseHost()) {
     this.sessionInitializationTimeoutMs = name === 'kimi' ? 45_000 : undefined;
-    if (name === 'grok') this.capabilities.interactions = { version: 1, kinds: GROK_INTERACTION_KINDS };
+    // ADR-055: shell and file approvals carry a category everywhere; computer use only for Kimi's plugin.
+    this.capabilities.interactions = { version: 1, kinds: name === 'grok' ? GROK_INTERACTION_KINDS : ACP_INTERACTION_KINDS,
+      standingGrants: { version: 1, categories: name === 'kimi' ? ['computer_use', 'command', 'file'] : ['command', 'file'] } };
     // Native credential persistence is not yet verified for Google's executable.
     if (name === 'antigravity') this.capabilities.sessionMcpServers = false;
   }
@@ -403,7 +405,7 @@ export class HostedAcpProvider implements Provider {
     if (this.permissions.has(id) || this.completedPermissions.has(id)) return null;
     const extension = input.method !== 'session/request_permission';
     const mapped = extension ? mapGrokInput(params, input.method === '_x.ai/exit_plan_mode')
-      : mapAcpPermission(this.name === 'kimi' ? this.kimiPermissionParams(params) : params, this.options.cwd);
+      : mapAcpPermission(this.name === 'kimi' ? this.kimiPermissionParams(params) : params, this.options.cwd, this.name);
     const reply = (result: Record<string, unknown>) => acpReply(id, extension ? { result } : result);
     const fallback = () => reply(mapped.result({ action: 'cancel' }));
     if (!context.interactions || !this.options.interactionHost?.kinds.includes(mapped.prompt.kind)

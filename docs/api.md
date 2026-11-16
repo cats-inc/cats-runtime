@@ -38,6 +38,26 @@ the requirement even when a session is unregistered and rediscovered.
   This control request runs while the model turn is occupied. Answer actions are
   `accept`, `decline` or `cancel`; acceptance uses the offered `choice`, typed
   `values`, or selected `grants` and `scope`, depending on the prompt kind.
+- `DELETE /sessions/:id/interactions/grants[?category=computer_use|command|file]`:
+  ends standing grants and returns the snapshot.
+
+#### Standing grants (ADR-055)
+
+A prompt with `grantCategory` (`computer_use`, `command` or `file`) lets the owner
+approve that category once. Add `"standingGrant": { "until": "session" }` or
+`{ "until": "time", "durationMs": 1800000 }` (1 minute to 24 hours) to an `accept`
+answer that uses the prompt's first choice. The grant lasts for this Runtime session,
+in memory only, across its worker respawns, until it expires, is revoked, the session
+is removed or Runtime restarts. The snapshot lists it in `standingGrants`.
+
+A send uses grants only with `"standingGrants": true` on
+`POST /sessions/:id/messages`; set it only for turns the owner started. In such a
+turn Runtime answers a matching prompt with its one-action choice. The host then sees
+only a `responding` and then a `resolved` receipt with reason `standing_grant`, never
+`pending`. Other sends keep the cards. Categories never cover each other. A target
+advertises the categories it tags in `interactions.standingGrants`; hosted ACP tags
+shell (`execute`) and file (`edit`) requests, and Kimi's computer-use plugin tools.
+Providers' own session or persistent approval options are never selected.
 
 Both endpoints use normal Runtime authentication and `Cache-Control: no-store`.
 Responses are capped at 32 KiB (HTTP envelope 36 KiB); invalid answers return 400,
@@ -184,7 +204,7 @@ cannot initialize on the verified 16 KiB-page host; see the
 [dated evidence](research/native-provider-host-protocols-2026-11-02.md).
 
 Supported approvals carry bounded input/scope summaries. Only ACP `allow_once`
-choices are offered; Muse also supports offered session-scoped approval, but no
+choices are offered (a standing grant answers with that same choice); Muse also supports offered session-scoped approval, but no
 persistent amendments. Native Muse questions and Grok questions/plan review use
 the existing interaction API. Unsupported custom host methods are declined.
 Changing a Muse approval requirement invalidates the earlier card; terminal tool

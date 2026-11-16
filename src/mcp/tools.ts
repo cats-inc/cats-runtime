@@ -1962,13 +1962,22 @@ async function createSession(
   };
 }
 
+/**
+ * The `send_message` request body. ADR-055: an MCP client is never the owner, so its sends can never
+ * use standing grants, whatever arguments it passes (tool calls are not validated against inputSchema).
+ */
+export function mcpSendMessageBody(args: Record<string, unknown>): Record<string, unknown> {
+  const { sessionId: _sessionId, standingGrants: _standingGrants, ...body } = args;
+  return body;
+}
+
 async function sendMessage(
   ctx: AppContext,
   args: Record<string, unknown>,
 ): Promise<McpToolCallResult> {
   const sessionId = readRequiredString(args, 'sessionId');
   readRequiredString(args, 'message');
-  const { sessionId: _sessionId, ...body } = args;
+  const body = mcpSendMessageBody(args);
   const result = await requestRuntimeNdjson(
     ctx,
     `/sessions/${encodeURIComponent(sessionId)}/messages`,
