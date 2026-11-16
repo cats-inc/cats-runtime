@@ -228,7 +228,7 @@ test('requires the scope channel in OpenCode and Kilo stored credentials', async
   assert.equal((await checkOne('kilo', context)).state, 'local');
 });
 
-test('checks Junie, Pi, Kimi, Goose and Cline by file presence and set variables, never opening a file', async () => {
+test('checks Junie, Pi, Kimi, Goose and Cline by file presence and set variables, never opening a credential file', async () => {
   const kimiHome = join(HOME, '.kimi-code');
   const gooseDir = join(APPDATA, 'Block', 'goose', 'config', 'chatgpt_codex');
   const signedIn = fakeContext({
@@ -239,6 +239,8 @@ test('checks Junie, Pi, Kimi, Goose and Cline by file presence and set variables
       [join(gooseDir, 'tokens.json')]: '{"refresh_token": "r"}',
       [join(HOME, '.cline', 'data', 'settings', 'providers.json')]: '{"providers": {"cline-pass": {}}}',
       [join(kimiHome, 'credentials', 'kimi-code.json')]: '{"refresh_token": "r"}',
+      // The sign-in region marker, the one non-secret file read (SPEC-045 FR-6).
+      [join(kimiHome, 'region')]: ['global', ''].join('\n'),
     },
     dirs: {
       [join(HOME, '.junie', 'dpapi_credentials')]: [{ name: 'a.dpapi', size: 352 }, { name: 'empty.dpapi', size: 0 }, { name: 'note.txt', size: 9 }],
@@ -252,11 +254,11 @@ test('checks Junie, Pi, Kimi, Goose and Cline by file presence and set variables
   assert.deepEqual(results.map(({ provider, state, detail }) => [provider, state, detail]), [
     ['junie', 'local', '1 DPAPI credential files; expiry cannot be read without starting Junie'],
     ['pi', 'unknown', 'auth.json is present; only its content, which Cats never reads, shows an openai-codex sign-in'],
-    ['kimi', 'local', 'credentials/kimi-code.json is present'],
+    ['kimi', 'local', 'credentials/kimi-code.json is present; detected basis: region global'],
     ['goose', 'local', 'chatgpt_codex/tokens.json is present'],
     ['cline', 'unknown', 'providers.json is present; only its content, which Cats never reads, shows a cline-pass sign-in'],
   ]);
-  assert.deepEqual(signedIn.opened, [], 'no credential file was opened');
+  assert.deepEqual(signedIn.opened, [join(kimiHome, 'region')], 'only the region marker was opened, no credential file');
 
   const signedOut = fakeContext({
     installed: ['junie', 'pi', 'kimi', 'goose', 'cline'],

@@ -4837,8 +4837,13 @@ A target can hold several captured lists, one per basis
   for an id-less first basis) and `bases`: one
   `{ id?, label, channel?, region?, plan?, cliVersion?, lastUpdated?, detected }`
   per basis in data order. `label` joins the channel, region and plan labels
-  with ` · `. `detected` marks the basis that matches the CLI sign-in on the
-  Runtime's host; it is `false` until a detection source exists.
+  with ` · `. `detected` marks the one basis that matches the CLI sign-in on
+  the Runtime's host, read only from CLI output or non-secret markers (never a
+  credential). The only source so far is Kimi's `<KIMI_CODE_HOME>/region`
+  file, matched against `basis.region.id` for a local native instance. No
+  match, several matches or no source marks none. Runtime never applies
+  detection itself: a request without `basis` still reads the first basis, and
+  Playground and Desktop start a new selection on the detected one.
 - Every catalog backed by a scope carries `capture` (`{ cliVersion?, lastUpdated? }`).
 - `modelSelection.basisId` names the basis of a structured selection; without
   it the selection means the first basis. A plain `model` string is looked up

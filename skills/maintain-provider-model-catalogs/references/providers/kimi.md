@@ -50,3 +50,18 @@ takes seconds per start, and Kimi 2.5.3 has no status command. A non-empty
 presence is checked: the credential files, and config.toml, which can hold the API keys of
 providers a user added, are never opened (ADR-038; owner decision 2026-11-16). A credential file
 proves a sign-in, not a plan.
+
+## Region detection
+
+Kimi Code 2.5.3 records the sign-in region in `<KIMI_CODE_HOME>/region`, a one-line non-secret
+marker holding the `kimi login --region` token (`global` or `mainland-cn`). On the owner's
+machine on 2026-11-16 it held `global`, matching the `kimi login` used for the current capture
+(ADR-056). It is SPEC-045 FR-6's first detection source:
+
+- Runtime reads only that file, for a local native Kimi instance, and marks the basis whose
+  `basis.region.id` equals the token as `detected`. A WSL, Docker or remote instance reads
+  nothing. The credentials and config.toml stay unopened.
+- `npm run catalog:logins -- --providers kimi` appends `detected basis: region <token>` to a
+  signed-in result. It reads the marker only after the presence check passes.
+- A refresh records this token with the capture; a new region basis needs it as evidence
+  (SPEC-045 FR-8).

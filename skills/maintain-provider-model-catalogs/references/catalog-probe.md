@@ -94,7 +94,7 @@ see [Muse](./providers/muse.md) and [Kimi Code](./providers/kimi.md).
 | claude | `claude auth status` JSON `loggedIn` | no |
 | opencode, kilo | `auth list` names the scope's channel credential (OpenCode Go, Kilo Gateway) | no |
 | junie | DPAPI credential files are present (Windows only) or `JUNIE_API_KEY` is set; never launched because of the Defender block in [Junie](./providers/junie.md) | no |
-| kimi | a non-empty `<KIMI_CODE_HOME>/credentials/*.json` is present or `KIMI_MODEL_API_KEY` is set; never launched, because each start of the 160 MB executable takes seconds | no |
+| kimi | a non-empty `<KIMI_CODE_HOME>/credentials/*.json` is present or `KIMI_MODEL_API_KEY` is set; never launched, because each start of the 160 MB executable takes seconds. A signed-in result adds the non-secret `region` marker as the detected basis | no |
 | goose | `chatgpt_codex/tokens.json` is present; never launched | no |
 | pi, cline | `unknown` while `~/.pi/agent/auth.json` or `~/.cline/data/settings/providers.json` is present, because each holds every provider and only its content shows the `openai-codex` or `cline-pass` sign-in; `signed out` when it is absent. Never launched; Cline's informational flags have started npm updates | no |
 

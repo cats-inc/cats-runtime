@@ -152,20 +152,29 @@ Illustrative Kimi data, if a mainland capture differs:
   against `basis.region.id`. Every other target reports no detected basis until a source is
   verified.
 - `detected: true` marks at most one basis per target. No match or no source means none is marked.
-- `npm run catalog:logins` reports the detected basis id where one is found.
+- `npm run catalog:logins` reports the detected marker value where one is found: for Kimi, the
+  region token (`detected basis: region global`), because a first basis may have no id. (Owner
+  decision 2026-11-16, made during Phase 2 implementation.)
 
 ## FR-7: Playground and Desktop display
 
 - A target with two or more bases shows one select labeled "List basis", placed before the Model
   select, with `bases[].label` as option text in data order. A single-basis target shows no select.
 - No option is added, renamed or marked by Cats: no "Auto", "Default" or "(detected)" suffix.
+  The one exception is a saved basis that cannot be used: a listed basis whose list did not load
+  is shown disabled, and a saved basis id that is no longer listed stays selected as one added
+  disabled option marked unavailable, with a notice. Either way the saved selection is sent
+  unchanged and never moved to another basis. (Owner decision 2026-11-16, made during Phase 2
+  implementation.)
 - The information icon stays beside the Model label. Its tooltip gains the selected basis's CLI
   version and capture date from `capture`. It still appears only when a basis exists.
 - When the selected basis differs from the detected one, a non-blocking hint under the selects
   says the list is for another plan or region than the CLI sign-in on the Runtime's host, so some
   models may fail. The turn is never blocked and the basis is never switched.
-- Changing the basis reloads the Model select from that basis. A saved entry that is missing
-  from the new basis follows SPEC-031 FR-4's unmappable handling.
+- Changing the basis reloads the Model select from that basis. The current entry and its controls
+  stay when the new basis lists the entry; otherwise the new basis's default entry is chosen. A
+  saved selection loaded later whose entry or basis is missing follows SPEC-031 FR-4's unmappable
+  handling. (Owner decision 2026-11-16, made during Phase 2 implementation.)
 - Desktop's select follows its current label rules: the information icon remains a focusable
   image, not a button inside the label. Platform SPEC-013 picker recovery rules apply to the new
   select.
