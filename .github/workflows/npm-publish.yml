@@ -39,17 +39,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # When the release preflight already passed on this exact commit on main,
-      # it ran this same release:check, so the publish does not repeat it.
-      # Anything else, or a failed lookup, runs the gate here as before.
-      # npm publish still builds fresh artifacts through prepack.
+      # When the release preflight passed on this exact commit on main and its
+      # release-preflight job either ran the gate or skipped it because this
+      # exact code had already passed, that code passed this same release:check,
+      # so the publish does not repeat it. A documentation-only skip proves
+      # nothing about the code and does not count. Anything else, or a failed
+      # lookup, runs the gate here as before. npm publish still builds fresh
+      # artifacts through prepack.
       - name: Check whether the release preflight passed on this commit on main
         id: ci
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/release-preflight.yml/runs?head_sha=$GITHUB_SHA&event=push&branch=main&status=success&per_page=1" --jq '.total_count' 2>/dev/null || true)
-          if [[ "$passed" =~ ^[1-9][0-9]*$ ]]; then tested=true; else tested=false; fi
+          tested=false
+          run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/release-preflight.yml/runs?head_sha=$GITHUB_SHA&event=push&branch=main&status=success&per_page=1" --jq '.workflow_runs[0].id // empty' 2>/dev/null || true)
+          if [[ "$run" =~ ^[0-9]+$ ]]; then
+            passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/jobs" --jq '.jobs[] | select(.name == "release-preflight") | .steps[]? | select(.conclusion == "success") | .name' 2>/dev/null || true)
+            if grep -qxE 'Run release preflight|Already tested' <<< "$passed"; then tested=true; fi
+          fi
           echo "tested=$tested" | tee -a "$GITHUB_OUTPUT"
 
       - name: Run release gate

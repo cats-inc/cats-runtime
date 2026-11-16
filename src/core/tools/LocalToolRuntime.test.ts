@@ -2135,14 +2135,14 @@ describe('LocalToolRuntime', () => {
         expect(payload.actions).toEqual(expect.arrayContaining([
           expect.objectContaining({
             type: 'create',
-            path: 'AGENTS.md',
-            outputPath: 'AGENTS.md',
+            path: 'AGENTS.md', // docs-boundary-ignore: temporary workspace file
+            outputPath: 'AGENTS.md', // docs-boundary-ignore: temporary workspace file
             mergeStrategy: 'create',
             diffStats: expect.objectContaining({ changed: true }),
           }),
-          expect.objectContaining({ type: 'create', path: 'CODEX.md' }),
+          expect.objectContaining({ type: 'create', path: 'CODEX.md' }), // docs-boundary-ignore: temporary workspace file
         ]));
-        expect(payload.plan.changedPaths).toEqual(expect.arrayContaining(['AGENTS.md', 'CODEX.md']));
+        expect(payload.plan.changedPaths).toEqual(expect.arrayContaining(['AGENTS.md', 'CODEX.md'])); // docs-boundary-ignore: temporary workspace file
       } finally {
         cleanup();
       }
@@ -2151,7 +2151,7 @@ describe('LocalToolRuntime', () => {
     it('writes review copies for conflicting files on apply', async () => {
       const { cwd, cleanup } = createWorkspace();
       const runtime = new LocalToolRuntime();
-      writeFileSync(join(cwd, 'AGENTS.md'), '# local custom rules\n');
+      writeFileSync(join(cwd, 'AGENTS.md'), '# local custom rules\n'); // docs-boundary-ignore: temporary workspace file
 
       try {
         const result = await runtime.execute(sharedCtx(cwd), {
@@ -2180,12 +2180,12 @@ describe('LocalToolRuntime', () => {
         expect(payload.actions).toEqual(expect.arrayContaining([
           expect.objectContaining({
             type: 'write_sidecar',
-            path: 'AGENTS.md',
+            path: 'AGENTS.md', // docs-boundary-ignore: temporary workspace file
             outputPath: 'AGENTS.md.bootstrap',
             requiresApproval: false,
           }),
         ]));
-        expect(readFileSync(join(cwd, 'AGENTS.md'), 'utf-8')).toBe('# local custom rules\n');
+        expect(readFileSync(join(cwd, 'AGENTS.md'), 'utf-8')).toBe('# local custom rules\n'); // docs-boundary-ignore: temporary workspace file
         expect(readFileSync(join(cwd, 'AGENTS.md.bootstrap'), 'utf-8'))
           .toContain('cats-runtime:workspace-substrate');
       } finally {

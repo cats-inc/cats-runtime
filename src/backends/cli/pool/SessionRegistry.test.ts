@@ -175,7 +175,7 @@ describe('SessionRegistry', () => {
               profile: 'standard',
               status: 'partial',
               checkedAt: '2026-03-23T00:00:00.000Z',
-              changedPaths: ['AGENTS.md'],
+              changedPaths: ['AGENTS.md'], // docs-boundary-ignore: a changed-path value
               reviewCopyPaths: [],
               findingCounts: {
                 missing: 1,
@@ -256,7 +256,7 @@ describe('SessionRegistry', () => {
             profile: 'standard',
             status: 'partial',
             checkedAt: '2026-03-23T00:00:00.000Z',
-            changedPaths: ['AGENTS.md'],
+            changedPaths: ['AGENTS.md'], // docs-boundary-ignore: a changed-path value
             reviewCopyPaths: [],
             findingCounts: {
               missing: 1,

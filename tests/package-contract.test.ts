@@ -354,7 +354,7 @@ describe('package contract', () => {
       actions: expect.arrayContaining([
         expect.objectContaining({
           type: 'create',
-          path: 'AGENTS.md',
+          path: 'AGENTS.md', // docs-boundary-ignore: audit action for a temporary consumer workspace
         }),
       ]),
     }));
