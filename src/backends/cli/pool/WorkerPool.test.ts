@@ -252,6 +252,28 @@ describe('WorkerPool', () => {
 });
 
 
+describe('standing grant holders (ADR-055)', () => {
+  it('lists only sessions that hold an unexpired grant, and forgets removed sessions', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'cats-runtime-workerpool-grants-'));
+    try {
+      const config = loadConfig({ HOME: root, USERPROFILE: '' }, { providerYaml: 'providers: { kimi: { instances: { native: {} } } }' });
+      const registry = new SessionRegistry(path.join(root, 'data'), undefined, config.providerDefaultInstances, config.providerDefaultTargets);
+      const pool = new WorkerPool(config, registry, {} as never, {} as never, {} as never, {} as never,
+        { getCachedAssessment: () => undefined } as never);
+      pool.standingGrantsFor('granted').add('computer_use', { until: 'session' });
+      pool.standingGrantsFor('expired').add('command', { until: 'time', durationMs: -1 });
+      pool.standingGrantsFor('revoked').add('file', { until: 'session' });
+      pool.existingStandingGrants('revoked')!.revoke();
+      pool.standingGrantsFor('removed').add('file', { until: 'session' });
+      pool.forgetStandingGrants('removed');
+      expect(pool.standingGrantHolders()).toEqual([{ sessionId: 'granted',
+        standingGrants: [expect.objectContaining({ category: 'computer_use', until: 'session' })] }]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('originating-session image resource handoff', () => {
   function fixture() {
     const cwd = path.join(tmpdir(), 'cats-idle-image-handoff');

@@ -23,6 +23,12 @@ interactionRoutes.get('/sessions/:id/interactions', c => {
   return c.json(getRuntimeSessionManager(ctx).interactionSnapshot(id));
 });
 
+/** ADR-055: every session holding a standing grant, so a host that restarted can still show Stop. */
+interactionRoutes.get('/interactions/grants', c => {
+  c.header('Cache-Control', 'no-store');
+  return c.json({ version: 1, sessions: getRuntimeSessionManager(c.get('ctx')).standingGrantHolders() });
+});
+
 /** ADR-055: the owner's stop. Ends standing grants (`?category=` limits it to one); answers with the snapshot. */
 interactionRoutes.delete('/sessions/:id/interactions/grants', c => {
   c.header('Cache-Control', 'no-store');

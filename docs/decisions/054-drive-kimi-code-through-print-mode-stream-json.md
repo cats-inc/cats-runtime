@@ -118,6 +118,12 @@ has `kimi acp`, an ACP server over stdio.
     - Like the other hosted targets, the persistent worker has no turn inactivity limit, so an
       approval card can wait for the host's interaction deadline and a long desktop cell is not
       cut off by Runtime.
+    - A host adds this target by key, `kimi/cli/hosted`, through provider selection. Runtime owns
+      its template (the `kimi` command, `runner: auto`, `runtime: native`, `protocol: hosted`). The
+      template is not an entry in the provider universe, so the universe and `nativeSetupTargets`
+      stay one per provider; Runtime's own setup page lists the selected hosted target as a row
+      of its own. Kimi's legacy default instance is `native`, so adding the asking target never
+      moves a caller that names no instance.
 
 ## Consequences
 

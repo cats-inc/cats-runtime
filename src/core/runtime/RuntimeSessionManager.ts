@@ -2,7 +2,7 @@ import { bindManagedNativeIdentity, hasManagedPluginExposure } from '../skills/m
 import { ProviderSessionNotResumableError, providerSessionSpawnOptions } from './providerSessionPersistence.js';
 import { RuntimeSkillError } from '../skills/errors.js';
 import { randomUUID } from 'node:crypto';
-import { InteractionError, type GrantCategory, type InteractionHost, type InteractionSnapshot } from '../interactions/types.js';
+import { InteractionError, type GrantCategory, type InteractionHost, type InteractionSnapshot, type StandingGrant } from '../interactions/types.js';
 import { assertExecutionPolicyAdmission, type SessionExecutionPolicy } from '../interactions/policy.js';
 import type { SessionCapabilitiesSnapshot } from '../interactions/capabilities.js';
 import { hostname } from 'node:os';
@@ -262,6 +262,11 @@ export class RuntimeSessionManager {
 
   forgetStandingGrants(sessionId: string): void {
     this.pool.forgetStandingGrants?.(sessionId);
+  }
+
+  /** ADR-055: the sessions holding standing grants, for a host's Stop after the host restarts. */
+  standingGrantHolders(): Array<{ sessionId: string; standingGrants: StandingGrant[] }> {
+    return this.pool.standingGrantHolders?.() ?? [];
   }
 
   respondToInteraction(sessionId: string, interactionId: string, response: unknown) {

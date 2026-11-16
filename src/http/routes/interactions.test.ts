@@ -94,3 +94,19 @@ describe('standing grant revoke route (ADR-055)', () => {
     expect(calls).toEqual([['session', undefined], ['session', 'command']]);
   });
 });
+
+describe('standing grant listing route (ADR-055)', () => {
+  it('lists every session holding grants, behind authentication, never cached', async () => {
+    const sessions = [{ sessionId: 'a', standingGrants: [{ category: 'computer_use', until: 'session', grantedAt: '2026-11-16T00:00:00.000Z' }] }];
+    const ctx = { registry: { get: () => undefined }, runtime: { standingGrantHolders: () => sessions } } as unknown as AppContext;
+    const app = new Hono<{ Variables: { ctx: AppContext } }>();
+    app.use('*', bearerAuth({ apiKey: 'fixture-token' } as AppContext['config']));
+    app.use('*', async (c, next) => { c.set('ctx', ctx); await next(); });
+    app.route('/', interactionRoutes);
+    expect((await app.request('/interactions/grants')).status).toBe(401);
+    const listed = await app.request('/interactions/grants', { headers: { Authorization: 'Bearer fixture-token' } });
+    expect(listed.status).toBe(200);
+    expect(listed.headers.get('Cache-Control')).toBe('no-store');
+    expect(await listed.json()).toEqual({ version: 1, sessions });
+  });
+});

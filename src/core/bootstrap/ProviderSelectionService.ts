@@ -102,7 +102,16 @@ export function providerSelectionCatalog(): ProviderSelectionCatalogEntry[] {
   ];
 }
 
+/**
+ * ADR-054 decision 11: Kimi's asking target. A selection template, not a universe entry, so a
+ * host's setup and install rows stay one per provider while it can still add this target by key.
+ */
+export const KIMI_HOSTED_TARGET: SelectedProviderTarget = { provider: 'kimi', backend: 'cli', instance: 'hosted' };
+
 function templateFor(target: SelectedProviderTarget): Record<string, unknown> | undefined {
+  if (providerSelectionKey(target) === providerSelectionKey(KIMI_HOSTED_TARGET)) {
+    return { command: getProviderInstallKnowledge('kimi').binaryName, runner: 'auto', runtime: 'native', protocol: 'hosted' };
+  }
   const entry = providerSelectionCatalog().find((candidate) =>
     providerSelectionKey(candidate) === providerSelectionKey(target));
   if (!entry) return undefined;

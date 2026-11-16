@@ -40,6 +40,8 @@ the requirement even when a session is unregistered and rediscovered.
   `values`, or selected `grants` and `scope`, depending on the prompt kind.
 - `DELETE /sessions/:id/interactions/grants[?category=computer_use|command|file]`:
   ends standing grants and returns the snapshot.
+- `GET /interactions/grants`: `{ version: 1, sessions: [{ sessionId, standingGrants }] }` for every
+  session that holds a grant now. A host uses it to show and stop grants after its own restart.
 
 #### Standing grants (ADR-055)
 
