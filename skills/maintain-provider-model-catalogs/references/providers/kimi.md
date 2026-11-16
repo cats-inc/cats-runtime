@@ -67,5 +67,18 @@ machine on 2026-11-16 it held `global`, matching the `kimi login` used for the c
   records the token on the snapshot's Kimi source and compares the basis it matches. The
   evidence command copies it into the fixture as `signIn`.
 - A refresh records this token with the capture; a new region basis needs it as evidence
-  (SPEC-045 FR-8). While the Kimi scope records no region, the token is kept but changes no
-  finding; once it records `global`, a `mainland-cn` sign-in reports `basis-not-captured`.
+  (SPEC-045 FR-8).
+
+## Recorded region
+
+Since 2026-11-16 (SPEC-045 FR-9) the Kimi scope records
+`basis: { region: { id: global, label: global (kimi.ai) } }`, the region of the current capture.
+The label is the `kimi login --region` help's own spelling. As the only and first basis it has no
+`id`, so saved selections keep resolving to it, Playground and Desktop show the region in the
+information icon, and no basis select appears.
+
+- A refresh signed in to `global` updates this scope. A `mainland-cn` sign-in makes the probe
+  report `basis-not-captured`; it is never compared against the `global` list.
+- A `mainland-cn (kimi.com)` basis is a separate owner-authorized capture (SPEC-045 owner
+  decision 6). It needs `basis.id: mainland-cn`, its own `cli_version` and `last_updated`, and
+  the region marker as evidence.

@@ -136,7 +136,7 @@ import {
   sameProviderModelSelection,
 } from '../../core/models/providerSelectionResolution.js';
 import { normalizeProviderCatalogModelId } from '../../core/models/providerModelCatalog.js';
-import { CatalogRevisionConflict } from '../../catalogs/errors.js';
+import { CatalogBasisUnknownError, CatalogRevisionConflict } from '../../catalogs/errors.js';
 import { cloneProviderControls } from '../../core/models/providerControlUtils.js';
 import {
   buildRuntimeExecutionStrategySessionPatch,
@@ -584,6 +584,16 @@ function sessionMatchesTarget(
   return session.providerName === target.providerName
     && (session.providerBackend || 'cli') === target.backend
     && (session.providerInstanceId || target.instanceId) === target.instanceId;
+}
+
+// A selection Runtime cannot resolve: a stale revision conflicts, anything else is a bad request.
+// An unknown basis keeps its code, as on the advanced catalog read (SPEC-045 FR-5).
+function sessionModelStateFailure(error: unknown): { body: { error: string; code?: string }; status: 400 | 409 } {
+  return {
+    body: { error: error instanceof Error ? error.message : String(error),
+      ...(error instanceof CatalogBasisUnknownError ? { code: error.code } : {}) },
+    status: error instanceof CatalogRevisionConflict ? 409 : 400,
+  };
 }
 
 async function resolveRequestedSessionModelState(
@@ -2837,7 +2847,8 @@ sessionRoutes.post('/sessions', async (c) => {
       selection: parsedModelSelection.selection,
     });
   } catch (error) {
-    return c.json({ error: error instanceof Error ? error.message : String(error) }, error instanceof CatalogRevisionConflict ? 409 : 400);
+    const failure = sessionModelStateFailure(error);
+    return c.json(failure.body, failure.status);
   }
 
   const requestedSessionKey = parseOptionalString(body.sessionKey);
@@ -4879,7 +4890,8 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
           warnings: [] }
         : { warnings: [] };
   } catch (error) {
-    return c.json({error: error instanceof Error ? error.message : String(error)}, error instanceof CatalogRevisionConflict ? 409 : 400);
+    const failure = sessionModelStateFailure(error);
+    return c.json(failure.body, failure.status);
   }
 
   const parentCaps = runtime.getCapabilities(

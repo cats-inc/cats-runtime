@@ -4885,6 +4885,9 @@ A target can hold several captured lists, one per basis
   it the selection means the first basis. A plain `model` string is looked up
   in every basis in data order. `modelResolution.basisId` records the basis the
   entry resolved in. A plan or region basis never changes execution arguments.
+  `POST /sessions` and `POST /sessions/{id}/fork` answer a `basisId` the target
+  does not have with `400` and `code: catalog_basis_unknown`; other rejected
+  selections keep a plain `400`.
 - `GET /providers/catalogs` advertises `catalogBases: true`. The MCP
   `provider_advanced_models` tool accepts the same `basis` input.
 

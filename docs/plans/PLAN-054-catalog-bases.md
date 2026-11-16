@@ -206,15 +206,23 @@ in SPEC-045 FR-4 and FR-5 and Platform SPEC-013 "Catalog bases".
 
 ## Phase 5: Kimi region data (after Phases 2 and 3 merge)
 
-- [ ] Add `basis: { region: { id: global, label: global (kimi.ai) } }` to the Kimi scope
-      (SPEC-045 FR-9), regenerate the JSON and pin it in `tests/catalog-runtime.test.ts`.
-- [ ] Record the region in `references/providers/kimi.md`.
-- [ ] `POST /sessions` with an unknown `basisId` returns 400 with `code: catalog_basis_unknown`
-      (SPEC-045 FR-5). Document it in `docs/api.md` and add a test in
-      `tests/catalog-runtime.test.ts`. Desktop already maps the code; its read-back stays for
-      older Runtimes.
-- [ ] It must ship in the same Runtime release as Playground and Desktop region display, so it
-      waits for Phases 2 and 3.
+- [x] Add `basis: { region: { id: global, label: global (kimi.ai) } }` to the Kimi scope
+      (SPEC-045 FR-9), regenerate the JSON and pin it in `tests/catalog-runtime.test.ts`. The
+      factory alone gives Kimi one basis, so the advanced result carries `basis` and `capture`
+      but no `bases` and no select.
+- [x] Record the region in `references/providers/kimi.md`.
+- [x] `POST /sessions` and `POST /sessions/{id}/fork` with an unknown `basisId` return 400 with
+      `code: catalog_basis_unknown` (SPEC-045 FR-5). Documented in `docs/api.md`; the test is in
+      `tests/runtime-server.test.ts`. Desktop already maps the code (cats-platform#496); its
+      read-back stays for older Runtimes.
+- [x] It must ship in the same Runtime release as Playground and Desktop region display, so it
+      waits for Phases 2 and 3. Both merged before this phase.
+- [x] Evidence: a real `probe --providers kimi` on 2026-11-16 with the new data stayed clean
+      (6/6), detected and confirmed `global (kimi.ai)` from the region marker and reported no
+      finding. Its rows and `signIn` are in
+      `docs/research/fixtures/kimi-2.5.3/model-list.probe.redacted.json`. Playground and Desktop
+      showing the Kimi region with the real factory data were not run.
+- [ ] Sync the skill mirrors after merge (`Sync-WorkspaceSkills.ps1`) for the Kimi reference.
 
 ## Out of scope
 
