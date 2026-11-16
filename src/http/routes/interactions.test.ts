@@ -70,3 +70,27 @@ describe('provider interaction HTTP control', () => {
     expect(f.deliveries()).toBe(0);
   });
 });
+
+describe('standing grant revoke route (ADR-055)', () => {
+  it('ends grants for the owning session only, by category or all, and rejects unknown categories', async () => {
+    const calls: Array<[string, string | undefined]> = [];
+    const ctx = { registry: { get: (id: string) => id === 'session' ? { id } : undefined },
+      runtime: { revokeStandingGrants: (session: string, category?: string) => {
+        calls.push([session, category]);
+        return { version: 1, sessionId: session, workerGeneration: null, revision: 0, interactions: [], standingGrants: [] };
+      } } } as unknown as AppContext;
+    const app = new Hono<{ Variables: { ctx: AppContext } }>();
+    app.use('*', bearerAuth({ apiKey: 'fixture-token' } as AppContext['config']));
+    app.use('*', async (c, next) => { c.set('ctx', ctx); await next(); });
+    app.route('/', interactionRoutes);
+    const headers = { Authorization: 'Bearer fixture-token' };
+    expect((await app.request('/sessions/session/interactions/grants', { method: 'DELETE' })).status).toBe(401);
+    expect((await app.request('/sessions/foreign/interactions/grants', { method: 'DELETE', headers })).status).toBe(404);
+    expect((await app.request('/sessions/session/interactions/grants?category=everything', { method: 'DELETE', headers })).status).toBe(400);
+    const all = await app.request('/sessions/session/interactions/grants', { method: 'DELETE', headers });
+    expect(all.status).toBe(200); expect(all.headers.get('Cache-Control')).toBe('no-store');
+    expect((await all.json()).standingGrants).toEqual([]);
+    expect((await app.request('/sessions/session/interactions/grants?category=command', { method: 'DELETE', headers })).status).toBe(200);
+    expect(calls).toEqual([['session', undefined], ['session', 'command']]);
+  });
+});

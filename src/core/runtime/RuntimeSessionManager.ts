@@ -2,7 +2,7 @@ import { bindManagedNativeIdentity, hasManagedPluginExposure } from '../skills/m
 import { ProviderSessionNotResumableError, providerSessionSpawnOptions } from './providerSessionPersistence.js';
 import { RuntimeSkillError } from '../skills/errors.js';
 import { randomUUID } from 'node:crypto';
-import { InteractionError, type InteractionHost, type InteractionSnapshot } from '../interactions/types.js';
+import { InteractionError, type GrantCategory, type InteractionHost, type InteractionSnapshot } from '../interactions/types.js';
 import { assertExecutionPolicyAdmission, type SessionExecutionPolicy } from '../interactions/policy.js';
 import type { SessionCapabilitiesSnapshot } from '../interactions/capabilities.js';
 import { hostname } from 'node:os';
@@ -247,9 +247,21 @@ export class RuntimeSessionManager {
   }
 
   interactionSnapshot(sessionId: string): InteractionSnapshot {
+    const grants = this.pool.existingStandingGrants?.(sessionId);
     return this.pool.get(sessionId)?.interactions?.snapshot() ?? {
       version: 1, sessionId, workerGeneration: null, revision: 0, interactions: [],
+      ...(grants ? { standingGrants: grants.list() } : {}),
     };
+  }
+
+  /** ADR-055: ends the session's standing grants (one category, or all) and returns the new snapshot. */
+  revokeStandingGrants(sessionId: string, category?: GrantCategory): InteractionSnapshot {
+    this.pool.existingStandingGrants?.(sessionId)?.revoke(category);
+    return this.interactionSnapshot(sessionId);
+  }
+
+  forgetStandingGrants(sessionId: string): void {
+    this.pool.forgetStandingGrants?.(sessionId);
   }
 
   respondToInteraction(sessionId: string, interactionId: string, response: unknown) {

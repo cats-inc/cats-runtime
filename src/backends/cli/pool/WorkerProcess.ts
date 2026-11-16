@@ -22,6 +22,7 @@ import { startWindowsCodexHost, windowsCodexHostPath, type ManagedCodexHost } fr
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 import { appendStderrLines } from '../stderrLines.js';
 import { InteractionStore } from '../../../core/interactions/InteractionStore.js';
+import type { StandingGrants } from '../../../core/interactions/standingGrants.js';
 import { WorkerControlChannel } from './WorkerControlChannel.js';
 import { SessionSecretRedactor } from './SessionSecretRedactor.js';
 
@@ -102,6 +103,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     this.bootstrapTimer.unref?.();
   }
   private process: ChildProcess | null = null;
+  private turnUsesStandingGrants = false;
   private starting: Promise<void> | null = null;
   private startupController: AbortController | null = null;
   private startupError: Error | null = null;
@@ -133,6 +135,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     /** SPEC-035 secrets for this child only; never logged or placed in argv. */
     private readonly launchEnv: Readonly<Record<string, string>> = {},
     private readonly runtimeSessionId: string = randomUUID(),
+    /** ADR-055: the session's standing grants; they outlive this worker. */
+    private readonly standingGrants?: StandingGrants,
   ) {
     super();
     this.provider = provider;
@@ -185,7 +189,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
           ? 'Waiting for your response.' : `Provider interaction: ${interaction.status}.`,
           metadata: { source: 'runtime', kind: interaction.status === 'pending'
             ? 'interaction_requested' : 'interaction_updated', interaction: receipt } });
-      }) : undefined;
+      }, Date.now, this.standingGrants ? { grants: this.standingGrants, allowed: () => this.turnUsesStandingGrants } : undefined)
+      : undefined;
     this.startupController?.abort();
     this.startupController = null;
     this.starting = null;
@@ -489,6 +494,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       throw new Error('Worker is busy processing another message');
     }
     this.interactionExecutionId = randomUUID();
+    // ADR-055: only a send the host marked may use the session's standing grants.
+    this.turnUsesStandingGrants = typeof content !== 'string' && content.standingGrants === true;
 
     if (this.provider.streamTurn) {
       this.isBusy = true;
@@ -514,6 +521,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       } finally {
         controller.abort();
         this.isBusy = false;
+        this.turnUsesStandingGrants = false;
         this.activeTurnController = null;
       }
       return;
@@ -735,6 +743,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       if (this.activeTurnController === controller) this.activeTurnController = null;
       clearTurnInactivityTimeout();
       this.isBusy = false;
+      this.turnUsesStandingGrants = false;
       this.removeListener('event', onEvent);
       this.removeListener('error', onError);
       this.removeListener('exit', onExit);

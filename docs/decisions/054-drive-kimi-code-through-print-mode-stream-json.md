@@ -93,7 +93,8 @@ has `kimi acp`, an ACP server over stdio.
     - If a live session reports a move to a mode other than `default` or `plan` (`plan` runs no
       tools), Runtime stops the session rather than let calls run without asking.
     - `session/request_permission` becomes the existing ACP approval card with only Kimi's
-      `allow_once` choice. Kimi's request names the tool but carries no input, so the card shows
+      `allow_once` choice. ADR-055 lets the owner approve computer use, shell or file requests once
+      for the conversation or a set time; Runtime then answers with that same choice. Kimi's request names the tool but carries no input, so the card shows
       the arguments Kimi streamed for that call just before it: for computer use, the JavaScript
       cell about to run. When those arguments are missing, over 64 KiB or not a JSON object, the
       card says the input cannot be shown instead of showing only the tool name. The request has

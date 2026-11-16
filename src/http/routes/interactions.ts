@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { getRuntimeSessionManager, type AppContext } from '../app.js';
-import { InteractionError } from '../../core/interactions/types.js';
+import { GRANT_CATEGORIES, InteractionError, type GrantCategory } from '../../core/interactions/types.js';
 
 /** Mounted after the same bearer-auth middleware as session execution. */
 export const interactionRoutes = new Hono<{ Variables: { ctx: AppContext } }>();
@@ -21,6 +21,19 @@ interactionRoutes.get('/sessions/:id/interactions', c => {
   const id = c.req.param('id');
   if (!ctx.registry.get(id)) return c.json({ error: 'Session not found' }, 404);
   return c.json(getRuntimeSessionManager(ctx).interactionSnapshot(id));
+});
+
+/** ADR-055: the owner's stop. Ends standing grants (`?category=` limits it to one); answers with the snapshot. */
+interactionRoutes.delete('/sessions/:id/interactions/grants', c => {
+  c.header('Cache-Control', 'no-store');
+  const ctx = c.get('ctx');
+  const id = c.req.param('id');
+  if (!ctx.registry.get(id)) return c.json({ error: 'Session not found' }, 404);
+  const category = c.req.query('category');
+  if (category !== undefined && !(GRANT_CATEGORIES as readonly string[]).includes(category)) {
+    return c.json({ error: 'Unknown grant category', code: 'interaction_invalid' }, 400);
+  }
+  return c.json(getRuntimeSessionManager(ctx).revokeStandingGrants(id, category as GrantCategory | undefined));
 });
 
 interactionRoutes.post('/sessions/:id/interactions/:interactionId/responses',

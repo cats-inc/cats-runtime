@@ -3,7 +3,7 @@ import type {
   ProviderModelSelection,
 } from './models/providerSelectionResolution.js';
 import type { SessionMcpServerLaunch } from './sessionMcpServers.js';
-import type { InteractionHost, InteractionKind } from './interactions/types.js';
+import type { GrantCategory, InteractionHost, InteractionKind } from './interactions/types.js';
 import type { ExecutionAccess, SessionExecutionPolicy } from './interactions/policy.js';
 import type { RuntimeWorkspaceActivitySnapshot } from './workspace/activityTypes.js';
 
@@ -1657,7 +1657,9 @@ export interface ProviderCapabilities {
   /** Adapter maps SPEC-035 session MCP servers into its launch configuration. */
   sessionMcpServers?: boolean;
   /** Negotiated host interactions; absent means unsupported. */
-  interactions?: { version: 1; kinds: InteractionKind[] };
+  interactions?: { version: 1; kinds: InteractionKind[];
+    /** ADR-055: categories whose prompts may carry a standing grant; absent means none. */
+    standingGrants?: { version: 1; categories: GrantCategory[] } };
   sessionCapabilities?: {
     version: 1;
     executionPolicy: boolean;
@@ -1711,6 +1713,8 @@ export interface TurnInput extends RuntimeExecutionStrategyRequest {
   skills?: SessionSkillState;
   context?: SessionInvocationContext;
   outputDir?: string;
+  /** ADR-055: this send may use the session's standing grants. The host sets it only for turns its owner started. */
+  standingGrants?: boolean;
 }
 
 interface StreamEventBase {

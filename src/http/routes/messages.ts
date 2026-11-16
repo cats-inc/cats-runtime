@@ -505,6 +505,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     correlation?: Record<string, unknown>;
     routing?: unknown;
     mcpServers?: unknown;
+    standingGrants?: unknown;
   }>();
   const message = parseOptionalString(body.message);
   if (!message) {
@@ -575,6 +576,8 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     acceptanceCriteria: strategyRequest?.acceptanceCriteria,
     strategyContext: strategyRequest?.strategyContext,
     correlation: strategyRequest?.correlation,
+    // ADR-055: only an explicit true lets this turn use the session's standing grants.
+    ...(body.standingGrants === true ? { standingGrants: true } : {}),
   };
   const inputPreview = summarizeSessionInputPreview(message);
   const explicitSkillsMutation = body.skills !== undefined;

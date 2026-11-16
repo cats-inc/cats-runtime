@@ -1,5 +1,5 @@
 import { record } from '../../../core/interactions/validation.js';
-import type { InteractionAnswer, InteractionKind, InteractionPrompt } from '../../../core/interactions/types.js';
+import type { GrantCategory, InteractionAnswer, InteractionKind, InteractionPrompt } from '../../../core/interactions/types.js';
 import { boundedInteractionText, interactionInputSummary } from './hostedInteractionSummary.js';
 
 export const ACP_INTERACTION_KINDS: InteractionKind[] = ['command_approval', 'file_approval', 'tool_approval'];
@@ -53,6 +53,18 @@ export function mapGrokInput(params: Record<string, unknown>, plan: boolean): Re
     } };
 }
 
+/** Kimi Code's computer-use plugin tools, as Kimi names them (`mcp__plugin-kimi-cu-win_win__js`). */
+const KIMI_COMPUTER_USE_TOOL = /^mcp__plugin-kimi-cu(?:-win)?_/u;
+
+/**
+ * ADR-055: the standing-grant category of an ACP permission, or none. A grant always answers with
+ * the one-action choice below, so it never selects ACP's allow_always or persists a native rule.
+ */
+export function acpGrantCategory(tool: Record<string, unknown>): GrantCategory | undefined {
+  if (typeof tool.title === 'string' && KIMI_COMPUTER_USE_TOOL.test(tool.title)) return 'computer_use';
+  return tool.kind === 'execute' ? 'command' : tool.kind === 'edit' ? 'file' : undefined;
+}
+
 /** ACP's allow_always can persist a global rule. Only a one-action grant is offered. */
 export function mapAcpPermission(params: Record<string, unknown>, cwd: string): {
   prompt: InteractionPrompt;
@@ -81,7 +93,8 @@ export function mapAcpPermission(params: Record<string, unknown>, cwd: string): 
       message: [paths.length ? `Paths:\n${paths.join('\n')}` : '',
         tool.rawInput !== undefined ? `Input:\n${interactionInputSummary(tool.rawInput)}` : '',
         'Scope: this action only'].filter(Boolean).join('\n'),
-      choices: allow.map(option => ({ id: String(option!.optionId), label: String(option!.name).slice(0, 256) })) },
+      choices: allow.map(option => ({ id: String(option!.optionId), label: String(option!.name).slice(0, 256) })),
+      ...(allow.length && acpGrantCategory(tool) ? { grantCategory: acpGrantCategory(tool) } : {}) },
     result: answer => {
       if (answer.action === 'cancel') return { outcome: { outcome: 'cancelled' } };
       const option = answer.action === 'accept'

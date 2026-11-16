@@ -6,6 +6,23 @@ export type InteractionKind = typeof INTERACTION_KINDS[number];
 export type InteractionStatus = 'pending' | 'responding' | 'resolved' | 'expired'
   | 'cancelled' | 'interrupted' | 'unsupported';
 
+/**
+ * ADR-055: what a standing grant covers. An adapter sets it on a prompt only when the prompt's first
+ * choice approves that one action, and only for these three; every other prompt stays per call.
+ */
+export const GRANT_CATEGORIES = ['computer_use', 'command', 'file'] as const;
+export type GrantCategory = typeof GRANT_CATEGORIES[number];
+/** One minute to 24 hours, the same bounds as an interaction host deadline. */
+export const STANDING_GRANT_DURATION_MS = { min: 60_000, max: 24 * 60 * 60_000 } as const;
+
+export interface StandingGrant {
+  category: GrantCategory;
+  /** 'session' lasts as long as this Runtime session; 'time' until `expiresAt`. */
+  until: 'session' | 'time';
+  grantedAt: string;
+  expiresAt?: string;
+}
+
 export interface InteractionHost {
   version: 1;
   kinds: InteractionKind[];
@@ -47,6 +64,8 @@ export interface InteractionPrompt {
   /** Provider-normalized permission units. Granting one never grants another unit. */
   permissions?: InteractionOption[];
   scopes?: ('turn' | 'session')[];
+  /** ADR-055: set when an answer may add a standing grant for this category. */
+  grantCategory?: GrantCategory;
 }
 
 export interface ProviderInteraction {
@@ -72,6 +91,8 @@ export interface InteractionAnswer {
   values?: Record<string, string | number | boolean | string[]>;
   grants?: string[];
   scope?: 'turn' | 'session';
+  /** ADR-055: with `accept` on a prompt that has `grantCategory`, approve its later calls too. */
+  standingGrant?: { until: 'session' } | { until: 'time'; durationMs: number };
 }
 
 export interface InteractionResponse {
@@ -86,6 +107,8 @@ export interface InteractionSnapshot {
   workerGeneration: string | null;
   revision: number;
   interactions: ProviderInteraction[];
+  /** ADR-055: grants in force for this Runtime session. */
+  standingGrants?: StandingGrant[];
 }
 
 export class InteractionError extends Error {

@@ -1,5 +1,5 @@
 import {
-  INTERACTION_KINDS, InteractionError,
+  INTERACTION_KINDS, InteractionError, STANDING_GRANT_DURATION_MS,
   type InteractionAnswer, type InteractionHost, type InteractionPrompt, type InteractionResponse,
 } from './types.js';
 
@@ -38,10 +38,20 @@ export function parseInteractionResponse(value: unknown): InteractionResponse {
     || typeof input.idempotencyKey !== 'string' || !/^[\w-]{1,128}$/.test(input.idempotencyKey)) invalid();
   const answer = record(input.answer);
   if (!answer) return invalid();
-  keys(answer, ['action', 'choice', 'values', 'grants', 'scope']);
+  keys(answer, ['action', 'choice', 'values', 'grants', 'scope', 'standingGrant']);
   if (typeof answer.action !== 'string' || !['accept', 'decline', 'cancel'].includes(answer.action)) invalid();
   if (answer.choice !== undefined && (typeof answer.choice !== 'string' || answer.choice.length > 128)) invalid();
   if (answer.scope !== undefined && answer.scope !== 'turn' && answer.scope !== 'session') invalid();
+  if (answer.standingGrant !== undefined) {
+    const grant = record(answer.standingGrant);
+    if (!grant) return invalid();
+    if (grant.until === 'session') keys(grant, ['until']);
+    else if (grant.until === 'time') {
+      keys(grant, ['until', 'durationMs']);
+      if (!Number.isSafeInteger(grant.durationMs) || Number(grant.durationMs) < STANDING_GRANT_DURATION_MS.min
+        || Number(grant.durationMs) > STANDING_GRANT_DURATION_MS.max) invalid();
+    } else invalid();
+  }
   if (answer.grants !== undefined && (!Array.isArray(answer.grants) || answer.grants.length > 64
     || answer.grants.some(id => typeof id !== 'string' || id.length > 128)
     || new Set(answer.grants).size !== answer.grants.length)) invalid();
@@ -63,9 +73,12 @@ export function parseInteractionResponse(value: unknown): InteractionResponse {
 export function validateAnswer(prompt: InteractionPrompt, answer: InteractionAnswer): void {
   if (answer.action !== 'accept') {
     if (answer.values !== undefined || answer.grants !== undefined || answer.scope !== undefined
-      || answer.choice !== undefined) invalid();
+      || answer.choice !== undefined || answer.standingGrant !== undefined) invalid();
     return;
   }
+  // A standing grant approves later calls with the prompt's one-action choice; only a categorized prompt offers it.
+  if (answer.standingGrant !== undefined && (!prompt.grantCategory || !prompt.choices?.length
+    || (answer.choice ?? prompt.choices[0]!.id) !== prompt.choices[0]!.id)) invalid();
   const choices = prompt.choices ?? [];
   if (choices.length && !choices.some(choice => choice.id === answer.choice)) invalid();
   if (!choices.length && answer.choice !== undefined) invalid();

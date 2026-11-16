@@ -81,7 +81,9 @@ export class HostedAcpProvider implements Provider {
   constructor(readonly name: 'grok' | 'antigravity' | 'kimi',
     private readonly kimiHost: KimiComputerUseHost = defaultKimiComputerUseHost()) {
     this.sessionInitializationTimeoutMs = name === 'kimi' ? 45_000 : undefined;
-    if (name === 'grok') this.capabilities.interactions = { version: 1, kinds: GROK_INTERACTION_KINDS };
+    // ADR-055: shell and file approvals carry a category everywhere; computer use only for Kimi's plugin.
+    this.capabilities.interactions = { version: 1, kinds: name === 'grok' ? GROK_INTERACTION_KINDS : ACP_INTERACTION_KINDS,
+      standingGrants: { version: 1, categories: name === 'kimi' ? ['computer_use', 'command', 'file'] : ['command', 'file'] } };
     // Native credential persistence is not yet verified for Google's executable.
     if (name === 'antigravity') this.capabilities.sessionMcpServers = false;
   }
