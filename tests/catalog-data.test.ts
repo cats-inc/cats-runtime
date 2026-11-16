@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   createCatalogSnapshot, readLocalCatalogProjection, readCatalogCandidate, catalogSnapshotPath,
+  findCatalogScope, listCatalogScopes,
 } from '../src/catalogs/resolver.js';
 import { parseCatalogDocument } from '../src/catalogs/schema.js';
 import { CatalogStore } from '../src/catalogs/store.js';
@@ -133,10 +134,95 @@ describe('catalog basis', () => {
       { id: 'zen/model-d', label: 'Model D', execution: { model: 'zen/model-d' } }] } as CatalogScope;
     expect(() => parse(withBasis(mixed, { channel: { id: 'go', label: 'go' } }))).toThrow(/does not match 'zen\/model-d'/);
     expect(() => parse(withBasis(bare, { channel: { id: 'model-c', label: 'model-c' } }))).toThrow(/'model-c' has no executable channel/);
-    expect(() => parse(withBasis(pi(), {}))).toThrow(/needs a channel or a plan/);
+    expect(() => parse(withBasis(pi(), {}))).toThrow(/needs a channel, a region or a plan/);
     expect(() => parse(withBasis(pi(), { plan: { label: ' ' } }))).toThrow(/plan\.label must be a nonempty/);
     expect(() => parse(withBasis(pi(), { channel: { id: 'subscription' } }))).toThrow(/channel\.label must be a nonempty/);
     expect(() => parse(withBasis(pi(), { plan: { label: 'Plan' }, route: 'x' }))).toThrow(/unknown field 'route'/);
+  });
+});
+
+describe('catalog bases (SPEC-045)', () => {
+  const kimi = (id: string | undefined, region: string, model = 'kimi-code/k3'): CatalogScope => ({
+    provider: 'kimi', backend: 'cli', selection_mode: 'full',
+    basis: { ...(id ? { id } : {}), region: { id: region, label: `${region} (fixture)` } },
+    models: [{ id: model, label: `Model ${model}`, execution: { model } }],
+  });
+  const copilot = (id: string | undefined, plan: string, model = 'model-c'): CatalogScope => ({
+    provider: 'copilot', backend: 'cli', selection_mode: 'full',
+    basis: { ...(id ? { id } : {}), plan: { label: plan } },
+    models: [{ id: model, label: `Model ${model}`, execution: { model } }],
+  });
+  const json = (...catalogs: CatalogScope[]) => JSON.stringify(doc(...catalogs));
+  const target = (providerName: string) => ({ providerName, backend: 'cli' as const });
+
+  it('accepts several bases of one target with a region, a plan id and an id-less first basis', () => {
+    const parsed = parseCatalogDocument(json(kimi(undefined, 'global'), kimi('mainland-cn', 'mainland-cn', 'kimi-code/k3-cn')));
+    expect(parsed.catalogs.map(scope => scope.basis)).toEqual([
+      { region: { id: 'global', label: 'global (fixture)' } },
+      { id: 'mainland-cn', region: { id: 'mainland-cn', label: 'mainland-cn (fixture)' } },
+    ]);
+    const planned = { ...copilot('pro', 'Pro'), basis: { id: 'pro', plan: { label: 'Pro', id: 'copilot_pro' } } } as CatalogScope;
+    expect(parseCatalogDocument(json(planned)).catalogs[0].basis?.plan).toEqual({ label: 'Pro', id: 'copilot_pro' });
+  });
+
+  it('rejects a later id-less scope, a duplicate id, a scope without basis among several, and a bad id', () => {
+    expect(() => parseCatalogDocument(json(kimi('global', 'global'), kimi(undefined, 'mainland-cn'))))
+      .toThrow("'kimi/cli/' already has a scope, so this one needs basis.id");
+    expect(() => parseCatalogDocument(json(kimi(undefined, 'global'), kimi(undefined, 'mainland-cn'))))
+      .toThrow(/needs basis.id/);
+    expect(() => parseCatalogDocument(json(kimi('global', 'global'), kimi('global', 'mainland-cn'))))
+      .toThrow(/catalog scopes contains duplicates/);
+    const bareFirst = { ...kimi(undefined, 'global'), basis: undefined } as CatalogScope;
+    expect(() => parseCatalogDocument(json(bareFirst, kimi('mainland-cn', 'mainland-cn'))))
+      .toThrow(/has several bases, so every scope needs a basis/);
+    expect(() => parseCatalogDocument(json(kimi('Global', 'global')))).toThrow(/basis.id must be a lowercase slug/);
+    expect(() => parseCatalogDocument(json({ ...kimi(undefined, 'global'), basis: { region: { id: 'global' } } } as unknown as CatalogScope)))
+      .toThrow(/region.label must be a nonempty/);
+  });
+
+  it('appends an override with a new id, keeps per-basis origins and finds bases by id', () => {
+    const snapshot = createCatalogSnapshot(json(copilot(undefined, 'Pro')), json(copilot('pro-plus', 'Pro+', 'model-plus')));
+    expect(snapshot.document.catalogs.map(scope => scope.basis?.plan?.label)).toEqual(['Pro', 'Pro+']);
+    expect(snapshot.origins).toEqual({ 'copilot/cli/': 'factory', 'copilot/cli/#pro-plus': 'override' });
+    expect(listCatalogScopes(snapshot, target('copilot')).map(scope => scope.models[0].id)).toEqual(['model-c', 'model-plus']);
+    expect(findCatalogScope(snapshot, target('copilot'))?.models[0].id).toBe('model-c');
+    expect(findCatalogScope(snapshot, target('copilot'), 'pro-plus')?.models[0].id).toBe('model-plus');
+    expect(findCatalogScope(snapshot, target('copilot'), 'missing')).toBeUndefined();
+  });
+
+  it('lets an id-less override replace the first basis and keep its id; two id-less overrides are rejected', () => {
+    const factory = json(kimi('global', 'global'), kimi('mainland-cn', 'mainland-cn', 'kimi-code/k3-cn'));
+    const snapshot = createCatalogSnapshot(factory, json(kimi(undefined, 'global', 'kimi-code/local')));
+    expect(snapshot.document.catalogs.map(scope => [scope.basis?.id, scope.models[0].id])).toEqual([
+      ['global', 'kimi-code/local'], ['mainland-cn', 'kimi-code/k3-cn'],
+    ]);
+    expect(snapshot.origins).toEqual({ 'kimi/cli/#global': 'override', 'kimi/cli/#mainland-cn': 'factory' });
+    // An override written before the factory had bases records none; it takes the first basis.
+    const older = createCatalogSnapshot(factory, json({ ...kimi(undefined, 'global', 'kimi-code/older'), basis: undefined }));
+    expect(older.document.catalogs[0]).toMatchObject({ basis: { id: 'global', region: { id: 'global' } },
+      models: [{ id: 'kimi-code/older' }] });
+    expect(() => createCatalogSnapshot(factory, json(kimi(undefined, 'global'), kimi(undefined, 'global'))))
+      .toThrow(/needs basis.id/);
+    // Within one document, also an override file, a target's id-less scope must come first.
+    expect(() => createCatalogSnapshot(factory, json(kimi('mainland-cn', 'mainland-cn'), kimi(undefined, 'global'))))
+      .toThrow(/needs basis.id/);
+    // A target whose first scope records no basis cannot gain a second one.
+    expect(() => createCatalogSnapshot(json(pi()), json({ ...pi('extra'), basis: { id: 'extra', plan: { label: 'Extra' } } })))
+      .toThrow(/has several bases, so every scope needs a basis/);
+  });
+
+  it('reloads one basis alone and restores a multi-basis accepted snapshot', () => {
+    const { paths, override, factory } = fixture();
+    writeFileSync(factory, json(copilot(undefined, 'Pro')));
+    writeFileSync(override, json(copilot('pro-plus', 'Pro+', 'model-plus')));
+    const store = new CatalogStore(paths);
+    writeFileSync(override, json(copilot('pro-plus', 'Pro+', 'model-plus-2')));
+    expect(store.reload(store.status().catalogRevision).affectedScopes).toEqual(['copilot/cli/#pro-plus']);
+    writeFileSync(override, '{ broken:');
+    const restarted = new CatalogStore(paths);
+    expect(restarted.status().source).toBe('last_accepted');
+    expect(listCatalogScopes(restarted.current(), target('copilot')).map(scope => scope.models[0].id))
+      .toEqual(['model-c', 'model-plus-2']);
   });
 });
 

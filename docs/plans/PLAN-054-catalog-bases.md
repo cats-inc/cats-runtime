@@ -16,60 +16,64 @@ acceptance scenario 1).
 Data, resolution and API. No factory data changes; tests build two-basis targets from
 overrides and fixtures.
 
-- [ ] Types (`src/catalogs/types.ts`): `CatalogBasis` gains `id?`, `region?: { id, label }` and
+- [x] Types (`src/catalogs/types.ts`): `CatalogBasis` gains `id?`, `region?: { id, label }` and
       `plan.id?`.
-- [ ] Schema (`src/catalogs/schema.ts`):
-  - [ ] `validateBasis` accepts the new fields and requires one of channel, region or plan.
-  - [ ] `catalogScopeKey` appends the basis id when present. An id-less scope keeps today's key,
+- [x] Schema (`src/catalogs/schema.ts`):
+  - [x] `validateBasis` accepts the new fields and requires one of channel, region or plan.
+  - [x] `catalogScopeKey` appends the basis id when present. An id-less scope keeps today's key,
         so `origins`, `affectedScopes` and accepted snapshots of single-basis targets do not
         change.
-  - [ ] `validateCatalogDocument`: unique keys, unique ids within a target, and an id-less
+  - [x] `validateCatalogDocument`: unique keys, unique ids within a target, and an id-less
         scope only as its target's first (FR-2).
-- [ ] Resolver (`src/catalogs/resolver.ts`, `store.ts`):
-  - [ ] `mergeCatalogDocuments`: an override with an id replaces that basis or appends a new
+- [x] Resolver (`src/catalogs/resolver.ts`, `store.ts`):
+  - [x] `mergeCatalogDocuments`: an override with an id replaces that basis or appends a new
         one after the factory bases; an id-less override replaces the target's first basis
         whatever its id (FR-3).
-  - [ ] `createCatalogSnapshot` and `readAcceptedCatalog` use the per-basis keys, so the
+  - [x] `createCatalogSnapshot` and `readAcceptedCatalog` use the per-basis keys, so the
         last-accepted snapshot of a multi-basis document still loads.
-  - [ ] `findCatalogScope` takes an optional `basisId` (absent means the first basis); add a
+  - [x] `findCatalogScope` takes an optional `basisId` (absent means the first basis); add a
         lister that returns a target's bases in data order. Keep both on the `./catalogs`
         package boundary.
-  - [ ] `CatalogStore.reload` reports affected scopes per basis.
-- [ ] Capabilities: `catalogCapabilities.catalogBases = true`. Update the pinned sets in
-      `tests/fixtures/catalog-soft-patch-smoke.mjs` and `tests/catalog-cli.test.ts`.
-- [ ] Advanced catalog (`src/core/models/providerAdvancedKnowledge.ts`,
+  - [x] `CatalogStore.reload` reports affected scopes per basis.
+- [x] Capabilities: `catalogCapabilities.catalogBases = true`. Update the pinned set in
+      `tests/fixtures/catalog-soft-patch-smoke.mjs`; `tests/catalog-cli.test.ts` pins a fake
+      older set on purpose and stays.
+- [x] Advanced catalog (`src/core/models/providerAdvancedKnowledge.ts`,
       `providerModelCatalog.ts`, `providerAdvancedCatalog.ts`):
-  - [ ] Thread `basisId` through `getAdvancedCatalog`, `getImmediateAdvancedCatalog`, the
+  - [x] Thread `basisId` through `getAdvancedCatalog`, `getImmediateAdvancedCatalog`, the
         knowledge builders and `tryManagedCatalog`, so the basic rows and the scope rows that
         `buildProviderAdvancedKnowledge` joins come from the same basis.
-  - [ ] The result gains `basisId` and `bases[]` when a target has two or more bases, and
+  - [x] The result gains `basisId` and `bases[]` when a target has two or more bases, and
         `capture { cliVersion, lastUpdated }` always. Runtime composes `bases[].label` from the
         channel, region and plan labels joined with ` · `. `detected` is `false` until Phase 2.
-  - [ ] `manifestId` includes the basis id.
-  - [ ] The basic model list stays on the first basis.
-- [ ] HTTP and MCP:
-  - [ ] `GET /providers/:provider/models/advanced` accepts `basis`; an unknown id returns 400
+  - [x] `manifestId` includes the basis id.
+  - [x] The basic model list stays on the first basis.
+- [x] HTTP and MCP:
+  - [x] `GET /providers/:provider/models/advanced` accepts `basis`; an unknown id returns 400
         with `code: catalog_basis_unknown` (`src/http/routes/providers.ts`).
-  - [ ] The MCP `providerAdvancedModels` tool gains a `basis` input (`src/mcp/tools.ts`, whose
-        schema has `additionalProperties: false`).
-  - [ ] `docs/api.md` documents both.
-- [ ] Selection and sessions (`src/core/models/providerSelectionResolution.ts`,
+  - [x] The MCP `providerAdvancedModels` tool gains a `basis` input (`src/mcp/tools.ts`, whose
+        schema has `additionalProperties: false`). No test covers the MCP input yet; it builds
+        the same query the HTTP route tests use.
+  - [x] `docs/api.md` documents both.
+- [x] Selection and sessions (`src/core/models/providerSelectionResolution.ts`,
       `src/http/routes/sessions.ts`):
-  - [ ] `ProviderModelSelection` and `ProviderModelResolution` gain `basisId`. Parse,
+  - [x] `ProviderModelSelection` and `ProviderModelResolution` gain `basisId`. Parse,
         canonicalize and compare keep it, so reuse conflicts see a change of basis.
-  - [ ] `resolveProviderSelection` resolves entries and controls in the selected basis, or the
+  - [x] `resolveProviderSelection` resolves entries and controls in the selected basis, or the
         first one; an unknown `basisId` is rejected like an unknown entry, never switched.
-  - [ ] The plain-string path (`resolveRequestedSessionModelState`) searches the bases in data
+  - [x] The plain-string path (`resolveRequestedSessionModelState`) searches the bases in data
         order and records the matching `basisId`.
-  - [ ] Create, reuse, fork and the Cursor native path record `basisId` in the binding; resume
-        keeps it (the registry stores bindings without a schema).
-- [ ] Tests:
-  - [ ] `tests/catalog-data.test.ts`: validation, merge, origins and accepted snapshot for a
+  - [x] Create, reuse, fork and the Cursor native path record `basisId` in the binding; resume
+        keeps it (the registry stores bindings without a schema). Tested for create and reuse;
+        fork and the Cursor native path go through the same resolver and have no own test.
+  - [x] `defaultSelection` of a non-first basis carries its `basisId`.
+- [x] Tests:
+  - [x] `tests/catalog-data.test.ts`: validation, merge, origins and accepted snapshot for a
         two-basis target.
-  - [ ] `tests/catalog-runtime.test.ts`: advanced result with `basis`, unknown basis,
+  - [x] `tests/catalog-runtime.test.ts`: advanced result with `basis`, unknown basis,
         resolution, plain strings, unchanged spawned arguments for a plan or region basis, and
         Bot/MCP requests without `basisId` on the first basis (scenarios 3, 6 and 8).
-  - [ ] `src/core/models/providerSelectionResolution.test.ts`: `basisId` parse and compare.
+  - [x] `src/core/models/providerSelectionResolution.test.ts`: `basisId` parse and compare.
 
 ## Phase 2: Runtime detection, Playground and sign-in report (after Phase 1)
 

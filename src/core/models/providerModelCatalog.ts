@@ -50,9 +50,9 @@ import {
 import { resolve } from 'node:path';
 import { resolveRuntimeRoot, resolveRuntimePackageRoot } from '../../shared/runtimePaths.js';
 import { CatalogStore } from '../../catalogs/store.js';
-import { CatalogUnavailableError } from '../../catalogs/errors.js';
-import { findCatalogScope, readCatalogFactory, createCatalogSnapshot } from '../../catalogs/resolver.js';
-import type { CatalogPaths } from '../../catalogs/types.js';
+import { CatalogBasisUnknownError, CatalogUnavailableError } from '../../catalogs/errors.js';
+import { findCatalogScope, listCatalogScopes, readCatalogFactory, createCatalogSnapshot } from '../../catalogs/resolver.js';
+import type { CatalogPaths, CatalogScope } from '../../catalogs/types.js';
 
 export interface ProviderModelCatalogEntry {
   id: string;
@@ -124,6 +124,8 @@ interface ProviderModelCatalogServiceOptions {
 
 interface ProviderModelCatalogRequestOptions {
   forceRefresh?: boolean;
+  /** The catalog basis to read; absent means the target's first basis (SPEC-045). */
+  basisId?: string;
 }
 
 interface CachedDynamicModels {
@@ -583,9 +585,10 @@ export class ProviderModelCatalogService {
   getImmediateAdvancedKnowledge(
     providerName: string,
     requestedInstance?: string,
+    options: Pick<ProviderModelCatalogRequestOptions, 'basisId'> = {},
   ): ProviderAdvancedKnowledgeContext {
     const target = resolveProviderTarget(this.config, providerName, requestedInstance);
-    return this.getImmediateAdvancedKnowledgeForTarget(target);
+    return this.getImmediateAdvancedKnowledgeForTarget(target, options);
   }
 
   async getAdvancedKnowledgeForTarget(
@@ -597,17 +600,23 @@ export class ProviderModelCatalogService {
     const catalog = await this.getCatalogForTarget(target, options);
     if (activation !== this.catalogStore.status().activationId) throw new Error('Provider catalog changed');
     return buildProviderAdvancedKnowledge(target, catalog, {
-      snapshot,
+      snapshot, basisId: options.basisId,
     });
   }
 
   getImmediateAdvancedKnowledgeForTarget(
     target: ProviderTargetDescriptor,
+    options: Pick<ProviderModelCatalogRequestOptions, 'basisId'> = {},
   ): ProviderAdvancedKnowledgeContext {
-    const catalog = this.getImmediateCatalogForTarget(target);
+    const catalog = this.getImmediateCatalogForTarget(target, options.basisId);
     return buildProviderAdvancedKnowledge(target, catalog, {
-      snapshot: this.catalogStore.current(),
+      snapshot: this.catalogStore.current(), basisId: options.basisId,
     });
+  }
+
+  /** Every catalog basis of a target in data order; the first is the default (SPEC-045). */
+  listCatalogBasesForTarget(target: ProviderTargetDescriptor): CatalogScope[] {
+    return listCatalogScopes(this.catalogStore.current(), target);
   }
 
   async getAdvancedCatalog(
@@ -622,8 +631,9 @@ export class ProviderModelCatalogService {
   getImmediateAdvancedCatalog(
     providerName: string,
     requestedInstance?: string,
+    options: Pick<ProviderModelCatalogRequestOptions, 'basisId'> = {},
   ) {
-    const knowledge = this.getImmediateAdvancedKnowledge(providerName, requestedInstance);
+    const knowledge = this.getImmediateAdvancedKnowledge(providerName, requestedInstance, options);
     return knowledge.catalog;
   }
 
@@ -643,9 +653,10 @@ export class ProviderModelCatalogService {
 
   private getImmediateCatalogForTarget(
     target: ProviderTargetDescriptor,
+    basisId?: string,
   ): ProviderModelCatalogResult {
     this.assertTarget(target);
-    const shortlist = this.tryManagedCatalog(target);
+    const shortlist = this.tryManagedCatalog(target, basisId);
     if (shortlist) return shortlist;
     const defaultModel = resolveDefaultModel(target, this.env);
     const warnings: string[] = [];
@@ -680,7 +691,7 @@ export class ProviderModelCatalogService {
     options: ProviderModelCatalogRequestOptions = {},
   ): Promise<ProviderModelCatalogResult> {
     this.assertTarget(target);
-    const shortlist = this.tryManagedCatalog(target);
+    const shortlist = this.tryManagedCatalog(target, options.basisId);
     if (shortlist) return shortlist;
     const generation = this.generation;
     const defaultModel = resolveDefaultModel(target, this.env);
@@ -706,10 +717,13 @@ export class ProviderModelCatalogService {
     return result;
   }
 
-  private tryManagedCatalog(target: ProviderTargetDescriptor): ProviderModelCatalogResult | null {
+  private tryManagedCatalog(target: ProviderTargetDescriptor, basisId?: string): ProviderModelCatalogResult | null {
     const snapshot = this.catalogStore.current();
     if (!snapshot) throw new CatalogUnavailableError();
-    const scope = findCatalogScope(snapshot, target);
+    const scope = findCatalogScope(snapshot, target, basisId);
+    if (!scope && basisId !== undefined) {
+      throw new CatalogBasisUnknownError(basisId, `${target.providerName}/${target.backend}`);
+    }
     if (!scope || scope.selection_mode === 'discovery') return null;
     return this.buildCatalog(target, {
       defaultModel: scope.models.find(model => model.default)?.id ?? null,

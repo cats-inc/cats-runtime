@@ -217,6 +217,10 @@ async function withRuntime(
       presets:[{id:'deep_reasoning',label:'Deep reasoning',availability:'supported',preferredEntryId:'gpt-5.4',controlDefaults:{'openai.reasoning_effort':'high'}}],
     }]}));
   }
+  if (Array.isArray(overrides.catalogScopes)) {
+    const path = join(config.dataDir!, '..', 'config', 'curated-model-catalogs.yaml');
+    writeFileSync(path, JSON.stringify({ schema_version: 2, catalogs: overrides.catalogScopes }));
+  }
   const runtime = createRuntimeServer(config, options);
   try {
     await run(runtime);
@@ -4469,6 +4473,80 @@ providers:
         entries: [{id:'gpt-5.4',label:'gpt-5.4'},{id:'gpt-5.4-mini',label:'gpt-5.4-mini'}],
       });
       expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('serves catalog bases and resolves sessions in the requested or matching basis (SPEC-045)', async () => {
+    const scope = (basis: Record<string, unknown>, ids: string[]) => ({
+      provider: 'codex', backend: 'api', transport: 'openai', selection_mode: 'full', cli_version: '1.2.3', basis,
+      models: ids.map(id => ({ id, label: `Label ${id}`, execution: { model: id } })),
+    });
+    await withRuntime({
+      catalogScopes: [scope({ plan: { label: 'Plan A' } }, ['gpt-5.4']),
+        { ...scope({ id: 'plan-b', plan: { label: 'Plan B' } }, ['gpt-5.4', 'only-b']), cli_version: undefined }],
+      providerDefaultTargets: { codex: { backend: 'api', instance: 'main' } },
+      remoteProviderCatalog: {
+        api: { codex: { main: { id: 'main', providerName: 'codex', backend: 'api', transport: 'openai',
+          apiKeyEnv: 'OPENAI_API_KEY', baseUrl: 'https://example.test', model: 'gpt-5.4' } } },
+        local: {},
+        agent: {},
+      },
+    }, {}, async (runtime) => {
+      const advanced = (query = '') => runtime.app.request(`/providers/codex/models/advanced?instance=api/main${query}`);
+      const first = await (await advanced()).json() as Record<string, unknown>;
+      expect(first.basisId).toBeUndefined();
+      expect(first.basis).toEqual({ plan: { label: 'Plan A' } });
+      expect(first.capture).toEqual({ cliVersion: '1.2.3' });
+      expect(first.bases).toEqual([
+        { label: 'Plan A', plan: { label: 'Plan A' }, cliVersion: '1.2.3', detected: false },
+        { id: 'plan-b', label: 'Plan B', plan: { label: 'Plan B' }, detected: false },
+      ]);
+      const second = await (await advanced('&basis=plan-b')).json() as Record<string, unknown>;
+      expect(second).toMatchObject({ basisId: 'plan-b', capture: {},
+        entries: [{ id: 'gpt-5.4' }, { id: 'only-b' }],
+        defaultSelection: { basisId: 'plan-b', entryId: 'gpt-5.4', entryMode: 'explicit' },
+        support: { provenance: { manifestId: 'codex/api/openai#plan-b' } } });
+      expect((first.defaultSelection as Record<string, unknown>).basisId).toBeUndefined();
+      const refreshed = await (await advanced('&basis=plan-b&refresh=1')).json() as Record<string, unknown>;
+      expect(refreshed).toMatchObject({ basisId: 'plan-b', entries: [{ id: 'gpt-5.4' }, { id: 'only-b' }] });
+      const unknown = await advanced('&basis=missing');
+      expect(unknown.status).toBe(400);
+      expect(await unknown.json()).toMatchObject({ code: 'catalog_basis_unknown' });
+
+      const create = (body: Record<string, unknown>) => runtime.app.request('/sessions', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ provider: 'codex', cwd: '/tmp/cats-runtime-repo', ...body }),
+      });
+      // Without basisId a structured selection means the first basis, whatever else is listed.
+      const plain = await create({ modelSelection: { entryId: 'gpt-5.4', entryMode: 'explicit' } });
+      expect(plain.status).toBe(201);
+      const plainBody = await plain.json() as Record<string, any>;
+      expect(plainBody.modelResolution.basisId).toBeUndefined();
+      expect((await create({ modelSelection: { entryId: 'only-b', entryMode: 'explicit' } })).status).toBe(400);
+
+      const chosen = await create({ modelSelection: { basisId: 'plan-b', entryId: 'only-b', entryMode: 'explicit' } });
+      expect(chosen.status).toBe(201);
+      expect(await chosen.json()).toMatchObject({ model: 'only-b',
+        modelSelection: { basisId: 'plan-b', entryId: 'only-b' },
+        modelResolution: { basisId: 'plan-b', entryId: 'only-b', model: 'only-b' } });
+
+      // A plain model string is looked up in every basis; the selection stays as sent.
+      const legacy = await create({ model: 'only-b' });
+      expect(legacy.status).toBe(201);
+      const legacyBody = await legacy.json() as Record<string, any>;
+      expect(legacyBody.modelResolution).toMatchObject({ basisId: 'plan-b', model: 'only-b' });
+      expect(legacyBody.modelSelection.basisId).toBeUndefined();
+
+      const missing = await create({ modelSelection: { basisId: 'missing', entryId: 'gpt-5.4', entryMode: 'explicit' } });
+      expect(missing.status).toBe(400);
+
+      // Reuse compares the basis: the same row in another basis is a different selection.
+      const keyed = { sessionKey: 'basis-reuse', reusePolicy: 'require_existing' };
+      expect((await create({ sessionKey: 'basis-reuse', modelSelection: { basisId: 'plan-b', entryId: 'gpt-5.4', entryMode: 'explicit' } })).status).toBe(201);
+      const reused = await create({ ...keyed, modelSelection: { basisId: 'plan-b', entryId: 'gpt-5.4', entryMode: 'explicit' } });
+      expect(reused.status).toBeLessThan(300);
+      expect(await reused.json()).toMatchObject({ modelResolution: { basisId: 'plan-b' } });
+      expect((await create({ ...keyed, modelSelection: { entryId: 'gpt-5.4', entryMode: 'explicit' } })).status).toBe(409);
     });
   });
 

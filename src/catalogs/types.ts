@@ -53,10 +53,17 @@ export interface CatalogPreset {
 
 /** What a scope's list was captured against; shown read-only, recorded only with evidence. */
 export interface CatalogBasis {
+  /**
+   * Identity among the bases of one target (SPEC-045). Only the target's first scope may omit
+   * it; a scope, override or selection without an id means that first basis.
+   */
+  id?: string;
   /** Routing channel inside the CLI host that every entry runs through. */
   channel?: { id: string; label: string };
-  /** Account plan the list was captured with, where the CLI states entitlement depends on it. */
-  plan?: { label: string };
+  /** Sign-in region the list was captured on, by the CLI's own region token and name. */
+  region?: { id: string; label: string };
+  /** Account plan the list was captured with; `id` is the CLI's own plan token, for detection. */
+  plan?: { label: string; id?: string };
 }
 
 export interface CatalogScope {

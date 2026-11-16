@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { CATALOG_BINDINGS, CATALOG_BINDING_VERSION } from './bindings.js';
-import { catalogScopeKey, parseCatalogDocument, validateCatalogDocument } from './schema.js';
+import { catalogScopeKey, catalogTargetKey, parseCatalogDocument, validateCatalogDocument } from './schema.js';
 import type { CatalogDocument, CatalogPaths, CatalogProjection, CatalogScope, CatalogSnapshot } from './types.js';
 
 export function catalogDigest(value: string): string {
@@ -41,10 +41,39 @@ export function resolveCatalogPaths(paths: CatalogPaths): Required<CatalogPaths>
   };
 }
 
+/**
+ * An override scope replaces the factory scope with the same key. One without basis.id replaces
+ * the target's first basis whatever id the factory gives it, and stays that basis: it keeps the
+ * factory's id, and when it records no basis while the factory target has several, it takes the
+ * factory's whole basis, so an override written before the factory added a second basis still
+ * loads and its selections still resolve. A single-basis target keeps the old rule: an override
+ * without a basis shows none. An override with a new basis.id is appended after the factory's
+ * scopes (SPEC-045 FR-3).
+ */
 export function mergeCatalogDocuments(factory: CatalogDocument, override?: CatalogDocument): CatalogDocument {
   const scopes = new Map(factory.catalogs.map(scope => [catalogScopeKey(scope), scope]));
-  for (const scope of override?.catalogs ?? []) scopes.set(catalogScopeKey(scope), scope);
+  for (const scope of override?.catalogs ?? []) {
+    const first = scope.basis?.id ? undefined : firstFactoryScope(factory, scope);
+    const several = first ? factory.catalogs.filter(c => catalogTargetKey(c) === catalogTargetKey(first)).length > 1 : false;
+    scopes.set(overrideScopeKey(factory, scope), first?.basis ? asFirstBasis(scope, first.basis, several) : scope);
+  }
   return validateCatalogDocument({ schema_version: 2, catalogs: [...scopes.values()] });
+}
+
+function asFirstBasis(scope: CatalogScope, factoryBasis: NonNullable<CatalogScope['basis']>, several: boolean): CatalogScope {
+  if (!scope.basis) return several ? { ...scope, basis: structuredClone(factoryBasis) } : scope;
+  return factoryBasis.id ? { ...scope, basis: { id: factoryBasis.id, ...scope.basis } } : scope;
+}
+
+function firstFactoryScope(factory: CatalogDocument, scope: CatalogScope): CatalogScope | undefined {
+  return factory.catalogs.find(candidate => catalogTargetKey(candidate) === catalogTargetKey(scope));
+}
+
+/** The merged key an override scope lands on: its own, or the first factory basis when id-less. */
+function overrideScopeKey(factory: CatalogDocument, scope: CatalogScope): string {
+  if (scope.basis?.id) return catalogScopeKey(scope);
+  const first = firstFactoryScope(factory, scope);
+  return first ? catalogScopeKey(first) : catalogScopeKey(scope);
 }
 
 export class CatalogFactoryError extends Error {}
@@ -63,7 +92,7 @@ export function createCatalogSnapshot(factorySource: string, overrideSource?: st
   const factory = parseCatalogDocument(factorySource);
   const override = overrideSource === undefined ? undefined : parseCatalogDocument(overrideSource);
   const document = mergeCatalogDocuments(factory, override);
-  const overrideKeys = new Set(override?.catalogs.map(catalogScopeKey));
+  const overrideKeys = new Set(override?.catalogs.map(scope => overrideScopeKey(factory, scope)));
   return freezeCatalog({
     schemaVersion: 2,
     catalogRevision: catalogDigest(stableCatalogJson(document)),
@@ -132,11 +161,28 @@ export function readLocalCatalogProjection(paths: CatalogPaths): CatalogProjecti
   }
 }
 
+export interface CatalogTarget {
+  providerName: string;
+  backend: CatalogScope['backend'];
+  remoteInstance?: { transport?: string };
+}
+
+/** Every basis of a target, in data order; the first is the default basis (SPEC-045). */
+export function listCatalogScopes(snapshot: CatalogSnapshot | undefined, target: CatalogTarget): CatalogScope[] {
+  const key = catalogTargetKey({ provider: target.providerName, backend: target.backend,
+    ...(target.backend !== 'cli' ? { transport: target.remoteInstance?.transport } : {}) });
+  return snapshot?.document.catalogs.filter(scope => catalogTargetKey(scope) === key) ?? [];
+}
+
+/**
+ * The scope of one basis: the named one, or the target's first basis when basisId is absent.
+ * An unknown id returns undefined; it never falls back to another basis.
+ */
 export function findCatalogScope(
   snapshot: CatalogSnapshot | undefined,
-  target: { providerName: string; backend: CatalogScope['backend']; remoteInstance?: { transport?: string } },
+  target: CatalogTarget,
+  basisId?: string,
 ): CatalogScope | undefined {
-  const key = catalogScopeKey({ provider: target.providerName, backend: target.backend,
-    ...(target.backend !== 'cli' ? { transport: target.remoteInstance?.transport } : {}) });
-  return snapshot?.document.catalogs.find(scope => catalogScopeKey(scope) === key);
+  const scopes = listCatalogScopes(snapshot, target);
+  return basisId === undefined ? scopes[0] : scopes.find(scope => scope.basis?.id === basisId);
 }

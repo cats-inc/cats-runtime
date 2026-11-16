@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { catalogCapabilities } from '../../catalogs/index.js';
-import { CatalogRevisionConflict, CatalogUnavailableError } from '../../catalogs/errors.js';
+import { CatalogBasisUnknownError, CatalogRevisionConflict, CatalogUnavailableError } from '../../catalogs/errors.js';
 import {
   isProviderTargetResolutionError,
   listConfiguredProviders,
@@ -441,14 +441,19 @@ providerRoutes.get('/providers/:provider/models/advanced', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const providerName = c.req.param('provider');
   const instance = c.req.query('instance') || undefined;
+  // SPEC-045: the basis to read; absent means the target's first basis.
+  const basisId = c.req.query('basis') || undefined;
 
   try {
     const forceRefresh = parseModelCatalogRefreshQuery(c.req.query('refresh'));
     const catalog = forceRefresh
-      ? await ctx.providerModelCatalog.getAdvancedCatalog(providerName, instance, { forceRefresh })
-      : ctx.providerModelCatalog.getImmediateAdvancedCatalog(providerName, instance);
+      ? await ctx.providerModelCatalog.getAdvancedCatalog(providerName, instance, { forceRefresh, basisId })
+      : ctx.providerModelCatalog.getImmediateAdvancedCatalog(providerName, instance, { basisId });
     return c.json(catalog);
   } catch (err) {
+    if (err instanceof CatalogBasisUnknownError) {
+      return c.json({ error: err.message, code: err.code }, 400);
+    }
     const payload: Record<string, unknown> = {
       error: `Failed to inspect advanced provider models: ${err}`,
       ...(err instanceof CatalogUnavailableError ? { code: err.code } : {}),

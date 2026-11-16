@@ -404,3 +404,29 @@ describe('provider selection resolution', () => {
     });
   });
 });
+
+describe('catalog basis in selections (SPEC-045)', () => {
+  it('parses, canonicalizes and compares basisId', async () => {
+    const { parseProviderModelSelection, sameProviderModelSelection } = await import('./providerSelectionResolution.js');
+    expect(parseProviderModelSelection({ basisId: ' plan-b ', entryId: 'model-a' }).selection)
+      .toEqual({ basisId: 'plan-b', entryId: 'model-a', entryMode: 'explicit' });
+    expect(parseProviderModelSelection({ basisId: ' ', entryId: 'model-a' }).error).toMatch(/basisId must be a nonempty string/);
+    expect(parseProviderModelSelection({ basisId: 7, entryId: 'model-a' }).error).toMatch(/basisId must be a nonempty string/);
+    const base = { entryId: 'model-a', entryMode: 'explicit' as const };
+    expect(sameProviderModelSelection(base, { ...base, basisId: 'plan-b' })).toBe(false);
+    expect(sameProviderModelSelection({ ...base, basisId: 'plan-b' }, { ...base, basisId: 'plan-b' })).toBe(true);
+  });
+
+  it('records the basis of the knowledge and refuses knowledge built for another basis', () => {
+    const scope = { provider: 'codex', backend: 'api' as const, transport: 'openai', selection_mode: 'full' as const,
+      basis: { id: 'plan-b', plan: { label: 'Plan B' } }, models: [] };
+    const knowledge = { ...createKnowledgeContext({}), scope };
+    const entryId = knowledge.catalog.entries[0].id;
+    expect(resolveProviderSelection(knowledge, { basisId: 'plan-b', entryId, entryMode: 'explicit' }).resolution.basisId)
+      .toBe('plan-b');
+    expect(() => resolveProviderSelection(knowledge, { basisId: 'plan-a', entryId, entryMode: 'explicit' }))
+      .toThrow("Catalog knowledge was built for another basis than 'plan-a'");
+    expect(resolveProviderSelection(createKnowledgeContext({}), { entryId, entryMode: 'explicit' }).resolution.basisId)
+      .toBeUndefined();
+  });
+});

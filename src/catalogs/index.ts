@@ -4,10 +4,12 @@ export * from './schema.js';
 export {
   catalogDigest, stableCatalogJson, resolveCatalogPaths, mergeCatalogDocuments,
   readCatalogFactory, readCatalogCandidate, readLocalCatalogProjection, findCatalogScope,
+  listCatalogScopes,
 } from './resolver.js';
+export type { CatalogTarget } from './resolver.js';
 export { CATALOG_BINDINGS, CATALOG_BINDING_VERSION } from './bindings.js';
 
 export const catalogCapabilities = Object.freeze({
   schemaVersion: 2, bindingVersion: 1, localOverrides: true, automaticSchema1Upgrade: true,
-  factorySnapshotRetirement: true,
+  factorySnapshotRetirement: true, catalogBases: true,
 });

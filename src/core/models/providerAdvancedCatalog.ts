@@ -90,7 +90,27 @@ export interface ProviderAdvancedCatalogResult {
   controls: ProviderAdvancedCatalogControl[];
   defaultSelection: ProviderModelSelection | null;
   support: ProviderAdvancedCatalogSupport;
-  /** Read-only channel or plan the scope was captured against; absent when not recorded. */
+  /** Read-only channel, region or plan the scope was captured against; absent when not recorded. */
   basis?: CatalogBasis;
+  /** The returned basis, when the target has two or more; absent for an id-less first basis. */
+  basisId?: string;
+  /** Every basis of the target in data order, present only when there are two or more (SPEC-045). */
+  bases?: ProviderAdvancedCatalogBasisOption[];
+  /** CLI version and capture date of the returned scope. */
+  capture?: { cliVersion?: string; lastUpdated?: string };
   warnings: string[];
+}
+
+export interface ProviderAdvancedCatalogBasisOption {
+  /** Absent only for an id-less first basis, which a selection names by omitting basisId. */
+  id?: string;
+  /** The channel, region and plan labels joined with " · ". */
+  label: string;
+  channel?: CatalogBasis['channel'];
+  region?: CatalogBasis['region'];
+  plan?: CatalogBasis['plan'];
+  cliVersion?: string;
+  lastUpdated?: string;
+  /** Matches the CLI sign-in on the Runtime's host; at most one basis per target. */
+  detected: boolean;
 }
