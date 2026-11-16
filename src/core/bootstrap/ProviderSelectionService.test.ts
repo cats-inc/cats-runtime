@@ -229,6 +229,29 @@ routing: {providers: {claude: {default_target: {backend: CLI, instance: ' ', ins
     expect(f.selection.getSnapshot().targets).toHaveLength(3);
   });
 
+  it('adds the asking Kimi target from its template, keeps print mode the default and installs only the native row (ADR-054 decision 11)', () => {
+    const native = { provider: 'kimi', backend: 'cli', instance: 'native' } as const;
+    const hosted = { provider: 'kimi', backend: 'cli', instance: 'hosted' } as const;
+    const f = fixture();
+    // Listed before the native target on purpose: order must not make the asking target the default.
+    f.selection.save([hosted, native], f.selection.getSnapshot().revision);
+    const written = parse(readFileSync(f.configPath, 'utf8')) as { backends: { cli: { providers: { kimi: { instances: Record<string, Record<string, unknown>> } } } } };
+    expect(written.backends.cli.providers.kimi.instances.hosted).toEqual({ command: 'kimi', runner: 'auto', runtime: 'native', protocol: 'hosted' });
+    expect(written.backends.cli.providers.kimi.instances.native?.protocol).toBeUndefined();
+    const snapshot = f.selection.getSnapshot();
+    expect(snapshot.targets).toEqual(expect.arrayContaining([native, hosted]));
+    expect(snapshot.nativeSetupTargets).toEqual([native]);
+    const reloaded = loadConfig(createRuntimeTestEnv(f.root));
+    expect(reloaded.providerDefaultTargets?.kimi).toMatchObject({ backend: 'cli', instance: 'native' });
+    expect(listProviderCatalog(reloaded).kimi?.instances.map((instance) => instance.instanceId).sort()).toEqual(['hosted', 'native']);
+  });
+
+  it('still defaults to a hosted instance when the provider has no other', () => {
+    const f = fixture();
+    f.selection.save([{ provider: 'kimi', backend: 'cli', instance: 'hosted' }], f.selection.getSnapshot().revision);
+    expect(loadConfig(createRuntimeTestEnv(f.root)).providerDefaultTargets?.kimi).toMatchObject({ backend: 'cli', instance: 'hosted' });
+  });
+
   it('does not restart services for an unchanged save unless bootstrap requires activation', () => {
     const f = fixture();
     f.selection.save([claude], 'missing');

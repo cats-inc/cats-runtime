@@ -27,6 +27,7 @@ import { MuseProvider } from '../providers/muse.js';
 import { MuseMspProvider } from '../providers/museMsp.js';
 import { HostedAcpProvider } from '../providers/hostedAcp.js';
 import { StandingGrants } from '../../../core/interactions/standingGrants.js';
+import type { StandingGrant } from '../../../core/interactions/types.js';
 import { ClaudeProvider } from '../providers/claude.js';
 import { CodexProvider } from '../providers/codex.js';
 import { CopilotProvider } from '../providers/copilot.js';
@@ -505,6 +506,13 @@ export class WorkerPool {
   /** The grants a session holds, without creating an empty record. */
   existingStandingGrants(sessionId: string): StandingGrants | undefined {
     return this.standingGrants.get(sessionId);
+  }
+
+  /** ADR-055: every session that holds a grant now, so a host can show and stop them after its own restart. */
+  standingGrantHolders(): Array<{ sessionId: string; standingGrants: StandingGrant[] }> {
+    return [...this.standingGrants.entries()]
+      .map(([sessionId, grants]) => ({ sessionId, standingGrants: grants.list() }))
+      .filter((holder) => holder.standingGrants.length > 0);
   }
 
   forgetStandingGrants(sessionId: string): void {
