@@ -4,20 +4,25 @@
 // for are compared.
 
 import { isDeepStrictEqual } from 'node:util';
+import { basisKey, chooseBasis, sameTarget, targetKey, targetScopes } from './basis.mjs';
 import { isPermissionDenied } from './process.mjs';
 
 const AUDIENCE_RANK = { none: 0, info: 1, operator: 2, agent: 3 };
 const OPERATOR_REASONS = new Set(['not-installed', 'not-authenticated', 'timeout', 'non-account-source', 'permission-denied']);
 const SAMPLE_LIMIT = 12;
 
-export function scopeKey({ provider, backend, transport }) {
-  return `${provider}/${backend}${transport ? `/${transport}` : ''}`;
+/** A scope's report key: the target, plus `#<id>` for a basis with an id (SPEC-045). */
+export function scopeKey(scope) {
+  return basisKey(scope);
 }
 
-function sameScope(left, right) {
-  return left.provider === right.provider
-    && left.backend === right.backend
-    && (left.transport ?? null) === (right.transport ?? null);
+const sameScope = sameTarget;
+
+/** An acknowledgement without basisId covers the target's first basis, like a selection. */
+function sameBasis(ack, summary) {
+  return ack.basisId === undefined
+    ? (summary.basis?.index ?? 0) === 0
+    : summary.basis?.id === ack.basisId;
 }
 
 function maxAudience(findings) {
@@ -66,8 +71,50 @@ function sample(ids) {
   return ids.length > SAMPLE_LIMIT ? [...ids.slice(0, SAMPLE_LIMIT), `… +${ids.length - SAMPLE_LIMIT} more`] : ids;
 }
 
-/** Compares one source entry with its factory scope. */
-export function compareScope(source, scope) {
+function describeMarker(values) {
+  return Object.entries(values).map(([dimension, value]) => `${dimension} ${value}`).join(', ');
+}
+
+/** The finding that explains which basis was compared, or why the comparison is not conclusive. */
+function basisFinding(basis, key, provider) {
+  const others = basis.others?.length ? ` Not compared: ${basis.others.join(', ')}.` : '';
+  const label = basis.label || 'the first basis';
+  if (basis.missing) {
+    return {
+      kind: 'basis-missing', audience: 'operator', subject: basis.id,
+      message: `The requested basis "${basis.id}" is not in the catalog's ${key} scopes.`,
+      nextAction: `Probe again, or validate with --basis ${provider}=<id> for a basis the catalog has.`,
+    };
+  }
+  if (basis.mismatch) {
+    return {
+      kind: 'basis-not-captured', audience: 'operator', subject: describeMarker(basis.mismatch),
+      message: `The CLI is signed in on ${describeMarker(basis.mismatch)}, which no captured ${key} basis covers. The list was compared with ${label} for information only.${others}`,
+      nextAction: 'Ask the owner before adding a basis for this sign-in (SPEC-045 FR-8); never edit another basis from this comparison.',
+    };
+  }
+  if (basis.confirmed === false) {
+    return {
+      kind: 'basis-unconfirmed', audience: 'operator', subject: key,
+      message: `${basis.count} captured bases and no sign-in marker showed which one this CLI uses, so the list was compared with the first, ${label}, for information only.${others}`,
+      nextAction: `Confirm the CLI sign-in's plan or region, then validate again with --basis ${provider}=<id> (or ${provider}=first).`,
+    };
+  }
+  if (basis.count > 1) {
+    return {
+      kind: 'basis-compared', audience: 'info', subject: key,
+      message: `Compared with the ${label} basis (${basis.how}).${others}`,
+    };
+  }
+  return null;
+}
+
+/**
+ * Compares one source entry with its factory scope. `basis` says which captured basis the scope
+ * is and how it was chosen (basis.mjs); an unconfirmed basis makes every model finding
+ * informational, because the live list may belong to another plan or region.
+ */
+export function compareScope(source, scope, { basis = null } = {}) {
   const deniedSignal = source.signals?.find((signal) => signal.kind === 'changelog-unreadable'
     && isPermissionDenied(signal.message));
   if (deniedSignal) {
@@ -79,13 +126,15 @@ export function compareScope(source, scope) {
   const findings = [];
   const add = (finding) => findings.push(finding);
   const provider = source.provider;
-  const conclusive = source.status === 'ok';
+  const basisUnconfirmed = basis?.confirmed === false;
+  const conclusive = source.status === 'ok' && !basisUnconfirmed;
   const membership = source.coverage?.membership ?? 'none';
   const summary = {
-    key: scopeKey(source),
+    key: scope ? scopeKey(scope) : scopeKey(source),
     provider,
     backend: source.backend,
     transport: source.transport ?? null,
+    ...(basis ? { basis } : {}),
     selectionMode: scope?.selection_mode ?? null,
     catalog: scope ? { cliVersion: scope.cli_version ?? null, lastUpdated: scope.last_updated ?? null, entries: scope.models?.length ?? 0 } : null,
     source: {
@@ -104,11 +153,21 @@ export function compareScope(source, scope) {
     confirmedEntries: [],
     findings,
   };
+  // Every model finding of an unconfirmed basis says so (SPEC-045 FR-8, scenario 9).
+  const done = () => {
+    if (basisUnconfirmed) {
+      for (const finding of findings) if (!finding.kind.startsWith('basis-')) finding.basisUnconfirmed = true;
+    }
+    return finalize(summary);
+  };
 
   if (!scope) {
-    add({ kind: 'scope-missing', audience: 'agent', subject: summary.key, message: `The factory has no ${summary.key} scope for this source.`, nextAction: 'Ask an agent to align the probe sources with the factory scopes.' });
+    if (basis?.missing) add(basisFinding(basis, summary.key, provider));
+    else add({ kind: 'scope-missing', audience: 'agent', subject: summary.key, message: `The factory has no ${summary.key} scope for this source.`, nextAction: 'Ask an agent to align the probe sources with the factory scopes.' });
     return finalize(summary);
   }
+  const basisNote = basis ? basisFinding(basis, summary.key, provider) : null;
+  if (basisNote) add(basisNote);
 
   // Side-by-side rows for the HTML view: every catalog entry with what the source listed for it,
   // plus the listed rows no entry executes. Statuses are derived from the findings in finalize.
@@ -147,7 +206,7 @@ export function compareScope(source, scope) {
       message: source.message ?? 'The source failed.',
       nextAction: sourceUnavailableAction(source),
     });
-    return finalize(summary);
+    return done();
   }
   if (source.status === 'degraded') {
     add({ kind: 'source-degraded', audience: 'operator', subject: source.reason ?? 'unknown', message: source.message ?? 'The source answered, but not conclusively.', nextAction: sourceUnavailableAction(source) });
@@ -156,8 +215,11 @@ export function compareScope(source, scope) {
   for (const note of source.notes ?? []) add({ kind: 'source-note', audience: 'info', subject: 'source', message: note });
 
   if (membership === 'none') {
-    compareWithoutEnumeration(source, scope, add);
-    return finalize(summary);
+    // A capture on an unconfirmed basis could land in the wrong basis, so it is a note too.
+    compareWithoutEnumeration(source, scope, basisUnconfirmed
+      ? (finding) => add(finding.audience === 'agent' ? { ...finding, audience: 'info', inconclusive: true } : finding)
+      : add);
+    return done();
   }
 
   const inconclusive = (finding) => (conclusive || finding.audience !== 'agent'
@@ -251,7 +313,7 @@ export function compareScope(source, scope) {
   summary.listConfirmed = conclusive
     && membership === 'complete'
     && !findings.some((finding) => ['absent-from-source', 'new-candidate', 'hidden-in-source'].includes(finding.kind));
-  return finalize(summary);
+  return done();
 }
 
 function compareFields(model, row, scope, coverage, provider, add) {
@@ -319,7 +381,7 @@ const ENTRY_STATUS_BY_KIND = [
 
 function entryStatus(summary, entry) {
   if (!summary.comparison.comparable) return 'unverified';
-  if (summary.source.status !== 'ok') return 'inconclusive';
+  if (summary.source.status !== 'ok' || summary.basis?.confirmed === false) return 'inconclusive';
   const related = entry.findings.map((index) => summary.findings[index]);
   if (related.length === 0) return 'confirmed';
   const open = related.filter((finding) => !finding.acknowledged);
@@ -370,6 +432,9 @@ export function validateAcknowledgements(document) {
     if (subjects.length !== 1 || typeof ack[subjects[0]] !== 'string' || !ack[subjects[0]].trim()) {
       throw new Error(`Acknowledgement ${index + 1} needs exactly one non-empty "subject" or "subjectPattern".`);
     }
+    if (ack.basisId !== undefined && (typeof ack.basisId !== 'string' || !ack.basisId.trim())) {
+      throw new Error(`Acknowledgement ${index + 1} has an empty "basisId"; omit it for the first basis.`);
+    }
     let subjectRegExp;
     if (ack.subjectPattern !== undefined) {
       try {
@@ -384,19 +449,37 @@ export function validateAcknowledgements(document) {
 
 function ackMatches(ack, scopeSummary, finding) {
   return sameScope(ack, scopeSummary)
+    && sameBasis(ack, scopeSummary)
     && ack.kind === finding.kind
     && (ack.subjectRegExp ? ack.subjectRegExp.test(finding.subject) : ack.subject === finding.subject)
     && (ack.field === undefined || ack.field === finding.field)
     && (ack.observed === undefined || isDeepStrictEqual(ack.observed, finding.observed));
 }
 
+/**
+ * The basis a snapshot source is compared with: `requestedBases` (--basis) first, then what the
+ * probe recorded (a requested id, or the raw sign-in marker re-matched against this catalog),
+ * then the first basis. A recorded id the catalog no longer has is reported, never replaced.
+ */
+function basisFor(source, catalogs, requestedBases) {
+  const scopes = targetScopes(catalogs, source);
+  const requested = requestedBases.get(source.provider) ?? source.basis?.requested;
+  const marker = source.basis?.marker ?? null;
+  const { scope, basis } = chooseBasis(scopes, { requested, marker });
+  if (!basis) return { scope: null, basis: null };
+  const described = { ...basis, others: scopes.filter((candidate) => candidate !== scope).map(scopeKey) };
+  // Single-basis targets without a sign-in marker keep their report shape.
+  const plain = !basis.missing && basis.count === 1 && !scope.basis && !marker && requested === undefined;
+  return { scope, basis: plain ? null : described };
+}
+
 /** Validates a whole snapshot. Returns the report object the renderers and agents consume. */
-export function validateSnapshot({ snapshot, catalogDocument, acknowledgements = [], environment = {} }) {
+export function validateSnapshot({ snapshot, catalogDocument, acknowledgements = [], environment = {}, requestedBases = new Map() }) {
   const catalogs = catalogDocument?.catalogs ?? [];
   const used = new Set();
   const scopes = (snapshot.sources ?? []).map((source) => {
-    const scope = catalogs.find((candidate) => sameScope(candidate, source)) ?? null;
-    const summary = compareScope(source, scope);
+    const { scope, basis } = basisFor(source, catalogs, requestedBases);
+    const summary = compareScope(source, scope, { basis });
     for (const finding of summary.findings) {
       const ack = acknowledgements.find((candidate) => ackMatches(candidate, summary, finding));
       if (!ack) continue;
@@ -408,16 +491,18 @@ export function validateSnapshot({ snapshot, catalogDocument, acknowledgements =
     return finalize(summary);
   });
 
-  // Only a run over every source can say that a curated scope has no source at all.
-  const probed = new Set(scopes.map((scope) => scope.key));
+  // Only a run over every source can say that a curated scope has no source at all. The other
+  // bases of a probed target are named by that scope's basis finding instead.
+  const probed = new Set(scopes.map((scope) => targetKey(scope)));
   const unprobedScopes = snapshot.selection === 'all'
     ? catalogs
-      .filter((scope) => scope.selection_mode !== 'discovery' && !probed.has(scopeKey(scope)))
+      .filter((scope) => scope.selection_mode !== 'discovery' && !probed.has(targetKey(scope)))
       .map((scope) => scopeKey(scope))
     : [];
   const staleAcknowledgements = acknowledgements
     .filter((ack) => !used.has(ack.index)
-      && scopes.some((scope) => sameScope(ack, scope) && scope.source.status === 'ok'
+      && scopes.some((scope) => sameScope(ack, scope) && sameBasis(ack, scope) && scope.source.status === 'ok'
+        && scope.basis?.confirmed !== false
         && !scope.findings.some((finding) => finding.kind === 'signal-unreadable')))
     .map(({ index, subjectRegExp, ...ack }) => ack);
 

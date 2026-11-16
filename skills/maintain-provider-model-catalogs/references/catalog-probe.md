@@ -171,6 +171,32 @@ probed on. A scope without it is a tool error, not a default.
 `listConfirmed: true` means a complete source listed exactly the catalog's membership on a
 conclusive run.
 
+## Catalog bases
+
+A CLI can have several captured bases, one scope per channel, region or plan (SPEC-045). The
+probe compares the live list with one of them and says which:
+
+- `--basis <provider>=<id>` names it (a bare `<id>` when one provider is selected; `first` is the
+  first basis, which may have no id). An unknown id fails before any CLI starts.
+- Otherwise the CLI's non-secret sign-in marker picks the one basis it matches. The only marker
+  so far is Kimi's `<KIMI_CODE_HOME>/region` file; see [Kimi Code](./providers/kimi.md).
+- Otherwise the first basis is compared.
+
+The snapshot records the request and the raw marker on the source as `basis`, never a choice, so
+`validate` matches them again against the current catalog; `validate --basis` overrides them. A
+channel basis also decides what a multi-channel source lists. The report key of a non-first
+basis ends in `#<id>`, and `scope.basis` says how it was chosen.
+
+| Kind | Who | Meaning |
+|---|---|---|
+| `basis-unconfirmed` | you | Several bases on the same channel and no marker showed the sign-in's: the first basis was compared, and every model finding is marked `basisUnconfirmed` and is informational. Confirm the plan or region, then validate with `--basis`. |
+| `basis-not-captured` | you | The marker names a region, plan or channel the catalog records for this CLI but no captured basis covers. Model findings are informational; ask the owner before adding a basis. |
+| `basis-missing` | you | A requested basis is not in the catalog. Nothing is compared, and no other basis is used instead. |
+| `basis-compared` | note | Which basis was compared and how, and the bases that were not. |
+
+A marker on a CLI whose scopes record no such id, like today's single Kimi scope, changes
+nothing in the report. Bases on different channels never make a comparison unconfirmed.
+
 ## Acknowledgements
 
 `config/catalog-probe-acknowledgements.json` records investigated differences so that routine
@@ -193,6 +219,9 @@ runs stay clean:
 ```
 
 - `backend` defaults to `cli` and `transport` to none; set them for other scopes.
+- `basisId` names the basis a finding was acknowledged on. Without it an entry covers the first
+  basis only, so acknowledging a gap on one basis never hides it on another, and an entry for a
+  basis that was not compared is never reported stale. An unconfirmed comparison retires none.
 - An entry matches one finding by scope, `kind` and `subject`, plus `field` and `observed` when
   given. Pin `observed` for a drift so a later different value reopens it. Acknowledgements do
   not expire with the CLI version: every CLI updates often, and a structural source gap stays.
@@ -311,3 +340,8 @@ Prices, endpoints, raw output, session and account fields are never kept.
 - Account-scoped results describe this machine's sign-ins only, at the time of the run. Lists can
   flap during a rollout: on 2026-10-02 Kiro 2.27.0 listed a new row and dropped it 13 minutes
   later. Re-read a new candidate before adding it.
+- Catalog bases (2026-11-16): the snapshot records the request and the sign-in marker, not which
+  channel a multi-channel source listed. `validate --basis` or `catalog-scope-entries --basis`
+  naming a basis on another channel would compare or write that channel's rows; no CLI has two
+  channel bases yet, so probe again with `--basis` instead. `--basis` also wins over a marker
+  that names another region or plan, which is the operator's explicit choice.

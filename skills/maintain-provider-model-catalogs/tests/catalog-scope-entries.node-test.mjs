@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parse } from 'yaml';
 import {
-  variantEntries, orderByCapture, clineEntries, devinEntries, cursorEntries, mergeExisting, spliceScopeModels,
+  variantEntries, orderByCapture, clineEntries, devinEntries, cursorEntries, mergeExisting, spliceScopeModels, selectWriteScope,
 } from '../scripts/catalog-scope-entries.mjs';
 
 const row = (id, label, evidence = {}) => ({ id, label, evidence });
@@ -186,4 +186,57 @@ test('existing tags and spellings survive a regeneration and only the target sco
   assert.deepEqual(document.catalogs[0].presets, []);
   assert.deepEqual(document.catalogs[1], { provider: 'ex', backend: 'cli', selection_mode: 'discovery', models: [] });
   assert.throws(() => spliceScopeModels(text, { provider: 'missing', backend: 'cli' }, merged), /No missing\/cli scope/);
+});
+
+test('a CLI with several bases is written only to the basis named, never another (SPEC-045 FR-8)', () => {
+  const text = [
+    'schema_version: 2',
+    'catalogs:',
+    '  - provider: ex',
+    '    backend: cli',
+    '    selection_mode: full',
+    '    basis:',
+    '      region:',
+    '        id: global',
+    '        label: global',
+    '    models:',
+    '      - id: g',
+    '        label: G',
+    '        execution:',
+    '          model: g',
+    '  - provider: ex',
+    '    backend: cli',
+    '    selection_mode: full',
+    '    basis:',
+    '      id: cn',
+    '      region:',
+    '        id: cn',
+    '        label: cn',
+    '    models:',
+    '      - id: c',
+    '        label: C',
+    '        execution:',
+    '          model: c',
+    '',
+  ].join('\n');
+  const target = { provider: 'ex', backend: 'cli' };
+  const { catalogs } = parse(text);
+  assert.throws(() => selectWriteScope(catalogs, target, undefined), /2 catalog bases \(first, cn\); pass --basis/);
+  assert.equal(selectWriteScope(catalogs, target, 'cn'), 1);
+  assert.equal(selectWriteScope(catalogs, target, 'first'), 0);
+  assert.throws(() => selectWriteScope(catalogs, target, 'eu'), /no basis "eu". Known: first, cn/);
+  // Rows listed under a detected or requested sign-in belong to that basis only.
+  const detectedCn = { basis: { marker: { region: 'cn' } } };
+  assert.equal(selectWriteScope(catalogs, target, 'cn', detectedCn), 1);
+  assert.throws(() => selectWriteScope(catalogs, target, 'first', detectedCn), /listed ex for basis cn; it cannot update basis first/);
+  assert.throws(() => selectWriteScope(catalogs, target, 'first', { basis: { requested: 'cn' } }), /cannot update basis first/);
+  assert.throws(() => selectWriteScope(catalogs, target, 'first', { basis: { marker: { region: 'eu' } } }), /not a captured basis; ask the owner/);
+  // No marker: the operator's --basis is the confirmation.
+  assert.equal(selectWriteScope(catalogs, target, 'cn', { basis: {} }), 1);
+  // A single-basis target needs no --basis, as before.
+  assert.equal(selectWriteScope([catalogs[0]], target, undefined), 0);
+
+  const out = parse(spliceScopeModels(text, target, [{ id: 'n', label: 'N', execution: { model: 'n' } }], 1));
+  assert.deepEqual(out.catalogs.map((scope) => scope.models.map((entry) => entry.id)), [['g'], ['n']]);
+  assert.deepEqual(out.catalogs[1].basis, catalogs[1].basis);
 });

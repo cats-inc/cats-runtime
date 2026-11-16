@@ -39,6 +39,16 @@ must equal every entry's executable channel (`execution.provider`, otherwise the
 that change through remote updates get no basis. Selectors show it read-only; entry labels need
 not repeat the channel. Re-check it on every refresh of the scope.
 
+Since SPEC-045 a target can hold several scopes, one per captured basis, in data order:
+
+- `basis.id` (lowercase token) names a basis. Only a target's first scope may omit it; with two or
+  more scopes, every scope needs a channel, region or plan so the "List basis" option has a label.
+- `basis.region { id, label }` is the CLI's own sign-in region token and the name it shows, such
+  as Kimi's `global`. `basis.plan.id` is the CLI's own plan token, for detection.
+- A personal override with an id replaces that basis or appends a new one; an id-less override
+  replaces the first basis. Selections without `basisId` keep resolving to the first basis.
+- A plan or region basis never changes execution arguments; Runtime and the UIs only show it.
+
 ## Factory checks
 
 From the Runtime root:

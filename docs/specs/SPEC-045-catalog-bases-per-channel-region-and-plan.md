@@ -193,6 +193,22 @@ This section amends the SPEC-028 basis amendment.
 - The probe compares the live list against the detected basis. With no detection, it compares
   against the first basis and marks each finding `basis-unconfirmed`. `--basis <id>` overrides
   both. The handoff, snapshot rows and acknowledgements carry the basis id.
+- Owner decisions of 2026-11-16, made during Phase 4 implementation:
+  - An unconfirmed comparison is not conclusive: its model findings, and a capture request,
+    become informational, nothing counts as confirmed, and an operator finding asks to confirm
+    the sign-in and validate with `--basis`. A CLI with several plan bases and no detection
+    source therefore asks on every run until `--basis` is given. Bases on different channels are
+    never unconfirmed, because the compared scope's channel decides what is listed.
+  - `--basis` takes `<provider>=<id>`, a bare `<id>` when one provider is selected, and `first`
+    for the first basis, which may have no id. An unknown id fails before any CLI starts, and a
+    recorded basis the catalog no longer has is reported, never replaced by the first.
+  - The sign-in marker is read for every target with a detection source. A marker naming a
+    region, plan or channel that the catalog records for the target but no basis covers is
+    reported as `basis-not-captured`, with model findings informational; a marker on a target
+    that records no such id changes nothing.
+  - An acknowledgement without a basis id covers the first basis only.
+  - `catalog-scope-entries.mjs --write` needs `--basis` for a target with several bases, and
+    refuses to write rows listed under a requested or detected basis into another basis.
 - SPEC-031 FR-8's statement that first-party CLIs record no plan is lifted for a plan whose
   captured list differs from another basis.
 

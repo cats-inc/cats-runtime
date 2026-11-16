@@ -8,7 +8,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { findRepoRoot, loadFactory, selectSources } from '../scripts/catalog-probe.mjs';
+import { findRepoRoot, loadFactory, probeSources, selectSources } from '../scripts/catalog-probe.mjs';
+import { assertRequestedBases, detectSignInMarker, parseBasisOption, readKimiRegion } from '../scripts/catalog-probe/basis.mjs';
 import {
   compareScope,
   exitCodeFor,
@@ -17,7 +18,7 @@ import {
   validateSnapshot,
 } from '../scripts/catalog-probe/compare.mjs';
 import { cleanEnv, launchSpec, resolveNpmShimScript } from '../scripts/catalog-probe/process.mjs';
-import { buildEvidence, evidenceDirectoryName, selectSnapshotSources, writeEvidence } from '../scripts/catalog-probe/evidence.mjs';
+import { buildEvidence, evidenceDirectoryName, selectorBases, selectSnapshotSources, writeEvidence } from '../scripts/catalog-probe/evidence.mjs';
 import { escapeHtml, renderHtml } from '../scripts/catalog-probe/html.mjs';
 import { renderMarkdown, renderTerminal } from '../scripts/catalog-probe/report.mjs';
 import { buildHandoff } from '../scripts/catalog-probe/handoff.mjs';
@@ -613,6 +614,197 @@ test('a full run lists curated scopes that have no source', () => {
   assert.match(text, /clean \(notes only\)/);
   assert.doesNotMatch(text, /Hand this to an agent/);
 });
+
+// --- catalog bases (SPEC-045 FR-8) --------------------------------------------------------------
+
+const REGION = (id) => ({ id, label: `${id} (label)` });
+function regionCatalogs() {
+  return [
+    fullScope({ basis: { region: REGION('global') } }),
+    fullScope({ basis: { id: 'cn', region: REGION('cn') }, models: [fullScope().models[0]] }),
+  ];
+}
+const withNew = () => source({ models: [...source().models, { id: 'd', label: 'Ex D' }] });
+const basisReport = (src, extra = {}) => validateSnapshot({ snapshot: snapshotOf([src]), catalogDocument: { catalogs: regionCatalogs() }, ...extra });
+
+test('without a sign-in marker a multi-basis target is compared with its first basis, unconfirmed', () => {
+  const report = basisReport(withNew());
+  const [scope] = report.scopes;
+  assert.equal(scope.key, 'ex/cli');
+  assert.deepEqual([scope.basis.how, scope.basis.confirmed, scope.basis.others], ['first', false, ['ex/cli#cn']]);
+  assert.deepEqual(kinds(scope), ['basis-unconfirmed:operator:ex/cli', 'new-candidate:info:d']);
+  assert.equal(scope.findings[1].basisUnconfirmed, true);
+  assert.equal(scope.findings[1].inconclusive, true);
+  assert.equal(scope.findings[0].basisUnconfirmed, undefined);
+  assert.match(scope.findings[0].nextAction, /--basis ex=<id>/);
+  // Nothing counts as confirmed against a basis the sign-in may not use.
+  assert.deepEqual(scope.confirmedEntries, []);
+  assert.equal(scope.listConfirmed, false);
+  assert.ok(scope.comparison.entries.every((entry) => entry.status === 'inconclusive'));
+  assert.deepEqual([report.needsAgent, report.needsOperator], [[], ['ex/cli']]);
+});
+
+test('a capture is not asked for on an unconfirmed basis either', () => {
+  const picker = source({ coverage: { membership: 'none' }, cliVersion: '1.1.0', models: [],
+    signals: [{ kind: 'changelog', sections: [{ version: '1.1.0', entries: ['Added model x'] }] }] });
+  const confirmed = validateSnapshot({ snapshot: snapshotOf([picker]), catalogDocument: { catalogs: [fullScope()] } }).scopes[0];
+  assert.ok(kinds(confirmed).includes('capture-needed:agent:picker'));
+  const report = basisReport(picker);
+  assert.deepEqual(kinds(report.scopes[0]), ['basis-unconfirmed:operator:ex/cli', 'version-changed:info:cli_version',
+    'capture-needed:info:picker', 'no-automatic-source:info:picker']);
+  assert.ok(report.scopes[0].findings.slice(1).every((finding) => finding.basisUnconfirmed));
+  assert.deepEqual(report.needsAgent, []);
+});
+
+test('the renderers show the compared basis and its findings', () => {
+  for (const report of [basisReport(withNew()), basisReport(source({ basis: { marker: { region: 'cn' } } }))]) {
+    const key = report.scopes[0].key;
+    const terminal = renderTerminal(report, { reportDir: 'tmp/x', reportPath: '/abs/report.json' });
+    const markdown = renderMarkdown(report, { reportPath: '/abs/report.json' });
+    const html = renderHtml(report, { handoff: null, files: {} });
+    for (const text of [terminal, markdown, html]) {
+      assert.ok(text.includes(key), key);
+      assert.doesNotMatch(text, /undefined/);
+    }
+    const basisMessage = report.scopes[0].findings.find((finding) => finding.kind.startsWith('basis-')).message;
+    assert.ok(markdown.includes(basisMessage.slice(0, 40)), 'markdown carries the basis finding');
+    assert.ok(html.includes(escapeHtml(basisMessage.slice(0, 40))), 'html carries the basis finding');
+  }
+});
+
+test('the sign-in marker or --basis picks the compared basis, and only that basis', () => {
+  const detected = basisReport(source({ basis: { marker: { region: 'cn' } } })).scopes[0];
+  assert.equal(detected.key, 'ex/cli#cn');
+  assert.deepEqual([detected.basis.how, detected.basis.id, detected.basis.confirmed], ['detected', 'cn', true]);
+  assert.deepEqual(kinds(detected), ['basis-compared:info:ex/cli#cn', 'new-candidate:agent:b', 'new-candidate:agent:c-low', 'new-candidate:agent:c-high']);
+  assert.match(detected.findings[0].message, /Compared with the cn \(label\) basis \(detected\)\. Not compared: ex\/cli\./);
+  assert.deepEqual(detected.confirmedEntries, ['a']);
+
+  // --basis beats the marker; a recorded request is reused by validate.
+  const requested = basisReport(source({ basis: { marker: { region: 'cn' } } }), { requestedBases: new Map([['ex', 'first']]) }).scopes[0];
+  assert.deepEqual([requested.key, requested.basis.how, requested.verdict], ['ex/cli', 'requested', 'info']);
+  assert.equal(basisReport(source({ basis: { requested: 'cn' } })).scopes[0].key, 'ex/cli#cn');
+
+  // A recorded basis the catalog no longer has is reported, never swapped for the first.
+  const gone = basisReport(source({ basis: { requested: 'retired' } })).scopes[0];
+  assert.deepEqual(kinds(gone), ['basis-missing:operator:retired']);
+  assert.equal(gone.comparison, undefined);
+});
+
+test('a sign-in no captured basis covers is the owner\'s call, and a bare marker changes nothing today', () => {
+  const uncovered = basisReport({ ...withNew(), basis: { marker: { region: 'eu' } } }).scopes[0];
+  assert.deepEqual(kinds(uncovered), ['basis-not-captured:operator:region eu', 'new-candidate:info:d']);
+  assert.equal(uncovered.basis.confirmed, false);
+  assert.match(uncovered.findings[0].nextAction, /Ask the owner before adding a basis/);
+
+  // Today's Kimi scope records no region: the marker is kept, and the report is as before.
+  const plain = validateSnapshot({ snapshot: snapshotOf([withNew()]), catalogDocument: { catalogs: [fullScope()] } }).scopes[0];
+  const marked = validateSnapshot({ snapshot: snapshotOf([{ ...withNew(), basis: { marker: { region: 'global' } } }]), catalogDocument: { catalogs: [fullScope()] } }).scopes[0];
+  assert.deepEqual(kinds(marked), kinds(plain));
+  assert.equal(marked.verdict, 'agent');
+  assert.deepEqual(marked.basis.marker, { region: 'global' });
+  assert.equal(plain.basis, undefined);
+  // Once that scope records global, a mainland sign-in is no longer silently compared with it.
+  const single = validateSnapshot({ snapshot: snapshotOf([{ ...withNew(), basis: { marker: { region: 'cn' } } }]),
+    catalogDocument: { catalogs: [fullScope({ basis: { region: REGION('global') } })] } }).scopes[0];
+  assert.deepEqual(kinds(single), ['basis-not-captured:operator:region cn', 'new-candidate:info:d']);
+
+  // Bases on different channels are not a sign-in question: the probe lists the chosen channel.
+  const channels = validateSnapshot({ snapshot: snapshotOf([source()]), catalogDocument: { catalogs: [
+    fullScope({ basis: { channel: { id: 'go', label: 'go' } } }),
+    fullScope({ basis: { id: 'zen', channel: { id: 'zen', label: 'zen' } } }),
+  ] } }).scopes[0];
+  assert.deepEqual([channels.basis.how, channels.basis.confirmed, channels.verdict], ['first', true, 'info']);
+  assert.deepEqual(kinds(channels), ['basis-compared:info:ex/cli']);
+});
+
+test('acknowledgements name their basis; without basisId they cover the first basis', () => {
+  const acks = validateAcknowledgements({ schemaVersion: 1, acknowledgements: [
+    { provider: 'ex', kind: 'new-candidate', subject: 'b', reason: 'first-basis gap', evidence: 'docs/x.md', acknowledgedOn: '2026-11-16' },
+    { provider: 'ex', basisId: 'cn', kind: 'new-candidate', subject: 'b', reason: 'not on cn', evidence: 'docs/y.md', acknowledgedOn: '2026-11-16' },
+  ] });
+  const onCn = basisReport(source({ basis: { marker: { region: 'cn' } } }), { acknowledgements: acks });
+  assert.equal(onCn.scopes[0].findings.find((finding) => finding.subject === 'b').acknowledged.reason, 'not on cn');
+  // The first-basis acknowledgement is not stale just because cn was compared.
+  assert.deepEqual(onCn.general, []);
+  const onFirst = basisReport(source({ basis: { requested: 'first' } }), { acknowledgements: acks });
+  assert.deepEqual(onFirst.general.map((item) => item.kind), ['stale-acknowledgement']);
+  assert.match(onFirst.general[0].message, /first-basis gap/);
+  // An unconfirmed comparison retires nothing.
+  assert.deepEqual(basisReport(source(), { acknowledgements: acks }).general, []);
+  assert.throws(() => validateAcknowledgements({ schemaVersion: 1, acknowledgements: [{ ...acks[1], basisId: ' ' }] }), /empty "basisId"/);
+});
+
+test('the handoff and evidence follow the compared basis', () => withScratch((root) => {
+  const catalogDocument = { catalogs: regionCatalogs() };
+  const snapshot = snapshotOf([source({ basis: { marker: { region: 'cn' } } })]);
+  const report = validateSnapshot({ snapshot, catalogDocument });
+  const handoff = buildHandoff({ report, snapshot, catalogDocument, repo: '/repo', snapshotPath: '/s/snapshot.json', reportPath: '/s/report.json' });
+  assert.deepEqual(handoff.scopes.map((scope) => scope.key), ['ex/cli#cn']);
+  assert.deepEqual(handoff.scopes[0].basis, catalogDocument.catalogs[1].basis);
+  assert.deepEqual(handoff.scopes[0].basisChoice, { id: 'cn', how: 'detected', marker: { region: 'cn' } });
+  assert.deepEqual(handoff.scopes[0].rows.map((row) => row.id), ['b', 'c-low', 'c-high']);
+  assert.ok(handoff.instructions.some((line) => /never another basis/.test(line)));
+  const scopeArg = handoff.scopes[0].evidenceCommand[handoff.scopes[0].evidenceCommand.indexOf('--scope') + 1];
+  assert.equal(scopeArg, 'ex/cli#cn');
+  const [picked] = selectSnapshotSources(snapshot, scopeArg);
+  assert.equal(picked, snapshot.sources[0]);
+  assert.deepEqual(selectorBases(`${scopeArg},ex`), ['cn', null]);
+  const document = buildEvidence({ snapshot, source: picked, basisId: 'cn' });
+  assert.deepEqual([document.basisId, document.signIn], ['cn', { region: 'cn' }]);
+  assert.equal(buildEvidence({ snapshot: snapshotOf([source()]), source: source() }).basisId, undefined);
+  assert.ok(root);
+}));
+
+test('the probe lists each CLI for its chosen basis and records only the request and the marker', async () => {
+  const catalogDocument = { catalogs: regionCatalogs() };
+  const listedFor = [];
+  const run = async (src, { scope }) => {
+    listedFor.push(scope.basis.id ?? 'first');
+    return { ...source(), provider: src.provider };
+  };
+  const detected = await probeSources({ sources: [source()], catalogDocument, detect: () => ({ region: 'cn' }), run });
+  assert.deepEqual(listedFor, ['cn']);
+  assert.deepEqual(detected.sources[0].basis, { marker: { region: 'cn' } });
+  const requested = await probeSources({ sources: [source()], catalogDocument, detect: () => ({ region: 'cn' }), run,
+    requestedBases: new Map([['ex', 'first']]) });
+  assert.deepEqual(listedFor, ['cn', 'first']);
+  assert.deepEqual(requested.sources[0].basis, { requested: 'first', marker: { region: 'cn' } });
+  const unmarked = await probeSources({ sources: [source()], catalogDocument: { catalogs: [fullScope()] }, detect: () => null,
+    run: async () => source() });
+  assert.equal(unmarked.sources[0].basis, undefined);
+
+  // --basis is checked against the catalog before any CLI starts.
+  assert.deepEqual([...parseBasisOption('cn', ['ex'])], [['ex', 'cn']]);
+  assert.deepEqual([...parseBasisOption('ex=cn,other=first', ['ex', 'other'])], [['ex', 'cn'], ['other', 'first']]);
+  assert.throws(() => parseBasisOption('cn', ['ex', 'other']), /exactly one selected provider/);
+  assert.throws(() => parseBasisOption('nope=cn', ['ex']), /does not include/);
+  assert.throws(() => assertRequestedBases(new Map([['ex', 'eu']]), catalogDocument.catalogs, [source()]), /ex\/cli has no basis "eu". Known: first, cn\./);
+  assertRequestedBases(new Map([['ex', 'first']]), catalogDocument.catalogs, [source()]);
+  const failed = spawnSync(process.execPath, [SCRIPT, 'probe', '--providers', 'kimi', '--basis', 'nope'], { encoding: 'utf8' });
+  assert.equal(failed.status, 1);
+  assert.match(failed.stderr, /kimi\/cli has no basis "nope"/);
+  assert.doesNotMatch(failed.stderr, /Probing/);
+});
+
+test('the Kimi sign-in marker is the region file alone', () => withScratch((root) => {
+  const reads = [];
+  const readText = (path) => {
+    reads.push(path);
+    return path.endsWith('region') ? ' mainland-cn \n' : 'secret';
+  };
+  assert.deepEqual(detectSignInMarker('kimi', { env: {}, home: root, readText }), { region: 'mainland-cn' });
+  assert.deepEqual(reads, [join(root, '.kimi-code', 'region')]);
+  assert.deepEqual(detectSignInMarker('kimi', { env: { KIMI_CODE_HOME: join(root, 'alt') }, home: root, readText }), { region: 'mainland-cn' });
+  assert.equal(reads.at(-1), join(root, 'alt', 'region'));
+  assert.equal(detectSignInMarker('kimi', { env: {}, home: root, readText: () => '{"token":1}' }), null);
+  assert.equal(detectSignInMarker('kimi', { env: {}, home: root }), null);
+  mkdirSync(join(root, '.kimi-code'));
+  writeFileSync(join(root, '.kimi-code', 'region'), 'global\n');
+  assert.deepEqual(detectSignInMarker('kimi', { env: {}, home: root }), { region: 'global' });
+  assert.equal(detectSignInMarker('copilot', { env: {}, home: root, readText }), null);
+  assert.deepEqual(readKimiRegion(join(root, '.kimi-code')), 'global');
+}));
 
 test('renderers name the agent scopes and give a hand-off prompt', () => {
   const report = validateSnapshot({

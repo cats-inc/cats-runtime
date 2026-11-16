@@ -12,6 +12,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { cleanEnv, findExecutable, launchSpec, npmPackageDir, runCommand } from './catalog-probe/process.mjs';
+import { readKimiRegion } from './catalog-probe/basis.mjs';
 import { museModelList, readMuseAccountCache } from './catalog-probe/sources.mjs';
 import { listCopilotModels } from './list-copilot-models.mjs';
 import { redactVisibleText, stripTerminalPresentation } from './normalize-picker-paste.mjs';
@@ -144,13 +145,9 @@ function kimiSignIn(ctx) {
   const kimiHome = ctx.env.KIMI_CODE_HOME || join(ctx.home, '.kimi-code');
   const files = ctx.listFiles(join(kimiHome, 'credentials')).filter((file) => file.name.endsWith('.json') && file.size > 0);
   if (files.length === 0) return ['signed-out', 'no Kimi Code OAuth credential file (run kimi login)'];
-  const region = kimiRegion(ctx, kimiHome);
+  // The same reader the catalog probe uses to choose a basis.
+  const region = readKimiRegion(kimiHome, (path) => ctx.readText(path));
   return ['local', `credentials/${files[0].name} is present${region ? `; detected basis: region ${region}` : ''}`];
-}
-
-function kimiRegion(ctx, kimiHome) {
-  const region = ctx.readText(join(kimiHome, 'region'))?.trim() ?? '';
-  return /^[a-z0-9][a-z0-9._-]*$/.test(region) ? region : null;
 }
 
 // The versioned binary named by .muse-version, never the self-updating launcher.

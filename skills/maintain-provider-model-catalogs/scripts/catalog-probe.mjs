@@ -13,8 +13,9 @@ import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
+import { assertRequestedBases, chooseBasis, detectSignInMarker, parseBasisOption, targetScopes } from './catalog-probe/basis.mjs';
 import { exitCodeFor, validateAcknowledgements, validateSnapshot } from './catalog-probe/compare.mjs';
-import { buildEvidence, selectSnapshotSources, writeEvidence } from './catalog-probe/evidence.mjs';
+import { buildEvidence, selectorBases, selectSnapshotSources, writeEvidence } from './catalog-probe/evidence.mjs';
 import { renderHtml } from './catalog-probe/html.mjs';
 import { buildHandoff } from './catalog-probe/handoff.mjs';
 import { handoffPrompt, renderMarkdown, renderTerminal } from './catalog-probe/report.mjs';
@@ -99,15 +100,24 @@ export function selectSources({ providers, skip } = {}) {
   return SOURCES.filter((source) => (!wanted || wanted.includes(source.provider)) && !skipped.includes(source.provider));
 }
 
-export async function probeSources({ sources, catalogDocument, env = process.env, timeoutMs, onResult }) {
+/**
+ * Runs each source against the basis it will be compared with (SPEC-045 FR-8): a requested one,
+ * else the one the CLI's non-secret sign-in marker matches, else the first. A channel basis
+ * decides what the source lists. The snapshot keeps the request and the raw marker, so
+ * `validate` can match them again against a later catalog.
+ */
+export async function probeSources({ sources, catalogDocument, env = process.env, timeoutMs, onResult,
+  requestedBases = new Map(), detect = (provider) => detectSignInMarker(provider, { env }), run = runSource }) {
   const catalogs = catalogDocument.catalogs ?? [];
   const results = await mapLimited(sources, CONCURRENCY, async (source) => {
-    const scope = catalogs.find((candidate) => candidate.provider === source.provider
-      && candidate.backend === source.backend
-      && (candidate.transport ?? null) === (source.transport ?? null));
-    const result = await runSource(source, { scope, env, timeoutMs });
-    onResult?.(result);
-    return result;
+    const requested = requestedBases.get(source.provider);
+    const marker = detect(source.provider);
+    const { scope } = chooseBasis(targetScopes(catalogs, source), { requested, marker });
+    const result = await run(source, { scope: scope ?? undefined, env, timeoutMs });
+    const basis = { ...(requested !== undefined ? { requested } : {}), ...(marker ? { marker } : {}) };
+    const recorded = Object.keys(basis).length ? { ...result, basis } : result;
+    onResult?.(recorded);
+    return recorded;
   });
   return {
     schemaVersion: 1,
@@ -162,8 +172,9 @@ function writeReport({ outDir, repo, report, snapshot, snapshotPath, catalogDocu
 function usage() {
   return [
     'Usage:',
-    '  catalog-probe.mjs probe [--providers codex,kiro | --skip muse,cursor] [--out <dir>] [--timeout <ms>] [--open] [--json]',
-    '  catalog-probe.mjs validate --snapshot <snapshot.json> [--out <dir>] [--open] [--json]',
+    '  catalog-probe.mjs probe [--providers codex,kiro | --skip muse,cursor] [--basis <provider>=<id>] [--out <dir>]',
+    '                         [--timeout <ms>] [--open] [--json]',
+    '  catalog-probe.mjs validate --snapshot <snapshot.json> [--basis <provider>=<id>] [--out <dir>] [--open] [--json]',
     '  catalog-probe.mjs evidence --snapshot <snapshot.json> --scope <provider[,provider]> [--ids a,b]',
     '                            [--name model-list.probe] [--fixtures-root <dir>] [--force]',
     '',
@@ -171,6 +182,8 @@ function usage() {
     'report.md, report.html and agent-handoff.json under tmp/catalog-probe/<time>/ (outside Git).',
     '--open shows report.html in the default browser.',
     'validate re-checks a saved snapshot, for example after a catalog or acknowledgement change.',
+    '--basis compares a CLI with that catalog basis instead of the one its sign-in marker matches, or the',
+    'first; a bare <id> works when one provider is selected, and "first" names the first basis.',
     'evidence writes a scope\'s rows with their provenance as a committable redacted fixture under',
     'docs/research/fixtures/<cli>-<version>/; --ids keeps only those rows.',
     'Exit codes: 0 nothing to do, 2 the operator or an agent has something to do, 1 the tool failed.',
@@ -189,12 +202,15 @@ function writeEvidenceFixtures({ repo, values }) {
   const { snapshot } = readSnapshot(values.snapshot);
   if (!values.scope) throw new Error('evidence needs --scope <provider[,provider]>.');
   const sources = selectSnapshotSources(snapshot, values.scope);
+  const bases = selectorBases(values.scope);
   const ids = values.ids ? values.ids.split(',').map((id) => id.trim()).filter(Boolean) : null;
   if (ids && sources.length > 1) throw new Error('--ids works with one --scope at a time.');
   const fixturesRoot = values['fixtures-root'] ? resolve(values['fixtures-root']) : join(repo, 'docs', 'research', 'fixtures');
-  const written = sources.map((source) => {
-    const document = buildEvidence({ snapshot, source, ids });
-    return { document, path: writeEvidence({ document, source, fixturesRoot, name: values.name, force: values.force }) };
+  const written = sources.map((source, index) => {
+    const document = buildEvidence({ snapshot, source, ids, basisId: bases[index] });
+    // Two bases of one CLI version get separate files unless --name says otherwise.
+    const name = values.name ?? (bases[index] ? `model-list.${bases[index]}.probe` : undefined);
+    return { document, path: writeEvidence({ document, source, fixturesRoot, name, force: values.force }) };
   });
   for (const { document, path } of written) {
     const inside = relative(repo, path);
@@ -218,6 +234,7 @@ async function main(argv) {
       timeout: { type: 'string' },
       repo: { type: 'string' },
       scope: { type: 'string' },
+      basis: { type: 'string' },
       ids: { type: 'string' },
       name: { type: 'string' },
       'fixtures-root': { type: 'string' },
@@ -241,21 +258,29 @@ async function main(argv) {
   let snapshot;
   let snapshotPath;
   let outDir;
+  let requestedBases;
   if (command === 'validate') {
     const read = readSnapshot(values.snapshot);
     snapshot = read.snapshot;
     snapshotPath = read.snapshotPath;
     outDir = values.out ? resolve(values.out) : dirname(read.snapshotPath);
+    const sources = snapshot.sources ?? [];
+    requestedBases = parseBasisOption(values.basis, [...new Set(sources.map((source) => source.provider))]);
+    assertRequestedBases(requestedBases, factory.document.catalogs, sources);
   } else {
     const timeoutMs = values.timeout ? Number(values.timeout) : 60000;
     if (!Number.isInteger(timeoutMs) || timeoutMs < 1000) throw new Error('--timeout must be an integer of at least 1000 ms.');
     const sources = selectSources({ providers: values.providers, skip: values.skip });
+    // An unknown basis fails here, before any CLI starts.
+    requestedBases = parseBasisOption(values.basis, [...new Set(sources.map((source) => source.provider))]);
+    assertRequestedBases(requestedBases, factory.document.catalogs, sources);
     outDir = values.out ? resolve(values.out) : join(repo, 'tmp', 'catalog-probe', timestamp());
     if (!values.json) process.stderr.write(`Probing ${sources.length} CLI sources (read-only)...\n`);
     snapshot = await probeSources({
       sources,
       catalogDocument: factory.document,
       timeoutMs,
+      requestedBases,
       onResult: values.json ? undefined : (result) => process.stderr.write(`  ${result.provider}: ${result.status}${result.reason ? ` (${result.reason})` : ''}\n`),
     });
     mkdirSync(outDir, { recursive: true });
@@ -263,7 +288,7 @@ async function main(argv) {
     writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
   }
 
-  const report = validateSnapshot({ snapshot, catalogDocument: factory.document, acknowledgements, environment });
+  const report = validateSnapshot({ snapshot, catalogDocument: factory.document, acknowledgements, environment, requestedBases });
   writeReport({ outDir, repo, report, snapshot, snapshotPath, catalogDocument: factory.document, json: values.json, open: values.open });
   return exitCodeFor(report);
 }

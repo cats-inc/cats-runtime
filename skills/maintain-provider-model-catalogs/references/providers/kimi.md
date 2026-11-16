@@ -63,5 +63,9 @@ machine on 2026-11-16 it held `global`, matching the `kimi login` used for the c
   nothing. The credentials and config.toml stay unopened.
 - `npm run catalog:logins -- --providers kimi` appends `detected basis: region <token>` to a
   signed-in result. It reads the marker only after the presence check passes.
+- The catalog probe reads the same file with the same reader (`catalog-probe/basis.mjs`),
+  records the token on the snapshot's Kimi source and compares the basis it matches. The
+  evidence command copies it into the fixture as `signIn`.
 - A refresh records this token with the capture; a new region basis needs it as evidence
-  (SPEC-045 FR-8).
+  (SPEC-045 FR-8). While the Kimi scope records no region, the token is kept but changes no
+  finding; once it records `global`, a `mainland-cn` sign-in reports `basis-not-captured`.

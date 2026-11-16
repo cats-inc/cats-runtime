@@ -24,6 +24,7 @@ const SHOWN_UPSTREAM = new Set(['new', 'acknowledged', 'inconclusive']);
 const SCOPE_FINDINGS = new Set([
   'version-changed', 'version-not-comparable', 'source-unavailable', 'source-degraded', 'source-note',
   'capture-needed', 'no-automatic-source', 'signal-unreadable', 'upstream-only', 'hidden-upstream', 'scope-missing',
+  'basis-compared', 'basis-unconfirmed', 'basis-not-captured', 'basis-missing',
 ]);
 
 export function escapeHtml(value) {
