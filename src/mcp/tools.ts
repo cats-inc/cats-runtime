@@ -927,6 +927,7 @@ async function providerAdvancedModels(
   const provider = readRequiredString(args, 'provider');
   const searchParams = new URLSearchParams();
   appendSingleQueryValue(searchParams, 'instance', readOptionalString(args, 'instance'));
+  appendSingleQueryValue(searchParams, 'basis', readOptionalString(args, 'basis'));
   if (readOptionalBoolean(args, 'forceRefresh') === true) {
     searchParams.set('refresh', '1');
   }
@@ -3193,6 +3194,7 @@ const TOOL_HANDLERS: McpToolHandler[] = [
         properties: {
           provider: { type: 'string' },
           instance: { type: 'string' },
+          basis: { type: 'string', description: 'Catalog basis id from the bases list of a previous result; omit for the first basis.' },
           forceRefresh: { type: 'boolean' },
         },
         required: ['provider'],

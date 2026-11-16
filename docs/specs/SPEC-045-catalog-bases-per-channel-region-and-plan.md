@@ -80,7 +80,12 @@ Illustrative Kimi data, if a mainland capture differs:
 
 - All SPEC-031 FR-8 checks still apply, including the channel-to-entry check.
 - Reject an empty `id` or label, a duplicate `basis.id` within a target, and an id-less scope
-  that is not its target's first.
+  that is not its target's first. The order rule applies to each document on its own, an
+  override file included: list a target's id-less scope before its other scopes.
+- In a target with two or more bases, every scope carries a basis with a channel, region or plan,
+  including the first. A target whose first scope records none therefore gains a second basis,
+  locally too, only together with a replacement of the first scope that records its basis.
+  (Added during Phase 1 implementation, 2026-11-16: the select needs a label for every basis.)
 - Model ids are unique within a scope, not across a target. Two bases may list the same id.
 
 ## FR-3: Local overrides
@@ -89,7 +94,11 @@ Illustrative Kimi data, if a mainland capture differs:
   basis, as SPEC-031 FR-2.5 replaces a scope.
 - An override without `basis.id` replaces the target's first basis, whatever id the factory
   gives it. An existing override therefore keeps replacing the same scope after the factory adds
-  a second basis.
+  a second basis. The merged scope stays that basis: it keeps the factory's id, and when the
+  override records no basis while the factory target has several, it takes the factory's whole
+  basis. An override written before the factory added a second basis therefore still loads, and
+  selections of the first basis still resolve. A single-basis target keeps the earlier rule: an
+  override without a basis shows none.
 - An override with a `basis.id` the factory does not have adds that basis after the factory's
   bases, in override order. A local capture of another plan can then be added by soft patch.
 
@@ -119,9 +128,11 @@ Illustrative Kimi data, if a mainland capture differs:
   `code: catalog_basis_unknown`. Without `basis`, it returns the first basis.
 - The result gains:
   - `basisId` when the target has two or more bases;
-  - `bases`, present only then: `[{ id, label, channel?, region?, plan?, cliVersion?,
-    lastUpdated?, detected }]`. Runtime composes `label` by joining the channel, region and plan
-    labels with ` · `, so both UIs show the same text;
+  - `bases`, present only then: `[{ id?, label, channel?, region?, plan?, cliVersion?,
+    lastUpdated?, detected }]`. `id` is absent only for an id-less first basis, which a client
+    selects by sending no `basisId`. Runtime composes `label` by joining the channel, region and
+    plan labels with ` · `, so both UIs show the same text;
+  - `defaultSelection.basisId` for a non-first basis, so posting the default back stays in it;
   - `capture: { cliVersion?, lastUpdated? }` for the returned scope, whether or not it has a basis.
 - The basic model list returns the first basis. Label registries key entries by target and
   basis, because two bases may list the same id with different labels.

@@ -13,6 +13,8 @@ export type ProviderModelSelectionEntryMode = 'auto' | 'explicit';
 
 export interface ProviderModelSelection {
   catalogRevision?: string;
+  /** The catalog basis of the entry; absent means the target's first basis (SPEC-045). */
+  basisId?: string;
   entryId?: string;
   entryMode: ProviderModelSelectionEntryMode;
   presetId?: string;
@@ -21,6 +23,8 @@ export interface ProviderModelSelection {
 
 export interface ProviderModelResolution {
   catalogRevision?: string;
+  /** The basis the entry resolved in; absent for an id-less first basis. */
+  basisId?: string;
   bindingVersion?: number;
   executionProvider?: string;
   label?: string;
@@ -268,6 +272,10 @@ export function parseProviderModelSelection(
   if (record.catalogRevision !== undefined && (typeof record.catalogRevision !== 'string' || !record.catalogRevision.trim())) {
     return { error: 'modelSelection.catalogRevision must be a nonempty string' };
   }
+  if (record.basisId !== undefined && (typeof record.basisId !== 'string' || !record.basisId.trim())) {
+    return { error: 'modelSelection.basisId must be a nonempty string' };
+  }
+  const basisId = trimOptionalString(record.basisId);
   const entryId = trimOptionalString(record.entryId);
   const presetId = trimOptionalString(record.presetId);
   const rawEntryMode = record.entryMode;
@@ -315,6 +323,7 @@ export function parseProviderModelSelection(
   return {
     selection: {
       ...(typeof record.catalogRevision === 'string' ? { catalogRevision: record.catalogRevision } : {}),
+      ...(basisId ? { basisId } : {}),
       ...(entryId ? { entryId } : {}),
       entryMode,
       ...(presetId ? { presetId } : {}),
@@ -337,6 +346,7 @@ export function canonicalizeProviderModelSelection(
 ): ProviderModelSelection {
   return {
     ...(selection.catalogRevision ? { catalogRevision: selection.catalogRevision } : {}),
+    ...(selection.basisId ? { basisId: selection.basisId } : {}),
     ...(selection.entryId ? { entryId: selection.entryId } : {}),
     entryMode: selection.entryMode,
     ...(selection.presetId ? { presetId: selection.presetId } : {}),
@@ -422,6 +432,9 @@ export function resolveProviderSelection(
   if (selection.catalogRevision !== undefined && selection.catalogRevision !== knowledge.catalog.catalogRevision) {
     throw new CatalogRevisionConflict('Catalog changed; choose the model again from the current catalog.');
   }
+  if (selection.basisId !== undefined && selection.basisId !== knowledge.scope?.basis?.id) {
+    throw new Error(`Catalog knowledge was built for another basis than '${selection.basisId}'`);
+  }
   const normalizedSelection = canonicalizeProviderModelSelection(selection);
   const preset = normalizedSelection.presetId
     ? knowledge.catalog.presets.find((entry) => entry.id === normalizedSelection.presetId)
@@ -478,8 +491,10 @@ export function resolveProviderSelection(
   if (binding?.variants?.length && !variant) throw new Error('No executable model variant matches the selected controls');
   const model = variant?.model ?? binding?.model ?? entry.id;
   const executionProvider = variant?.provider ?? binding?.provider;
+  const resolvedBasisId = knowledge.scope?.basis?.id;
   const resolution: ProviderModelResolution = {
     catalogRevision: knowledge.catalog.catalogRevision,
+    ...(resolvedBasisId ? { basisId: resolvedBasisId } : {}),
     bindingVersion: CATALOG_BINDING_VERSION,
     label: entry.label,
     ...(executionProvider ? { executionProvider } : {}),

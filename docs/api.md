@@ -4826,6 +4826,27 @@ never send it as a control, and selection and execution ignore it. It is absent
 when the catalog records none. See the
 [SPEC-031 basis amendment](./specs/SPEC-031-provider-catalog-data-and-local-overrides.md#amendment-2026-09-29-catalog-basis).
 
+A target can hold several captured lists, one per basis
+([SPEC-045](./specs/SPEC-045-catalog-bases-per-channel-region-and-plan.md)).
+`basis` may then also carry `id`, `region` (`{ id, label }`) and `plan.id`.
+
+- `?basis=<id>` reads that basis. Without it the route returns the target's
+  first basis. An unknown id returns `400` with `code: catalog_basis_unknown`;
+  it never falls back to another basis.
+- When the target has two or more bases, the result carries `basisId` (absent
+  for an id-less first basis) and `bases`: one
+  `{ id?, label, channel?, region?, plan?, cliVersion?, lastUpdated?, detected }`
+  per basis in data order. `label` joins the channel, region and plan labels
+  with ` · `. `detected` marks the basis that matches the CLI sign-in on the
+  Runtime's host; it is `false` until a detection source exists.
+- Every catalog backed by a scope carries `capture` (`{ cliVersion?, lastUpdated? }`).
+- `modelSelection.basisId` names the basis of a structured selection; without
+  it the selection means the first basis. A plain `model` string is looked up
+  in every basis in data order. `modelResolution.basisId` records the basis the
+  entry resolved in. A plan or region basis never changes execution arguments.
+- `GET /providers/catalogs` advertises `catalogBases: true`. The MCP
+  `provider_advanced_models` tool accepts the same `basis` input.
+
 The same usability warning applies to the advanced route: advanced entries,
 presets, and controls are runtime-owned model metadata, not a guarantee that
 the underlying target is currently healthy. Selector UIs that must only show

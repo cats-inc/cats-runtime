@@ -586,7 +586,17 @@ async function resolveRequestedSessionModelState(
     return { warnings: [] };
   }
 
-  const knowledge = await ctx.providerModelCatalog.getAdvancedKnowledgeForTarget(target);
+  // SPEC-045: a selection names its basis or means the first one. A plain model string is looked
+  // up in every basis in data order, and the first that lists it decides.
+  let basisId = effectiveSelection.basisId;
+  if (basisId === undefined && !input.selection && effectiveSelection.entryId) {
+    const bases = ctx.providerModelCatalog.listCatalogBasesForTarget(target);
+    const listing = bases.length > 1
+      ? bases.find(scope => scope.models.some(model => model.id === effectiveSelection.entryId))
+      : undefined;
+    basisId = listing?.basis?.id;
+  }
+  const knowledge = await ctx.providerModelCatalog.getAdvancedKnowledgeForTarget(target, { basisId });
   // Custom strings carry no catalog-derived effort/provider. Known strings and
   // structured selections resolve through the same accepted snapshot.
   if (normalizedLegacyModel && !knowledge.catalog.entries.some(entry => entry.id === effectiveSelection.entryId)
@@ -601,7 +611,13 @@ async function resolveRequestedSessionModelState(
         controls: {}, supportTier: 'entry_only', warnings: [] }, warnings: [],
     };
   }
-  const resolved = resolveProviderSelection(knowledge, effectiveSelection);
+  const resolved = resolveProviderSelection(knowledge, basisId === effectiveSelection.basisId
+    ? effectiveSelection
+    : { ...effectiveSelection, ...(basisId ? { basisId } : {}) });
+  if (resolved.selection.basisId && !effectiveSelection.basisId) {
+    // The lookup chose the basis; the requested selection stays as the client sent it.
+    delete resolved.selection.basisId;
+  }
 
   if (
     input.enforceLegacyMatch !== false

@@ -1,10 +1,10 @@
-import { effectiveModelControls } from '../../catalogs/schema.js';
-import { findCatalogScope } from '../../catalogs/resolver.js';
+import { catalogScopeKey, effectiveModelControls } from '../../catalogs/schema.js';
+import { findCatalogScope, listCatalogScopes } from '../../catalogs/resolver.js';
 import type { CatalogControl, CatalogModel, CatalogScope, CatalogSnapshot } from '../../catalogs/types.js';
 import type { ProviderTargetDescriptor } from '../providerCatalog.js';
 import type { ProviderModelCatalogResult } from './providerModelCatalog.js';
 import type {
-  ProviderAdvancedCatalogControl, ProviderAdvancedCatalogEntry,
+  ProviderAdvancedCatalogBasisOption, ProviderAdvancedCatalogControl, ProviderAdvancedCatalogEntry,
   ProviderAdvancedCatalogResult, ProviderAdvancedCatalogSupportTier, ProviderAdvancedControlValue,
 } from './providerAdvancedCatalog.js';
 
@@ -20,6 +20,34 @@ export interface ProviderAdvancedKnowledgeContext {
 
 export interface ProviderAdvancedKnowledgeBuildOptions {
   snapshot?: CatalogSnapshot;
+  /** The basis to build; absent means the target's first basis (SPEC-045). */
+  basisId?: string;
+}
+
+/** The channel, region and plan labels of a basis, joined the same way for every client. */
+export function catalogBasisLabel(scope: CatalogScope): string {
+  const basis = scope.basis;
+  return [basis?.channel?.label, basis?.region?.label, basis?.plan?.label].filter(Boolean).join(' · ');
+}
+
+function captureOf(scope: CatalogScope): { cliVersion?: string; lastUpdated?: string } {
+  return {
+    ...(scope.cli_version ? { cliVersion: scope.cli_version } : {}),
+    ...(scope.last_updated ? { lastUpdated: scope.last_updated } : {}),
+  };
+}
+
+function basisOption(scope: CatalogScope): ProviderAdvancedCatalogBasisOption {
+  const basis = scope.basis;
+  return {
+    ...(basis?.id ? { id: basis.id } : {}),
+    label: catalogBasisLabel(scope),
+    ...(basis?.channel ? { channel: { ...basis.channel } } : {}),
+    ...(basis?.region ? { region: { ...basis.region } } : {}),
+    ...(basis?.plan ? { plan: { ...basis.plan } } : {}),
+    ...captureOf(scope),
+    detected: false,
+  };
 }
 
 function projectControl(control: CatalogControl, entryId: string): ProviderAdvancedCatalogControl {
@@ -39,7 +67,8 @@ export function buildProviderAdvancedKnowledge(
   modelCatalog: ProviderModelCatalogResult,
   options: ProviderAdvancedKnowledgeBuildOptions = {},
 ): ProviderAdvancedKnowledgeContext {
-  const scope = findCatalogScope(options.snapshot, target);
+  const scope = findCatalogScope(options.snapshot, target, options.basisId);
+  const bases = listCatalogScopes(options.snapshot, target);
   const modelsById = Object.fromEntries((scope?.models ?? []).map(model => [model.id, model]));
   const entryDefaults: ProviderAdvancedKnowledgeContext['entryDefaults'] = {};
   const combined = new Map<string, ProviderAdvancedCatalogControl>();
@@ -84,6 +113,8 @@ export function buildProviderAdvancedKnowledge(
     defaultModel: modelCatalog.defaultModel, source: modelCatalog.source, cache: modelCatalog.cache,
     entries, controls, presets: structuredClone(presets),
     defaultSelection: defaultEntry ? {
+      // A non-first basis must travel with its default, or posting it back resolves in the first.
+      ...(scope && bases.length > 1 && scope.basis?.id ? { basisId: scope.basis.id } : {}),
       entryId: defaultEntry.id, entryMode: 'explicit',
       ...(modelCatalog.catalogRevision ? { catalogRevision: modelCatalog.catalogRevision } : {}),
       ...(defaultEntry.controlDefaults ? { controls: { ...defaultEntry.controlDefaults } } : {}),
@@ -92,10 +123,13 @@ export function buildProviderAdvancedKnowledge(
       tier: supportTier, advancedMetadataStatus: scope ? 'verified_manifest' : 'unverified_omitted',
       discoveryMode: 'manual_refresh',
       ...(scope ? { provenance: { status: 'verified_manifest',
-        manifestId: `${scope.provider}/${scope.backend}/${scope.transport ?? ''}`,
+        manifestId: catalogScopeKey(scope),
         manifestVersion: modelCatalog.catalogRevision } } : {}),
     },
     ...(scope?.basis ? { basis: structuredClone(scope.basis) } : {}),
+    ...(scope && bases.length > 1 && scope.basis?.id ? { basisId: scope.basis.id } : {}),
+    ...(bases.length > 1 ? { bases: bases.map(basisOption) } : {}),
+    ...(scope ? { capture: captureOf(scope) } : {}),
     warnings: [...modelCatalog.warnings],
   };
   return { target, catalog, supportTier, entryDefaults, scope, modelsById,

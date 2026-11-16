@@ -12,7 +12,7 @@ const { catalogCapabilities, readLocalCatalogProjection } = await fromPackage('b
 const { ProviderModelCatalogService } = await fromPackage('build/runtime/core/models/providerModelCatalog.js');
 const { resolveProviderSelection } = await fromPackage('build/runtime/core/models/providerSelectionResolution.js');
 const { PiProvider } = await fromPackage('build/runtime/backends/cli/providers/pi.js');
-assert.deepEqual(catalogCapabilities, { schemaVersion: 2, bindingVersion: 1, localOverrides: true, automaticSchema1Upgrade: true, factorySnapshotRetirement: true });
+assert.deepEqual(catalogCapabilities, { schemaVersion: 2, bindingVersion: 1, localOverrides: true, automaticSchema1Upgrade: true, factorySnapshotRetirement: true, catalogBases: true });
 const paths = { packageRoot, runtimeRoot };
 const configPath = join(runtimeRoot, 'config', 'providers.yaml');
 const overridePath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');

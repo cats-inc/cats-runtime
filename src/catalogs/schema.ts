@@ -6,8 +6,18 @@ import type {
 
 export const CATALOG_SCHEMA_VERSION = 2;
 
-export function catalogScopeKey(scope: Pick<CatalogScope, 'provider' | 'backend' | 'transport'>): string {
+/** The target a scope belongs to: provider, backend and transport, without a basis. */
+export function catalogTargetKey(scope: Pick<CatalogScope, 'provider' | 'backend' | 'transport'>): string {
   return `${scope.provider}/${scope.backend}/${scope.transport ?? ''}`;
+}
+
+/**
+ * A scope's identity: its target, plus `#<basis.id>` when the scope names a basis (SPEC-045).
+ * An id-less scope keeps the target key, so single-basis catalogs keep their existing keys.
+ */
+export function catalogScopeKey(scope: Pick<CatalogScope, 'provider' | 'backend' | 'transport'> & { basis?: { id?: string } }): string {
+  const target = catalogTargetKey(scope);
+  return scope.basis?.id ? `${target}#${scope.basis.id}` : target;
 }
 
 function record(value: unknown, at: string): Record<string, unknown> {
@@ -102,17 +112,32 @@ export function effectiveModelControls(scope: CatalogScope, model: CatalogModel)
   return [...merged.values()];
 }
 
+const BASIS_ID = /^[a-z0-9][a-z0-9._-]*$/;
+
 // A channel must be the one every entry actually runs through, so the display cannot drift
 // from the wire value: execution.provider when set, otherwise the model's first path segment.
 // An empty model list has no entry to contradict it, so the check passes by design.
 function validateBasis(raw: unknown, scope: CatalogScope, at: string): void {
   const data = record(raw, at);
-  keys(data, ['channel', 'plan'], at);
-  if (data.channel === undefined && data.plan === undefined) throw new Error(`${at} needs a channel or a plan`);
+  keys(data, ['id', 'channel', 'region', 'plan'], at);
+  if (data.id !== undefined) {
+    text(data.id, `${at}.id`);
+    if (!BASIS_ID.test(data.id)) throw new Error(`${at}.id must be a lowercase slug`);
+  }
+  if (data.channel === undefined && data.region === undefined && data.plan === undefined) {
+    throw new Error(`${at} needs a channel, a region or a plan`);
+  }
+  if (data.region !== undefined) {
+    const region = record(data.region, `${at}.region`);
+    keys(region, ['id', 'label'], `${at}.region`);
+    text(region.id, `${at}.region.id`);
+    text(region.label, `${at}.region.label`);
+  }
   if (data.plan !== undefined) {
     const plan = record(data.plan, `${at}.plan`);
-    keys(plan, ['label'], `${at}.plan`);
+    keys(plan, ['label', 'id'], `${at}.plan`);
     text(plan.label, `${at}.plan.label`);
+    if (plan.id !== undefined) text(plan.id, `${at}.plan.id`);
   }
   if (data.channel === undefined) return;
   const channel = record(data.channel, `${at}.channel`);
@@ -250,6 +275,24 @@ export function validateCatalogDocument(value: unknown): CatalogDocument {
   if (doc.schema_version !== CATALOG_SCHEMA_VERSION) throw new Error(`Unsupported catalog schema '${String(doc.schema_version)}'; expected 2. Use the explicit converter for schema 1.`);
   array(doc.catalogs, 'catalogs');
   const catalogs = doc.catalogs.map((scope, i) => validateScope(scope, `catalogs[${i}]`));
+  // A target may hold several bases (SPEC-045). Only its first scope may omit basis.id, which
+  // then means "the first basis" everywhere.
+  const targets = new Map<string, number>();
+  catalogs.forEach((scope, i) => {
+    const target = catalogTargetKey(scope);
+    if (targets.has(target) && !scope.basis?.id) {
+      throw new Error(`catalogs[${i}]: '${target}' already has a scope, so this one needs basis.id`);
+    }
+    targets.set(target, (targets.get(target) ?? 0) + 1);
+  });
+  // Each basis of a multi-basis target is told apart by its own channel, region or plan, so the
+  // first scope must record what it was captured on before a second basis is added.
+  catalogs.forEach((scope, i) => {
+    const target = catalogTargetKey(scope);
+    if (targets.get(target)! > 1 && !scope.basis) {
+      throw new Error(`catalogs[${i}]: '${target}' has several bases, so every scope needs a basis`);
+    }
+  });
   unique(catalogs.map(catalogScopeKey), 'catalog scopes');
   return structuredClone({ schema_version: 2, catalogs });
 }

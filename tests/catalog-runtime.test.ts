@@ -257,6 +257,37 @@ describe('factory and executable catalog projections', () => {
     expect(spawn(pi)).toEqual(['--mode', 'rpc', '--provider', 'openai-codex', '--model', 'gpt-6-sol', '--thinking', 'high']);
   });
 
+  it('builds each Copilot plan basis separately and spawns the same arguments for the same row (SPEC-045)', () => {
+    const factoryCopilot = snapshot.document.catalogs.find(s => s.provider === 'copilot' && s.backend === 'cli')!;
+    const plus: CatalogScope = { ...structuredClone(factoryCopilot), cli_version: undefined, last_updated: undefined,
+      basis: { id: 'pro-plus', plan: { label: 'Copilot Pro+' } } };
+    const current = createCatalogSnapshot(factory.source, JSON.stringify({ schema_version: 2, catalogs: [plus] }));
+    const knowledgeOf = (basisId?: string) => {
+      const scope = current.document.catalogs.filter(s => s.provider === 'copilot' && s.backend === 'cli')
+        .find(s => basisId === undefined || s.basis?.id === basisId)!;
+      return buildProviderAdvancedKnowledge(target(scope), {
+        provider: 'copilot', backend: 'cli', instance: 'fixture', source: 'static', cache: null,
+        catalogRevision: current.catalogRevision, defaultModel: null,
+        models: scope.models.map(({ id, label, default: isDefault }) => ({ id, label, default: isDefault })), warnings: [],
+      }, { snapshot: current, basisId });
+    };
+    const pro = knowledgeOf();
+    const proPlus = knowledgeOf('pro-plus');
+    expect(pro.catalog.basisId).toBeUndefined();
+    expect(proPlus.catalog.basisId).toBe('pro-plus');
+    expect(pro.catalog.bases?.map(b => [b.id, b.label, b.detected])).toEqual([[undefined, 'Copilot Pro', false], ['pro-plus', 'Copilot Pro+', false]]);
+    expect(pro.catalog.capture).toEqual({ cliVersion: factoryCopilot.cli_version, lastUpdated: factoryCopilot.last_updated });
+    expect(proPlus.catalog.capture).toEqual({});
+    expect(proPlus.catalog.support.provenance?.manifestId).toBe('copilot/cli/#pro-plus');
+    // A plan basis is display data: the same row and controls spawn the same arguments.
+    const spawn = (k: ReturnType<typeof knowledgeOf>, basisId?: string) => {
+      const selected = resolveProviderSelection(k, { ...(basisId ? { basisId } : {}), entryId: 'grok-4.7', entryMode: 'explicit',
+        controls: { 'copilot.reasoning_effort': 'xhigh', 'copilot.context': 'long_context' } });
+      return new CopilotProvider().buildSpawnArgs({ cwd: '/tmp', model: selected.execution.model, modelControls: selected.resolution.controls });
+    };
+    expect(spawn(proPlus, 'pro-plus')).toEqual(spawn(pro));
+  });
+
   it('lists the Copilot Pro picker with Terra as default and first-value effort, context and tier', () => {
     const copilot = knowledge(snapshot.document.catalogs.find(s => s.provider === 'copilot' && s.backend === 'cli')!);
     expect(copilot.catalog.entries).toHaveLength(16);
