@@ -3901,8 +3901,11 @@ Runtime logs the path. These processes can still outlive the wait:
 
 - a CLI launched through a `.cmd` shim that ignores its closed input: the
   Runtime kills `cmd.exe`, not the CLI it started;
+- on Windows, processes a CLI that is not a Node program started itself (a
+  shell tool, for example): they survive the CLI, whose exit ends the wait;
 - processes a provider adapter starts per turn itself;
-- a process still exiting when a delete finds the session no longer active.
+- a process still exiting when a close or delete finds the session no longer
+  active: neither waits then.
 
 `POST /sessions/{id}/workspace/cleanup` is a bounded retained-worktree recovery
 primitive for closed worktree-backed sessions whose most recent cleanup attempt

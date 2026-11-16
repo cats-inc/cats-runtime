@@ -547,43 +547,45 @@ export class WorkerPool {
    * Kills a session's worker. The returned promise settles once its process has stopped (true), or
    * after `timeoutMs` (false); it never rejects, and a failure to kill still throws here. Until a
    * Windows process has exited it holds its working folder, so a caller about to remove that folder
-   * (a sandbox on delete) awaits this. Killing a worker already being stopped kills it again but
-   * shares the first wait, so repeated closes add no listeners.
+   * (a sandbox on delete) awaits this. Killing a worker already being stopped kills it again and
+   * joins the wait in progress, so repeated closes add no listeners; a caller whose own deadline
+   * is later then waits out the rest of it.
    */
   kill(sessionId: string, timeoutMs = WORKER_STOP_WAIT_MS): Promise<boolean> {
     const worker = this.workers.get(sessionId);
     if (!worker) return Promise.resolve(true);
+    // 'process-stopped' is never emitted from within kill(); the wait reads processRunning first anyway.
+    worker.kill();
+    return this.waitForStop(worker, timeoutMs);
+  }
+
+  /**
+   * Settles true once the worker's process has stopped, or false after `timeoutMs`. One wait per
+   * worker at a time: a second caller joins it, and waits on alone if its own deadline is later.
+   */
+  private waitForStop(worker: WorkerProcess, timeoutMs: number): Promise<boolean> {
+    if (!worker.processRunning) return Promise.resolve(true);
+    if (timeoutMs <= 0) return Promise.resolve(false);
+    const deadline = Date.now() + timeoutMs;
     const pending = this.stopping.get(worker);
-    if (pending) {
-      worker.kill();
-      return pending;
-    }
-    let settle: (stopped: boolean) => void = () => {};
-    const stopped = new Promise<boolean>(resolve => { settle = resolve; });
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const check = () => {
-      if (worker.processRunning) return;
-      clearTimeout(timer);
-      worker.removeListener('process-stopped', check);
-      settle(true);
-    };
-    worker.on('process-stopped', check);
-    try {
-      worker.kill();
-    } catch (error) {
-      worker.removeListener('process-stopped', check);
-      throw error;
-    }
-    check();
-    if (worker.processRunning) {
-      timer = setTimeout(() => {
+    // The pending wait's own cleanup was registered first, so it has left the map when this runs.
+    if (pending) return pending.then(stopped => stopped || this.waitForStop(worker, deadline - Date.now()));
+    const stopped = new Promise<boolean>(resolve => {
+      const check = () => {
+        if (worker.processRunning) return;
+        clearTimeout(timer);
         worker.removeListener('process-stopped', check);
-        settle(false);
+        resolve(true);
+      };
+      const timer = setTimeout(() => {
+        worker.removeListener('process-stopped', check);
+        resolve(false);
       }, timeoutMs);
       timer.unref?.();
-      this.stopping.set(worker, stopped);
-      void stopped.then(() => { if (this.stopping.get(worker) === stopped) this.stopping.delete(worker); });
-    }
+      worker.on('process-stopped', check);
+    });
+    this.stopping.set(worker, stopped);
+    void stopped.then(() => { if (this.stopping.get(worker) === stopped) this.stopping.delete(worker); });
     return stopped;
   }
 

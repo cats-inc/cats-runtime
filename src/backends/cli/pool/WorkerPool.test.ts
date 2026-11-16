@@ -287,11 +287,23 @@ describe('kill waits for the worker process to stop (its working folder is busy 
     worker.kill = vi.fn();
     const first = pool.kill('session-1');
     const second = pool.kill('session-1');
-    expect(second).toBe(first);
     expect(worker.kill).toHaveBeenCalledTimes(2);
     expect(worker.listenerCount('process-stopped')).toBe(listeners + 1);
     stop();
-    await expect(first).resolves.toBe(true);
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+    expect(worker.listenerCount('process-stopped')).toBe(listeners);
+  });
+
+  it('lets a later caller wait out its own deadline after a shorter shared wait ends', async () => {
+    const { pool, worker, stop } = running();
+    const listeners = worker.listenerCount('process-stopped');
+    worker.kill = vi.fn();
+    const short = pool.kill('session-1', 20);
+    const long = pool.kill('session-1', 60_000);
+    await expect(short).resolves.toBe(false);
+    expect(worker.listenerCount('process-stopped')).toBe(listeners + 1);
+    stop();
+    await expect(long).resolves.toBe(true);
     expect(worker.listenerCount('process-stopped')).toBe(listeners);
   });
 
