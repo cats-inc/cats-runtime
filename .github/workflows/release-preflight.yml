@@ -10,11 +10,19 @@ permissions:
   contents: read
 
 jobs:
-  # A change confined to docs/ skips the application gate. The required
-  # release-preflight check then reports skipped, which branch protection
-  # accepts; any other path, a manual run or a failed detection runs it. A push
-  # to main also skips it when its merged pull request passed on the same tree.
-  # tests/docs-boundary.test.ts keeps tests and scripts from reading docs/.
+  # A change confined to documentation skips install and the release preflight.
+  # Documentation is docs/ plus a root AGENTS.md, CLAUDE.md, CODEX.md or
+  # GEMINI.md that was added or modified and so still exists; deleting,
+  # renaming or retyping one, or changing a nested AGENTS.md, is code. Code
+  # that already passed also skips: the fingerprint covers every tracked file
+  # outside docs/, and those four files only by mode and path, so a rebase that
+  # only brings in documentation from main reuses the earlier green run. A pull request's cache is scoped to that
+  # request, so a push to main instead reuses its merged pull request's run when
+  # that run tested the same tree. The required release-preflight job still runs
+  # and passes, so branch protection is satisfied; only its steps are skipped.
+  # Any other path, a manual run or a failed detection runs every step.
+  # tests/docs-boundary.test.ts keeps tests and scripts from reading docs/ or
+  # those four files.
   changes:
     runs-on: ubuntu-latest
     # Job permissions replace the workflow's: checkout and the merge lookups read
@@ -25,7 +33,8 @@ jobs:
       actions: read
     outputs:
       code: ${{ steps.paths.outputs.code }}
-      tested: ${{ steps.merged.outputs.tested }}
+      fingerprint: ${{ steps.fingerprint.outputs.fingerprint }}
+      skip: ${{ steps.plan.outputs.skip }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -46,11 +55,37 @@ jobs:
           esac
           code=true
           if [ -n "$base" ] && git rev-parse --verify --quiet "$base^{commit}" > /dev/null; then
-            changed=$(git diff --name-only "$base" HEAD)
+            # Without rename detection a move also lists its old path as
+            # deleted, so moving code into docs/ or renaming a root agent file
+            # is code.
+            changed=$(git diff --name-status --no-renames "$base" HEAD)
             printf 'Changed files:\n%s\n' "$changed"
-            if [ -n "$changed" ] && ! grep -qv '^docs/' <<< "$changed"; then code=false; fi
+            # Code is any change outside docs/ except a root agent instruction
+            # file that was added or modified and so still exists at HEAD.
+            code_paths=$(awk -F '\t' '$2 !~ /^docs\// && !($1 ~ /^[AM]$/ && $2 ~ /^(AGENTS|CLAUDE|CODEX|GEMINI)\.md$/)' <<< "$changed")
+            if [ -n "$changed" ] && [ -z "$code_paths" ]; then code=false; fi
           fi
           echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Fingerprint the code under test
+        id: fingerprint
+        run: |
+          set -euo pipefail
+          # Mode, blob and path of every tracked file outside docs/. The root
+          # agent instruction files keep their mode and path but not their
+          # content. For a pull request this is the merge result that the tests
+          # would exercise.
+          fingerprint=$(git ls-tree -r --full-tree HEAD | awk -F '\t' '$2 ~ /^docs\// { next } $2 ~ /^(AGENTS|CLAUDE|CODEX|GEMINI)\.md$/ { split($1, meta, " "); print meta[1] "\t" $2; next } { print }' | sha256sum | cut -d ' ' -f 1)
+          echo "fingerprint=$fingerprint" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Look for an earlier green run of this exact code
+        id: green
+        if: steps.paths.outputs.code == 'true' && github.event_name != 'workflow_dispatch'
+        uses: actions/cache/restore@v4
+        with:
+          path: .ci-green
+          key: ci-green-v1-${{ steps.fingerprint.outputs.fingerprint }}
+          lookup-only: true
 
       - name: Reuse the merged pull request's green run
         id: merged
@@ -86,15 +121,37 @@ jobs:
           fi
           echo "tested=$tested" | tee -a "$GITHUB_OUTPUT"
 
+      - name: Decide what to skip
+        id: plan
+        env:
+          CODE: ${{ steps.paths.outputs.code }}
+          GREEN: ${{ steps.green.outputs.cache-hit }}
+          MERGED: ${{ steps.merged.outputs.tested }}
+        run: |
+          set -euo pipefail
+          skip=
+          if [ "$CODE" = "false" ]; then skip=docs; elif [ "$GREEN" = "true" ] || [ "$MERGED" = "true" ]; then skip=tested; fi
+          echo "skip=$skip" | tee -a "$GITHUB_OUTPUT"
+
   release-preflight:
     needs: changes
-    if: ${{ !cancelled() && (needs.changes.result != 'success' || (needs.changes.outputs.code == 'true' && needs.changes.outputs.tested != 'true')) }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
+      - name: Documentation-only change
+        if: needs.changes.outputs.skip == 'docs'
+        run: echo "Only documentation changed; install and the release preflight are skipped."
+
+      - name: Already tested
+        if: needs.changes.outputs.skip == 'tested'
+        run: echo "This exact code already passed; install and the release preflight are skipped."
+
       - name: Checkout
+        if: needs.changes.outputs.skip == ''
         uses: actions/checkout@v7
 
       - name: Setup Node.js
+        if: needs.changes.outputs.skip == ''
         uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -102,7 +159,26 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
+        if: needs.changes.outputs.skip == ''
         run: npm ci
 
       - name: Run release preflight
+        if: needs.changes.outputs.skip == ''
         run: npm run release:check
+
+      # Reached only when every step above passed. A failed detection leaves no
+      # fingerprint, so nothing is recorded.
+      - name: Record this code as tested
+        if: needs.changes.outputs.skip == '' && needs.changes.outputs.fingerprint != ''
+        env:
+          FINGERPRINT: ${{ needs.changes.outputs.fingerprint }}
+        run: |
+          mkdir -p .ci-green
+          echo "$FINGERPRINT $GITHUB_RUN_ID" > .ci-green/marker
+
+      - name: Save the tested marker
+        if: needs.changes.outputs.skip == '' && needs.changes.outputs.fingerprint != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .ci-green
+          key: ci-green-v1-${{ needs.changes.outputs.fingerprint }}

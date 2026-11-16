@@ -65,15 +65,30 @@ full-suite diagnosis, or changes whose impact cannot be bounded confidently.
 
 ### Docs-only changes in CI
 
-The release preflight workflow first checks whether every changed file is under
-`docs/`. If so, the required `release-preflight` job is skipped and reported as
-passing, so the pull request still merges. Any other path, a manual run or a failed
-detection runs the full gate.
+The release preflight workflow's `changes` job first checks whether the change is
+documentation only. Documentation is anything under `docs/`, plus a root
+`AGENTS.md`, `CLAUDE.md`, `CODEX.md` or `GEMINI.md` that was added or modified and so
+still exists. Deleting, renaming or changing the type of one of those four files is
+code, and so is any nested `AGENTS.md`. The comparison does not detect renames, so
+moving a file into `docs/` also counts as code. For documentation, the required
+`release-preflight` job still runs, but it skips install and `release:check` and
+passes, so the pull request still merges with the check name unchanged. Any other
+path, a manual run or a failed detection runs the full gate.
 
-A push to `main` also skips the gate when its merged pull request already passed on
-the same tree. `main` requires up-to-date branches, so a squash merge usually lands
-exactly what the pull request's preflight tested. The `changes` job reuses that run
-only when all of these hold:
+The job also skips code that already passed. It fingerprints the mode, blob and path
+of every tracked file outside `docs/`, keeping the four root agent files by mode and
+path only, so their content does not count. A full gate that passes saves an
+`actions/cache` entry named `ci-green-v1-<fingerprint>`. A later run with the same
+fingerprint that can see that entry skips the gate, for example a pull request
+updated with a rebase that only brings in documentation. An entry saved by a pull
+request is visible only to that pull request; one saved on `main` is visible to
+every run. Manual runs neither look the entry up nor skip.
+
+Because a pull request's entry is not visible on `main`, a push to `main` also
+skips the gate when its merged pull request already passed on the same tree. `main`
+requires up-to-date branches, so a squash merge usually lands exactly what the pull
+request's preflight tested. The `changes` job reuses that run only when all of these
+hold:
 
 - the push adds one commit on the previous `main`;
 - the GitHub API names that commit as a pull request's merge;
@@ -82,16 +97,20 @@ only when all of these hold:
 - the preflight passed on that head as a `pull_request` run.
 
 Any other push, or any failed lookup, runs the full gate. `npm-publish.yml` likewise
-skips `release:check` when the preflight passed on the dispatched commit on `main`,
-and runs it otherwise. `tests/ci-workflow.test.ts` runs both steps against a local
-origin with a stubbed `gh`.
+skips `release:check` when the preflight run passed on the dispatched commit on
+`main`, and runs it otherwise. A preflight run whose steps were skipped also counts
+as passed. `tests/ci-workflow.test.ts` runs the detection, fingerprint, skip and
+merge steps against local repositories with a stubbed `gh`, and checks how the
+steps are gated.
 
-Tests and scripts must therefore not read repository documentation. Executable
-inputs live under `tests/fixtures/`: captured provider output that tests replay in
+Tests and scripts must therefore not read repository documentation, and may only
+check that a root agent instruction file exists. Executable inputs live under
+`tests/fixtures/`: captured provider output that tests replay in
 `tests/fixtures/provider-captures/<cli>-<version>/`, and schema-1 catalog profiles in
 `tests/fixtures/catalog-schema1/`. Evidence that notes only cite stays in
 `docs/research/fixtures/`. `tests/docs-boundary.test.ts` enforces the rule. A line that
-names a docs path without reading it carries `// docs-boundary-ignore: <reason>`.
+names a docs path or a root agent file without reading it carries
+`// docs-boundary-ignore: <reason>`.
 
 ## Running Tests
 
