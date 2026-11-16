@@ -195,8 +195,8 @@ only known fields, so `basisId` would be dropped on almost every path.
       Pi, Copilot, OpenCode, Kilo, Cline and Goose (all with a channel or plan basis), and two
       earlier snapshots of Claude, Codex, Antigravity, Grok and Muse, gave the same verdicts,
       findings and counts with the old and the new scripts.
-- [ ] Sync the skill mirrors after merge (`Sync-WorkspaceSkills.ps1`), which also carries the
-      Phase 2 skill changes.
+- [x] Sync the skill mirrors after merge (`Sync-WorkspaceSkills.ps1`), which also carries the
+      Phase 2 skill changes. Done on 2026-11-16 after #236.
 
 ## Phase 5: Kimi region data (after Phases 2 and 3 merge)
 
