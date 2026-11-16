@@ -158,8 +158,8 @@ export class InteractionStore {
       throw new InteractionError('interaction_conflict', 'Provider interaction is no longer pending at this revision.');
     }
     validateAnswer(entry.view.prompt, input.answer);
-    if (input.answer.standingGrant && !this.standing) {
-      throw new InteractionError('interaction_unsupported', 'This session does not keep standing grants.');
+    if (input.answer.standingGrant && (!this.standing || !this.standing.categories.includes(entry.view.prompt.grantCategory!))) {
+      throw new InteractionError('interaction_unsupported', 'This session does not keep standing grants for this request.');
     }
     const send = entry.respond!;
     // The grant is the owner's decision on this card; whether a later turn may use it is the host's per send.

@@ -62,9 +62,12 @@ The owner decided on 2026-11-16:
 
 ## Consequences
 
-- A computer-use grant covers Kimi's `js` cells. Those cells run in KimiCU's kernel, which refuses Node built-ins, so a
-  cell cannot reach the shell or files directly. KimiCU also refuses input to Command Prompt, PowerShell and Windows
-  Terminal windows. Shell and file work still need their own grants or cards.
+- A computer-use grant covers Kimi's `js` cells. According to the kimi-cu-win 0.3.13 README and skill, those cells
+  run in KimiCU's kernel, which refuses Node built-ins, and KimiCU refuses input to Command Prompt, PowerShell and
+  Windows Terminal. These are block lists, not a boundary: through the desktop a cell can still start programs (Run
+  dialog, Explorer, an editor's terminal, Git Bash) and change files. A computer-use grant is therefore as broad as a
+  person at the keyboard, and hosts must say so; the separate shell and file categories only govern Kimi's own Bash
+  and Write tools.
 
 - An owner-started Kimi session can work on the desktop for as long as the owner chose without further
   clicks, while every other trigger still waits for the owner.
