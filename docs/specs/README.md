@@ -1,5 +1,10 @@
 # Feature Specifications
 
+- [SPEC-045: Catalog bases per channel, region and plan](SPEC-045-catalog-bases-per-channel-region-and-plan.md)
+  — approved, 2026-11-16; several captured model lists per CLI target keyed by `basis.id`, one
+  "List basis" select, a region field for Kimi, and sign-in detection without credentials. Not
+  implemented.
+
 - [SPEC-044: Reference media generation](SPEC-044-reference-media-generation.md) — implemented; host acceptance in progress.
 
 - [SPEC-043: Text-only sessions](SPEC-043-text-only-sessions.md)

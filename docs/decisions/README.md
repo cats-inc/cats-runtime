@@ -1,5 +1,8 @@
 # Architecture Decision Records (ADR)
 
+- [ADR-056: One basis selector over captured catalog bases](056-offer-one-basis-selector-over-captured-catalog-bases.md)
+  — accepted, 2026-11-16; several channel, region or plan lists per CLI, one flat "List basis"
+  select, detection without credentials. Not implemented.
 - [ADR-055: Let the owner grant computer use, shell and file approvals once](055-let-the-owner-grant-computer-use-shell-and-file-approvals-once.md)
   — accepted, 2026-11-16; per-session standing grants, used only by sends the host marks as owner-started.
 - [ADR-054: Kimi Code through print-mode stream-json](054-drive-kimi-code-through-print-mode-stream-json.md)
@@ -83,6 +86,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 |-----|-------|--------|------|
 | [ADR-054](054-drive-kimi-code-through-print-mode-stream-json.md) | Drive Kimi Code through Print-Mode stream-json | Accepted; amended for hosted `kimi acp` | 2026-11-16 |
 | [ADR-055](055-let-the-owner-grant-computer-use-shell-and-file-approvals-once.md) | Let the Owner Grant Computer Use, Shell and File Approvals Once | Accepted | 2026-11-16 |
+| [ADR-056](056-offer-one-basis-selector-over-captured-catalog-bases.md) | Offer One Basis Selector over Captured Catalog Bases | Accepted; not implemented | 2026-11-16 |
 | [ADR-047](047-generalize-bounded-image-generation-to-provider-profiles.md) | Generalize Bounded Image Generation to Provider Profiles | Accepted; Grok and Muse enabled | 2026-10-23 |
 | [ADR-046](046-expose-evidence-backed-session-workspace-activity.md) | Expose Evidence-Backed Session Workspace Activity | Accepted for sliced implementation; acceptance pending | 2026-10-20 |
 | [041-bridge-explicit-codex-read-tools-through-runtime](./041-bridge-explicit-codex-read-tools-through-runtime.md) | Bridge Explicit Codex Read Tools Through Runtime | Accepted; native local bridge verified | 2026-09-25 |
