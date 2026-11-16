@@ -10,11 +10,20 @@ permissions:
   contents: read
 
 jobs:
-  # A change confined to docs/ skips the application gate. The required
-  # release-preflight check then reports skipped, which branch protection
-  # accepts; any other path, a manual run or a failed detection runs it. A push
-  # to main also skips it when its merged pull request passed on the same tree.
-  # tests/docs-boundary.test.ts keeps tests and scripts from reading docs/.
+  # A change confined to documentation skips install and the release preflight.
+  # Documentation is docs/ plus a root AGENTS.md, CLAUDE.md, CODEX.md or
+  # GEMINI.md that was added or modified and so still exists; deleting,
+  # renaming or retyping one, or changing a nested AGENTS.md, is code. Code
+  # that already passed also skips: the fingerprint covers every tracked file
+  # outside docs/, and those four files only by mode, type and path, so a rebase
+  # that only brings in documentation from main reuses the earlier green run. A
+  # pull request's cache is scoped to that request, so a push to main instead
+  # reuses its merged pull request's run when that run tested the same tree. The
+  # required release-preflight job still runs and passes, so branch protection
+  # is satisfied; only its steps are skipped.
+  # Any other path, a manual run or a failed detection runs every step.
+  # tests/docs-boundary.test.ts keeps tests and scripts from reading docs/ or
+  # those four files.
   changes:
     runs-on: ubuntu-latest
     # Job permissions replace the workflow's: checkout and the merge lookups read
@@ -25,7 +34,8 @@ jobs:
       actions: read
     outputs:
       code: ${{ steps.paths.outputs.code }}
-      tested: ${{ steps.merged.outputs.tested }}
+      fingerprint: ${{ steps.fingerprint.outputs.fingerprint }}
+      skip: ${{ steps.plan.outputs.skip }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -45,12 +55,44 @@ jobs:
             *) base= ;;
           esac
           code=true
-          if [ -n "$base" ] && git rev-parse --verify --quiet "$base^{commit}" > /dev/null; then
-            changed=$(git diff --name-only "$base" HEAD)
+          # Without rename detection a move lists both paths, so moving code
+          # into docs/ or renaming a root agent file is code. code_changed lists
+          # changes outside docs/ and the four root agent files; agents_removed
+          # lists those four when deleted or changed in type, since one counts
+          # as documentation only while it still exists. Nested copies are
+          # code. Any git failure keeps code=true.
+          if [ -n "$base" ] && git rev-parse --verify --quiet "$base^{commit}" > /dev/null &&
+            changed=$(git diff --no-renames --name-only "$base" HEAD) &&
+            code_changed=$(git diff --no-renames --name-only "$base" HEAD -- . ':(top,exclude)docs/' ':(top,exclude)AGENTS.md' ':(top,exclude)CLAUDE.md' ':(top,exclude)CODEX.md' ':(top,exclude)GEMINI.md') &&
+            agents_removed=$(git diff --no-renames --name-only --diff-filter=am "$base" HEAD -- ':(top)AGENTS.md' ':(top)CLAUDE.md' ':(top)CODEX.md' ':(top)GEMINI.md'); then
             printf 'Changed files:\n%s\n' "$changed"
-            if [ -n "$changed" ] && ! grep -qv '^docs/' <<< "$changed"; then code=false; fi
+            if [ -n "$changed" ] && [ -z "$code_changed" ] && [ -z "$agents_removed" ]; then code=false; fi
           fi
           echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Fingerprint the code under test
+        id: fingerprint
+        run: |
+          set -euo pipefail
+          # Mode, blob and path of every tracked file outside docs/. For a pull
+          # request this is the merge result that the tests would exercise. The
+          # root agent instructions keep their mode, type and path but not their
+          # blob, so editing one keeps the fingerprint while adding, removing or
+          # retyping one changes it. Unquoted paths keep non-ASCII docs/ out.
+          fingerprint=$(git -c core.quotePath=false ls-tree -r --full-tree HEAD | awk -F '\t' '
+            $2 ~ /^docs\// { next }
+            $2 ~ /^(AGENTS|CLAUDE|CODEX|GEMINI)\.md$/ { sub(/ [^ ]+$/, " agent-instructions", $1); print $1 "\t" $2; next }
+            { print }' | sha256sum | cut -d ' ' -f 1)
+          echo "fingerprint=$fingerprint" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Look for an earlier green run of this exact code
+        id: green
+        if: steps.paths.outputs.code == 'true' && github.event_name != 'workflow_dispatch'
+        uses: actions/cache/restore@v4
+        with:
+          path: .ci-green
+          key: ci-green-v1-${{ steps.fingerprint.outputs.fingerprint }}
+          lookup-only: true
 
       - name: Reuse the merged pull request's green run
         id: merged
@@ -86,15 +128,41 @@ jobs:
           fi
           echo "tested=$tested" | tee -a "$GITHUB_OUTPUT"
 
+      - name: Decide what to skip
+        id: plan
+        env:
+          CODE: ${{ steps.paths.outputs.code }}
+          GREEN: ${{ steps.green.outputs.cache-hit }}
+          MERGED: ${{ steps.merged.outputs.tested }}
+        run: |
+          set -euo pipefail
+          skip=
+          if [ "$CODE" = "false" ]; then skip=docs; elif [ "$GREEN" = "true" ] || [ "$MERGED" = "true" ]; then skip=tested; fi
+          echo "skip=$skip" | tee -a "$GITHUB_OUTPUT"
+
   release-preflight:
     needs: changes
-    if: ${{ !cancelled() && (needs.changes.result != 'success' || (needs.changes.outputs.code == 'true' && needs.changes.outputs.tested != 'true')) }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
+    # A skip counts only from a changes job that succeeded; any other result
+    # runs every step. npm-publish.yml relies on these step names.
+    env:
+      SKIP: ${{ needs.changes.result == 'success' && needs.changes.outputs.skip || '' }}
     steps:
+      - name: Documentation-only change
+        if: env.SKIP == 'docs'
+        run: echo "Only documentation changed; install and the release preflight are skipped."
+
+      - name: Already tested
+        if: env.SKIP == 'tested'
+        run: echo "This exact code already passed; install and the release preflight are skipped."
+
       - name: Checkout
+        if: env.SKIP == ''
         uses: actions/checkout@v7
 
       - name: Setup Node.js
+        if: env.SKIP == ''
         uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -102,7 +170,26 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
+        if: env.SKIP == ''
         run: npm ci
 
       - name: Run release preflight
+        if: env.SKIP == ''
         run: npm run release:check
+
+      # Reached only when every step above passed. A failed fingerprint leaves
+      # none, so nothing is recorded.
+      - name: Record this code as tested
+        if: env.SKIP == '' && needs.changes.outputs.fingerprint != ''
+        env:
+          FINGERPRINT: ${{ needs.changes.outputs.fingerprint }}
+        run: |
+          mkdir -p .ci-green
+          echo "$FINGERPRINT $GITHUB_RUN_ID" > .ci-green/marker
+
+      - name: Save the tested marker
+        if: env.SKIP == '' && needs.changes.outputs.fingerprint != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .ci-green
+          key: ci-green-v1-${{ needs.changes.outputs.fingerprint }}

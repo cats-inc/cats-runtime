@@ -91,7 +91,7 @@ describe('workspace substrate routes', () => {
         applied: false,
         findings: expect.arrayContaining([
           expect.objectContaining({
-            path: 'AGENTS.md',
+            path: 'AGENTS.md', // docs-boundary-ignore: temporary workspace file
             status: 'missing',
           }),
         ]),
@@ -104,7 +104,7 @@ describe('workspace substrate routes', () => {
   it('blocks update apply without privileged authorization through POST /workspace/substrate/update', async () => {
     const { root, cleanup } = createWorkspace();
     const app = createTestApp();
-    writeFileSync(join(root, 'AGENTS.md'), '# local rules\n');
+    writeFileSync(join(root, 'AGENTS.md'), '# local rules\n'); // docs-boundary-ignore: temporary workspace file
 
     try {
       const response = await app.request('/workspace/substrate/update', {
@@ -142,7 +142,7 @@ describe('workspace substrate routes', () => {
         actions: expect.arrayContaining([
           expect.objectContaining({
             type: 'write_sidecar',
-            path: 'AGENTS.md',
+            path: 'AGENTS.md', // docs-boundary-ignore: temporary workspace file
             reviewCopyPath: 'AGENTS.md.bootstrap',
           }),
         ]),
@@ -185,7 +185,7 @@ describe('workspace substrate routes', () => {
         }),
       }));
       expect(existsSync(join(root, 'AGENTS.md'))).toBe(true);
-      expect(readFileSync(join(root, 'AGENTS.md'), 'utf-8')).toContain('cats-runtime:workspace-substrate');
+      expect(readFileSync(join(root, 'AGENTS.md'), 'utf-8')).toContain('cats-runtime:workspace-substrate'); // docs-boundary-ignore: temporary workspace file
     } finally {
       cleanup();
     }
