@@ -27,62 +27,74 @@ const provider: Provider = {
   parseStreamLine: () => null,
 };
 
-const commandConfig: ProviderCommandConfig = { path: 'claude.cmd', runner: 'auto', runtime: { mode: 'native' } };
+const commandConfig: ProviderCommandConfig = { path: 'claude.exe', runner: 'auto', runtime: { mode: 'native' } };
+
+const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')!;
+function onPlatform(platform: NodeJS.Platform) {
+  Object.defineProperty(process, 'platform', { ...platformDescriptor, value: platform });
+}
 
 /**
- * A `.cmd` shim runs through cmd.exe (or PowerShell) on Windows; the Runtime's process is then that
- * shell, and only a tree kill also ends the CLI it started (see processTree.test.ts).
+ * Windows does not end a process's children with it. Whether the Runtime's process is a shell
+ * proxy (cmd.exe running a `.cmd` shim) or a CLI it runs directly, only a tree kill also ends the
+ * CLI behind the proxy and the tools the CLI started (see processTree.test.ts).
  */
-describe('stopping a worker whose process is a Windows shell proxy', () => {
+describe('stopping a worker process', () => {
   afterEach(() => {
+    Object.defineProperty(process, 'platform', platformDescriptor);
     spawnMock.mockReset();
     buildSpawnConfigMock.mockReset();
     vi.resetModules();
   });
 
-  function launch(windowsShellProxy: boolean) {
+  function launch(command: string) {
     const cli = child();
     const killer = Object.assign(new EventEmitter(), { kill: vi.fn() });
     const inputEndedAtTaskkill: boolean[] = [];
-    spawnMock.mockImplementation((command: string) => {
-      if (command !== 'taskkill.exe') return cli;
+    spawnMock.mockImplementation((file: string) => {
+      if (file !== 'taskkill.exe') return cli;
       inputEndedAtTaskkill.push(cli.stdin.writableEnded);
       return killer;
     });
-    buildSpawnConfigMock.mockReturnValue({
-      command: windowsShellProxy ? 'cmd.exe' : 'claude.exe', args: [], shell: false, cwd: process.cwd(),
-      ...(windowsShellProxy ? { windowsShellProxy: true } : {}),
-    });
+    buildSpawnConfigMock.mockReturnValue({ command, args: [], shell: false, cwd: process.cwd() });
     return { cli, killer, inputEndedAtTaskkill };
   }
 
-  for (const windowsShellProxy of [true, false]) {
-    it(windowsShellProxy
-      ? 'ends the proxy with the CLI it started, before the CLI sees its input end'
-      : 'keeps EOF and SIGTERM for a CLI it runs directly', async () => {
-      const { cli, killer, inputEndedAtTaskkill } = launch(windowsShellProxy);
+  for (const command of ['cmd.exe', 'claude.exe']) {
+    it(`on Windows, ends ${command} with every process under it, before it sees its input end`, async () => {
+      onPlatform('win32');
+      const { cli, killer, inputEndedAtTaskkill } = launch(command);
       const { WorkerProcess } = await import('./WorkerProcess.js');
       const worker = new WorkerProcess(provider, { cwd: process.cwd() }, commandConfig);
       worker.start();
       worker.cancel();
-      if (windowsShellProxy) {
-        expect(spawnMock).toHaveBeenCalledWith('taskkill.exe', ['/pid', '1234', '/t', '/f'], expect.objectContaining({ windowsHide: true }));
-        // An EOF first could let the CLI exit and orphan what it started, out of taskkill's reach.
-        expect(inputEndedAtTaskkill).toEqual([false]);
-        killer.emit('exit', 0);
-        expect(cli.kill).not.toHaveBeenCalled();
-      } else {
-        expect(spawnMock.mock.calls.map(([command]) => command)).not.toContain('taskkill.exe');
-        expect(cli.stdin.writableEnded).toBe(true);
-        expect(cli.kill).toHaveBeenCalledWith('SIGTERM');
-      }
+      expect(spawnMock).toHaveBeenCalledWith('taskkill.exe', ['/pid', '1234', '/t', '/f'], expect.objectContaining({ windowsHide: true }));
+      // An EOF first could let the CLI exit and orphan what it started, out of taskkill's reach.
+      expect(inputEndedAtTaskkill).toEqual([false]);
+      killer.emit('exit', 0);
+      expect(cli.kill).not.toHaveBeenCalled();
       cli.exitCode = 0;
       cli.emit('close', 0, null);
     });
   }
 
-  it('ends the tree on an error path too, and neither writes to nor hears from the CLI while taskkill runs', async () => {
-    const { cli } = launch(true);
+  it('elsewhere, sends EOF and then SIGTERM to the CLI alone', async () => {
+    onPlatform('linux');
+    const { cli } = launch('claude');
+    const { WorkerProcess } = await import('./WorkerProcess.js');
+    const worker = new WorkerProcess(provider, { cwd: process.cwd() }, commandConfig);
+    worker.start();
+    worker.cancel();
+    expect(spawnMock.mock.calls.map(([file]) => file)).not.toContain('taskkill.exe');
+    expect(cli.stdin.writableEnded).toBe(true);
+    expect(cli.kill).toHaveBeenCalledWith('SIGTERM');
+    cli.exitCode = 0;
+    cli.emit('close', 0, null);
+  });
+
+  it('on Windows, ends the tree on an error path too, and neither writes to nor hears from the CLI while taskkill runs', async () => {
+    onPlatform('win32');
+    const { cli } = launch('claude.exe');
     let writes = '';
     cli.stdin.on('data', (chunk) => { writes += String(chunk); });
     const { WorkerProcess } = await import('./WorkerProcess.js');
@@ -92,6 +104,8 @@ describe('stopping a worker whose process is a Windows shell proxy', () => {
       // Any line asks for an automatic answer, and is also an event of its own.
       buildAutoResponse: () => 'auto-answer\n',
       parseStreamLine: (line) => ({ type: 'text', text: line }),
+      // Any stderr line is a refusal that fails the launch at once.
+      classifyLaunchFailure: () => ({ category: 'capacity_exhausted', message: 'No capacity.', retryable: true, source: 'stderr' }),
     }, { cwd: process.cwd() }, commandConfig);
     const events: unknown[] = [];
     worker.on('event', (event) => { events.push(event); });
@@ -103,11 +117,16 @@ describe('stopping a worker whose process is a Windows shell proxy', () => {
     await failed;
     expect(spawnMock.mock.calls.map(([command]) => command)).toContain('taskkill.exe');
     expect(cli.kill).not.toHaveBeenCalled();
-    // The CLI is still alive until taskkill has run: what it says now goes nowhere.
+    // The CLI is still alive until taskkill has run: what it says now goes nowhere. A refusal on
+    // stderr would otherwise be reported once more, after the turn and its listener are gone.
+    const errors: unknown[] = [];
+    worker.on('error', (error) => { errors.push(error); });
     cli.stdout.write('still talking\n');
+    cli.stderr.write('429 Too Many Requests\n');
     await new Promise<void>((done) => setImmediate(done));
     expect(writes).not.toContain('auto-answer');
     expect(events).toEqual([]);
+    expect(errors).toEqual([]);
     cli.exitCode = 0;
     cli.emit('close', 0, null);
   });

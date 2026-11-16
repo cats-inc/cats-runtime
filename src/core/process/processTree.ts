@@ -70,3 +70,23 @@ export function killProcessTree(
   }
   return Promise.resolve();
 }
+
+/** CLIs `stopCliProcess` has already been asked to stop. */
+const stoppedClis = new WeakSet<ChildProcess>();
+
+/**
+ * Stops a provider CLI the Runtime runs. On Windows the CLI goes together with every process under
+ * it ({@link killWindowsProcessTree}): Windows does not end a process's children with it, and only
+ * a CLI that is a Node program ends its own. Elsewhere it gets SIGTERM. A CLI already being stopped
+ * is left to that stop.
+ */
+export function stopCliProcess(
+  child: ChildProcess,
+  platform: NodeJS.Platform = process.platform,
+  run: Spawn = spawn,
+): void {
+  if (child.exitCode !== null || child.signalCode !== null || stoppedClis.has(child)) return;
+  stoppedClis.add(child);
+  if (platform === 'win32') void killWindowsProcessTree(child, run);
+  else child.kill('SIGTERM');
+}

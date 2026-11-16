@@ -26,6 +26,7 @@ import type {
 } from '../../../core/types.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
+import { stopCliProcess } from '../../../core/process/processTree.js';
 import { appendStderrLines } from '../stderrLines.js';
 import { mergeReportedModels } from '../../../core/runtime/reportedModels.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
@@ -198,11 +199,8 @@ export class JunieProvider implements Provider {
       }
     };
 
-    const terminateChild = () => {
-      if (child.exitCode === null) {
-        child.kill('SIGTERM');
-      }
-    };
+    // On Windows, the tools Junie started go with it.
+    const terminateChild = () => stopCliProcess(child);
 
     const enqueue = (event: StreamEvent) => {
       if (finished) return;

@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { killProcessTree, killWindowsProcessTree, TASKKILL_TIMEOUT_MS } from './processTree.js';
+import { killProcessTree, killWindowsProcessTree, stopCliProcess, TASKKILL_TIMEOUT_MS } from './processTree.js';
 
 function fakeChild(overrides: Partial<{ pid: number | undefined; exitCode: number | null }> = {}) {
   return Object.assign(new EventEmitter(), {
@@ -111,6 +111,32 @@ describe('process tree kill', () => {
       const unstarted = fakeChild({ pid: undefined });
       await killProcessTree(unstarted, 'linux');
       expect(unstarted.kill).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('stopCliProcess', () => {
+    it('ends a CLI with its tree on Windows and sends SIGTERM elsewhere, once per CLI', () => {
+      const killer = fakeKiller();
+      const run = vi.fn(() => killer);
+      const onWindows = fakeChild();
+      stopCliProcess(onWindows, 'win32', run);
+      stopCliProcess(onWindows, 'win32', run);
+      expect(run).toHaveBeenCalledOnce();
+      expect(run).toHaveBeenCalledWith('taskkill.exe', ['/pid', '4321', '/t', '/f'], expect.anything());
+      const elsewhere = fakeChild();
+      stopCliProcess(elsewhere, 'linux', run);
+      stopCliProcess(elsewhere, 'linux', run);
+      expect(elsewhere.kill.mock.calls).toEqual([['SIGTERM']]);
+      expect(run).toHaveBeenCalledOnce();
+    });
+
+    it('leaves a CLI that has already exited alone', () => {
+      const run = vi.fn();
+      const exited = fakeChild({ exitCode: 1 });
+      stopCliProcess(exited, 'win32', run);
+      stopCliProcess(exited, 'linux', run);
+      expect(run).not.toHaveBeenCalled();
+      expect(exited.kill).not.toHaveBeenCalled();
     });
   });
 

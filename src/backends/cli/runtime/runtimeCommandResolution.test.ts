@@ -112,8 +112,6 @@ describe('provider command resolution through install knowledge', () => {
 
     expect(spawnConfig.command.toLowerCase()).toContain('cmd.exe');
     expect(spawnConfig.args[4]).toContain(join(installDir, 'muse.cmd'));
-    // cmd.exe is a proxy for the launcher: stopping it has to end the launcher too.
-    expect(spawnConfig.windowsShellProxy).toBe(true);
   });
 
   it('leaves a command PATH can see alone on Windows', () => {

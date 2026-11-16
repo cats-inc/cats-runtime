@@ -124,13 +124,24 @@ describe('WorkerProcess with a managed Codex host', () => {
     await expect(turn).resolves.toMatchObject([{ type: 'result' }]);
   });
 
-  it('terminates the app-server if its host dies', async () => {
-    const error = vi.fn(); worker.on('error', error);
-    worker.start(); pending.resolve(host);
-    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledOnce());
-    closed.resolve();
-    await vi.waitFor(() => expect(child.kill).toHaveBeenCalledWith('SIGTERM'));
-    expect(error.mock.calls[0][0].message).toContain('host exited during the session');
+  it('terminates the app-server and the processes under it if its host dies', async () => {
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
+    Object.defineProperty(process, 'platform', { ...platform, value: 'win32' });
+    try {
+      const killer = Object.assign(new EventEmitter(), { kill: vi.fn() });
+      spawnMock.mockImplementation((file: string) => (file === 'taskkill.exe' ? killer : child));
+      Object.assign(child, { pid: 4321, signalCode: null });
+      const error = vi.fn(); worker.on('error', error);
+      worker.start(); pending.resolve(host);
+      await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledOnce());
+      closed.resolve();
+      await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledWith('taskkill.exe', ['/pid', '4321', '/t', '/f'], expect.anything()));
+      killer.emit('exit', 0);
+      expect(child.kill).not.toHaveBeenCalled();
+      expect(error.mock.calls[0][0].message).toContain('host exited during the session');
+    } finally {
+      Object.defineProperty(process, 'platform', platform);
+    }
   });
 
   it('ignores the old app-server closing while its replacement awaits a host', async () => {
