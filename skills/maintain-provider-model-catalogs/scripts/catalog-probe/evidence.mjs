@@ -17,6 +17,7 @@ const MEMBERSHIP_MEANING = {
 const ACCOUNT_SCOPE = {
   'machine-readable': "The CLI's existing sign-in on the probing machine. No identity is recorded.",
   'static-artifact': 'Data in the installed package. Not account-resolved.',
+  'cli-account-cache': 'The account list the CLI cached on the probing machine at its last account read, not a live server answer. No identity is recorded.',
 };
 
 const STILL_PICKER = 'A model (default) marker, picker descriptions, picker order, and every field not listed under '

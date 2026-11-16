@@ -176,6 +176,24 @@ test('asks the versioned Muse binary and accepts only the account catalog', asyn
   assert.deepEqual([(await checkOne('muse', noVersion)).state, noVersion.calls], ['unknown', []]);
 });
 
+test('accepts the Muse account cache when MSP answers from bundledCatalog', async () => {
+  const dir = join(LOCALAPPDATA, 'Programs', 'muse');
+  const museHome = join(HOME, '.local', 'share', 'muse');
+  const cacheDir = join(museHome, 'model-catalog');
+  const setup = (profileId) => fakeContext({
+    installed: ['muse'],
+    files: {
+      [join(dir, '.muse-version')]: '1.4.20-R1\r\n',
+      [join(cacheDir, 'a__p01.json')]: JSON.stringify({ source: 'provider_catalog', provider_id: 'meta', profile_id: 'x', rows: [{}, {}, {}] }),
+    },
+    dirs: { [dir]: [{ name: 'muse-bin-1.4.20-R1.exe', size: 1 }], [cacheDir]: [{ name: 'a__p01.json', size: 1 }] },
+    muse: { source: 'bundledCatalog', providerId: 'meta', profileId, museHome, models: [] },
+  });
+  const cached = await checkOne('muse', setup('x'));
+  assert.deepEqual([cached.state, cached.detail], ['local', 'model/list answered from bundledCatalog; the CLI account cache lists 3 models']);
+  assert.equal((await checkOne('muse', setup('another-profile'))).state, 'unknown');
+});
+
 test('reads Copilot models.list from the npm package loader', async () => {
   const packageDirs = { '@github/copilot': join('npm', 'node_modules', '@github', 'copilot') };
   const ready = fakeContext({ installed: ['copilot'], packageDirs, copilot: { models: [{}, {}] } });

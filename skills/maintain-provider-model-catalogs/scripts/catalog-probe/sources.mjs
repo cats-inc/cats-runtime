@@ -13,6 +13,7 @@ import { readJunieModelIds, defaultJunieDataDir } from '../junie-model-ids.mjs';
 import { listCopilotModels } from '../list-copilot-models.mjs';
 import { redactVisibleText, stripTerminalPresentation } from '../normalize-picker-paste.mjs';
 import { parseVerboseModels } from '../project-opencode-models.mjs';
+import { projectMuseModelCache } from '../project-muse-model-cache.mjs';
 import { KIRO_ACP_ARGS, KiroAcpError, readKiroModelOptions } from './kiro-acp.mjs';
 import { cleanEnv, findExecutable, isPermissionDenied, launchSpec, npmPackageDir, readPackageVersion, runCommand } from './process.mjs';
 
@@ -344,6 +345,81 @@ export function projectMuseModelList(result) {
   return { rows, catalogSource: typeof result.source === 'string' ? result.source : null };
 }
 
+const listJsonNames = (dir) => {
+  try {
+    return readdirSync(dir).filter((name) => name.endsWith('.json'));
+  } catch {
+    return [];
+  }
+};
+const readTextOrNull = (path) => {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
+};
+const modifiedAt = (path) => {
+  try {
+    return statSync(path).mtime.toISOString();
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * The account model list the signed-in Muse CLI caches at `<museHome>/model-catalog/*.json`
+ * (`source: provider_catalog`). muse-bin 1.4.20 answered MSP model/list from bundledCatalog with no
+ * rows on a signed-in machine (2026-11-16), so a non-account reply falls back to this cache. Only a
+ * cache for the provider and profile the MSP reply names is used.
+ */
+export function readMuseAccountCache({ museHome, providerId, profileId } = {},
+  { list = listJsonNames, read = readTextOrNull, modified = modifiedAt } = {}) {
+  if (!museHome || !providerId || !profileId) return null;
+  const dir = join(museHome, 'model-catalog');
+  for (const name of list(dir).filter((entry) => entry.endsWith('.json')).sort()) {
+    let cache;
+    try {
+      cache = JSON.parse(read(join(dir, name)) ?? '');
+    } catch {
+      continue;
+    }
+    if (cache?.source !== 'provider_catalog' || cache.provider_id !== providerId
+      || cache.profile_id !== profileId || !Array.isArray(cache.rows)) continue;
+    return { file: name, cache, writtenAt: modified(join(dir, name)) };
+  }
+  return null;
+}
+
+/** Cache rows as probe rows: tiers are the efforts, and only `visible` rows are picker rows. */
+export function projectMuseAccountCache(cache) {
+  return projectMuseModelCache(cache).models.map((model) => withEvidence({
+    id: model.id,
+    label: model.label ?? null,
+    efforts: model.efforts ? model.efforts.map((effort) => effort.tier) : null,
+    hidden: model.visibility !== 'visible',
+  }, {
+    description: str(model.description ?? null),
+    releaseDate: str(model.releaseDate ?? null),
+    contextLimit: num(model.contextLimit ?? null),
+    outputLimit: num(model.outputLimit ?? null),
+    // Like MSP isDefault it has pointed at a -contributor row; never a curated default.
+    cacheIsDefault: model.rawIsDefault || null,
+  }));
+}
+
+const MUSE_CACHE_STALE_DAYS = 14;
+
+export function museAccountCacheNote({ file, writtenAt }, catalogSource, now = Date.now()) {
+  const written = writtenAt ? `, written ${writtenAt.slice(0, 16).replace('T', ' ')} UTC` : '';
+  const ageDays = writtenAt ? Math.floor((now - Date.parse(writtenAt)) / 86400000) : null;
+  const stale = ageDays !== null && ageDays > MUSE_CACHE_STALE_DAYS
+    ? ` It is ${ageDays} days old; a newer sign-in or picker capture may list different rows.`
+    : '';
+  return `MSP answered from "${catalogSource}", so the rows come from the account list the CLI cached `
+    + `(<museHome>/model-catalog/${file}, source provider_catalog${written}), not from a live server read.${stale}`;
+}
+
 export function claudeChangelogSignals(changelog) {
   return (changelog?.sections ?? [])
     .map((section) => ({
@@ -436,12 +512,44 @@ function museInstall(ctx) {
   return null;
 }
 
+/**
+ * An account reply is used as is. Any other reply falls back to the CLI's account cache for the
+ * same provider and profile; without one the source stays degraded, as before.
+ */
+export function museProbeResult(install, reply, { cache = readMuseAccountCache, now = Date.now() } = {}) {
+  const { rows, catalogSource } = projectMuseModelList(reply);
+  const base = { cliVersion: install.version, versionSource: '.muse-version', models: rows, catalogSource };
+  if (catalogSource === 'providerCatalog') return base;
+  const degraded = {
+    ...base, status: 'degraded', reason: 'non-account-source',
+    message: `MSP answered from "${catalogSource}", not the account's providerCatalog, and no account cache matched.`,
+  };
+  const found = cache({ museHome: reply?.museHome, providerId: reply?.providerId, profileId: reply?.profileId });
+  if (!found) return degraded;
+  let models;
+  try {
+    models = projectMuseAccountCache(found.cache);
+  } catch (error) {
+    return { ...degraded, notes: [`The account cache ${found.file} could not be read: ${sanitize(error?.message ?? error)}`] };
+  }
+  if (!models.some((row) => !row.hidden)) return degraded;
+  return {
+    ...base,
+    sourceClass: 'cli-account-cache',
+    command: 'muse-bin serve --no-session-log, MSP model/list, then the CLI account cache',
+    catalogSource: 'accountCache',
+    models,
+    notes: [museAccountCacheNote(found, catalogSource, now)],
+  };
+}
+
 /** MSP over newline-delimited JSON: initialize, the required initialized notice, model/list. */
 export function museModelList({ binary, env, timeoutMs }) {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(binary, ['serve', '--no-session-log'], { env, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
     let buffer = '';
     let settled = false;
+    let museHome = null;
     const finish = (error, value) => {
       if (settled) return;
       settled = true;
@@ -476,6 +584,8 @@ export function museModelList({ binary, env, timeoutMs }) {
             finish(new SourceFailure('error', 'exit', `MSP initialize failed: ${sanitize(message.error.message)}`));
             return;
           }
+          // initialize names the data directory, where the CLI caches the account model list.
+          museHome = typeof message.result?.museHome === 'string' ? message.result.museHome : null;
           send({ method: 'initialized', params: {} });
           send({ id: 2, method: 'model/list', params: {} });
         } else if (message.id === 2) {
@@ -483,7 +593,7 @@ export function museModelList({ binary, env, timeoutMs }) {
             const reason = AUTH_PATTERN.test(message.error.message ?? '') ? 'not-authenticated' : 'exit';
             finish(new SourceFailure(reason === 'exit' ? 'error' : 'unavailable', reason, `MSP model/list failed: ${sanitize(message.error.message)}`));
           } else {
-            finish(null, message.result);
+            finish(null, museHome ? { ...message.result, museHome } : message.result);
           }
         }
       }
@@ -587,16 +697,7 @@ export const SOURCES = [
       const install = museInstall(ctx);
       if (!install) throw new SourceFailure('unavailable', 'not-installed', 'No Muse install with a .muse-version file was found.');
       const reply = await museModelList({ binary: install.binary, env: ctx.env(), timeoutMs: ctx.timeoutMs });
-      const { rows, catalogSource } = projectMuseModelList(reply);
-      return {
-        cliVersion: install.version,
-        versionSource: '.muse-version',
-        models: rows,
-        catalogSource,
-        ...(catalogSource !== 'providerCatalog'
-          ? { status: 'degraded', reason: 'non-account-source', message: `MSP answered from "${catalogSource}", not the account's providerCatalog.` }
-          : {}),
-      };
+      return museProbeResult(install, reply);
     },
   },
   {

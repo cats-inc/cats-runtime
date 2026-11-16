@@ -78,7 +78,7 @@ once from one empty temporary directory, with the probe's cleaned environment an
 |---|---|---|
 | antigravity | `agy models` lists rows | yes |
 | grok | `grok models` says "You are logged in", retried once like the probe | yes |
-| muse | MSP `model/list` on the versioned binary answers from `providerCatalog` | yes |
+| muse | MSP `model/list` on the versioned binary answers from `providerCatalog`; otherwise the CLI account cache for the same profile counts as local credentials | yes |
 | auggie | `auggie model list --json` reports `registryAvailable: true` | yes |
 | copilot | headless `models.list` through `list-copilot-models.mjs` | yes |
 | codex, kiro, cursor, devin | `codex login status`, `kiro-cli whoami`, `cursor-agent status`, `devin auth status` | no |
@@ -114,7 +114,7 @@ The retry is noted on the scope; only a second degraded answer asks you to sign 
 | codex | `codex debug models` | complete | label, efforts, effort default; `visibility=hide` rows are not picker rows | none needed so far |
 | antigravity | `agy models` | complete | executable IDs, including every variant | none needed so far |
 | grok | `grok models` | complete | IDs; "not authenticated" makes the source degraded | none needed so far |
-| muse | `muse-bin-<version> serve --no-session-log`, MSP `model/list` | complete | IDs, efforts (`variants`); a non-`providerCatalog` reply is degraded | runs the versioned binary, never the self-updating launcher |
+| muse | `muse-bin-<version> serve --no-session-log`, MSP `model/list`; on a non-`providerCatalog` reply the CLI account cache `<museHome>/model-catalog/*.json` for the same provider and profile (`cli-account-cache`, hidden rows marked) | complete | IDs, efforts (`variants` or cache tiers); without a matching cache the reply is degraded | runs the versioned binary, never the self-updating launcher |
 | cursor | `cursor-agent --list-models` | family | family slug only | none needed so far |
 | copilot | `list-copilot-models.mjs` (`models.list`) | partial | label, efforts | `--headless --stdio --no-auto-update`, no `COPILOT_*` |
 | opencode | `opencode models <basis channel> --verbose --pure` | complete | label | `OPENCODE_DISABLE_AUTOUPDATE=true` |
@@ -280,8 +280,8 @@ support a note or a limit, but they are the source's own claim, not picker evide
   variant names.
 - **pi:** name, input types, reasoning flag, thinking-level map, context window, maximum tokens;
   pi-ai version and default thinking level as source evidence.
-- **muse:** description, release date, context and output limits, MSP `isDefault` (never a
-  curated default).
+- **muse:** description, release date, context and output limits, MSP `isDefault` or, from the
+  account cache, `cacheIsDefault` (never a curated default).
 - **junie:** enum name; the accepted aliases as source evidence.
 - **cline:** family, release date, context window, maximum tokens, reasoning option types.
 - **grok, cursor:** the list's own `(default)` marker.
@@ -292,9 +292,10 @@ Prices, endpoints, raw output, session and account fields are never kept.
 
 - Verified on native Windows 11 on 2026-10-02 with all sixteen CLIs installed. Other platforms
   locate the same commands on `PATH`; Muse needs `.muse-version` beside its launcher there.
-- Two live branches are covered only by synthetic tests: Muse's signed-in `providerCatalog` reply
-  (this machine answered from `bundledCatalog`; the parser follows the 2026-09-26 fixture shape)
-  and Grok's "not authenticated" state (the probe run was signed in).
+- Muse's `providerCatalog` reply ran live on 2026-11-16 (four rows). Two branches are covered only
+  by synthetic tests: Muse's account-cache fallback, whose trigger (MSP answering `bundledCatalog`
+  while signed in) had ended before the fallback was built, and Grok's "not authenticated" state
+  (the probe run was signed in).
 - The probe proves "still listed", not "still executes". A per-model execution check would spend
   quota and needs separate authorization.
 - Account-scoped results describe this machine's sign-ins only, at the time of the run. Lists can
