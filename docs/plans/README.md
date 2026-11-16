@@ -1,5 +1,9 @@
 # Implementation Plans
 
+- [PLAN-054: Catalog bases per channel, region and plan](PLAN-054-catalog-bases.md)
+  — ready, 2026-11-16; SPEC-045 in five phases: Runtime contract, Runtime detection and
+  Playground, Platform, maintenance skill, then the Kimi region data. All phases pending.
+
 - [PLAN-053: Reference media generation](PLAN-053-reference-media-generation.md) — in progress.
 
 - [PLAN-052: Codex session retention and continuity](PLAN-052-codex-session-retention-and-continuity.md)
